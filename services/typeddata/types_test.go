@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestUnmarshal(t *testing.T) {
+func TestUnmarshalFull(t *testing.T) {
 	data := `
 {
   "types": {

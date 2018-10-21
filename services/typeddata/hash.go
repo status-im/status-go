@@ -116,27 +116,18 @@ func encodeData(target string, data map[string]interface{}, types Types) (rst co
 			}
 			val = data[f.Name]
 			if typ.T == abi.AddressTy {
-				val = common.HexToAddress(val.(string))
-			}
-			// if size of the integer > 64 - abi expects pointer to a big.Int
-			// TODO split to ints and uints
-			if (typ.T == abi.IntTy || typ.T == abi.UintTy) && typ.Kind == reflect.Ptr {
 				strval, ok := val.(string)
 				if !ok {
-					// fallback to integers
-					intval, ok := val.(int64)
-					if !ok {
-						return rst, fmt.Errorf("can't cast %v to an integer", val)
-					}
-					val = new(big.Int).SetInt64(intval)
-				} else {
-					val, ok = new(big.Int).SetString(strval, 0)
-					if !ok {
-						return rst, fmt.Errorf("failed to set big.Int from string value %s", strval)
-					}
+					err = fmt.Errorf("can't cast %v to a string", val)
+				}
+				val = common.HexToAddress(strval)
+			}
+			if typ.T == abi.IntTy || typ.T == abi.UintTy {
+				val, err = castInteger(typ, val)
+				if err != nil {
+					return
 				}
 			}
-			// TODO cast int to precise type
 		}
 		vals = append(vals, val)
 		args = append(args, abi.Argument{Name: f.Name, Type: typ})
@@ -146,4 +137,75 @@ func encodeData(target string, data map[string]interface{}, types Types) (rst co
 		return
 	}
 	return crypto.Keccak256Hash(packed), nil
+}
+
+func castInteger(typ abi.Type, val interface{}) (interface{}, error) {
+	if typ.Kind == reflect.Ptr {
+		return castToBig(typ, val)
+	}
+	if typ.T == abi.IntTy {
+		return castToInt(typ, val)
+	}
+	if typ.T == abi.UintTy {
+		return castToUint(typ, val)
+	}
+	return nil, fmt.Errorf("value %d of type %v is not an integer", val, typ)
+}
+
+func castToInt(typ abi.Type, val interface{}) (rst interface{}, err error) {
+	intval, ok := val.(int)
+	if ok {
+		switch typ.Size {
+		case 8:
+			rst = int8(intval)
+		case 16:
+			rst = int16(intval)
+		case 32:
+			rst = int32(intval)
+		case 64:
+			rst = int64(intval)
+		}
+	}
+	if !ok {
+		err = fmt.Errorf("can't cast %v to int%d", val, typ.Size)
+	}
+	return
+}
+
+func castToUint(typ abi.Type, val interface{}) (rst interface{}, err error) {
+	intval, ok := val.(uint)
+	if ok {
+		switch typ.Size {
+		case 8:
+			rst = uint8(intval)
+		case 16:
+			rst = uint16(intval)
+		case 32:
+			rst = uint32(intval)
+		case 64:
+			rst = uint64(intval)
+		}
+	}
+	if !ok {
+		err = fmt.Errorf("can't cast %v to uint%d", val, typ.Size)
+	}
+	return
+}
+
+func castToBig(typ abi.Type, val interface{}) (interface{}, error) {
+	strval, ok := val.(string)
+	if !ok {
+		// fallback to integers
+		intval, ok := val.(int)
+		if !ok {
+			return nil, fmt.Errorf("can't cast %v to an integer", val)
+		}
+		val = new(big.Int).SetInt64(int64(intval))
+		return val, nil
+	}
+	val, ok = new(big.Int).SetString(strval, 0)
+	if !ok {
+		return nil, fmt.Errorf("failed to set big.Int from string value %s", strval)
+	}
+	return val, nil
 }

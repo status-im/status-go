@@ -1,17 +1,12 @@
 package typeddata
 
 import (
-	"math"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/services/typeddata/eip712example"
 	"github.com/stretchr/testify/require"
 )
 
@@ -144,7 +139,7 @@ func TestEncodeData(t *testing.T) {
 		},
 		{
 			"Int32Uint32AsIs",
-			map[string]interface{}{"i": int32(-10), "ui": uint32(10)},
+			map[string]interface{}{"i": -10, "ui": uint(10)},
 			Types{"A": []Field{{Name: "i", Type: "int32"}, {Name: "ui", Type: "uint32"}}},
 			"A",
 			func(tc testCase) common.Hash {
@@ -152,7 +147,7 @@ func TestEncodeData(t *testing.T) {
 				uintT, _ := abi.NewType("uint32")
 				args := abi.Arguments{{Type: bytes32}, {Type: intT}, {Type: uintT}}
 				typehash := typeHash(tc.target, tc.types)
-				packed, _ := args.Pack(typehash, tc.message["i"], tc.message["ui"])
+				packed, _ := args.Pack(typehash, int32(tc.message["i"].(int)), uint32(tc.message["ui"].(uint)))
 				return crypto.Keccak256Hash(packed)
 			},
 		},
@@ -255,13 +250,6 @@ func TestEncodeDataErrors(t *testing.T) {
 			Types{"A": []Field{{Name: "name", Type: "uint256"}}},
 			"A",
 		},
-		{
-			// FIXME json always unmarshalls to int. cast it to int64 always?
-			"IntIsNotSupported",
-			map[string]interface{}{"a": 100},
-			Types{"A": []Field{{Name: "name", Type: "int"}}},
-			"A",
-		},
 	} {
 		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
@@ -270,33 +258,4 @@ func TestEncodeDataErrors(t *testing.T) {
 			require.Equal(t, common.Hash{}, encoded)
 		})
 	}
-}
-
-func TestInteroparableWithSolidity(t *testing.T) {
-	key, _ := crypto.GenerateKey()
-	testaddr := crypto.PubkeyToAddress(key.PublicKey)
-	genesis := core.GenesisAlloc{
-		testaddr: {Balance: new(big.Int).SetInt64(math.MaxInt64)},
-	}
-	backend := backends.NewSimulatedBackend(genesis, math.MaxInt64)
-	_, _, example, err := eip712example.DeployExample(bind.NewKeyedTransactor(key), backend)
-	require.NoError(t, err)
-	backend.Commit()
-	domainSol, err := example.DOMAINSEPARATOR(nil)
-	require.NoError(t, err)
-	types := Types{eip712Domain: []Field{
-		{Name: "name", Type: "string"},
-		{Name: "version", Type: "string"},
-		{Name: "chainId", Type: "uint256"},
-		{Name: "verifyingContract", Type: "address"},
-	}}
-	msg := map[string]interface{}{
-		"name":              "Ether Mail",
-		"version":           "1",
-		"chainId":           1,
-		"verifyingContract": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
-	}
-	domain, err := encodeData(eip712Domain, msg, types)
-	require.NoError(t, err)
-	require.Equal(t, domainSol[:], domain[:])
 }
