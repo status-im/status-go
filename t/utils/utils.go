@@ -414,3 +414,22 @@ func copyFile(src, dst string) error {
 	}
 	return nil
 }
+
+// Eventually will raise error if condition won't be met during the given timeout.
+func Eventually(f func() error, timeout, period time.Duration) (err error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timer.C:
+			return
+		case <-ticker.C:
+			err = f()
+			if err == nil {
+				return nil
+			}
+		}
+	}
+}
