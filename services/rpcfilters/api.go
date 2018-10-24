@@ -48,9 +48,9 @@ func NewPublicAPI(s *Service) *PublicAPI {
 		filters:                        make(map[rpc.ID]filter),
 		latestBlockChangedEvent:        s.latestBlockChangedEvent,
 		transactionSentToUpstreamEvent: s.transactionSentToUpstreamEvent,
-		client:               func() ContextCaller { return s.rpc.RPCClient() },
-		filterLivenessLoop:   defaultFilterLivenessPeriod,
-		filterLivenessPeriod: defaultFilterLivenessPeriod + 10*time.Second,
+		client:                         func() ContextCaller { return s.rpc.RPCClient() },
+		filterLivenessLoop:             defaultFilterLivenessPeriod,
+		filterLivenessPeriod:           defaultFilterLivenessPeriod + 10*time.Second,
 	}
 	go api.timeoutLoop(s.quit)
 	return api

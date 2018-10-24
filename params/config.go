@@ -31,6 +31,12 @@ type LightEthConfig struct {
 
 	// DatabaseCache is memory (in MBs) allocated to internal caching (min 16MB / database forced)
 	DatabaseCache int
+
+	// TrustedNodes is a list of trusted servers
+	TrustedNodes []string
+
+	//MinTrustedFraction is minimum percentage of connected trusted servers to validate header(1-100)
+	MinTrustedFraction int
 }
 
 // ----------
