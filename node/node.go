@@ -218,6 +218,10 @@ func activateLightEthService(stack *node.Node, config *params.NodeConfig) error 
 	ethConf.SyncMode = downloader.LightSync
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
+	ethConf.ULC = &eth.ULCConfig{
+		TrustedServers:config.LightEthConfig.TrustedNodes,
+		MinTrustedFraction:config.LightEthConfig.MinTrustedFraction,
+	}
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return les.New(ctx, &ethConf)
 	})
