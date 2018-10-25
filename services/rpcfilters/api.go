@@ -49,8 +49,7 @@ func NewPublicAPI(s *Service) *PublicAPI {
 		latestBlockChangedEvent:        s.latestBlockChangedEvent,
 		transactionSentToUpstreamEvent: s.transactionSentToUpstreamEvent,
 
-		client: func() ContextCaller { return s.rpc.RPCClient() },
-
+		client:               func() ContextCaller { return s.rpc.RPCClient() },
 		filterLivenessLoop:   defaultFilterLivenessPeriod,
 		filterLivenessPeriod: defaultFilterLivenessPeriod + 10*time.Second,
 	}
