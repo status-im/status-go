@@ -251,6 +251,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+			// TODO: Temporarily increase to a high number, until
+			// we make sure it's a sliding window rather than dropping
+			dr.WithMaxSkip(10000),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	} else {
 		session, err = dr.NewWithRemoteKey(
@@ -259,6 +262,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair.PubKey,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+			// TODO: Temporarily increase to a high number, until
+			// we make sure it's a sliding window rather than dropping
+			dr.WithMaxSkip(10000),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	}
 
@@ -285,6 +291,9 @@ func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		drInfo.ID,
 		sessionStorage,
 		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		// TODO: Temporarily increase to a high number, until
+		// we make sure it's a sliding window rather than dropping
+		dr.WithMaxSkip(10000),
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 	if err != nil {
@@ -333,6 +342,9 @@ func (s *EncryptionService) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		drInfo.ID,
 		sessionStorage,
 		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		// TODO: Temporarily increase to a high number, until
+		// we make sure it's a sliding window rather than dropping
+		dr.WithMaxSkip(10000),
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 	if err != nil {
