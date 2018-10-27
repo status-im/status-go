@@ -1,5 +1,6 @@
 {
   "Rendezvous": true,
+  "NoDiscovery": false,
   "ClusterConfig": {
     "Enabled": true,
     "Fleet": "eth.staging",

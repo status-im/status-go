@@ -253,6 +253,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.LogFile = *logFile
 	}
 
+	nodeConfig.NoDiscovery = true
 	nodeConfig.ListenAddr = ""
 	if *staticEnodeAddr != "" {
 		nodeConfig.ClusterConfig.Enabled = true
