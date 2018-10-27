@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/account"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -173,7 +173,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.StopNode())
 
 	// resume node
-	s.NoError(s.Backend.StartNode(&preservedNodeConfig))
+	s.Require().NoError(s.Backend.StartNode(&preservedNodeConfig))
 
 	// re-check selected account (account2 MUST be selected)
 	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()

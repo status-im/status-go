@@ -8,15 +8,12 @@ dist: trusty
 install: make setup
 jobs:
   include:
-  - stage: Lint & Vendor Check
-    sudo: required
+  - stage: Lint
     before_script: make dep-ensure
     script:
       - make lint
-      - make vendor-check
   - stage: Test unit and integration
     script:
-      - make test-unit-race
       - make test-unit
   - stage: Test e2e on private network
     script:

@@ -20,6 +20,8 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
+	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/chat/crypto"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -120,6 +122,11 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
+
+	// Start by validating configuration
+	if err := config.Validate(); err != nil {
+		return err
+	}
 
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
@@ -407,6 +414,17 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 		return err
 	}
 
+	if whisperService != nil {
+		st, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.InitProtocol(address, password); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -425,4 +443,81 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 		return services
 	}
 	return append(services, service)
+}
+
+// CreateContactCode create or return the latest contact code
+func (b *StatusBackend) CreateContactCode() (string, error) {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return "", err
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return "", err
+	}
+
+	bundle, err := st.GetBundle(selectedAccount.AccountKey.PrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return bundle.ToBase64()
+}
+
+// ProcessContactCode process and adds the someone else's bundle
+func (b *StatusBackend) ProcessContactCode(contactCode string) error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return err
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	bundle, err := chat.FromBase64(contactCode)
+	if err != nil {
+		b.log.Error("error decoding base64", "err", err)
+		return err
+	}
+
+	if _, err := st.ProcessPublicBundle(selectedAccount.AccountKey.PrivateKey, bundle); err != nil {
+		b.log.Error("error adding bundle", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+// ExtractIdentityFromContactCode extract the identity of the user generating the contact code
+func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (string, error) {
+	bundle, err := chat.FromBase64(contactCode)
+	if err != nil {
+		return "", err
+	}
+
+	return chat.ExtractIdentity(bundle)
+}
+
+// DEPRECATED
+// VerifyGroupMembershipSignatures verifies that the signatures are valid
+func (b *StatusBackend) VerifyGroupMembershipSignatures(signaturePairs [][3]string) error {
+	return crypto.VerifySignatures(signaturePairs)
+}
+
+// ExtractGroupMembershipSignatures extract signatures from tuples of content/signature
+func (b *StatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error) {
+	return crypto.ExtractSignatures(signaturePairs)
+}
+
+// SignGroupMembership signs a piece of data containing membership information
+func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return "", err
+	}
+
+	return crypto.Sign(content, selectedAccount.AccountKey.PrivateKey)
 }

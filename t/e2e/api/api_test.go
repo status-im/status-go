@@ -2,10 +2,7 @@ package api_test
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/rand"
-	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -40,19 +37,6 @@ func (s *APITestSuite) SetupTest() {
 }
 
 func (s *APITestSuite) TestCHTUpdate() {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), "cht-updates")
-	s.NoError(err)
-	defer os.RemoveAll(tmpDir) //nolint: errcheck
-
-	configJSON := `{
-		"NetworkId": ` + strconv.Itoa(params.RopstenNetworkID) + `,
-		"DataDir": "` + tmpDir + `",
-		"LogLevel": "INFO",
-		"RPCEnabled": true
-	}`
-
-	_, err = params.LoadNodeConfig(configJSON)
-	s.NoError(err)
 	// TODO(tiabc): Test that CHT is really updated.
 }
 
@@ -140,12 +124,12 @@ func (s *APITestSuite) TestEventsNodeStartStop() {
 
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
-	s.NoError(s.backend.StartNode(nodeConfig))
+	s.Require().NoError(s.backend.StartNode(nodeConfig))
 	s.NoError(s.backend.StopNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady, signal.EventNodeStopped)
-	s.NoError(s.backend.StartNode(nodeConfig))
+	s.Require().NoError(s.backend.StartNode(nodeConfig))
 	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady)
-	s.NoError(s.backend.RestartNode())
+	s.Require().NoError(s.backend.RestartNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStopped, signal.EventNodeStarted, signal.EventNodeReady)
 	s.NoError(s.backend.StopNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStopped)

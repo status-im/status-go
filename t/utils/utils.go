@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -244,18 +245,29 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 	}
 
 	configJSON := `{
+		"Name": "test",
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
 		"DataDir": "` + testDir + `",
+		"BackupDisabledDataDir": "` + testDir + `",
+		"KeyStoreDir": "` + path.Join(testDir, "keystore") + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
-		"LogLevel": "` + errorLevel + `"
+		"LogLevel": "` + errorLevel + `",
+		"NoDiscovery": true,
+		"LightEthConfig": {
+			"Enabled": true
+		},
+		"WhisperConfig": {
+			"Enabled": true,
+			"DataDir": "` + path.Join(testDir, "wnode") + `",
+			"EnableNTPSync": false
+		}
 	}`
 
-	nodeConfig, err := params.LoadNodeConfig(configJSON)
+	nodeConfig, err := params.NewConfigFromJSON(configJSON)
 	if err != nil {
 		return nil, err
 	}
-	nodeConfig.WhisperConfig.EnableNTPSync = false
 
 	return nodeConfig, nil
 }
@@ -264,14 +276,30 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 // where specific network addresses are assigned based on provided network id, and assigns
 // a given name and data dir.
 func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*params.NodeConfig, error) {
-	cfg, err := params.NewNodeConfig(dataDir, "", params.FleetBeta, networkID)
+	cfg, err := params.NewNodeConfig(dataDir, networkID)
 	if err != nil {
 		return nil, err
 	}
-	cfg.Name = name
-	cfg.NetworkID = uint64(GetNetworkID())
+	if name == "" {
+		cfg.Name = "test"
+	} else {
+		cfg.Name = name
+	}
+	cfg.NoDiscovery = true
 	cfg.LightEthConfig.Enabled = false
+	cfg.WhisperConfig.Enabled = true
 	cfg.WhisperConfig.EnableNTPSync = false
+	if dataDir != "" {
+		cfg.KeyStoreDir = path.Join(dataDir, "keystore")
+		cfg.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
+	}
+
+	// Only attempt to validate if a dataDir is specified, we only support in-memory DB for tests
+	if dataDir != "" {
+		if err := cfg.Validate(); err != nil {
+			return nil, err
+		}
+	}
 
 	return cfg, nil
 }
@@ -295,23 +323,32 @@ type testConfig struct {
 
 const passphraseEnvName = "ACCOUNT_PASSWORD"
 
+// getStatusHome gets home directory of status-go
+func getStatusHome() string {
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		gopath = build.Default.GOPATH
+	}
+	return path.Join(gopath, "/src/github.com/status-im/status-go/")
+}
+
 // loadTestConfig loads test configuration values from disk
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
-	pathOfStatic := path.Join(params.GetStatusHome(), "/static")
-	err := getTestConfigFromFile(path.Join(pathOfStatic, "config/test-data.json"), &config)
+	pathOfConfig := path.Join(getStatusHome(), "/t/config")
+	err := getTestConfigFromFile(path.Join(pathOfConfig, "test-data.json"), &config)
 	if err != nil {
 		return nil, err
 	}
 
 	if GetNetworkID() == params.StatusChainNetworkID {
-		err := getTestConfigFromFile(path.Join(pathOfStatic, "config/status-chain-accounts.json"), &config)
+		err := getTestConfigFromFile(path.Join(pathOfConfig, "status-chain-accounts.json"), &config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err := getTestConfigFromFile(path.Join(pathOfStatic, "config/public-chain-accounts.json"), &config)
+		err := getTestConfigFromFile(path.Join(pathOfConfig, "public-chain-accounts.json"), &config)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +374,7 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 	}
 
 	dst := filepath.Join(keystoreDir, accountFile)
-	err := copyFile(path.Join(params.GetStatusHome(), "static/keys/", accountFile), dst)
+	err := copyFile(path.Join(getStatusHome(), "static/keys/", accountFile), dst)
 	if err != nil {
 		logger.Warn("cannot copy test account PK", "error", err)
 	}
@@ -376,4 +413,23 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return nil
+}
+
+// Eventually will raise error if condition won't be met during the given timeout.
+func Eventually(f func() error, timeout, period time.Duration) (err error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-timer.C:
+			return
+		case <-ticker.C:
+			err = f()
+			if err == nil {
+				return nil
+			}
+		}
+	}
 }

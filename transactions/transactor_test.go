@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"errors"
+	"math"
 	"math/big"
 	"reflect"
 	"testing"
@@ -53,7 +54,7 @@ func (s *TransactorSuite) SetupTest() {
 	rpcClient, _ := rpc.NewClient(s.client, params.UpstreamRPCConfig{})
 	// expected by simulated backend
 	chainID := gethparams.AllEthashProtocolChanges.ChainID.Uint64()
-	nodeConfig, err := params.NewNodeConfig("/tmp", "", params.FleetBeta, chainID)
+	nodeConfig, err := MakeTestNodeConfigWithDataDir("", "/tmp", chainID)
 	s.Require().NoError(err)
 	s.nodeConfig = nodeConfig
 
@@ -264,7 +265,7 @@ func (s *TransactorSuite) TestContractCreation() {
 	genesis := core.GenesisAlloc{
 		testaddr: {Balance: big.NewInt(100000000000)},
 	}
-	backend := backends.NewSimulatedBackend(genesis)
+	backend := backends.NewSimulatedBackend(genesis, math.MaxInt64)
 	selectedAccount := &account.SelectedExtKey{
 		Address:    testaddr,
 		AccountKey: &keystore.Key{PrivateKey: key},

@@ -6,14 +6,27 @@
 	Example usage:
 
 		1. Start a Whisper node with mail server capability:
-			./build/bin/statusd \
-				-networkid=4 \
-				-maxpeers=100 \
-				-shh \
-				-shh.pow=0.002 \
-				-shh.mailserver \
-				-shh.passwordfile=./static/keys/wnodepassword \
-				-log DEBUG
+			./build/bin/statusd -c mailserver-config.json
+
+			where mailserver-config.json contains:
+			``` json
+			{
+				"NetworkId": 4,
+				"DataDir": "./ethereumtest/rinkeby_rpc",
+				"BackupDisabledDataDir": "./ethereumtest/rinkeby_rpc",
+				"KeyStoreDir": "./ethereumtest/keystore",
+				"MaxPeers": 100,
+				"LogLevel": "DEBUG",
+				"WhisperConfig": {
+					"Enabled": true,
+					"EnableMailServer": true,
+					"DataDir": "./ethereumtest/wnode",
+					"MinimumPoW": 0.002,
+					"MailServerPassword": "status-offline-inbox"
+				}
+			}
+			```
+
 		2. Generate some messages:
 			go test -v -timeout=30s -run TestSendMessages ./t/benchmarks \
 				-peerurl=$ENODE_ADDR \

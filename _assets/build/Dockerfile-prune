@@ -10,6 +10,10 @@ RUN cd /go/src/github.com/status-im/status-go && make statusd-prune
 # Copy the binary to the second image
 FROM alpine:latest
 
+LABEL maintainer="support@status.im"
+LABEL source="https://github.com/status-im/status-go"
+LABEL description="statusd-prune is used to prune old messages stored by MailServer."
+
 RUN apk add --no-cache ca-certificates bash
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/statusd-prune /usr/local/bin/

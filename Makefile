@@ -25,13 +25,16 @@ endef
 $(error $(NOT_IN_GOPATH_ERROR))
 endif
 
-CGO_CFLAGS=-I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
-GOBIN=$(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT := $(shell git rev-parse --short HEAD)
+CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
+GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
+	if [ $$? -eq 0 ]; then echo $$tag | sed 's/^v\(.*\)$$/\1/'; \
+	else git rev-parse --short HEAD; fi)
+AUTHOR = $(shell echo $$USER)
 
-BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.VersionMeta=$(GIT_COMMIT)'")
+BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
 
-GO ?= latest
+XGO_GO ?= latest
 XGOVERSION ?= 1.10.x
 XGOIMAGE = statusteam/xgo:$(XGOVERSION)
 XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
@@ -41,9 +44,10 @@ gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
+PROXY_IMAGE_NAME ?= statusteam/discovery-proxy
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
-DOCKER_IMAGE_CUSTOM_TAG ?= $(shell BUILD_TAGS="$(BUILD_TAGS)" ./_assets/ci/get-docker-image-tag.sh)
+DOCKER_IMAGE_CUSTOM_TAG ?= $(GIT_COMMIT)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -80,15 +84,23 @@ statusd-prune: ##@statusd-prune Build statusd-prune
 	@echo "Run \"build/bin/statusd-prune -h\" to view available commands."
 
 statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
-	@echo "Building docker image..."
-	docker build --file _assets/build/Dockerfile-prune . -t $(STATUSD_PRUNE_IMAGE_NAME):latest
+	@echo "Building docker image for ststusd-prune..."
+	docker build --file _assets/build/Dockerfile-prune . \
+		--label "commit=$(GIT_COMMIT)" \
+		--label "author=$(AUTHOR)" \
+		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(STATUSD_PRUNE_IMAGE_NAME):latest
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
 	@echo "Compilation done."
 
-mailserver-canary: ##@build Build mailserver canary using status-go deps
-	go build -i -o $(GOBIN)/mailserver-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/mailserver-canary/
+proxy: ##@build Build proxy for rendezvous servers using status-go deps
+	go build -i -o $(GOBIN)/proxy -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/proxy/
+	@echo "Compilation done."
+
+node-canary: ##@build Build P2P node canary using status-go deps
+	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
 	@echo "Compilation done."
 
 statusgo-cross: statusgo-android statusgo-ios
@@ -97,7 +109,7 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
@@ -124,14 +136,28 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 	docker build --file _assets/build/Dockerfile . \
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
+		--label "commit=$(GIT_COMMIT)" \
+		--label "author=$(AUTHOR)" \
 		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
 	@echo "Building docker image for bootnode..."
 	docker build --file _assets/build/Dockerfile-bootnode . \
+		--build-arg "build_tags=$(BUILD_TAGS)" \
+		--build-arg "build_flags=$(BUILD_FLAGS)" \
+		--label "commit=$(GIT_COMMIT)" \
+		--label "author=$(AUTHOR)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
+
+proxy-image:
+	@echo "Building docker image for proxy..."
+	docker build --file _assets/build/Dockerfile-proxy . \
+		--build-arg "build_tags=$(BUILD_TAGS)" \
+		--build-arg "build_flags=$(BUILD_FLAGS)" \
+		-t $(PROXY_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(PROXY_IMAGE_NAME):latest
 
 push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
@@ -162,13 +188,27 @@ xgo-docker-images: ##@docker Build xgo docker images
 
 xgo:
 	docker pull $(XGOIMAGE)
-	go get github.com/karalabe/xgo
+	go get github.com/status-im/xgo
+	mkdir -p $(GOBIN)
+
+install-os-dependencies:
+	_assets/scripts/install_deps.sh
+
+setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
+
+generate: ##@other Regenerate assets and other auto-generated stuff
+	go generate ./static ./static/migrations
+	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
 gomobile:
 	@echo "Installing gomobile..."
 	@go get -u golang.org/x/mobile/cmd/gomobile
 
 setup: dep-install lint-install mock-install gomobile ##@other Prepare project for first build
+
+gen-install:
+	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
@@ -214,7 +254,7 @@ test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.9.1
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.10.2
 
 lint:
 	@echo "lint"
@@ -228,27 +268,14 @@ clean: ##@other Cleanup
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
-vendor-check: ##@dependencies Require all new patches and disallow other changes
-	./_assets/patches/patcher -c
-	./_assets/ci/isolate-vendor-check.sh
-
-dep-ensure: ##@dependencies Dep ensure and apply all patches
+dep-ensure: ##@dependencies Ensure all dependencies are in place with dep
 	@dep ensure
-	./_assets/patches/patcher
 
 dep-install: ##@dependencies Install vendoring tool
 	go get -u github.com/golang/dep/cmd/dep
 
-update-geth: ##@dependencies Update geth (use GETH_BRANCH to optionally set the geth branch name)
-	./_assets/ci/update-geth.sh $(GETH_BRANCH)
-	@echo "**************************************************************"
-	@echo "NOTE: Don't forget to:"
-	@echo "- update the goleveldb dependency revision in Gopkg.toml to match the version used in go-ethereum"
-	@echo "- reconcile any changes to interfaces in transactions/fake (such as PublicTransactionPoolAPI), which are copies from internal geth interfaces"
-	@echo "**************************************************************"
-
-patch: ##@patching Revert and apply all patches
-	./_assets/patches/patcher
-
-patch-revert: ##@patching Revert all patches only
-	./_assets/patches/patcher -r
+update-fleet-config: ##@other Update fleets configuration from fleets.status.im
+	./_assets/ci/update-fleet-config.sh
+	@echo "Updating static assets..."
+	@go generate ./static
+	@echo "Done"

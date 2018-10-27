@@ -3,7 +3,7 @@ package node
 import (
 	"testing"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
@@ -11,7 +11,7 @@ import (
 
 func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 	config := params.NodeConfig{
-		WhisperConfig: &params.WhisperConfig{
+		WhisperConfig: params.WhisperConfig{
 			Enabled:     true,
 			LightClient: true,
 		},
@@ -33,7 +33,7 @@ func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 
 func TestWhisperLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 	config := params.NodeConfig{
-		WhisperConfig: &params.WhisperConfig{
+		WhisperConfig: params.WhisperConfig{
 			Enabled:     true,
 			LightClient: false,
 		},

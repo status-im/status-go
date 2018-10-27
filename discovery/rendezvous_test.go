@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	lcrypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/server"
@@ -18,17 +18,21 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
-func TestRendezvousDiscovery(t *testing.T) {
+func makeTestRendezvousServer(t *testing.T, addr string) *server.Server {
 	priv, _, err := lcrypto.GenerateKeyPair(lcrypto.Secp256k1, 0)
 	require.NoError(t, err)
-	laddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/7777"))
+	laddr, err := ma.NewMultiaddr(addr)
 	require.NoError(t, err)
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 	srv := server.NewServer(laddr, priv, server.NewStorage(db))
 	require.NoError(t, srv.Start())
-	defer srv.Stop()
+	return srv
+}
 
+func TestRendezvousDiscovery(t *testing.T) {
+	srv := makeTestRendezvousServer(t, "/ip4/127.0.0.1/tcp/7777")
+	defer srv.Stop()
 	identity, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	node := discover.NewNode(discover.PubkeyID(&identity.PublicKey), net.IP{10, 10, 10, 10}, 10, 20)
@@ -55,4 +59,41 @@ func TestRendezvousDiscovery(t *testing.T) {
 	}
 	close(stop)
 	close(period)
+}
+
+func TestMakeRecordReturnsCachedRecord(t *testing.T) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	record := enr.Record{}
+	require.NoError(t, enr.SignV4(&record, identity))
+	c := NewRendezvousWithENR(nil, record)
+	rst, err := c.MakeRecord()
+	require.NoError(t, err)
+	require.NotNil(t, rst.NodeAddr())
+	require.Equal(t, record.NodeAddr(), rst.NodeAddr())
+}
+
+func TestRendezvousRegisterAndDiscoverExitGracefully(t *testing.T) {
+	r, err := NewRendezvous(make([]ma.Multiaddr, 1), nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, r.Start())
+	require.NoError(t, r.Stop())
+	require.EqualError(t, errDiscoveryIsStopped, r.register("", enr.Record{}).Error())
+	_, err = r.discoverRequest(nil, "")
+	require.EqualError(t, errDiscoveryIsStopped, err.Error())
+}
+
+func BenchmarkRendezvousStart(b *testing.B) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(b, err)
+	addr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/7777")
+	require.NoError(b, err)
+	node := discover.NewNode(discover.PubkeyID(&identity.PublicKey), net.IP{10, 10, 10, 10}, 10, 20)
+
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		c, err := NewRendezvous([]ma.Multiaddr{addr}, identity, node)
+		require.NoError(b, err)
+		require.NoError(b, c.Start())
+	}
 }

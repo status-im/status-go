@@ -14,6 +14,9 @@ var _ node.Service = (*Service)(nil)
 type Service struct {
 	latestBlockChangedEvent        *latestBlockChangedEvent
 	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent
+	rpc                            rpcProvider
+
+	quit chan struct{}
 }
 
 // New returns a new Service.
@@ -22,8 +25,9 @@ func New(rpc rpcProvider) *Service {
 	latestBlockChangedEvent := newLatestBlockChangedEvent(provider)
 	transactionSentToUpstreamEvent := newTransactionSentToUpstreamEvent()
 	return &Service{
-		latestBlockChangedEvent,
-		transactionSentToUpstreamEvent,
+		latestBlockChangedEvent:        latestBlockChangedEvent,
+		transactionSentToUpstreamEvent: transactionSentToUpstreamEvent,
+		rpc:                            rpc,
 	}
 }
 
@@ -38,16 +42,15 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "eth",
 			Version:   "1.0",
-			Service: NewPublicAPI(
-				s.latestBlockChangedEvent,
-				s.transactionSentToUpstreamEvent),
-			Public: true,
+			Service:   NewPublicAPI(s),
+			Public:    true,
 		},
 	}
 }
 
 // Start is run when a service is started.
 func (s *Service) Start(server *p2p.Server) error {
+	s.quit = make(chan struct{})
 	err := s.transactionSentToUpstreamEvent.Start()
 	if err != nil {
 		return err
@@ -57,6 +60,7 @@ func (s *Service) Start(server *p2p.Server) error {
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
+	close(s.quit)
 	s.transactionSentToUpstreamEvent.Stop()
 	s.latestBlockChangedEvent.Stop()
 	return nil

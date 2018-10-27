@@ -3,7 +3,7 @@ package mailserver
 import (
 	"testing"
 
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -54,7 +54,7 @@ func (s *MailServerDBPanicSuite) TestArchive() {
 
 func (s *MailServerDBPanicSuite) TestDeliverMail() {
 	defer s.testPanicRecover("DeliverMail")
-	_, _, _, err := s.server.processRequest(nil, 10, 20, []byte{}, 0, nil)
+	_, _, _, err := s.server.processRequest(nil, 10, 20, []byte{}, 0, nil, false)
 	s.Error(err)
 	s.Equal("recovered from panic in processRequest: panicDB panic on NewIterator", err.Error())
 }

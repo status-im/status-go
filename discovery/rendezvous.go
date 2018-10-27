@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"math/rand"
 	"net"
 	"sync"
@@ -22,21 +23,29 @@ const (
 	bucketSize         = 10
 )
 
+var (
+	errNodeIsNil          = errors.New("node cannot be nil")
+	errIdentityIsNil      = errors.New("identity cannot be nil")
+	errDiscoveryIsStopped = errors.New("discovery is stopped")
+)
+
 func NewRendezvous(servers []ma.Multiaddr, identity *ecdsa.PrivateKey, node *discover.Node) (*Rendezvous, error) {
+	r := new(Rendezvous)
+	r.node = node
+	r.identity = identity
+	r.servers = servers
+	r.registrationPeriod = registrationPeriod
+	r.bucketSize = bucketSize
+	return r, nil
+}
+
+func NewRendezvousWithENR(servers []ma.Multiaddr, record enr.Record) *Rendezvous {
 	r := new(Rendezvous)
 	r.servers = servers
 	r.registrationPeriod = registrationPeriod
 	r.bucketSize = bucketSize
-
-	r.record = enr.Record{}
-	r.record.Set(enr.IP(node.IP))
-	r.record.Set(enr.TCP(node.TCP))
-	r.record.Set(enr.UDP(node.UDP))
-	// public key is added to ENR when ENR is signed
-	if err := enr.SignV4(&r.record, identity); err != nil {
-		return nil, err
-	}
-	return r, nil
+	r.record = &record
+	return r
 }
 
 // Rendezvous is an implementation of discovery interface that uses
@@ -53,7 +62,11 @@ type Rendezvous struct {
 	servers            []ma.Multiaddr
 	registrationPeriod time.Duration
 	bucketSize         int
-	record             enr.Record
+	node               *discover.Node
+	identity           *ecdsa.PrivateKey
+
+	recordMu sync.Mutex
+	record   *enr.Record // record is set directly if rendezvous is used in proxy mode
 }
 
 func (r *Rendezvous) Running() bool {
@@ -66,7 +79,7 @@ func (r *Rendezvous) Running() bool {
 func (r *Rendezvous) Start() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	client, err := rendezvous.NewTemporary()
+	client, err := rendezvous.NewEphemeral()
 	if err != nil {
 		return err
 	}
@@ -84,15 +97,40 @@ func (r *Rendezvous) Stop() error {
 	return nil
 }
 
-func (r *Rendezvous) register(topic string) error {
+func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
+	r.recordMu.Lock()
+	defer r.recordMu.Unlock()
+	if r.record != nil {
+		return *r.record, nil
+	}
+	if r.node == nil {
+		return record, errNodeIsNil
+	}
+	if r.identity == nil {
+		return record, errIdentityIsNil
+	}
+	record.Set(enr.IP(r.node.IP))
+	record.Set(enr.TCP(r.node.TCP))
+	record.Set(enr.UDP(r.node.UDP))
+	// public key is added to ENR when ENR is signed
+	if err := enr.SignV4(&record, r.identity); err != nil {
+		return record, err
+	}
+	r.record = &record
+	return record, nil
+}
+
+func (r *Rendezvous) register(topic string, record enr.Record) error {
 	srv := r.servers[rand.Intn(len(r.servers))]
 	ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 	defer cancel()
 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
-	err := r.client.Register(ctx, srv, topic, r.record)
+	if r.client == nil {
+		return errDiscoveryIsStopped
+	}
+	err := r.client.Register(ctx, srv, topic, record, r.registrationPeriod)
 	if err != nil {
 		log.Error("error registering", "topic", topic, "rendezvous server", srv, "err", err)
 	}
@@ -101,10 +139,16 @@ func (r *Rendezvous) register(topic string) error {
 
 // Register renews registration in the specified server.
 func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
-	ticker := time.NewTicker(r.registrationPeriod)
+	record, err := r.MakeRecord()
+	if err != nil {
+		return err
+	}
+	// sending registration more often than the whole registraton period
+	// will ensure that it won't be accidentally removed
+	ticker := time.NewTicker(r.registrationPeriod / 2)
 	defer ticker.Stop()
 
-	if err := r.register(topic); err == context.Canceled {
+	if err := r.register(topic, record); err == context.Canceled {
 		return err
 	}
 
@@ -113,11 +157,24 @@ func (r *Rendezvous) Register(topic string, stop chan struct{}) error {
 		case <-stop:
 			return nil
 		case <-ticker.C:
-			if err := r.register(topic); err == context.Canceled {
+			if err := r.register(topic, record); err == context.Canceled {
 				return err
+			} else if err == errDiscoveryIsStopped {
+				return nil
 			}
 		}
 	}
+}
+
+func (r *Rendezvous) discoverRequest(srv ma.Multiaddr, topic string) ([]enr.Record, error) {
+	ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
+	defer cancel()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.client == nil {
+		return nil, errDiscoveryIsStopped
+	}
+	return r.client.Discover(ctx, srv, topic, r.bucketSize)
 }
 
 // Discover will search for new records every time period fetched from period channel.
@@ -135,23 +192,33 @@ func (r *Rendezvous) Discover(
 			ticker = time.NewTicker(newPeriod)
 		case <-ticker.C:
 			srv := r.servers[rand.Intn(len(r.servers))]
-			ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
-			r.mu.RLock()
-			records, err := r.client.Discover(ctx, srv, topic, r.bucketSize)
-			r.mu.RUnlock()
-			cancel()
+			records, err := r.discoverRequest(srv, topic)
 			if err == context.Canceled {
 				return err
+			} else if err == errDiscoveryIsStopped {
+				return nil
 			} else if err != nil {
 				log.Debug("error fetching records", "topic", topic, "rendezvous server", srv, "err", err)
-				continue
-			}
-			for i := range records {
-				n, err := enrToNode(records[i])
-				if err != nil {
-					log.Warn("error converting enr record to node", "err", err)
+			} else {
+				for i := range records {
+					n, err := enrToNode(records[i])
+					log.Debug("converted enr to", "ENODE", n.String())
+					if err != nil {
+						log.Warn("error converting enr record to node", "err", err)
+
+					} else {
+						select {
+						case found <- n:
+						case newPeriod, ok := <-period:
+							// closing a period channel is a signal to producer that consumer exited
+							ticker.Stop()
+							if !ok {
+								return nil
+							}
+							ticker = time.NewTicker(newPeriod)
+						}
+					}
 				}
-				found <- n
 			}
 		}
 	}
@@ -159,13 +226,21 @@ func (r *Rendezvous) Discover(
 
 func enrToNode(record enr.Record) (*discv5.Node, error) {
 	var (
-		key   enr.Secp256k1
-		ip    enr.IP
-		tport enr.TCP
-		uport enr.UDP
+		key     enr.Secp256k1
+		ip      enr.IP
+		tport   enr.TCP
+		uport   enr.UDP
+		proxied Proxied
+		nodeID  discv5.NodeID
 	)
-	if err := record.Load(&key); err != nil {
-		return nil, err
+	if err := record.Load(&proxied); err == nil {
+		nodeID = discv5.NodeID(proxied)
+	} else {
+		if err := record.Load(&key); err != nil {
+			return nil, err
+		}
+		ecdsaKey := ecdsa.PublicKey(key)
+		nodeID = discv5.PubkeyID(&ecdsaKey)
 	}
 	if err := record.Load(&ip); err != nil {
 		return nil, err
@@ -175,6 +250,5 @@ func enrToNode(record enr.Record) (*discv5.Node, error) {
 	}
 	// ignore absence of udp port, as it is optional
 	_ = record.Load(&uport)
-	ecdsaKey := ecdsa.PublicKey(key)
-	return discv5.NewNode(discv5.PubkeyID(&ecdsaKey), net.IP(ip), uint16(uport), uint16(tport)), nil
+	return discv5.NewNode(nodeID, net.IP(ip), uint16(uport), uint16(tport)), nil
 }

@@ -19,19 +19,20 @@ package mailserver
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/shhext"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -72,19 +73,13 @@ func (s *MailserverSuite) SetupTest() {
 	s.dataDir = tmpDir
 
 	// required files to validate mail server decryption method
-	asymKeyFile := filepath.Join(tmpDir, "asymkey")
-	passwordFile := filepath.Join(tmpDir, "password")
 	privateKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	err = crypto.SaveECDSA(asymKeyFile, privateKey)
-	s.Require().NoError(err)
-	err = ioutil.WriteFile(passwordFile, []byte("testpassword"), os.ModePerm)
 	s.Require().NoError(err)
 
 	s.config = &params.WhisperConfig{
-		DataDir:                tmpDir,
-		MailServerAsymKeyFile:  asymKeyFile,
-		MailServerPasswordFile: passwordFile,
+		DataDir:            tmpDir,
+		MailServerAsymKey:  hex.EncodeToString(crypto.FromECDSA(privateKey)),
+		MailServerPassword: "testpassword",
 	}
 }
 
@@ -118,7 +113,7 @@ func (s *MailserverSuite) TestInit() {
 			config: params.WhisperConfig{
 				DataDir:            s.config.DataDir,
 				MailServerPassword: "",
-				MailServerAsymKey:  nil,
+				MailServerAsymKey:  "",
 			},
 			expectedError: errDecryptionMethodNotProvided,
 			info:          "config with an empty password and empty asym key",
@@ -134,7 +129,7 @@ func (s *MailserverSuite) TestInit() {
 		{
 			config: params.WhisperConfig{
 				DataDir:           s.config.DataDir,
-				MailServerAsymKey: asymKey,
+				MailServerAsymKey: hex.EncodeToString(crypto.FromECDSA(asymKey)),
 			},
 			expectedError: nil,
 			info:          "config with correct DataDir and AsymKey",
@@ -142,7 +137,7 @@ func (s *MailserverSuite) TestInit() {
 		{
 			config: params.WhisperConfig{
 				DataDir:            s.config.DataDir,
-				MailServerAsymKey:  asymKey,
+				MailServerAsymKey:  hex.EncodeToString(crypto.FromECDSA(asymKey)),
 				MailServerPassword: "pwd",
 			},
 			expectedError: nil,
@@ -186,11 +181,13 @@ func (s *MailserverSuite) TestInit() {
 func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 	// without configured Password and AsymKey
 	config := *s.config
+	config.MailServerAsymKey = ""
+	config.MailServerPassword = ""
 	s.Error(errDecryptionMethodNotProvided, s.server.Init(s.shh, &config))
 
 	// Password should work ok
 	config = *s.config
-	s.NoError(config.ReadMailServerPasswordFile())
+	config.MailServerAsymKey = "" // clear asym key field
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Require().NotNil(s.server.symFilter)
 	s.NotNil(s.server.symFilter.KeySym)
@@ -199,17 +196,15 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 
 	// AsymKey can also be used
 	config = *s.config
-	s.NoError(config.ReadMailServerAsymKeyFile())
+	config.MailServerPassword = "" // clear password field
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Nil(s.server.symFilter) // important: symmetric filter should be nil
 	s.Require().NotNil(s.server.asymFilter)
-	s.Equal(config.MailServerAsymKey, s.server.asymFilter.KeyAsym)
+	s.Equal(config.MailServerAsymKey, hex.EncodeToString(crypto.FromECDSA(s.server.asymFilter.KeyAsym)))
 	s.server.Close()
 
 	// when Password and AsymKey are set, both are supported
 	config = *s.config
-	s.NoError(config.ReadMailServerPasswordFile())
-	s.NoError(config.ReadMailServerAsymKeyFile())
 	s.NoError(s.server.Init(s.shh, &config))
 	s.Require().NotNil(s.server.symFilter)
 	s.NotNil(s.server.symFilter.KeySym)
@@ -220,7 +215,7 @@ func (s *MailserverSuite) TestSetupRequestMessageDecryptor() {
 func (s *MailserverSuite) TestOpenEnvelopeWithSymKey() {
 	// Setup the server with a sym key
 	config := *s.config
-	s.NoError(config.ReadMailServerPasswordFile())
+	config.MailServerAsymKey = "" // clear asym key
 	s.NoError(s.server.Init(s.shh, &config))
 
 	// Prepare a valid envelope
@@ -239,7 +234,7 @@ func (s *MailserverSuite) TestOpenEnvelopeWithSymKey() {
 func (s *MailserverSuite) TestOpenEnvelopeWithAsymKey() {
 	// Setup the server with an asymetric key
 	config := *s.config
-	s.NoError(config.ReadMailServerAsymKeyFile())
+	config.MailServerPassword = "" // clear password field
 	s.NoError(s.server.Init(s.shh, &config))
 
 	// Prepare a valid envelope
@@ -256,10 +251,10 @@ func (s *MailserverSuite) TestOpenEnvelopeWithAsymKey() {
 }
 
 func (s *MailserverSuite) TestArchive() {
-	err := s.config.ReadMailServerPasswordFile()
-	s.Require().NoError(err)
+	config := *s.config
+	config.MailServerAsymKey = "" // clear asym key
 
-	err = s.server.Init(s.shh, s.config)
+	err := s.server.Init(s.shh, &config)
 	s.Require().NoError(err)
 	defer s.server.Close()
 
@@ -328,12 +323,12 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	params.limit = 6
 	request := s.createRequest(params)
 	src := crypto.FromECDSAPub(&params.key.PublicKey)
-	ok, lower, upper, bloom, limit, cursor := s.server.validateRequest(src, request)
-	s.True(ok)
+	lower, upper, bloom, limit, cursor, err := s.server.validateRequest(src, request)
+	s.True(err == nil)
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil)
+	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil, false)
 	s.NoError(err)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
@@ -345,12 +340,12 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Equal(limit, uint32(len(receivedHashes)))
 	// the 6 envelopes received should be in descending order
 	s.Equal(reverseSentHashes[:limit], receivedHashes)
-	// cursor should be the key of the first envelope of the next page
+	// cursor should be the key of the last envelope of the last page
 	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
 
 	// second page
 	receivedHashes = []common.Hash{}
-	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor)
+	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor, false)
 	s.NoError(err)
 	for _, env := range envelopes {
 		receivedHashes = append(receivedHashes, env.Hash())
@@ -434,9 +429,9 @@ func (s *MailserverSuite) TestMailServer() {
 		s.T().Run(tc.info, func(*testing.T) {
 			request := s.createRequest(tc.params)
 			src := crypto.FromECDSAPub(&tc.params.key.PublicKey)
-			ok, lower, upper, bloom, limit, _ := s.server.validateRequest(src, request)
-			s.Equal(tc.isOK, ok)
-			if ok {
+			lower, upper, bloom, limit, _, err := s.server.validateRequest(src, request)
+			s.Equal(tc.isOK, err == nil)
+			if err == nil {
 				s.Equal(tc.params.low, lower)
 				s.Equal(tc.params.upp, upper)
 				s.Equal(tc.params.limit, limit)
@@ -444,16 +439,43 @@ func (s *MailserverSuite) TestMailServer() {
 				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
-				ok, _, _, _, _, _ = s.server.validateRequest(src, request)
-				s.True(ok)
+				_, _, _, _, _, err = s.server.validateRequest(src, request)
+				s.True(err == nil)
 			}
 		})
 	}
 }
 
+func (s *MailserverSuite) TestDecodeRequest() {
+	s.setupServer(s.server)
+	defer s.server.Close()
+
+	payload := shhext.MessagesRequestPayload{
+		Lower:  50,
+		Upper:  100,
+		Bloom:  []byte{0x01},
+		Limit:  10,
+		Cursor: []byte{},
+		Batch:  true,
+	}
+	data, err := rlp.EncodeToBytes(payload)
+	s.Require().NoError(err)
+
+	id, err := s.shh.NewKeyPair()
+	s.Require().NoError(err)
+	srcKey, err := s.shh.GetPrivateKey(id)
+	s.Require().NoError(err)
+
+	env := s.createEnvelope(whisper.TopicType{0x01}, data, srcKey)
+
+	decodedPayload, err := s.server.decodeRequest(nil, env)
+	s.Require().NoError(err)
+	s.Equal(payload, decodedPayload)
+}
+
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil)
+	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil, false)
 	s.NoError(err)
 	for _, msg := range mail {
 		if msg.Hash() == envelope.Hash() {
@@ -555,6 +577,10 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 		data = append(data, limitData...)
 	}
 
+	return s.createEnvelope(p.topic, data, p.key)
+}
+
+func (s *MailserverSuite) createEnvelope(topic whisper.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *whisper.Envelope {
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {
 		s.T().Fatalf("failed to retrieve sym key with seed %d: %s.", seed, err)
@@ -562,17 +588,18 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 
 	params := &whisper.MessageParams{
 		KeySym:   key,
-		Topic:    p.topic,
+		Topic:    topic,
 		Payload:  data,
 		PoW:      powRequirement * 2,
 		WorkTime: 2,
-		Src:      p.key,
+		Src:      srcKey,
 	}
 
 	msg, err := whisper.NewSentMessage(params)
 	if err != nil {
 		s.T().Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
+
 	env, err := msg.Wrap(params, time.Now())
 	if err != nil {
 		s.T().Fatalf("failed to wrap with seed %d: %s.", seed, err)

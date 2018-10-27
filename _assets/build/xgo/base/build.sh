@@ -298,6 +298,9 @@ for TARGET in $TARGETS; do
         (cd $archive && zip -r $bundle *)
         rm -rf $jni $archive
       fi
+
+      # Fix up permissions on bundle file
+      chown $UID:$GID $bundle
     fi
     # Clean up the android builds, toolchains and runtimes
     rm -rf /build-android-aar
@@ -583,6 +586,8 @@ for TARGET in $TARGETS; do
         echo -e "framework module \"$title\" {\n  header \"$title.h\"\n  export *\n}" > $framework/Versions/A/Modules/module.modulemap
         (cd $framework && ln -nsf Versions/A/Modules Modules)
 
+        # Fix up permissions on bundle file
+        chown $UID:$GID /build/$NAME-ios-$PLATFORM-framework
         chmod 777 -R /build/$NAME-ios-$PLATFORM-framework
       fi
       rm -rf /build-ios-fw

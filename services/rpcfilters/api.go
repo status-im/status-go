@@ -1,58 +1,102 @@
 package rpcfilters
 
 import (
+	"context"
 	"errors"
 	"sync"
+	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/eth/filters"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pborman/uuid"
 )
 
-type filter struct {
-	hashes []common.Hash
-	mu     sync.Mutex
-	done   chan struct{}
-}
+const (
+	defaultFilterLivenessPeriod = 5 * time.Minute
+	defaultLogsPeriod           = 3 * time.Second
+	defaultLogsQueryTimeout     = 10 * time.Second
+)
 
-// AddHash adds a hash to the filter
-func (f *filter) AddHash(hash common.Hash) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.hashes = append(f.hashes, hash)
-}
-
-// PopHashes returns all the hashes stored in the filter and clears the filter contents
-func (f *filter) PopHashes() []common.Hash {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	hashes := f.hashes
-	f.hashes = nil
-	return returnHashes(hashes)
-}
-
-func newFilter() *filter {
-	return &filter{
-		done: make(chan struct{}),
-	}
+type filter interface {
+	add(interface{}) error
+	pop() interface{}
+	stop()
+	deadline() *time.Timer
 }
 
 // PublicAPI represents filter API that is exported to `eth` namespace
 type PublicAPI struct {
-	filters                        map[rpc.ID]*filter
-	filtersMu                      sync.Mutex
+	filtersMu sync.Mutex
+	filters   map[rpc.ID]filter
+
+	// filterLivenessLoop defines how often timeout loop is executed
+	filterLivenessLoop time.Duration
+	// filter liveness increased by this period when changes are requested
+	filterLivenessPeriod time.Duration
+
+	client func() ContextCaller
+
 	latestBlockChangedEvent        *latestBlockChangedEvent
 	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent
 }
 
 // NewPublicAPI returns a reference to the PublicAPI object
-func NewPublicAPI(latestBlockChangedEvent *latestBlockChangedEvent,
-	transactionSentToUpstreamEvent *transactionSentToUpstreamEvent) *PublicAPI {
-	return &PublicAPI{
-		filters:                        make(map[rpc.ID]*filter),
-		latestBlockChangedEvent:        latestBlockChangedEvent,
-		transactionSentToUpstreamEvent: transactionSentToUpstreamEvent,
+func NewPublicAPI(s *Service) *PublicAPI {
+	api := &PublicAPI{
+		filters:                        make(map[rpc.ID]filter),
+		latestBlockChangedEvent:        s.latestBlockChangedEvent,
+		transactionSentToUpstreamEvent: s.transactionSentToUpstreamEvent,
+		client:                         func() ContextCaller { return s.rpc.RPCClient() },
+		filterLivenessLoop:             defaultFilterLivenessPeriod,
+		filterLivenessPeriod:           defaultFilterLivenessPeriod + 10*time.Second,
 	}
+	go api.timeoutLoop(s.quit)
+	return api
+}
+
+func (api *PublicAPI) timeoutLoop(quit chan struct{}) {
+	for {
+		select {
+		case <-quit:
+			return
+		case <-time.After(api.filterLivenessLoop):
+			api.filtersMu.Lock()
+			for id, f := range api.filters {
+				deadline := f.deadline()
+				if deadline == nil {
+					continue
+				}
+				select {
+				case <-deadline.C:
+					delete(api.filters, id)
+					f.stop()
+				default:
+					continue
+				}
+			}
+			api.filtersMu.Unlock()
+		}
+	}
+}
+
+func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (rpc.ID, error) {
+	id := rpc.ID(uuid.New())
+	ctx, cancel := context.WithCancel(context.Background())
+	f := &logsFilter{
+		id:     id,
+		crit:   ethereum.FilterQuery(crit),
+		done:   make(chan struct{}),
+		timer:  time.NewTimer(api.filterLivenessPeriod),
+		ctx:    ctx,
+		cancel: cancel,
+	}
+	api.filtersMu.Lock()
+	api.filters[id] = f
+	api.filtersMu.Unlock()
+	go pollLogs(api.client(), f, defaultLogsQueryTimeout, defaultLogsPeriod)
+	return id, nil
 }
 
 // NewBlockFilter is an implemenation of `eth_newBlockFilter` API
@@ -61,7 +105,7 @@ func (api *PublicAPI) NewBlockFilter() rpc.ID {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
-	f := newFilter()
+	f := newHashFilter()
 	id := rpc.ID(uuid.New())
 
 	api.filters[id] = f
@@ -73,7 +117,9 @@ func (api *PublicAPI) NewBlockFilter() rpc.ID {
 		for {
 			select {
 			case hash := <-s:
-				f.AddHash(hash)
+				if err := f.add(hash); err != nil {
+					log.Error("error adding value to filter", "hash", hash, "error", err)
+				}
 			case <-f.done:
 				return
 			}
@@ -90,7 +136,7 @@ func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
-	f := newFilter()
+	f := newHashFilter()
 	id := rpc.ID(uuid.New())
 
 	api.filters[id] = f
@@ -102,7 +148,9 @@ func (api *PublicAPI) NewPendingTransactionFilter() rpc.ID {
 		for {
 			select {
 			case hash := <-s:
-				f.AddHash(hash)
+				if err := f.add(hash); err != nil {
+					log.Error("error adding value to filter", "hash", hash, "error", err)
+				}
 			case <-f.done:
 				return
 			}
@@ -125,7 +173,7 @@ func (api *PublicAPI) UninstallFilter(id rpc.ID) bool {
 	api.filtersMu.Unlock()
 
 	if found {
-		close(f.done)
+		f.stop()
 	}
 
 	return found
@@ -135,22 +183,26 @@ func (api *PublicAPI) UninstallFilter(id rpc.ID) bool {
 // last time it was called. This can be used for polling.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterchanges
-func (api *PublicAPI) GetFilterChanges(id rpc.ID) ([]common.Hash, error) {
+func (api *PublicAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 	api.filtersMu.Lock()
 	defer api.filtersMu.Unlock()
 
 	if f, found := api.filters[id]; found {
-		return f.PopHashes(), nil
+		deadline := f.deadline()
+		if deadline != nil {
+			if !deadline.Stop() {
+				// timer expired but filter is not yet removed in timeout loop
+				// receive timer value and reset timer
+				// see https://golang.org/pkg/time/#Timer.Reset
+				<-deadline.C
+			}
+			deadline.Reset(api.filterLivenessPeriod)
+		}
+		rst := f.pop()
+		if rst == nil {
+			return []interface{}{}, nil
+		}
+		return rst, nil
 	}
-
-	return []common.Hash{}, errors.New("filter not found")
-}
-
-// returnHashes is a helper that will return an empty hash array case the given hash array is nil,
-// otherwise the given hashes array is returned.
-func returnHashes(hashes []common.Hash) []common.Hash {
-	if hashes == nil {
-		return []common.Hash{}
-	}
-	return hashes
+	return []interface{}{}, errors.New("filter not found")
 }

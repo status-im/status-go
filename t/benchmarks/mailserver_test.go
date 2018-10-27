@@ -3,12 +3,13 @@ package benchmarks
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/node"
-	whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
 	"github.com/status-im/status-go/services/shhext"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +36,13 @@ func testMailserverPeer(t *testing.T) {
 
 	shhService := createWhisperService()
 	shhAPI := whisper.NewPublicWhisperAPI(shhService)
-	mailService := shhext.New(shhService, nil, nil, false)
+	config := &shhext.ServiceConfig{
+		DataDir:        os.TempDir(),
+		InstallationID: "1",
+		Debug:          false,
+		PFSEnabled:     false,
+	}
+	mailService := shhext.New(shhService, nil, nil, config)
 	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// create node with services

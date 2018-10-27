@@ -1,20 +1,5 @@
 #!/usr/bin/env groovy
 
-@NonCPS
-def getVersion(branch, sha, buildNumber) {
-    version = branch.replaceAll(/\//, '-')
-
-    if (sha?.trim()) {
-        version = version + '-g' + sha
-    }
-
-    if (buildNumber?.trim()) {
-        version = version + '-' + buildNumber
-    }
-
-    return version
-}
-
 node('linux') {
     env.GOPATH = "${env.WORKSPACE}"
     env.PATH = "${env.PATH}:${env.GOPATH}/bin"
@@ -64,7 +49,7 @@ node('linux') {
     }
 
     stage('Build') {
-        sh 'go get github.com/karalabe/xgo'
+        sh 'go get github.com/status-im/xgo'
 
         parallel (
             'statusgo-android': {
@@ -87,7 +72,10 @@ node('linux') {
     stage('Deploy') {
         dir(cloneDir) {
             // For branch builds, replace the old artifact. For develop keep all of them.
-            def version = gitBranch == 'develop' ? getVersion(gitBranch, gitShortSHA, '') : getVersion(gitBranch, gitShortSHA, env.BUILD_ID)
+            def version = sh(
+                script: "git describe --exact-match --tag 2>/dev/null || git describe --always",
+                returnStdout: true
+            ).trim()
             def server = Artifactory.server 'artifacts'
             def uploadSpec = """{
                 "files": [
