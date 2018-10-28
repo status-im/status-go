@@ -27,7 +27,8 @@ func New(rpc rpcProvider) *Service {
 	return &Service{
 		latestBlockChangedEvent:        latestBlockChangedEvent,
 		transactionSentToUpstreamEvent: transactionSentToUpstreamEvent,
-		rpc:                            rpc,
+
+		rpc: rpc,
 	}
 }
 
