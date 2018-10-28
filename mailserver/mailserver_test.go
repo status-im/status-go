@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -636,4 +638,17 @@ func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.
 func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 	h := crypto.Keccak256Hash([]byte("test sample data"))
 	return generateEnvelopeWithKeys(sentTime, h[:], nil)
+}
+
+// mockPeerWithID is a struct that conforms to peerWithID interface.
+type mockPeerWithID struct {
+	id []byte
+}
+
+func (p mockPeerWithID) ID() []byte { return p.id }
+
+func TestPeerIDString(t *testing.T) {
+	a := []byte{0x01, 0x02, 0x03}
+	result := peerIDString(&mockPeerWithID{a})
+	require.Equal(t, "0x010203", result)
 }

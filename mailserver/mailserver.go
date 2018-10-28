@@ -639,6 +639,14 @@ func (s *WMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]
 	return msg.Payload[8 : 8+whisper.BloomFilterSize], nil
 }
 
-func peerIDString(peer *whisper.Peer) string {
-	return string(peer.ID())
+// peerWithID is a generalization of whisper.Peer.
+// whisper.Peer has all fields and methods, except for ID(), unexported.
+// It makes it impossible to create an instance of it
+// outside of whisper package and test properly.
+type peerWithID interface {
+	ID() []byte
+}
+
+func peerIDString(peer peerWithID) string {
+	return fmt.Sprintf("0x%x", peer.ID())
 }
