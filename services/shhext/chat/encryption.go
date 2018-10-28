@@ -21,6 +21,15 @@ var ErrSessionNotFound = errors.New("session not found")
 // If we have no bundles, we use a constant so that the message can reach any device
 const noInstallationID = "none"
 
+// How many consecutive messages can be skipped in the receiving chain
+const maxSkip = 1000
+
+// Any message with seqNo <= currentSeq - maxKeep will be deleted
+const maxKeep = 3000
+
+// How many keys do we store in total per session
+const maxMessageKeysPerSession = 2000
+
 // EncryptionService defines a service that is responsible for the encryption aspect of the protocol
 type EncryptionService struct {
 	log            log.Logger
@@ -251,9 +260,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-			// TODO: Temporarily increase to a high number, until
-			// we make sure it's a sliding window rather than dropping
-			dr.WithMaxSkip(10000),
+			dr.WithMaxSkip(maxSkip),
+			dr.WithMaxKeep(maxKeep),
+			dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	} else {
 		session, err = dr.NewWithRemoteKey(
@@ -262,9 +271,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair.PubKey,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-			// TODO: Temporarily increase to a high number, until
-			// we make sure it's a sliding window rather than dropping
-			dr.WithMaxSkip(10000),
+			dr.WithMaxSkip(maxSkip),
+			dr.WithMaxKeep(maxKeep),
+			dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	}
 
@@ -291,9 +300,9 @@ func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		drInfo.ID,
 		sessionStorage,
 		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-		// TODO: Temporarily increase to a high number, until
-		// we make sure it's a sliding window rather than dropping
-		dr.WithMaxSkip(10000),
+		dr.WithMaxSkip(maxSkip),
+		dr.WithMaxKeep(maxKeep),
+		dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 	if err != nil {
@@ -342,9 +351,9 @@ func (s *EncryptionService) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		drInfo.ID,
 		sessionStorage,
 		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-		// TODO: Temporarily increase to a high number, until
-		// we make sure it's a sliding window rather than dropping
-		dr.WithMaxSkip(10000),
+		dr.WithMaxSkip(maxSkip),
+		dr.WithMaxKeep(maxKeep),
+		dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 	if err != nil {
