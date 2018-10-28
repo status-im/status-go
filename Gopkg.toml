@@ -160,7 +160,7 @@
 
 [[constraint]]
   name = "github.com/status-im/doubleratchet"
-  revision = "321788dbb6eac36f7dab04e631db139e13bb280b"
+  revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
 
 [[constraint]]
   name = "github.com/status-im/migrate"

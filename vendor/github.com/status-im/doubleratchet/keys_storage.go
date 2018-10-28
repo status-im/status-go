@@ -1,18 +1,26 @@
 package doubleratchet
 
+import (
+	"bytes"
+	"sort"
+)
+
 // KeysStorage is an interface of an abstract in-memory or persistent keys storage.
 type KeysStorage interface {
 	// Get returns a message key by the given key and message number.
 	Get(k Key, msgNum uint) (mk Key, ok bool, err error)
 
 	// Put saves the given mk under the specified key and msgNum.
-	Put(k Key, msgNum uint, mk Key) error
+	Put(sessionID []byte, k Key, msgNum uint, mk Key, keySeqNum uint) error
 
 	// DeleteMk ensures there's no message key under the specified key and msgNum.
 	DeleteMk(k Key, msgNum uint) error
 
-	// DeletePk ensures there's no message keys under the specified key.
-	DeletePk(k Key) error
+	// DeleteOldMKeys deletes old message keys for a session.
+	DeleteOldMks(sessionID []byte, deleteUntilSeqKey uint) error
+
+	// TruncateMks truncates the number of keys to maxKeys.
+	TruncateMks(sessionID []byte, maxKeys int) error
 
 	// Count returns number of message keys stored under the specified key.
 	Count(k Key) (uint, error)
@@ -23,10 +31,10 @@ type KeysStorage interface {
 
 // KeysStorageInMemory is an in-memory message keys storage.
 type KeysStorageInMemory struct {
-	keys map[Key]map[uint]Key
+	keys map[Key]map[uint]InMemoryKey
 }
 
-// See KeysStorage.
+// Get returns a message key by the given key and message number.
 func (s *KeysStorageInMemory) Get(pubKey Key, msgNum uint) (Key, bool, error) {
 	if s.keys == nil {
 		return Key{}, false, nil
@@ -39,22 +47,32 @@ func (s *KeysStorageInMemory) Get(pubKey Key, msgNum uint) (Key, bool, error) {
 	if !ok {
 		return Key{}, false, nil
 	}
-	return mk, true, nil
+	return mk.messageKey, true, nil
 }
 
-// See KeysStorage.
-func (s *KeysStorageInMemory) Put(pubKey Key, msgNum uint, mk Key) error {
+type InMemoryKey struct {
+	messageKey Key
+	seqNum     uint
+	sessionID  []byte
+}
+
+// Put saves the given mk under the specified key and msgNum.
+func (s *KeysStorageInMemory) Put(sessionID []byte, pubKey Key, msgNum uint, mk Key, seqNum uint) error {
 	if s.keys == nil {
-		s.keys = make(map[Key]map[uint]Key)
+		s.keys = make(map[Key]map[uint]InMemoryKey)
 	}
 	if _, ok := s.keys[pubKey]; !ok {
-		s.keys[pubKey] = make(map[uint]Key)
+		s.keys[pubKey] = make(map[uint]InMemoryKey)
 	}
-	s.keys[pubKey][msgNum] = mk
+	s.keys[pubKey][msgNum] = InMemoryKey{
+		sessionID:  sessionID,
+		messageKey: mk,
+		seqNum:     seqNum,
+	}
 	return nil
 }
 
-// See KeysStorage.
+// DeleteMk ensures there's no message key under the specified key and msgNum.
 func (s *KeysStorageInMemory) DeleteMk(pubKey Key, msgNum uint) error {
 	if s.keys == nil {
 		return nil
@@ -72,19 +90,58 @@ func (s *KeysStorageInMemory) DeleteMk(pubKey Key, msgNum uint) error {
 	return nil
 }
 
-// See KeysStorage.
-func (s *KeysStorageInMemory) DeletePk(pubKey Key) error {
-	if s.keys == nil {
+// TruncateMks truncates the number of keys to maxKeys.
+func (s *KeysStorageInMemory) TruncateMks(sessionID []byte, maxKeys int) error {
+	var seqNos []uint
+	// Collect all seq numbers
+	for _, keys := range s.keys {
+		for _, inMemoryKey := range keys {
+			if bytes.Equal(inMemoryKey.sessionID, sessionID) {
+				seqNos = append(seqNos, inMemoryKey.seqNum)
+			}
+		}
+	}
+
+	// Nothing to do if we haven't reached the limit
+	if len(seqNos) <= maxKeys {
 		return nil
 	}
-	if _, ok := s.keys[pubKey]; !ok {
-		return nil
+
+	// Take the sequence numbers we care about
+	sort.Slice(seqNos, func(i, j int) bool { return seqNos[i] < seqNos[j] })
+	toDeleteSlice := seqNos[:len(seqNos)-maxKeys]
+
+	// Put in map for easier lookup
+	toDelete := make(map[uint]bool)
+
+	for _, seqNo := range toDeleteSlice {
+		toDelete[seqNo] = true
 	}
-	delete(s.keys, pubKey)
+
+	for pubKey, keys := range s.keys {
+		for i, inMemoryKey := range keys {
+			if toDelete[inMemoryKey.seqNum] && bytes.Equal(inMemoryKey.sessionID, sessionID) {
+				delete(s.keys[pubKey], i)
+			}
+		}
+	}
+
 	return nil
 }
 
-// See KeysStorage.
+// DeleteOldMKeys deletes old message keys for a session.
+func (s *KeysStorageInMemory) DeleteOldMks(sessionID []byte, deleteUntilSeqKey uint) error {
+	for pubKey, keys := range s.keys {
+		for i, inMemoryKey := range keys {
+			if inMemoryKey.seqNum <= deleteUntilSeqKey && bytes.Equal(inMemoryKey.sessionID, sessionID) {
+				delete(s.keys[pubKey], i)
+			}
+		}
+	}
+	return nil
+}
+
+// Count returns number of message keys stored under the specified key.
 func (s *KeysStorageInMemory) Count(pubKey Key) (uint, error) {
 	if s.keys == nil {
 		return 0, nil
@@ -92,7 +149,16 @@ func (s *KeysStorageInMemory) Count(pubKey Key) (uint, error) {
 	return uint(len(s.keys[pubKey])), nil
 }
 
-// See KeysStorage.
+// All returns all the keys
 func (s *KeysStorageInMemory) All() (map[Key]map[uint]Key, error) {
-	return s.keys, nil
+	response := make(map[Key]map[uint]Key)
+
+	for pubKey, keys := range s.keys {
+		response[pubKey] = make(map[uint]Key)
+		for n, key := range keys {
+			response[pubKey][n] = key.messageKey
+		}
+	}
+
+	return response, nil
 }
