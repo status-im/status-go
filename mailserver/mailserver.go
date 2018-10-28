@@ -547,7 +547,7 @@ func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (s
 	lowerTime := time.Unix(int64(payload.Lower), 0)
 	upperTime := time.Unix(int64(payload.Upper), 0)
 	if upperTime.Sub(lowerTime) > maxQueryRange {
-		log.Warn("Query range too long", "peerID", string(peerID), "length", upperTime.Sub(lowerTime), "max", maxQueryRange)
+		log.Warn("Query range too long", "peerID", peerIDBytesString(peerID), "length", upperTime.Sub(lowerTime), "max", maxQueryRange)
 		return payload, fmt.Errorf("query range must be shorted than %d", maxQueryRange)
 	}
 
@@ -649,4 +649,8 @@ type peerWithID interface {
 
 func peerIDString(peer peerWithID) string {
 	return fmt.Sprintf("%x", peer.ID())
+}
+
+func peerIDBytesString(id []byte) string {
+	return fmt.Sprintf("%x", id)
 }
