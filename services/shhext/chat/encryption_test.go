@@ -314,6 +314,213 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Equal(cleartext2, decryptedPayload1, "It correctly decrypts the payload using X3DH")
 }
 
+// Previous implementation allowed max maxSkip keys in the same receiving chain
+// leading to a problem whereby dropped messages would accumulate and eventually
+// we would not be able to decrypt any new message anymore.
+// Here we are testing that maxSkip only applies to *consecutive* messages, not
+// overall.
+func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
+	bobText := []byte("text")
+
+	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Create a bundle
+	bobBundle, err := s.bob.CreateBundle(bobKey)
+	s.Require().NoError(err)
+
+	// We add bob bundle
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	s.Require().NoError(err)
+
+	// Create a bundle
+	aliceBundle, err := s.alice.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	// We add alice bundle
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	s.Require().NoError(err)
+
+	// Bob sends a message
+
+	for i := 0; i < maxSkip; i++ {
+		_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		s.Require().NoError(err)
+	}
+
+	// Bob sends a message
+	bobMessage1, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	s.Require().NoError(err)
+
+	// Alice receives the message
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, bobMessage1)
+	s.Require().NoError(err)
+
+	// Bob sends a message
+	_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	s.Require().NoError(err)
+
+	// Bob sends a message
+	bobMessage2, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	s.Require().NoError(err)
+
+	// Alice receives the message, we should have 1001 keys in the db, but
+	// we should not throw an error
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, bobMessage2)
+	s.Require().NoError(err)
+}
+
+// Test that an error is thrown if max skip is reached
+func (s *EncryptionServiceTestSuite) TestMaxSkipKeysError() {
+	bobText := []byte("text")
+
+	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Create a bundle
+	bobBundle, err := s.bob.CreateBundle(bobKey)
+	s.Require().NoError(err)
+
+	// We add bob bundle
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	s.Require().NoError(err)
+
+	// Create a bundle
+	aliceBundle, err := s.alice.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	// We add alice bundle
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	s.Require().NoError(err)
+
+	// Bob sends a message
+
+	for i := 0; i < maxSkip+1; i++ {
+		_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		s.Require().NoError(err)
+	}
+
+	// Bob sends a message
+	bobMessage1, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	s.Require().NoError(err)
+
+	// Alice receives the message
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, bobMessage1)
+	s.Require().Error(err)
+}
+
+func (s *EncryptionServiceTestSuite) TestMaxMessageKeysPerSession() {
+	bobText := []byte("text")
+
+	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Create a bundle
+	bobBundle, err := s.bob.CreateBundle(bobKey)
+	s.Require().NoError(err)
+
+	// We add bob bundle
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	s.Require().NoError(err)
+
+	// Create a bundle
+	aliceBundle, err := s.alice.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	// We add alice bundle
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	s.Require().NoError(err)
+
+	// We create just enough messages so that the first key should be deleted
+
+	nMessages := maxMessageKeysPerSession + maxMessageKeysPerSession/maxSkip + 2
+	messages := make([]map[string]*DirectMessageProtocol, nMessages)
+	for i := 0; i < nMessages; i++ {
+		m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		s.Require().NoError(err)
+
+		messages[i] = m
+
+		// We decrypt some messages otherwise we hit maxSkip limit
+		if i%maxSkip == 0 {
+			_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, m)
+			s.Require().NoError(err)
+		}
+
+	}
+
+	// Another message to trigger the deletion
+	m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	s.Require().NoError(err)
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, m)
+	s.Require().NoError(err)
+
+	// We decrypt the first message, and it should fail
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, messages[1])
+	s.Require().Error(err)
+
+	// We decrypt the second message, and it should be decrypted
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, messages[2])
+	s.Require().NoError(err)
+}
+
+func (s *EncryptionServiceTestSuite) TestMaxKeep() {
+	bobText := []byte("text")
+
+	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Create a bundle
+	bobBundle, err := s.bob.CreateBundle(bobKey)
+	s.Require().NoError(err)
+
+	// We add bob bundle
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	s.Require().NoError(err)
+
+	// Create a bundle
+	aliceBundle, err := s.alice.CreateBundle(aliceKey)
+	s.Require().NoError(err)
+
+	// We add alice bundle
+	_, err = s.bob.ProcessPublicBundle(bobKey, aliceBundle)
+	s.Require().NoError(err)
+
+	// We decrypt all messages but 1 & 2
+	messages := make([]map[string]*DirectMessageProtocol, maxKeep)
+	for i := 0; i < maxKeep; i++ {
+		m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		messages[i] = m
+		s.Require().NoError(err)
+
+		if i != 0 && i != 1 {
+			_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, m)
+			s.Require().NoError(err)
+		}
+
+	}
+
+	// We decrypt the first message, and it should fail, as it should have been remove
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, messages[0])
+	s.Require().Error(err)
+
+	// We decrypt the second message, and it should be decrypted
+	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, messages[1])
+	s.Require().NoError(err)
+}
+
 // Alice has Bob's bundle
 // Bob has Alice's bundle
 // Bob sends a message to alice
@@ -557,6 +764,9 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 
 	bobBundle2, err := NewBundleContainer(bobKey, bobInstallationID)
 	s.Require().NoError(err)
+	// We set the version
+
+	bobBundle2.GetBundle().GetSignedPreKeys()[bobInstallationID].Version = 1
 
 	err = SignBundle(bobKey, bobBundle2)
 	s.Require().NoError(err)
