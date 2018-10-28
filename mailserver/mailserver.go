@@ -648,5 +648,5 @@ type peerWithID interface {
 }
 
 func peerIDString(peer peerWithID) string {
-	return fmt.Sprintf("0x%x", peer.ID())
+	return fmt.Sprintf("%x", peer.ID())
 }

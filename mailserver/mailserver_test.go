@@ -650,5 +650,5 @@ func (p mockPeerWithID) ID() []byte { return p.id }
 func TestPeerIDString(t *testing.T) {
 	a := []byte{0x01, 0x02, 0x03}
 	result := peerIDString(&mockPeerWithID{a})
-	require.Equal(t, "0x010203", result)
+	require.Equal(t, "010203", result)
 }
