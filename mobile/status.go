@@ -25,7 +25,7 @@ var logger = log.New("package", "status-go/lib")
 
 //GenerateConfig for status node
 func GenerateConfig(datadir string, networkID int) string {
-	config, err := params.NewNodeConfig(datadir, "", params.FleetBeta, uint64(networkID))
+	config, err := params.NewNodeConfig(datadir, uint64(networkID))
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -40,7 +40,7 @@ func GenerateConfig(datadir string, networkID int) string {
 
 //StartNode - start Status node
 func StartNode(configJSON string) string {
-	config, err := params.LoadNodeConfig(configJSON)
+	config, err := params.NewConfigFromJSON(configJSON)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -64,7 +64,7 @@ func StopNode() string {
 func ValidateNodeConfig(configJSON string) string {
 	var resp APIDetailedResponse
 
-	_, err := params.LoadNodeConfig(configJSON)
+	_, err := params.NewConfigFromJSON(configJSON)
 
 	// Convert errors to APIDetailedResponse
 	switch err := err.(type) {
