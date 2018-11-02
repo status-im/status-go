@@ -3,7 +3,7 @@ package chat
 import (
 	"crypto/ecdsa"
 	"database/sql"
-	"time"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -103,13 +103,13 @@ func (s *SQLLitePersistence) Open(path string, key string) error {
 }
 
 // AddPrivateBundle adds the specified BundleContainer to the database
-func (s *SQLLitePersistence) AddPrivateBundle(b *BundleContainer) error {
+func (s *SQLLitePersistence) AddPrivateBundle(bc *BundleContainer) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 
-	for installationID, signedPreKey := range b.GetBundle().GetSignedPreKeys() {
+	for installationID, signedPreKey := range bc.GetBundle().GetSignedPreKeys() {
 		var version uint32
 		stmt, err := tx.Prepare("SELECT version FROM bundles WHERE installation_id = ? AND identity = ? ORDER BY version DESC LIMIT 1")
 		if err != nil {
@@ -118,7 +118,7 @@ func (s *SQLLitePersistence) AddPrivateBundle(b *BundleContainer) error {
 
 		defer stmt.Close()
 
-		err = stmt.QueryRow(installationID, b.GetBundle().GetIdentity()).Scan(&version)
+		err = stmt.QueryRow(installationID, bc.GetBundle().GetIdentity()).Scan(&version)
 		if err != nil && err != sql.ErrNoRows {
 			return err
 		}
@@ -130,12 +130,12 @@ func (s *SQLLitePersistence) AddPrivateBundle(b *BundleContainer) error {
 		defer stmt.Close()
 
 		_, err = stmt.Exec(
-			b.GetBundle().GetIdentity(),
-			b.GetPrivateSignedPreKey(),
+			bc.GetBundle().GetIdentity(),
+			bc.GetPrivateSignedPreKey(),
 			signedPreKey.GetSignedPreKey(),
 			installationID,
 			version+1,
-			time.Now().UnixNano(),
+			bc.GetBundle().GetTimestamp(),
 		)
 		if err != nil {
 			_ = tx.Rollback()
@@ -173,7 +173,7 @@ func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
 			signedPreKey,
 			installationID,
 			version,
-			time.Now().UnixNano(),
+			b.GetTimestamp(),
 		)
 		if err != nil {
 			_ = tx.Rollback()
@@ -202,8 +202,11 @@ func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
 }
 
 // GetAnyPrivateBundle retrieves any bundle from the database containing a private key
-func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleContainer, error) {
-	stmt, err := s.db.Prepare("SELECT identity, private_key, signed_pre_key, installation_id, timestamp FROM bundles WHERE identity = ? AND expired = 0")
+func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installationIDs []string) (*BundleContainer, error) {
+
+	/* #nosec */
+	statement := "SELECT identity, private_key, signed_pre_key, installation_id, timestamp FROM bundles WHERE expired = 0 AND identity = ? AND installation_id IN (?" + strings.Repeat(",?", len(installationIDs)-1) + ")"
+	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +216,13 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 	var identity []byte
 	var privateKey []byte
 
-	rows, err := stmt.Query(myIdentityKey)
+	args := make([]interface{}, len(installationIDs)+1)
+	args[0] = myIdentityKey
+	for i, installationID := range installationIDs {
+		args[i+1] = installationID
+	}
+
+	rows, err := stmt.Query(args...)
 	rowCount := 0
 
 	if err != nil {
@@ -246,7 +255,7 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 		}
 		// If there is a private key, we set the timestamp of the bundle container
 		if privateKey != nil {
-			bundleContainer.Timestamp = timestamp
+			bundle.Timestamp = timestamp
 		}
 
 		bundle.SignedPreKeys[installationID] = &SignedPreKey{SignedPreKey: signedPreKey}
@@ -254,7 +263,7 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 	}
 
 	// If no records are found or no record with private key, return nil
-	if rowCount == 0 || bundleContainer.Timestamp == 0 {
+	if rowCount == 0 || bundleContainer.GetBundle().Timestamp == 0 {
 		return nil, nil
 	}
 
@@ -283,10 +292,9 @@ func (s *SQLLitePersistence) GetPrivateKeyBundle(bundleID []byte) ([]byte, error
 	}
 }
 
-// RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
-// associated with the specified bundle ID and interlocutor identity public key
+// MarkBundleExpired expires any private bundle for a given identity
 func (s *SQLLitePersistence) MarkBundleExpired(identity []byte) error {
-	stmt, err := s.db.Prepare("UPDATE bundles SET expired = 1 WHERE identity = ?")
+	stmt, err := s.db.Prepare("UPDATE bundles SET expired = 1 WHERE identity = ? AND private_key IS NOT NULL")
 	if err != nil {
 		return err
 	}
@@ -298,16 +306,29 @@ func (s *SQLLitePersistence) MarkBundleExpired(identity []byte) error {
 }
 
 // GetPublicBundle retrieves an existing Bundle for the specified public key from the database
-func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey) (*Bundle, error) {
+func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installationIDs []string) (*Bundle, error) {
+
+	if len(installationIDs) == 0 {
+		return nil, nil
+	}
 
 	identity := crypto.CompressPubkey(publicKey)
-	stmt, err := s.db.Prepare("SELECT signed_pre_key,installation_id, version FROM bundles WHERE expired = 0 AND identity = ? ORDER BY version DESC")
+
+	/* #nosec */
+	statement := "SELECT signed_pre_key,installation_id, version FROM bundles WHERE expired = 0 AND identity = ? AND installation_id IN (?" + strings.Repeat(",?", len(installationIDs)-1) + ") ORDER BY version DESC"
+	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(identity)
+	args := make([]interface{}, len(installationIDs)+1)
+	args[0] = identity
+	for i, installationID := range installationIDs {
+		args[i+1] = installationID
+	}
+
+	rows, err := stmt.Query(args...)
 	rowCount := 0
 
 	if err != nil {
@@ -685,6 +706,126 @@ func (s *SQLLiteSessionStorage) Load(id []byte) (*dr.State, error) {
 	default:
 		return nil, err
 	}
+}
+
+// GetActiveInstallations returns the active installations for a given identity
+func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations uint, identity []byte) ([]string, error) {
+	stmt, err := s.db.Prepare("SELECT installation_id FROM installations WHERE enabled = 1 AND identity = ? ORDER BY timestamp DESC LIMIT ?")
+	if err != nil {
+		return nil, err
+	}
+
+	var installations []string
+	rows, err := stmt.Query(identity, maxInstallations)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var installationID string
+		err = rows.Scan(
+			&installationID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		installations = append(installations, installationID)
+	}
+
+	return installations, nil
+
+}
+
+// AddInstallations adds the installations for a given identity, maintaining the enabled flag
+func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, installationIDs []string, defaultEnabled bool) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil
+	}
+
+	for _, installationID := range installationIDs {
+		stmt, err := tx.Prepare("SELECT enabled FROM installations WHERE identity = ? AND installation_id = ? LIMIT 1")
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+
+		var oldEnabled bool
+
+		err = stmt.QueryRow(identity, installationID).Scan(&oldEnabled)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+
+		// We update timestamp if present without changing enabled
+		if err != sql.ErrNoRows {
+			stmt, err = tx.Prepare("UPDATE installations SET timestamp = ?,  enabled = ? WHERE identity = ? AND installation_id = ?")
+			if err != nil {
+				return err
+			}
+
+			_, err = stmt.Exec(
+				timestamp,
+				oldEnabled,
+				identity,
+				installationID,
+			)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+
+		} else {
+			stmt, err = tx.Prepare("INSERT INTO installations(identity, installation_id, timestamp, enabled) VALUES (?, ?, ?, ?)")
+			if err != nil {
+				return err
+			}
+
+			_, err = stmt.Exec(
+				identity,
+				installationID,
+				timestamp,
+				defaultEnabled,
+			)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+		}
+
+	}
+
+	if err := tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return nil
+
+}
+
+// EnableInstallation enables the installation
+func (s *SQLLitePersistence) EnableInstallation(identity []byte, installationID string) error {
+	stmt, err := s.db.Prepare("UPDATE installations SET enabled = 1 WHERE identity = ? AND installation_id = ?")
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(identity, installationID)
+	return err
+
+}
+
+// DisableInstallation disable the installation
+func (s *SQLLitePersistence) DisableInstallation(identity []byte, installationID string) error {
+
+	stmt, err := s.db.Prepare("UPDATE installations SET enabled = 0 WHERE identity = ? AND installation_id = ?")
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(identity, installationID)
+	return err
 }
 
 func toKey(a []byte) dr.Key {
