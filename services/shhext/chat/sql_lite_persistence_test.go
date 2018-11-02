@@ -344,4 +344,137 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 	s.Nil(ratchetInfo, "It returns nil when no bundle is there")
 }
 
+func (s *SQLLitePersistenceTestSuite) TestAddInstallations() {
+	identity := []byte("alice")
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+
+	s.Require().NoError(err)
+
+	enabledInstallations, err := s.service.GetActiveInstallations(5, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal(installations, enabledInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestAddInstallationsLimit() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	installations = []string{"alice-2", "alice-3"}
+	err = s.service.AddInstallations(
+		identity,
+		2,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	installations = []string{"alice-2", "alice-3", "alice-4"}
+	err = s.service.AddInstallations(
+		identity,
+		3,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	enabledInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-2", "alice-3", "alice-4"}, enabledInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestAddInstallationsDisabled() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		false,
+	)
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Nil(actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestDisableInstallation() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DisableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	// We add the installations again
+	installations = []string{"alice-1", "alice-2"}
+	err = s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-2"}, actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DisableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-2"}, actualInstallations)
+
+	err = s.service.EnableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	actualInstallations, err = s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-1", "alice-2"}, actualInstallations)
+
+}
+
 // TODO: Add test for MarkBundleExpired

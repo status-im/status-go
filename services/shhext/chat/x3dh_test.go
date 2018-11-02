@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -65,6 +66,7 @@ func TestNewBundleContainer(t *testing.T) {
 
 	signatureMaterial := append([]byte(bobInstallationID), bundle.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey()...)
 	signatureMaterial = append(signatureMaterial, []byte("0")...)
+	signatureMaterial = append(signatureMaterial, []byte(fmt.Sprint(bundle.GetTimestamp()))...)
 	recoveredPublicKey, err := crypto.SigToPub(
 		crypto.Keccak256(signatureMaterial),
 		bundle.Signature,
@@ -102,6 +104,7 @@ func TestSignBundle(t *testing.T) {
 	signatureMaterial = append(signatureMaterial, []byte("2")...)
 	signatureMaterial = append(signatureMaterial, []byte("key")...)
 	signatureMaterial = append(signatureMaterial, []byte("0")...)
+	signatureMaterial = append(signatureMaterial, []byte(fmt.Sprint(bundle1.GetTimestamp()))...)
 
 	recoveredPublicKey, err := crypto.SigToPub(
 		crypto.Keccak256(signatureMaterial),
