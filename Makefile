@@ -201,11 +201,17 @@ xgo:
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
+setup: install-os-dependencies dep-install lint-install mock-install deploy-install gen-install update-fleet-config ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
+
+deploy-install:
+	go get -u github.com/c4milo/github-release
+
+deploy:
+	github-release status-im/status-go $(release_tag) $(release_branch) "" "$(release_directory)"
 
 gen-install:
 	go get -u github.com/jteeuwen/go-bindata/...

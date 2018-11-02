@@ -44,7 +44,6 @@ node('linux') {
     stage('Test') {
         dir(cloneDir) {
             sh 'make setup'
-            sh 'make ci'
         }
     }
 
@@ -71,32 +70,11 @@ node('linux') {
 
     stage('Deploy') {
         dir(cloneDir) {
-            // For branch builds, replace the old artifact. For develop keep all of them.
             def version = sh(
                 script: "git describe --exact-match --tag 2>/dev/null || git describe --always",
                 returnStdout: true
             ).trim()
-            def server = Artifactory.server 'artifacts'
-            def uploadSpec = """{
-                "files": [
-                    {
-                        "pattern": "build/bin/statusgo-android-16.aar",
-                        "target": "libs-release-local/status-im/status-go/${version}/status-go-${version}.aar"
-                    },
-                    {
-                        "pattern": "build/bin/statusgo-ios-9.3-framework/status-go-ios.zip",
-                        "target": "libs-release-local/status-im/status-go-ios-simulator/${version}/status-go-ios-simulator-${version}.zip"
-                    }
-                ]
-            }"""
-
-            def buildInfo = Artifactory.newBuildInfo()
-            buildInfo.env.capture = false
-            buildInfo.name = 'status-go (' + gitBranch + '-' + gitShortSHA + ')'
-            server.upload(uploadSpec, buildInfo)
-            server.publishBuildInfo(buildInfo)
-
-            slackSend color: 'good', message: 'status-go `' + version + '` was built successfully. ' + env.BUILD_URL
+            sh "env GITHUB_TOKEN=${env.GIT_PASS} make deploy release_tag=${version} release_branch=${gitBranch} release_directory=\"build/bin/*\""
         }
     }
 }
