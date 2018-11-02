@@ -74,7 +74,26 @@ node('linux') {
                 script: "git describe --exact-match --tag 2>/dev/null || git describe --always",
                 returnStdout: true
             ).trim()
-            sh "env GITHUB_TOKEN=${env.GIT_PASS} make deploy release_tag=${version} release_branch=${gitBranch} release_directory=\"build/bin/*\""
+            sh "rm -rf /tmp/release-${version}"
+            sh "mkdir -p /tmp/release-${version}"
+            sh "mv build/bin/statusgo-android-16.aar /tmp/release-${version}/status-go-android.aar"
+            sh "mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip /tmp/release-${version}/status-go-ios.zip"
+            sh "make clean"
+            sh "zip -r /tmp/release-${version}/status-go-desktop.zip . -x *.git*"
+            withCredentials([[
+                $class: 'UsernamePasswordMultiBinding',
+                credentialsId: 'status-im-auto',
+                usernameVariable: 'GITHUB_USER',
+                passwordVariable: 'GITHUB_TOKEN'
+            ]]) {
+              sh """
+                make deploy \
+                    release_tag=${version} \
+                    release_branch=${gitBranch} \
+                    release_directory='/tmp/release-${version}/*'
+              """
+            }
+            sh "rm -rf /tmp/release-${version}"
         }
     }
 }
