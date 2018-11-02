@@ -44,6 +44,7 @@ node('linux') {
     stage('Test') {
         dir(cloneDir) {
             sh 'make setup'
+            sh 'make ci'
         }
     }
 
@@ -74,7 +75,21 @@ node('linux') {
                 script: "git describe --exact-match --tag 2>/dev/null || git describe --always",
                 returnStdout: true
             ).trim()
-            sh "env GITHUB_TOKEN=${env.GIT_PASS} make deploy release_tag=${version} release_branch=${gitBranch} release_directory=\"build/bin/*\""
+            sh "make prepare-release release_tag=${version}"
+            withCredentials([[
+                $class: 'UsernamePasswordMultiBinding',
+                credentialsId: 'status-im-auto',
+                usernameVariable: 'GITHUB_USER',
+                passwordVariable: 'GITHUB_TOKEN'
+            ]]) {
+              sh """
+                make deploy \
+                    release_tag=${version} \
+                    release_branch=${gitBranch} \
+                    release_directory='/tmp/release-${version}/*'
+              """
+            }
+            sh "make clean-release release_tag=${version}"
         }
     }
 }
