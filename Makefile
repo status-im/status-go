@@ -207,6 +207,17 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
+prepare-release:
+	rm -rf /tmp/release-$(release_tag)
+	mkdir -p /tmp/release-$(release_tag)
+	mv build/bin/statusgo-android-16.aar /tmp/release-$(release_tag)/status-go-android.aar
+	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip /tmp/release-$(release_tag)/status-go-ios.zip
+	${MAKE} clean
+	zip -r /tmp/release-$(release_tag)/status-go-desktop.zip . -x *.git*
+
+clean-release:
+	rm -rf /tmp/release-$(release_tag)
+
 deploy-install:
 	go get -u github.com/c4milo/github-release
 
