@@ -36,7 +36,7 @@ type PersistenceService interface {
 	GetPrivateKeyBundle([]byte) ([]byte, error)
 	// AddPrivateBundle persists a BundleContainer
 	AddPrivateBundle(*BundleContainer) error
-	// MarkBundleExpired marks a bundle as expired, not to be used for encryption anymore
+	// MarkBundleExpired marks a private bundle as expired, not to be used for encryption anymore
 	MarkBundleExpired([]byte) error
 
 	// AddRatchetInfo persists the specified ratchet info
@@ -48,4 +48,16 @@ type PersistenceService interface {
 	// RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
 	// associated with the specified bundle ID and interlocutor identity public key
 	RatchetInfoConfirmed([]byte, []byte, string) error
+
+	// GetActiveInstallations returns the active installations for a given identity
+	GetActiveInstallations(maxInstallations uint, identity []byte) ([]string, error)
+
+	// AddInstallations adds the installations for a given identity
+	AddInstallations(identity []byte, timestamp int, installationIDs []string, enabled bool) error
+
+	// EnableInstallation enables the installation
+	EnableInstallation(identity []byte, installationID string) error
+
+	// DisableInstallation disable the installation
+	DisableInstallation(identity []byte, installationID string) error
 }

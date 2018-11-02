@@ -70,7 +70,7 @@ func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle,
 	}
 
 	// If the bundle has expired we create a new one
-	if bundleContainer != nil && bundleContainer.Timestamp < time.Now().AddDate(0, 0, -14).UnixNano() {
+	if bundleContainer != nil && bundleContainer.GetBundle().Timestamp < time.Now().AddDate(0, 0, -14).UnixNano() {
 		// Mark sessions has expired
 		if err := s.persistence.MarkBundleExpired(bundleContainer.GetBundle().GetIdentity()); err != nil {
 			return nil, err
@@ -452,9 +452,8 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 			if drInfo.EphemeralKey != nil {
 				dmp.X3DHHeader = &X3DHHeader{
-					Key:            drInfo.EphemeralKey,
-					Id:             drInfo.BundleID,
-					InstallationId: s.installationID,
+					Key: drInfo.EphemeralKey,
+					Id:  drInfo.BundleID,
 				}
 			}
 
@@ -482,9 +481,8 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 			}
 
 			x3dhHeader := &X3DHHeader{
-				Key:            ourEphemeralKeyC,
-				Id:             theirSignedPreKey,
-				InstallationId: s.installationID,
+				Key: ourEphemeralKeyC,
+				Id:  theirSignedPreKey,
 			}
 
 			drInfo, err := s.persistence.GetAnyRatchetInfo(theirIdentityKeyC, installationID)
