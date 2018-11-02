@@ -1,6 +1,11 @@
 .PHONY: statusgo statusd-prune all test xgo clean help
 .PHONY: statusgo-android statusgo-ios
 
+RELEASE_TAG := $(shell cat VERSION)
+RELEASE_BRANCH := "develop"
+RELEASE_DIRECTORY := /tmp/release-$(RELEASE_TAG)
+PRE_RELEASE := "1"
+
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
@@ -201,11 +206,32 @@ xgo:
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
+setup: install-os-dependencies dep-install lint-install mock-install deploy-install gen-install update-fleet-config ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
+
+prepare-release: clean-release
+	mkdir -p $(RELEASE_DIRECTORY)
+	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
+	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
+	${MAKE} clean
+	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
+
+clean-release:
+	rm -rf $(RELEASE_DIRECTORY)
+
+release:
+	@read -p "Are you sure you want to create a new GitHub $(shell if [[ $(PRE_RELEASE) = "0" ]] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch?  (y/n): " REPLY; \
+	if [ $$REPLY = "y" ]; then \
+	    github-release $(shell if [[ $(PRE_RELEASE) != "0" ]] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "" "$(RELEASE_DIRECTORY)/*" ; \
+	else \
+	    echo "Aborting." && exit 1; \
+	fi
+
+deploy-install:
+	go get -u github.com/c4milo/github-release
 
 gen-install:
 	go get -u github.com/jteeuwen/go-bindata/...
