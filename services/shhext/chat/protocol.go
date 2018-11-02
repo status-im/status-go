@@ -115,6 +115,16 @@ func (p *ProtocolService) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*Bundle, e
 	return p.encryption.CreateBundle(myIdentityKey)
 }
 
+// EnableInstallation enables an installation for multi-device sync
+func (p *ProtocolService) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return p.encryption.EnableInstallation(myIdentityKey, installationID)
+}
+
+// DisableInstallation disables an installation for multi-device sync
+func (p *ProtocolService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return p.encryption.DisableInstallation(myIdentityKey, installationID)
+}
+
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message
 func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) (*HandleMessageResponse, error) {
 	if p.encryption == nil {

@@ -3,6 +3,7 @@ package chat
 import (
 	"crypto/ecdsa"
 	"database/sql"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 
@@ -201,8 +202,11 @@ func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
 }
 
 // GetAnyPrivateBundle retrieves any bundle from the database containing a private key
-func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleContainer, error) {
-	stmt, err := s.db.Prepare("SELECT identity, private_key, signed_pre_key, installation_id, timestamp FROM bundles WHERE identity = ? AND expired = 0")
+func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installationIDs []string) (*BundleContainer, error) {
+
+	/* #nosec */
+	statement := "SELECT identity, private_key, signed_pre_key, installation_id, timestamp FROM bundles WHERE expired = 0 AND identity = ? AND installation_id IN (?" + strings.Repeat(",?", len(installationIDs)-1) + ")"
+	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +216,13 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte) (*BundleC
 	var identity []byte
 	var privateKey []byte
 
-	rows, err := stmt.Query(myIdentityKey)
+	args := make([]interface{}, len(installationIDs)+1)
+	args[0] = myIdentityKey
+	for i, installationID := range installationIDs {
+		args[i+1] = installationID
+	}
+
+	rows, err := stmt.Query(args...)
 	rowCount := 0
 
 	if err != nil {
@@ -296,16 +306,29 @@ func (s *SQLLitePersistence) MarkBundleExpired(identity []byte) error {
 }
 
 // GetPublicBundle retrieves an existing Bundle for the specified public key from the database
-func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey) (*Bundle, error) {
+func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installationIDs []string) (*Bundle, error) {
+
+	if len(installationIDs) == 0 {
+		return nil, nil
+	}
 
 	identity := crypto.CompressPubkey(publicKey)
-	stmt, err := s.db.Prepare("SELECT signed_pre_key,installation_id, version FROM bundles WHERE expired = 0 AND identity = ? ORDER BY version DESC")
+
+	/* #nosec */
+	statement := "SELECT signed_pre_key,installation_id, version FROM bundles WHERE expired = 0 AND identity = ? AND installation_id IN (?" + strings.Repeat(",?", len(installationIDs)-1) + ") ORDER BY version DESC"
+	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 
-	rows, err := stmt.Query(identity)
+	args := make([]interface{}, len(installationIDs)+1)
+	args[0] = identity
+	for i, installationID := range installationIDs {
+		args[i+1] = installationID
+	}
+
+	rows, err := stmt.Query(args...)
 	rowCount := 0
 
 	if err != nil {
@@ -697,7 +720,7 @@ func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations uint, ident
 }
 
 // AddInstallations adds the installations for a given identity, maintaining the enabled flag
-func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int, installationIDs []string, defaultEnabled bool) error {
+func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, installationIDs []string, defaultEnabled bool) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil

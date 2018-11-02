@@ -122,6 +122,24 @@ func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*chat.Bundle, erro
 	return s.protocol.GetBundle(myIdentityKey)
 }
 
+// EnableInstallation enables an installation for multi-device sync
+func (s *Service) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	if s.protocol == nil {
+		return errProtocolNotInitialized
+	}
+
+	return s.protocol.EnableInstallation(myIdentityKey, installationID)
+}
+
+// DisableInstallation disables an installation for multi-device sync
+func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	if s.protocol == nil {
+		return errProtocolNotInitialized
+	}
+
+	return s.protocol.DisableInstallation(myIdentityKey, installationID)
+}
+
 // APIs returns a list of new APIs.
 func (s *Service) APIs() []rpc.API {
 	apis := []rpc.API{

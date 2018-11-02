@@ -85,7 +85,7 @@ node('linux') {
               sh """
                 make deploy \
                     release_tag=${version} \
-                    release_branch=${gitBranch} \
+                    release_branch=${paramBranch} \
                     release_directory='/tmp/release-${version}/*'
               """
             }
