@@ -782,11 +782,11 @@
   version = "v1.1"
 
 [[projects]]
-  digest = "1:b80bfc6278c27edcb1946fc38bc61f4c3a1cd50978083a4a79b7c875c70ed9d8"
+  digest = "1:41fb72d7a71f37f1f9c766d965178636ecda21b429b1f2e3fff42cfc31279751"
   name = "github.com/status-im/doubleratchet"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "321788dbb6eac36f7dab04e631db139e13bb280b"
+  revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
 
 [[projects]]
   branch = "master"

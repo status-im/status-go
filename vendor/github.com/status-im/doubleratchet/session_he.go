@@ -103,11 +103,8 @@ func (s *sessionHE) RatchetDecrypt(m MessageHE, ad []byte) ([]byte, error) {
 		return nil, fmt.Errorf("can't decrypt: %s", err)
 	}
 
-	if err = s.applyChanges(sc, append(skippedKeys1, skippedKeys2...)); err != nil {
+	if err = s.applyChanges(sc, []byte("FIXME"), append(skippedKeys1, skippedKeys2...)); err != nil {
 		return nil, fmt.Errorf("failed to apply changes: %s", err)
-	}
-	if step {
-		_ = s.deleteSkippedKeys(s.HKr)
 	}
 
 	return plaintext, nil

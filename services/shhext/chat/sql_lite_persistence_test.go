@@ -51,7 +51,7 @@ func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	s.Require().NoError(err)
 
 	actualKey, err := s.service.GetPrivateKeyBundle([]byte("non-existing"))
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualKey)
 
 	anyPrivateBundle, err := s.service.GetAnyPrivateBundle([]byte("non-existing-id"))
@@ -82,7 +82,7 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	s.Require().NoError(err)
 
 	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key, "1")
@@ -98,12 +98,82 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
 }
 
+func (s *SQLLitePersistenceTestSuite) TestUpdatedBundle() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
+	s.Nil(actualBundle)
+
+	// Create & add initial bundle
+	bundleContainer, err := NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+
+	bundle := bundleContainer.GetBundle()
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
+
+	// Create & add a new bundle
+	bundleContainer, err = NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+	bundle = bundleContainer.GetBundle()
+	// We set the version
+	bundle.GetSignedPreKeys()["1"].Version = 1
+
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
+
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
+	s.Require().NoError(err)
+	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
+	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
+}
+
+func (s *SQLLitePersistenceTestSuite) TestOutOfOrderBundles() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
+	s.Nil(actualBundle)
+
+	// Create & add initial bundle
+	bundleContainer, err := NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+
+	bundle1 := bundleContainer.GetBundle()
+	err = s.service.AddPublicBundle(bundle1)
+	s.Require().NoError(err)
+
+	// Create & add a new bundle
+	bundleContainer, err = NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+
+	bundle2 := bundleContainer.GetBundle()
+	// We set the version
+	bundle2.GetSignedPreKeys()["1"].Version = 1
+
+	err = s.service.AddPublicBundle(bundle2)
+	s.Require().NoError(err)
+
+	// Add again the initial bundle
+	err = s.service.AddPublicBundle(bundle1)
+	s.Require().NoError(err)
+
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
+	s.Require().NoError(err)
+	s.Equal(bundle2.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
+	s.Equal(bundle2.GetSignedPreKeys()["1"].GetVersion(), uint32(1))
+	s.Equal(bundle2.GetSignedPreKeys()["1"].GetSignedPreKey(), actualBundle.GetSignedPreKeys()["1"].GetSignedPreKey(), "It sets the right prekeys")
+}
+
 func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
 	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key, "1")
@@ -120,8 +190,10 @@ func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	// Adding a different bundle
 	bundleContainer, err = NewBundleContainer(key, "1")
 	s.Require().NoError(err)
-
+	// We set the version
 	bundle = bundleContainer.GetBundle()
+	bundle.GetSignedPreKeys()["1"].Version = 1
+
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
@@ -139,7 +211,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiDevicePublicBundle() {
 	s.Require().NoError(err)
 
 	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key, "1")
@@ -273,4 +345,3 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 }
 
 // TODO: Add test for MarkBundleExpired
-// TODO: Add test for AddPublicBundle checking that it expires previous bundles
