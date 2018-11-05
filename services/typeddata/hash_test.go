@@ -211,7 +211,6 @@ func TestEncodeData(t *testing.T) {
 	}
 }
 
-/*
 func TestEncodeDataErrors(t *testing.T) {
 	type testCase struct {
 		description string
@@ -222,46 +221,44 @@ func TestEncodeDataErrors(t *testing.T) {
 
 	for _, tc := range []testCase{
 		{
-			"FailedToCastToAString",
-			map[string]json.RawMessage{"a": 1},
+			"FailedUnmxarshalAsAString",
+			map[string]json.RawMessage{"a": json.RawMessage("1")},
 			Types{"A": []Field{{Name: "name", Type: "string"}}},
 			"A",
 		},
 		{
-			"FailedToCastToABytes",
-			map[string]json.RawMessage{"a": 1},
+			"FailedUnmarshalToHexBytesToABytes",
+			map[string]json.RawMessage{"a": json.RawMessage{1, 2, 3}},
 			Types{"A": []Field{{Name: "name", Type: "bytes"}}},
 			"A",
 		},
 		{
 			"CompositeTypeIsNotAnObject",
-			map[string]json.RawMessage{"a": "AAA"},
+			map[string]json.RawMessage{"a": json.RawMessage(`"AAA"`)},
 			Types{"A": []Field{{Name: "name", Type: "string"}}, "Z": []Field{{Name: "a", Type: "A"}}},
 			"Z",
 		},
 		{
 			"CompositeTypesFailed",
-			map[string]json.RawMessage{"a": map[string]json.RawMessage{
-				"name": 10,
-			}},
+			map[string]json.RawMessage{"a": json.RawMessage(`{"name":10}`)},
 			Types{"A": []Field{{Name: "name", Type: "string"}}, "Z": []Field{{Name: "a", Type: "A"}}},
 			"Z",
 		},
 		{
 			"ArraysNotSupported",
-			map[string]json.RawMessage{"a": []string{"A", "B"}},
-			Types{"A": []Field{{Name: "name", Type: "string[2]"}}},
+			map[string]json.RawMessage{"a": json.RawMessage("[1,2]")},
+			Types{"A": []Field{{Name: "name", Type: "int8[2]"}}},
 			"A",
 		},
 		{
 			"SlicesNotSupported",
-			map[string]json.RawMessage{"a": []string{"A", "B"}},
-			Types{"A": []Field{{Name: "name", Type: "string[]"}}},
+			map[string]json.RawMessage{"a": json.RawMessage("[1,2]")},
+			Types{"A": []Field{{Name: "name", Type: "int[]"}}},
 			"A",
 		},
 		{
-			"FailedToSetABigInt",
-			map[string]json.RawMessage{"a": "x00x"},
+			"FailedToUnmarshalInteger",
+			map[string]json.RawMessage{"a": json.RawMessage("x00x")},
 			Types{"A": []Field{{Name: "name", Type: "uint256"}}},
 			"A",
 		},
@@ -274,4 +271,3 @@ func TestEncodeDataErrors(t *testing.T) {
 		})
 	}
 }
-*/
