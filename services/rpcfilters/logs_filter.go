@@ -16,7 +16,9 @@ import (
 type logsFilter struct {
 	mu   sync.RWMutex
 	logs []types.Log
-	crit ethereum.FilterQuery
+	crit ethereum.FilterQuery // will be modified and different from original
+
+	originalCrit ethereum.FilterQuery // not modified version of the criteria
 
 	logsCache *cache
 

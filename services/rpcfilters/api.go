@@ -3,10 +3,12 @@ package rpcfilters
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -17,6 +19,10 @@ const (
 	defaultFilterLivenessPeriod = 5 * time.Minute
 	defaultLogsPeriod           = 3 * time.Second
 	defaultLogsQueryTimeout     = 10 * time.Second
+)
+
+var (
+	errFilterNotFound = errors.New("filter not found")
 )
 
 type filter interface {
@@ -86,13 +92,14 @@ func (api *PublicAPI) NewFilter(crit filters.FilterCriteria) (rpc.ID, error) {
 	id := rpc.ID(uuid.New())
 	ctx, cancel := context.WithCancel(context.Background())
 	f := &logsFilter{
-		id:        id,
-		crit:      ethereum.FilterQuery(crit),
-		done:      make(chan struct{}),
-		timer:     time.NewTimer(api.filterLivenessPeriod),
-		ctx:       ctx,
-		cancel:    cancel,
-		logsCache: newCache(defaultCacheSize),
+		id:           id,
+		crit:         ethereum.FilterQuery(crit),
+		originalCrit: ethereum.FilterQuery(crit),
+		done:         make(chan struct{}),
+		timer:        time.NewTimer(api.filterLivenessPeriod),
+		ctx:          ctx,
+		cancel:       cancel,
+		logsCache:    newCache(defaultCacheSize),
 	}
 	api.filtersMu.Lock()
 	api.filters[id] = f
@@ -181,6 +188,27 @@ func (api *PublicAPI) UninstallFilter(id rpc.ID) bool {
 	return found
 }
 
+// GetFilterLogs returns the logs for the filter with the given id.
+// If the filter could not be found an empty array of logs is returned.
+//
+// https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getfilterlogs
+func (api *PublicAPI) GetFilterLogs(ctx context.Context, id rpc.ID) ([]types.Log, error) {
+	api.filtersMu.Lock()
+	f, exist := api.filters[id]
+	api.filtersMu.Unlock()
+	if !exist {
+		return []types.Log{}, errFilterNotFound
+	}
+	logs, ok := f.(*logsFilter)
+	if !ok {
+		return []types.Log{}, fmt.Errorf("filter with ID %v is not of logs type", id)
+	}
+	ctx, cancel := context.WithTimeout(ctx, defaultLogsQueryTimeout)
+	defer cancel()
+	rst, err := getLogs(ctx, api.client(), logs.originalCrit)
+	return rst, err
+}
+
 // GetFilterChanges returns the hashes for the filter with the given id since
 // last time it was called. This can be used for polling.
 //
@@ -206,5 +234,5 @@ func (api *PublicAPI) GetFilterChanges(id rpc.ID) (interface{}, error) {
 		}
 		return rst, nil
 	}
-	return []interface{}{}, errors.New("filter not found")
+	return []interface{}{}, errFilterNotFound
 }
