@@ -2,6 +2,7 @@ package typeddata
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"math/big"
 	"testing"
@@ -15,34 +16,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	fromWallet = `
+{
+  "name":   "Cow",
+  "wallet": "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"
+}
+`
+	toWallet = `
+{
+  "name":   "Bob",
+  "wallet": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB"
+}
+`
+)
+
 func TestChainIDValidation(t *testing.T) {
 	chain := big.NewInt(10)
 	type testCase struct {
 		description string
-		domain      map[string]interface{}
-		err         string
+		domain      map[string]json.RawMessage
 	}
 	for _, tc := range []testCase{
 		{
 			"ChainIDMismatch",
-			map[string]interface{}{chainIDKey: 1},
-			"chainId 1 doesn't match selected chain 10",
+			map[string]json.RawMessage{chainIDKey: json.RawMessage("1")},
 		},
 		{
 			"ChainIDNotAnInt",
-			map[string]interface{}{chainIDKey: "10"},
-			"chainId is not an int",
+			map[string]json.RawMessage{chainIDKey: json.RawMessage(`"aa"`)},
 		},
 		{
 			"NoChainIDKey",
 			nil,
-			"domain misses chain key chainId",
 		},
 	} {
 		t.Run(tc.description, func(t *testing.T) {
 			typed := TypedData{Domain: tc.domain}
 			_, err := Sign(typed, nil, chain)
-			require.EqualError(t, err, tc.err)
+			require.Error(t, err)
 		})
 	}
 }
@@ -81,22 +93,16 @@ func TestInteroparableWithSolidity(t *testing.T) {
 			{Name: "contents", Type: "string"},
 		},
 	}
-	domain := map[string]interface{}{
-		"name":              "Ether Mail",
-		"version":           "1",
-		"chainId":           1,
-		"verifyingContract": "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+	domain := map[string]json.RawMessage{
+		"name":              json.RawMessage(`"Ether Mail"`),
+		"version":           json.RawMessage(`"1"`),
+		"chainId":           json.RawMessage("1"),
+		"verifyingContract": json.RawMessage(`"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`),
 	}
-	msg := map[string]interface{}{
-		"from": map[string]interface{}{
-			"name":   "Cow",
-			"wallet": "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
-		},
-		"to": map[string]interface{}{
-			"name":   "Bob",
-			"wallet": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
-		},
-		"contents": "Hello, Bob!",
+	msg := map[string]json.RawMessage{
+		"from":     json.RawMessage(fromWallet),
+		"to":       json.RawMessage(toWallet),
+		"contents": json.RawMessage(`"Hello, Bob!"`),
 	}
 	typed := TypedData{
 		Types:       mytypes,

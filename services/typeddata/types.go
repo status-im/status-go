@@ -1,6 +1,7 @@
 package typeddata
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -33,10 +34,10 @@ func (f Field) Validate() error {
 
 // TypedData defines typed data according to eip-712.
 type TypedData struct {
-	Types       Types                  `json:"types"`
-	PrimaryType string                 `json:"primaryType"`
-	Domain      map[string]interface{} `json:"domain"`
-	Message     map[string]interface{} `json:"message"`
+	Types       Types                      `json:"types"`
+	PrimaryType string                     `json:"primaryType"`
+	Domain      map[string]json.RawMessage `json:"domain"`
+	Message     map[string]json.RawMessage `json:"message"`
 }
 
 // Validate that required fields are defined.
@@ -74,11 +75,11 @@ func (t TypedData) ValidateChainID(chain *big.Int) error {
 	if _, exist := t.Domain[chainIDKey]; !exist {
 		return fmt.Errorf("domain misses chain key %s", chainIDKey)
 	}
-	chainID, ok := t.Domain[chainIDKey].(int)
-	if !ok {
-		return errors.New("chainId is not an int")
+	var chainID int64
+	if err := json.Unmarshal(t.Domain[chainIDKey], &chainID); err != nil {
+		return err
 	}
-	if int64(chainID) != chain.Int64() {
+	if chainID != chain.Int64() {
 		return fmt.Errorf("chainId %d doesn't match selected chain %s", chainID, chain)
 	}
 	return nil

@@ -2,19 +2,20 @@ package typeddata
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
-	"reflect"
 	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
 	bytes32Type, _ = abi.NewType("bytes32")
+	int256Type, _  = abi.NewType("int256")
 )
 
 func deps(target string, types Types) []string {
@@ -70,7 +71,7 @@ func typeHash(target string, types Types) (rst common.Hash) {
 	return crypto.Keccak256Hash([]byte(typeString(target, types)))
 }
 
-func hashStruct(target string, data map[string]interface{}, types Types) (rst common.Hash, err error) {
+func hashStruct(target string, data map[string]json.RawMessage, types Types) (rst common.Hash, err error) {
 	fields := types[target]
 	typeh := typeHash(target, types)
 	args := abi.Arguments{{Type: bytes32Type}}
@@ -91,25 +92,25 @@ func hashStruct(target string, data map[string]interface{}, types Types) (rst co
 	return crypto.Keccak256Hash(packed), nil
 }
 
-func toABITypeAndValue(f Field, data map[string]interface{}, types Types) (val interface{}, typ abi.Type, err error) {
+func toABITypeAndValue(f Field, data map[string]json.RawMessage, types Types) (val interface{}, typ abi.Type, err error) {
 	if f.Type == "string" {
-		str, ok := data[f.Name].(string)
-		if !ok {
-			return val, typ, fmt.Errorf("%v is not a string", data[f.Name])
+		var str string
+		if err = json.Unmarshal(data[f.Name], &str); err != nil {
+			return
 		}
 		typ = bytes32Type
 		val = crypto.Keccak256Hash([]byte(str))
 	} else if f.Type == "bytes" {
 		typ = bytes32Type
-		bytes, ok := data[f.Name].([]byte)
-		if !ok {
-			return val, typ, fmt.Errorf("%v is not a byte slice", data[f.Name])
+		var bytes hexutil.Bytes
+		if err = json.Unmarshal(data[f.Name], &bytes); err != nil {
+			return
 		}
 		val = crypto.Keccak256Hash(bytes)
 	} else if _, exist := types[f.Type]; exist {
-		obj, ok := data[f.Name].(map[string]interface{})
-		if !ok {
-			return val, typ, fmt.Errorf("%v is not an object", data[f.Name])
+		var obj map[string]json.RawMessage
+		if err = json.Unmarshal(data[f.Name], &obj); err != nil {
+			return
 		}
 		val, err = hashStruct(f.Type, obj, types)
 		if err != nil {
@@ -123,92 +124,39 @@ func toABITypeAndValue(f Field, data map[string]interface{}, types Types) (val i
 		}
 		if typ.T == abi.SliceTy || typ.T == abi.ArrayTy || typ.T == abi.FunctionTy {
 			return val, typ, errors.New("arrays, slices and functions are not supported")
-		}
-		val = data[f.Name]
-		if typ.T == abi.AddressTy {
-			strval, ok := val.(string)
-			if !ok {
-				return val, typ, fmt.Errorf("can't cast %v to a string", val)
+		} else if typ.T == abi.FixedBytesTy {
+			var bytes hexutil.Bytes
+			if err = json.Unmarshal(data[f.Name], &bytes); err != nil {
+				return
 			}
-			val = common.HexToAddress(strval)
-		}
-		if typ.T == abi.IntTy || typ.T == abi.UintTy {
-			val, err = castInteger(typ, val)
-			if err != nil {
-				return val, typ, err
+			typ = bytes32Type
+			rst := [32]byte{}
+			// reduce the length to the advertised type
+			if len(bytes) > typ.Size {
+				bytes = bytes[:typ.Size]
 			}
+			copy(rst[:], bytes)
+			val = rst
+		} else if typ.T == abi.AddressTy {
+			var addr common.Address
+			if err = json.Unmarshal(data[f.Name], &addr); err != nil {
+				return
+			}
+			val = addr
+		} else if typ.T == abi.IntTy || typ.T == abi.UintTy {
+			var big big.Int
+			if err = json.Unmarshal(data[f.Name], &big); err != nil {
+				return
+			}
+			typ = int256Type
+			val = &big
+		} else if typ.T == abi.BoolTy {
+			var rst bool
+			if err = json.Unmarshal(data[f.Name], &rst); err != nil {
+				return
+			}
+			val = rst
 		}
 	}
 	return
-}
-
-func castInteger(typ abi.Type, val interface{}) (interface{}, error) {
-	if typ.Kind == reflect.Ptr {
-		return castToBig(typ, val)
-	}
-	if typ.T == abi.IntTy {
-		return castToInt(typ, val)
-	}
-	if typ.T == abi.UintTy {
-		return castToUint(typ, val)
-	}
-	return nil, fmt.Errorf("value %d of type %v is not an integer", val, typ)
-}
-
-func castToInt(typ abi.Type, val interface{}) (rst interface{}, err error) {
-	intval, ok := val.(int)
-	if ok {
-		switch typ.Size {
-		case 8:
-			rst = int8(intval)
-		case 16:
-			rst = int16(intval)
-		case 32:
-			rst = int32(intval)
-		case 64:
-			rst = int64(intval)
-		}
-	}
-	if !ok {
-		err = fmt.Errorf("can't cast %v to int%d", val, typ.Size)
-	}
-	return
-}
-
-func castToUint(typ abi.Type, val interface{}) (rst interface{}, err error) {
-	intval, ok := val.(uint)
-	if ok {
-		switch typ.Size {
-		case 8:
-			rst = uint8(intval)
-		case 16:
-			rst = uint16(intval)
-		case 32:
-			rst = uint32(intval)
-		case 64:
-			rst = uint64(intval)
-		}
-	}
-	if !ok {
-		err = fmt.Errorf("can't cast %v to uint%d", val, typ.Size)
-	}
-	return
-}
-
-func castToBig(typ abi.Type, val interface{}) (interface{}, error) {
-	strval, ok := val.(string)
-	if !ok {
-		// fallback to integers
-		intval, ok := val.(int)
-		if !ok {
-			return nil, fmt.Errorf("can't cast %v to an integer", val)
-		}
-		val = new(big.Int).SetInt64(int64(intval))
-		return val, nil
-	}
-	val, ok = new(big.Int).SetString(strval, 0)
-	if !ok {
-		return nil, fmt.Errorf("failed to set big.Int from string value %s", strval)
-	}
-	return val, nil
 }
