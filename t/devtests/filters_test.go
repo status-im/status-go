@@ -22,14 +22,17 @@ type LogsSuite struct {
 	DevNodeSuite
 }
 
-func (s *LogsSuite) testEmit(event *eventer.Eventer, opts *bind.TransactOpts, id string, topic [32]byte, expect int) {
+func (s *LogsSuite) emitEvent(event *eventer.Eventer, opts *bind.TransactOpts, topic [32]byte) {
 	tx, err := event.Emit(opts, topic)
 	s.NoError(err)
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = bind.WaitMined(timeout, s.Eth, tx)
 	s.NoError(err)
+}
 
+func (s *LogsSuite) testEmit(event *eventer.Eventer, opts *bind.TransactOpts, id string, topic [32]byte, expect int) {
+	s.emitEvent(event, opts, topic)
 	s.NoError(utils.Eventually(func() error {
 		var logs []types.Log
 		err := s.Local.Call(&logs, "eth_getFilterChanges", id)
@@ -76,4 +79,29 @@ func (s *LogsSuite) TestLogsNewFilter() {
 	s.testEmit(event, opts, fid, ftopic, 1)
 	s.testEmit(event, opts, sid, stopic, 1)
 	s.testEmit(event, opts, fid, ftopic, 1)
+}
+
+func (s *LogsSuite) TestGetFilterLogs() {
+	var (
+		id string
+	)
+	s.Require().NoError(s.Local.Call(&id, "eth_newFilter", map[string]interface{}{}))
+
+	opts := bind.NewKeyedTransactor(s.DevAccount)
+	_, tx, event, err := eventer.DeployEventer(opts, s.Eth)
+	s.Require().NoError(err)
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	addr, err := bind.WaitDeployed(timeout, s.Eth, tx)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(addr)
+
+	s.emitEvent(event, opts, [32]byte{})
+	var logs []types.Log
+	s.Require().NoError(s.Local.Call(&logs, "eth_getFilterLogs", id))
+	s.Require().Len(logs, 1)
+	s.emitEvent(event, opts, [32]byte{})
+	logs = nil
+	s.Require().NoError(s.Local.Call(&logs, "eth_getFilterLogs", id))
+	s.Require().Len(logs, 2)
 }

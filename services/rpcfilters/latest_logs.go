@@ -54,6 +54,9 @@ func toFilterArg(q ethereum.FilterQuery) interface{} {
 		"address":   q.Addresses,
 		"topics":    q.Topics,
 	}
+	if q.FromBlock == nil {
+		arg["fromBlock"] = "0x0"
+	}
 	return arg
 }
 

@@ -1,10 +1,13 @@
 package rpcfilters
 
 import (
+	"context"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/assert"
@@ -73,4 +76,24 @@ func TestGetFilterChangesResetsTimer(t *testing.T) {
 	_, err = api.GetFilterChanges(id)
 	require.NoError(t, err)
 	require.True(t, f.deadline().Stop())
+}
+
+func TestGetFilterLogs(t *testing.T) {
+	tracker := new(callTracker)
+	api := &PublicAPI{
+		filters: make(map[rpc.ID]filter),
+		client:  func() ContextCaller { return tracker },
+	}
+	block := big.NewInt(10)
+	id, err := api.NewFilter(filters.FilterCriteria{
+		FromBlock: block,
+	})
+	require.NoError(t, err)
+	logs, err := api.GetFilterLogs(context.TODO(), id)
+	require.NoError(t, err)
+	require.Empty(t, logs)
+	require.Len(t, tracker.criterias, 1)
+	rst, err := hexutil.DecodeBig(tracker.criterias[0]["fromBlock"].(string))
+	require.NoError(t, err)
+	require.Equal(t, block, rst)
 }
