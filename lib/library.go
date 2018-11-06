@@ -94,29 +94,6 @@ func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
 	return C.CString(string(data))
 }
 
-// VerifyGroupMembershipSignatures ensure the signature pairs are valid
-//export VerifyGroupMembershipSignatures
-func VerifyGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
-	var signaturePairs [][3]string
-
-	if err := json.Unmarshal([]byte(C.GoString(signaturePairsStr)), &signaturePairs); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	if err := statusBackend.VerifyGroupMembershipSignatures(signaturePairs); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Success bool `json:"success"`
-	}{Success: true})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(data))
-}
-
 // ExtractGroupMembershipSignatures extract public keys from tuples of content/signature
 //export ExtractGroupMembershipSignatures
 func ExtractGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
@@ -152,6 +129,42 @@ func SignGroupMembership(content *C.char) *C.char {
 	data, err := json.Marshal(struct {
 		Signature string `json:"signature"`
 	}{Signature: signature})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// EnableInstallation enables an installation for multi-device sync.
+//export EnableInstallation
+func EnableInstallation(installationID *C.char) *C.char {
+	err := statusBackend.EnableInstallation(C.GoString(installationID))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+//export DisableInstallation
+func DisableInstallation(installationID *C.char) *C.char {
+	err := statusBackend.DisableInstallation(C.GoString(installationID))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
 	if err != nil {
 		return makeJSONResponse(err)
 	}
