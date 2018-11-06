@@ -122,10 +122,10 @@ func toABITypeAndValue(f Field, data map[string]json.RawMessage, types Types) (v
 		}
 		return val, bytes32Type, nil
 	}
-	return atomicType(f, data, types)
+	return atomicType(f, data)
 }
 
-func atomicType(f Field, data map[string]json.RawMessage, types Types) (val interface{}, typ abi.Type, err error) {
+func atomicType(f Field, data map[string]json.RawMessage) (val interface{}, typ abi.Type, err error) {
 	typ, err = abi.NewType(f.Type)
 	if err != nil {
 		return
@@ -133,38 +133,48 @@ func atomicType(f Field, data map[string]json.RawMessage, types Types) (val inte
 	if typ.T == abi.SliceTy || typ.T == abi.ArrayTy || typ.T == abi.FunctionTy {
 		return val, typ, errors.New("arrays, slices and functions are not supported")
 	} else if typ.T == abi.FixedBytesTy {
-		var bytes hexutil.Bytes
-		if err = json.Unmarshal(data[f.Name], &bytes); err != nil {
-			return
-		}
-		typ = bytes32Type
-		rst := [32]byte{}
-		// reduce the length to the advertised size
-		if len(bytes) > typ.Size {
-			bytes = bytes[:typ.Size]
-		}
-		copy(rst[:], bytes)
-		val = rst
+		return toFixedBytes(f, data[f.Name])
 	} else if typ.T == abi.AddressTy {
-		var addr common.Address
-		if err = json.Unmarshal(data[f.Name], &addr); err != nil {
-			return
-		}
-		val = addr
+		val, err = toAddress(f, data[f.Name])
 	} else if typ.T == abi.IntTy || typ.T == abi.UintTy {
-		var big big.Int
-		if err = json.Unmarshal(data[f.Name], &big); err != nil {
-			return
-		}
-		typ = int256Type
-		val = &big
+		return toInt(f, data[f.Name])
 	} else if typ.T == abi.BoolTy {
-		var rst bool
-		if err = json.Unmarshal(data[f.Name], &rst); err != nil {
-			return
-		}
-		val = rst
+		val, err = toBool(f, data[f.Name])
+	} else {
+		err = fmt.Errorf("type %s is not supported", f.Type)
 	}
-	err = fmt.Errorf("type %s is not supported", f.Type)
+	return
+}
+
+func toFixedBytes(f Field, data json.RawMessage) (rst [32]byte, typ abi.Type, err error) {
+	var bytes hexutil.Bytes
+	if err = json.Unmarshal(data, &bytes); err != nil {
+		return
+	}
+	typ = bytes32Type
+	rst = [32]byte{}
+	// reduce the length to the advertised size
+	if len(bytes) > typ.Size {
+		bytes = bytes[:typ.Size]
+	}
+	copy(rst[:], bytes)
+	return rst, typ, nil
+}
+
+func toInt(f Field, data json.RawMessage) (val *big.Int, typ abi.Type, err error) {
+	var rst big.Int
+	if err = json.Unmarshal(data, &rst); err != nil {
+		return
+	}
+	return &rst, int256Type, nil
+}
+
+func toAddress(f Field, data json.RawMessage) (rst common.Address, err error) {
+	err = json.Unmarshal(data, &rst)
+	return
+}
+
+func toBool(f Field, data json.RawMessage) (rst bool, err error) {
+	err = json.Unmarshal(data, &rst)
 	return
 }
