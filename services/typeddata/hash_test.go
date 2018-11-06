@@ -228,7 +228,7 @@ func TestEncodeDataErrors(t *testing.T) {
 		},
 		{
 			"FailedUnmarshalToHexBytesToABytes",
-			map[string]json.RawMessage{"a": json.RawMessage{1, 2, 3}},
+			map[string]json.RawMessage{"a": {1, 2, 3}},
 			Types{"A": []Field{{Name: "name", Type: "bytes"}}},
 			"A",
 		},

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -52,22 +53,22 @@ func deps(target string, types Types) []string {
 func typeString(target string, types Types) string {
 	b := new(bytes.Buffer)
 	for _, dep := range deps(target, types) {
-		b.WriteString(dep) // nolint: errcheck
-		b.WriteString("(") // nolint: errcheck
+		b.WriteString(dep)
+		b.WriteString("(")
 		fields := types[dep]
 		first := true
 		for i := range fields {
 			if !first {
-				b.WriteString(",") // nolint: errcheck
+				b.WriteString(",")
 			} else {
 				first = false
 			}
 			f := fields[i]
-			b.WriteString(f.Type) // nolint: errcheck
-			b.WriteString(" ")    // nolint: errcheck
-			b.WriteString(f.Name) // nolint: errcheck
+			b.WriteString(f.Type)
+			b.WriteString(" ")
+			b.WriteString(f.Name)
 		}
-		b.WriteString(")") // nolint: errcheck
+		b.WriteString(")")
 	}
 	return b.String()
 }
@@ -103,15 +104,13 @@ func toABITypeAndValue(f Field, data map[string]json.RawMessage, types Types) (v
 		if err = json.Unmarshal(data[f.Name], &str); err != nil {
 			return
 		}
-		typ = bytes32Type
-		val = crypto.Keccak256Hash([]byte(str))
+		return crypto.Keccak256Hash([]byte(str)), bytes32Type, nil
 	} else if f.Type == "bytes" {
-		typ = bytes32Type
 		var bytes hexutil.Bytes
 		if err = json.Unmarshal(data[f.Name], &bytes); err != nil {
 			return
 		}
-		val = crypto.Keccak256Hash(bytes)
+		return crypto.Keccak256Hash(bytes), bytes32Type, nil
 	} else if _, exist := types[f.Type]; exist {
 		var obj map[string]json.RawMessage
 		if err = json.Unmarshal(data[f.Name], &obj); err != nil {
@@ -121,11 +120,9 @@ func toABITypeAndValue(f Field, data map[string]json.RawMessage, types Types) (v
 		if err != nil {
 			return
 		}
-		typ = bytes32Type
-	} else {
-		return atomicType(f, data, types)
+		return val, bytes32Type, nil
 	}
-	return
+	return atomicType(f, data, types)
 }
 
 func atomicType(f Field, data map[string]json.RawMessage, types Types) (val interface{}, typ abi.Type, err error) {
@@ -142,7 +139,7 @@ func atomicType(f Field, data map[string]json.RawMessage, types Types) (val inte
 		}
 		typ = bytes32Type
 		rst := [32]byte{}
-		// reduce the length to the advertised type
+		// reduce the length to the advertised size
 		if len(bytes) > typ.Size {
 			bytes = bytes[:typ.Size]
 		}
@@ -168,5 +165,6 @@ func atomicType(f Field, data map[string]json.RawMessage, types Types) (val inte
 		}
 		val = rst
 	}
+	err = fmt.Errorf("type %s is not supported", f.Type)
 	return
 }

@@ -63,7 +63,7 @@ func (t TypedData) Validate() error {
 		fields := t.Types[typ]
 		for i := range fields {
 			if err := fields[i].Validate(); err != nil {
-				return err
+				return fmt.Errorf("field %d from type `%s` is invalid: %v", i, typ, err)
 			}
 		}
 	}
