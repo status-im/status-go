@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -256,6 +258,20 @@ func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Byte
 // key that was used to calculate the signature in the message
 func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (gethcommon.Address, error) {
 	return b.personalAPI.Recover(rpcParams)
+}
+
+// SignTypedData accepts data and password. Gets verified account and signs typed data.
+func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string) (hexutil.Bytes, error) {
+	account, err := b.getVerifiedAccount(password)
+	if err != nil {
+		return hexutil.Bytes{}, err
+	}
+	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
+	sig, err := typeddata.Sign(typed, account.AccountKey.PrivateKey, chain)
+	if err != nil {
+		return hexutil.Bytes{}, err
+	}
+	return hexutil.Bytes(sig), err
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {

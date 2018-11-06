@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 	"gopkg.in/go-playground/validator.v9"
@@ -347,6 +348,22 @@ func SendTransaction(txArgsJSON, password *C.char) *C.char {
 		code = c
 	}
 	return C.CString(prepareJSONResponseWithCode(hash.String(), err, code))
+}
+
+// SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
+// if password matches selected account.
+//export SignTypedData
+func SignTypedData(data, password *C.char) *C.char {
+	var typed typeddata.TypedData
+	err := json.Unmarshal([]byte(C.GoString(data)), &typed)
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+	if err := typed.Validate(); err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+	result, err := statusBackend.SignTypedData(typed, C.GoString(password))
+	return C.CString(prepareJSONResponse(result.String(), err))
 }
 
 //StartCPUProfile runs pprof for cpu
