@@ -139,8 +139,10 @@ func main() {
 		profiling.NewProfiler(*pprofPort).Go()
 	}
 
-	// Run stats server.
-	if *metrics {
+	// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
+	// or setting `gethmetrics.Enabled` to true during compilation time:
+	// https://github.com/status-im/go-ethereum/pull/76.
+	if *metrics || gethmetrics.Enabled {
 		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
 		go gethmetrics.CollectProcessMetrics(3 * time.Second)
 	}
