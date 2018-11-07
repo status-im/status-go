@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	nodePeersCounter  metrics.Counter
+	nodePeersGauge    metrics.Gauge
 	nodeMaxPeersGauge metrics.Gauge
 )
 
@@ -22,7 +22,7 @@ func init() {
 		metrics.Enabled = true
 	}
 
-	nodePeersCounter = metrics.NewRegisteredCounter("p2p/Peers", nil)
+	nodePeersGauge = metrics.NewRegisteredGauge("p2p/Peers", nil)
 	nodeMaxPeersGauge = metrics.NewRegisteredGauge("p2p/MaxPeers", nil)
 }
 
@@ -32,12 +32,7 @@ func updateNodeMetrics(node *node.Node, evType p2p.PeerEventType) error {
 		return errors.New("p2p server is unavailable")
 	}
 
-	if evType == p2p.PeerEventTypeAdd {
-		nodePeersCounter.Inc(1)
-	} else if evType == p2p.PeerEventTypeDrop {
-		nodePeersCounter.Dec(1)
-	}
-
+	nodePeersGauge.Update(int64(server.PeerCount()))
 	nodeMaxPeersGauge.Update(int64(server.MaxPeers))
 
 	return nil

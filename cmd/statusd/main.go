@@ -202,8 +202,15 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
-			logger.Error("Failed to subscribe server events", "error", err)
+		// Try to subscribe and collect metrics. In case of an error, retry.
+		for {
+			if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
+				logger.Error("Failed to subscribe server events", "error", err)
+			} else {
+				return
+			}
+
+			time.Sleep(time.Second)
 		}
 	}()
 
