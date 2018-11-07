@@ -207,6 +207,7 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 			if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
 				logger.Error("Failed to subscribe server events", "error", err)
 			} else {
+				// no error means that the subscription was terminated by purpose
 				return
 			}
 
