@@ -37,7 +37,11 @@ GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
 	else git rev-parse --short HEAD; fi)
 AUTHOR = $(shell echo $$USER)
 
-BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
+ENABLE_METRICS ?= false
+BUILD_FLAGS ?= $(shell echo "-ldflags '\
+	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+	-X github.com/status-im/status-go/params.Version=$(GIT_COMMIT) \
+	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
 
 XGO_GO ?= latest
 XGOVERSION ?= 1.10.x
