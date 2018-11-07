@@ -9,10 +9,10 @@ package loggables
 import (
 	"net"
 
+	uuid "github.com/google/uuid"
 	logging "github.com/ipfs/go-log"
 	peer "github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
-	uuid "github.com/satori/go.uuid"
 )
 
 // NetConn returns an eventlog.Metadata with the conn addresses
@@ -32,7 +32,7 @@ func Error(e error) logging.Loggable {
 
 func Uuid(key string) logging.Metadata {
 	ids := "#UUID-ERROR#"
-	if id, err := uuid.NewV4(); err == nil {
+	if id, err := uuid.NewRandom(); err == nil {
 		ids = id.String()
 	}
 	return logging.Metadata{

@@ -58,7 +58,7 @@ func InfoFromP2pAddr(m ma.Multiaddr) (*PeerInfo, error) {
 }
 
 func InfoToP2pAddrs(pi *PeerInfo) ([]ma.Multiaddr, error) {
-	addrs := []ma.Multiaddr{}
+	var addrs []ma.Multiaddr
 	tpl := "/" + ma.ProtocolWithCode(ma.P_IPFS).Name + "/"
 	for _, addr := range pi.Addrs {
 		p2paddr, err := ma.NewMultiaddr(tpl + peer.IDB58Encode(pi.ID))

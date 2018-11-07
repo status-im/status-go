@@ -219,18 +219,14 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
 
 	// Generate the list of seal verification requests, and start the parallel verifier
 	seals := make([]bool, len(chain))
-	if checkFreq != 0 {
-		// In case of checkFreq == 0 all seals are left false.
-		for i := 0; i < len(seals)/checkFreq; i++ {
-			index := i*checkFreq + hc.rand.Intn(checkFreq)
-			if index >= len(seals) {
-				index = len(seals) - 1
-			}
-			seals[index] = true
+	for i := 0; i < len(seals)/checkFreq; i++ {
+		index := i*checkFreq + hc.rand.Intn(checkFreq)
+		if index >= len(seals) {
+			index = len(seals) - 1
 		}
-		// Last should always be verified to avoid junk.
-		seals[len(seals)-1] = true
+		seals[index] = true
 	}
+	seals[len(seals)-1] = true // Last should always be verified to avoid junk
 
 	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
 	defer close(abort)

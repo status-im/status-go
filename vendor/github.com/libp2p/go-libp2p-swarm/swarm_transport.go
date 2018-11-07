@@ -18,6 +18,11 @@ func (s *Swarm) TransportForDialing(a ma.Multiaddr) transport.Transport {
 
 	s.transports.RLock()
 	defer s.transports.RUnlock()
+	if len(s.transports.m) == 0 {
+		log.Error("you have no transports configured")
+		return nil
+	}
+
 	for _, p := range protocols {
 		transport, ok := s.transports.m[p.Code]
 		if !ok {
@@ -41,6 +46,11 @@ func (s *Swarm) TransportForListening(a ma.Multiaddr) transport.Transport {
 
 	s.transports.RLock()
 	defer s.transports.RUnlock()
+	if len(s.transports.m) == 0 {
+		log.Error("you have no transports configured")
+		return nil
+	}
+
 	selected := s.transports.m[protocols[len(protocols)-1].Code]
 	for _, p := range protocols {
 		transport, ok := s.transports.m[p.Code]

@@ -33,6 +33,8 @@ type Conn struct {
 		sync.Mutex
 		m map[*Stream]struct{}
 	}
+
+	stat inet.Stat
 }
 
 // Close closes this connection.
@@ -98,7 +100,7 @@ func (c *Conn) start() {
 			}
 			c.swarm.refs.Add(1)
 			go func() {
-				s, err := c.addStream(ts)
+				s, err := c.addStream(ts, inet.DirInbound)
 
 				// Don't defer this. We don't want to block
 				// swarm shutdown on the connection handler.
@@ -158,16 +160,21 @@ func (c *Conn) RemotePublicKey() ic.PubKey {
 	return c.conn.RemotePublicKey()
 }
 
+// Stat returns metadata pertaining to this connection
+func (c *Conn) Stat() inet.Stat {
+	return c.stat
+}
+
 // NewStream returns a new Stream from this connection
 func (c *Conn) NewStream() (inet.Stream, error) {
 	ts, err := c.conn.OpenStream()
 	if err != nil {
 		return nil, err
 	}
-	return c.addStream(ts)
+	return c.addStream(ts, inet.DirOutbound)
 }
 
-func (c *Conn) addStream(ts smux.Stream) (*Stream, error) {
+func (c *Conn) addStream(ts smux.Stream, dir inet.Direction) (*Stream, error) {
 	c.streams.Lock()
 	// Are we still online?
 	if c.streams.m == nil {
@@ -177,9 +184,11 @@ func (c *Conn) addStream(ts smux.Stream) (*Stream, error) {
 	}
 
 	// Wrap and register the stream.
+	stat := inet.Stat{Direction: dir}
 	s := &Stream{
 		stream: ts,
 		conn:   c,
+		stat:   stat,
 	}
 	c.streams.m[s] = struct{}{}
 

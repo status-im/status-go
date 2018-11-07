@@ -22,6 +22,9 @@ const (
 	streamReset
 )
 
+// Validate Stream conforms to the go-libp2p-net Stream interface
+var _ inet.Stream = &Stream{}
+
 // Stream is the stream type used by swarm. In general, you won't use this type
 // directly.
 type Stream struct {
@@ -36,6 +39,8 @@ type Stream struct {
 	notifyLk sync.Mutex
 
 	protocol atomic.Value
+
+	stat inet.Stat
 }
 
 func (s *Stream) String() string {
@@ -164,4 +169,9 @@ func (s *Stream) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline sets the write deadline for this stream.
 func (s *Stream) SetWriteDeadline(t time.Time) error {
 	return s.stream.SetWriteDeadline(t)
+}
+
+// Stat returns metadata information for this stream.
+func (s *Stream) Stat() inet.Stat {
+	return s.stat
 }

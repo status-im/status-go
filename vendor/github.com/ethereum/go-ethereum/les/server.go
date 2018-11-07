@@ -41,34 +41,17 @@ import (
 type LesServer struct {
 	lesCommons
 
-	fcManager    *flowcontrol.ClientManager // nil if our node is client only
-	fcCostStats  *requestCostStats
-	defParams    *flowcontrol.ServerParams
-	lesTopics    []discv5.Topic
-	privateKey   *ecdsa.PrivateKey
-	quitSync     chan struct{}
-	onlyAnnounce bool
+	fcManager   *flowcontrol.ClientManager // nil if our node is client only
+	fcCostStats *requestCostStats
+	defParams   *flowcontrol.ServerParams
+	lesTopics   []discv5.Topic
+	privateKey  *ecdsa.PrivateKey
+	quitSync    chan struct{}
 }
 
 func NewLesServer(eth *eth.Ethereum, config *eth.Config) (*LesServer, error) {
 	quitSync := make(chan struct{})
-	pm, err := NewProtocolManager(
-		eth.BlockChain().Config(),
-		light.DefaultServerIndexerConfig,
-		false,
-		config.NetworkId,
-		eth.EventMux(),
-		eth.Engine(),
-		newPeerSet(),
-		eth.BlockChain(),
-		eth.TxPool(),
-		eth.ChainDb(),
-		nil,
-		nil,
-		nil,
-		quitSync,
-		new(sync.WaitGroup),
-		config.ULC)
+	pm, err := NewProtocolManager(eth.BlockChain().Config(), light.DefaultServerIndexerConfig, false, config.NetworkId, eth.EventMux(), eth.Engine(), newPeerSet(), eth.BlockChain(), eth.TxPool(), eth.ChainDb(), nil, nil, nil, quitSync, new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}
@@ -87,9 +70,8 @@ func NewLesServer(eth *eth.Ethereum, config *eth.Config) (*LesServer, error) {
 			bloomTrieIndexer: light.NewBloomTrieIndexer(eth.ChainDb(), nil, params.BloomBitsBlocks, params.BloomTrieFrequency),
 			protocolManager:  pm,
 		},
-		quitSync:     quitSync,
-		lesTopics:    lesTopics,
-		onlyAnnounce: config.OnlyAnnounce,
+		quitSync:  quitSync,
+		lesTopics: lesTopics,
 	}
 
 	logger := log.New()
@@ -307,8 +289,10 @@ func (s *requestCostStats) getCurrentList() RequestCostList {
 	defer s.lock.Unlock()
 
 	list := make(RequestCostList, len(reqList))
+	//fmt.Println("RequestCostList")
 	for idx, code := range reqList {
 		b, m := s.stats[code].calc()
+		//fmt.Println(code, s.stats[code].cnt, b/1000000, m/1000000)
 		if m < 0 {
 			b += m
 			m = 0

@@ -137,22 +137,27 @@
   name = "github.com/beevik/ntp"
   version = "0.2.0"
 
+# gx release 1.3.6
 [[override]]
   name = "github.com/multiformats/go-multiaddr"
-  revision = "f36800afeb9c141e1adb7da099e6f010dfd4c419"
+  revision = "8dc8c4a64c84bc5f68e230f01a9c861d2aefc781"
 
-# 1.0.8
+# gx release 1.0.9
 [[override]]
   name = "github.com/multiformats/go-multihash"
-  revision = "8be2a682ab9f254311de1375145a2f78a809b07d"
+  revision = "a91e75d03bf4dba801af7b159c8b2aa7b5f47ea8"
 
 [[override]]
   name = "github.com/satori/go.uuid"
   revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
 
 [[constraint]]
-  branch = "master"
+  version = "v1.0.0"
   name = "github.com/status-im/rendezvous"
+
+[[override]]
+  name = "github.com/status-im/go-multiaddr-ethv4"
+  revision = "17cb1ad76379d65e802eacc786d8f67eebd7cd6d"
 
 [[override]]
   name = "github.com/deckarep/golang-set"

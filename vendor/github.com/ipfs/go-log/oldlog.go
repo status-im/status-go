@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
 	tracer "github.com/ipfs/go-log/tracer"
 
@@ -30,26 +31,49 @@ var defaultLogFormat = "color"
 
 // Logging environment variables
 const (
+	// TODO these env names should be more general, IPFS is not the only project to
+	// use go-log
 	envLogging    = "IPFS_LOGGING"
 	envLoggingFmt = "IPFS_LOGGING_FMT"
+
+	envLoggingFile = "GOLOG_FILE" // /path/to/file
 )
 
 // ErrNoSuchLogger is returned when the util pkg is asked for a non existant logger
 var ErrNoSuchLogger = errors.New("Error: No such logger")
 
 // loggers is the set of loggers in the system
+var loggerMutex sync.RWMutex
 var loggers = map[string]*logging.Logger{}
 
 // SetupLogging will initialize the logger backend and set the flags.
+// TODO calling this in `init` pushes all configuration to env variables
+// - move it out of `init`? then we need to change all the code (js-ipfs, go-ipfs) to call this explicitly
+// - have it look for a config file? need to define what that is
 func SetupLogging() {
 
+	// colorful or plain
 	lfmt := LogFormats[os.Getenv(envLoggingFmt)]
 	if lfmt == "" {
 		lfmt = LogFormats[defaultLogFormat]
 	}
 
-	backend := logging.NewLogBackend(colorable.NewColorableStderr(), "", 0)
-	logging.SetBackend(backend)
+	// check if we log to a file
+	var lgbe []logging.Backend
+	if logfp := os.Getenv(envLoggingFile); len(logfp) > 0 {
+		f, err := os.Create(logfp)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR go-log: %s: failed to set logging file backend\n", err)
+		} else {
+			lgbe = append(lgbe, logging.NewLogBackend(f, "", 0))
+		}
+	}
+
+	// logs written to stderr
+	lgbe = append(lgbe, logging.NewLogBackend(colorable.NewColorableStderr(), "", 0))
+
+	// set the backend(s)
+	logging.SetBackend(lgbe...)
 	logging.SetFormatter(logging.MustStringFormatter(lfmt))
 
 	lvl := logging.ERROR
@@ -79,6 +103,10 @@ func SetDebugLogging() {
 // SetAllLoggers changes the logging.Level of all loggers to lvl
 func SetAllLoggers(lvl logging.Level) {
 	logging.SetLevel(lvl, "")
+
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+
 	for n := range loggers {
 		logging.SetLevel(lvl, n)
 	}
@@ -98,6 +126,9 @@ func SetLogLevel(name, level string) error {
 		return nil
 	}
 
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+
 	// Check if we have a logger by that name
 	if _, ok := loggers[name]; !ok {
 		return ErrNoSuchLogger
@@ -111,6 +142,8 @@ func SetLogLevel(name, level string) error {
 // GetSubsystems returns a slice containing the
 // names of the current loggers
 func GetSubsystems() []string {
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
 	subs := make([]string, 0, len(loggers))
 
 	for k := range loggers {
@@ -120,7 +153,14 @@ func GetSubsystems() []string {
 }
 
 func getLogger(name string) *logging.Logger {
-	log := logging.MustGetLogger(name)
-	loggers[name] = log
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
+
+	log := loggers[name]
+	if log == nil {
+		log = logging.MustGetLogger(name)
+		loggers[name] = log
+	}
+
 	return log
 }

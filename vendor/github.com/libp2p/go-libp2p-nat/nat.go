@@ -3,6 +3,7 @@ package nat
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -125,13 +126,38 @@ func (nat *NAT) NewMapping(maddr ma.Multiaddr) (Mapping, error) {
 		return nil, fmt.Errorf("DialArgs failed on addr: %s", maddr.String())
 	}
 
+	var ip net.IP
 	switch network {
 	case "tcp", "tcp4", "tcp6":
+		addr, err := net.ResolveTCPAddr(network, addr)
+		if err != nil {
+			return nil, err
+		}
+		ip = addr.IP
 		network = "tcp"
 	case "udp", "udp4", "udp6":
+		addr, err := net.ResolveUDPAddr(network, addr)
+		if err != nil {
+			return nil, err
+		}
+		ip = addr.IP
 		network = "udp"
 	default:
 		return nil, fmt.Errorf("transport not supported by NAT: %s", network)
+	}
+
+	// XXX: Known limitation: doesn't handle multiple internal addresses.
+	// If this applies to you, you can figure it out yourself. Ideally, the
+	// NAT library would allow us to handle this case but the "go way"
+	// appears to be to just "shrug" at edge-cases.
+	if !ip.IsUnspecified() {
+		internalAddr, err := nat.nat.GetInternalAddress()
+		if err != nil {
+			return nil, fmt.Errorf("failed to discover address on nat: %s", err)
+		}
+		if !ip.Equal(internalAddr) {
+			return nil, fmt.Errorf("nat address is %s, refusing to map %s", internalAddr, ip)
+		}
 	}
 
 	intports := strings.Split(addr, ":")[1]

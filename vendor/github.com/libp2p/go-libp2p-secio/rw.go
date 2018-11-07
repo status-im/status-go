@@ -9,8 +9,8 @@ import (
 	"io"
 	"sync"
 
+	pool "github.com/libp2p/go-buffer-pool"
 	msgio "github.com/libp2p/go-msgio"
-	mpool "github.com/libp2p/go-msgio/mpool"
 )
 
 // ErrMACInvalid signals that a MAC verification failed
@@ -42,10 +42,10 @@ func (w *etmWriter) WriteMsg(b []byte) error {
 	w.Lock()
 	defer w.Unlock()
 
-	bufsize := uint32(4 + len(b) + w.mac.Size())
 	// encrypt.
-	buf := mpool.ByteSlicePool.Get(bufsize).([]byte)
-	data := buf[4 : 4+len(b)] // the pool's buffer may be larger
+	buf := pool.Get(4 + len(b) + w.mac.Size())
+	defer pool.Put(buf)
+	data := buf[4 : 4+len(b)]
 	w.str.XORKeyStream(data, b)
 
 	// log.Debugf("ENC plaintext (%d): %s %v", len(b), b, b)
@@ -61,8 +61,7 @@ func (w *etmWriter) WriteMsg(b []byte) error {
 	w.mac.Reset()
 	binary.BigEndian.PutUint32(buf[:4], uint32(len(data)))
 
-	_, err := w.w.Write(buf[:bufsize])
-	mpool.ByteSlicePool.Put(bufsize, buf)
+	_, err := w.w.Write(buf)
 	return err
 }
 
@@ -88,6 +87,10 @@ type etmReader struct {
 	msg msgio.ReadCloser // msgio for knowing where boundaries lie
 	str cipher.Stream    // the stream cipher to encrypt with
 	mac HMAC             // the mac to authenticate data with
+
+	// internal buffer used for checking MACs, this saves us quite a few
+	// allocations and should be quite small.
+	macBuf []byte
 
 	sync.Mutex
 }
@@ -216,12 +219,12 @@ func (r *etmReader) macCheckThenDecrypt(m []byte) (int, error) {
 	macd := m[mark:]
 
 	r.mac.Write(data)
-	expected := r.mac.Sum(nil)
+	r.macBuf = r.mac.Sum(r.macBuf[:0])
 	r.mac.Reset()
 
 	// check mac. if failed, return error.
-	if !hmac.Equal(macd, expected) {
-		log.Debug("MAC Invalid:", expected, "!=", macd)
+	if !hmac.Equal(macd, r.macBuf) {
+		log.Debug("MAC Invalid:", r.macBuf, "!=", macd)
 		return 0, ErrMACInvalid
 	}
 

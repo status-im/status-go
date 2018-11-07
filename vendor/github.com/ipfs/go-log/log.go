@@ -336,13 +336,17 @@ func (el *eventLogger) Event(ctx context.Context, event string, metadata ...Logg
 	accum["system"] = e.system
 	accum["time"] = FormatRFC3339(time.Now())
 
-	out, err := json.Marshal(accum)
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	err = encoder.Encode(accum)
 	if err != nil {
 		el.Errorf("ERROR FORMATTING EVENT ENTRY: %s", err)
 		return
 	}
 
-	writer.WriterGroup.Write(append(out, '\n'))
+	writer.WriterGroup.Write(buf.Bytes())
 }
 
 // DEPRECATED

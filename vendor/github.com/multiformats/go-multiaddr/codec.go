@@ -11,7 +11,7 @@ func stringToBytes(s string) ([]byte, error) {
 	// consume trailing slashes
 	s = strings.TrimRight(s, "/")
 
-	b := new(bytes.Buffer)
+	var b bytes.Buffer
 	sp := strings.Split(s, "/")
 
 	if sp[0] != "" {
@@ -26,7 +26,7 @@ func stringToBytes(s string) ([]byte, error) {
 		if p.Code == 0 {
 			return nil, fmt.Errorf("no protocol with name %s", sp[0])
 		}
-		b.Write(CodeToVarint(p.Code))
+		_, _ = b.Write(CodeToVarint(p.Code))
 		sp = sp[1:]
 
 		if p.Size == 0 { // no length.
@@ -43,12 +43,12 @@ func stringToBytes(s string) ([]byte, error) {
 			sp = []string{"/" + strings.Join(sp, "/")}
 		}
 
-		if p.Transcoder == nil {
-			return nil, fmt.Errorf("no transcoder for %s protocol", p.Name)
-		}
 		a, err := p.Transcoder.StringToBytes(sp[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse %s: %s %s", p.Name, sp[0], err)
+		}
+		if p.Size < 0 { // varint size.
+			_, _ = b.Write(CodeToVarint(len(a)))
 		}
 		b.Write(a)
 		sp = sp[1:]
@@ -74,13 +74,20 @@ func validateBytes(b []byte) (err error) {
 			continue
 		}
 
-		size, err := sizeForAddr(p, b)
+		n, size, err := sizeForAddr(p, b)
 		if err != nil {
 			return err
 		}
 
+		b = b[n:]
+
 		if len(b) < size || size < 0 {
 			return fmt.Errorf("invalid value for size")
+		}
+
+		err = p.Transcoder.ValidateBytes(b[:size])
+		if err != nil {
+			return err
 		}
 
 		b = b[size:]
@@ -89,69 +96,72 @@ func validateBytes(b []byte) (err error) {
 	return nil
 }
 
-func bytesToString(b []byte) (ret string, err error) {
-	s := ""
+func readComponent(b []byte) (int, Component, error) {
+	var offset int
+	code, n, err := ReadVarintCode(b)
+	if err != nil {
+		return 0, Component{}, err
+	}
+	offset += n
 
-	for len(b) > 0 {
-		code, n, err := ReadVarintCode(b)
-		if err != nil {
-			return "", err
-		}
-
-		b = b[n:]
-		p := ProtocolWithCode(code)
-		if p.Code == 0 {
-			return "", fmt.Errorf("no protocol with code %d", code)
-		}
-		s += "/" + p.Name
-
-		if p.Size == 0 {
-			continue
-		}
-
-		size, err := sizeForAddr(p, b)
-		if err != nil {
-			return "", err
-		}
-
-		if len(b) < size || size < 0 {
-			return "", fmt.Errorf("invalid value for size")
-		}
-
-		if p.Transcoder == nil {
-			return "", fmt.Errorf("no transcoder for %s protocol", p.Name)
-		}
-		a, err := p.Transcoder.BytesToString(b[:size])
-		if err != nil {
-			return "", err
-		}
-		if len(a) > 0 {
-			s += "/" + a
-		}
-		b = b[size:]
+	p := ProtocolWithCode(code)
+	if p.Code == 0 {
+		return 0, Component{}, fmt.Errorf("no protocol with code %d", code)
 	}
 
-	return s, nil
+	if p.Size == 0 {
+		return offset, Component{
+			bytes:    b[:offset],
+			offset:   offset,
+			protocol: p,
+		}, nil
+	}
+
+	n, size, err := sizeForAddr(p, b[offset:])
+	if err != nil {
+		return 0, Component{}, err
+	}
+
+	offset += n
+
+	if len(b[offset:]) < size || size < 0 {
+		return 0, Component{}, fmt.Errorf("invalid value for size")
+	}
+
+	return offset + size, Component{
+		bytes:    b[:offset+size],
+		protocol: p,
+		offset:   offset,
+	}, nil
 }
 
-func sizeForAddr(p Protocol, b []byte) (int, error) {
+func bytesToString(b []byte) (ret string, err error) {
+	var buf strings.Builder
+
+	for len(b) > 0 {
+		n, c, err := readComponent(b)
+		if err != nil {
+			return "", err
+		}
+		b = b[n:]
+		c.writeTo(&buf)
+	}
+
+	return buf.String(), nil
+}
+
+func sizeForAddr(p Protocol, b []byte) (skip, size int, err error) {
 	switch {
 	case p.Size > 0:
-		return (p.Size / 8), nil
+		return 0, (p.Size / 8), nil
 	case p.Size == 0:
-		return 0, nil
-	case p.Path:
-		size, n, err := ReadVarintCode(b)
-		if err != nil {
-			return 0, err
-		}
-		return size + n, nil
+		return 0, 0, nil
 	default:
 		size, n, err := ReadVarintCode(b)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
-		return size + n, nil
+		return n, size, nil
 	}
 }
 
@@ -168,12 +178,12 @@ func bytesSplit(b []byte) ([][]byte, error) {
 			return nil, fmt.Errorf("no protocol with code %d", b[0])
 		}
 
-		size, err := sizeForAddr(p, b[n:])
+		n2, size, err := sizeForAddr(p, b[n:])
 		if err != nil {
 			return nil, err
 		}
 
-		length := n + size
+		length := n + n2 + size
 		ret = append(ret, b[:length])
 		b = b[length:]
 	}

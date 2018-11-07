@@ -1,7 +1,7 @@
 package madns
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 
 	ma "github.com/multiformats/go-multiaddr"
@@ -44,23 +44,19 @@ func init() {
 	}
 }
 
-var DnsTranscoder = ma.NewTranscoderFromFunctions(dnsStB, dnsBtS)
+var DnsTranscoder = ma.NewTranscoderFromFunctions(dnsStB, dnsBtS, dnsVal)
+
+func dnsVal(b []byte) error {
+	if bytes.IndexByte(b, '/') >= 0 {
+		return fmt.Errorf("domain name %q contains a slash", string(b))
+	}
+	return nil
+}
 
 func dnsStB(s string) ([]byte, error) {
-	size := ma.CodeToVarint(len(s))
-	b := append(size, []byte(s)...)
-	return b, nil
+	return []byte(s), nil
 }
 
 func dnsBtS(b []byte) (string, error) {
-	size, n, err := ma.ReadVarintCode(b)
-	if err != nil {
-		return "", err
-	}
-
-	b = b[n:]
-	if len(b) != size {
-		return "", errors.New("inconsistent lengths")
-	}
 	return string(b), nil
 }

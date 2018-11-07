@@ -12,7 +12,6 @@ import (
 	peer "github.com/libp2p/go-libp2p-peer"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
 	ma "github.com/multiformats/go-multiaddr"
-	mh "github.com/multiformats/go-multihash"
 )
 
 func peerToPeerInfo(p *pb.CircuitRelay_Peer) (pstore.PeerInfo, error) {
@@ -20,7 +19,7 @@ func peerToPeerInfo(p *pb.CircuitRelay_Peer) (pstore.PeerInfo, error) {
 		return pstore.PeerInfo{}, errors.New("nil peer")
 	}
 
-	h, err := mh.Cast(p.Id)
+	id, err := peer.IDFromBytes(p.Id)
 	if err != nil {
 		return pstore.PeerInfo{}, err
 	}
@@ -33,7 +32,7 @@ func peerToPeerInfo(p *pb.CircuitRelay_Peer) (pstore.PeerInfo, error) {
 		}
 	}
 
-	return pstore.PeerInfo{ID: peer.ID(h), Addrs: addrs}, nil
+	return pstore.PeerInfo{ID: id, Addrs: addrs}, nil
 }
 
 func peerInfoToPeer(pi pstore.PeerInfo) *pb.CircuitRelay_Peer {

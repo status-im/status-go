@@ -1,142 +1,158 @@
 package multiaddr
 
-import (
-	"encoding/binary"
-	"fmt"
-	"strings"
-)
-
-// Protocol is a Multiaddr protocol description structure.
-type Protocol struct {
-	Code       int
-	Size       int // a size of -1 indicates a length-prefixed variable size
-	Name       string
-	VCode      []byte
-	Path       bool // indicates a path protocol (eg unix, http)
-	Transcoder Transcoder
-}
-
 // You **MUST** register your multicodecs with
 // https://github.com/multiformats/multicodec before adding them here.
 //
 // TODO: Use a single source of truth for all multicodecs instead of
 // distributing them like this...
 const (
-	P_IP4   = 0x0004
-	P_TCP   = 0x0006
-	P_UDP   = 0x0111
-	P_DCCP  = 0x0021
-	P_IP6   = 0x0029
-	P_QUIC  = 0x01CC
-	P_SCTP  = 0x0084
-	P_UDT   = 0x012D
-	P_UTP   = 0x012E
-	P_UNIX  = 0x0190
-	P_IPFS  = 0x01A5
-	P_HTTP  = 0x01E0
-	P_HTTPS = 0x01BB
-	P_ONION = 0x01BC
+	P_IP4     = 0x0004
+	P_TCP     = 0x0006
+	P_UDP     = 0x0111
+	P_DCCP    = 0x0021
+	P_IP6     = 0x0029
+	P_IP6ZONE = 0x002A
+	P_QUIC    = 0x01CC
+	P_SCTP    = 0x0084
+	P_UDT     = 0x012D
+	P_UTP     = 0x012E
+	P_UNIX    = 0x0190
+	P_P2P     = 0x01A5
+	P_IPFS    = 0x01A5 // alias for backwards compatability
+	P_HTTP    = 0x01E0
+	P_HTTPS   = 0x01BB
+	P_ONION   = 0x01BC
 )
 
-// These are special sizes
-const (
-	LengthPrefixedVarSize = -1
+var (
+	protoIP4 = Protocol{
+		Name:       "ip4",
+		Code:       P_IP4,
+		VCode:      CodeToVarint(P_IP4),
+		Size:       32,
+		Path:       false,
+		Transcoder: TranscoderIP4,
+	}
+	protoTCP = Protocol{
+		Name:       "tcp",
+		Code:       P_TCP,
+		VCode:      CodeToVarint(P_TCP),
+		Size:       16,
+		Path:       false,
+		Transcoder: TranscoderPort,
+	}
+	protoUDP = Protocol{
+		Name:       "udp",
+		Code:       P_UDP,
+		VCode:      CodeToVarint(P_UDP),
+		Size:       16,
+		Path:       false,
+		Transcoder: TranscoderPort,
+	}
+	protoDCCP = Protocol{
+		Name:       "dccp",
+		Code:       P_DCCP,
+		VCode:      CodeToVarint(P_DCCP),
+		Size:       16,
+		Path:       false,
+		Transcoder: TranscoderPort,
+	}
+	protoIP6 = Protocol{
+		Name:       "ip6",
+		Code:       P_IP6,
+		VCode:      CodeToVarint(P_IP6),
+		Size:       128,
+		Transcoder: TranscoderIP6,
+	}
+	// these require varint
+	protoIP6ZONE = Protocol{
+		Name:       "ip6zone",
+		Code:       P_IP6ZONE,
+		VCode:      CodeToVarint(P_IP6ZONE),
+		Size:       LengthPrefixedVarSize,
+		Path:       false,
+		Transcoder: TranscoderIP6Zone,
+	}
+	protoSCTP = Protocol{
+		Name:       "sctp",
+		Code:       P_SCTP,
+		VCode:      CodeToVarint(P_SCTP),
+		Size:       16,
+		Transcoder: TranscoderPort,
+	}
+	protoONION = Protocol{
+		Name:       "onion",
+		Code:       P_ONION,
+		VCode:      CodeToVarint(P_ONION),
+		Size:       96,
+		Transcoder: TranscoderOnion,
+	}
+	protoUTP = Protocol{
+		Name:  "utp",
+		Code:  P_UTP,
+		VCode: CodeToVarint(P_UTP),
+	}
+	protoUDT = Protocol{
+		Name:  "udt",
+		Code:  P_UDT,
+		VCode: CodeToVarint(P_UDT),
+	}
+	protoQUIC = Protocol{
+		Name:  "quic",
+		Code:  P_QUIC,
+		VCode: CodeToVarint(P_QUIC),
+	}
+	protoHTTP = Protocol{
+		Name:  "http",
+		Code:  P_HTTP,
+		VCode: CodeToVarint(P_HTTP),
+	}
+	protoHTTPS = Protocol{
+		Name:  "https",
+		Code:  P_HTTPS,
+		VCode: CodeToVarint(P_HTTPS),
+	}
+	protoP2P = Protocol{
+		Name:       "ipfs",
+		Code:       P_P2P,
+		VCode:      CodeToVarint(P_P2P),
+		Size:       LengthPrefixedVarSize,
+		Transcoder: TranscoderP2P,
+	}
+	protoUNIX = Protocol{
+		Name:       "unix",
+		Code:       P_UNIX,
+		VCode:      CodeToVarint(P_UNIX),
+		Size:       LengthPrefixedVarSize,
+		Path:       true,
+		Transcoder: TranscoderUnix,
+	}
 )
 
-// Protocols is the list of multiaddr protocols supported by this module.
-var Protocols = []Protocol{
-	Protocol{P_IP4, 32, "ip4", CodeToVarint(P_IP4), false, TranscoderIP4},
-	Protocol{P_TCP, 16, "tcp", CodeToVarint(P_TCP), false, TranscoderPort},
-	Protocol{P_UDP, 16, "udp", CodeToVarint(P_UDP), false, TranscoderPort},
-	Protocol{P_DCCP, 16, "dccp", CodeToVarint(P_DCCP), false, TranscoderPort},
-	Protocol{P_IP6, 128, "ip6", CodeToVarint(P_IP6), false, TranscoderIP6},
-	// these require varint:
-	Protocol{P_SCTP, 16, "sctp", CodeToVarint(P_SCTP), false, TranscoderPort},
-	Protocol{P_ONION, 96, "onion", CodeToVarint(P_ONION), false, TranscoderOnion},
-	Protocol{P_UTP, 0, "utp", CodeToVarint(P_UTP), false, nil},
-	Protocol{P_UDT, 0, "udt", CodeToVarint(P_UDT), false, nil},
-	Protocol{P_QUIC, 0, "quic", CodeToVarint(P_QUIC), false, nil},
-	Protocol{P_HTTP, 0, "http", CodeToVarint(P_HTTP), false, nil},
-	Protocol{P_HTTPS, 0, "https", CodeToVarint(P_HTTPS), false, nil},
-	Protocol{P_IPFS, LengthPrefixedVarSize, "ipfs", CodeToVarint(P_IPFS), false, TranscoderIPFS},
-	Protocol{P_UNIX, LengthPrefixedVarSize, "unix", CodeToVarint(P_UNIX), true, TranscoderUnix},
-}
-
-func AddProtocol(p Protocol) error {
-	for _, pt := range Protocols {
-		if pt.Code == p.Code {
-			return fmt.Errorf("protocol code %d already taken by %q", p.Code, pt.Name)
-		}
-		if pt.Name == p.Name {
-			return fmt.Errorf("protocol by the name %q already exists", p.Name)
+func init() {
+	for _, p := range []Protocol{
+		protoIP4,
+		protoTCP,
+		protoUDP,
+		protoDCCP,
+		protoIP6,
+		protoIP6ZONE,
+		protoSCTP,
+		protoONION,
+		protoUTP,
+		protoUDT,
+		protoQUIC,
+		protoHTTP,
+		protoHTTPS,
+		protoP2P,
+		protoUNIX,
+	} {
+		if err := AddProtocol(p); err != nil {
+			panic(err)
 		}
 	}
 
-	Protocols = append(Protocols, p)
-	return nil
-}
-
-// ProtocolWithName returns the Protocol description with given string name.
-func ProtocolWithName(s string) Protocol {
-	for _, p := range Protocols {
-		if p.Name == s {
-			return p
-		}
-	}
-	return Protocol{}
-}
-
-// ProtocolWithCode returns the Protocol description with given protocol code.
-func ProtocolWithCode(c int) Protocol {
-	for _, p := range Protocols {
-		if p.Code == c {
-			return p
-		}
-	}
-	return Protocol{}
-}
-
-// ProtocolsWithString returns a slice of protocols matching given string.
-func ProtocolsWithString(s string) ([]Protocol, error) {
-	s = strings.Trim(s, "/")
-	sp := strings.Split(s, "/")
-	if len(sp) == 0 {
-		return nil, nil
-	}
-
-	t := make([]Protocol, len(sp))
-	for i, name := range sp {
-		p := ProtocolWithName(name)
-		if p.Code == 0 {
-			return nil, fmt.Errorf("no protocol with name: %s", name)
-		}
-		t[i] = p
-	}
-	return t, nil
-}
-
-// CodeToVarint converts an integer to a varint-encoded []byte
-func CodeToVarint(num int) []byte {
-	buf := make([]byte, (num/7)+1) // varint package is uint64
-	n := binary.PutUvarint(buf, uint64(num))
-	return buf[:n]
-}
-
-// VarintToCode converts a varint-encoded []byte to an integer protocol code
-func VarintToCode(buf []byte) int {
-	num, _, err := ReadVarintCode(buf)
-	if err != nil {
-		panic(err)
-	}
-	return num
-}
-
-// ReadVarintCode reads a varint code from the beginning of buf.
-// returns the code, and the number of bytes read.
-func ReadVarintCode(buf []byte) (int, int, error) {
-	num, n := binary.Uvarint(buf)
-	if n < 0 {
-		return 0, 0, fmt.Errorf("varints larger than uint64 not yet supported")
-	}
-	return int(num), n, nil
+	// explicitly set both of these
+	protocolsByName["p2p"] = protoP2P
+	protocolsByName["ipfs"] = protoP2P
 }

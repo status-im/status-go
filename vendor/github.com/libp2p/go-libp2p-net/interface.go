@@ -29,8 +29,29 @@ type Stream interface {
 	Protocol() protocol.ID
 	SetProtocol(protocol.ID)
 
+	// Stat returns metadata pertaining to this stream.
+	Stat() Stat
+
 	// Conn returns the connection this stream is part of.
 	Conn() Conn
+}
+
+// Direction represents which peer in a stream initiated a connection.
+type Direction int
+
+const (
+	// DirUnknown is the default direction.
+	DirUnknown Direction = iota
+	// DirInbound is for when the remote peer initiated a connection.
+	DirInbound
+	// DirOutbound is for when the local peer initiated a connection.
+	DirOutbound
+)
+
+// Stat stores metadata pertaining to a given Stream/Conn.
+type Stat struct {
+	Direction Direction
+	Extra     map[interface{}]interface{}
 }
 
 // StreamHandler is the type of function used to listen for
@@ -80,6 +101,9 @@ type Conn interface {
 
 	// GetStreams returns all open streams over this conn.
 	GetStreams() []Stream
+
+	// Stat stores metadata pertaining to this conn.
+	Stat() Stat
 }
 
 // ConnHandler is the type of function used to listen for
@@ -180,7 +204,7 @@ const (
 // notifications from a Network.
 type Notifiee interface {
 	Listen(Network, ma.Multiaddr)      // called when network starts listening on an addr
-	ListenClose(Network, ma.Multiaddr) // called when network starts listening on an addr
+	ListenClose(Network, ma.Multiaddr) // called when network stops listening on an addr
 	Connected(Network, Conn)           // called when a connection opened
 	Disconnected(Network, Conn)        // called when a connection closed
 	OpenedStream(Network, Stream)      // called when a stream opened

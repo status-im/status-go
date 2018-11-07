@@ -167,15 +167,15 @@ func (srv *Server) Stop() {
 }
 
 func (srv *Server) purgeOutdated() {
-	key := srv.cleaner.PopOneSince(time.Now())
-	if len(key) == 0 {
-		return
-	}
-	topic := TopicPart([]byte(key))
-	log.Debug("Removing record with", "topic", string(topic))
-	metrics.RemoveActiveRegistration(string(topic))
-	if err := srv.storage.RemoveByKey(key); err != nil {
-		logger.Error("error removing key from storage", "key", key, "error", err)
+	keys := srv.cleaner.PopSince(time.Now())
+	log.Info("removed records from cleaner", "deadlines", len(srv.cleaner.deadlines), "heap", len(srv.cleaner.heap), "lth", len(keys))
+	for _, key := range keys {
+		topic := TopicPart([]byte(key))
+		log.Debug("Removing record with", "topic", string(topic))
+		metrics.RemoveActiveRegistration(string(topic))
+		if err := srv.storage.RemoveByKey(key); err != nil {
+			logger.Error("error removing key from storage", "key", key, "error", err)
+		}
 	}
 }
 

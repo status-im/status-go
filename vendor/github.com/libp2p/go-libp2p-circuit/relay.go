@@ -33,20 +33,26 @@ type Relay struct {
 	ctx      context.Context
 	self     peer.ID
 
-	active bool
-	hop    bool
+	active    bool
+	hop       bool
+	discovery bool
 
 	incoming chan *Conn
 
 	relays map[peer.ID]struct{}
 	mx     sync.Mutex
+
+	liveHops map[peer.ID]map[peer.ID]int
+	lhCount  uint64
+	lhLk     sync.Mutex
 }
 
 type RelayOpt int
 
 var (
-	OptActive = RelayOpt(0)
-	OptHop    = RelayOpt(1)
+	OptActive    = RelayOpt(0)
+	OptHop       = RelayOpt(1)
+	OptDiscovery = RelayOpt(2)
 )
 
 type RelayError struct {
@@ -65,6 +71,7 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 		self:     h.ID(),
 		incoming: make(chan *Conn),
 		relays:   make(map[peer.ID]struct{}),
+		liveHops: make(map[peer.ID]map[peer.ID]int),
 	}
 
 	for _, opt := range opts {
@@ -73,15 +80,65 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 			r.active = true
 		case OptHop:
 			r.hop = true
+		case OptDiscovery:
+			r.discovery = true
 		default:
 			return nil, fmt.Errorf("unrecognized option: %d", opt)
 		}
 	}
 
 	h.SetStreamHandler(ProtoID, r.handleNewStream)
-	h.Network().Notify(r.Notifiee())
+
+	if r.discovery {
+		h.Network().Notify(r.Notifiee())
+	}
 
 	return r, nil
+}
+
+func (r *Relay) addLiveHop(from, to peer.ID) {
+	r.lhLk.Lock()
+	defer r.lhLk.Unlock()
+
+	trg, ok := r.liveHops[from]
+	if !ok {
+		trg = make(map[peer.ID]int)
+		r.liveHops[from] = trg
+	}
+	trg[to]++
+	r.lhCount++
+}
+
+func (r *Relay) rmLiveHop(from, to peer.ID) {
+	r.lhLk.Lock()
+	defer r.lhLk.Unlock()
+
+	trg, ok := r.liveHops[from]
+	if !ok {
+		return
+	}
+	var count int
+	if count, ok = trg[to]; !ok {
+		return
+	}
+	count--
+
+	r.lhCount--
+	if count <= 0 {
+		delete(trg, to)
+		if len(trg) == 0 {
+			delete(r.liveHops, from)
+		}
+	} else {
+		trg[to] = count
+	}
+}
+
+func (r *Relay) GetActiveHops() uint64 {
+	r.lhLk.Lock()
+	defer r.lhLk.Unlock()
+
+	return r.lhCount
 }
 
 func (r *Relay) DialPeer(ctx context.Context, relay pstore.PeerInfo, dest pstore.PeerInfo) (*Conn, error) {
@@ -299,9 +356,13 @@ func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	// relay connection
 	log.Infof("relaying connection between %s and %s", src.ID.Pretty(), dst.ID.Pretty())
 
+	r.addLiveHop(src.ID, dst.ID)
+
 	// Don't reset streams after finishing or the other side will get an
 	// error, not an EOF.
 	go func() {
+		defer r.rmLiveHop(src.ID, dst.ID)
+
 		count, err := io.Copy(s, bs)
 		if err != nil {
 			log.Debugf("relay copy error: %s", err)
