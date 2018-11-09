@@ -70,14 +70,9 @@ func (s *TopicPoolSuite) TestUsingCache() {
 
 	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.Equal([]*discv5.Node{peer1}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
-
-	// Add a new peer which exceeds the upper limit.
-	// It should still be added to the cache and
-	// not removed when dropped.
 	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer2)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
 	s.Equal([]*discv5.Node{peer1, peer2}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
 	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
@@ -253,12 +248,13 @@ func (s *TopicPoolSuite) TestReplacementPeerIsCounted() {
 	s.topicPool.processFoundNode(s.peer, peer2)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
-	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
 	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID))
+	s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer2.ID))
 
 	s.NotContains(s.topicPool.pendingPeers, peer1.ID)
 	s.NotContains(s.topicPool.connectedPeers, peer1.ID)
 	s.Contains(s.topicPool.pendingPeers, peer2.ID)
+	s.topicPool.pendingPeers[peer2.ID].added = true
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
 	s.True(s.topicPool.MaxReached())
 }
@@ -327,4 +323,27 @@ func (s *TopicPoolSuite) TestNewTopicPoolInterface() {
 	tp := newTopicPool(nil, MailServerDiscoveryTopic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
 	cacheTP := newCacheOnlyTopicPool(tp, &testTrueVerifier{})
 	s.IsType(&cacheOnlyTopicPool{}, cacheTP)
+}
+
+func (s *TopicPoolSuite) TestIgnoreInboundConnection() {
+	s.topicPool.limits = params.NewLimits(0, 0)
+	s.topicPool.maxCachedPeers = 0
+	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, peer1)
+	s.Contains(s.topicPool.pendingPeers, peer1.ID)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
+	s.Contains(s.topicPool.pendingPeers, peer1.ID)
+	s.NotContains(s.topicPool.connectedPeers, peer1.ID)
+}
+
+func (s *TopicPoolSuite) TestConnectedButRemoved() {
+	s.topicPool.limits = params.NewLimits(0, 0)
+	s.topicPool.maxCachedPeers = 1
+	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	s.topicPool.processFoundNode(s.peer, peer1)
+	s.Contains(s.topicPool.pendingPeers, peer1.ID)
+	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
+	s.Contains(s.topicPool.connectedPeers, peer1.ID)
+	s.False(s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID)))
+	s.False(s.topicPool.pendingPeers[peer1.ID].added)
 }

@@ -270,9 +270,9 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 
 	discV5NodeID := discv5.NodeID(nodeID)
 
-	// inbound connection
 	peerInfoItem, ok := t.pendingPeers[discV5NodeID]
-	if !ok {
+	// inbound connection
+	if !ok || !peerInfoItem.added {
 		return
 	}
 	peer := peerInfoItem.peerInfo // get explicit reference
@@ -463,6 +463,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 }
 
 func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
+	info.added = true
 	server.AddPeer(discover.NewNode(
 		discover.NodeID(info.node.ID),
 		info.node.IP,
@@ -472,6 +473,7 @@ func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
 }
 
 func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
+	info.added = false
 	server.RemovePeer(discover.NewNode(
 		discover.NodeID(info.node.ID),
 		info.node.IP,
