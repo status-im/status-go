@@ -1,11 +1,12 @@
 package helpers
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 var (
@@ -23,7 +24,7 @@ func waitForPeer(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration, 
 	if u == "" {
 		return ErrEmptyPeerURL
 	}
-	parsedPeer, err := discover.ParseNode(u)
+	parsedPeer, err := enode.ParseV4(u)
 	if err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func waitForPeer(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration, 
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == e && ev.Peer == parsedPeer.ID {
+			if ev.Type == e && bytes.Equal(ev.Peer.Bytes(), parsedPeer.ID().Bytes()) {
 				return nil
 			}
 		case err := <-subscription.Err():

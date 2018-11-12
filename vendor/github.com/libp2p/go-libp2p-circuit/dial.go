@@ -12,20 +12,20 @@ import (
 )
 
 func (d *RelayTransport) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (tpt.Conn, error) {
-	c, err := d.Relay().Dial(ctx, a, p)
+	c, err := d.Relay().Dial(ctx, a)
 	if err != nil {
 		return nil, err
 	}
 	return d.upgrader.UpgradeOutbound(ctx, d, c, p)
 }
 
-func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (*Conn, error) {
+func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr) (*Conn, error) {
 	if !r.Matches(a) {
 		return nil, fmt.Errorf("%s is not a relay address", a)
 	}
 	parts := ma.Split(a)
 
-	spl := ma.Cast(ma.CodeToVarint(P_CIRCUIT))
+	spl, _ := ma.NewMultiaddr("/p2p-circuit")
 
 	var relayaddr, destaddr ma.Multiaddr
 	for i, p := range parts {
@@ -36,9 +36,9 @@ func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (*Conn, err
 		}
 	}
 
-	dinfo := &pstore.PeerInfo{ID: p, Addrs: []ma.Multiaddr{}}
-	if len(destaddr.Bytes()) > 0 {
-		dinfo.Addrs = append(dinfo.Addrs, destaddr)
+	dinfo, err := pstore.InfoFromP2pAddr(destaddr)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(relayaddr.Bytes()) == 0 {
@@ -47,9 +47,9 @@ func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (*Conn, err
 	}
 
 	var rinfo *pstore.PeerInfo
-	rinfo, err := pstore.InfoFromP2pAddr(relayaddr)
+	rinfo, err = pstore.InfoFromP2pAddr(relayaddr)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing multiaddr '%s': %s", relayaddr.String(), err)
+		return nil, err
 	}
 
 	return r.DialPeer(ctx, *rinfo, *dinfo)

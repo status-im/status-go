@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	libp2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
@@ -232,7 +233,9 @@ func (srv *Server) register(msg protocol.Register) (protocol.RegisterResponse, e
 	if bytes.IndexByte([]byte(msg.Topic), TopicBodyDelimiter) != -1 {
 		return protocol.RegisterResponse{Status: protocol.E_INVALID_NAMESPACE}, nil
 	}
-	if !msg.Record.Signed() {
+
+	if err := msg.Record.VerifySignature(enode.ValidSchemes); err != nil {
+		logger.Error("error verify signature message", "error", err)
 		return protocol.RegisterResponse{Status: protocol.E_INVALID_ENR}, nil
 	}
 	deadline := time.Now().Add(time.Duration(msg.TTL)).Add(srv.networkDelay)

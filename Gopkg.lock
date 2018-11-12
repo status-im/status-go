@@ -88,7 +88,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:b021074e0a2e41e585991a27f322a404077c98f3ffc903024dbd768e7d2fdb78"
+  digest = "1:e221b8d0ccd91e9ee0a2ddda27ec75518dd683de945d01c87816f64ce418bf91"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -141,7 +141,6 @@
     "les/flowcontrol",
     "light",
     "log",
-    "log/term",
     "metrics",
     "metrics/exp",
     "miner",
@@ -149,6 +148,7 @@
     "p2p",
     "p2p/discover",
     "p2p/discv5",
+    "p2p/enode",
     "p2p/enr",
     "p2p/nat",
     "p2p/netutil",
@@ -158,9 +158,9 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "89c6e7ee8f69f97a83bf40a05f9944ffb33cf17f"
+  revision = "2ad6673303bb48f8e3c2865386cfa928e92dbcbd"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.16"
+  version = "v1.8.17"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -322,6 +322,17 @@
   revision = "679507af18f3c7ba2bcc7905392ce23e148661c3"
 
 [[projects]]
+  digest = "1:5c3e769d03dfa7e39d4890b05910916526a349780323d22e7ac427d8949ffa75"
+  name = "github.com/ipfs/go-datastore"
+  packages = [
+    ".",
+    "query",
+  ]
+  pruneopts = "NUT"
+  revision = "5accf38b689df4e06a973bb70cc678f798d691c0"
+  version = "v3.2.0"
+
+[[projects]]
   digest = "1:6a47f871127308942b643ebd602e9c4299805ce813cbc14d87e5a9d41bf6b2d7"
   name = "github.com/ipfs/go-log"
   packages = [
@@ -434,15 +445,14 @@
   revision = "a08d9e63dbf006c905a532d5f645a2bf6fae3bd1"
 
 [[projects]]
-  digest = "1:f0e4ec0c487dd070a88b91856f39583943df5d53dc184af79829b9669af632fc"
+  digest = "1:0100e793f30ec5bcc48eed82ae6a425525f68eb641f6241f4a9bffd4e8f2140a"
   name = "github.com/libp2p/go-libp2p-circuit"
   packages = [
     ".",
     "pb",
   ]
   pruneopts = "NUT"
-  revision = "16eb677aaa62fd2e5e6d73d66388f8ac38bd6388"
-  version = "v2.3.2"
+  revision = "eca2b86a1bcf00adba4f71b3654c3898b19ef421"
 
 [[projects]]
   digest = "1:bbc5fc51426225288282e18dc070718dd34c472f6d8dba3c72df9919b0d7e652"
@@ -520,12 +530,14 @@
   version = "v2.4.0"
 
 [[projects]]
-  digest = "1:0d8c5c8908b7cda1908f99acd361ed04fe45432a2ffe6f79cdd7263f875b647a"
+  digest = "1:a2d5c1d6af8c1c67d6a45e673362237932aa32a16c509c93014258b2933a2c97"
   name = "github.com/libp2p/go-libp2p-peerstore"
-  packages = ["."]
+  packages = [
+    ".",
+    "addr",
+  ]
   pruneopts = "NUT"
-  revision = "6295e61c9fd2f13ad159c6241be3b371918045e2"
-  version = "v2.0.6"
+  revision = "b1e626f38de4d5f3b8c292f230f8b9f03889ae65"
 
 [[projects]]
   digest = "1:b8ddff56e9a25cdb2afe2daf04f9314deb52a651882043026da6603199c94266"
@@ -654,11 +666,11 @@
   revision = "5411d3eea5978e6cdc258b30de592b60df6aba96"
 
 [[projects]]
-  digest = "1:f3b286c0af7136e7afa8093165abb64159742bd31f580d7b000d21e1d7e73256"
+  digest = "1:b95b22ee36277368bbf22e0fbe4f1be366585516914d6cfe4b3dc7b8b37eda5f"
   name = "github.com/mattn/go-isatty"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "281032e84ae07510239465db46bf442aa44b953a"
+  revision = "3fb116b820352b7f0c281308a4d6250c22d94e27"
 
 [[projects]]
   branch = "master"
@@ -685,19 +697,18 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:3eea41bb55ec1d69be6675f478ec29b434eeb26bc22189fa989f3ec5a682d665"
+  digest = "1:24146ace1d6b7bddf7058273907d7c5b250d442059c704b34dea536b8120f387"
   name = "github.com/multiformats/go-multiaddr"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "8dc8c4a64c84bc5f68e230f01a9c861d2aefc781"
+  revision = "f36800afeb9c141e1adb7da099e6f010dfd4c419"
 
 [[projects]]
-  digest = "1:ba2fd2521c120c0b902aeb537837074d4e989d66cf7cd293aba0cfc3646f7a78"
+  digest = "1:0cc11f5c48012da0af72f88c9e60ad48641cf1e6449a8159a3735550e8efb168"
   name = "github.com/multiformats/go-multiaddr-dns"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "317a9bc842d426da4d878690625babb26d64e73b"
-  version = "v0.2.5"
+  revision = "4c36f46414bba59a19ffe5154841f76d4a55b780"
 
 [[projects]]
   digest = "1:86512c9978e28c0fd20daa4273d526188ccc9c330b3f8c7d98eb40dce49b0896"
@@ -708,11 +719,11 @@
   version = "v1.6.3"
 
 [[projects]]
-  digest = "1:932e003ff86aca5297a1ee0539d09bf7bc3e8201c770631ed40efc46144abd13"
+  digest = "1:1b7b4b29b6d4928bfe5b11f2dde41d85458449584647d053d746f5fa2debcb77"
   name = "github.com/multiformats/go-multihash"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "a91e75d03bf4dba801af7b159c8b2aa7b5f47ea8"
+  revision = "8be2a682ab9f254311de1375145a2f78a809b07d"
 
 [[projects]]
   digest = "1:226883468090b059229b7803122c67ded05f4e51e83ef9b3b5b12a25f4b96ee1"
@@ -801,11 +812,11 @@
   revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
 
 [[projects]]
-  digest = "1:5d3c51d0f96ff0b228582e5e36295a33da8e16d106cd9dc31538096bd35dce1e"
+  digest = "1:f3044238fc5d70eca12cc181b1e6d5270570d85a7b7046686381e618a783a7d6"
   name = "github.com/status-im/go-multiaddr-ethv4"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "17cb1ad76379d65e802eacc786d8f67eebd7cd6d"
+  revision = "cbcba3a7c121e29718d9011ffc9e2b78ac6d5c99"
 
 [[projects]]
   branch = "master"
@@ -820,7 +831,8 @@
   revision = "57d2e2abe46f80680b96640a8ce62d8187bee7e8"
 
 [[projects]]
-  digest = "1:042d55716d3bc4a4473cf83d70a68e80bf5164ae0ce46eb2cd9ef30fc333d3d8"
+  branch = "master"
+  digest = "1:5fb8fc6a365f62e1d771b8a33c808a111ace9ba3506089f00ec252ec1e257a83"
   name = "github.com/status-im/rendezvous"
   packages = [
     ".",
@@ -828,16 +840,15 @@
     "server",
   ]
   pruneopts = "NUT"
-  revision = "58dfa5b68d9bee4d4b7f84b3beea2ece5cb2b40a"
-  version = "v1.0.0"
+  revision = "fbcc46a78cd43fef95a110df664aab513116a850"
 
 [[projects]]
-  digest = "1:9552f5ea7e82e95910e182bd41b6c71933b50717990a61ac517bfa1cc6f653dc"
+  digest = "1:fe884981c5589ade6ea86ca876be4a744ea1344c6e8cfa17e434fcf270b04598"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "14e1bbfd9ba956e7fc7649e815aa19e4386b26da"
-  version = "v1.2.0"
+  revision = "e25ea1d673d5982b16fd3e51ed2a0d8f91b809d9"
+  version = "v1.3.0"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1020,19 +1031,6 @@
   version = "v0.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:33153c3338a57d72bc48b527e91cf82d8aeecd92bb27daba82cf24f52305b73c"
-  name = "golang.org/x/tools"
-  packages = [
-    "go/ast/astutil",
-    "imports",
-    "internal/fastwalk",
-    "internal/gopathwalk",
-  ]
-  pruneopts = "NUT"
-  revision = "e21233ffa6c386fc230b4328493f77af54ff9372"
-
-[[projects]]
   digest = "1:ef9fb6a2c8b42d4d22b997886ba73d889b9dd2be2fc49524f0d218ace7c805e1"
   name = "gopkg.in/go-playground/validator.v9"
   packages = ["."]
@@ -1103,6 +1101,7 @@
     "github.com/ethereum/go-ethereum/p2p",
     "github.com/ethereum/go-ethereum/p2p/discover",
     "github.com/ethereum/go-ethereum/p2p/discv5",
+    "github.com/ethereum/go-ethereum/p2p/enode",
     "github.com/ethereum/go-ethereum/p2p/enr",
     "github.com/ethereum/go-ethereum/p2p/nat",
     "github.com/ethereum/go-ethereum/params",

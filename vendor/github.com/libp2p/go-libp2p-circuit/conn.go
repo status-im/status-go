@@ -35,14 +35,12 @@ func (c *Conn) RemoteAddr() net.Addr {
 	}
 }
 
-// TODO: is it okay to cast c.Conn().RemotePeer() into a multiaddr? might be "user input"
 func (c *Conn) RemoteMultiaddr() ma.Multiaddr {
-	proto := ma.ProtocolWithCode(ma.P_P2P).Name
-	peerid := c.Conn().RemotePeer().Pretty()
-	p2paddr := ma.StringCast(fmt.Sprintf("/%s/%s", proto, peerid))
-
-	circaddr := ma.Cast(ma.CodeToVarint(P_CIRCUIT))
-	return p2paddr.Encapsulate(circaddr)
+	a, err := ma.NewMultiaddr(fmt.Sprintf("/ipfs/%s/p2p-circuit/ipfs/%s", c.Conn().RemotePeer().Pretty(), c.remote.ID.Pretty()))
+	if err != nil {
+		panic(err)
+	}
+	return a
 }
 
 func (c *Conn) LocalMultiaddr() ma.Multiaddr {

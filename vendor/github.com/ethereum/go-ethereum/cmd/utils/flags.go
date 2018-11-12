@@ -19,6 +19,7 @@ package utils
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -51,8 +52,8 @@ import (
 	"github.com/ethereum/go-ethereum/metrics/influxdb"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/params"
@@ -157,6 +158,23 @@ var (
 		Usage: "Document Root for HTTPClient file scheme",
 		Value: DirectoryString{homeDir()},
 	}
+	ULCModeConfigFlag = cli.StringFlag{
+		Name:  "les.ulcconfig",
+		Usage: "Config file to use for ULC mode",
+	}
+	OnlyAnnounceModeFlag = cli.BoolFlag{
+		Name:  "les.onlyannounce",
+		Usage: "LES server sends only announce",
+	}
+	ULCMinTrustedFractionFlag = cli.IntFlag{
+		Name:  "les.mintrustedfraction",
+		Usage: "LES server sends only announce",
+	}
+	ULCTrustedNodesFlag = cli.StringFlag{
+		Name:  "les.trusted",
+		Usage: "List of trusted nodes",
+	}
+
 	defaultSyncMode = eth.DefaultConfig.SyncMode
 	SyncModeFlag    = TextMarshalerFlag{
 		Name:  "syncmode",
@@ -692,9 +710,9 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		return // already set, don't apply defaults.
 	}
 
-	cfg.BootstrapNodes = make([]*discover.Node, 0, len(urls))
+	cfg.BootstrapNodes = make([]*enode.Node, 0, len(urls))
 	for _, url := range urls {
-		node, err := discover.ParseNode(url)
+		node, err := enode.ParseV4(url)
 		if err != nil {
 			log.Crit("Bootstrap URL invalid", "enode", url, "err", err)
 		}
@@ -813,6 +831,40 @@ func setIPC(ctx *cli.Context, cfg *node.Config) {
 		cfg.IPCPath = ""
 	case ctx.GlobalIsSet(IPCPathFlag.Name):
 		cfg.IPCPath = ctx.GlobalString(IPCPathFlag.Name)
+	}
+}
+
+// SetULC setup ULC config from file if given.
+func SetULC(ctx *cli.Context, cfg *eth.Config) {
+	// ULC config isn't loaded from global config and ULC config and ULC trusted nodes are not defined.
+	if cfg.ULC == nil && !(ctx.GlobalIsSet(ULCModeConfigFlag.Name) || ctx.GlobalIsSet(ULCTrustedNodesFlag.Name)) {
+		return
+	}
+	cfg.ULC = &eth.ULCConfig{}
+
+	path := ctx.GlobalString(ULCModeConfigFlag.Name)
+	if path != "" {
+		cfgData, err := ioutil.ReadFile(path)
+		if err != nil {
+			Fatalf("Failed to unmarshal ULC configuration: %v", err)
+		}
+
+		err = json.Unmarshal(cfgData, &cfg.ULC)
+		if err != nil {
+			Fatalf("Failed to unmarshal ULC configuration: %s", err.Error())
+		}
+	}
+
+	if trustedNodes := ctx.GlobalString(ULCTrustedNodesFlag.Name); trustedNodes != "" {
+		cfg.ULC.TrustedServers = strings.Split(trustedNodes, ",")
+	}
+
+	if trustedFraction := ctx.GlobalInt(ULCMinTrustedFractionFlag.Name); trustedFraction > 0 {
+		cfg.ULC.MinTrustedFraction = trustedFraction
+	}
+	if cfg.ULC.MinTrustedFraction <= 0 && cfg.ULC.MinTrustedFraction > 100 {
+		log.Error("MinTrustedFraction is invalid", "MinTrustedFraction", cfg.ULC.MinTrustedFraction, "Changed to default", eth.DefaultUTCMinTrustedFraction)
+		cfg.ULC.MinTrustedFraction = eth.DefaultUTCMinTrustedFraction
 	}
 }
 
@@ -1085,11 +1137,14 @@ func checkExclusive(ctx *cli.Context, args ...interface{}) {
 		if i+1 < len(args) {
 			switch option := args[i+1].(type) {
 			case string:
-				// Extended flag, expand the name and shift the arguments
+				// Extended flag check, make sure value set doesn't conflict with passed in option
 				if ctx.GlobalString(flag.GetName()) == option {
 					name += "=" + option
+					set = append(set, "--"+name)
 				}
+				// shift arguments and continue
 				i++
+				continue
 
 			case cli.Flag:
 			default:
@@ -1139,6 +1194,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	}
 	if ctx.GlobalIsSet(LightPeersFlag.Name) {
 		cfg.LightPeers = ctx.GlobalInt(LightPeersFlag.Name)
+	}
+	if ctx.GlobalIsSet(OnlyAnnounceModeFlag.Name) {
+		cfg.OnlyAnnounce = ctx.GlobalBool(OnlyAnnounceModeFlag.Name)
 	}
 	if ctx.GlobalIsSet(NetworkIdFlag.Name) {
 		cfg.NetworkId = ctx.GlobalUint64(NetworkIdFlag.Name)

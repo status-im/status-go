@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	ma "github.com/multiformats/go-multiaddr"
 )
@@ -123,7 +124,7 @@ func makeProxiedENR(n *discv5.Node) (enr.Record, error) {
 	if err != nil {
 		return record, fmt.Errorf("unable to generate private key. error : %v", err)
 	}
-	if err := enr.SignV4(&record, key); err != nil {
+	if err := enode.SignV4(&record, key); err != nil {
 		return record, fmt.Errorf("unable to sign enr record. error: %v", err)
 	}
 	return record, nil

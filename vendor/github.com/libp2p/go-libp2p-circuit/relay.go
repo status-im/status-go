@@ -33,16 +33,15 @@ type Relay struct {
 	ctx      context.Context
 	self     peer.ID
 
-	active    bool
-	hop       bool
-	discovery bool
+	active bool
+	hop    bool
 
 	incoming chan *Conn
 
 	relays map[peer.ID]struct{}
 	mx     sync.Mutex
 
-	liveHops map[peer.ID]map[peer.ID]int
+	liveHops map[peer.ID]map[peer.ID]struct{}
 	lhCount  uint64
 	lhLk     sync.Mutex
 }
@@ -50,9 +49,8 @@ type Relay struct {
 type RelayOpt int
 
 var (
-	OptActive    = RelayOpt(0)
-	OptHop       = RelayOpt(1)
-	OptDiscovery = RelayOpt(2)
+	OptActive = RelayOpt(0)
+	OptHop    = RelayOpt(1)
 )
 
 type RelayError struct {
@@ -71,7 +69,7 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 		self:     h.ID(),
 		incoming: make(chan *Conn),
 		relays:   make(map[peer.ID]struct{}),
-		liveHops: make(map[peer.ID]map[peer.ID]int),
+		liveHops: make(map[peer.ID]map[peer.ID]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -80,18 +78,13 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 			r.active = true
 		case OptHop:
 			r.hop = true
-		case OptDiscovery:
-			r.discovery = true
 		default:
 			return nil, fmt.Errorf("unrecognized option: %d", opt)
 		}
 	}
 
 	h.SetStreamHandler(ProtoID, r.handleNewStream)
-
-	if r.discovery {
-		h.Network().Notify(r.Notifiee())
-	}
+	h.Network().Notify(r.Notifiee())
 
 	return r, nil
 }
@@ -100,13 +93,14 @@ func (r *Relay) addLiveHop(from, to peer.ID) {
 	r.lhLk.Lock()
 	defer r.lhLk.Unlock()
 
+	r.lhCount++
 	trg, ok := r.liveHops[from]
 	if !ok {
-		trg = make(map[peer.ID]int)
+		trg = make(map[peer.ID]struct{})
 		r.liveHops[from] = trg
 	}
-	trg[to]++
-	r.lhCount++
+
+	trg[to] = struct{}{}
 }
 
 func (r *Relay) rmLiveHop(from, to peer.ID) {
@@ -117,20 +111,11 @@ func (r *Relay) rmLiveHop(from, to peer.ID) {
 	if !ok {
 		return
 	}
-	var count int
-	if count, ok = trg[to]; !ok {
-		return
-	}
-	count--
 
 	r.lhCount--
-	if count <= 0 {
-		delete(trg, to)
-		if len(trg) == 0 {
-			delete(r.liveHops, from)
-		}
-	} else {
-		trg[to] = count
+	delete(trg, to)
+	if len(trg) == 0 {
+		delete(r.liveHops, from)
 	}
 }
 

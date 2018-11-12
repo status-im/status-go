@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/services/shhext/chat"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
@@ -163,7 +163,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 
 	var err error
 
-	mailServerNode, err := discover.ParseNode(r.MailServerPeer)
+	mailServerNode, err := enode.ParseV4(r.MailServerPeer)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
@@ -179,10 +179,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 			return nil, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
 		}
 	} else {
-		publicKey, err = mailServerNode.ID.Pubkey()
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", ErrInvalidPublicKey, err)
-		}
+		publicKey = mailServerNode.Pubkey()
 	}
 
 	payload, err := makePayload(r)
@@ -203,7 +200,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	}
 
 	hash := envelope.Hash()
-	if err := shh.RequestHistoricMessages(mailServerNode.ID[:], envelope); err != nil {
+	if err := shh.RequestHistoricMessages(mailServerNode.ID().Bytes(), envelope); err != nil {
 		return nil, err
 	}
 

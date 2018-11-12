@@ -16,8 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
@@ -340,15 +340,15 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 	})
 }
 
-// parseNodes creates list of discover.Node out of enode strings.
-func parseNodes(enodes []string) []*discover.Node {
-	var nodes []*discover.Node
-	for _, enode := range enodes {
-		parsedPeer, err := discover.ParseNode(enode)
+// parseNodes creates list of enode.Node out of enode strings.
+func parseNodes(enodes []string) []*enode.Node {
+	var nodes []*enode.Node
+	for _, item := range enodes {
+		parsedPeer, err := enode.ParseV4(item)
 		if err == nil {
 			nodes = append(nodes, parsedPeer)
 		} else {
-			logger.Error("Failed to parse enode", "enode", enode, "err", err)
+			logger.Error("Failed to parse enode", "enode", item, "err", err)
 		}
 
 	}
@@ -370,10 +370,10 @@ func parseNodesV5(enodes []string) []*discv5.Node {
 	return nodes
 }
 
-func parseNodesToNodeID(enodes []string) []discover.NodeID {
-	nodeIDs := make([]discover.NodeID, 0, len(enodes))
+func parseNodesToNodeID(enodes []string) []enode.ID {
+	nodeIDs := make([]enode.ID, 0, len(enodes))
 	for _, node := range parseNodes(enodes) {
-		nodeIDs = append(nodeIDs, node.ID)
+		nodeIDs = append(nodeIDs, node.ID())
 	}
 	return nodeIDs
 }

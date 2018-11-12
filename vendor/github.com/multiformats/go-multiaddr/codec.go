@@ -11,7 +11,7 @@ func stringToBytes(s string) ([]byte, error) {
 	// consume trailing slashes
 	s = strings.TrimRight(s, "/")
 
-	var b bytes.Buffer
+	b := new(bytes.Buffer)
 	sp := strings.Split(s, "/")
 
 	if sp[0] != "" {
@@ -26,7 +26,7 @@ func stringToBytes(s string) ([]byte, error) {
 		if p.Code == 0 {
 			return nil, fmt.Errorf("no protocol with name %s", sp[0])
 		}
-		_, _ = b.Write(CodeToVarint(p.Code))
+		b.Write(CodeToVarint(p.Code))
 		sp = sp[1:]
 
 		if p.Size == 0 { // no length.
@@ -43,12 +43,12 @@ func stringToBytes(s string) ([]byte, error) {
 			sp = []string{"/" + strings.Join(sp, "/")}
 		}
 
+		if p.Transcoder == nil {
+			return nil, fmt.Errorf("no transcoder for %s protocol", p.Name)
+		}
 		a, err := p.Transcoder.StringToBytes(sp[0])
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse %s: %s %s", p.Name, sp[0], err)
-		}
-		if p.Size < 0 { // varint size.
-			_, _ = b.Write(CodeToVarint(len(a)))
 		}
 		b.Write(a)
 		sp = sp[1:]
@@ -74,20 +74,13 @@ func validateBytes(b []byte) (err error) {
 			continue
 		}
 
-		n, size, err := sizeForAddr(p, b)
+		size, err := sizeForAddr(p, b)
 		if err != nil {
 			return err
 		}
-
-		b = b[n:]
 
 		if len(b) < size || size < 0 {
 			return fmt.Errorf("invalid value for size")
-		}
-
-		err = p.Transcoder.ValidateBytes(b[:size])
-		if err != nil {
-			return err
 		}
 
 		b = b[size:]
@@ -96,72 +89,69 @@ func validateBytes(b []byte) (err error) {
 	return nil
 }
 
-func readComponent(b []byte) (int, Component, error) {
-	var offset int
-	code, n, err := ReadVarintCode(b)
-	if err != nil {
-		return 0, Component{}, err
-	}
-	offset += n
-
-	p := ProtocolWithCode(code)
-	if p.Code == 0 {
-		return 0, Component{}, fmt.Errorf("no protocol with code %d", code)
-	}
-
-	if p.Size == 0 {
-		return offset, Component{
-			bytes:    b[:offset],
-			offset:   offset,
-			protocol: p,
-		}, nil
-	}
-
-	n, size, err := sizeForAddr(p, b[offset:])
-	if err != nil {
-		return 0, Component{}, err
-	}
-
-	offset += n
-
-	if len(b[offset:]) < size || size < 0 {
-		return 0, Component{}, fmt.Errorf("invalid value for size")
-	}
-
-	return offset + size, Component{
-		bytes:    b[:offset+size],
-		protocol: p,
-		offset:   offset,
-	}, nil
-}
-
 func bytesToString(b []byte) (ret string, err error) {
-	var buf strings.Builder
+	s := ""
 
 	for len(b) > 0 {
-		n, c, err := readComponent(b)
+		code, n, err := ReadVarintCode(b)
 		if err != nil {
 			return "", err
 		}
+
 		b = b[n:]
-		c.writeTo(&buf)
+		p := ProtocolWithCode(code)
+		if p.Code == 0 {
+			return "", fmt.Errorf("no protocol with code %d", code)
+		}
+		s += "/" + p.Name
+
+		if p.Size == 0 {
+			continue
+		}
+
+		size, err := sizeForAddr(p, b)
+		if err != nil {
+			return "", err
+		}
+
+		if len(b) < size || size < 0 {
+			return "", fmt.Errorf("invalid value for size")
+		}
+
+		if p.Transcoder == nil {
+			return "", fmt.Errorf("no transcoder for %s protocol", p.Name)
+		}
+		a, err := p.Transcoder.BytesToString(b[:size])
+		if err != nil {
+			return "", err
+		}
+		if len(a) > 0 {
+			s += "/" + a
+		}
+		b = b[size:]
 	}
 
-	return buf.String(), nil
+	return s, nil
 }
 
-func sizeForAddr(p Protocol, b []byte) (skip, size int, err error) {
+func sizeForAddr(p Protocol, b []byte) (int, error) {
 	switch {
 	case p.Size > 0:
-		return 0, (p.Size / 8), nil
+		return (p.Size / 8), nil
 	case p.Size == 0:
-		return 0, 0, nil
+		return 0, nil
+	case p.Path:
+		size, n, err := ReadVarintCode(b)
+		if err != nil {
+			return 0, err
+		}
+		return size + n, nil
 	default:
 		size, n, err := ReadVarintCode(b)
 		if err != nil {
-			return 0, 0, err
+			return 0, err
 		}
-		return n, size, nil
+		return size + n, nil
 	}
 }
 
@@ -178,12 +168,12 @@ func bytesSplit(b []byte) ([][]byte, error) {
 			return nil, fmt.Errorf("no protocol with code %d", b[0])
 		}
 
-		n2, size, err := sizeForAddr(p, b[n:])
+		size, err := sizeForAddr(p, b[n:])
 		if err != nil {
 			return nil, err
 		}
 
-		length := n + n2 + size
+		length := n + size
 		ret = append(ret, b[:length])
 		b = b[length:]
 	}

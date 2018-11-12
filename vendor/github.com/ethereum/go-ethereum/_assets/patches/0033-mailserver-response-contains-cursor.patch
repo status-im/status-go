@@ -20,7 +20,7 @@ index 1665539d6..fe7570ed5 100644
 @@ -24,4 +28,5 @@ type EnvelopeEvent struct {
  	Event EventType
  	Hash  common.Hash
- 	Peer  discover.NodeID
+ 	Peer  enode.ID
 +	Data  interface{}
  }
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go

@@ -18,7 +18,6 @@
 package les
 
 import (
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
@@ -51,14 +50,13 @@ const (
 
 type peer struct {
 	*p2p.Peer
-	pubKey *ecdsa.PublicKey
 
 	rw p2p.MsgReadWriter
 
 	version int    // Protocol version negotiated
 	network uint64 // Network ID being on
 
-	announceType, requestAnnounceType uint64
+	announceType uint64
 
 	id string
 
@@ -69,27 +67,29 @@ type peer struct {
 	sendQueue   *execQueue
 
 	poolEntry      *poolEntry
-	hasBlock       func(common.Hash, uint64) bool
+	hasBlock       func(common.Hash, uint64, bool) bool
 	responseErrors int
 
 	fcClient       *flowcontrol.ClientNode // nil if the peer is server only
 	fcServer       *flowcontrol.ServerNode // nil if the peer is client only
 	fcServerParams *flowcontrol.ServerParams
 	fcCosts        requestCostTable
+
+	isTrusted      bool
+	isOnlyAnnounce bool
 }
 
-func newPeer(version int, network uint64, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
+func newPeer(version int, network uint64, isTrusted bool, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 	id := p.ID()
-	pubKey, _ := id.Pubkey()
 
 	return &peer{
 		Peer:        p,
-		pubKey:      pubKey,
 		rw:          rw,
 		version:     version,
 		network:     network,
 		id:          fmt.Sprintf("%x", id[:8]),
 		announceChn: make(chan announceData, 20),
+		isTrusted:   isTrusted,
 	}
 }
 
@@ -175,11 +175,11 @@ func (p *peer) GetRequestCost(msgcode uint64, amount int) uint64 {
 }
 
 // HasBlock checks if the peer has a given block
-func (p *peer) HasBlock(hash common.Hash, number uint64) bool {
+func (p *peer) HasBlock(hash common.Hash, number uint64, hasState bool) bool {
 	p.lock.RLock()
 	hasBlock := p.hasBlock
 	p.lock.RUnlock()
-	return hasBlock != nil && hasBlock(hash, number)
+	return hasBlock != nil && hasBlock(hash, number, hasState)
 }
 
 // SendAnnounce announces the availability of a number of blocks through
@@ -405,23 +405,32 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 	send = send.add("headNum", headNum)
 	send = send.add("genesisHash", genesis)
 	if server != nil {
-		send = send.add("serveHeaders", nil)
-		send = send.add("serveChainSince", uint64(0))
-		send = send.add("serveStateSince", uint64(0))
-		send = send.add("txRelay", nil)
+		if !server.onlyAnnounce {
+			//only announce server. It sends only announse requests
+			send = send.add("serveHeaders", nil)
+			send = send.add("serveChainSince", uint64(0))
+			send = send.add("serveStateSince", uint64(0))
+			send = send.add("txRelay", nil)
+		}
 		send = send.add("flowControl/BL", server.defParams.BufLimit)
 		send = send.add("flowControl/MRR", server.defParams.MinRecharge)
 		list := server.fcCostStats.getCurrentList()
 		send = send.add("flowControl/MRC", list)
 		p.fcCosts = list.decode()
 	} else {
-		p.requestAnnounceType = announceTypeSimple // set to default until "very light" client mode is implemented
-		send = send.add("announceType", p.requestAnnounceType)
+		//on client node
+		p.announceType = announceTypeSimple
+		if p.isTrusted {
+			p.announceType = announceTypeSigned
+		}
+		send = send.add("announceType", p.announceType)
 	}
+
 	recvList, err := p.sendReceiveHandshake(send)
 	if err != nil {
 		return err
 	}
+
 	recv := recvList.decode()
 
 	var rGenesis, rHash common.Hash
@@ -456,25 +465,33 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 	if int(rVersion) != p.version {
 		return errResp(ErrProtocolVersionMismatch, "%d (!= %d)", rVersion, p.version)
 	}
+
 	if server != nil {
 		// until we have a proper peer connectivity API, allow LES connection to other servers
 		/*if recv.get("serveStateSince", nil) == nil {
 			return errResp(ErrUselessPeer, "wanted client, got server")
 		}*/
 		if recv.get("announceType", &p.announceType) != nil {
+			//set default announceType on server side
 			p.announceType = announceTypeSimple
 		}
 		p.fcClient = flowcontrol.NewClientNode(server.fcManager, server.defParams)
 	} else {
+		//mark OnlyAnnounce server if "serveHeaders", "serveChainSince", "serveStateSince" or "txRelay" fields don't exist
 		if recv.get("serveChainSince", nil) != nil {
-			return errResp(ErrUselessPeer, "peer cannot serve chain")
+			p.isOnlyAnnounce = true
 		}
 		if recv.get("serveStateSince", nil) != nil {
-			return errResp(ErrUselessPeer, "peer cannot serve state")
+			p.isOnlyAnnounce = true
 		}
 		if recv.get("txRelay", nil) != nil {
-			return errResp(ErrUselessPeer, "peer cannot relay transactions")
+			p.isOnlyAnnounce = true
 		}
+
+		if p.isOnlyAnnounce && !p.isTrusted {
+			return errResp(ErrUselessPeer, "peer cannot serve requests")
+		}
+
 		params := &flowcontrol.ServerParams{}
 		if err := recv.get("flowControl/BL", &params.BufLimit); err != nil {
 			return err
@@ -490,7 +507,6 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		p.fcServer = flowcontrol.NewServerNode(params)
 		p.fcCosts = MRC.decode()
 	}
-
 	p.headInfo = &announceData{Td: rTd, Hash: rHash, Number: rNum}
 	return nil
 }
@@ -580,8 +596,10 @@ func (ps *peerSet) Unregister(id string) error {
 		for _, n := range peers {
 			n.unregisterPeer(p)
 		}
+
 		p.sendQueue.quit()
 		p.Peer.Disconnect(p2p.DiscUselessPeer)
+
 		return nil
 	}
 }

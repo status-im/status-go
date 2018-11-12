@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/p2p/discover"
-	crypto "github.com/libp2p/go-libp2p-crypto"
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-crypto"
+	"github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 const (
@@ -40,7 +40,7 @@ func ethv4BtS(b []byte) (string, error) {
 }
 
 // PeerIDToNodeID casts peer.ID (b58 encoded string) to discover.NodeID
-func PeerIDToNodeID(pid string) (n discover.NodeID, err error) {
+func PeerIDToNodeID(pid string) (n enode.ID, err error) {
 	nodeid, err := peer.IDB58Decode(pid)
 	if err != nil {
 		return n, err
@@ -53,5 +53,5 @@ func PeerIDToNodeID(pid string) (n discover.NodeID, err error) {
 	if !ok {
 		return n, errors.New("public key is not on the secp256k1 curve")
 	}
-	return discover.PubkeyID((*ecdsa.PublicKey)(seckey)), nil
+	return enode.PubkeyToIDV4((*ecdsa.PublicKey)(seckey)), nil
 }
