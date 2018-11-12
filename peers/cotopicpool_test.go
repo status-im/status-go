@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/suite"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 type CacheOnlyTopicPoolSuite struct {
@@ -59,18 +59,18 @@ func (s *CacheOnlyTopicPoolSuite) TearDown() {
 func (s *CacheOnlyTopicPoolSuite) TestReplacementPeerIsCounted() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
-	key1, _:=crypto.GenerateKey()
+	key1, _ := crypto.GenerateKey()
 	peer1 := discv5.NewNode(discv5.PubkeyID(&key1.PublicKey), s.peer.Self().IP(), 32311, 32311)
-	key2, _:=crypto.GenerateKey()
+	key2, _ := crypto.GenerateKey()
 	peer2 := discv5.NewNode(discv5.PubkeyID(&key2.PublicKey), s.peer.Self().IP(), 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
 	s.topicPool.processFoundNode(s.peer, peer2)
 
-	n,err:=Discv5ToEnode(*peer1)
+	n, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
 	s.topicPool.ConfirmAdded(s.peer, n.ID())
 
-	n,err=Discv5ToEnode(*peer1)
+	n, err = Discv5ToEnode(*peer1)
 	s.NoError(err)
 	s.topicPool.ConfirmAdded(s.peer, n.ID())
 	s.True(s.topicPool.MaxReached())
@@ -97,10 +97,10 @@ func (s *CacheOnlyTopicPoolSuite) TestConfirmAddedSignals() {
 		sentTopic = topic
 	}
 
-	key1, _:=crypto.GenerateKey()
-	nodeID:=discv5.PubkeyID(&key1.PublicKey)
+	key1, _ := crypto.GenerateKey()
+	nodeID := discv5.PubkeyID(&key1.PublicKey)
 	peer1 := discv5.NewNode(nodeID, s.peer.Self().IP(), 32311, 32311)
-	n,err:=Discv5ToEnode(*peer1)
+	n, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
 
 	s.topicPool.ConfirmAdded(s.peer, n.ID())
@@ -117,11 +117,11 @@ func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
 	s.topicPool.maxCachedPeers = 1
 	s.topicPool.verifier = &testFalseVerifier{}
 
-	key1, _:=crypto.GenerateKey()
+	key1, _ := crypto.GenerateKey()
 	foundPeer := discv5.NewNode(discv5.PubkeyID(&key1.PublicKey), s.peer.Self().IP(), 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, foundPeer)
 
-	n,err:=Discv5ToEnode(*foundPeer)
+	n, err := Discv5ToEnode(*foundPeer)
 	s.NoError(err)
 	s.topicPool.ConfirmAdded(s.peer, n.ID())
 

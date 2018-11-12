@@ -15,12 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	whisper "github.com/status-im/whisper/whisperv6"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 func TestStatusNodeStart(t *testing.T) {

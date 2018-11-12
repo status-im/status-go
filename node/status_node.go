@@ -20,6 +20,7 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
@@ -28,7 +29,6 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"net"
 )
 
@@ -198,7 +198,7 @@ func (n *StatusNode) discoverNode() *enode.Node {
 	discNode := n.gethNode.Server().Self()
 	if n.config.AdvertiseAddr != "" {
 		n.log.Info("using AdvertiseAddr for rendezvous", "addr", n.config.AdvertiseAddr)
-		ip:= net.ParseIP(n.config.AdvertiseAddr)
+		ip := net.ParseIP(n.config.AdvertiseAddr)
 		return enode.NewV4(&n.gethNode.Server().PrivateKey.PublicKey, ip, discNode.TCP(), discNode.UDP())
 	}
 	return discNode

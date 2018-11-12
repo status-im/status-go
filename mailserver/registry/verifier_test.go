@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/suite"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/stretchr/testify/suite"
 )
 
 type VerifierTestSuite struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
@@ -28,7 +29,6 @@ import (
 	"github.com/status-im/status-go/timesource"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // Errors related to node and services creation.

@@ -66,7 +66,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(time.Second)
 
 	// Mark mailbox node trusted.
-	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID[:])
+	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID().Bytes())
 	s.Require().NoError(err)
 
 	// Generate mailbox symkey.

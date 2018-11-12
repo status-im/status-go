@@ -3,13 +3,13 @@ package node
 import (
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/crypto"
 	"net"
 )
 
@@ -63,8 +63,8 @@ func TestMakeNodeMalformedBootnodes(t *testing.T) {
 }
 
 func TestParseNodesToNodeID(t *testing.T) {
-	c,_:=crypto.GenerateKey()
-	n:=enode.NewV4(&c.PublicKey, net.ParseIP("127.0.0.1"),30303, 30303)
+	c, _ := crypto.GenerateKey()
+	n := enode.NewV4(&c.PublicKey, net.ParseIP("127.0.0.1"), 30303, 30303)
 
 	nodeIDs := parseNodesToNodeID([]string{
 		"enode://badkey@127.0.0.1:30303",

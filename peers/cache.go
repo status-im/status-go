@@ -3,10 +3,10 @@ package peers
 import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/db"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // NewCache returns instance of PeersDatabase
@@ -29,7 +29,7 @@ func (d *Cache) AddPeer(peer *discv5.Node, topic discv5.Topic) error {
 	if err != nil {
 		return err
 	}
-	en,err:=Discv5ToEnode(*peer)
+	en, err := Discv5ToEnode(*peer)
 	if err != nil {
 		return err
 	}

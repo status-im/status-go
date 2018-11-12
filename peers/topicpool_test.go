@@ -68,9 +68,9 @@ func (s *TopicPoolSuite) TestUsingCache() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(2)
+	nodeIDs := generateCorrectDiscv5Nodeid(2)
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -81,7 +81,7 @@ func (s *TopicPoolSuite) TestUsingCache() {
 	// It should still be added to the cache and
 	// not removed when dropped.
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, peer2)
@@ -97,9 +97,9 @@ func (s *TopicPoolSuite) TestUsingCache() {
 }
 
 func (s *TopicPoolSuite) TestSyncSwitches() {
-	nodeIDs:=generateCorrectDiscv5Nodeid(1)
+	nodeIDs := generateCorrectDiscv5Nodeid(1)
 	testPeer := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
-	p,err:=Discv5ToEnode(*testPeer)
+	p, err := Discv5ToEnode(*testPeer)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, testPeer)
@@ -160,18 +160,17 @@ func (s *TopicPoolSuite) TestSetSyncMode() {
 }
 
 func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
-	nodeIDs:=generateCorrectDiscv5Nodeid(3)
+	nodeIDs := generateCorrectDiscv5Nodeid(3)
 
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
 	peer3 := discv5.NewNode(nodeIDs[2], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
-	p3,err:=Discv5ToEnode(*peer3)
+	p3, err := Discv5ToEnode(*peer3)
 	s.NoError(err)
-
 
 	// add 3 nodes and confirm connection for 1 and 2
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -203,13 +202,13 @@ func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(2)
+	nodeIDs := generateCorrectDiscv5Nodeid(2)
 
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -230,18 +229,17 @@ func (s *TopicPoolSuite) TestTheMostRecentPeerIsSelected() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(3)
+	nodeIDs := generateCorrectDiscv5Nodeid(3)
 
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
 	peer3 := discv5.NewNode(nodeIDs[2], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
-	p3,err:=Discv5ToEnode(*peer3)
+	p3, err := Discv5ToEnode(*peer3)
 	s.NoError(err)
-
 
 	// after these operations, peer1 is confirmed and peer3 and peer2
 	// was added to the pool; peer3 is the most recent one
@@ -265,17 +263,16 @@ func (s *TopicPoolSuite) TestSelectPeerAfterMaxLimit() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(3)
+	nodeIDs := generateCorrectDiscv5Nodeid(3)
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
 	peer3 := discv5.NewNode(nodeIDs[2], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
-	p3,err:=Discv5ToEnode(*peer3)
+	p3, err := Discv5ToEnode(*peer3)
 	s.NoError(err)
-
 
 	s.topicPool.processFoundNode(s.peer, peer1)
 	s.topicPool.processFoundNode(s.peer, peer2)
@@ -294,12 +291,12 @@ func (s *TopicPoolSuite) TestReplacementPeerIsCounted() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(3)
+	nodeIDs := generateCorrectDiscv5Nodeid(3)
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -320,10 +317,10 @@ func (s *TopicPoolSuite) TestPeerDontAddTwice() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(2)
+	nodeIDs := generateCorrectDiscv5Nodeid(2)
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -337,15 +334,15 @@ func (s *TopicPoolSuite) TestMaxCachedPeers() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 3
 
-	nodeIDs:=generateCorrectDiscv5Nodeid(3)
+	nodeIDs := generateCorrectDiscv5Nodeid(3)
 	peer1 := discv5.NewNode(nodeIDs[0], s.peer.Self().IP(), 32311, 32311)
 	peer2 := discv5.NewNode(nodeIDs[1], s.peer.Self().IP(), 32311, 32311)
 	peer3 := discv5.NewNode(nodeIDs[2], s.peer.Self().IP(), 32311, 32311)
-	p1,err:=Discv5ToEnode(*peer1)
+	p1, err := Discv5ToEnode(*peer1)
 	s.NoError(err)
-	p2,err:=Discv5ToEnode(*peer2)
+	p2, err := Discv5ToEnode(*peer2)
 	s.NoError(err)
-	p3,err:=Discv5ToEnode(*peer3)
+	p3, err := Discv5ToEnode(*peer3)
 	s.NoError(err)
 
 	s.topicPool.processFoundNode(s.peer, peer1)
@@ -406,16 +403,16 @@ func (s *TopicPoolSuite) TestNewTopicPoolInterface() {
 }
 
 //generateCorrectDiscv5Nodeid generate correct discv5.NodeID list sorted by enode.ID
-func generateCorrectDiscv5Nodeid(n int) []discv5.NodeID  {
+func generateCorrectDiscv5Nodeid(n int) []discv5.NodeID {
 	var nodeIDs []discv5.NodeID
-	for i:=0;i<n;i++ {
-		key,_:=crypto.GenerateKey()
-		nodeIDs=append(nodeIDs, discv5.PubkeyID(&key.PublicKey))
+	for i := 0; i < n; i++ {
+		key, _ := crypto.GenerateKey()
+		nodeIDs = append(nodeIDs, discv5.PubkeyID(&key.PublicKey))
 	}
 
 	sort.Slice(nodeIDs, func(i, j int) bool {
-		n1,_:=Discv5IDToEnodeID(nodeIDs[i])
-		n2,_:=Discv5IDToEnodeID(nodeIDs[j])
+		n1, _ := Discv5IDToEnodeID(nodeIDs[i])
+		n2, _ := Discv5IDToEnodeID(nodeIDs[j])
 		return n1.String() < n2.String()
 	})
 	return nodeIDs

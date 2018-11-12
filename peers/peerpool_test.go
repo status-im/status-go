@@ -27,8 +27,8 @@ import (
 	"github.com/status-im/status-go/signal"
 
 	// to access logs in the test with `-log` flag
-	_ "github.com/status-im/status-go/t/utils"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	_ "github.com/status-im/status-go/t/utils"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -245,7 +245,7 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 	s.T().Log(connectedPeer)
 
 	s.T().Log("Peers")
-	for i:=range s.peers {
+	for i := range s.peers {
 		s.T().Log(s.peers[i].Self().ID())
 	}
 
@@ -521,7 +521,7 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
 	s.Require().Len(cachedPeers, 1)
 
-	p1,err:=Discv5ToEnode(*cachedPeers[0])
+	p1, err := Discv5ToEnode(*cachedPeers[0])
 	s.NoError(err)
 
 	s.Equal(s.peers[0].Self().ID(), p1.ID())

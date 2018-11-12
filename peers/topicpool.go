@@ -6,15 +6,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/common/mclock"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"crypto/ecdsa"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 const (
@@ -86,7 +86,7 @@ type TopicPool struct {
 	fastModeTimeoutCancel chan struct{}
 
 	pendingPeers         map[enode.ID]*peerInfoItem // contains found and requested to be connected peers but not confirmed
-	discoveredPeersQueue peerPriorityQueue               // priority queue to find the most recently discovered peers; does not containt peers requested to connect
+	discoveredPeersQueue peerPriorityQueue          // priority queue to find the most recently discovered peers; does not containt peers requested to connect
 	connectedPeers       map[enode.ID]*peerInfo     // currently connected peers
 
 	stopSearchTimeout *time.Time
@@ -96,8 +96,8 @@ type TopicPool struct {
 }
 
 func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
-	en, err:=Discv5ToEnode(*peer.node)
-	if err!=nil {
+	en, err := Discv5ToEnode(*peer.node)
+	if err != nil {
 		log.Warn("Failed to decode key", "ID", peer.node.ID, "err", err)
 		return
 	}
@@ -113,8 +113,8 @@ func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
 
 // addToQueue adds the passed peer to the queue if it is already pending.
 func (t *TopicPool) addToQueue(peer *peerInfo) {
-	en, err:=Discv5ToEnode(*peer.node)
-	if err!=nil {
+	en, err := Discv5ToEnode(*peer.node)
+	if err != nil {
 		log.Warn("Failed to decode key", "ID", peer.node.ID, "err", err)
 		return
 	}
@@ -431,8 +431,8 @@ func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.No
 			return
 		case <-lookup:
 		case node := <-found:
-			nodeID,err:= Discv5IDToEnodeID(node.ID)
-			if err!=nil {
+			nodeID, err := Discv5IDToEnodeID(node.ID)
+			if err != nil {
 				continue
 			}
 
@@ -453,8 +453,8 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 	defer t.mu.Unlock()
 
 	log.Debug("peer found", "ID", node.ID, "topic", t.topic)
-	en,err:=Discv5ToEnode(*node)
-	if err!=nil {
+	en, err := Discv5ToEnode(*node)
+	if err != nil {
 		log.Warn("Failed to convert to enode", "ID", node.ID, "err", err)
 		return
 	}
@@ -482,8 +482,8 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 }
 
 func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
-	key, err:= decodePubkey64(info.node.ID[:])
-	if err!=nil {
+	key, err := decodePubkey64(info.node.ID[:])
+	if err != nil {
 		log.Warn("Failed to decode key", "ID", info.node.ID, "err", err)
 		return
 	}
@@ -496,8 +496,8 @@ func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
 }
 
 func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
-	key, err:= decodePubkey64(info.node.ID[:])
-	if err!=nil {
+	key, err := decodePubkey64(info.node.ID[:])
+	if err != nil {
 		log.Warn("Failed to decode key", "ID", info.node.ID, "err", err)
 		return
 	}
@@ -558,7 +558,7 @@ func (t *TopicPool) SetLimits(limits params.Limits) {
 
 func Discv5ToEnode(n discv5.Node) (*enode.Node, error) {
 	pubkey, err := decodePubkey64(n.ID[:])
-	if err!=nil {
+	if err != nil {
 		return &enode.Node{}, err
 	}
 	return enode.NewV4(pubkey, n.IP, int(n.TCP), int(n.UDP)), nil
@@ -566,13 +566,13 @@ func Discv5ToEnode(n discv5.Node) (*enode.Node, error) {
 
 func Discv5IDToEnodeID(nodeID discv5.NodeID) (enode.ID, error) {
 	pubkey, err := decodePubkey64(nodeID[:])
-	if err!=nil {
+	if err != nil {
 		return enode.ID{}, err
 	}
 	return enode.PubkeyToIDV4(pubkey), nil
 }
 
-func EnodeToDiscv5(node enode.Node) ( *discv5.Node) {
+func EnodeToDiscv5(node enode.Node) *discv5.Node {
 	return discv5.NewNode(discv5.PubkeyID(node.Pubkey()), node.IP(), uint16(node.UDP()), uint16(node.TCP()))
 }
 
