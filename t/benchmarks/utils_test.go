@@ -1,7 +1,6 @@
 package benchmarks
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -42,7 +41,7 @@ func addPeerWithConfirmation(server *p2p.Server, node *enode.Node) error {
 	server.AddPeer(node)
 
 	ev := <-ch
-	if ev.Type != p2p.PeerEventTypeAdd || bytes.Equal(ev.Peer.Bytes(), node.ID().Bytes()) {
+	if ev.Type != p2p.PeerEventTypeAdd || ev.Peer == node.ID() {
 		return fmt.Errorf("got unexpected event: %+v", ev)
 	}
 

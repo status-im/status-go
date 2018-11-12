@@ -477,10 +477,7 @@ func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
 }
 
 func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
-	n, err := enode.ParseV4(info.node.String())
-	if err != nil {
-		panic(err)
-	}
+	n := enode.NewV4(info.publicKey, info.node.IP, int(info.node.TCP), int(info.node.UDP))
 	server.RemovePeer(n)
 }
 

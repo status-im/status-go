@@ -167,9 +167,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	aliceErrCh := helpers.WaitForPeerAsync(aliceBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	bobErrCh := helpers.WaitForPeerAsync(bobBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	charlieErrCh := helpers.WaitForPeerAsync(charlieBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
+	aliceErrCh := helpers.WaitForPeerAsync(aliceBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
+	bobErrCh := helpers.WaitForPeerAsync(bobBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
+	charlieErrCh := helpers.WaitForPeerAsync(charlieBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
 
 	s.Require().NoError(aliceBackend.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(bobBackend.StatusNode().AddPeer(mailboxEnode))

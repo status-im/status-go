@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"bytes"
 	"errors"
 	"time"
 
@@ -37,7 +36,7 @@ func waitForPeer(p *p2p.Server, u string, e p2p.PeerEventType, t time.Duration, 
 	for {
 		select {
 		case ev := <-ch:
-			if ev.Type == e && bytes.Equal(ev.Peer.Bytes(), parsedPeer.ID().Bytes()) {
+			if ev.Type == e && ev.Peer == parsedPeer.ID() {
 				return nil
 			}
 		case err := <-subscription.Err():
