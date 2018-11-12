@@ -66,7 +66,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(time.Second)
 
 	// Mark mailbox node trusted.
-	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID[:])
+	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID().Bytes())
 	s.Require().NoError(err)
 
 	// Generate mailbox symkey.
@@ -345,7 +345,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	clientRPCClient := client.StatusNode().RPCPrivateClient()
 
 	// Add mailbox to client's peers
-	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
+	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
 	s.Require().NoError(client.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(<-errCh)
 
