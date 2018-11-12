@@ -94,16 +94,10 @@ type TopicPool struct {
 }
 
 func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
-	pk, err := peer.node.ID.Pubkey()
-	id := enode.PubkeyToIDV4(pk)
-	if err != nil {
-		panic(err)
-	}
-
-	if _, ok := t.pendingPeers[id]; ok {
+	if _, ok := t.pendingPeers[peer.NodeID()]; ok {
 		return
 	}
-	t.pendingPeers[id] = &peerInfoItem{
+	t.pendingPeers[peer.NodeID()] = &peerInfoItem{
 		peerInfo: peer,
 		index:    notQueuedIndex,
 	}
@@ -111,7 +105,7 @@ func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
 
 // addToQueue adds the passed peer to the queue if it is already pending.
 func (t *TopicPool) addToQueue(peer *peerInfo) {
-	if p, ok := t.pendingPeers[peer.nodeID]; ok {
+	if p, ok := t.pendingPeers[peer.NodeID()]; ok {
 		heap.Push(&t.discoveredPeersQueue, p)
 	}
 }
@@ -463,7 +457,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 		t.addToPendingPeers(&peerInfo{
 			discoveredTime: mclock.Now(),
 			node:           node,
-			nodeID:         nodeID,
+			publicKey:      pk,
 		})
 	}
 
@@ -478,10 +472,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 }
 
 func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
-	n, err := enode.ParseV4(info.node.String())
-	if err != nil {
-		panic(err)
-	}
+	n := enode.NewV4(info.publicKey, info.node.IP, int(info.node.TCP), int(info.node.UDP))
 	server.AddPeer(n)
 }
 

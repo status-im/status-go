@@ -1,6 +1,7 @@
 package peers
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"sync"
 	"time"
@@ -80,8 +81,13 @@ type peerInfo struct {
 	// dismissed is true when our node requested a disconnect
 	dismissed bool
 
-	node   *discv5.Node
-	nodeID enode.ID
+	node *discv5.Node
+	// store public key separately to make peerInfo more independent from discv5
+	publicKey *ecdsa.PublicKey
+}
+
+func (p *peerInfo) NodeID() enode.ID {
+	return enode.PubkeyToIDV4(p.publicKey)
 }
 
 // PeerPool manages discovered peers and connects them to p2p server

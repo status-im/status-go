@@ -94,10 +94,12 @@ func (s *CacheOnlyTopicPoolSuite) TestConfirmAddedSignals() {
 		sentTopic = topic
 	}
 
-	id := enode.ID{1}
+	id, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	nodeID := enode.PubkeyToIDV4(&id.PublicKey)
 
-	s.topicPool.ConfirmAdded(s.peer, id)
-	s.Equal(id.String(), sentNodeID)
+	s.topicPool.ConfirmAdded(s.peer, nodeID)
+	s.Equal(nodeID.String(), sentNodeID)
 	s.Equal(MailServerDiscoveryTopic, sentTopic)
 }
 
@@ -109,9 +111,11 @@ func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
 	s.topicPool.maxCachedPeers = 1
 	s.topicPool.verifier = &testFalseVerifier{}
 
-	foundPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP(), 32311, 32311)
+	id, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	foundPeer := discv5.NewNode(discv5.PubkeyID(&id.PublicKey), s.peer.Self().IP(), 32311, 32311)
 	s.Require().NoError(s.topicPool.processFoundNode(s.peer, foundPeer))
-	s.topicPool.ConfirmAdded(s.peer, enode.ID{1})
+	s.topicPool.ConfirmAdded(s.peer, enode.PubkeyToIDV4(&id.PublicKey))
 
 	s.False(signalCalled)
 	// limits should not change

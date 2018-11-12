@@ -229,7 +229,7 @@ func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 	}
 	node, err := n.discoverNode()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get a node: %v", err)
+		return nil, fmt.Errorf("failed to get a discover node: %v", err)
 	}
 
 	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, node)
