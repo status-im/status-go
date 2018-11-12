@@ -147,26 +147,6 @@
   revision = "8be2a682ab9f254311de1375145a2f78a809b07d"
 
 [[override]]
-  name = "github.com/libp2p/go-libp2p-circuit"
-  revision = "eca2b86a1bcf00adba4f71b3654c3898b19ef421"
-
-[[override]]
-  name = "github.com/status-im/go-multiaddr-ethv4"
-  revision = "cbcba3a7c121e29718d9011ffc9e2b78ac6d5c99"
-
-[[override]]
-  name = "github.com/libp2p/go-libp2p"
-  revision = "a08d9e63dbf006c905a532d5f645a2bf6fae3bd1"
-
-[[override]]
-  name = "github.com/libp2p/go-libp2p-peerstore"
-  revision = "b1e626f38de4d5f3b8c292f230f8b9f03889ae65"
-
-[[override]]
-  name = "github.com/libp2p/go-libp2p-peer"
-  version = "2.3.5"
-
-[[override]]
   name = "github.com/satori/go.uuid"
   revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
 

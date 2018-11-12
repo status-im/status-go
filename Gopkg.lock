@@ -812,6 +812,7 @@
   revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
 
 [[projects]]
+  branch = "master"
   digest = "1:f3044238fc5d70eca12cc181b1e6d5270570d85a7b7046686381e618a783a7d6"
   name = "github.com/status-im/go-multiaddr-ethv4"
   packages = ["."]
@@ -1099,7 +1100,6 @@
     "github.com/ethereum/go-ethereum/metrics",
     "github.com/ethereum/go-ethereum/node",
     "github.com/ethereum/go-ethereum/p2p",
-    "github.com/ethereum/go-ethereum/p2p/discover",
     "github.com/ethereum/go-ethereum/p2p/discv5",
     "github.com/ethereum/go-ethereum/p2p/enode",
     "github.com/ethereum/go-ethereum/p2p/enr",
