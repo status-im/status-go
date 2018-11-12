@@ -6,6 +6,7 @@ import (
 	"github.com/status-im/status-go/db"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // NewCache returns instance of PeersDatabase
@@ -18,7 +19,7 @@ type Cache struct {
 	db *leveldb.DB
 }
 
-func makePeerKey(peerID discv5.NodeID, topic discv5.Topic) []byte {
+func makePeerKey(peerID enode.ID, topic discv5.Topic) []byte {
 	return db.Key(db.PeersCache, []byte(topic), peerID[:])
 }
 
@@ -28,11 +29,16 @@ func (d *Cache) AddPeer(peer *discv5.Node, topic discv5.Topic) error {
 	if err != nil {
 		return err
 	}
-	return d.db.Put(makePeerKey(peer.ID, topic), data, nil)
+	en,err:=Discv5ToEnode(*peer)
+	if err != nil {
+		return err
+	}
+
+	return d.db.Put(makePeerKey(en.ID(), topic), data, nil)
 }
 
 // RemovePeer deletes a peer from database.
-func (d *Cache) RemovePeer(peerID discv5.NodeID, topic discv5.Topic) error {
+func (d *Cache) RemovePeer(peerID enode.ID, topic discv5.Topic) error {
 	return d.db.Delete(makePeerKey(peerID, topic), nil)
 }
 

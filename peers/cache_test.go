@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // newInMemoryCache creates a cache for tests
@@ -24,10 +25,16 @@ func TestPeersRange(t *testing.T) {
 	peersDB, err := newInMemoryCache()
 	require.NoError(t, err)
 	topic := discv5.Topic("test")
+	ids:=generateCorrectDiscv5Nodeid(3)
+	t.Log("ids")
+	for i:=range ids {
+		t.Log(ids[i])
+	}
+	t.Log("ids")
 	peers := [3]*discv5.Node{
-		discv5.NewNode(discv5.NodeID{3}, net.IPv4(100, 100, 0, 3), 32311, 32311),
-		discv5.NewNode(discv5.NodeID{4}, net.IPv4(100, 100, 0, 4), 32311, 32311),
-		discv5.NewNode(discv5.NodeID{2}, net.IPv4(100, 100, 0, 2), 32311, 32311),
+		discv5.NewNode(ids[1], net.IPv4(100, 100, 0, 3), 32311, 32311),
+		discv5.NewNode(ids[2], net.IPv4(100, 100, 0, 4), 32311, 32311),
+		discv5.NewNode(ids[0], net.IPv4(100, 100, 0, 2), 32311, 32311),
 	}
 	for _, peer := range peers {
 		assert.NoError(t, peersDB.AddPeer(peer, topic))
@@ -41,7 +48,9 @@ func TestPeersRange(t *testing.T) {
 	assert.Equal(t, peers[0].String(), nodes[1].String())
 	assert.Equal(t, peers[1].String(), nodes[2].String())
 
-	assert.NoError(t, peersDB.RemovePeer(peers[1].ID, topic))
+	id,err:=Discv5IDToEnodeID(peers[1].ID)
+	require.NoError(t,err)
+	assert.NoError(t, peersDB.RemovePeer(id, topic))
 	require.Len(t, peersDB.GetPeersRange(topic, 3), 2)
 }
 
@@ -49,20 +58,34 @@ func TestMultipleTopics(t *testing.T) {
 	peersDB, err := newInMemoryCache()
 	require.NoError(t, err)
 	topics := []discv5.Topic{discv5.Topic("first"), discv5.Topic("second")}
+	keys:=make(map[discv5.Topic]map[discv5.NodeID] struct{})
+
 	for i := range topics {
-		peers := [3]*discv5.Node{
-			discv5.NewNode(discv5.NodeID{byte(i), 1}, net.IPv4(100, 100, 0, 3), 32311, 32311),
-			discv5.NewNode(discv5.NodeID{byte(i), 2}, net.IPv4(100, 100, 0, 4), 32311, 32311),
-			discv5.NewNode(discv5.NodeID{byte(i), 3}, net.IPv4(100, 100, 0, 2), 32311, 32311)}
+		var peers []*discv5.Node
+		keys[topics[i]]=make(map[discv5.NodeID]struct{})
+
+		for j:=0;j<3;j++ {
+			key,_:=crypto.GenerateKey()
+			nodeID:=discv5.PubkeyID(&key.PublicKey)
+			keys[topics[i]][nodeID]= struct{}{}
+			node:=discv5.NewNode(nodeID, net.IPv4(100, 100, 0, byte(j+1)), 32311, 32311)
+			peers=append(peers,node)
+		}
+
 		for _, peer := range peers {
 			assert.NoError(t, peersDB.AddPeer(peer, topics[i]))
 		}
 	}
+
 	for i := range topics {
 		nodes := peersDB.GetPeersRange(topics[i], 10)
 		assert.Len(t, nodes, 3)
 		for _, n := range nodes {
-			assert.Equal(t, byte(i), n.ID[0])
+			_,ok:=keys[topics[i]][n.ID]
+			assert.True(t,ok)
 		}
 	}
 }
+
+
+

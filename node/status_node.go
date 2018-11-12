@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	ma "github.com/multiformats/go-multiaddr"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -30,6 +28,8 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"net"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -190,7 +190,7 @@ func (n *StatusNode) discoveryEnabled() bool {
 	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig.Enabled
 }
 
-func (n *StatusNode) discoverNode() *discover.Node {
+func (n *StatusNode) discoverNode() *enode.Node {
 	if !n.isRunning() {
 		return nil
 	}
@@ -198,7 +198,8 @@ func (n *StatusNode) discoverNode() *discover.Node {
 	discNode := n.gethNode.Server().Self()
 	if n.config.AdvertiseAddr != "" {
 		n.log.Info("using AdvertiseAddr for rendezvous", "addr", n.config.AdvertiseAddr)
-		discNode.IP = net.ParseIP(n.config.AdvertiseAddr)
+		ip:= net.ParseIP(n.config.AdvertiseAddr)
+		return enode.NewV4(&n.gethNode.Server().PrivateKey.PublicKey, ip, discNode.TCP(), discNode.UDP())
 	}
 	return discNode
 }
@@ -414,7 +415,7 @@ func (n *StatusNode) AddPeer(url string) error {
 
 // addPeer adds new static peer node
 func (n *StatusNode) addPeer(url string) error {
-	parsedNode, err := discover.ParseNode(url)
+	parsedNode, err := enode.ParseV4(url)
 	if err != nil {
 		return err
 	}
@@ -429,7 +430,7 @@ func (n *StatusNode) addPeer(url string) error {
 }
 
 func (n *StatusNode) removePeer(url string) error {
-	parsedNode, err := discover.ParseNode(url)
+	parsedNode, err := enode.ParseV4(url)
 	if err != nil {
 		return err
 	}

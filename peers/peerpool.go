@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 
 	"github.com/status-im/status-go/contracts"
@@ -19,6 +18,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers/verifier"
 	"github.com/status-im/status-go/signal"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 var (
@@ -58,7 +58,7 @@ type Options struct {
 	// filled before really stopping the search.
 	TopicStopSearchDelay time.Duration
 	// TrustedMailServers is a list of trusted nodes.
-	TrustedMailServers []discover.NodeID
+	TrustedMailServers []enode.ID
 	// MailServerRegistryAddress is the MailServerRegistry contract address
 	MailServerRegistryAddress string
 }
@@ -290,7 +290,7 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 }
 
 // handleAddedPeer notifies all topics about added peer.
-func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID discover.NodeID) {
+func (p *PeerPool) handleAddedPeer(server *p2p.Server, nodeID enode.ID) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, t := range p.topics {
@@ -335,7 +335,7 @@ func (p *PeerPool) allTopicsStopped() (all bool) {
 
 // handleDroppedPeer notifies every topic about dropped peer and returns true if any peer have connections
 // below min limit
-func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID discover.NodeID) (any bool) {
+func (p *PeerPool) handleDroppedPeer(server *p2p.Server, nodeID enode.ID) (any bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, t := range p.topics {

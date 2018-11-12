@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	lcrypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
@@ -29,6 +28,7 @@ import (
 
 	// to access logs in the test with `-log` flag
 	_ "github.com/status-im/status-go/t/utils"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -130,7 +130,7 @@ func (s *PeerPoolSimulationSuite) TearDown() {
 	}
 }
 
-func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID discover.NodeID) {
+func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID enode.ID) {
 	select {
 	case ev := <-events:
 		if ev.Type == etype {
@@ -241,7 +241,15 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 
 	// wait for the peer to be found and connected
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID, connectedPeer)
+	s.T().Log("connectedPeer")
+	s.T().Log(connectedPeer)
+
+	s.T().Log("Peers")
+	for i:=range s.peers {
+		s.T().Log(s.peers[i].Self().ID())
+	}
+
+	s.Equal(s.peers[0].Self().ID(), connectedPeer)
 	// as the upper limit was reached, Discovery should be stoped
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
@@ -494,7 +502,7 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 		0,
 		true,
 		100 * time.Millisecond,
-		[]discover.NodeID{s.peers[0].Self().ID},
+		[]enode.ID{s.peers[0].Self().ID()},
 		"",
 	}
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -503,20 +511,24 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 
 	// wait for and verify the mail server peer
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID, connectedPeer)
+	s.Equal(s.peers[0].Self().ID(), connectedPeer)
 
 	// wait for a summary event to be sure that ConfirmAdded() was called
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Equal(s.peers[0].Self().ID.String(), (<-summaries)[0].ID)
+	s.Equal(s.peers[0].Self().ID().String(), (<-summaries)[0].ID)
 
 	// check cache
 	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
 	s.Require().Len(cachedPeers, 1)
-	s.Equal(s.peers[0].Self().ID[:], cachedPeers[0].ID[:])
+
+	p1,err:=Discv5ToEnode(*cachedPeers[0])
+	s.NoError(err)
+
+	s.Equal(s.peers[0].Self().ID(), p1.ID())
 
 	// wait for another event as the peer should be removed
 	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
-	s.Equal(s.peers[0].Self().ID, disconnectedPeer)
+	s.Equal(s.peers[0].Self().ID(), disconnectedPeer)
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	s.Len(<-summaries, 0)
 }

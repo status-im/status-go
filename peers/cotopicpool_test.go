@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/suite"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 type CacheOnlyTopicPoolSuite struct {
@@ -59,13 +59,20 @@ func (s *CacheOnlyTopicPoolSuite) TearDown() {
 func (s *CacheOnlyTopicPoolSuite) TestReplacementPeerIsCounted() {
 	s.topicPool.limits = params.NewLimits(1, 1)
 	s.topicPool.maxCachedPeers = 1
-
-	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
-	peer2 := discv5.NewNode(discv5.NodeID{2}, s.peer.Self().IP, 32311, 32311)
+	key1, _:=crypto.GenerateKey()
+	peer1 := discv5.NewNode(discv5.PubkeyID(&key1.PublicKey), s.peer.Self().IP(), 32311, 32311)
+	key2, _:=crypto.GenerateKey()
+	peer2 := discv5.NewNode(discv5.PubkeyID(&key2.PublicKey), s.peer.Self().IP(), 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, peer1)
 	s.topicPool.processFoundNode(s.peer, peer2)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer2.ID))
+
+	n,err:=Discv5ToEnode(*peer1)
+	s.NoError(err)
+	s.topicPool.ConfirmAdded(s.peer, n.ID())
+
+	n,err=Discv5ToEnode(*peer1)
+	s.NoError(err)
+	s.topicPool.ConfirmAdded(s.peer, n.ID())
 	s.True(s.topicPool.MaxReached())
 
 	// When we stop searching for peers (when Max limit is reached)
@@ -90,9 +97,15 @@ func (s *CacheOnlyTopicPoolSuite) TestConfirmAddedSignals() {
 		sentTopic = topic
 	}
 
-	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.Equal((discv5.NodeID{1}).String(), sentNodeID)
+	key1, _:=crypto.GenerateKey()
+	nodeID:=discv5.PubkeyID(&key1.PublicKey)
+	peer1 := discv5.NewNode(nodeID, s.peer.Self().IP(), 32311, 32311)
+	n,err:=Discv5ToEnode(*peer1)
+	s.NoError(err)
+
+	s.topicPool.ConfirmAdded(s.peer, n.ID())
+
+	s.Equal(n.ID().String(), sentNodeID)
 	s.Equal(MailServerDiscoveryTopic, sentTopic)
 }
 
@@ -104,9 +117,13 @@ func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
 	s.topicPool.maxCachedPeers = 1
 	s.topicPool.verifier = &testFalseVerifier{}
 
-	foundPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
+	key1, _:=crypto.GenerateKey()
+	foundPeer := discv5.NewNode(discv5.PubkeyID(&key1.PublicKey), s.peer.Self().IP(), 32311, 32311)
 	s.topicPool.processFoundNode(s.peer, foundPeer)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(foundPeer.ID))
+
+	n,err:=Discv5ToEnode(*foundPeer)
+	s.NoError(err)
+	s.topicPool.ConfirmAdded(s.peer, n.ID())
 
 	s.False(signalCalled)
 	// limits should not change
@@ -118,12 +135,12 @@ func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
 
 type testTrueVerifier struct{}
 
-func (v *testTrueVerifier) VerifyNode(context.Context, discover.NodeID) bool {
+func (v *testTrueVerifier) VerifyNode(context.Context, enode.ID) bool {
 	return true
 }
 
 type testFalseVerifier struct{}
 
-func (v *testFalseVerifier) VerifyNode(context.Context, discover.NodeID) bool {
+func (v *testFalseVerifier) VerifyNode(context.Context, enode.ID) bool {
 	return false
 }

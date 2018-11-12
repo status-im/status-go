@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 const (
@@ -35,11 +36,11 @@ func TopicPart(key []byte) []byte {
 type RecordsKey []byte
 
 func NewRecordsKey(topic string, record enr.Record) RecordsKey {
-	key := make(RecordsKey, 2+len([]byte(topic))+len(record.NodeAddr()))
+	key := make(RecordsKey, 2+len([]byte(topic))+len(enode.ValidSchemes.NodeAddr(&record)))
 	key[0] = RecordsPrefix
 	copy(key[1:], []byte(topic))
 	key[1+len([]byte(topic))] = TopicBodyDelimiter
-	copy(key[2+len([]byte(topic)):], record.NodeAddr())
+	copy(key[2+len([]byte(topic)):], enode.ValidSchemes.NodeAddr(&record))
 	return key
 }
 

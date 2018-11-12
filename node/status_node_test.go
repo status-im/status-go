@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/discovery"
@@ -21,6 +20,7 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 func TestStatusNodeStart(t *testing.T) {
@@ -234,7 +234,7 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 		require.NoError(t, <-errCh)
 	}
 	require.Equal(t, 1, n.PeerCount())
-	require.Equal(t, peer.Server().Self().ID.String(), n.GethNode().Server().PeersInfo()[0].ID)
+	require.Equal(t, peer.Server().Self().ID().String(), n.GethNode().Server().PeersInfo()[0].ID)
 
 	// reconnect static peers
 	errDropCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeDrop, time.Second*30)
@@ -252,7 +252,7 @@ func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
 		return false, ErrNoRunningNode
 	}
 
-	parsedPeer, err := discover.ParseNode(peerURL)
+	parsedPeer, err := enode.ParseV4(peerURL)
 	if err != nil {
 		return false, err
 	}
@@ -260,7 +260,7 @@ func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
 	server := node.GethNode().Server()
 
 	for _, peer := range server.PeersInfo() {
-		if peer.ID == parsedPeer.ID.String() {
+		if peer.ID == parsedPeer.ID().String() {
 			return true, nil
 		}
 	}
@@ -292,7 +292,8 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	}
 	n := New()
 	require.NoError(t, n.Start(&config))
-	require.Equal(t, net.ParseIP("127.0.0.1").To4(), n.discoverNode().IP)
+	t.Log(net.ParseIP("0.0.0.0"))
+	require.Equal(t, net.ParseIP("127.0.0.1").To4(), n.discoverNode().IP())
 
 	config = params.NodeConfig{
 		NoDiscovery:   true,
@@ -301,5 +302,5 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	}
 	n = New()
 	require.NoError(t, n.Start(&config))
-	require.Equal(t, net.ParseIP("127.0.0.2"), n.discoverNode().IP)
+	require.Equal(t, net.ParseIP("127.0.0.2").To4(), n.discoverNode().IP())
 }

@@ -20,6 +20,7 @@ package les
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
@@ -161,6 +162,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	}
 
 	if leth.protocolManager.isULCEnabled() {
+		log.Warn("Ultra light client is enabled", "trustedNodes", len(leth.protocolManager.ulc.trustedKeys), "minTrustedFraction", leth.protocolManager.ulc.minTrustedFraction)
 		leth.blockchain.DisableCheckFreq()
 	}
 	leth.ApiBackend = &LesApiBackend{leth, nil}
@@ -279,6 +281,7 @@ func (s *LightEthereum) Stop() error {
 
 	s.eventMux.Stop()
 
+	time.Sleep(time.Millisecond * 200)
 	s.chainDb.Close()
 	close(s.shutdownChan)
 
