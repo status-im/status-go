@@ -23,6 +23,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 
 	ch := make(chan *p2p.PeerEvent, server.MaxPeers)
 	subscription := server.SubscribeEvents(ch)
+	defer subscription.Unsubscribe()
 
 	logger.Debug("Subscribed to server events")
 
@@ -38,10 +39,8 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 			if err != nil {
 				logger.Error("Subscription failed", "err", err)
 			}
-			subscription.Unsubscribe()
 			return err
 		case <-ctx.Done():
-			subscription.Unsubscribe()
 			return nil
 		}
 	}
