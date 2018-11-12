@@ -810,6 +810,7 @@
   revision = "57d2e2abe46f80680b96640a8ce62d8187bee7e8"
 
 [[projects]]
+  branch = "master"
   digest = "1:5fb8fc6a365f62e1d771b8a33c808a111ace9ba3506089f00ec252ec1e257a83"
   name = "github.com/status-im/rendezvous"
   packages = [
@@ -818,14 +819,15 @@
     "server",
   ]
   pruneopts = "NUT"
-  revision = "6aa6103545295820fb9a680b0da080e8cdf45def"
+  revision = "fbcc46a78cd43fef95a110df664aab513116a850"
 
 [[projects]]
   digest = "1:fe884981c5589ade6ea86ca876be4a744ea1344c6e8cfa17e434fcf270b04598"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "64c74e62c161909003e74edeae8563e803f99329"
+  revision = "e25ea1d673d5982b16fd3e51ed2a0d8f91b809d9"
+  version = "v1.3.0"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1084,7 +1086,6 @@
     "github.com/ethereum/go-ethereum/metrics",
     "github.com/ethereum/go-ethereum/node",
     "github.com/ethereum/go-ethereum/p2p",
-    "github.com/ethereum/go-ethereum/p2p/discover",
     "github.com/ethereum/go-ethereum/p2p/discv5",
     "github.com/ethereum/go-ethereum/p2p/enode",
     "github.com/ethereum/go-ethereum/p2p/enr",
