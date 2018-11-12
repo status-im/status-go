@@ -66,8 +66,8 @@ func (s *CacheOnlyTopicPoolSuite) TestReplacementPeerIsCounted() {
 	id2, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	peer2 := discv5.NewNode(discv5.PubkeyID(&id2.PublicKey), s.peer.Self().IP(), 32311, 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
 	s.topicPool.ConfirmAdded(s.peer, enode.PubkeyToIDV4(&id1.PublicKey))
 	s.topicPool.ConfirmAdded(s.peer, enode.PubkeyToIDV4(&id1.PublicKey))
 	s.True(s.topicPool.MaxReached())
@@ -110,7 +110,7 @@ func (s *CacheOnlyTopicPoolSuite) TestNotTrustedPeer() {
 	s.topicPool.verifier = &testFalseVerifier{}
 
 	foundPeer := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP(), 32311, 32311)
-	s.topicPool.processFoundNode(s.peer, foundPeer)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, foundPeer))
 	s.topicPool.ConfirmAdded(s.peer, enode.ID{1})
 
 	s.False(signalCalled)

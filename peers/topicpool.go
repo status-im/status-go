@@ -423,8 +423,11 @@ func (t *TopicPool) handleFoundPeers(server *p2p.Server, found <-chan *discv5.No
 			return
 		case <-lookup:
 		case node := <-found:
-			if node.ID != selfID {
-				t.processFoundNode(server, node)
+			if node.ID == selfID {
+				continue
+			}
+			if err := t.processFoundNode(server, node); err != nil {
+				log.Error("failed to process found node", "node", node, "error", err)
 			}
 		}
 	}

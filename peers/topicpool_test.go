@@ -78,7 +78,7 @@ func (s *TopicPoolSuite) TestUsingCache() {
 	s.topicPool.maxCachedPeers = 1
 
 	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.Equal([]*discv5.Node{peer1}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
 
@@ -86,7 +86,7 @@ func (s *TopicPoolSuite) TestUsingCache() {
 	// It should still be added to the cache and
 	// not removed when dropped.
 	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
-	s.topicPool.processFoundNode(s.peer, peer2)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 
 	cached := s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10)
@@ -105,7 +105,7 @@ func (s *TopicPoolSuite) TestUsingCache() {
 
 func (s *TopicPoolSuite) TestSyncSwitches() {
 	nodeID, peer := s.createDiscV5Node(s.peer.Self().IP(), 32311)
-	s.topicPool.processFoundNode(s.peer, peer)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer))
 	s.topicPool.ConfirmAdded(s.peer, nodeID)
 	s.AssertConsumed(s.topicPool.period, s.topicPool.slowMode, time.Second)
 	s.NotNil(s.topicPool.connectedPeers[nodeID])
@@ -168,9 +168,9 @@ func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
 	nodeID3, peer3 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 
 	// add 3 nodes and confirm connection for 1 and 2
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
-	s.topicPool.processFoundNode(s.peer, peer3)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer3))
 	s.Len(s.topicPool.pendingPeers, 3)
 	s.Len(s.topicPool.discoveredPeersQueue, 0)
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
@@ -200,8 +200,8 @@ func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 	s.False(s.topicPool.connectedPeers[nodeID1].dismissed)
@@ -224,9 +224,9 @@ func (s *TopicPoolSuite) TestTheMostRecentPeerIsSelected() {
 
 	// after these operations, peer1 is confirmed and peer3 and peer2
 	// was added to the pool; peer3 is the most recent one
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
-	s.topicPool.processFoundNode(s.peer, peer3)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer3))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 	s.topicPool.ConfirmAdded(s.peer, nodeID3)
@@ -248,14 +248,14 @@ func (s *TopicPoolSuite) TestSelectPeerAfterMaxLimit() {
 	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	nodeID3, peer3 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 	s.topicPool.ConfirmDropped(s.peer, nodeID2)
 	s.Len(s.topicPool.pendingPeers, 1)
 	s.Contains(s.topicPool.pendingPeers, nodeID2)
-	s.topicPool.processFoundNode(s.peer, peer3)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer3))
 	s.Len(s.topicPool.pendingPeers, 2)
 	s.Contains(s.topicPool.pendingPeers, nodeID3)
 	s.Equal(peer3, s.topicPool.AddPeerFromTable(s.peer))
@@ -267,8 +267,8 @@ func (s *TopicPoolSuite) TestReplacementPeerIsCounted() {
 
 	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 	s.topicPool.ConfirmDropped(s.peer, nodeID2)
@@ -287,8 +287,8 @@ func (s *TopicPoolSuite) TestPeerDontAddTwice() {
 
 	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	_, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	// peer2 already added to p2p server no reason to add it again
 	s.Nil(s.topicPool.AddPeerFromTable(s.peer))
@@ -300,9 +300,9 @@ func (s *TopicPoolSuite) TestMaxCachedPeers() {
 	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	nodeID3, peer3 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.topicPool.processFoundNode(s.peer, peer2)
-	s.topicPool.processFoundNode(s.peer, peer3)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer3))
 	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 	s.topicPool.ConfirmAdded(s.peer, nodeID3)

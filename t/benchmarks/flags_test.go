@@ -3,7 +3,7 @@ package benchmarks
 import (
 	"flag"
 
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 var (
@@ -18,10 +18,10 @@ var (
 	msgBatchSize = flag.Int64("msgbatchsize", int64(20), "Number of messages to send in a batch")
 )
 
-var peerEnode *discover.Node
+var peerEnode *enode.Node
 
 func init() {
 	flag.Parse()
 
-	peerEnode = discover.MustParseNode(*peerURL)
+	peerEnode = enode.MustParseV4(*peerURL)
 }

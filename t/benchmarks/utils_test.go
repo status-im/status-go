@@ -1,12 +1,13 @@
 package benchmarks
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
@@ -33,7 +34,7 @@ func createNode() (*node.Node, error) {
 	})
 }
 
-func addPeerWithConfirmation(server *p2p.Server, node *discover.Node) error {
+func addPeerWithConfirmation(server *p2p.Server, node *enode.Node) error {
 	ch := make(chan *p2p.PeerEvent, server.MaxPeers)
 	subscription := server.SubscribeEvents(ch)
 	defer subscription.Unsubscribe()
@@ -41,7 +42,7 @@ func addPeerWithConfirmation(server *p2p.Server, node *discover.Node) error {
 	server.AddPeer(node)
 
 	ev := <-ch
-	if ev.Type != p2p.PeerEventTypeAdd || ev.Peer != node.ID {
+	if ev.Type != p2p.PeerEventTypeAdd || bytes.Equal(ev.Peer.Bytes(), node.ID().Bytes()) {
 		return fmt.Errorf("got unexpected event: %+v", ev)
 	}
 
