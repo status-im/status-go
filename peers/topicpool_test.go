@@ -10,6 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/whisper/whisperv6"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -333,6 +336,7 @@ func (s *TopicPoolSuite) TestIgnoreInboundConnection() {
 	s.Contains(s.topicPool.pendingPeers, peer1.ID)
 	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
 	s.Contains(s.topicPool.pendingPeers, peer1.ID)
+	s.False(s.topicPool.pendingPeers[peer1.ID].dismissed)
 	s.NotContains(s.topicPool.connectedPeers, peer1.ID)
 }
 
@@ -346,4 +350,76 @@ func (s *TopicPoolSuite) TestConnectedButRemoved() {
 	s.Contains(s.topicPool.connectedPeers, peer1.ID)
 	s.False(s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID)))
 	s.False(s.topicPool.pendingPeers[peer1.ID].added)
+}
+
+func TestServerIgnoresInboundPeer(t *testing.T) {
+	topic := discv5.Topic("cap=cap1")
+	limits := params.NewLimits(0, 0)
+	cache, err := newInMemoryCache()
+	require.NoError(t, err)
+	topicPool := newTopicPool(nil, topic, limits, 100*time.Millisecond, 200*time.Millisecond, cache)
+	topicPool.running = 1
+	topicPool.maxCachedPeers = 0
+
+	whisper := whisperv6.New(nil)
+	srvkey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	server := &p2p.Server{
+		Config: p2p.Config{
+			MaxPeers:    1,
+			Name:        "server",
+			ListenAddr:  ":0",
+			PrivateKey:  srvkey,
+			NoDiscovery: true,
+			Protocols:   whisper.Protocols(),
+		},
+	}
+	require.NoError(t, server.Start())
+	clientkey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	client := &p2p.Server{
+		Config: p2p.Config{
+			MaxPeers:    1,
+			Name:        "client",
+			ListenAddr:  ":0",
+			PrivateKey:  clientkey,
+			NoDiscovery: true,
+			Protocols:   whisper.Protocols(),
+		},
+	}
+	require.NoError(t, client.Start())
+
+	// add peer to topic pool, as if it was discovered.
+	// it will be ignored due to the limit and added to a table of pending peers.
+	clientID := discv5.NodeID(client.Self().ID)
+	topicPool.processFoundNode(server, discv5.NewNode(
+		clientID,
+		client.Self().IP,
+		client.Self().UDP, client.Self().TCP))
+	require.Contains(t, topicPool.pendingPeers, clientID)
+	require.False(t, topicPool.pendingPeers[clientID].added)
+
+	// connect to a server from client. client will be an inbound connection for a server.
+	client.AddPeer(server.Self())
+	errch := helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeAdd, 5*time.Second)
+	select {
+	case err := <-errch:
+		require.NoError(t, err)
+	case <-time.After(10 * time.Second):
+		require.FailNow(t, "failed waiting for WaitPeerAsync")
+	}
+
+	// simulate that event was received by a topic pool.
+	// topic pool will ignore this even because it sees that it is inbound connection.
+	topicPool.ConfirmAdded(server, client.Self().ID)
+	require.Contains(t, topicPool.pendingPeers, clientID)
+	require.False(t, topicPool.pendingPeers[clientID].dismissed)
+	// wait some time to confirm that RemovePeer wasn't called on the server object.
+	errch = helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeDrop, time.Second)
+	select {
+	case err := <-errch:
+		require.EqualError(t, err, "wait for peer: timeout")
+	case <-time.After(10 * time.Second):
+		require.FailNow(t, "failed waiting for WaitPeerAsync")
+	}
 }
