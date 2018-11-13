@@ -79,6 +79,8 @@ type peerInfo struct {
 	discoveredTime mclock.AbsTime
 	// dismissed is true when our node requested a disconnect
 	dismissed bool
+	// added is true when the node tries to add this peer to a server
+	added bool
 
 	node *discv5.Node
 }
