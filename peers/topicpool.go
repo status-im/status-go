@@ -22,7 +22,7 @@ const (
 
 // maxCachedPeersMultiplier peers max limit will be multiplied by this number
 // to get the maximum number of cached peers allowed.
-var maxCachedPeersMultiplier = 2
+var maxCachedPeersMultiplier = 1
 
 // TopicPoolInterface the TopicPool interface.
 type TopicPoolInterface interface {
@@ -271,8 +271,10 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID discover.NodeID) {
 	discV5NodeID := discv5.NodeID(nodeID)
 
 	peerInfoItem, ok := t.pendingPeers[discV5NodeID]
+	inbound := !ok || !peerInfoItem.added
+	log.Debug("peer added event", "peer", nodeID.String(), "inbound", inbound)
 	// inbound connection
-	if !ok || !peerInfoItem.added {
+	if inbound {
 		return
 	}
 	peer := peerInfoItem.peerInfo // get explicit reference
@@ -453,7 +455,9 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) {
 			node:           node,
 		})
 	}
-
+	log.Debug(
+		"adding peer to a server", "peer", node.ID.String(),
+		"connected", len(t.connectedPeers), "max", t.maxCachedPeers)
 	// the upper limit is not reached, so let's add this peer
 	if len(t.connectedPeers) < t.maxCachedPeers {
 		t.addServerPeer(server, t.pendingPeers[node.ID].peerInfo)
@@ -473,6 +477,7 @@ func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
 }
 
 func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
+	log.Debug("request to remove a peer", "id", info.node.ID.String())
 	info.added = false
 	server.RemovePeer(discover.NewNode(
 		discover.NodeID(info.node.ID),

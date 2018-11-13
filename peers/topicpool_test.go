@@ -399,9 +399,9 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 	require.Contains(t, topicPool.pendingPeers, clientID)
 	require.False(t, topicPool.pendingPeers[clientID].added)
 
+	errch := helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeAdd, 5*time.Second)
 	// connect to a server from client. client will be an inbound connection for a server.
 	client.AddPeer(server.Self())
-	errch := helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeAdd, 5*time.Second)
 	select {
 	case err := <-errch:
 		require.NoError(t, err)
@@ -409,13 +409,14 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 		require.FailNow(t, "failed waiting for WaitPeerAsync")
 	}
 
+	// wait some time to confirm that RemovePeer wasn't called on the server object.
+	errch = helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeDrop, time.Second)
 	// simulate that event was received by a topic pool.
 	// topic pool will ignore this even because it sees that it is inbound connection.
 	topicPool.ConfirmAdded(server, client.Self().ID)
 	require.Contains(t, topicPool.pendingPeers, clientID)
 	require.False(t, topicPool.pendingPeers[clientID].dismissed)
-	// wait some time to confirm that RemovePeer wasn't called on the server object.
-	errch = helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeDrop, time.Second)
+
 	select {
 	case err := <-errch:
 		require.EqualError(t, err, "wait for peer: timeout")
