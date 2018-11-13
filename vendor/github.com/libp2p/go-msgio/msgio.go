@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	pool "github.com/libp2p/go-buffer-pool"
+	mpool "github.com/libp2p/go-msgio/mpool"
 )
 
 //  ErrMsgTooLarge is returned when the message length is exessive
@@ -41,8 +41,9 @@ type Reader interface {
 	Read([]byte) (int, error)
 
 	// ReadMsg reads the next message from the Reader.
-	// Uses a pool.BufferPool internally to reuse buffers. User may call
-	// ReleaseMsg(msg) to signal a buffer can be reused.
+	// Uses a mpool.Pool internally to reuse buffers. io.ErrShortBuffer will
+	// be returned if the Pool.Get(...) returns nil.
+	// User may call ReleaseMsg(msg) to signal a buffer can be reused.
 	ReadMsg() ([]byte, error)
 
 	// ReleaseMsg signals a buffer can be reused.
@@ -104,6 +105,9 @@ func (s *writer) WriteMsg(msg []byte) (err error) {
 }
 
 func (s *writer) Close() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if c, ok := s.W.(io.Closer); ok {
 		return c.Close()
 	}
@@ -116,7 +120,7 @@ type reader struct {
 
 	lbuf []byte
 	next int
-	pool *pool.BufferPool
+	pool *mpool.Pool
 	lock sync.Locker
 	max  int // the maximal message size (in bytes) this reader handles
 }
@@ -125,13 +129,13 @@ type reader struct {
 // will read whole messages at a time (using the length). Assumes an equivalent
 // writer on the other side.
 func NewReader(r io.Reader) ReadCloser {
-	return NewReaderWithPool(r, pool.GlobalPool)
+	return NewReaderWithPool(r, &mpool.ByteSlicePool)
 }
 
 // NewReaderWithPool wraps an io.Reader with a msgio framed reader. The msgio.Reader
 // will read whole messages at a time (using the length). Assumes an equivalent
-// writer on the other side.  It uses a given pool.BufferPool
-func NewReaderWithPool(r io.Reader, p *pool.BufferPool) ReadCloser {
+// writer on the other side.  It uses a given mpool.Pool
+func NewReaderWithPool(r io.Reader, p *mpool.Pool) ReadCloser {
 	if p == nil {
 		panic("nil pool")
 	}
@@ -193,26 +197,28 @@ func (s *reader) ReadMsg() ([]byte, error) {
 		return nil, err
 	}
 
-	if length == 0 {
-		s.next = -1
-		return nil, nil
-	}
-
 	if length > s.max || length < 0 {
 		return nil, ErrMsgTooLarge
 	}
 
-	msg := s.pool.Get(length)
+	msgb := s.pool.Get(uint32(length))
+	if msgb == nil {
+		return nil, io.ErrShortBuffer
+	}
+	msg := msgb.([]byte)[:length]
 	_, err = io.ReadFull(s.R, msg)
 	s.next = -1 // signal we've consumed this msg
 	return msg, err
 }
 
 func (s *reader) ReleaseMsg(msg []byte) {
-	s.pool.Put(msg)
+	s.pool.Put(uint32(cap(msg)), msg)
 }
 
 func (s *reader) Close() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if c, ok := s.R.(io.Closer); ok {
 		return c.Close()
 	}

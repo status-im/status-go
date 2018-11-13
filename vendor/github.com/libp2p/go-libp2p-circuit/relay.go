@@ -40,10 +40,6 @@ type Relay struct {
 
 	relays map[peer.ID]struct{}
 	mx     sync.Mutex
-
-	liveHops map[peer.ID]map[peer.ID]struct{}
-	lhCount  uint64
-	lhLk     sync.Mutex
 }
 
 type RelayOpt int
@@ -69,7 +65,6 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 		self:     h.ID(),
 		incoming: make(chan *Conn),
 		relays:   make(map[peer.ID]struct{}),
-		liveHops: make(map[peer.ID]map[peer.ID]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -87,43 +82,6 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 	h.Network().Notify(r.Notifiee())
 
 	return r, nil
-}
-
-func (r *Relay) addLiveHop(from, to peer.ID) {
-	r.lhLk.Lock()
-	defer r.lhLk.Unlock()
-
-	r.lhCount++
-	trg, ok := r.liveHops[from]
-	if !ok {
-		trg = make(map[peer.ID]struct{})
-		r.liveHops[from] = trg
-	}
-
-	trg[to] = struct{}{}
-}
-
-func (r *Relay) rmLiveHop(from, to peer.ID) {
-	r.lhLk.Lock()
-	defer r.lhLk.Unlock()
-
-	trg, ok := r.liveHops[from]
-	if !ok {
-		return
-	}
-
-	r.lhCount--
-	delete(trg, to)
-	if len(trg) == 0 {
-		delete(r.liveHops, from)
-	}
-}
-
-func (r *Relay) GetActiveHops() uint64 {
-	r.lhLk.Lock()
-	defer r.lhLk.Unlock()
-
-	return r.lhCount
 }
 
 func (r *Relay) DialPeer(ctx context.Context, relay pstore.PeerInfo, dest pstore.PeerInfo) (*Conn, error) {
@@ -341,13 +299,9 @@ func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	// relay connection
 	log.Infof("relaying connection between %s and %s", src.ID.Pretty(), dst.ID.Pretty())
 
-	r.addLiveHop(src.ID, dst.ID)
-
 	// Don't reset streams after finishing or the other side will get an
 	// error, not an EOF.
 	go func() {
-		defer r.rmLiveHop(src.ID, dst.ID)
-
 		count, err := io.Copy(s, bs)
 		if err != nil {
 			log.Debugf("relay copy error: %s", err)

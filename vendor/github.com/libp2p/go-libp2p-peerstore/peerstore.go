@@ -11,7 +11,6 @@ import (
 
 	//ds "github.com/jbenet/go-datastore"
 	//dssync "github.com/jbenet/go-datastore/sync"
-	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -30,6 +29,9 @@ type Peerstore interface {
 	AddrBook
 	KeyBook
 	Metrics
+
+	// Peers returns a list of all peer.IDs in this Peerstore
+	Peers() []peer.ID
 
 	// PeerInfo returns a peer.PeerInfo struct for given peer.ID.
 	// This is a small slice of the information Peerstore has on
@@ -81,9 +83,6 @@ type AddrBook interface {
 
 	// ClearAddresses removes all previously stored addresses
 	ClearAddrs(p peer.ID)
-
-	// Peers returns all of the peer IDs stored in the AddrBook
-	Peers() []peer.ID
 }
 
 // KeyBook tracks the Public keys of Peers.
@@ -180,7 +179,7 @@ func (kb *keybook) AddPrivKey(p peer.ID, sk ic.PrivKey) error {
 type peerstore struct {
 	*keybook
 	*metrics
-	AddrBook
+	AddrManager
 
 	// store other data, like versions
 	//ds ds.ThreadSafeDatastore
@@ -195,28 +194,12 @@ type peerstore struct {
 // NewPeerstore creates a threadsafe collection of peers.
 func NewPeerstore() Peerstore {
 	return &peerstore{
-		keybook:  newKeybook(),
-		metrics:  NewMetrics(),
-		AddrBook: &AddrManager{},
-		ds:       make(map[string]interface{}),
+		keybook:     newKeybook(),
+		metrics:     NewMetrics(),
+		AddrManager: AddrManager{},
+		//ds:          dssync.MutexWrap(ds.NewMapDatastore()),
+		ds: make(map[string]interface{}),
 	}
-}
-
-// NewPeerstoreDatastore creates a threadsafe collection of peers backed by a
-// Datastore to prevent excess memory pressure.
-func NewPeerstoreDatastore(ctx context.Context, ds datastore.Batching) (Peerstore, error) {
-	addrBook, err := NewDatastoreAddrManager(ctx, ds, time.Second)
-	if err != nil {
-		return nil, err
-	}
-
-	ps := &peerstore{
-		keybook:  newKeybook(),
-		metrics:  NewMetrics(),
-		AddrBook: addrBook,
-		ds:       make(map[string]interface{}),
-	}
-	return ps, nil
 }
 
 func (ps *peerstore) Put(p peer.ID, key string, val interface{}) error {
@@ -248,7 +231,7 @@ func (ps *peerstore) Peers() []peer.ID {
 	for _, p := range ps.keybook.Peers() {
 		set[p] = struct{}{}
 	}
-	for _, p := range ps.AddrBook.Peers() {
+	for _, p := range ps.AddrManager.Peers() {
 		set[p] = struct{}{}
 	}
 
@@ -262,7 +245,7 @@ func (ps *peerstore) Peers() []peer.ID {
 func (ps *peerstore) PeerInfo(p peer.ID) PeerInfo {
 	return PeerInfo{
 		ID:    p,
-		Addrs: ps.AddrBook.Addrs(p),
+		Addrs: ps.AddrManager.Addrs(p),
 	}
 }
 

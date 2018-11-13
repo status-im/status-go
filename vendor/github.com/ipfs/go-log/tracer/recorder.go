@@ -1,8 +1,6 @@
 package loggabletracer
 
 import (
-	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -67,18 +65,6 @@ func (r *LoggableSpanRecorder) RecordSpan(span RawSpan) {
 		}
 	}
 
-	tags := make(map[string]interface{}, len(span.Tags))
-	for k, v := range span.Tags {
-		switch vt := v.(type) {
-		case bool, string, int, int8, int16, int32, int64, uint, uint8, uint16, uint64:
-			tags[k] = v
-		case []byte:
-			base64.StdEncoding.EncodeToString(vt)
-		default:
-			tags[k] = fmt.Sprint(v)
-		}
-	}
-
 	spanlog := &LoggableSpan{
 		TraceID:      span.Context.TraceID,
 		SpanID:       span.Context.SpanID,
@@ -86,19 +72,15 @@ func (r *LoggableSpanRecorder) RecordSpan(span RawSpan) {
 		Operation:    span.Operation,
 		Start:        span.Start,
 		Duration:     span.Duration,
-		Tags:         tags,
+		Tags:         span.Tags,
 		Logs:         sl,
 	}
 
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-	err := encoder.Encode(spanlog)
+	out, err := json.Marshal(spanlog)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR FORMATTING SPAN ENTRY: %s\n", err)
 		return
 	}
 
-	writer.WriterGroup.Write(buf.Bytes())
+	writer.WriterGroup.Write(append(out, '\n'))
 }

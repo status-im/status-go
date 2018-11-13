@@ -3,7 +3,7 @@ package msgio
 import (
 	"io"
 
-	pool "github.com/libp2p/go-buffer-pool"
+	mpool "github.com/libp2p/go-msgio/mpool"
 )
 
 // Chan is a msgio duplex channel. It is used to have a channel interface
@@ -30,8 +30,8 @@ func (s *Chan) ReadFrom(r io.Reader) {
 }
 
 // ReadFromWithPool wraps the given io.Reader with a msgio.Reader, reads all
-// messages, ands sends them down the channel. Uses given BufferPool.
-func (s *Chan) ReadFromWithPool(r io.Reader, p *pool.BufferPool) {
+// messages, ands sends them down the channel. Uses given Pool
+func (s *Chan) ReadFromWithPool(r io.Reader, p *mpool.Pool) {
 	s.readFrom(NewReaderWithPool(r, p))
 }
 

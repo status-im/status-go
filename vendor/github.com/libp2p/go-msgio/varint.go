@@ -5,7 +5,7 @@ import (
 	"io"
 	"sync"
 
-	pool "github.com/libp2p/go-buffer-pool"
+	mpool "github.com/libp2p/go-msgio/mpool"
 )
 
 // varintWriter is the underlying type that implements the Writer interface.
@@ -49,6 +49,9 @@ func (s *varintWriter) WriteMsg(msg []byte) error {
 }
 
 func (s *varintWriter) Close() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if c, ok := s.W.(io.Closer); ok {
 		return c.Close()
 	}
@@ -62,7 +65,7 @@ type varintReader struct {
 
 	lbuf []byte
 	next int
-	pool *pool.BufferPool
+	pool *mpool.Pool
 	lock sync.Locker
 	max  int // the maximal message size (in bytes) this reader handles
 }
@@ -72,15 +75,14 @@ type varintReader struct {
 // Varints read according to https://golang.org/pkg/encoding/binary/#ReadUvarint
 // Assumes an equivalent writer on the other side.
 func NewVarintReader(r io.Reader) ReadCloser {
-	return NewVarintReaderWithPool(r, pool.GlobalPool)
+	return NewVarintReaderWithPool(r, &mpool.ByteSlicePool)
 }
 
 // NewVarintReaderWithPool wraps an io.Reader with a varint msgio framed reader.
 // The msgio.Reader will read whole messages at a time (using the length).
 // Varints read according to https://golang.org/pkg/encoding/binary/#ReadUvarint
-// Assumes an equivalent writer on the other side. It uses a given
-// pool.BufferPool.
-func NewVarintReaderWithPool(r io.Reader, p *pool.BufferPool) ReadCloser {
+// Assumes an equivalent writer on the other side. It uses a given mpool.Pool
+func NewVarintReaderWithPool(r io.Reader, p *mpool.Pool) ReadCloser {
 	if p == nil {
 		panic("nil pool")
 	}
@@ -140,26 +142,29 @@ func (s *varintReader) ReadMsg() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if length == 0 {
-		s.next = -1
-		return nil, nil
-	}
 
 	if length > s.max {
 		return nil, ErrMsgTooLarge
 	}
 
-	msg := s.pool.Get(length)
+	msgb := s.pool.Get(uint32(length))
+	if msgb == nil {
+		return nil, io.ErrShortBuffer
+	}
+	msg := msgb.([]byte)[:length]
 	_, err = io.ReadFull(s.R, msg)
 	s.next = -1 // signal we've consumed this msg
 	return msg, err
 }
 
 func (s *varintReader) ReleaseMsg(msg []byte) {
-	s.pool.Put(msg)
+	s.pool.Put(uint32(cap(msg)), msg)
 }
 
 func (s *varintReader) Close() error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	if c, ok := s.R.(io.Closer); ok {
 		return c.Close()
 	}
