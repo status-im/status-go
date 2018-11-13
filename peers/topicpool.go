@@ -22,7 +22,7 @@ const (
 
 // maxCachedPeersMultiplier peers max limit will be multiplied by this number
 // to get the maximum number of cached peers allowed.
-var maxCachedPeersMultiplier = 2
+var maxCachedPeersMultiplier = 1
 
 // TopicPoolInterface the TopicPool interface.
 type TopicPoolInterface interface {
@@ -268,11 +268,15 @@ func (t *TopicPool) ConfirmAdded(server *p2p.Server, nodeID enode.ID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// inbound connection
 	peerInfoItem, ok := t.pendingPeers[nodeID]
-	if !ok {
+	inbound := !ok || !peerInfoItem.added
+
+	log.Debug("peer added event", "peer", nodeID.String(), "inbound", inbound)
+
+	if inbound {
 		return
 	}
+
 	peer := peerInfoItem.peerInfo // get explicit reference
 
 	// established connection means that the node
@@ -460,7 +464,9 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 			publicKey:      pk,
 		})
 	}
-
+	log.Debug(
+		"adding peer to a server", "peer", node.ID.String(),
+		"connected", len(t.connectedPeers), "max", t.maxCachedPeers)
 	// the upper limit is not reached, so let's add this peer
 	if len(t.connectedPeers) < t.maxCachedPeers {
 		t.addServerPeer(server, t.pendingPeers[nodeID].peerInfo)
@@ -472,11 +478,13 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 }
 
 func (t *TopicPool) addServerPeer(server *p2p.Server, info *peerInfo) {
+	info.added = true
 	n := enode.NewV4(info.publicKey, info.node.IP, int(info.node.TCP), int(info.node.UDP))
 	server.AddPeer(n)
 }
 
 func (t *TopicPool) removeServerPeer(server *p2p.Server, info *peerInfo) {
+	info.added = false
 	n := enode.NewV4(info.publicKey, info.node.IP, int(info.node.TCP), int(info.node.UDP))
 	server.RemovePeer(n)
 }

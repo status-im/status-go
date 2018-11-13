@@ -139,8 +139,10 @@ func main() {
 		profiling.NewProfiler(*pprofPort).Go()
 	}
 
-	// Run stats server.
-	if *metrics {
+	// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
+	// or setting `gethmetrics.Enabled` to true during compilation time:
+	// https://github.com/status-im/go-ethereum/pull/76.
+	if *metrics || gethmetrics.Enabled {
 		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
 		go gethmetrics.CollectProcessMetrics(3 * time.Second)
 	}
@@ -202,8 +204,16 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
-		if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
-			logger.Error("Failed to subscribe server events", "error", err)
+		// Try to subscribe and collect metrics. In case of an error, retry.
+		for {
+			if err := nodemetrics.SubscribeServerEvents(ctx, gethNode); err != nil {
+				logger.Error("Failed to subscribe server events", "error", err)
+			} else {
+				// no error means that the subscription was terminated by purpose
+				return
+			}
+
+			time.Sleep(time.Second)
 		}
 	}()
 
