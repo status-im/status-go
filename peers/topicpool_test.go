@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
@@ -83,21 +82,17 @@ func (s *TopicPoolSuite) TestUsingCache() {
 
 	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
-	s.topicPool.ConfirmAdded(s.peer, nodeID1)
-	s.Equal([]*discv5.Node{peer1}, s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10))
-
-	// Add a new peer whicgith exceeds the upper limit.
-	// It should still be added to the cache and
-	// not removed when dropped.
 	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
+
+	s.topicPool.ConfirmAdded(s.peer, nodeID1)
 	s.topicPool.ConfirmAdded(s.peer, nodeID2)
 
 	cached := s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10)
 	s.Contains(cached, peer1)
 	s.Contains(cached, peer2)
+
 	s.topicPool.ConfirmDropped(s.peer, nodeID2)
-	// Should be preserved in the cache as peer got dropped due to the max limit.
 	cached = s.topicPool.cache.GetPeersRange(s.topicPool.topic, 10)
 	s.Contains(cached, peer1)
 	s.Contains(cached, peer2)
@@ -362,25 +357,27 @@ func (s *TopicPoolSuite) TestNewTopicPoolInterface() {
 func (s *TopicPoolSuite) TestIgnoreInboundConnection() {
 	s.topicPool.limits = params.NewLimits(0, 0)
 	s.topicPool.maxCachedPeers = 0
-	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.Contains(s.topicPool.pendingPeers, peer1.ID)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.Contains(s.topicPool.pendingPeers, peer1.ID)
-	s.False(s.topicPool.pendingPeers[peer1.ID].dismissed)
-	s.NotContains(s.topicPool.connectedPeers, peer1.ID)
+
+	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Contains(s.topicPool.pendingPeers, nodeID1)
+	s.topicPool.ConfirmAdded(s.peer, nodeID1)
+	s.Contains(s.topicPool.pendingPeers, nodeID1)
+	s.False(s.topicPool.pendingPeers[nodeID1].dismissed)
+	s.NotContains(s.topicPool.connectedPeers, nodeID1)
 }
 
 func (s *TopicPoolSuite) TestConnectedButRemoved() {
 	s.topicPool.limits = params.NewLimits(0, 0)
 	s.topicPool.maxCachedPeers = 1
-	peer1 := discv5.NewNode(discv5.NodeID{1}, s.peer.Self().IP, 32311, 32311)
-	s.topicPool.processFoundNode(s.peer, peer1)
-	s.Contains(s.topicPool.pendingPeers, peer1.ID)
-	s.topicPool.ConfirmAdded(s.peer, discover.NodeID(peer1.ID))
-	s.Contains(s.topicPool.connectedPeers, peer1.ID)
-	s.False(s.topicPool.ConfirmDropped(s.peer, discover.NodeID(peer1.ID)))
-	s.False(s.topicPool.pendingPeers[peer1.ID].added)
+
+	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Contains(s.topicPool.pendingPeers, nodeID1)
+	s.topicPool.ConfirmAdded(s.peer, nodeID1)
+	s.Contains(s.topicPool.connectedPeers, nodeID1)
+	s.False(s.topicPool.ConfirmDropped(s.peer, nodeID1))
+	s.False(s.topicPool.pendingPeers[nodeID1].added)
 }
 
 func TestServerIgnoresInboundPeer(t *testing.T) {
@@ -422,11 +419,14 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 
 	// add peer to topic pool, as if it was discovered.
 	// it will be ignored due to the limit and added to a table of pending peers.
-	clientID := discv5.NodeID(client.Self().ID)
-	topicPool.processFoundNode(server, discv5.NewNode(
-		clientID,
-		client.Self().IP,
-		client.Self().UDP, client.Self().TCP))
+	clientID := enode.PubkeyToIDV4(&clientkey.PublicKey)
+	clientNodeV5 := discv5.NewNode(
+		discv5.PubkeyID(&clientkey.PublicKey),
+		client.Self().IP(),
+		uint16(client.Self().UDP()),
+		uint16(client.Self().TCP()),
+	)
+	require.NoError(t, topicPool.processFoundNode(server, clientNodeV5))
 	require.Contains(t, topicPool.pendingPeers, clientID)
 	require.False(t, topicPool.pendingPeers[clientID].added)
 
@@ -444,7 +444,7 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 	errch = helpers.WaitForPeerAsync(server, client.Self().String(), p2p.PeerEventTypeDrop, time.Second)
 	// simulate that event was received by a topic pool.
 	// topic pool will ignore this even because it sees that it is inbound connection.
-	topicPool.ConfirmAdded(server, client.Self().ID)
+	topicPool.ConfirmAdded(server, clientID)
 	require.Contains(t, topicPool.pendingPeers, clientID)
 	require.False(t, topicPool.pendingPeers[clientID].dismissed)
 
