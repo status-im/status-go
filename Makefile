@@ -37,7 +37,10 @@ GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
 	else git rev-parse --short HEAD; fi)
 AUTHOR = $(shell echo $$USER)
 
-BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
+BUILD_FLAGS ?= $(shell echo "-ldflags '\
+	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT)'")
 
 XGO_GO ?= latest
 XGOVERSION ?= 1.10.x
@@ -223,8 +226,12 @@ clean-release:
 	rm -rf $(RELEASE_DIRECTORY)
 
 release:
-	@read -p "Are you sure you want to create a new GitHub $(shell if [[ $(PRE_RELEASE) = "0" ]] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch?  (y/n): " REPLY; \
+	@read -p "Are you sure you want to create a new GitHub $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
 	if [ $$REPLY = "y" ]; then \
+		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
+		comparison="$$latest_tag..HEAD"; \
+		if [[ -z "$$latest_tag" ]]; then comparison=""; fi; \
+		changelog=$$(git log $$comparison --oneline --no-merges); \
 	    github-release $(shell if [[ $(PRE_RELEASE) != "0" ]] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "" "$(RELEASE_DIRECTORY)/*" ; \
 	else \
 	    echo "Aborting." && exit 1; \
