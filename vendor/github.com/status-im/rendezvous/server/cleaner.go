@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type deadline struct {
+	time time.Time
+	refs int
+}
+
 // definitely rename
 // Rewrite cleaner to operate on a leveldb directly
 // if it is impossible to query on topic+timestamp(big endian) for purging
@@ -13,14 +18,14 @@ import (
 func NewCleaner() *Cleaner {
 	return &Cleaner{
 		heap:      []string{},
-		deadlines: map[string]time.Time{},
+		deadlines: map[string]deadline{},
 	}
 }
 
 type Cleaner struct {
 	mu        sync.RWMutex
 	heap      []string
-	deadlines map[string]time.Time
+	deadlines map[string]deadline
 }
 
 func (c *Cleaner) Id(index int) string {
@@ -32,7 +37,7 @@ func (c *Cleaner) Len() int {
 }
 
 func (c *Cleaner) Less(i, j int) bool {
-	return c.deadlines[c.Id(i)].Before(c.deadlines[c.Id(j)])
+	return c.deadlines[c.Id(i)].time.Before(c.deadlines[c.Id(j)].time)
 }
 
 func (c *Cleaner) Swap(i, j int) {
@@ -48,14 +53,29 @@ func (c *Cleaner) Pop() interface{} {
 	n := len(old)
 	x := old[n-1]
 	c.heap = old[0 : n-1]
-	delete(c.deadlines, x)
+	dl, exist := c.deadlines[x]
+	if !exist {
+		return x
+	}
+	dl.refs--
+	c.deadlines[x] = dl
+	if dl.refs == 0 {
+		delete(c.deadlines, x)
+	}
 	return x
 }
 
-func (c *Cleaner) Add(deadline time.Time, key string) {
+func (c *Cleaner) Add(deadlineTime time.Time, key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.deadlines[key] = deadline
+	dl, exist := c.deadlines[key]
+	if !exist {
+		dl = deadline{time: deadlineTime, refs: 1}
+	} else {
+		dl.time = deadlineTime
+		dl.refs++
+	}
+	c.deadlines[key] = dl
 	heap.Push(c, key)
 }
 
@@ -66,20 +86,23 @@ func (c *Cleaner) Exist(key string) bool {
 	return exist
 }
 
-func (c *Cleaner) PopOneSince(now time.Time) (rst string) {
+func (c *Cleaner) PopSince(now time.Time) (rst []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.heap) == 0 {
-		return
+	for len(c.heap) != 0 {
+		dl, exist := c.deadlines[c.heap[0]]
+		if !exist {
+			continue
+		}
+		if dl.refs > 1 {
+			heap.Pop(c)
+			continue
+		}
+		if now.After(dl.time) {
+			rst = append(rst, heap.Pop(c).(string))
+		} else {
+			return rst
+		}
 	}
-	// same key can be inserted multiple times into the heap,
-	// deadline for a key is removed when it was popped the first time
-	if _, exist := c.deadlines[c.heap[0]]; !exist {
-		heap.Pop(c)
-		return
-	}
-	if now.After(c.deadlines[c.heap[0]]) {
-		return heap.Pop(c).(string)
-	}
-	return
+	return rst
 }

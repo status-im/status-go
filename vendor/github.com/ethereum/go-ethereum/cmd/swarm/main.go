@@ -38,7 +38,7 @@ import (
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/swarm"
 	bzzapi "github.com/ethereum/go-ethereum/swarm/api"
 	swarmmetrics "github.com/ethereum/go-ethereum/swarm/metrics"
@@ -115,6 +115,12 @@ var (
 		Name:   "sync-update-delay",
 		Usage:  "Duration for sync subscriptions update after no new peers are added (default 15s)",
 		EnvVar: SWARM_ENV_SYNC_UPDATE_DELAY,
+	}
+	SwarmMaxStreamPeerServersFlag = cli.IntFlag{
+		Name:   "max-stream-peer-servers",
+		Usage:  "Limit of Stream peer servers, 0 denotes unlimited",
+		EnvVar: SWARM_ENV_MAX_STREAM_PEER_SERVERS,
+		Value:  10000, // A very large default value is possible as stream servers have very small memory footprint
 	}
 	SwarmLightNodeEnabled = cli.BoolFlag{
 		Name:   "lightnode",
@@ -197,21 +203,29 @@ var (
 		Usage:  "Number of recent chunks cached in memory (default 5000)",
 		EnvVar: SWARM_ENV_STORE_CACHE_CAPACITY,
 	}
-	SwarmResourceMultihashFlag = cli.BoolFlag{
-		Name:  "multihash",
-		Usage: "Determines how to interpret data for a resource update. If not present, data will be interpreted as raw, literal data that will be included in the resource",
-	}
-	SwarmResourceNameFlag = cli.StringFlag{
-		Name:  "name",
-		Usage: "User-defined name for the new resource",
-	}
-	SwarmResourceDataOnCreateFlag = cli.StringFlag{
-		Name:  "data",
-		Usage: "Initializes the resource with the given hex-encoded data. Data must be prefixed by 0x",
-	}
 	SwarmCompressedFlag = cli.BoolFlag{
 		Name:  "compressed",
 		Usage: "Prints encryption keys in compressed form",
+	}
+	SwarmFeedNameFlag = cli.StringFlag{
+		Name:  "name",
+		Usage: "User-defined name for the new feed, limited to 32 characters. If combined with topic, it will refer to a subtopic with this name",
+	}
+	SwarmFeedTopicFlag = cli.StringFlag{
+		Name:  "topic",
+		Usage: "User-defined topic this feed is tracking, hex encoded. Limited to 64 hexadecimal characters",
+	}
+	SwarmFeedDataOnCreateFlag = cli.StringFlag{
+		Name:  "data",
+		Usage: "Initializes the feed with the given hex-encoded data. Data must be prefixed by 0x",
+	}
+	SwarmFeedManifestFlag = cli.StringFlag{
+		Name:  "manifest",
+		Usage: "Refers to the feed through a manifest",
+	}
+	SwarmFeedUserFlag = cli.StringFlag{
+		Name:  "user",
+		Usage: "Indicates the user who updates the feed",
 	}
 )
 
@@ -242,12 +256,12 @@ func init() {
 	utils.ListenPortFlag.Value = 30399
 }
 
-var app = utils.NewApp(gitCommit, "Ethereum Swarm")
+var app = utils.NewApp("", "Ethereum Swarm")
 
 // This init function creates the cli.App.
 func init() {
 	app.Action = bzzd
-	app.HideVersion = true // we have a command to print the version
+	app.Version = sv.ArchiveVersion(gitCommit)
 	app.Copyright = "Copyright 2013-2016 The go-ethereum Authors"
 	app.Commands = []cli.Command{
 		{
@@ -332,36 +346,62 @@ func init() {
 		},
 		{
 			CustomHelpTemplate: helpTemplate,
-			Name:               "resource",
-			Usage:              "(Advanced) Create and update Mutable Resources",
+			Name:               "feed",
+			Usage:              "(Advanced) Create and update Swarm Feeds",
 			ArgsUsage:          "<create|update|info>",
-			Description:        "Works with Mutable Resource Updates",
+			Description:        "Works with Swarm Feeds",
 			Subcommands: []cli.Command{
 				{
-					Action:             resourceCreate,
+					Action:             feedCreateManifest,
 					CustomHelpTemplate: helpTemplate,
 					Name:               "create",
-					Usage:              "creates a new Mutable Resource",
-					ArgsUsage:          "<frequency>",
-					Description:        "creates a new Mutable Resource",
-					Flags:              []cli.Flag{SwarmResourceNameFlag, SwarmResourceDataOnCreateFlag, SwarmResourceMultihashFlag},
+					Usage:              "creates and publishes a new feed manifest",
+					Description: `creates and publishes a new feed manifest pointing to a specified user's updates about a particular topic.
+					The feed topic can be built in the following ways:
+					* use --topic to set the topic to an arbitrary binary hex string.
+					* use --name to set the topic to a human-readable name.
+					    For example --name could be set to "profile-picture", meaning this feed allows to get this user's current profile picture.
+					* use both --topic and --name to create named subtopics. 
+						For example, --topic could be set to an Ethereum contract address and --name could be set to "comments", meaning
+						this feed tracks a discussion about that contract.
+					The --user flag allows to have this manifest refer to a user other than yourself. If not specified,
+					it will then default to your local account (--bzzaccount)`,
+					Flags: []cli.Flag{SwarmFeedNameFlag, SwarmFeedTopicFlag, SwarmFeedUserFlag},
 				},
 				{
-					Action:             resourceUpdate,
+					Action:             feedUpdate,
 					CustomHelpTemplate: helpTemplate,
 					Name:               "update",
-					Usage:              "updates the content of an existing Mutable Resource",
-					ArgsUsage:          "<Manifest Address or ENS domain> <0x Hex data>",
-					Description:        "updates the content of an existing Mutable Resource",
-					Flags:              []cli.Flag{SwarmResourceMultihashFlag},
+					Usage:              "updates the content of an existing Swarm Feed",
+					ArgsUsage:          "<0x Hex data>",
+					Description: `publishes a new update on the specified topic
+					The feed topic can be built in the following ways:
+					* use --topic to set the topic to an arbitrary binary hex string.
+					* use --name to set the topic to a human-readable name.
+					    For example --name could be set to "profile-picture", meaning this feed allows to get this user's current profile picture.
+					* use both --topic and --name to create named subtopics. 
+						For example, --topic could be set to an Ethereum contract address and --name could be set to "comments", meaning
+						this feed tracks a discussion about that contract.
+					
+					If you have a manifest, you can specify it with --manifest to refer to the feed,
+					instead of using --topic / --name
+					`,
+					Flags: []cli.Flag{SwarmFeedManifestFlag, SwarmFeedNameFlag, SwarmFeedTopicFlag},
 				},
 				{
-					Action:             resourceInfo,
+					Action:             feedInfo,
 					CustomHelpTemplate: helpTemplate,
 					Name:               "info",
-					Usage:              "obtains information about an existing Mutable Resource",
-					ArgsUsage:          "<Manifest Address or ENS domain>",
-					Description:        "obtains information about an existing Mutable Resource",
+					Usage:              "obtains information about an existing Swarm feed",
+					Description: `obtains information about an existing Swarm feed
+					The topic can be specified directly with the --topic flag as an hex string
+					If no topic is specified, the default topic (zero) will be used
+					The --name flag can be used to specify subtopics with a specific name.
+					The --user flag allows to refer to a user other than yourself. If not specified,
+					it will then default to your local account (--bzzaccount)
+					If you have a manifest, you can specify it with --manifest instead of --topic / --name / ---user
+					to refer to the feed`,
+					Flags: []cli.Flag{SwarmFeedManifestFlag, SwarmFeedNameFlag, SwarmFeedTopicFlag, SwarmFeedUserFlag},
 				},
 			},
 		},
@@ -497,14 +537,6 @@ pv(1) tool to get a progress bar:
 
     pv chunks.tar | swarm db import ~/.ethereum/swarm/bzz-KEY/chunks -`,
 				},
-				{
-					Action:             dbClean,
-					CustomHelpTemplate: helpTemplate,
-					Name:               "clean",
-					Usage:              "remove corrupt entries from a local chunk database",
-					ArgsUsage:          "<chunkdb>",
-					Description:        "Remove corrupt entries from a local chunk database",
-				},
 			},
 		},
 
@@ -542,6 +574,7 @@ pv(1) tool to get a progress bar:
 		SwarmSwapAPIFlag,
 		SwarmSyncDisabledFlag,
 		SwarmSyncUpdateDelay,
+		SwarmMaxStreamPeerServersFlag,
 		SwarmLightNodeEnabled,
 		SwarmDeliverySkipCheckFlag,
 		SwarmListenAddrFlag,
@@ -697,7 +730,7 @@ func getAccount(bzzaccount string, ctx *cli.Context, stack *node.Node) *ecdsa.Pr
 }
 
 // getPrivKey returns the private key of the specified bzzaccount
-// Used only by client commands, such as `resource`
+// Used only by client commands, such as `feed`
 func getPrivKey(ctx *cli.Context) *ecdsa.PrivateKey {
 	// booting up the swarm node just as we do in bzzd action
 	bzzconfig, err := buildConfig(ctx)
@@ -788,10 +821,10 @@ func setSwarmBootstrapNodes(ctx *cli.Context, cfg *node.Config) {
 		return
 	}
 
-	cfg.P2P.BootstrapNodes = []*discover.Node{}
+	cfg.P2P.BootstrapNodes = []*enode.Node{}
 
 	for _, url := range SwarmBootnodes {
-		node, err := discover.ParseNode(url)
+		node, err := enode.ParseV4(url)
 		if err != nil {
 			log.Error("Bootstrap URL invalid", "enode", url, "err", err)
 		}

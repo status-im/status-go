@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/stretchr/testify/require"
 )
 
 func TestLocalVerifierForNodeIDTypes(t *testing.T) {
-	nodeID := discover.NodeID{1}
+	nodeID := enode.ID{1}
 
-	v := NewLocalVerifier([]discover.NodeID{{1}})
+	v := NewLocalVerifier([]enode.ID{{1}})
 	require.True(t, v.VerifyNode(context.TODO(), nodeID))
-	require.False(t, v.VerifyNode(context.TODO(), discover.NodeID{2}))
+	require.False(t, v.VerifyNode(context.TODO(), enode.ID{2}))
 }

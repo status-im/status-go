@@ -24,12 +24,12 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "=v1.8.16"
+  version = "=v1.8.17"
   source = "github.com/status-im/go-ethereum"
 
 [[constraint]]
   name = "github.com/status-im/whisper"
-  version = "=v1.2.0"
+  version = "=v1.3.0"
 
 [[override]]
   name = "github.com/golang/protobuf"
@@ -84,7 +84,7 @@
 
 [[override]]
   name = "github.com/mattn/go-isatty"
-  revision = "281032e84ae07510239465db46bf442aa44b953a"
+  revision = "3fb116b820352b7f0c281308a4d6250c22d94e27"
 
 [[override]]
   name = "github.com/pborman/uuid"
@@ -151,8 +151,8 @@
   revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
 
 [[constraint]]
-  branch = "master"
   name = "github.com/status-im/rendezvous"
+  branch = "master"
 
 [[override]]
   name = "github.com/deckarep/golang-set"

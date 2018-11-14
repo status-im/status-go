@@ -31,7 +31,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +40,7 @@ import (
 	"github.com/ethereum/go-ethereum/swarm/api"
 	"github.com/ethereum/go-ethereum/swarm/log"
 	"github.com/ethereum/go-ethereum/swarm/storage"
-	"github.com/ethereum/go-ethereum/swarm/storage/mru"
+	"github.com/ethereum/go-ethereum/swarm/storage/feed"
 
 	"github.com/rs/cors"
 )
@@ -145,13 +144,13 @@ func NewServer(api *api.API, corsString string) *Server {
 			defaultMiddlewares...,
 		),
 	})
-	mux.Handle("/bzz-resource:/", methodHandler{
+	mux.Handle("/bzz-feed:/", methodHandler{
 		"GET": Adapt(
-			http.HandlerFunc(server.HandleGetResource),
+			http.HandlerFunc(server.HandleGetFeed),
 			defaultMiddlewares...,
 		),
 		"POST": Adapt(
-			http.HandlerFunc(server.HandlePostResource),
+			http.HandlerFunc(server.HandlePostFeed),
 			defaultMiddlewares...,
 		),
 	})
@@ -201,6 +200,13 @@ func (s *Server) HandleBzzGet(w http.ResponseWriter, r *http.Request) {
 		defer reader.Close()
 
 		w.Header().Set("Content-Type", "application/x-tar")
+
+		fileName := uri.Addr
+		if found := path.Base(uri.Path); found != "" && found != "." && found != "/" {
+			fileName = found
+		}
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s.tar\"", fileName))
+
 		w.WriteHeader(http.StatusOK)
 		io.Copy(w, reader)
 		return
@@ -451,219 +457,156 @@ func (s *Server) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, newKey)
 }
 
-// Parses a resource update post url to corresponding action
-// possible combinations:
-// /			add multihash update to existing hash
-// /raw 		add raw update to existing hash
-// /#			create new resource with first update as mulitihash
-// /raw/#		create new resource with first update raw
-func resourcePostMode(path string) (isRaw bool, frequency uint64, err error) {
-	re, err := regexp.Compile("^(raw)?/?([0-9]+)?$")
-	if err != nil {
-		return isRaw, frequency, err
-	}
-	m := re.FindAllStringSubmatch(path, 2)
-	var freqstr = "0"
-	if len(m) > 0 {
-		if m[0][1] != "" {
-			isRaw = true
-		}
-		if m[0][2] != "" {
-			freqstr = m[0][2]
-		}
-	} else if len(path) > 0 {
-		return isRaw, frequency, fmt.Errorf("invalid path")
-	}
-	frequency, err = strconv.ParseUint(freqstr, 10, 64)
-	return isRaw, frequency, err
-}
-
-// Handles creation of new mutable resources and adding updates to existing mutable resources
-// There are two types of updates available, "raw" and "multihash."
-// If the latter is used, a subsequent bzz:// GET call to the manifest of the resource will return
-// the page that the multihash is pointing to, as if it held a normal swarm content manifest
-//
-// The POST request admits a JSON structure as defined in the mru package: `mru.updateRequestJSON`
-// The requests can be to a) create a resource, b) update a resource or c) both a+b: create a resource and set the initial content
-func (s *Server) HandlePostResource(w http.ResponseWriter, r *http.Request) {
+// Handles feed manifest creation and feed updates
+// The POST request admits a JSON structure as defined in the feeds package: `feed.updateRequestJSON`
+// The requests can be to a) create a feed manifest, b) update a feed or c) both a+b: create a feed manifest and publish a first update
+func (s *Server) HandlePostFeed(w http.ResponseWriter, r *http.Request) {
 	ruid := GetRUID(r.Context())
-	log.Debug("handle.post.resource", "ruid", ruid)
+	uri := GetURI(r.Context())
+	log.Debug("handle.post.feed", "ruid", ruid)
 	var err error
 
-	// Creation and update must send mru.updateRequestJSON JSON structure
+	// Creation and update must send feed.updateRequestJSON JSON structure
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		RespondError(w, r, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	var updateRequest mru.Request
-	if err := updateRequest.UnmarshalJSON(body); err != nil { // decodes request JSON
-		RespondError(w, r, err.Error(), http.StatusBadRequest) //TODO: send different status response depending on error
+
+	fd, err := s.api.ResolveFeed(r.Context(), uri, r.URL.Query())
+	if err != nil { // couldn't parse query string or retrieve manifest
+		getFail.Inc(1)
+		httpStatus := http.StatusBadRequest
+		if err == api.ErrCannotLoadFeedManifest || err == api.ErrCannotResolveFeedURI {
+			httpStatus = http.StatusNotFound
+		}
+		RespondError(w, r, fmt.Sprintf("cannot retrieve feed from manifest: %s", err), httpStatus)
+		return
+	}
+
+	var updateRequest feed.Request
+	updateRequest.Feed = *fd
+	query := r.URL.Query()
+
+	if err := updateRequest.FromValues(query, body); err != nil { // decodes request from query parameters
+		RespondError(w, r, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if updateRequest.IsUpdate() {
 		// Verify that the signature is intact and that the signer is authorized
-		// to update this resource
-		// Check this early, to avoid creating a resource and then not being able to set its first update.
+		// to update this feed
+		// Check this early, to avoid creating a feed and then not being able to set its first update.
 		if err = updateRequest.Verify(); err != nil {
 			RespondError(w, r, err.Error(), http.StatusForbidden)
 			return
 		}
-	}
-
-	if updateRequest.IsNew() {
-		err = s.api.ResourceCreate(r.Context(), &updateRequest)
-		if err != nil {
-			code, err2 := s.translateResourceError(w, r, "resource creation fail", err)
-			RespondError(w, r, err2.Error(), code)
-			return
-		}
-	}
-
-	if updateRequest.IsUpdate() {
-		_, err = s.api.ResourceUpdate(r.Context(), &updateRequest.SignedResourceUpdate)
+		_, err = s.api.FeedsUpdate(r.Context(), &updateRequest)
 		if err != nil {
 			RespondError(w, r, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
 
-	// at this point both possible operations (create, update or both) were successful
-	// so in case it was a new resource, then create a manifest and send it over.
-
-	if updateRequest.IsNew() {
-		// we create a manifest so we can retrieve the resource with bzz:// later
-		// this manifest has a special "resource type" manifest, and its hash is the key of the mutable resource
-		// metadata chunk (rootAddr)
-		m, err := s.api.NewResourceManifest(r.Context(), updateRequest.RootAddr().Hex())
+	if query.Get("manifest") == "1" {
+		// we create a manifest so we can retrieve feed updates with bzz:// later
+		// this manifest has a special "feed type" manifest, and saves the
+		// feed identification used to retrieve feed updates later
+		m, err := s.api.NewFeedManifest(r.Context(), &updateRequest.Feed)
 		if err != nil {
-			RespondError(w, r, fmt.Sprintf("failed to create resource manifest: %v", err), http.StatusInternalServerError)
+			RespondError(w, r, fmt.Sprintf("failed to create feed manifest: %v", err), http.StatusInternalServerError)
 			return
 		}
-
 		// the key to the manifest will be passed back to the client
-		// the client can access the root chunk key directly through its Hash member
-		// the manifest key should be set as content in the resolver of the ENS name
-		// \TODO update manifest key automatically in ENS
+		// the client can access the feed  directly through its Feed member
+		// the manifest key can be set as content in the resolver of the ENS name
 		outdata, err := json.Marshal(m)
 		if err != nil {
 			RespondError(w, r, fmt.Sprintf("failed to create json response: %s", err), http.StatusInternalServerError)
 			return
 		}
 		fmt.Fprint(w, string(outdata))
+
+		w.Header().Add("Content-type", "application/json")
 	}
-	w.Header().Add("Content-type", "application/json")
 }
 
-// Retrieve mutable resource updates:
-// bzz-resource://<id> - get latest update
-// bzz-resource://<id>/<n> - get latest update on period n
-// bzz-resource://<id>/<n>/<m> - get update version m of period n
-// bzz-resource://<id>/meta - get metadata and next version information
-// <id> = ens name or hash
-// TODO: Enable pass maxPeriod parameter
-func (s *Server) HandleGetResource(w http.ResponseWriter, r *http.Request) {
+// HandleGetFeed retrieves Swarm feeds updates:
+// bzz-feed://<manifest address or ENS name> - get latest feed update, given a manifest address
+// - or -
+// specify user + topic (optional), subtopic name (optional) directly, without manifest:
+// bzz-feed://?user=0x...&topic=0x...&name=subtopic name
+// topic defaults to 0x000... if not specified.
+// name defaults to empty string if not specified.
+// thus, empty name and topic refers to the user's default feed.
+//
+// Optional parameters:
+// time=xx - get the latest update before time (in epoch seconds)
+// hint.time=xx - hint the lookup algorithm looking for updates at around that time
+// hint.level=xx - hint the lookup algorithm looking for updates at around this frequency level
+// meta=1 - get feed metadata and status information instead of performing a feed query
+// NOTE: meta=1 will be deprecated in the near future
+func (s *Server) HandleGetFeed(w http.ResponseWriter, r *http.Request) {
 	ruid := GetRUID(r.Context())
 	uri := GetURI(r.Context())
-	log.Debug("handle.get.resource", "ruid", ruid)
+	log.Debug("handle.get.feed", "ruid", ruid)
 	var err error
 
-	// resolve the content key.
-	manifestAddr := uri.Address()
-	if manifestAddr == nil {
-		manifestAddr, err = s.api.Resolve(r.Context(), uri.Addr)
-		if err != nil {
-			getFail.Inc(1)
-			RespondError(w, r, fmt.Sprintf("cannot resolve %s: %s", uri.Addr, err), http.StatusNotFound)
-			return
-		}
-	} else {
-		w.Header().Set("Cache-Control", "max-age=2147483648")
-	}
-
-	// get the root chunk rootAddr from the manifest
-	rootAddr, err := s.api.ResolveResourceManifest(r.Context(), manifestAddr)
-	if err != nil {
+	fd, err := s.api.ResolveFeed(r.Context(), uri, r.URL.Query())
+	if err != nil { // couldn't parse query string or retrieve manifest
 		getFail.Inc(1)
-		RespondError(w, r, fmt.Sprintf("error resolving resource root chunk for %s: %s", uri.Addr, err), http.StatusNotFound)
+		httpStatus := http.StatusBadRequest
+		if err == api.ErrCannotLoadFeedManifest || err == api.ErrCannotResolveFeedURI {
+			httpStatus = http.StatusNotFound
+		}
+		RespondError(w, r, fmt.Sprintf("cannot retrieve feed information from manifest: %s", err), httpStatus)
 		return
 	}
 
-	log.Debug("handle.get.resource: resolved", "ruid", ruid, "manifestkey", manifestAddr, "rootchunk addr", rootAddr)
-
 	// determine if the query specifies period and version or it is a metadata query
-	var params []string
-	if len(uri.Path) > 0 {
-		if uri.Path == "meta" {
-			unsignedUpdateRequest, err := s.api.ResourceNewRequest(r.Context(), rootAddr)
-			if err != nil {
-				getFail.Inc(1)
-				RespondError(w, r, fmt.Sprintf("cannot retrieve resource metadata for rootAddr=%s: %s", rootAddr.Hex(), err), http.StatusNotFound)
-				return
-			}
-			rawResponse, err := unsignedUpdateRequest.MarshalJSON()
-			if err != nil {
-				RespondError(w, r, fmt.Sprintf("cannot encode unsigned UpdateRequest: %v", err), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Add("Content-type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, string(rawResponse))
+	if r.URL.Query().Get("meta") == "1" {
+		unsignedUpdateRequest, err := s.api.FeedsNewRequest(r.Context(), fd)
+		if err != nil {
+			getFail.Inc(1)
+			RespondError(w, r, fmt.Sprintf("cannot retrieve feed metadata for feed=%s: %s", fd.Hex(), err), http.StatusNotFound)
 			return
-
 		}
-
-		params = strings.Split(uri.Path, "/")
-
+		rawResponse, err := unsignedUpdateRequest.MarshalJSON()
+		if err != nil {
+			RespondError(w, r, fmt.Sprintf("cannot encode unsigned feed update request: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, string(rawResponse))
+		return
 	}
-	var name string
-	var data []byte
-	now := time.Now()
 
-	switch len(params) {
-	case 0: // latest only
-		name, data, err = s.api.ResourceLookup(r.Context(), mru.LookupLatest(rootAddr))
-	case 2: // specific period and version
-		var version uint64
-		var period uint64
-		version, err = strconv.ParseUint(params[1], 10, 32)
-		if err != nil {
-			break
-		}
-		period, err = strconv.ParseUint(params[0], 10, 32)
-		if err != nil {
-			break
-		}
-		name, data, err = s.api.ResourceLookup(r.Context(), mru.LookupVersion(rootAddr, uint32(period), uint32(version)))
-	case 1: // last version of specific period
-		var period uint64
-		period, err = strconv.ParseUint(params[0], 10, 32)
-		if err != nil {
-			break
-		}
-		name, data, err = s.api.ResourceLookup(r.Context(), mru.LookupLatestVersionInPeriod(rootAddr, uint32(period)))
-	default: // bogus
-		err = mru.NewError(storage.ErrInvalidValue, "invalid mutable resource request")
+	lookupParams := &feed.Query{Feed: *fd}
+	if err = lookupParams.FromValues(r.URL.Query()); err != nil { // parse period, version
+		RespondError(w, r, fmt.Sprintf("invalid feed update request:%s", err), http.StatusBadRequest)
+		return
 	}
+
+	data, err := s.api.FeedsLookup(r.Context(), lookupParams)
 
 	// any error from the switch statement will end up here
 	if err != nil {
-		code, err2 := s.translateResourceError(w, r, "mutable resource lookup fail", err)
+		code, err2 := s.translateFeedError(w, r, "feed lookup fail", err)
 		RespondError(w, r, err2.Error(), code)
 		return
 	}
 
 	// All ok, serve the retrieved update
-	log.Debug("Found update", "name", name, "ruid", ruid)
-	w.Header().Set("Content-Type", "application/octet-stream")
-	http.ServeContent(w, r, "", now, bytes.NewReader(data))
+	log.Debug("Found update", "feed", fd.Hex(), "ruid", ruid)
+	w.Header().Set("Content-Type", api.MimeOctetStream)
+	http.ServeContent(w, r, "", time.Now(), bytes.NewReader(data))
 }
 
-func (s *Server) translateResourceError(w http.ResponseWriter, r *http.Request, supErr string, err error) (int, error) {
+func (s *Server) translateFeedError(w http.ResponseWriter, r *http.Request, supErr string, err error) (int, error) {
 	code := 0
 	defaultErr := fmt.Errorf("%s: %v", supErr, err)
-	rsrcErr, ok := err.(*mru.Error)
+	rsrcErr, ok := err.(*feed.Error)
 	if !ok && rsrcErr != nil {
 		code = rsrcErr.Code()
 	}
@@ -730,11 +673,9 @@ func (s *Server) HandleGet(w http.ResponseWriter, r *http.Request) {
 	case uri.Raw():
 		// allow the request to overwrite the content type using a query
 		// parameter
-		contentType := "application/octet-stream"
 		if typ := r.URL.Query().Get("content_type"); typ != "" {
-			contentType = typ
+			w.Header().Set("Content-Type", typ)
 		}
-		w.Header().Set("Content-Type", contentType)
 		http.ServeContent(w, r, "", time.Now(), reader)
 	case uri.Hash():
 		w.Header().Set("Content-Type", "text/plain")
@@ -890,8 +831,17 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", contentType)
-	http.ServeContent(w, r, "", time.Now(), newBufferedReadSeeker(reader, getFileBufferSize))
+	if contentType != "" {
+		w.Header().Set("Content-Type", contentType)
+	}
+
+	fileName := uri.Addr
+	if found := path.Base(uri.Path); found != "" && found != "." && found != "/" {
+		fileName = found
+	}
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", fileName))
+
+	http.ServeContent(w, r, fileName, time.Now(), newBufferedReadSeeker(reader, getFileBufferSize))
 }
 
 // The size of buffer used for bufio.Reader on LazyChunkReader passed to

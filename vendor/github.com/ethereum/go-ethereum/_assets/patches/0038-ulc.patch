@@ -26,11 +26,11 @@ index fae4b57..bdc624d 100644
  		utils.GCModeFlag,
  		utils.LightServFlag,
 diff --git a/cmd/utils/flags.go b/cmd/utils/flags.go
-index a2becd0..0df8fb8 100644
+index 429c2bb..878847c 100644
 --- a/cmd/utils/flags.go
 +++ b/cmd/utils/flags.go
 @@ -19,6 +19,7 @@ package utils
- 
+
  import (
  	"crypto/ecdsa"
 +	"encoding/json"
@@ -64,7 +64,7 @@ index a2becd0..0df8fb8 100644
 @@ -816,6 +834,40 @@ func setIPC(ctx *cli.Context, cfg *node.Config) {
  	}
  }
- 
+
 +// SetULC setup ULC config from file if given.
 +func SetULC(ctx *cli.Context, cfg *eth.Config) {
 +	// ULC config isn't loaded from global config and ULC config and ULC trusted nodes are not defined.
@@ -102,7 +102,7 @@ index a2becd0..0df8fb8 100644
  // makeDatabaseHandles raises out the number of allowed file handles per process
  // for Geth and returns half of the allowance to assign to the database.
  func makeDatabaseHandles() int {
-@@ -1140,6 +1192,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
+@@ -1143,6 +1195,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
  	if ctx.GlobalIsSet(LightPeersFlag.Name) {
  		cfg.LightPeers = ctx.GlobalInt(LightPeersFlag.Name)
  	}
@@ -117,7 +117,7 @@ index d209311..8904dd8 100644
 --- a/core/headerchain.go
 +++ b/core/headerchain.go
 @@ -219,14 +219,18 @@ func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int)
- 
+
  	// Generate the list of seal verification requests, and start the parallel verifier
  	seals := make([]bool, len(chain))
 -	for i := 0; i < len(seals)/checkFreq; i++ {
@@ -138,7 +138,7 @@ index d209311..8904dd8 100644
 +		seals[len(seals)-1] = true
  	}
 -	seals[len(seals)-1] = true // Last should always be verified to avoid junk
- 
+
  	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
  	defer close(abort)
 diff --git a/eth/config.go b/eth/config.go
@@ -147,7 +147,7 @@ index efbaafb..7d1db9f 100644
 +++ b/eth/config.go
 @@ -87,8 +87,12 @@ type Config struct {
  	NoPruning bool
- 
+
  	// Light client options
 -	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
 -	LightPeers int `toml:",omitempty"` // Maximum number of LES client peers
@@ -157,11 +157,11 @@ index efbaafb..7d1db9f 100644
 +
 +	// Ultra Light client options
 +	ULC *ULCConfig `toml:",omitempty"`
- 
+
  	// Database options
  	SkipBcVersionCheck bool `toml:"-"`
 diff --git a/eth/gen_config.go b/eth/gen_config.go
-index d401a91..6423cf5 100644
+index d401a91..382d4d9 100644
 --- a/eth/gen_config.go
 +++ b/eth/gen_config.go
 @@ -23,10 +23,12 @@ func (c Config) MarshalTOML() (interface{}, error) {
@@ -181,7 +181,16 @@ index d401a91..6423cf5 100644
  		DatabaseCache           int
  		TrieCache               int
  		TrieTimeout             time.Duration
-@@ -79,10 +81,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
+@@ -51,6 +53,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
+ 	enc.NoPruning = c.NoPruning
+ 	enc.LightServ = c.LightServ
+ 	enc.LightPeers = c.LightPeers
++	enc.OnlyAnnounce = c.OnlyAnnounce
++	enc.ULC = c.ULC
+ 	enc.SkipBcVersionCheck = c.SkipBcVersionCheck
+ 	enc.DatabaseHandles = c.DatabaseHandles
+ 	enc.DatabaseCache = c.DatabaseCache
+@@ -79,10 +83,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
  		NetworkId               *uint64
  		SyncMode                *downloader.SyncMode
  		NoPruning               *bool
@@ -198,7 +207,7 @@ index d401a91..6423cf5 100644
  		DatabaseCache           *int
  		TrieCache               *int
  		TrieTimeout             *time.Duration
-@@ -122,6 +126,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
+@@ -122,6 +128,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
  	if dec.LightPeers != nil {
  		c.LightPeers = *dec.LightPeers
  	}
@@ -227,13 +236,21 @@ index 0000000..960cb0d
 +	MinTrustedFraction int      `toml:",omitempty"` // Minimum percentage of connected trusted servers to validate trusted (1-100)
 +}
 diff --git a/les/backend.go b/les/backend.go
-index 8e9cca6..fd32e59 100644
+index 8e9cca6..d54b466 100644
 --- a/les/backend.go
 +++ b/les/backend.go
-@@ -108,8 +108,12 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
+@@ -20,6 +20,7 @@ package les
+ import (
+ 	"fmt"
+ 	"sync"
++	"time"
+
+ 	"github.com/ethereum/go-ethereum/accounts"
+ 	"github.com/ethereum/go-ethereum/common"
+@@ -108,8 +109,12 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
  		bloomIndexer:   eth.NewBloomIndexer(chainDb, params.BloomBitsBlocksClient, params.HelperTrieConfirmations),
  	}
- 
+
 +	var trustedNodes []string
 +	if leth.config.ULC != nil {
 +		trustedNodes = leth.config.ULC.TrustedServers
@@ -242,11 +259,11 @@ index 8e9cca6..fd32e59 100644
 -	leth.serverPool = newServerPool(chainDb, quitSync, &leth.wg)
 +	leth.serverPool = newServerPool(chainDb, quitSync, &leth.wg, trustedNodes)
  	leth.retriever = newRetrieveManager(peers, leth.reqDist, leth.serverPool)
- 
+
  	leth.odr = NewLesOdr(chainDb, light.DefaultClientIndexerConfig, leth.retriever)
-@@ -135,10 +139,32 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
+@@ -135,10 +140,33 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
  	}
- 
+
  	leth.txPool = light.NewTxPool(leth.chainConfig, leth.blockchain, leth.relay)
 -	if leth.protocolManager, err = NewProtocolManager(leth.chainConfig, light.DefaultClientIndexerConfig, true, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, leth.serverPool, quitSync, &leth.wg); err != nil {
 +
@@ -271,6 +288,7 @@ index 8e9cca6..fd32e59 100644
  	}
 +
 +	if leth.protocolManager.isULCEnabled() {
++		log.Warn("Ultra light client is enabled", "trustedNodes", len(leth.protocolManager.ulc.trustedKeys), "minTrustedFraction", leth.protocolManager.ulc.minTrustedFraction)
 +		leth.blockchain.DisableCheckFreq()
 +	}
  	leth.ApiBackend = &LesApiBackend{leth, nil}
@@ -278,23 +296,31 @@ index 8e9cca6..fd32e59 100644
  	gpoParams := config.GPO
  	if gpoParams.Default == nil {
  		gpoParams.Default = config.MinerGasPrice
+@@ -253,6 +281,7 @@ func (s *LightEthereum) Stop() error {
+
+ 	s.eventMux.Stop()
+
++	time.Sleep(time.Millisecond * 200)
+ 	s.chainDb.Close()
+ 	close(s.shutdownChan)
+
 diff --git a/les/fetcher.go b/les/fetcher.go
-index cc539c4..1291c4f 100644
+index f0d3b18..16cfc00 100644
 --- a/les/fetcher.go
 +++ b/les/fetcher.go
-@@ -42,7 +42,7 @@ const (
+@@ -43,7 +43,7 @@ const (
  type lightFetcher struct {
  	pm    *ProtocolManager
  	odr   *LesOdr
 -	chain *light.LightChain
 +	chain lightChain
- 
+
  	lock            sync.Mutex // lock protects access to the fetcher's internal state variables except sent requests
  	maxConfirmedTd  *big.Int
-@@ -51,11 +51,19 @@ type lightFetcher struct {
+@@ -52,11 +52,19 @@ type lightFetcher struct {
  	syncing         bool
  	syncDone        chan *peer
- 
+
 -	reqMu      sync.RWMutex // reqMu protects access to sent header fetch requests
 -	requested  map[uint64]fetchRequest
 -	deliverChn chan fetchResponse
@@ -314,9 +340,9 @@ index cc539c4..1291c4f 100644
 +	LockChain()
 +	UnlockChain()
  }
- 
+
  // fetcherPeerInfo holds fetcher-specific information about each active peer
-@@ -143,6 +151,7 @@ func (f *lightFetcher) syncLoop() {
+@@ -144,9 +152,11 @@ func (f *lightFetcher) syncLoop() {
  				rq    *distReq
  				reqID uint64
  			)
@@ -324,7 +350,11 @@ index cc539c4..1291c4f 100644
  			if !f.syncing && !(newAnnounce && s) {
  				rq, reqID = f.nextRequest()
  			}
-@@ -205,8 +214,11 @@ func (f *lightFetcher) syncLoop() {
++
+ 			syncing := f.syncing
+ 			f.lock.Unlock()
+
+@@ -206,8 +216,11 @@ func (f *lightFetcher) syncLoop() {
  		case p := <-f.syncDone:
  			f.lock.Lock()
  			p.Log().Debug("Done synchronising with peer")
@@ -332,20 +362,20 @@ index cc539c4..1291c4f 100644
 +			res, h, td := f.checkSyncedHeaders(p)
  			f.syncing = false
 +			if res {
-+				f.newHeaders(h, []*big.Int{td})
++				f.newHeaders([]*types.Header{h}, []*big.Int{td})
 +			}
  			f.lock.Unlock()
  		}
  	}
-@@ -222,7 +234,6 @@ func (f *lightFetcher) registerPeer(p *peer) {
- 
+@@ -223,7 +236,6 @@ func (f *lightFetcher) registerPeer(p *peer) {
+
  	f.lock.Lock()
  	defer f.lock.Unlock()
 -
  	f.peers[p] = &fetcherPeerInfo{nodeByHash: make(map[common.Hash]*fetcherTreeNode)}
  }
- 
-@@ -275,8 +286,10 @@ func (f *lightFetcher) announce(p *peer, head *announceData) {
+
+@@ -276,8 +288,10 @@ func (f *lightFetcher) announce(p *peer, head *announceData) {
  		fp.nodeCnt = 0
  		fp.nodeByHash = make(map[common.Hash]*fetcherTreeNode)
  	}
@@ -357,7 +387,7 @@ index cc539c4..1291c4f 100644
  		locked := false
  		for uint64(fp.nodeCnt)+head.Number-n.number > maxNodeCount && fp.root != nil {
  			if !locked {
-@@ -320,6 +333,7 @@ func (f *lightFetcher) announce(p *peer, head *announceData) {
+@@ -321,6 +335,7 @@ func (f *lightFetcher) announce(p *peer, head *announceData) {
  			fp.nodeByHash[n.hash] = n
  		}
  	}
@@ -365,7 +395,7 @@ index cc539c4..1291c4f 100644
  	if n == nil {
  		// could not find reorg common ancestor or had to delete entire tree, a new root and a resync is needed
  		if fp.root != nil {
-@@ -400,25 +414,13 @@ func (f *lightFetcher) requestedID(reqID uint64) bool {
+@@ -407,25 +422,13 @@ func (f *lightFetcher) requestedID(reqID uint64) bool {
  // to be downloaded starting from the head backwards is also returned
  func (f *lightFetcher) nextRequest() (*distReq, uint64) {
  	var (
@@ -379,7 +409,7 @@ index cc539c4..1291c4f 100644
 -	bestTd := f.maxConfirmedTd
 -	bestSyncing := false
 +	bestHash, bestAmount, bestTd, bestSyncing = f.findBestValues()
- 
+
 -	for p, fp := range f.peers {
 -		for hash, n := range fp.nodeByHash {
 -			if !f.checkKnownNode(p, n) && !n.requested && (bestTd == nil || n.td.Cmp(bestTd) >= 0) {
@@ -396,7 +426,7 @@ index cc539c4..1291c4f 100644
  	if bestTd == f.maxConfirmedTd {
  		return nil, 0
  	}
-@@ -428,72 +430,131 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
+@@ -435,72 +438,131 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
  	var rq *distReq
  	reqID := genReqID()
  	if f.syncing {
@@ -448,7 +478,7 @@ index cc539c4..1291c4f 100644
 +
 +			//if ulc mode is disabled, isTrustedHash returns true
 +			amount := f.requestAmount(p, n)
-+			if (bestTd == nil || n.td.Cmp(bestTd) > 0 || amount < bestAmount) && f.isTrustedHash(hash) {
++			if (bestTd == nil || n.td.Cmp(bestTd) > 0 || amount < bestAmount) && (f.isTrustedHash(hash) || f.maxConfirmedTd.Int64() == 0) {
 +				bestHash = hash
 +				bestTd = n.td
 +				bestAmount = amount
@@ -511,7 +541,7 @@ index cc539c4..1291c4f 100644
 +		},
 +	}
 +}
- 
+
 -				fp := f.peers[p]
 -				if fp == nil {
 -					return false
@@ -586,9 +616,9 @@ index cc539c4..1291c4f 100644
  	}
 -	return rq, reqID
  }
- 
+
  // deliverHeaders delivers header download request responses for processing
-@@ -511,6 +572,7 @@ func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) boo
+@@ -518,6 +580,7 @@ func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) boo
  	for i, header := range resp.headers {
  		headers[int(req.amount)-1-i] = header
  	}
@@ -596,7 +626,7 @@ index cc539c4..1291c4f 100644
  	if _, err := f.chain.InsertHeaderChain(headers, 1); err != nil {
  		if err == consensus.ErrFutureBlock {
  			return true
-@@ -535,6 +597,7 @@ func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) boo
+@@ -542,6 +605,7 @@ func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) boo
  // downloaded and validated batch or headers
  func (f *lightFetcher) newHeaders(headers []*types.Header, tds []*big.Int) {
  	var maxTd *big.Int
@@ -604,7 +634,7 @@ index cc539c4..1291c4f 100644
  	for p, fp := range f.peers {
  		if !f.checkAnnouncedHeaders(fp, headers, tds) {
  			p.Log().Debug("Inconsistent announcement")
-@@ -544,6 +607,7 @@ func (f *lightFetcher) newHeaders(headers []*types.Header, tds []*big.Int) {
+@@ -551,6 +615,7 @@ func (f *lightFetcher) newHeaders(headers []*types.Header, tds []*big.Int) {
  			maxTd = fp.confirmedTd
  		}
  	}
@@ -612,18 +642,21 @@ index cc539c4..1291c4f 100644
  	if maxTd != nil {
  		f.updateMaxConfirmedTd(maxTd)
  	}
-@@ -625,28 +689,111 @@ func (f *lightFetcher) checkAnnouncedHeaders(fp *fetcherPeerInfo, headers []*typ
+@@ -632,28 +697,100 @@ func (f *lightFetcher) checkAnnouncedHeaders(fp *fetcherPeerInfo, headers []*typ
  // checkSyncedHeaders updates peer's block tree after synchronisation by marking
  // downloaded headers as known. If none of the announced headers are found after
  // syncing, the peer is dropped.
 -func (f *lightFetcher) checkSyncedHeaders(p *peer) {
-+func (f *lightFetcher) checkSyncedHeaders(p *peer) (bool, []*types.Header, *big.Int) {
++func (f *lightFetcher) checkSyncedHeaders(p *peer) (bool, *types.Header, *big.Int) {
  	fp := f.peers[p]
  	if fp == nil {
  		p.Log().Debug("Unknown peer to check sync headers")
 -		return
 +		return false, nil, nil
  	}
++
+ 	n := fp.lastAnnounced
+ 	var td *big.Int
 +
 +	var h *types.Header
 +	if f.pm.isULCEnabled() {
@@ -632,46 +665,30 @@ index cc539c4..1291c4f 100644
 +		h, unapprovedHashes = f.lastTrustedTreeNode(p)
 +		//rollback untrusted blocks
 +		f.chain.Rollback(unapprovedHashes)
++		//overwrite to last trusted
++		n = fp.nodeByHash[h.Hash()]
 +	}
 +
- 	n := fp.lastAnnounced
- 	var td *big.Int
-+	trustedHeaderExisted := false
-+
-+	//find last trusted block
++	//find last valid block
  	for n != nil {
--		if td = f.chain.GetTd(n.hash, n.number); td != nil {
-+		//we found last trusted header
-+		if n.hash == h.Hash() {
-+			trustedHeaderExisted = true
-+		}
-+		if td = f.chain.GetTd(n.hash, n.number); td != nil && trustedHeaderExisted {
-+			break
-+		}
-+
-+		//break if we found last trusted hash before sync
-+		if f.lastTrustedHeader == nil {
-+			break
-+		}
-+		if n.hash == f.lastTrustedHeader.Hash() {
+ 		if td = f.chain.GetTd(n.hash, n.number); td != nil {
  			break
  		}
  		n = n.parent
  	}
 -	// now n is the latest downloaded header after syncing
--	if n == nil {
 +
 +	// Now n is the latest downloaded/approved header after syncing
-+	if n == nil && !p.isTrusted {
+ 	if n == nil {
  		p.Log().Debug("Synchronisation failed")
  		go f.pm.removePeer(p.id)
 -	} else {
 -		header := f.chain.GetHeader(n.hash, n.number)
 -		f.newHeaders([]*types.Header{header}, []*big.Int{td})
 +		return false, nil, nil
- 	}
++	}
 +	header := f.chain.GetHeader(n.hash, n.number)
-+	return true, []*types.Header{header}, td
++	return true, header, td
 +}
 +
 +// lastTrustedTreeNode return last approved treeNode and a list of unapproved hashes
@@ -681,7 +698,7 @@ index cc539c4..1291c4f 100644
 +
 +	if f.lastTrustedHeader == nil {
 +		return current, unapprovedHashes
-+	}
+ 	}
 +
 +	canonical := f.chain.CurrentHeader()
 +	if canonical.Number.Uint64() > f.lastTrustedHeader.Number.Uint64() {
@@ -730,9 +747,9 @@ index cc539c4..1291c4f 100644
 +	defer f.lock.Unlock()
 +	f.lastTrustedHeader = h
  }
- 
+
  // checkKnownNode checks if a block tree node is known (downloaded and validated)
-@@ -738,6 +885,7 @@ func (f *lightFetcher) updateMaxConfirmedTd(td *big.Int) {
+@@ -745,6 +882,7 @@ func (f *lightFetcher) updateMaxConfirmedTd(td *big.Int) {
  		if f.lastUpdateStats != nil {
  			f.lastUpdateStats.next = newEntry
  		}
@@ -740,7 +757,7 @@ index cc539c4..1291c4f 100644
  		f.lastUpdateStats = newEntry
  		for p := range f.peers {
  			f.checkUpdateStats(p, newEntry)
-@@ -760,6 +908,7 @@ func (f *lightFetcher) checkUpdateStats(p *peer, newEntry *updateStatsEntry) {
+@@ -767,6 +905,7 @@ func (f *lightFetcher) checkUpdateStats(p *peer, newEntry *updateStatsEntry) {
  		p.Log().Debug("Unknown peer to check update stats")
  		return
  	}
@@ -750,35 +767,33 @@ index cc539c4..1291c4f 100644
  	}
 diff --git a/les/fetcher_test.go b/les/fetcher_test.go
 new file mode 100644
-index 0000000..fd60ec2
+index 0000000..e5b6ef3
 --- /dev/null
 +++ b/les/fetcher_test.go
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,155 @@
 +package les
 +
 +import (
-+	"crypto/rand"
 +	"math/big"
 +	"testing"
 +
++	"net"
++
 +	"github.com/ethereum/go-ethereum/common"
 +	"github.com/ethereum/go-ethereum/core/types"
++	"github.com/ethereum/go-ethereum/crypto"
 +	"github.com/ethereum/go-ethereum/p2p"
-+	"github.com/ethereum/go-ethereum/p2p/discover"
++	"github.com/ethereum/go-ethereum/p2p/enode"
 +)
 +
 +func TestFetcherULCPeerSelector(t *testing.T) {
 +
 +	var (
-+		id1 discover.NodeID
-+		id2 discover.NodeID
-+		id3 discover.NodeID
-+		id4 discover.NodeID
++		id1 enode.ID = newNodeID(t).ID()
++		id2 enode.ID = newNodeID(t).ID()
++		id3 enode.ID = newNodeID(t).ID()
++		id4 enode.ID = newNodeID(t).ID()
 +	)
-+	rand.Read(id1[:])
-+	rand.Read(id2[:])
-+	rand.Read(id3[:])
-+	rand.Read(id4[:])
 +
 +	ftn1 := &fetcherTreeNode{
 +		hash: common.HexToHash("1"),
@@ -903,8 +918,16 @@ index 0000000..fd60ec2
 +func (l *lightChainStub) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 +	return l.insertHeaderChainAssertFunc(chain, checkFreq)
 +}
++
++func newNodeID(t *testing.T) *enode.Node {
++	key, err := crypto.GenerateKey()
++	if err != nil {
++		t.Fatal("generate key err:", err)
++	}
++	return enode.NewV4(&key.PublicKey, net.IP{}, 35000, 35000)
++}
 diff --git a/les/handler.go b/les/handler.go
-index e884afb..ea6455a 100644
+index de3b5f8..5e60fc8 100644
 --- a/les/handler.go
 +++ b/les/handler.go
 @@ -33,6 +33,7 @@ import (
@@ -916,14 +939,14 @@ index e884afb..ea6455a 100644
  	"github.com/ethereum/go-ethereum/ethdb"
  	"github.com/ethereum/go-ethereum/event"
 @@ -119,12 +120,29 @@ type ProtocolManager struct {
- 
+
  	// wait group is used for graceful shutdowns during downloading
  	// and processing
 -	wg *sync.WaitGroup
 +	wg  *sync.WaitGroup
 +	ulc *ulc
  }
- 
+
  // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
  // with the ethereum network.
 -func NewProtocolManager(chainConfig *params.ChainConfig, indexerConfig *light.IndexerConfig, lightSync bool, networkId uint64, mux *event.TypeMux, engine consensus.Engine, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay, serverPool *serverPool, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
@@ -950,7 +973,7 @@ index e884afb..ea6455a 100644
 @@ -149,6 +167,10 @@ func NewProtocolManager(chainConfig *params.ChainConfig, indexerConfig *light.In
  		manager.reqDist = odr.retriever.dist
  	}
- 
+
 +	if ulcConfig != nil {
 +		manager.ulc = newULC(ulcConfig)
 +	}
@@ -958,9 +981,9 @@ index e884afb..ea6455a 100644
  	removePeer := manager.removePeer
  	if disableClientRemovePeer {
  		removePeer = func(id string) {}
-@@ -238,7 +260,11 @@ func (pm *ProtocolManager) runPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWrit
+@@ -237,7 +259,11 @@ func (pm *ProtocolManager) runPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWrit
  }
- 
+
  func (pm *ProtocolManager) newPeer(pv int, nv uint64, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 -	return newPeer(pv, nv, p, newMeteredMsgWriter(rw))
 +	var isTrusted bool
@@ -969,9 +992,9 @@ index e884afb..ea6455a 100644
 +	}
 +	return newPeer(pv, nv, isTrusted, p, newMeteredMsgWriter(rw))
  }
- 
+
  // handle is the callback invoked to manage the life cycle of a les peer. When
-@@ -280,6 +306,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
+@@ -279,6 +305,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
  	if rw, ok := p.rw.(*meteredMsgReadWriter); ok {
  		rw.Init(p.version)
  	}
@@ -979,7 +1002,7 @@ index e884afb..ea6455a 100644
  	// Register the peer locally
  	if err := pm.peers.Register(p); err != nil {
  		p.Log().Error("Light Ethereum peer registration failed", "err", err)
-@@ -291,6 +318,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
+@@ -290,6 +317,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
  		}
  		pm.removePeer(p.id)
  	}()
@@ -987,7 +1010,7 @@ index e884afb..ea6455a 100644
  	// Register the peer in the downloader. If the downloader considers it banned, we disconnect
  	if pm.lightSync {
  		p.lock.Lock()
-@@ -375,7 +403,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
+@@ -374,16 +402,15 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
  	// Block header query, collect the requested headers and reply
  	case AnnounceMsg:
  		p.Log().Trace("Received announce message")
@@ -995,20 +1018,21 @@ index e884afb..ea6455a 100644
 +		if p.announceType == announceTypeNone {
  			return errResp(ErrUnexpectedResponse, "")
  		}
- 
-@@ -384,7 +412,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
+-
+ 		var req announceData
+ 		if err := msg.Decode(&req); err != nil {
  			return errResp(ErrDecode, "%v: %v", msg, err)
  		}
- 
+
 -		if p.requestAnnounceType == announceTypeSigned {
 +		if p.announceType == announceTypeSigned {
- 			if err := req.checkSignature(p.pubKey); err != nil {
+ 			if err := req.checkSignature(p.ID()); err != nil {
  				p.Log().Trace("Invalid announcement signature", "err", err)
  				return err
-@@ -1179,6 +1207,14 @@ func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
+@@ -1178,6 +1205,14 @@ func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
  	return stats
  }
- 
+
 +// isULCEnabled returns true if we can use ULC
 +func (pm *ProtocolManager) isULCEnabled() bool {
 +	if pm.ulc == nil || len(pm.ulc.trustedKeys) == 0 {
@@ -1019,8 +1043,8 @@ index e884afb..ea6455a 100644
 +
  // downloaderPeerNotify implements peerSetNotify
  type downloaderPeerNotify ProtocolManager
- 
-@@ -1223,7 +1259,8 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
+
+@@ -1222,7 +1257,8 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
  			return peer.GetRequestCost(GetBlockHeadersMsg, amount)
  		},
  		canSend: func(dp distPeer) bool {
@@ -1030,8 +1054,8 @@ index e884afb..ea6455a 100644
  		},
  		request: func(dp distPeer) func() {
  			peer := dp.(*peer)
-@@ -1250,5 +1287,7 @@ func (d *downloaderPeerNotify) registerPeer(p *peer) {
- 
+@@ -1249,5 +1285,7 @@ func (d *downloaderPeerNotify) registerPeer(p *peer) {
+
  func (d *downloaderPeerNotify) unregisterPeer(p *peer) {
  	pm := (*ProtocolManager)(d)
 -	pm.downloader.UnregisterPeer(p.id)
@@ -1044,7 +1068,7 @@ index 43be7f4..72ba266 100644
 --- a/les/handler_test.go
 +++ b/les/handler_test.go
 @@ -494,7 +494,7 @@ func TestGetBloombitsProofs(t *testing.T) {
- 
+
  func TestTransactionStatusLes2(t *testing.T) {
  	db := ethdb.NewMemDatabase()
 -	pm := newTestProtocolManagerMust(t, false, 0, nil, nil, nil, db)
@@ -1053,7 +1077,7 @@ index 43be7f4..72ba266 100644
  	config := core.DefaultTxPoolConfig
  	config.Journal = ""
 diff --git a/les/helper_test.go b/les/helper_test.go
-index 29496d6..5c37763 100644
+index b46d41f..02b1668 100644
 --- a/les/helper_test.go
 +++ b/les/helper_test.go
 @@ -146,7 +146,7 @@ func testRCL() RequestCostList {
@@ -1088,21 +1112,21 @@ index 29496d6..5c37763 100644
 @@ -343,7 +343,7 @@ func newServerEnv(t *testing.T, blocks int, protocol int, waitIndexers func(*cor
  	db := ethdb.NewMemDatabase()
  	cIndexer, bIndexer, btIndexer := testIndexers(db, nil, light.TestServerIndexerConfig)
- 
+
 -	pm := newTestProtocolManagerMust(t, false, blocks, testChainGen, nil, nil, db)
 +	pm := newTestProtocolManagerMust(t, false, blocks, testChainGen, nil, nil, db, nil)
  	peer, _ := newTestPeer(t, "peer", protocol, pm, true)
- 
+
  	cIndexer.Start(pm.blockchain.(*core.BlockChain))
 @@ -383,8 +383,8 @@ func newClientServerEnv(t *testing.T, blocks int, protocol int, waitIndexers fun
  	lcIndexer, lbIndexer, lbtIndexer := testIndexers(ldb, odr, light.TestClientIndexerConfig)
  	odr.SetIndexers(lcIndexer, lbtIndexer, lbIndexer)
- 
+
 -	pm := newTestProtocolManagerMust(t, false, blocks, testChainGen, nil, peers, db)
 -	lpm := newTestProtocolManagerMust(t, true, 0, nil, odr, lPeers, ldb)
 +	pm := newTestProtocolManagerMust(t, false, blocks, testChainGen, nil, peers, db, nil)
 +	lpm := newTestProtocolManagerMust(t, true, 0, nil, odr, lPeers, ldb, nil)
- 
+
  	startIndexers := func(clientMode bool, pm *ProtocolManager) {
  		if clientMode {
 diff --git a/les/odr.go b/les/odr.go
@@ -1122,19 +1146,19 @@ index 9def05a..f759235 100644
  		request: func(dp distPeer) func() {
  			p := dp.(*peer)
 diff --git a/les/peer.go b/les/peer.go
-index 70c863c..c7fa59c 100644
+index 678384f..9ae94b2 100644
 --- a/les/peer.go
 +++ b/les/peer.go
-@@ -58,7 +58,7 @@ type peer struct {
+@@ -56,7 +56,7 @@ type peer struct {
  	version int    // Protocol version negotiated
  	network uint64 // Network ID being on
- 
+
 -	announceType, requestAnnounceType uint64
 +	announceType uint64
- 
+
  	id string
- 
-@@ -76,9 +76,12 @@ type peer struct {
+
+@@ -74,9 +74,12 @@ type peer struct {
  	fcServer       *flowcontrol.ServerNode // nil if the peer is client only
  	fcServerParams *flowcontrol.ServerParams
  	fcCosts        requestCostTable
@@ -1142,21 +1166,21 @@ index 70c863c..c7fa59c 100644
 +	isTrusted      bool
 +	isOnlyAnnounce bool
  }
- 
+
 -func newPeer(version int, network uint64, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 +func newPeer(version int, network uint64, isTrusted bool, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
  	id := p.ID()
- 	pubKey, _ := id.Pubkey()
- 
-@@ -90,6 +93,7 @@ func newPeer(version int, network uint64, p *p2p.Peer, rw p2p.MsgReadWriter) *pe
+
+ 	return &peer{
+@@ -86,6 +89,7 @@ func newPeer(version int, network uint64, p *p2p.Peer, rw p2p.MsgReadWriter) *pe
  		network:     network,
  		id:          fmt.Sprintf("%x", id[:8]),
  		announceChn: make(chan announceData, 20),
 +		isTrusted:   isTrusted,
  	}
  }
- 
-@@ -405,23 +409,32 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis
+
+@@ -401,23 +405,32 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis
  	send = send.add("headNum", headNum)
  	send = send.add("genesisHash", genesis)
  	if server != nil {
@@ -1193,9 +1217,9 @@ index 70c863c..c7fa59c 100644
  	}
 +
  	recv := recvList.decode()
- 
+
  	var rGenesis, rHash common.Hash
-@@ -456,25 +469,33 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis
+@@ -452,25 +465,33 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis
  	if int(rVersion) != p.version {
  		return errResp(ErrProtocolVersionMismatch, "%d (!= %d)", rVersion, p.version)
  	}
@@ -1232,7 +1256,7 @@ index 70c863c..c7fa59c 100644
  		params := &flowcontrol.ServerParams{}
  		if err := recv.get("flowControl/BL", &params.BufLimit); err != nil {
  			return err
-@@ -490,7 +511,6 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis
+@@ -486,7 +507,6 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis
  		p.fcServer = flowcontrol.NewServerNode(params)
  		p.fcCosts = MRC.decode()
  	}
@@ -1240,7 +1264,7 @@ index 70c863c..c7fa59c 100644
  	p.headInfo = &announceData{Td: rTd, Hash: rHash, Number: rNum}
  	return nil
  }
-@@ -580,8 +600,10 @@ func (ps *peerSet) Unregister(id string) error {
+@@ -576,8 +596,10 @@ func (ps *peerSet) Unregister(id string) error {
  		for _, n := range peers {
  			n.unregisterPeer(p)
  		}
@@ -1253,21 +1277,20 @@ index 70c863c..c7fa59c 100644
  }
 diff --git a/les/peer_test.go b/les/peer_test.go
 new file mode 100644
-index 0000000..e88d9c9
+index 0000000..0ba9cbf
 --- /dev/null
 +++ b/les/peer_test.go
-@@ -0,0 +1,303 @@
+@@ -0,0 +1,297 @@
 +package les
 +
 +import (
-+	"crypto/rand"
 +	"math/big"
 +	"testing"
 +
 +	"github.com/ethereum/go-ethereum/common"
 +	"github.com/ethereum/go-ethereum/les/flowcontrol"
 +	"github.com/ethereum/go-ethereum/p2p"
-+	"github.com/ethereum/go-ethereum/p2p/discover"
++	"github.com/ethereum/go-ethereum/p2p/enode"
 +	"github.com/ethereum/go-ethereum/rlp"
 +)
 +
@@ -1285,8 +1308,8 @@ index 0000000..e88d9c9
 +
 +//ulc connects to trusted peer and send announceType=announceTypeSigned
 +func TestPeerHandshakeSetAnnounceTypeToAnnounceTypeSignedForTrustedPeer(t *testing.T) {
-+	var id discover.NodeID
-+	rand.Read(id[:])
++
++	var id enode.ID = newNodeID(t).ID()
 +
 +	//peer to connect(on ulc side)
 +	p := peer{
@@ -1334,8 +1357,7 @@ index 0000000..e88d9c9
 +}
 +
 +func TestPeerHandshakeAnnounceTypeSignedForTrustedPeersPeerNotInTrusted(t *testing.T) {
-+	var id discover.NodeID
-+	rand.Read(id[:])
++	var id enode.ID = newNodeID(t).ID()
 +	p := peer{
 +		Peer:    p2p.NewPeer(id, "test peer", []p2p.Cap{}),
 +		version: protocol_version,
@@ -1379,8 +1401,7 @@ index 0000000..e88d9c9
 +}
 +
 +func TestPeerHandshakeDefaultAllRequests(t *testing.T) {
-+	var id discover.NodeID
-+	rand.Read(id[:])
++	var id enode.ID = newNodeID(t).ID()
 +
 +	s := generateLesServer()
 +
@@ -1409,8 +1430,7 @@ index 0000000..e88d9c9
 +}
 +
 +func TestPeerHandshakeServerSendOnlyAnnounceRequestsHeaders(t *testing.T) {
-+	var id discover.NodeID
-+	rand.Read(id[:])
++	var id enode.ID = newNodeID(t).ID()
 +
 +	s := generateLesServer()
 +	s.onlyAnnounce = true
@@ -1444,8 +1464,7 @@ index 0000000..e88d9c9
 +	}
 +}
 +func TestPeerHandshakeClientReceiveOnlyAnnounceRequestsHeaders(t *testing.T) {
-+	var id discover.NodeID
-+	rand.Read(id[:])
++	var id enode.ID = newNodeID(t).ID()
 +
 +	p := peer{
 +		Peer:    p2p.NewPeer(id, "test peer", []p2p.Cap{}),
@@ -1476,8 +1495,7 @@ index 0000000..e88d9c9
 +}
 +
 +func TestPeerHandshakeClientReturnErrorOnUselessPeer(t *testing.T) {
-+	var id discover.NodeID
-+	rand.Read(id[:])
++	var id enode.ID = newNodeID(t).ID()
 +
 +	p := peer{
 +		Peer:    p2p.NewPeer(id, "test peer", []p2p.Cap{}),
@@ -1567,7 +1585,7 @@ index 2fa0456..2ded3c1 100644
 @@ -41,17 +41,34 @@ import (
  type LesServer struct {
  	lesCommons
- 
+
 -	fcManager   *flowcontrol.ClientManager // nil if our node is client only
 -	fcCostStats *requestCostStats
 -	defParams   *flowcontrol.ServerParams
@@ -1582,7 +1600,7 @@ index 2fa0456..2ded3c1 100644
 +	quitSync     chan struct{}
 +	onlyAnnounce bool
  }
- 
+
  func NewLesServer(eth *eth.Ethereum, config *eth.Config) (*LesServer, error) {
  	quitSync := make(chan struct{})
 -	pm, err := NewProtocolManager(eth.BlockChain().Config(), light.DefaultServerIndexerConfig, false, config.NetworkId, eth.EventMux(), eth.Engine(), newPeerSet(), eth.BlockChain(), eth.TxPool(), eth.ChainDb(), nil, nil, nil, quitSync, new(sync.WaitGroup))
@@ -1616,11 +1634,11 @@ index 2fa0456..2ded3c1 100644
 +		lesTopics:    lesTopics,
 +		onlyAnnounce: config.OnlyAnnounce,
  	}
- 
+
  	logger := log.New()
 @@ -289,10 +307,8 @@ func (s *requestCostStats) getCurrentList() RequestCostList {
  	defer s.lock.Unlock()
- 
+
  	list := make(RequestCostList, len(reqList))
 -	//fmt.Println("RequestCostList")
  	for idx, code := range reqList {
@@ -1630,18 +1648,18 @@ index 2fa0456..2ded3c1 100644
  			b += m
  			m = 0
 diff --git a/les/serverpool.go b/les/serverpool.go
-index 1a4c752..3a2dcea 100644
+index 0fe6e49..c7edfc7 100644
 --- a/les/serverpool.go
 +++ b/les/serverpool.go
-@@ -125,22 +125,22 @@ type serverPool struct {
- 	discNodes     chan *discv5.Node
+@@ -126,22 +126,22 @@ type serverPool struct {
+ 	discNodes     chan *enode.Node
  	discLookups   chan bool
- 
+
 +	trustedNodes         []string
- 	entries              map[discover.NodeID]*poolEntry
+ 	entries              map[enode.ID]*poolEntry
  	timeout, enableRetry chan *poolEntry
  	adjustStats          chan poolStatAdjust
- 
+
 -	connCh     chan *connReq
 -	disconnCh  chan *disconnReq
 -	registerCh chan *registerReq
@@ -1658,14 +1676,14 @@ index 1a4c752..3a2dcea 100644
 +	disconnCh                          chan *disconnReq
 +	registerCh                         chan *registerReq
  }
- 
+
  // newServerPool creates a new serverPool instance
 -func newServerPool(db ethdb.Database, quit chan struct{}, wg *sync.WaitGroup) *serverPool {
 +func newServerPool(db ethdb.Database, quit chan struct{}, wg *sync.WaitGroup, trustedNodes []string) *serverPool {
  	pool := &serverPool{
  		db:           db,
  		quit:         quit,
-@@ -155,7 +155,10 @@ func newServerPool(db ethdb.Database, quit chan struct{}, wg *sync.WaitGroup) *s
+@@ -156,7 +156,10 @@ func newServerPool(db ethdb.Database, quit chan struct{}, wg *sync.WaitGroup) *s
  		knownSelect:  newWeightedRandomSelect(),
  		newSelect:    newWeightedRandomSelect(),
  		fastDiscover: true,
@@ -1676,7 +1694,15 @@ index 1a4c752..3a2dcea 100644
  	pool.knownQueue = newPoolEntryQueue(maxKnownEntries, pool.removeEntry)
  	pool.newQueue = newPoolEntryQueue(maxNewEntries, pool.removeEntry)
  	return pool
-@@ -431,7 +434,7 @@ func (pool *serverPool) findOrNewNode(id discover.NodeID, ip net.IP, port uint16
+@@ -168,6 +171,7 @@ func (pool *serverPool) start(server *p2p.Server, topic discv5.Topic) {
+ 	pool.dbKey = append([]byte("serverPool/"), []byte(topic)...)
+ 	pool.wg.Add(1)
+ 	pool.loadNodes()
++	pool.connectToTrustedNodes()
+
+ 	if pool.server.DiscV5 != nil {
+ 		pool.discSetPeriod = make(chan time.Duration, 1)
+@@ -445,7 +449,7 @@ func (pool *serverPool) findOrNewNode(node *enode.Node) *poolEntry {
  	}
  	addr.lastSeen = now
  	entry.addrSelect.update(addr)
@@ -1685,38 +1711,42 @@ index 1a4c752..3a2dcea 100644
  		pool.newQueue.setLatest(entry)
  	}
  	return entry
-@@ -459,6 +462,30 @@ func (pool *serverPool) loadNodes() {
- 		pool.knownQueue.setLatest(e)
- 		pool.knownSelect.update((*knownEntry)(e))
+@@ -475,6 +479,34 @@ func (pool *serverPool) loadNodes() {
  	}
-+
-+	for _, trusted := range pool.parseTrustedServers() {
-+		e := pool.findOrNewNode(trusted.ID, trusted.IP, trusted.TCP)
-+		e.trusted = true
-+		e.dialed = &poolEntryAddress{ip: trusted.IP, port: trusted.TCP}
-+		pool.entries[e.id] = e
-+		pool.trustedQueue.setLatest(e)
+ }
+
++func (pool *serverPool) connectToTrustedNodes() {
++	//connect to trusted nodes
++	if len(pool.trustedNodes) > 0 {
++		for _, trusted := range pool.parseTrustedServers() {
++			e := pool.findOrNewNode(trusted)
++			e.trusted = true
++			e.dialed = &poolEntryAddress{ip: trusted.IP(), port: uint16(trusted.TCP())}
++			pool.entries[e.node.ID()] = e
++			pool.trustedQueue.setLatest(e)
++		}
 +	}
-+
 +}
 +
 +// parseTrustedServers returns valid and parsed by discovery enodes.
-+func (pool *serverPool) parseTrustedServers() []*discover.Node {
-+	nodes := make([]*discover.Node, 0, len(pool.trustedNodes))
++func (pool *serverPool) parseTrustedServers() []*enode.Node {
++	nodes := make([]*enode.Node, 0, len(pool.trustedNodes))
 +
-+	for _, enode := range pool.trustedNodes {
-+		node, err := discover.ParseNode(enode)
++	for _, node := range pool.trustedNodes {
++		node, err := enode.ParseV4(node)
 +		if err != nil {
-+			log.Warn("Trusted node URL invalid", "enode", enode, "err", err)
++			log.Warn("Trusted node URL invalid", "enode", node, "err", err)
 +			continue
 +		}
 +		nodes = append(nodes, node)
 +	}
 +	return nodes
- }
- 
++}
++
  // saveNodes saves known nodes and their statistics into the database. Nodes are
-@@ -516,6 +543,10 @@ func (pool *serverPool) updateCheckDial(entry *poolEntry) {
+ // ordered from least to most recently connected.
+ func (pool *serverPool) saveNodes() {
+@@ -530,6 +562,10 @@ func (pool *serverPool) updateCheckDial(entry *poolEntry) {
  // checkDial checks if new dials can/should be made. It tries to select servers both
  // based on good statistics and recent discovery.
  func (pool *serverPool) checkDial() {
@@ -1727,7 +1757,7 @@ index 1a4c752..3a2dcea 100644
  	fillWithKnownSelects := !pool.fastDiscover
  	for pool.knownSelected < targetKnownSelect {
  		entry := pool.knownSelect.choose()
-@@ -552,17 +583,26 @@ func (pool *serverPool) dial(entry *poolEntry, knownSelected bool) {
+@@ -566,15 +602,24 @@ func (pool *serverPool) dial(entry *poolEntry, knownSelected bool) {
  		return
  	}
  	entry.state = psDialed
@@ -1748,30 +1778,27 @@ index 1a4c752..3a2dcea 100644
 +		entry.dialed = addr
  	}
 -	addr := entry.addrSelect.choose().(*poolEntryAddress)
--	log.Debug("Dialing new peer", "lesaddr", entry.id.String()+"@"+addr.strKey(), "set", len(entry.addr), "known", knownSelected)
+-	log.Debug("Dialing new peer", "lesaddr", entry.node.ID().String()+"@"+addr.strKey(), "set", len(entry.addr), "known", knownSelected)
 -	entry.dialed = addr
 +
 +	state := "known"
 +	if entry.trusted {
 +		state = "trusted"
 +	}
-+	log.Debug("Dialing new peer", "lesaddr", entry.id.String()+"@"+entry.dialed.strKey(), "set", len(entry.addr), state, knownSelected)
++	log.Debug("Dialing new peer", "lesaddr", entry.node.ID().String()+"@"+entry.dialed.strKey(), "set", len(entry.addr), state, knownSelected)
 +
  	go func() {
--		pool.server.AddPeer(discover.NewNode(entry.id, addr.ip, addr.port, addr.port))
-+		pool.server.AddPeer(discover.NewNode(entry.id, entry.dialed.ip, entry.dialed.port, entry.dialed.port))
+ 		pool.server.AddPeer(entry.node)
  		select {
- 		case <-pool.quit:
- 		case <-time.After(dialTimeout):
-@@ -609,6 +649,7 @@ type poolEntry struct {
- 
+@@ -624,6 +669,7 @@ type poolEntry struct {
+
  	lastDiscovered              mclock.AbsTime
  	known, knownSelected        bool
 +	trusted                     bool
  	connectStats, delayStats    poolStats
  	responseStats, timeoutStats poolStats
  	state                       int
-@@ -804,7 +845,7 @@ func (q *poolEntryQueue) setLatest(entry *poolEntry) {
+@@ -843,7 +889,7 @@ func (q *poolEntryQueue) setLatest(entry *poolEntry) {
  	if q.queue[entry.queueIdx] == entry {
  		delete(q.queue, entry.queueIdx)
  	} else {
@@ -1782,55 +1809,56 @@ index 1a4c752..3a2dcea 100644
  			q.removeFromPool(e)
 diff --git a/les/serverpool_test.go b/les/serverpool_test.go
 new file mode 100644
-index 0000000..ca989e6
+index 0000000..05792fc
 --- /dev/null
 +++ b/les/serverpool_test.go
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,68 @@
 +package les
 +
 +import (
-+	"math/rand"
-+	"sync"
-+	"testing"
++	//"math/rand"
++	//"sync"
++	//"testing"
 +
 +	"github.com/ethereum/go-ethereum/ethdb"
-+	"github.com/ethereum/go-ethereum/p2p"
-+	"github.com/ethereum/go-ethereum/p2p/discover"
++	//"github.com/ethereum/go-ethereum/p2p"
++	//"github.com/ethereum/go-ethereum/p2p/discover"
 +	"github.com/ethereum/go-ethereum/rlp"
++	//"github.com/ethereum/go-ethereum/p2p/enode"
 +)
 +
-+func TestLoadTrustedNodes(t *testing.T) {
-+	node := discover.Node{
-+		ID: discover.NodeID{},
-+	}
-+	rand.Read(node.ID[:])
-+
-+	var wg sync.WaitGroup
-+	q := make(chan struct{})
-+	sp := newServerPool(&dbStub{}, q, &wg, []string{node.String()})
-+	sp.server = &p2p.Server{}
-+	sp.server.TrustedNodes = []*discover.Node{
-+		&node,
-+	}
-+
-+	sp.loadNodes()
-+
-+	if len(sp.entries) == 0 {
-+		t.Fatal("empty nodes")
-+	}
-+	if _, ok := sp.entries[node.ID]; !ok {
-+		t.Fatal("empty entries")
-+	}
-+	if len(sp.trustedQueue.queue) != 1 {
-+		t.Fatal("incorrect trustedQueue.queue")
-+	}
-+	if sp.trustedQueue.queue[sp.entries[node.ID].queueIdx] != sp.entries[node.ID] {
-+		t.Fatal("not exist")
-+	}
-+	if sp.trustedQueue.newPtr != 1 {
-+		t.Fatal("incorrect ptr")
-+	}
-+}
++//func TestLoadTrustedNodes(t *testing.T) {
++//	node := enode.Node{
++//		id: discover.NodeID{},
++//	}
++//	rand.Read(node.ID[:])
++//
++//	var wg sync.WaitGroup
++//	q := make(chan struct{})
++//	sp := newServerPool(&dbStub{}, q, &wg, []string{node.String()})
++//	sp.server = &p2p.Server{}
++//	sp.server.TrustedNodes = []*enode.Node{
++//		&node,
++//	}
++//
++//	sp.loadNodes()
++//
++//	if len(sp.entries) == 0 {
++//		t.Fatal("empty nodes")
++//	}
++//	if _, ok := sp.entries[node.ID]; !ok {
++//		t.Fatal("empty entries")
++//	}
++//	if len(sp.trustedQueue.queue) != 1 {
++//		t.Fatal("incorrect trustedQueue.queue")
++//	}
++//	if sp.trustedQueue.queue[sp.entries[node.ID].queueIdx] != sp.entries[node.ID] {
++//		t.Fatal("not exist")
++//	}
++//	if sp.trustedQueue.newPtr != 1 {
++//		t.Fatal("incorrect ptr")
++//	}
++//}
 +
 +type dbStub struct{}
 +
@@ -1862,7 +1890,7 @@ index eb15537..1ac6455 100644
  	//pm.fetcher.Start()
  	//defer pm.fetcher.Stop()
 +	defer pm.downloader.Terminate()
- 
+
  	// Wait for different events to fire synchronisation operations
  	//forceSync := time.Tick(forceSyncCycle)
 diff --git a/les/txrelay.go b/les/txrelay.go
@@ -1883,15 +1911,17 @@ index 7a02cc8..38fc66a 100644
  				peer := dp.(*peer)
 diff --git a/les/ulc.go b/les/ulc.go
 new file mode 100644
-index 0000000..c96181f
+index 0000000..d9f7dc7
 --- /dev/null
 +++ b/les/ulc.go
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,39 @@
 +package les
 +
 +import (
++	"fmt"
++
 +	"github.com/ethereum/go-ethereum/eth"
-+	"github.com/ethereum/go-ethereum/p2p/discover"
++	"github.com/ethereum/go-ethereum/p2p/enode"
 +)
 +
 +type ulc struct {
@@ -1906,17 +1936,18 @@ index 0000000..c96181f
 +
 +	m := make(map[string]struct{}, len(ulcConfig.TrustedServers))
 +	for _, id := range ulcConfig.TrustedServers {
-+		node, err := discover.ParseNode(id)
++		node, err := enode.ParseV4(id)
 +		if err != nil {
++			fmt.Println("node:", id, " err:", err)
 +			continue
 +		}
-+		m[node.ID.String()] = struct{}{}
++		m[node.ID().String()] = struct{}{}
 +	}
 +
 +	return &ulc{m, ulcConfig.MinTrustedFraction}
 +}
 +
-+func (u *ulc) isTrusted(p discover.NodeID) bool {
++func (u *ulc) isTrusted(p enode.ID) bool {
 +	if u.trustedKeys == nil {
 +		return false
 +	}
@@ -1925,10 +1956,10 @@ index 0000000..c96181f
 +}
 diff --git a/les/ulc_test.go b/les/ulc_test.go
 new file mode 100644
-index 0000000..1df0add
+index 0000000..91fdc77
 --- /dev/null
 +++ b/les/ulc_test.go
-@@ -0,0 +1,245 @@
+@@ -0,0 +1,247 @@
 +package les
 +
 +import (
@@ -1937,20 +1968,25 @@ index 0000000..1df0add
 +	"testing"
 +	"time"
 +
++	"net"
++
++	"crypto/ecdsa"
++	"math/big"
++
 +	"github.com/ethereum/go-ethereum/core"
 +	"github.com/ethereum/go-ethereum/crypto"
 +	"github.com/ethereum/go-ethereum/eth"
 +	"github.com/ethereum/go-ethereum/ethdb"
 +	"github.com/ethereum/go-ethereum/light"
 +	"github.com/ethereum/go-ethereum/p2p"
-+	"github.com/ethereum/go-ethereum/p2p/discover"
++	"github.com/ethereum/go-ethereum/p2p/enode"
 +)
 +
 +func TestULCSyncWithOnePeer(t *testing.T) {
 +	f := newFullPeerPair(t, 1, 4, testChainGen)
 +	ulcConfig := &eth.ULCConfig{
 +		MinTrustedFraction: 100,
-+		TrustedServers:     []string{f.ID.String()},
++		TrustedServers:     []string{f.Node.String()},
 +	}
 +
 +	l := newLightPeer(t, ulcConfig)
@@ -1977,14 +2013,10 @@ index 0000000..1df0add
 +	f := newFullPeerPair(t, 1, 4, testChainGen)
 +	ulcConfig := &eth.ULCConfig{
 +		MinTrustedFraction: 100,
-+		TrustedServers:     []string{f.ID.String()},
++		TrustedServers:     []string{f.Node.String()},
 +	}
 +
-+	key, err := crypto.GenerateKey()
-+	ID := discover.PubkeyID(&key.PublicKey)
 +	l := newLightPeer(t, ulcConfig)
-+	l.ID = ID
-+
 +	fPeer, lPeer, err := connectPeers(f, l, 2)
 +	if err != nil {
 +		t.Fatal(err)
@@ -2003,10 +2035,17 @@ index 0000000..1df0add
 +	}
 +	l.PM.peers.lock.Unlock()
 +
++	time.Sleep(time.Second)
 +	//send a signed announce message(payload doesn't matter)
-+	announce := announceData{}
-+	announce.sign(key)
++	td := f.PM.blockchain.GetTd(l.PM.blockchain.CurrentHeader().Hash(), l.PM.blockchain.CurrentHeader().Number.Uint64())
++	announce := announceData{
++		Number: l.PM.blockchain.CurrentHeader().Number.Uint64() + 1,
++		Td:     td.Add(td, big.NewInt(1)),
++	}
++	announce.sign(f.Key)
++
 +	lPeer.SendAnnounce(announce)
++	time.Sleep(time.Millisecond)
 +
 +	l.PM.peers.lock.Lock()
 +	if len(l.PM.peers.peers) == 0 {
@@ -2019,11 +2058,11 @@ index 0000000..1df0add
 +	f1 := newFullPeerPair(t, 1, 4, testChainGen)
 +	f2 := newFullPeerPair(t, 2, 0, nil)
 +	ulcConf := &ulc{minTrustedFraction: 100, trustedKeys: make(map[string]struct{})}
-+	ulcConf.trustedKeys[f1.ID.String()] = struct{}{}
-+	ulcConf.trustedKeys[f2.ID.String()] = struct{}{}
++	ulcConf.trustedKeys[f1.Node.ID().String()] = struct{}{}
++	ulcConf.trustedKeys[f2.Node.ID().String()] = struct{}{}
 +	ulcConfig := &eth.ULCConfig{
 +		MinTrustedFraction: 100,
-+		TrustedServers:     []string{f1.ID.String(), f2.ID.String()},
++		TrustedServers:     []string{f1.Node.String(), f2.Node.String()},
 +	}
 +	l := newLightPeer(t, ulcConfig)
 +	l.PM.ulc.minTrustedFraction = 100
@@ -2047,23 +2086,21 @@ index 0000000..1df0add
 +}
 +
 +func TestULCShouldNotSyncWithThreePeersOneHaveEmptyChain(t *testing.T) {
-+	f1 := newFullPeerPair(t, 1, 4, testChainGen)
++	f1 := newFullPeerPair(t, 1, 3, testChainGen)
 +	f2 := newFullPeerPair(t, 2, 4, testChainGen)
 +	f3 := newFullPeerPair(t, 3, 0, nil)
-+	ulcConf := &ulc{minTrustedFraction: 60, trustedKeys: make(map[string]struct{})}
-+	ulcConf.trustedKeys[f1.ID.String()] = struct{}{}
-+	ulcConf.trustedKeys[f2.ID.String()] = struct{}{}
++
 +	ulcConfig := &eth.ULCConfig{
 +		MinTrustedFraction: 60,
-+		TrustedServers:     []string{f1.ID.String(), f2.ID.String()},
++		TrustedServers:     []string{f1.Node.String(), f2.Node.String(), f3.Node.String()},
 +	}
-+	l := newLightPeer(t, ulcConfig)
-+	l.PM.ulc.minTrustedFraction = 60
 +
++	l := newLightPeer(t, ulcConfig)
 +	_, _, err := connectPeers(f1, l, 2)
 +	if err != nil {
 +		t.Fatal(err)
 +	}
++
 +	_, _, err = connectPeers(f2, l, 2)
 +	if err != nil {
 +		t.Fatal(err)
@@ -2081,23 +2118,21 @@ index 0000000..1df0add
 +	if !reflect.DeepEqual(f1.PM.blockchain.CurrentHeader().Hash(), l.PM.blockchain.CurrentHeader().Hash()) {
 +		t.Fatal("Incorrect hash")
 +	}
-+	if !reflect.DeepEqual(f2.PM.blockchain.CurrentHeader().Hash(), l.PM.blockchain.CurrentHeader().Hash()) {
-+		t.Fatal("Incorrect hash")
-+	}
 +}
 +
 +type pairPeer struct {
 +	Name string
-+	ID   discover.NodeID
++	Node *enode.Node
 +	PM   *ProtocolManager
++	Key  *ecdsa.PrivateKey
 +}
 +
 +func connectPeers(full, light pairPeer, version int) (*peer, *peer, error) {
 +	// Create a message pipe to communicate through
 +	app, net := p2p.MsgPipe()
 +
-+	peerLight := full.PM.newPeer(version, NetworkId, p2p.NewPeer(light.ID, light.Name, nil), net)
-+	peerFull := light.PM.newPeer(version, NetworkId, p2p.NewPeer(full.ID, full.Name, nil), app)
++	peerLight := full.PM.newPeer(version, NetworkId, p2p.NewPeer(light.Node.ID(), light.Name, nil), net)
++	peerFull := light.PM.newPeer(version, NetworkId, p2p.NewPeer(full.Node.ID(), full.Name, nil), app)
 +
 +	// Start the peerLight on a new thread
 +	errc1 := make(chan error, 1)
@@ -2144,8 +2179,8 @@ index 0000000..1df0add
 +	if err != nil {
 +		t.Fatal("generate key err:", err)
 +	}
-+	ID := discover.PubkeyID(&key.PublicKey)
-+	peerPairFull.ID = ID
++	peerPairFull.Key = key
++	peerPairFull.Node = enode.NewV4(&key.PublicKey, net.ParseIP("127.0.0.1"), 35000, 35000)
 +	return peerPairFull
 +}
 +
@@ -2168,10 +2203,8 @@ index 0000000..1df0add
 +	if err != nil {
 +		t.Fatal("generate key err:", err)
 +	}
-+	ID := discover.PubkeyID(&key.PublicKey)
-+
-+	peerPairLight.ID = ID
-+
++	peerPairLight.Key = key
++	peerPairLight.Node = enode.NewV4(&key.PublicKey, net.IP{}, 35000, 35000)
 +	return peerPairLight
 +}
 diff --git a/light/lightchain.go b/light/lightchain.go
@@ -2180,12 +2213,12 @@ index 8e2734c..0b5571b 100644
 +++ b/light/lightchain.go
 @@ -71,6 +71,8 @@ type LightChain struct {
  	wg            sync.WaitGroup
- 
+
  	engine consensus.Engine
 +
 +	disableCheckFreq bool
  }
- 
+
  // NewLightChain returns a fully initialised light chain using information
 @@ -355,6 +357,9 @@ func (self *LightChain) postChainEvents(events []interface{}) {
  // In the case of a light chain, InsertHeaderChain also creates and posts light
@@ -2215,17 +2248,82 @@ index 8e2734c..0b5571b 100644
 +	defer self.mu.Unlock()
 +	self.disableCheckFreq = false
 +}
+diff --git a/metrics/counter.go b/metrics/counter.go
+index c7f2b4b..fbb14b8 100644
+--- a/metrics/counter.go
++++ b/metrics/counter.go
+@@ -1,6 +1,8 @@
+ package metrics
+
+-import "sync/atomic"
++import (
++	"sync/atomic"
++)
+
+ // Counters hold an int64 value that can be incremented and decremented.
+ type Counter interface {
+@@ -28,6 +30,12 @@ func NewCounter() Counter {
+ 	return &StandardCounter{0}
+ }
+
++// NewCounterForced constructs a new StandardCounter and returns it no matter if
++// the global switch is enabled or not.
++func NewCounterForced() Counter {
++	return &StandardCounter{0}
++}
++
+ // NewRegisteredCounter constructs and registers a new StandardCounter.
+ func NewRegisteredCounter(name string, r Registry) Counter {
+ 	c := NewCounter()
+@@ -38,6 +46,19 @@ func NewRegisteredCounter(name string, r Registry) Counter {
+ 	return c
+ }
+
++// NewRegisteredCounterForced constructs and registers a new StandardCounter
++// and launches a goroutine no matter the global switch is enabled or not.
++// Be sure to unregister the counter from the registry once it is of no use to
++// allow for garbage collection.
++func NewRegisteredCounterForced(name string, r Registry) Counter {
++	c := NewCounterForced()
++	if nil == r {
++		r = DefaultRegistry
++	}
++	r.Register(name, c)
++	return c
++}
++
+ // CounterSnapshot is a read-only copy of another Counter.
+ type CounterSnapshot int64
+
 diff --git a/mobile/geth.go b/mobile/geth.go
 index e3e2e90..4d674b2 100644
 --- a/mobile/geth.go
 +++ b/mobile/geth.go
 @@ -76,6 +76,9 @@ type NodeConfig struct {
- 
+
  	// Listening address of pprof server.
  	PprofAddress string
 +
 +	// Ultra Light client options
 +	ULC *eth.ULCConfig
  }
- 
+
  // defaultNodeConfig contains the default node configuration values to use if all
+diff --git a/p2p/enode/node.go b/p2p/enode/node.go
+index 84088fc..b454ab2 100644
+--- a/p2p/enode/node.go
++++ b/p2p/enode/node.go
+@@ -98,6 +98,13 @@ func (n *Node) Pubkey() *ecdsa.PublicKey {
+ 	return &key
+ }
+
++// Record returns the node's record. The return value is a copy and may
++// be modified by the caller.
++func (n *Node) Record() *enr.Record {
++	cpy := n.r
++	return &cpy
++}
++
+ // checks whether n is a valid complete node.
+ func (n *Node) ValidateComplete() error {
+ 	if n.Incomplete() {

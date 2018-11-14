@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 var logger = log.New("package", "mailserver/registry")
@@ -32,7 +32,7 @@ func NewVerifier(contractCaller bind.ContractCaller, contractAddress common.Addr
 }
 
 // VerifyNode checks if a given node is trusted using a smart contract.
-func (v *Verifier) VerifyNode(ctx context.Context, nodeID discover.NodeID) bool {
+func (v *Verifier) VerifyNode(ctx context.Context, nodeID enode.ID) bool {
 	res, err := v.rc.Exists(&bind.CallOpts{Context: ctx}, nodeID.Bytes())
 	logger.Debug("verifying node", "id", nodeID, "verified", res)
 	if err != nil {

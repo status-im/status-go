@@ -1,10 +1,11 @@
 package node
 
 import (
-	"fmt"
+	"net"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
@@ -62,12 +63,15 @@ func TestMakeNodeMalformedBootnodes(t *testing.T) {
 }
 
 func TestParseNodesToNodeID(t *testing.T) {
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	node := enode.NewV4(&identity.PublicKey, net.IP{10, 10, 10, 10}, 10, 20)
 	nodeIDs := parseNodesToNodeID([]string{
 		"enode://badkey@127.0.0.1:30303",
-		fmt.Sprintf("enode://%s@127.0.0.1:30303", discover.NodeID{1}),
+		node.String(),
 	})
 	require.Len(t, nodeIDs, 1)
-	require.Equal(t, discover.NodeID{1}, nodeIDs[0])
+	require.Equal(t, node.ID(), nodeIDs[0])
 }
 
 func TestNewGethNodeConfig(t *testing.T) {

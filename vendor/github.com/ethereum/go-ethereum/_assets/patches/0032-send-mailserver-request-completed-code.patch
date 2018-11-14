@@ -35,7 +35,7 @@ index e03ec9d..1665539 100644
 -       "github.com/ethereum/go-ethereum/common"
 -       "github.com/ethereum/go-ethereum/p2p/discover"
 +	"github.com/ethereum/go-ethereum/common"
-+	"github.com/ethereum/go-ethereum/p2p/discover"
++	"github.com/ethereum/go-ethereum/p2p/enode"
  )
  
  // EventType used to define known envelope events.
@@ -63,7 +63,7 @@ index e03ec9d..1665539 100644
 -       Peer  discover.NodeID
 +	Event EventType
 +	Hash  common.Hash
-+	Peer  discover.NodeID
++	Peer  enode.ID
  }
 diff --git a/whisper/whisperv6/whisper.go b/whisper/whisperv6/whisper.go
 index 697f0ec..4a7b006 100644
