@@ -32,9 +32,7 @@ endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
-	if [ $$? -eq 0 ]; then echo $$tag | sed 's/^v\(.*\)$$/\1/'; \
-	else git rev-parse --short HEAD; fi)
+GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
@@ -55,7 +53,7 @@ BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 PROXY_IMAGE_NAME ?= statusteam/discovery-proxy
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
-DOCKER_IMAGE_CUSTOM_TAG ?= $(GIT_COMMIT)
+DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
