@@ -66,7 +66,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	time.Sleep(time.Second)
 
 	// Mark mailbox node trusted.
-	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID[:])
+	err = senderWhisperService.AllowP2PMessagesFromPeer(mailboxNode.Server().Self().ID().Bytes())
 	s.Require().NoError(err)
 
 	// Generate mailbox symkey.
@@ -167,9 +167,9 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	mailboxNode := mailboxBackend.StatusNode().GethNode()
 	mailboxEnode := mailboxNode.Server().NodeInfo().Enode
 
-	aliceErrCh := helpers.WaitForPeerAsync(aliceBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	bobErrCh := helpers.WaitForPeerAsync(bobBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
-	charlieErrCh := helpers.WaitForPeerAsync(charlieBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
+	aliceErrCh := helpers.WaitForPeerAsync(aliceBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
+	bobErrCh := helpers.WaitForPeerAsync(bobBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
+	charlieErrCh := helpers.WaitForPeerAsync(charlieBackend.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
 
 	s.Require().NoError(aliceBackend.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(bobBackend.StatusNode().AddPeer(mailboxEnode))
@@ -345,7 +345,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	clientRPCClient := client.StatusNode().RPCPrivateClient()
 
 	// Add mailbox to client's peers
-	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, time.Second)
+	errCh := helpers.WaitForPeerAsync(client.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
 	s.Require().NoError(client.StatusNode().AddPeer(mailboxEnode))
 	s.Require().NoError(<-errCh)
 

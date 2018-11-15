@@ -35,10 +35,12 @@ GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
+ENABLE_METRICS ?= false
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
-	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT)'")
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
+	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
 
 XGO_GO ?= latest
 XGOVERSION ?= 1.10.x
@@ -263,7 +265,7 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /lib)
 test-unit: ##@tests Run unit and integration tests
-	go test -v $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -61,18 +61,18 @@ func (s *VerifierTestSuite) setupAccount() {
 	s.from = crypto.PubkeyToAddress(s.privKey.PublicKey)
 }
 
-func (s *VerifierTestSuite) add(nodeID discover.NodeID) {
+func (s *VerifierTestSuite) add(nodeID enode.ID) {
 	auth := bind.NewKeyedTransactor(s.privKey)
-	_, err := s.registry.Add(auth, nodeID[:])
+	_, err := s.registry.Add(auth, nodeID.Bytes())
 	s.Require().NoError(err)
 	s.backend.Commit()
 }
 
-func (s *VerifierTestSuite) generateNodeID() discover.NodeID {
+func (s *VerifierTestSuite) generateNodeID() enode.ID {
 	k, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return discover.PubkeyID(&k.PublicKey)
+	return enode.PubkeyToIDV4(&k.PublicKey)
 }
 
 func (s *VerifierTestSuite) TestVerifyNode() {

@@ -1,6 +1,8 @@
 package metrics
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 // Counters hold an int64 value that can be incremented and decremented.
 type Counter interface {
@@ -28,9 +30,28 @@ func NewCounter() Counter {
 	return &StandardCounter{0}
 }
 
+// NewCounterForced constructs a new StandardCounter and returns it no matter if
+// the global switch is enabled or not.
+func NewCounterForced() Counter {
+	return &StandardCounter{0}
+}
+
 // NewRegisteredCounter constructs and registers a new StandardCounter.
 func NewRegisteredCounter(name string, r Registry) Counter {
 	c := NewCounter()
+	if nil == r {
+		r = DefaultRegistry
+	}
+	r.Register(name, c)
+	return c
+}
+
+// NewRegisteredCounterForced constructs and registers a new StandardCounter
+// and launches a goroutine no matter the global switch is enabled or not.
+// Be sure to unregister the counter from the registry once it is of no use to
+// allow for garbage collection.
+func NewRegisteredCounterForced(name string, r Registry) Counter {
+	c := NewCounterForced()
 	if nil == r {
 		r = DefaultRegistry
 	}

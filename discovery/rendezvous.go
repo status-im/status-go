@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous"
@@ -29,7 +29,7 @@ var (
 	errDiscoveryIsStopped = errors.New("discovery is stopped")
 )
 
-func NewRendezvous(servers []ma.Multiaddr, identity *ecdsa.PrivateKey, node *discover.Node) (*Rendezvous, error) {
+func NewRendezvous(servers []ma.Multiaddr, identity *ecdsa.PrivateKey, node *enode.Node) (*Rendezvous, error) {
 	r := new(Rendezvous)
 	r.node = node
 	r.identity = identity
@@ -62,7 +62,7 @@ type Rendezvous struct {
 	servers            []ma.Multiaddr
 	registrationPeriod time.Duration
 	bucketSize         int
-	node               *discover.Node
+	node               *enode.Node
 	identity           *ecdsa.PrivateKey
 
 	recordMu sync.Mutex
@@ -109,11 +109,11 @@ func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
 	if r.identity == nil {
 		return record, errIdentityIsNil
 	}
-	record.Set(enr.IP(r.node.IP))
-	record.Set(enr.TCP(r.node.TCP))
-	record.Set(enr.UDP(r.node.UDP))
+	record.Set(enr.IP(r.node.IP()))
+	record.Set(enr.TCP(r.node.TCP()))
+	record.Set(enr.UDP(r.node.UDP()))
 	// public key is added to ENR when ENR is signed
-	if err := enr.SignV4(&record, r.identity); err != nil {
+	if err := enode.SignV4(&record, r.identity); err != nil {
 		return record, err
 	}
 	r.record = &record
@@ -226,7 +226,7 @@ func (r *Rendezvous) Discover(
 
 func enrToNode(record enr.Record) (*discv5.Node, error) {
 	var (
-		key     enr.Secp256k1
+		key     enode.Secp256k1
 		ip      enr.IP
 		tport   enr.TCP
 		uport   enr.UDP

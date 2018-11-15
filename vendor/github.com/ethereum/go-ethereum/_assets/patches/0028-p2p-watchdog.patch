@@ -1,8 +1,8 @@
-diff --git c/p2p/peer.go w/p2p/peer.go
-index 73e33418e..322268b28 100644
---- c/p2p/peer.go
-+++ w/p2p/peer.go
-@@ -22,6 +22,7 @@ import (
+diff --git a/p2p/peer.go b/p2p/peer.go
+index af019d0..cfd63af 100644
+--- a/p2p/peer.go
++++ b/p2p/peer.go
+@@ -23,6 +23,7 @@ import (
  	"net"
  	"sort"
  	"sync"
@@ -10,7 +10,7 @@ index 73e33418e..322268b28 100644
  	"time"
  
  	"github.com/ethereum/go-ethereum/common/mclock"
-@@ -38,7 +39,10 @@ const (
+@@ -44,7 +45,10 @@ const (
  
  	snappyProtocolVersion = 5
  
@@ -22,7 +22,7 @@ index 73e33418e..322268b28 100644
  )
  
  const (
-@@ -100,6 +104,7 @@ type Peer struct {
+@@ -106,6 +110,7 @@ type Peer struct {
  	log     log.Logger
  	created mclock.AbsTime
  
@@ -30,7 +30,7 @@ index 73e33418e..322268b28 100644
  	wg       sync.WaitGroup
  	protoErr chan error
  	closed   chan struct{}
-@@ -118,6 +123,11 @@ func NewPeer(id discover.NodeID, name string, caps []Cap) *Peer {
+@@ -125,6 +130,11 @@ func NewPeer(id enode.ID, name string, caps []Cap) *Peer {
  	return peer
  }
  
@@ -40,9 +40,9 @@ index 73e33418e..322268b28 100644
 +}
 +
  // ID returns the node's public key.
- func (p *Peer) ID() discover.NodeID {
- 	return p.rw.id
-@@ -188,8 +198,10 @@ func (p *Peer) run() (remoteRequested bool, err error) {
+ func (p *Peer) ID() enode.ID {
+ 	return p.rw.node.ID()
+@@ -201,8 +211,10 @@ func (p *Peer) run() (remoteRequested bool, err error) {
  		readErr    = make(chan error, 1)
  		reason     DiscReason // sent to the peer
  	)
@@ -55,7 +55,7 @@ index 73e33418e..322268b28 100644
  	go p.pingLoop()
  
  	// Start all protocol handlers.
-@@ -248,7 +260,24 @@ func (p *Peer) pingLoop() {
+@@ -262,7 +274,24 @@ func (p *Peer) pingLoop() {
  	}
  }
  
@@ -81,7 +81,7 @@ index 73e33418e..322268b28 100644
  	defer p.wg.Done()
  	for {
  		msg, err := p.rw.ReadMsg()
-@@ -261,6 +290,7 @@ func (p *Peer) readLoop(errc chan<- error) {
+@@ -275,6 +304,7 @@ func (p *Peer) readLoop(errc chan<- error) {
  			errc <- err
  			return
  		}
@@ -89,11 +89,11 @@ index 73e33418e..322268b28 100644
  	}
  }
  
-diff --git c/p2p/server.go w/p2p/server.go
-index c41d1dc15..04c6f7147 100644
---- c/p2p/server.go
-+++ w/p2p/server.go
-@@ -45,7 +45,7 @@ const (
+diff --git a/p2p/server.go b/p2p/server.go
+index 40db758..8546b02 100644
+--- a/p2p/server.go
++++ b/p2p/server.go
+@@ -49,7 +49,7 @@ const (
  
  	// Maximum time allowed for reading a complete message.
  	// This is effectively the amount of time a connection can be idle.
@@ -102,11 +102,11 @@ index c41d1dc15..04c6f7147 100644
  
  	// Maximum amount of time allowed for writing a complete message.
  	frameWriteTimeout = 20 * time.Second
-diff --git c/whisper/whisperv6/peer.go w/whisper/whisperv6/peer.go
-index 427127290..c30e92d1c 100644
---- c/whisper/whisperv6/peer.go
-+++ w/whisper/whisperv6/peer.go
-@@ -187,6 +187,10 @@ func (peer *Peer) expire() {
+diff --git a/whisper/whisperv6/peer.go b/whisper/whisperv6/peer.go
+index eb17d2d..2b7687e 100644
+--- a/whisper/whisperv6/peer.go
++++ b/whisper/whisperv6/peer.go
+@@ -195,6 +195,10 @@ func (peer *Peer) expire() {
  // broadcast iterates over the collection of envelopes and transmits yet unknown
  // ones over the network.
  func (peer *Peer) broadcast() error {
