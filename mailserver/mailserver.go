@@ -50,7 +50,9 @@ var (
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
 	requestProcessTimer            = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
+	requestProcessNetTimer         = metrics.NewRegisteredTimer("mailserver/requestProcessNetTime", nil)
 	requestsMeter                  = metrics.NewRegisteredMeter("mailserver/requests", nil)
+	requestsBatchedCounter         = metrics.NewRegisteredCounter("mailserver/requestsBatched", nil)
 	requestErrorsCounter           = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
 	sentEnvelopesMeter             = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
 	sentEnvelopesSizeMeter         = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
@@ -292,6 +294,10 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		"cursor", cursor,
 		"batch", batch)
 
+	if batch {
+		requestsBatchedCounter.Inc(1)
+	}
+
 	_, lastEnvelopeHash, nextPageCursor, err := s.processRequest(
 		peer,
 		lower, upper,
@@ -471,6 +477,9 @@ func (s *WMailServer) processRequest(
 }
 
 func (s *WMailServer) sendEnvelopes(peer *whisper.Peer, envelopes []*whisper.Envelope, batch bool) error {
+	start := time.Now()
+	defer requestProcessNetTimer.UpdateSince(start)
+
 	if batch {
 		return s.w.SendP2PDirect(peer, envelopes...)
 	}
