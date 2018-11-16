@@ -101,7 +101,7 @@ func (s *Service) InitProtocol(address string, password string) error {
 	if err != nil {
 		return err
 	}
-	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, s.installationID))
+	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, chat.DefaultEncryptionServiceConfig(s.installationID)))
 
 	return nil
 }

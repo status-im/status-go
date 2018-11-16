@@ -51,7 +51,7 @@ func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, m
 func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) ([]byte, error) {
 	// Build message not encrypted
 	protocolMessage := &ProtocolMessage{
-		InstallationId: p.encryption.installationID,
+		InstallationId: p.encryption.config.InstallationID,
 		PublicMessage:  payload,
 	}
 
@@ -71,7 +71,7 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pa
 
 		// Build message
 		protocolMessage := &ProtocolMessage{
-			InstallationId: p.encryption.installationID,
+			InstallationId: p.encryption.config.InstallationID,
 			DirectMessage:  encryptionResponse,
 		}
 
@@ -98,7 +98,7 @@ func (p *ProtocolService) BuildPairingMessage(myIdentityKey *ecdsa.PrivateKey, p
 
 	// Build message
 	protocolMessage := &ProtocolMessage{
-		InstallationId: p.encryption.installationID,
+		InstallationId: p.encryption.config.InstallationID,
 		DirectMessage:  encryptionResponse,
 	}
 

@@ -50,7 +50,7 @@ type PersistenceService interface {
 	RatchetInfoConfirmed([]byte, []byte, string) error
 
 	// GetActiveInstallations returns the active installations for a given identity.
-	GetActiveInstallations(maxInstallations uint, identity []byte) ([]string, error)
+	GetActiveInstallations(maxInstallations int, identity []byte) ([]string, error)
 	// AddInstallations adds the installations for a given identity.
 	AddInstallations(identity []byte, timestamp int64, installationIDs []string, enabled bool) error
 	// EnableInstallation enables the installation.
