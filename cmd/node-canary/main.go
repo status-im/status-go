@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -50,9 +50,9 @@ var (
 
 func main() {
 	var err error
-	var staticParsedNode, mailserverParsedNode *discv5.Node
+	var staticParsedNode, mailserverParsedNode *enode.Node
 	if *staticEnodeAddr != "" {
-		staticParsedNode, err = discv5.ParseNode(*staticEnodeAddr)
+		staticParsedNode, err = enode.ParseV4(*staticEnodeAddr)
 		if err != nil {
 			logger.Crit("Invalid static address specified", "staticEnodeAddr", *staticEnodeAddr, "error", err)
 			os.Exit(1)
@@ -60,7 +60,7 @@ func main() {
 	}
 
 	if *mailserverEnodeAddr != "" {
-		mailserverParsedNode, err = discv5.ParseNode(*mailserverEnodeAddr)
+		mailserverParsedNode, err = enode.ParseV4(*mailserverEnodeAddr)
 		if err != nil {
 			logger.Crit("Invalid mailserver address specified", "mailserverEnodeAddr", *mailserverEnodeAddr, "error", err)
 			os.Exit(1)
@@ -96,7 +96,7 @@ func init() {
 	}
 }
 
-func verifyMailserverBehavior(mailserverNode *discv5.Node) {
+func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	clientBackend, err := startClientNode()
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
@@ -138,11 +138,10 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 		os.Exit(1)
 	}
 
-	mailboxPeer := mailserverNode.ID[:]
-	mailboxPeerStr := mailserverNode.ID.String()
+	mailboxPeer := mailserverNode.ID().Bytes()
 	err = clientWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
 	if err != nil {
-		logger.Error("Failed to allow P2P messages from peer", "error", err)
+		logger.Error("Failed to allow P2P messages from mailserver peer", "error", err, mailserverNode.String())
 		os.Exit(1)
 	}
 
@@ -169,7 +168,7 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	shhextAPI := shhext.NewPublicAPI(clientShhExtService)
 	requestIDBytes, err := shhextAPI.RequestMessages(context.TODO(),
 		shhext.MessagesRequest{
-			MailServerPeer: mailboxPeerStr,
+			MailServerPeer: mailserverNode.String(),
 			From:           uint32(clientWhisperService.GetCurrentTime().Add(-time.Duration(*period) * time.Second).Unix()),
 			Limit:          1,
 			Topic:          topic,
@@ -197,7 +196,7 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	}
 }
 
-func verifyStaticNodeBehavior(staticNode *discv5.Node) {
+func verifyStaticNodeBehavior(staticNode *enode.Node) {
 	clientBackend, err := startClientNode()
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
