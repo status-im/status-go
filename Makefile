@@ -279,6 +279,9 @@ test-e2e: ##@tests Run e2e tests
 test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
+canary-test: node-canary
+	_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.beta.json
+
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.10.2
@@ -287,7 +290,7 @@ lint:
 	@echo "lint"
 	@golangci-lint run ./...
 
-ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint mock dep-ensure canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*

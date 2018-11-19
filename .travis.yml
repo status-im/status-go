@@ -12,6 +12,9 @@ jobs:
     before_script: make dep-ensure
     script:
       - make lint
+  - stage: Test with deployed mailservers
+    script:
+      - make canary-test
   - stage: Test unit and integration
     script:
       - make test-unit
