@@ -231,7 +231,7 @@ release:
 		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
 		comparison="$$latest_tag..HEAD"; \
 		if [ -z "$$latest_tag" ]; then comparison=""; fi; \
-		changelog=$$(git log $$comparison --oneline --no-merges); \
+		changelog=$$(git log $$comparison --oneline --no-merges --format="* %h %s"); \
 	    github-release $(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "$(changelog)" "$(RELEASE_DIRECTORY)/*" ; \
 	else \
 	    echo "Aborting." && exit 1; \
