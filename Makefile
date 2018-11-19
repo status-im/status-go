@@ -230,9 +230,9 @@ release:
 	if [ $$REPLY = "y" ]; then \
 		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
 		comparison="$$latest_tag..HEAD"; \
-		if [[ -z "$$latest_tag" ]]; then comparison=""; fi; \
+		if [ -z "$$latest_tag" ]; then comparison=""; fi; \
 		changelog=$$(git log $$comparison --oneline --no-merges); \
-	    github-release $(shell if [[ $(PRE_RELEASE) != "0" ]] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "" "$(RELEASE_DIRECTORY)/*" ; \
+	    github-release $(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "$(changelog)" "$(RELEASE_DIRECTORY)/*" ; \
 	else \
 	    echo "Aborting." && exit 1; \
 	fi
