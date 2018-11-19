@@ -30,10 +30,11 @@ node('linux') {
         println(gitSHA)
     }
 
-    // TODO(adam): enable when unit tests start passing
-    // stage('Test') {
-    //     sh 'make ci'
-    // }
+    stage('Test') {
+        // TODO(adam): enable when unit tests start passing
+        //sh 'make ci'
+        sh 'make canary-test'
+    }
 
     stage('Build') {
         sh 'go get github.com/status-im/xgo'
