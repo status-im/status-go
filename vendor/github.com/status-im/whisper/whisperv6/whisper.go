@@ -800,8 +800,18 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			log.Warn("unxepected status message received", "peer", p.peer.ID())
 		case messagesCode:
 			// decode the contained envelopes
+			data, err := ioutil.ReadAll(packet.Payload)
+			if err != nil {
+				log.Warn("failed to read envelopes data", "peer", p.peer.ID(), "error", err)
+				return errors.New("invalid enveloopes")
+			}
+			batchHash := crypto.Keccak256Hash(data)
+			if err := p2p.Send(rw, confirmationCode, batchHash); err != nil {
+				log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", p.peer.ID(), "error", err)
+			}
+
 			var envelopes []*Envelope
-			if err := packet.Decode(&envelopes); err != nil {
+			if err := rlp.DecodeBytes(data, &envelopes); err != nil {
 				log.Warn("failed to decode envelopes, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid envelopes")
 			}
@@ -821,6 +831,18 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			if trouble {
 				return errors.New("invalid envelope")
 			}
+		case confirmationCode:
+			var batchHash common.Hash
+			if err := packet.Decode(&batchHash); err != nil {
+				fmt.Println(err.Error())
+				log.Warn("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
+				return errors.New("invalid confirmation message")
+			}
+			whisper.envelopeFeed.Send(EnvelopeEvent{
+				Batch: batchHash,
+				Event: EventBatchAcknowledged,
+				Peer:  p.peer.ID(),
+			})
 		case powRequirementCode:
 			s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 			i, err := s.Uint()
