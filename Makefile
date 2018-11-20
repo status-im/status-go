@@ -32,15 +32,14 @@ endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
-	if [ $$? -eq 0 ]; then echo $$tag | sed 's/^v\(.*\)$$/\1/'; \
-	else git rev-parse --short HEAD; fi)
+GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
 ENABLE_METRICS ?= false
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
-	-X github.com/status-im/status-go/params.Version=$(GIT_COMMIT) \
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
 
 XGO_GO ?= latest
@@ -56,7 +55,7 @@ BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 PROXY_IMAGE_NAME ?= statusteam/discovery-proxy
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
-DOCKER_IMAGE_CUSTOM_TAG ?= $(GIT_COMMIT)
+DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -227,9 +226,13 @@ clean-release:
 	rm -rf $(RELEASE_DIRECTORY)
 
 release:
-	@read -p "Are you sure you want to create a new GitHub $(shell if [[ $(PRE_RELEASE) = "0" ]] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch?  (y/n): " REPLY; \
+	@read -p "Are you sure you want to create a new GitHub $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
 	if [ $$REPLY = "y" ]; then \
-	    github-release $(shell if [[ $(PRE_RELEASE) != "0" ]] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "" "$(RELEASE_DIRECTORY)/*" ; \
+		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
+		comparison="$$latest_tag..HEAD"; \
+		if [ -z "$$latest_tag" ]; then comparison=""; fi; \
+		changelog=$$(git log $$comparison --oneline --no-merges --format="* %h %s"); \
+	    github-release $(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "$(changelog)" "$(RELEASE_DIRECTORY)/*" ; \
 	else \
 	    echo "Aborting." && exit 1; \
 	fi
