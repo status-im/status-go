@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -92,6 +93,8 @@ type Whisper struct {
 
 	settings syncmap.Map // holds configuration settings that can be dynamically changed
 
+	disableConfirmations bool // do not reply with confirmations
+
 	syncAllowance int // maximum time in seconds allowed to process the whisper-related messages
 
 	statsMu sync.Mutex // guard stats
@@ -111,16 +114,17 @@ func New(cfg *Config) *Whisper {
 	}
 
 	whisper := &Whisper{
-		privateKeys:   make(map[string]*ecdsa.PrivateKey),
-		symKeys:       make(map[string][]byte),
-		envelopes:     make(map[common.Hash]*Envelope),
-		expirations:   make(map[uint32]mapset.Set),
-		peers:         make(map[*Peer]struct{}),
-		messageQueue:  make(chan *Envelope, messageQueueLimit),
-		p2pMsgQueue:   make(chan *Envelope, messageQueueLimit),
-		quit:          make(chan struct{}),
-		syncAllowance: DefaultSyncAllowance,
-		timeSource:    time.Now,
+		privateKeys:          make(map[string]*ecdsa.PrivateKey),
+		symKeys:              make(map[string][]byte),
+		envelopes:            make(map[common.Hash]*Envelope),
+		expirations:          make(map[uint32]mapset.Set),
+		peers:                make(map[*Peer]struct{}),
+		messageQueue:         make(chan *Envelope, messageQueueLimit),
+		p2pMsgQueue:          make(chan *Envelope, messageQueueLimit),
+		quit:                 make(chan struct{}),
+		syncAllowance:        DefaultSyncAllowance,
+		timeSource:           time.Now,
+		disableConfirmations: cfg.DisableConfirmations,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -780,6 +784,13 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
+func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte) {
+	batchHash := crypto.Keccak256Hash(data)
+	if err := p2p.Send(rw, batchAcknowledgedCode, batchHash); err != nil {
+		log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", peer, "error", err)
+	}
+}
+
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	for {
@@ -805,9 +816,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("failed to read envelopes data", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid enveloopes")
 			}
-			batchHash := crypto.Keccak256Hash(data)
-			if err := p2p.Send(rw, confirmationCode, batchHash); err != nil {
-				log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", p.peer.ID(), "error", err)
+			if !whisper.disableConfirmations {
+				go whisper.sendConfirmation(p.peer.ID(), rw, data)
 			}
 
 			var envelopes []*Envelope
@@ -831,10 +841,9 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			if trouble {
 				return errors.New("invalid envelope")
 			}
-		case confirmationCode:
+		case batchAcknowledgedCode:
 			var batchHash common.Hash
 			if err := packet.Decode(&batchHash); err != nil {
-				fmt.Println(err.Error())
 				log.Warn("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid confirmation message")
 			}

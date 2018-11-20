@@ -71,6 +71,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		w:       w,
 		handler: handler,
 		cache:   map[common.Hash]EnvelopeState{},
+		batches: map[common.Hash]map[common.Hash]struct{}{},
 	}
 	return &Service{
 		w:              w,
@@ -184,8 +185,9 @@ type tracker struct {
 	w       *whisper.Whisper
 	handler EnvelopeEventsHandler
 
-	mu    sync.Mutex
-	cache map[common.Hash]EnvelopeState
+	mu      sync.Mutex
+	cache   map[common.Hash]EnvelopeState
+	batches map[common.Hash]map[common.Hash]struct{}
 
 	wg   sync.WaitGroup
 	quit chan struct{}
@@ -255,6 +257,7 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 	handlers := map[whisper.EventType]func(whisper.EnvelopeEvent){
 		whisper.EventEnvelopeSent:               t.handleEventEnvelopeSent,
 		whisper.EventEnvelopeExpired:            t.handleEventEnvelopeExpired,
+		whisper.EventBatchAcknowledged:          t.handleAcknowledgedBatch,
 		whisper.EventMailServerRequestCompleted: t.handleEventMailServerRequestCompleted,
 		whisper.EventMailServerRequestExpired:   t.handleEventMailServerRequestExpired,
 	}
@@ -274,11 +277,41 @@ func (t *tracker) handleEventEnvelopeSent(event whisper.EnvelopeEvent) {
 	if !ok || state == EnvelopeSent {
 		return
 	}
-	log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
-	t.cache[event.Hash] = EnvelopeSent
-	if t.handler != nil {
-		t.handler.EnvelopeSent(event.Hash)
+	if event.Batch != (common.Hash{}) {
+		if _, ok := t.batches[event.Batch]; !ok {
+			t.batches[event.Batch] = map[common.Hash]struct{}{}
+		}
+		t.batches[event.Batch][event.Hash] = struct{}{}
+		log.Debug("waiting for a confirmation", "batch", event.Batch)
+	} else {
+		log.Debug("envelope is sent", "hash", event.Hash, "peer", event.Peer)
+		t.cache[event.Hash] = EnvelopeSent
+		if t.handler != nil {
+			t.handler.EnvelopeSent(event.Hash)
+		}
 	}
+}
+
+func (t *tracker) handleAcknowledgedBatch(event whisper.EnvelopeEvent) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	envelopes, ok := t.batches[event.Batch]
+	if !ok {
+		log.Debug("batch is not found", "batch", event.Batch)
+	}
+	log.Debug("received a confirmation", "batch", event.Batch, "peer", event.Peer)
+	for hash := range envelopes {
+		state, ok := t.cache[hash]
+		if !ok || state == EnvelopeSent {
+			continue
+		}
+		t.cache[hash] = EnvelopeSent
+		if t.handler != nil {
+			t.handler.EnvelopeSent(hash)
+		}
+	}
+	delete(t.batches, event.Batch)
 }
 
 func (t *tracker) handleEventEnvelopeExpired(event whisper.EnvelopeEvent) {
@@ -286,11 +319,11 @@ func (t *tracker) handleEventEnvelopeExpired(event whisper.EnvelopeEvent) {
 	defer t.mu.Unlock()
 
 	if state, ok := t.cache[event.Hash]; ok {
-		log.Debug("envelope expired", "hash", event.Hash, "state", state)
 		delete(t.cache, event.Hash)
 		if state == EnvelopeSent {
 			return
 		}
+		log.Debug("envelope expired", "hash", event.Hash, "state", state)
 		if t.handler != nil {
 			t.handler.EnvelopeExpired(event.Hash)
 		}

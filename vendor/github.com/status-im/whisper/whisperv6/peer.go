@@ -88,8 +88,9 @@ func (peer *Peer) handshake() error {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
+		confirmationsEnabled := !peer.host.disableConfirmations
 
-		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, true)
+		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -220,6 +221,7 @@ func (peer *Peer) broadcast() error {
 		batchHash, err := sendBundle(peer.ws, bundle)
 		if err != nil {
 			log.Warn("failed to deliver envelopes", "peer", peer.peer.ID(), "error", err)
+			return err
 		}
 
 		// mark envelopes only if they were successfully sent

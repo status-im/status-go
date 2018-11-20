@@ -13,7 +13,7 @@ const (
 	EventEnvelopeSent EventType = "envelope.sent"
 	// EventEnvelopeExpired fires when envelop expired
 	EventEnvelopeExpired EventType = "envelope.expired"
-	// EventBatchAcknowledged is sent when envelope was acknowleged by a peer
+	// EventBatchAcknowledged is sent when batch of envelopes was acknowleged by a peer.
 	EventBatchAcknowledged EventType = "batch.acknowleged"
 	// EventEnvelopeAvailable fires when envelop is available for filters
 	EventEnvelopeAvailable EventType = "envelope.available"
