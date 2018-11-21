@@ -231,8 +231,8 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIRECTORY)
-	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
-	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
+	mv build/lib/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
+	mv build/lib/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
 	mv build/lib/linux/status-go-linux.zip $(RELEASE_DIRECTORY)/status-go-linux.zip
 	mv build/lib/darwin/status-go-darwin.zip $(RELEASE_DIRECTORY)/status-go-darwin.zip
 	mv build/lib/windows/status-go-win-x86-64.zip $(RELEASE_DIRECTORY)/status-go-win-x86-64.zip
