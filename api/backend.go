@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	fcmlib "github.com/NaySoftware/go-fcm"
 
@@ -569,5 +570,23 @@ func (b *StatusBackend) DisableInstallation(installationID string) error {
 		return err
 	}
 
+	return nil
+}
+
+// UpdateMailservers on ShhExtService.
+func (b *StatusBackend) UpdateMailservers(enodes []string) error {
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+	nodes := make([]*enode.Node, len(enodes))
+	for i, rawurl := range enodes {
+		node, err := enode.ParseV4(rawurl)
+		if err != nil {
+			return err
+		}
+		nodes[i] = node
+	}
+	st.UpdateMailservers(nodes)
 	return nil
 }

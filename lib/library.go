@@ -462,6 +462,18 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 	return
 }
 
+// UpdateMailservers updates mail servers in status backend.
+//export UpdateMailservers
+func UpdateMailservers(data *C.char) *C.char {
+	var enodes []string
+	err := json.Unmarshal([]byte(C.GoString(data)), &enodes)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.UpdateMailservers(enodes)
+	return makeJSONResponse(err)
+}
+
 // AddPeer adds an enode as a peer.
 //export AddPeer
 func AddPeer(enode *C.char) *C.char {
