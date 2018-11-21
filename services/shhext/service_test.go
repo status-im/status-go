@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/t/helpers"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
@@ -88,10 +89,11 @@ func (s *ShhExtSuite) SetupTest() {
 			return s.whisper[i], nil
 		}))
 		config := &ServiceConfig{
-			InstallationID: "1",
-			DataDir:        os.TempDir(),
-			Debug:          true,
-			PFSEnabled:     false,
+			InstallationID:          "1",
+			DataDir:                 os.TempDir(),
+			Debug:                   true,
+			PFSEnabled:              false,
+			MailServerConfirmations: true,
 		}
 		s.services[i] = New(s.whisper[i], nil, nil, config)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
@@ -106,6 +108,7 @@ func (s *ShhExtSuite) SetupTest() {
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	mock := newHandlerMock(1)
 	s.services[0].tracker.handler = mock
+	s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()})
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)
@@ -411,18 +414,23 @@ type TrackerSuite struct {
 
 func (s *TrackerSuite) SetupTest() {
 	s.tracker = &tracker{
-		cache:   map[common.Hash]EnvelopeState{},
-		batches: map[common.Hash]map[common.Hash]struct{}{},
+		cache:                  map[common.Hash]EnvelopeState{},
+		batches:                map[common.Hash]map[common.Hash]struct{}{},
+		mailservers:            map[enode.ID]struct{}{},
+		mailServerConfirmation: true,
 	}
 }
 
 func (s *TrackerSuite) TestConfirmed() {
+	testPeer := enode.ID{1}
+	s.tracker.mailservers[testPeer] = struct{}{}
 	s.tracker.Add(testHash)
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
+		Peer:  testPeer,
 	})
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
@@ -430,18 +438,22 @@ func (s *TrackerSuite) TestConfirmed() {
 
 func (s *TrackerSuite) TestConfirmedWithAcknowledge() {
 	testBatch := common.Hash{1}
+	testPeer := enode.ID{1}
 	s.tracker.Add(testHash)
+	s.tracker.mailservers[testPeer] = struct{}{}
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
 		Batch: testBatch,
+		Peer:  testPeer,
 	})
 	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventBatchAcknowledged,
 		Batch: testBatch,
+		Peer:  testPeer,
 	})
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
