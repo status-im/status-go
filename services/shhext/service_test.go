@@ -94,6 +94,7 @@ func (s *ShhExtSuite) SetupTest() {
 			Debug:                   true,
 			PFSEnabled:              false,
 			MailServerConfirmations: true,
+			ConnectionTarget:        10,
 		}
 		s.services[i] = New(s.whisper[i], nil, nil, config)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
@@ -252,6 +253,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		PFSEnabled:     false,
 	}
 	service := New(shh, mock, nil, config)
+	s.NoError(service.Start(aNode.Server()))
 	api := NewPublicAPI(service)
 
 	// with a peer acting as a mailserver
@@ -288,8 +290,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	})
 	s.NoError(err)
 	s.NotNil(hash)
-	s.Contains(api.service.tracker.cache, common.BytesToHash(hash))
-
+	s.NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 	// Send a request without a symmetric key. In this case,
 	// a public key extracted from MailServerPeer will be used.
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
@@ -297,7 +298,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	})
 	s.NoError(err)
 	s.NotNil(hash)
-	s.Contains(api.service.tracker.cache, common.BytesToHash(hash))
+	s.NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 }
 
 func (s *ShhExtSuite) TestDebugPostSync() {
@@ -398,141 +399,16 @@ func (s *ShhExtSuite) TearDown() {
 	}
 }
 
-var (
-	testHash = common.Hash{0x01}
-)
-
-func TestTrackerSuite(t *testing.T) {
-	suite.Run(t, new(TrackerSuite))
-}
-
-type TrackerSuite struct {
-	suite.Suite
-
-	tracker *tracker
-}
-
-func (s *TrackerSuite) SetupTest() {
-	s.tracker = &tracker{
-		cache:                  map[common.Hash]EnvelopeState{},
-		batches:                map[common.Hash]map[common.Hash]struct{}{},
-		mailservers:            map[enode.ID]struct{}{},
-		mailServerConfirmation: true,
-	}
-}
-
-func (s *TrackerSuite) TestConfirmed() {
-	testPeer := enode.ID{1}
-	s.tracker.mailservers[testPeer] = struct{}{}
-	s.tracker.Add(testHash)
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventEnvelopeSent,
-		Hash:  testHash,
-		Peer:  testPeer,
-	})
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
-}
-
-func (s *TrackerSuite) TestConfirmedWithAcknowledge() {
-	testBatch := common.Hash{1}
-	testPeer := enode.ID{1}
-	s.tracker.Add(testHash)
-	s.tracker.mailservers[testPeer] = struct{}{}
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventEnvelopeSent,
-		Hash:  testHash,
-		Batch: testBatch,
-		Peer:  testPeer,
-	})
-	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventBatchAcknowledged,
-		Batch: testBatch,
-		Peer:  testPeer,
-	})
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
-}
-
-func (s *TrackerSuite) TestIgnored() {
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventEnvelopeSent,
-		Hash:  testHash,
-	})
-	s.NotContains(s.tracker.cache, testHash)
-}
-
-func (s *TrackerSuite) TestRemoved() {
-	s.tracker.Add(testHash)
-	s.Contains(s.tracker.cache, testHash)
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventEnvelopeExpired,
-		Hash:  testHash,
-	})
-	s.NotContains(s.tracker.cache, testHash)
-}
-
-func (s *TrackerSuite) TestRequestCompleted() {
-	mock := newHandlerMock(1)
-	s.tracker.handler = mock
-	s.tracker.AddRequest(testHash, time.After(defaultRequestTimeout*time.Second))
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventMailServerRequestCompleted,
-		Hash:  testHash,
-		Data:  &whisper.MailServerResponse{},
-	})
-	select {
-	case requestID := <-mock.requestsCompleted:
-		s.Equal(testHash, requestID)
-		s.NotContains(s.tracker.cache, testHash)
-	case <-time.After(10 * time.Second):
-		s.Fail("timed out while waiting for a request to be completed")
-	}
-}
-
-func (s *TrackerSuite) TestRequestFailed() {
-	mock := newHandlerMock(1)
-	s.tracker.handler = mock
-	s.tracker.AddRequest(testHash, time.After(defaultRequestTimeout*time.Second))
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventMailServerRequestCompleted,
-		Hash:  testHash,
-		Data:  &whisper.MailServerResponse{Error: errors.New("test error")},
-	})
-	select {
-	case requestID := <-mock.requestsFailed:
-		s.Equal(testHash, requestID)
-		s.NotContains(s.tracker.cache, testHash)
-	case <-time.After(10 * time.Second):
-		s.Fail("timed out while waiting for a request to be failed")
-	}
-}
-
-func (s *TrackerSuite) TestRequestExpiration() {
-	mock := newHandlerMock(1)
-	s.tracker.handler = mock
-	c := make(chan time.Time)
-	s.tracker.AddRequest(testHash, c)
-	s.Contains(s.tracker.cache, testHash)
-	s.Equal(MailServerRequestSent, s.tracker.cache[testHash])
-	s.tracker.handleEvent(whisper.EnvelopeEvent{
-		Event: whisper.EventMailServerRequestExpired,
-		Hash:  testHash,
-	})
-	select {
-	case requestID := <-mock.requestsExpired:
-		s.Equal(testHash, requestID)
-		s.NotContains(s.tracker.cache, testHash)
-	case <-time.After(10 * time.Second):
-		s.Fail("timed out while waiting for request expiration")
+func waitForHashInTracker(track *tracker, hash common.Hash, state EnvelopeState, deadline time.Duration) error {
+	after := time.After(deadline)
+	for {
+		select {
+		case <-after:
+			return fmt.Errorf("failed while waiting for %s to get into state %d", hash, state)
+		default:
+			if track.GetState(hash) == state {
+				return nil
+			}
+		}
 	}
 }

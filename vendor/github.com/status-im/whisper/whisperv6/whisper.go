@@ -407,12 +407,40 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
+	return whisper.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
+}
+
+func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *Envelope, timeout time.Duration) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
+	whisper.envelopeFeed.Send(EnvelopeEvent{
+		Peer:  p.peer.ID(),
+		Hash:  envelope.Hash(),
+		Event: EventMailServerRequestSent,
+	})
 	p.trusted = true
-	return p2p.Send(p.ws, p2pRequestCode, envelope)
+	err = p2p.Send(p.ws, p2pRequestCode, envelope)
+	if timeout != 0 {
+		go whisper.expireRequestHistoricMessages(p.peer.ID(), envelope.Hash(), timeout)
+	}
+	return err
+}
+
+func (whisper *Whisper) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-whisper.quit:
+		return
+	case <-timer.C:
+		whisper.envelopeFeed.Send(EnvelopeEvent{
+			Peer:  peer,
+			Hash:  hash,
+			Event: EventMailServerRequestExpired,
+		})
+	}
 }
 
 func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
