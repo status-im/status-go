@@ -27,12 +27,12 @@ pipeline {
   }
 
   stages {
-    stage('Parallel Builds') {
+    stage('Build') {
       parallel {
-        steps {
-          stage('Android') {
-            agent { label 'linux' }
+        stage('Android') {
+          agent { label 'linux' }
 
+          stages {
             stage('Prep') {
               steps { script {
                 lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
@@ -65,7 +65,6 @@ pipeline {
                   lib.uploadArtifact("status-go-android-${lib.suffix()}.aar")
                 } } }
               }
-            }
 
             stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
               steps {
@@ -81,11 +80,13 @@ pipeline {
                 sh 'make clean-release'
               }
             }
-          } // Android
+          }
+        } // Android
 
-          stage('iOS') {
-            agent { label 'macos' }
+        stage('iOS') {
+          agent { label 'macos' }
 
+          stages {
             stage('Prep') {
               steps { script {
                 lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
@@ -137,8 +138,8 @@ pipeline {
                 sh 'make clean-release'
               }
             }
-          } // iOS
-        } // steps
+          }
+        } // iOS
       } // parallel
     } // stage
   } // stages
