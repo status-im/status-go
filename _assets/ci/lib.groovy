@@ -8,7 +8,7 @@ def timestamp() {
 }
 
 def suffix() {
-  return "${gitCommit()}-${timestamp()}"
+  return "${timestamp()}-${gitCommit()}"
 }
 
 def gitBranch() {
