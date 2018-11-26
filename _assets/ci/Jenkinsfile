@@ -1,5 +1,5 @@
 pipeline {
-  agent { label 'linux' }
+  agent none
 
   parameters {
     booleanParam(
@@ -27,22 +27,27 @@ pipeline {
   }
 
   stages {
-    stage('Prep') {
-      steps { script {
-        lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-        println("Git Branch: ${lib.gitBranch()}")
-        println("Git Commit: ${lib.gitCommit()}")
-      } }
-    }
-    stage('Setup') { steps { dir(env.STATUS_PATH) {
-      sh 'make setup'
-    } } }
-    stage('Lint') { steps { dir(env.STATUS_PATH) {
-      sh 'make ci'
-    } } }
-    stage('Build') {
-      parallel {
-        stage('Android') {
+    parallel {
+      stage('Android') {
+        agent { label 'linux' }
+
+        stage('Prep') {
+          steps { script {
+            lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
+            println("Git Branch: ${lib.gitBranch()}")
+            println("Git Commit: ${lib.gitCommit()}")
+          } }
+        }
+
+        stage('Setup') { steps { dir(env.STATUS_PATH) {
+          sh 'make setup'
+        } } }
+
+        stage('Lint') { steps { dir(env.STATUS_PATH) {
+          sh 'make ci'
+        } } }
+
+        stage('Build') {
           stages {
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-android'
@@ -59,17 +64,53 @@ pipeline {
             } } }
           }
         }
-        stage('iOS') {
+
+        stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
+          steps {
+            sh 'make prepare-release'
+            withCredentials([[
+              $class: 'UsernamePasswordMultiBinding',
+              credentialsId: 'status-im-auto',
+              usernameVariable: 'GITHUB_USER',
+              passwordVariable: 'GITHUB_TOKEN'
+            ]]) {
+              sh "yes | make release release_branch=${gitBranch}"
+            }
+            sh 'make clean-release'
+          }
+        }
+      } // Android
+
+      stage('iOS') {
+        agent { label 'macos' }
+
+        stage('Prep') {
+          steps { script {
+            lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
+            println("Git Branch: ${lib.gitBranch()}")
+            println("Git Commit: ${lib.gitCommit()}")
+          } }
+        }
+
+        stage('Setup') { steps { dir(env.STATUS_PATH) {
+          sh 'make setup'
+        } } }
+
+        stage('Lint') { steps { dir(env.STATUS_PATH) {
+          sh 'make ci'
+        } } }
+
+        stage('Build') {
           stages {
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-ios'
-              dir('build/bin/Statusgo.framework') {
-                sh 'zip -r status-go-ios.zip Statusgo.framework'
+              dir('build/bin') {
+                sh 'zip -r Statusgo.framework.zip Statusgo.framework'
               }
             } } }
             stage('Archive') { steps {
               sh """
-                mv ${env.STATUS_PATH}/build/bin/statusgo-ios-9.3-framework/status-go-ios.zip \
+                mv ${env.STATUS_PATH}/build/bin/Statusgo.framework.zip \
                   ${env.WORKSPACE}/status-go-ios-${lib.suffix()}.zip
               """
               archiveArtifacts("status-go-ios-${lib.suffix()}.zip")
@@ -79,21 +120,22 @@ pipeline {
             } } }
           }
         }
-      }
-    }
-    stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
-      steps {
-        sh 'make prepare-release'
-        withCredentials([[
-          $class: 'UsernamePasswordMultiBinding',
-          credentialsId: 'status-im-auto',
-          usernameVariable: 'GITHUB_USER',
-          passwordVariable: 'GITHUB_TOKEN'
-        ]]) {
-          sh "yes | make release release_branch=${gitBranch}"
+
+        stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
+          steps {
+            sh 'make prepare-release'
+            withCredentials([[
+              $class: 'UsernamePasswordMultiBinding',
+              credentialsId: 'status-im-auto',
+              usernameVariable: 'GITHUB_USER',
+              passwordVariable: 'GITHUB_TOKEN'
+            ]]) {
+              sh "yes | make release release_branch=${gitBranch}"
+            }
+            sh 'make clean-release'
+          }
         }
-        sh 'make clean-release'
-      }
-    }
-  }
+      } // iOS
+    } // parallel
+  } // stages
 }

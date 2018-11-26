@@ -137,7 +137,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
-	@echo "Building docker image for bootnode..."
+	@echo "Building docker image for bootnode..."`
 	docker build --file _assets/build/Dockerfile-bootnode . \
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
@@ -189,8 +189,9 @@ setup: dep-install lint-install mock-install gomobile-install ##@other Prepare p
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIRECTORY)
-	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
-	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
+	mv build/bin/statusgo.aar $(RELEASE_DIRECTORY)/status-go-android.aar
+	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
+	mv build/bin/Statusgo.framework.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
 	${MAKE} clean
 	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
 

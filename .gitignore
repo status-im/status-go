@@ -36,7 +36,6 @@ tags
 # used by the Makefile
 /build/_workspace/
 /build/bin/
-/vendor/github.com/status-im/xgo
 
 # travis
 profile.tmp
