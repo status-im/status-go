@@ -42,7 +42,7 @@ pipeline {
             }
 
             stage('Setup') { steps { dir(env.STATUS_PATH) {
-              sh 'make setup'
+              sh 'make setup-build'
             } } }
 
             stage('Lint') { steps { dir(env.STATUS_PATH) {
@@ -103,7 +103,7 @@ pipeline {
             }
 
             stage('Setup') { steps { dir(env.STATUS_PATH) {
-              sh 'make setup'
+              sh 'make setup-build'
             } } }
 
             stage('Lint') { steps { dir(env.STATUS_PATH) {

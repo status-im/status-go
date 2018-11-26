@@ -179,7 +179,11 @@ endif
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup: install-os-dependencies dep-install lint-install mock-install deploy-install gen-install update-fleet-config ##@other Prepare project for first build
+setup-dev: setup-build install-os-dependencies gen-install update-fleet-config ##@other Prepare project for development
+
+setup-build: dep-install lint-install mock-install deploy-install ##@other Prepare project for build
+
+setup: setup-build setup-dev ##@other Prepare project for development and building
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
