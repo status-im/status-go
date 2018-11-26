@@ -65,6 +65,7 @@ pipeline {
                   lib.uploadArtifact("status-go-android-${lib.suffix()}.aar")
                 } } }
               }
+            }
 
             stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
               steps {
