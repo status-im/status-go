@@ -21,9 +21,9 @@ import (
 var statusBackend = api.NewStatusBackend()
 
 // All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/lib")
+var logger = log.New("package", "status-go/mobile")
 
-//GenerateConfig for status node
+// GenerateConfig for status node.
 func GenerateConfig(datadir string, networkID int) string {
 	config, err := params.NewNodeConfig(datadir, uint64(networkID))
 	if err != nil {
@@ -38,7 +38,7 @@ func GenerateConfig(datadir string, networkID int) string {
 	return string(outBytes)
 }
 
-//StartNode - start Status node
+// StartNode starts the Ethereum Status node.
 func StartNode(configJSON string) string {
 	config, err := params.NewConfigFromJSON(configJSON)
 	if err != nil {
@@ -54,13 +54,129 @@ func StartNode(configJSON string) string {
 	return makeJSONResponse(nil)
 }
 
-//StopNode - stop status node
+// StopNode stops the Ethereum Status node.
 func StopNode() string {
 	api.RunAsync(statusBackend.StopNode)
 	return makeJSONResponse(nil)
 }
 
-//ValidateNodeConfig validates config for status node
+// CreateContactCode creates an X3DH bundle.
+func CreateContactCode() string {
+	bundle, err := statusBackend.CreateContactCode()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return bundle
+}
+
+// ProcessContactCode processes an X3DH bundle.
+// TODO(adam): it looks like the return should be error.
+func ProcessContactCode(bundle string) string {
+	err := statusBackend.ProcessContactCode(bundle)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return ""
+}
+
+// ExtractIdentityFromContactCode extracts an identity from an X3DH bundle.
+func ExtractIdentityFromContactCode(bundle string) string {
+	identity, err := statusBackend.ExtractIdentityFromContactCode(bundle)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := statusBackend.ProcessContactCode(bundle); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Identity string `json:"identity"`
+	}{Identity: identity})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
+// ExtractGroupMembershipSignatures extract public keys from tuples of content/signature.
+func ExtractGroupMembershipSignatures(signaturePairsStr string) string {
+	var signaturePairs [][2]string
+
+	if err := json.Unmarshal([]byte(signaturePairsStr), &signaturePairs); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	identities, err := statusBackend.ExtractGroupMembershipSignatures(signaturePairs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Identities []string `json:"identities"`
+	}{Identities: identities})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
+// SignGroupMembership signs a string containing group membership information.
+func SignGroupMembership(content string) string {
+	signature, err := statusBackend.SignGroupMembership(content)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Signature string `json:"signature"`
+	}{Signature: signature})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
+// EnableInstallation enables an installation for multi-device sync.
+func EnableInstallation(installationID string) string {
+	err := statusBackend.EnableInstallation(installationID)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func DisableInstallation(installationID string) string {
+	err := statusBackend.DisableInstallation(installationID)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
+// ValidateNodeConfig validates config for the Status node.
 func ValidateNodeConfig(configJSON string) string {
 	var resp APIDetailedResponse
 
@@ -102,24 +218,24 @@ func ValidateNodeConfig(configJSON string) string {
 	return string(respJSON)
 }
 
-//ResetChainData remove chain data from data directory
+// ResetChainData removes chain data from data directory.
 func ResetChainData() string {
 	api.RunAsync(statusBackend.ResetChainData)
 	return makeJSONResponse(nil)
 }
 
-//CallRPC calls public APIs via RPC
+// CallRPC calls public APIs via RPC.
 func CallRPC(inputJSON string) string {
 	return statusBackend.CallRPC(inputJSON)
 }
 
-//CallPrivateRPC calls both public and private APIs via RPC
+// CallPrivateRPC calls both public and private APIs via RPC.
 func CallPrivateRPC(inputJSON string) string {
 	return statusBackend.CallPrivateRPC(inputJSON)
 }
 
-//CreateAccount is equivalent to creating an account from the command line,
-// just modified to handle the function arg passing
+// CreateAccount is equivalent to creating an account from the command line,
+// just modified to handle the function arg passing.
 func CreateAccount(password string) string {
 	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(password)
 
@@ -139,7 +255,7 @@ func CreateAccount(password string) string {
 	return string(outBytes)
 }
 
-//CreateChildAccount creates sub-account
+// CreateChildAccount creates sub-account.
 func CreateChildAccount(parentAddress, password string) string {
 	address, pubKey, err := statusBackend.AccountManager().CreateChildAccount(parentAddress, password)
 
@@ -158,7 +274,7 @@ func CreateChildAccount(parentAddress, password string) string {
 	return string(outBytes)
 }
 
-//RecoverAccount re-creates master key using given details
+// RecoverAccount re-creates master key using given details.
 func RecoverAccount(password, mnemonic string) string {
 	address, pubKey, err := statusBackend.AccountManager().RecoverAccount(password, mnemonic)
 
@@ -178,27 +294,28 @@ func RecoverAccount(password, mnemonic string) string {
 	return string(outBytes)
 }
 
-//VerifyAccountPassword verifies account password
+// VerifyAccountPassword verifies account password.
 func VerifyAccountPassword(keyStoreDir, address, password string) string {
 	_, err := statusBackend.AccountManager().VerifyAccountPassword(keyStoreDir, address, password)
 	return makeJSONResponse(err)
 }
 
-//Login loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
-// if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
+// Login loads a key file (for a given address), tries to decrypt it using the password,
+// to verify ownership if verified, purges all the previous identities from Whisper,
+// and injects verified key as shh identity.
 func Login(address, password string) string {
 	err := statusBackend.SelectAccount(address, password)
 	return makeJSONResponse(err)
 }
 
-//Logout is equivalent to clearing whisper identities
+// Logout is equivalent to clearing whisper identities.
 func Logout() string {
 	err := statusBackend.Logout()
 	return makeJSONResponse(err)
 }
 
-// SignMessage unmarshals rpc params {data, address, password} and passes
-// them onto backend.SignMessage
+// SignMessage unmarshals rpc params {data, address, password} and
+// passes them onto backend.SignMessage.
 func SignMessage(rpcParams string) string {
 	var params personal.SignParams
 	err := json.Unmarshal([]byte(rpcParams), &params)
@@ -221,7 +338,7 @@ func Recover(rpcParams string) string {
 	return prepareJSONResponse(addr.String(), err)
 }
 
-// SendTransaction converts RPC args and calls backend.SendTransaction
+// SendTransaction converts RPC args and calls backend.SendTransaction.
 func SendTransaction(txArgsJSON, password string) string {
 	var params transactions.SendTxArgs
 	err := json.Unmarshal([]byte(txArgsJSON), &params)
@@ -236,13 +353,13 @@ func SendTransaction(txArgsJSON, password string) string {
 	return prepareJSONResponseWithCode(hash.String(), err, code)
 }
 
-//StartCPUProfile runs pprof for cpu
+// StartCPUProfile runs pprof for CPU.
 func StartCPUProfile(dataDir string) string {
 	err := profiling.StartCPUProfile(dataDir)
 	return makeJSONResponse(err)
 }
 
-//StopCPUProfiling stops pprof for cpu
+// StopCPUProfiling stops pprof for cpu.
 func StopCPUProfiling() string { //nolint: deadcode
 	err := profiling.StopCPUProfile()
 	return makeJSONResponse(err)

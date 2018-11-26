@@ -121,17 +121,15 @@ statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Android cross compilation done."
 
-## TODO(divan): rename statusgo-android-16.aar to Statusgo.aar
-statusgo-android: gomobile ##@cross-compile Build status-go for Android
+statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	@gomobile bind -target=android/arm -ldflags="-s -w" -o build/bin/statusgo-android-16.aar github.com/status-im/status-go/mobile
-	@echo "Android cross compilation done in build/bin/statusgo-android-16.aar"
+	@gomobile bind -target=android/arm -ldflags="-s -w" -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
-## TODO(divan): rename statusgo-ios-9.3-framework to Statusgo.framework/
-statusgo-ios: gomobile	##@cross-compile Build status-go for iOS
+statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	@gomobile bind -target=ios -ldflags="-s -w" -o build/bin/statusgo-ios-9.3-framework github.com/status-im/status-go/mobile
-	@echo "iOS framework cross compilation done in build/bin/statusgo-ios-9.3-framework"
+	@gomobile bind -target=ios -ldflags="-s -w" -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
