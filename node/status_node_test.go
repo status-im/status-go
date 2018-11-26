@@ -165,6 +165,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 			NoDiscovery: true,
 			ListenAddr:  ":0",
 		},
+		NoUSB: true,
 	})
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
@@ -200,6 +201,7 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 			NoDiscovery: true,
 			ListenAddr:  ":0",
 		},
+		NoUSB: true,
 	})
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())

@@ -165,6 +165,7 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 			MaxPeers:    math.MaxInt32,
 			NoDiscovery: true,
 		},
+		NoUSB: true,
 	}) // in-memory node as no data dir
 	s.NoError(err)
 	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) {
@@ -233,6 +234,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 			MaxPeers:    math.MaxInt32,
 			NoDiscovery: true,
 		},
+		NoUSB: true,
 	}) // in-memory node as no data dir
 	s.NoError(err)
 	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) { return shh, nil })
@@ -260,6 +262,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 			NoDiscovery: true,
 			ListenAddr:  ":0",
 		},
+		NoUSB: true,
 	}) // in-memory node as no data dir
 	s.NoError(err)
 	err = mailNode.Register(func(*node.ServiceContext) (node.Service, error) {
