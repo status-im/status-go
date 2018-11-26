@@ -181,15 +181,13 @@ install-os-dependencies:
 
 setup-dev: setup-build install-os-dependencies gen-install update-fleet-config ##@other Prepare project for development
 
-setup-build: dep-install lint-install mock-install deploy-install ##@other Prepare project for build
+setup-build: dep-install lint-install mock-install deploy-install gomobile-install ##@other Prepare project for build
 
 setup: setup-build setup-dev ##@other Prepare project for development and building
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
-
-setup: dep-install lint-install mock-install gomobile-install ##@other Prepare project for first build
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIRECTORY)
@@ -216,6 +214,7 @@ release:
 
 gomobile-install:
 	go get -u golang.org/x/mobile/cmd/gomobile
+	gomobile init
 
 deploy-install:
 	go get -u github.com/c4milo/github-release
