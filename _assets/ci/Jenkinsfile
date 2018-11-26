@@ -83,7 +83,6 @@ pipeline {
     }
     stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
       steps {
-        def dst = lib.getReleaseDir()
         sh 'make prepare-release'
         withCredentials([[
           $class: 'UsernamePasswordMultiBinding',
