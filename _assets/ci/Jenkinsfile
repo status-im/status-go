@@ -49,7 +49,7 @@ pipeline {
             } } }
             stage('Archive') { steps {
               sh """
-                mv ${env.STATUS_PATH}/build/bin/statusgo-android-16.aar \
+                mv ${env.STATUS_PATH}/build/bin/statusgo.aar \
                   ${env.WORKSPACE}/status-go-android-${lib.suffix()}.aar
               """
               archiveArtifacts("status-go-android-${lib.suffix()}.aar")
@@ -62,8 +62,8 @@ pipeline {
         stage('iOS') {
           stages {
             stage('Compile') { steps { dir(env.STATUS_PATH) {
-              sh 'make statusgo-ios-simulator'
-              dir('build/bin/statusgo-ios-9.3-framework') {
+              sh 'make statusgo-ios'
+              dir('build/bin/Statusgo.framework') {
                 sh 'zip -r status-go-ios.zip Statusgo.framework'
               }
             } } }

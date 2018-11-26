@@ -1,4 +1,4 @@
-.PHONY: statusgo statusd-prune all test xgo gomobile clean help
+.PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
 
 RELEASE_TAG := $(shell cat VERSION)
@@ -41,11 +41,6 @@ BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
-
-XGO_GO ?= latest
-XGOVERSION ?= 1.10.x
-XGOIMAGE = statusteam/xgo:$(XGOVERSION)
-XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 networkid ?= StatusChain
 gotest_extraflags =
@@ -115,12 +110,6 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
-statusgo-linux: xgo ##@cross-compile Build status-go for Linux
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "Android cross compilation done."
-
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	@gomobile bind -target=android/arm -ldflags="-s -w" -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
@@ -186,16 +175,6 @@ ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
 endif
 	docker push $(BOOTNODE_IMAGE_NAME):latest
 	docker push $(DOCKER_IMAGE_NAME):latest
-
-xgo-docker-images: ##@docker Build xgo docker images
-	@echo "Building xgo docker images..."
-	docker build _assets/build/xgo/base -t $(XGOIMAGE)
-	docker build _assets/build/xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
-
-xgo:
-	docker pull $(XGOIMAGE)
-	go get github.com/status-im/xgo
-	mkdir -p $(GOBIN)
 
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
