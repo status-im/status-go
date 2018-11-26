@@ -200,11 +200,10 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
-gomobile:
-	@echo "Installing gomobile..."
-	@go get -u golang.org/x/mobile/cmd/gomobile
+setup: dep-install lint-install mock-install gomobile-install ##@other Prepare project for first build
 
-setup: dep-install lint-install mock-install gomobile ##@other Prepare project for first build
+gomobile-install:
+	go get -u golang.org/x/mobile/cmd/gomobile
 
 gen-install:
 	go get -u github.com/jteeuwen/go-bindata/...
