@@ -80,6 +80,7 @@ func (s *ShhExtSuite) SetupTest() {
 				MaxPeers:    1,
 				ListenAddr:  ":0",
 			},
+			NoUSB: true,
 		}
 		stack, err := node.New(cfg)
 		s.NoError(err)
