@@ -36,6 +36,7 @@ pipeline {
     }
     stage('Setup') { steps { dir(env.STATUS_PATH) {
       sh 'make setup'
+      sh 'make xgo'
     } } }
     stage('Lint') { steps { dir(env.STATUS_PATH) {
       sh 'make ci'
