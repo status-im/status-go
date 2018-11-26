@@ -17,7 +17,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	ma "github.com/multiformats/go-multiaddr"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -190,17 +191,25 @@ func (n *StatusNode) discoveryEnabled() bool {
 	return n.config != nil && (!n.config.NoDiscovery || n.config.Rendezvous) && n.config.ClusterConfig.Enabled
 }
 
-func (n *StatusNode) discoverNode() *discover.Node {
+func (n *StatusNode) discoverNode() (*enode.Node, error) {
 	if !n.isRunning() {
-		return nil
+		return nil, nil
 	}
 
 	discNode := n.gethNode.Server().Self()
-	if n.config.AdvertiseAddr != "" {
-		n.log.Info("using AdvertiseAddr for rendezvous", "addr", n.config.AdvertiseAddr)
-		discNode.IP = net.ParseIP(n.config.AdvertiseAddr)
+
+	if n.config.AdvertiseAddr == "" {
+		return discNode, nil
 	}
-	return discNode
+
+	n.log.Info("Using AdvertiseAddr for rendezvous", "addr", n.config.AdvertiseAddr)
+
+	r := discNode.Record()
+	r.Set(enr.IP(net.ParseIP(n.config.AdvertiseAddr)))
+	if err := enode.SignV4(r, n.Server().PrivateKey); err != nil {
+		return nil, err
+	}
+	return enode.New(enode.ValidSchemes[r.IdentityScheme()], r)
 }
 
 func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
@@ -218,7 +227,12 @@ func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 			return nil, fmt.Errorf("failed to parse rendezvous node %s: %v", n.config.ClusterConfig.RendezvousNodes[0], err)
 		}
 	}
-	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, n.discoverNode())
+	node, err := n.discoverNode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get a discover node: %v", err)
+	}
+
+	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, node)
 }
 
 func (n *StatusNode) startDiscovery() error {
@@ -414,7 +428,7 @@ func (n *StatusNode) AddPeer(url string) error {
 
 // addPeer adds new static peer node
 func (n *StatusNode) addPeer(url string) error {
-	parsedNode, err := discover.ParseNode(url)
+	parsedNode, err := enode.ParseV4(url)
 	if err != nil {
 		return err
 	}
@@ -429,7 +443,7 @@ func (n *StatusNode) addPeer(url string) error {
 }
 
 func (n *StatusNode) removePeer(url string) error {
-	parsedNode, err := discover.ParseNode(url)
+	parsedNode, err := enode.ParseV4(url)
 	if err != nil {
 		return err
 	}

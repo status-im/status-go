@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	lcrypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/whisper/whisperv6"
@@ -130,7 +130,7 @@ func (s *PeerPoolSimulationSuite) TearDown() {
 	}
 }
 
-func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID discover.NodeID) {
+func (s *PeerPoolSimulationSuite) getPeerFromEvent(events <-chan *p2p.PeerEvent, etype p2p.PeerEventType) (nodeID enode.ID) {
 	select {
 	case ev := <-events:
 		if ev.Type == etype {
@@ -241,7 +241,7 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 
 	// wait for the peer to be found and connected
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID, connectedPeer)
+	s.Equal(s.peers[0].Self().ID(), connectedPeer)
 	// as the upper limit was reached, Discovery should be stoped
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
@@ -262,7 +262,7 @@ func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
 	register = NewRegister(s.discovery[2], topic)
 	s.Require().NoError(register.Start())
 	defer register.Stop()
-	s.Equal(s.peers[2].Self().ID, s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
+	s.Equal(s.peers[2].Self().ID(), s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
 	// Discovery can be stopped again.
 	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
@@ -494,7 +494,7 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 		0,
 		true,
 		100 * time.Millisecond,
-		[]discover.NodeID{s.peers[0].Self().ID},
+		[]enode.ID{s.peers[0].Self().ID()},
 		"",
 	}
 	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
@@ -503,20 +503,20 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 
 	// wait for and verify the mail server peer
 	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID, connectedPeer)
+	s.Equal(s.peers[0].Self().ID().String(), connectedPeer.String())
 
 	// wait for a summary event to be sure that ConfirmAdded() was called
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Equal(s.peers[0].Self().ID.String(), (<-summaries)[0].ID)
+	s.Equal(s.peers[0].Self().ID().String(), (<-summaries)[0].ID)
 
 	// check cache
 	cachedPeers := peerPool.cache.GetPeersRange(MailServerDiscoveryTopic, 5)
 	s.Require().Len(cachedPeers, 1)
-	s.Equal(s.peers[0].Self().ID[:], cachedPeers[0].ID[:])
+	s.Equal(discv5.PubkeyID(s.peers[0].Self().Pubkey()), cachedPeers[0].ID)
 
 	// wait for another event as the peer should be removed
 	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
-	s.Equal(s.peers[0].Self().ID, disconnectedPeer)
+	s.Equal(s.peers[0].Self().ID().String(), disconnectedPeer.String())
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
 	s.Len(<-summaries, 0)
 }

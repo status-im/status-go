@@ -2,7 +2,7 @@ package whisperv6
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/p2p/discover"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // EventType used to define known envelope events.
@@ -27,6 +27,6 @@ const (
 type EnvelopeEvent struct {
 	Event EventType
 	Hash  common.Hash
-	Peer  discover.NodeID
+	Peer  enode.ID
 	Data  interface{}
 }

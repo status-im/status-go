@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
@@ -38,6 +38,7 @@ var (
 	staticEnodeAddr     = flag.String("staticnode", "", "static node enode address to test (e.g. enode://3f04db09bedc8d85a198de94c84da73aa7782fafc61b28c525ec5cca5a6cc16be7ebbb5cd001780f71d8408d35a2f6326faa1e524d9d8875294172ebec988743@172.16.238.10:30303)")
 	mailserverEnodeAddr = flag.String("mailserver", "", "mailserver enode address to test (e.g. enode://1da276e34126e93babf24ec88aac1a7602b4cbb2e11b0961d0ab5e989ca9c261aa7f7c1c85f15550a5f1e5a5ca2305b53b9280cf5894d5ecf7d257b173136d40@167.99.209.61:30504)")
 	publicChannel       = flag.String("channel", "status", "The public channel name to retrieve historic messages from (used with 'mailserver' flag)")
+	timeout             = flag.Int("timeout", 10, "Timeout when connecting to node or fetching messages from mailserver, in seconds")
 	period              = flag.Int("period", 24*60*60, "How far in the past to request messages from mailserver, in seconds")
 	minPow              = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
 	ttl                 = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
@@ -49,9 +50,9 @@ var (
 
 func main() {
 	var err error
-	var staticParsedNode, mailserverParsedNode *discv5.Node
+	var staticParsedNode, mailserverParsedNode *enode.Node
 	if *staticEnodeAddr != "" {
-		staticParsedNode, err = discv5.ParseNode(*staticEnodeAddr)
+		staticParsedNode, err = enode.ParseV4(*staticEnodeAddr)
 		if err != nil {
 			logger.Crit("Invalid static address specified", "staticEnodeAddr", *staticEnodeAddr, "error", err)
 			os.Exit(1)
@@ -59,7 +60,7 @@ func main() {
 	}
 
 	if *mailserverEnodeAddr != "" {
-		mailserverParsedNode, err = discv5.ParseNode(*mailserverEnodeAddr)
+		mailserverParsedNode, err = enode.ParseV4(*mailserverEnodeAddr)
 		if err != nil {
 			logger.Crit("Invalid mailserver address specified", "mailserverEnodeAddr", *mailserverEnodeAddr, "error", err)
 			os.Exit(1)
@@ -95,7 +96,7 @@ func init() {
 	}
 }
 
-func verifyMailserverBehavior(mailserverNode *discv5.Node) {
+func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	clientBackend, err := startClientNode()
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
@@ -116,7 +117,8 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	}
 
 	// add mailserver peer to client
-	clientErrCh := helpers.WaitForPeerAsync(clientNode.Server(), *mailserverEnodeAddr, p2p.PeerEventTypeAdd, 5*time.Second)
+	clientErrCh := helpers.WaitForPeerAsync(clientNode.Server(), *mailserverEnodeAddr, p2p.PeerEventTypeAdd, time.Duration(*timeout)*time.Second)
+
 	err = clientNode.AddPeer(*mailserverEnodeAddr)
 	if err != nil {
 		logger.Error("Failed to add mailserver peer to client", "error", err)
@@ -136,11 +138,10 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 		os.Exit(1)
 	}
 
-	mailboxPeer := mailserverNode.ID[:]
-	mailboxPeerStr := mailserverNode.ID.String()
+	mailboxPeer := mailserverNode.ID().Bytes()
 	err = clientWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
 	if err != nil {
-		logger.Error("Failed to allow P2P messages from peer", "error", err)
+		logger.Error("Failed to allow P2P messages from mailserver peer", "error", err, mailserverNode.String())
 		os.Exit(1)
 	}
 
@@ -167,11 +168,12 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	shhextAPI := shhext.NewPublicAPI(clientShhExtService)
 	requestIDBytes, err := shhextAPI.RequestMessages(context.TODO(),
 		shhext.MessagesRequest{
-			MailServerPeer: mailboxPeerStr,
+			MailServerPeer: mailserverNode.String(),
 			From:           uint32(clientWhisperService.GetCurrentTime().Add(-time.Duration(*period) * time.Second).Unix()),
 			Limit:          1,
 			Topic:          topic,
 			SymKeyID:       mailServerKeyID,
+			Timeout:        time.Duration(*timeout) * time.Second,
 		})
 	if err != nil {
 		logger.Error("Error requesting historic messages from mailserver", "error", err)
@@ -180,7 +182,7 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	requestID := common.BytesToHash(requestIDBytes)
 
 	// wait for mailserver response
-	resp, err := waitForMailServerResponse(mailServerResponseWatcher, requestID, 10*time.Second)
+	resp, err := waitForMailServerResponse(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
 	if err != nil {
 		logger.Error("Error waiting for mailserver response", "error", err)
 		os.Exit(3)
@@ -194,7 +196,7 @@ func verifyMailserverBehavior(mailserverNode *discv5.Node) {
 	}
 }
 
-func verifyStaticNodeBehavior(staticNode *discv5.Node) {
+func verifyStaticNodeBehavior(staticNode *enode.Node) {
 	clientBackend, err := startClientNode()
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
@@ -253,6 +255,7 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		nodeConfig.LogFile = *logFile
 	}
 
+	nodeConfig.NoDiscovery = true
 	nodeConfig.ListenAddr = ""
 	if *staticEnodeAddr != "" {
 		nodeConfig.ClusterConfig.Enabled = true

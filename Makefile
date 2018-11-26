@@ -1,6 +1,11 @@
 .PHONY: statusgo statusd-prune all test xgo gomobile clean help
 .PHONY: statusgo-android statusgo-ios
 
+RELEASE_TAG := $(shell cat VERSION)
+RELEASE_BRANCH := "develop"
+RELEASE_DIRECTORY := /tmp/release-$(RELEASE_TAG)
+PRE_RELEASE := "1"
+
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
@@ -27,12 +32,15 @@ endif
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
-GIT_COMMIT = $(shell tag=`git describe --exact-match --tag 2>/dev/null`; \
-	if [ $$? -eq 0 ]; then echo $$tag | sed 's/^v\(.*\)$$/\1/'; \
-	else git rev-parse --short HEAD; fi)
+GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
-BUILD_FLAGS ?= $(shell echo "-ldflags '-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` -X github.com/status-im/status-go/params.Version=$(GIT_COMMIT)'")
+ENABLE_METRICS ?= false
+BUILD_FLAGS ?= $(shell echo "-ldflags '\
+	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
+	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
 
 XGO_GO ?= latest
 XGOVERSION ?= 1.10.x
@@ -47,7 +55,7 @@ BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
 PROXY_IMAGE_NAME ?= statusteam/discovery-proxy
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
-DOCKER_IMAGE_CUSTOM_TAG ?= $(GIT_COMMIT)
+DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
@@ -194,7 +202,7 @@ xgo:
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup: install-os-dependencies dep-install lint-install mock-install gen-install update-fleet-config ##@other Prepare project for first build
+setup: install-os-dependencies dep-install lint-install mock-install deploy-install gen-install update-fleet-config ##@other Prepare project for first build
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
@@ -202,8 +210,33 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 
 setup: dep-install lint-install mock-install gomobile-install ##@other Prepare project for first build
 
+prepare-release: clean-release
+	mkdir -p $(RELEASE_DIRECTORY)
+	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
+	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
+	${MAKE} clean
+	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
+
+clean-release:
+	rm -rf $(RELEASE_DIRECTORY)
+
+release:
+	@read -p "Are you sure you want to create a new GitHub $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
+	if [ $$REPLY = "y" ]; then \
+		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
+		comparison="$$latest_tag..HEAD"; \
+		if [ -z "$$latest_tag" ]; then comparison=""; fi; \
+		changelog=$$(git log $$comparison --oneline --no-merges --format="* %h %s"); \
+	    github-release $(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) "status-im/status-go" "$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "$(changelog)" "$(RELEASE_DIRECTORY)/*" ; \
+	else \
+	    echo "Aborting." && exit 1; \
+	fi
+
 gomobile-install:
 	go get -u golang.org/x/mobile/cmd/gomobile
+
+deploy-install:
+	go get -u github.com/c4milo/github-release
 
 gen-install:
 	go get -u github.com/jteeuwen/go-bindata/...
@@ -230,7 +263,7 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /lib)
 test-unit: ##@tests Run unit and integration tests
-	go test -v $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -251,6 +284,9 @@ test-e2e: ##@tests Run e2e tests
 test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
+canary-test: node-canary
+	_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.beta.json
+
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.10.2
@@ -259,7 +295,7 @@ lint:
 	@echo "lint"
 	@golangci-lint run ./...
 
-ci: lint mock dep-ensure test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint mock dep-ensure canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*

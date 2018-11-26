@@ -1,5 +1,6 @@
 {
   "LogLevel": "DEBUG",
+  "NoDiscovery": false,
   "ClusterConfig": {
     "Enabled": true,
     "Fleet": "eth.test",

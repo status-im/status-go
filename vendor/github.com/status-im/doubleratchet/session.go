@@ -130,7 +130,6 @@ func (s *sessionState) RatchetDecrypt(m Message, ad []byte) ([]byte, error) {
 	)
 
 	// Is there a new ratchet key?
-	isDHStepped := false
 	if m.Header.DH != sc.DHr {
 		if skippedKeys1, err = sc.skipMessageKeys(sc.DHr, uint(m.Header.PN)); err != nil {
 			return nil, fmt.Errorf("can't skip previous chain message keys: %s", err)
@@ -138,7 +137,6 @@ func (s *sessionState) RatchetDecrypt(m Message, ad []byte) ([]byte, error) {
 		if err = sc.dhRatchet(m.Header); err != nil {
 			return nil, fmt.Errorf("can't perform ratchet step: %s", err)
 		}
-		isDHStepped = true
 	}
 
 	// After all, update the current chain.
@@ -151,16 +149,12 @@ func (s *sessionState) RatchetDecrypt(m Message, ad []byte) ([]byte, error) {
 		return nil, fmt.Errorf("can't decrypt: %s", err)
 	}
 
-	// Apply changes.
-	if err := s.applyChanges(sc, append(skippedKeys1, skippedKeys2...)); err != nil {
-		return nil, err
-	}
+	// Increment the number of keys
+	sc.KeysCount++
 
-	if isDHStepped {
-		err = s.deleteSkippedKeys(s.DHr)
-		if err != nil {
-			return nil, err
-		}
+	// Apply changes.
+	if err := s.applyChanges(sc, s.id, append(skippedKeys1, skippedKeys2...)); err != nil {
+		return nil, err
 	}
 
 	// Store state

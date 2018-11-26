@@ -17,7 +17,7 @@ func WithMaxSkip(n int) option {
 	}
 }
 
-// WithMaxKeep specifies the maximum number of ratchet steps before a message is deleted.
+// WithMaxKeep specifies how long we keep message keys, counted in number of messages received
 // nolint: golint
 func WithMaxKeep(n int) option {
 	return func(s *State) error {
@@ -25,6 +25,18 @@ func WithMaxKeep(n int) option {
 			return fmt.Errorf("n must be non-negative")
 		}
 		s.MaxKeep = uint(n)
+		return nil
+	}
+}
+
+// WithMaxMessageKeysPerSession specifies the maximum number of message keys per session
+// nolint: golint
+func WithMaxMessageKeysPerSession(n int) option {
+	return func(s *State) error {
+		if n < 0 {
+			return fmt.Errorf("n must be non-negative")
+		}
+		s.MaxMessageKeysPerSession = n
 		return nil
 	}
 }

@@ -42,14 +42,18 @@ type State struct {
 	// Sending header key and next header key. Only used for header encryption.
 	HKs, NHKs Key
 
-	// Number of ratchet steps after which all skipped message keys for that key will be deleted.
+	// How long we keep messages keys, counted in number of messages received,
+	// for example if MaxKeep is 5 we only keep the last 5 messages keys, deleting everything n - 5.
 	MaxKeep uint
+
+	// Max number of message keys per session, older keys will be deleted in FIFO fashion
+	MaxMessageKeysPerSession int
 
 	// The number of the current ratchet step.
 	Step uint
 
-	// Which key for the receiving chain was used at the specified step.
-	DeleteKeys map[uint]Key
+	// KeysCount the number of keys generated for decrypting
+	KeysCount uint
 }
 
 func DefaultState(sharedKey Key) State {
@@ -61,12 +65,13 @@ func DefaultState(sharedKey Key) State {
 		RootCh: kdfRootChain{CK: sharedKey, Crypto: c},
 		// Populate CKs and CKr with sharedKey so that both parties could send and receive
 		// messages from the very beginning.
-		SendCh:     kdfChain{CK: sharedKey, Crypto: c},
-		RecvCh:     kdfChain{CK: sharedKey, Crypto: c},
-		MkSkipped:  &KeysStorageInMemory{},
-		MaxSkip:    1000,
-		MaxKeep:    100,
-		DeleteKeys: make(map[uint]Key),
+		SendCh:                   kdfChain{CK: sharedKey, Crypto: c},
+		RecvCh:                   kdfChain{CK: sharedKey, Crypto: c},
+		MkSkipped:                &KeysStorageInMemory{},
+		MaxSkip:                  1000,
+		MaxMessageKeysPerSession: 2000,
+		MaxKeep:                  2000,
+		KeysCount:                0,
 	}
 }
 
@@ -112,6 +117,7 @@ type skippedKey struct {
 	key Key
 	nr  uint
 	mk  Key
+	seq uint
 }
 
 // skipMessageKeys skips message keys in the current receiving chain.
@@ -119,14 +125,11 @@ func (s *State) skipMessageKeys(key Key, until uint) ([]skippedKey, error) {
 	if until < uint(s.RecvCh.N) {
 		return nil, fmt.Errorf("bad until: probably an out-of-order message that was deleted")
 	}
-	nSkipped, err := s.MkSkipped.Count(key)
-	if err != nil {
-		return nil, err
-	}
 
-	if until-uint(s.RecvCh.N)+nSkipped > s.MaxSkip {
+	if uint(s.RecvCh.N)+s.MaxSkip < until {
 		return nil, fmt.Errorf("too many messages")
 	}
+
 	skipped := []skippedKey{}
 	for uint(s.RecvCh.N) < until {
 		mk := s.RecvCh.step()
@@ -134,32 +137,31 @@ func (s *State) skipMessageKeys(key Key, until uint) ([]skippedKey, error) {
 			key: key,
 			nr:  uint(s.RecvCh.N - 1),
 			mk:  mk,
+			seq: s.KeysCount,
 		})
+		// Increment key count
+		s.KeysCount++
+
 	}
 	return skipped, nil
 }
 
-func (s *State) applyChanges(sc State, skipped []skippedKey) error {
+func (s *State) applyChanges(sc State, sessionID []byte, skipped []skippedKey) error {
 	*s = sc
 	for _, skipped := range skipped {
-		if err := s.MkSkipped.Put(skipped.key, skipped.nr, skipped.mk); err != nil {
+		if err := s.MkSkipped.Put(sessionID, skipped.key, skipped.nr, skipped.mk, skipped.seq); err != nil {
 			return err
 		}
 	}
 
-	return nil
-}
-
-func (s *State) deleteSkippedKeys(key Key) error {
-
-	s.DeleteKeys[s.Step] = key
-	s.Step++
-	if hk, ok := s.DeleteKeys[s.Step-s.MaxKeep]; ok {
-		if err := s.MkSkipped.DeletePk(hk); err != nil {
+	if err := s.MkSkipped.TruncateMks(sessionID, s.MaxMessageKeysPerSession); err != nil {
+		return err
+	}
+	if s.KeysCount >= s.MaxKeep {
+		if err := s.MkSkipped.DeleteOldMks(sessionID, s.KeysCount-s.MaxKeep); err != nil {
 			return err
 		}
-
-		delete(s.DeleteKeys, s.Step-s.MaxKeep)
 	}
+
 	return nil
 }

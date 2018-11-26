@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
@@ -43,10 +44,8 @@ func (c *callTracker) CallContext(ctx context.Context, result interface{}, metho
 	return nil
 }
 
-func runLogsFetcherTest(t *testing.T, f *logsFilter) *callTracker {
-	c := callTracker{reply: [][]types.Log{
-		make([]types.Log, 2),
-	}}
+func runLogsFetcherTest(t *testing.T, f *logsFilter, replies [][]types.Log, queries int) *callTracker {
+	c := callTracker{reply: replies}
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -66,7 +65,7 @@ func runLogsFetcherTest(t *testing.T, f *logsFilter) *callTracker {
 				c.mu.Lock()
 				num := c.calls
 				c.mu.Unlock()
-				if num >= 2 {
+				if num >= queries {
 					f.stop()
 					return
 				}
@@ -74,7 +73,7 @@ func runLogsFetcherTest(t *testing.T, f *logsFilter) *callTracker {
 		}
 	}()
 	wg.Wait()
-	require.Len(t, c.criterias, 2)
+	require.Len(t, c.criterias, queries)
 	return &c
 }
 
@@ -84,11 +83,36 @@ func TestLogsFetcherAdjusted(t *testing.T) {
 		crit: ethereum.FilterQuery{
 			FromBlock: big.NewInt(10),
 		},
-		done: make(chan struct{}),
+		done:      make(chan struct{}),
+		logsCache: newCache(defaultCacheSize),
 	}
-	c := runLogsFetcherTest(t, f)
+	logs := []types.Log{
+		{BlockNumber: 11}, {BlockNumber: 12},
+	}
+	c := runLogsFetcherTest(t, f, [][]types.Log{logs}, 2)
 	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[0]["fromBlock"])
 	require.Equal(t, c.criterias[1]["fromBlock"], "latest")
+}
+
+func TestAdjustedDueToReorg(t *testing.T) {
+	f := &logsFilter{
+		ctx: context.TODO(),
+		crit: ethereum.FilterQuery{
+			FromBlock: big.NewInt(10),
+		},
+		done:      make(chan struct{}),
+		logsCache: newCache(defaultCacheSize),
+	}
+	logs := []types.Log{
+		{BlockNumber: 11, BlockHash: common.Hash{1}}, {BlockNumber: 12, BlockHash: common.Hash{2}},
+	}
+	reorg := []types.Log{
+		{BlockNumber: 12, BlockHash: common.Hash{2, 2}},
+	}
+	c := runLogsFetcherTest(t, f, [][]types.Log{logs, reorg}, 3)
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[0]["fromBlock"])
+	require.Equal(t, "latest", c.criterias[1]["fromBlock"])
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(11)), c.criterias[2]["fromBlock"])
 }
 
 func TestLogsFetcherCanceledContext(t *testing.T) {
@@ -98,48 +122,11 @@ func TestLogsFetcherCanceledContext(t *testing.T) {
 		crit: ethereum.FilterQuery{
 			FromBlock: big.NewInt(10),
 		},
-		done: make(chan struct{}),
+		done:      make(chan struct{}),
+		logsCache: newCache(defaultCacheSize),
 	}
 	cancel()
-	c := runLogsFetcherTest(t, f)
+	c := runLogsFetcherTest(t, f, [][]types.Log{make([]types.Log, 2)}, 2)
 	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[0]["fromBlock"])
 	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[1]["fromBlock"])
-}
-
-func TestAdjustFromBlock(t *testing.T) {
-	type testCase struct {
-		description string
-		initial     ethereum.FilterQuery
-		result      ethereum.FilterQuery
-	}
-
-	for _, tc := range []testCase{
-		{
-			"ToBlockHigherThenLatest",
-			ethereum.FilterQuery{ToBlock: big.NewInt(10)},
-			ethereum.FilterQuery{ToBlock: big.NewInt(10)},
-		},
-		{
-			"FromBlockIsPending",
-			ethereum.FilterQuery{FromBlock: big.NewInt(-2)},
-			ethereum.FilterQuery{FromBlock: big.NewInt(-2)},
-		},
-		{
-			"FromBlockIsOlderThenLatest",
-			ethereum.FilterQuery{FromBlock: big.NewInt(10)},
-			ethereum.FilterQuery{FromBlock: big.NewInt(-1)},
-		},
-		{
-			"NotInterestedInLatestBlocks",
-			ethereum.FilterQuery{FromBlock: big.NewInt(10), ToBlock: big.NewInt(15)},
-			ethereum.FilterQuery{FromBlock: big.NewInt(10), ToBlock: big.NewInt(15)},
-		},
-	} {
-		tc := tc
-		t.Run(tc.description, func(t *testing.T) {
-			t.Parallel()
-			adjustFromBlock(&tc.initial)
-			require.Equal(t, tc.result, tc.initial)
-		})
-	}
 }

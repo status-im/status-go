@@ -88,7 +88,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:1dc638d013f2a6f6ae13568584e8fee7e172cbf295e82064ded18bcf6d63c04c"
+  digest = "1:e221b8d0ccd91e9ee0a2ddda27ec75518dd683de945d01c87816f64ce418bf91"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -132,6 +132,7 @@
     "eth/tracers",
     "eth/tracers/internal/tracers",
     "ethapi",
+    "ethclient",
     "ethdb",
     "event",
     "internal/debug",
@@ -140,7 +141,6 @@
     "les/flowcontrol",
     "light",
     "log",
-    "log/term",
     "metrics",
     "metrics/exp",
     "miner",
@@ -148,6 +148,7 @@
     "p2p",
     "p2p/discover",
     "p2p/discv5",
+    "p2p/enode",
     "p2p/enr",
     "p2p/nat",
     "p2p/netutil",
@@ -157,9 +158,9 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "31f0afca344c53678e98032d6306e0e4ff7b9be1"
+  revision = "2ad6673303bb48f8e3c2865386cfa928e92dbcbd"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.16"
+  version = "v1.8.17"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -635,11 +636,11 @@
   revision = "5411d3eea5978e6cdc258b30de592b60df6aba96"
 
 [[projects]]
-  digest = "1:f3b286c0af7136e7afa8093165abb64159742bd31f580d7b000d21e1d7e73256"
+  digest = "1:b95b22ee36277368bbf22e0fbe4f1be366585516914d6cfe4b3dc7b8b37eda5f"
   name = "github.com/mattn/go-isatty"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "281032e84ae07510239465db46bf442aa44b953a"
+  revision = "3fb116b820352b7f0c281308a4d6250c22d94e27"
 
 [[projects]]
   branch = "master"
@@ -782,19 +783,19 @@
   version = "v1.1"
 
 [[projects]]
-  digest = "1:b80bfc6278c27edcb1946fc38bc61f4c3a1cd50978083a4a79b7c875c70ed9d8"
+  digest = "1:41fb72d7a71f37f1f9c766d965178636ecda21b429b1f2e3fff42cfc31279751"
   name = "github.com/status-im/doubleratchet"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "321788dbb6eac36f7dab04e631db139e13bb280b"
+  revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
 
 [[projects]]
   branch = "master"
-  digest = "1:5d3c51d0f96ff0b228582e5e36295a33da8e16d106cd9dc31538096bd35dce1e"
+  digest = "1:f3044238fc5d70eca12cc181b1e6d5270570d85a7b7046686381e618a783a7d6"
   name = "github.com/status-im/go-multiaddr-ethv4"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "17cb1ad76379d65e802eacc786d8f67eebd7cd6d"
+  revision = "cbcba3a7c121e29718d9011ffc9e2b78ac6d5c99"
 
 [[projects]]
   branch = "master"
@@ -810,7 +811,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b88d64c27ed467659fa0ee1806bc790b88c37bcbff0b8fcd1b97d6a3ee7f9703"
+  digest = "1:5fb8fc6a365f62e1d771b8a33c808a111ace9ba3506089f00ec252ec1e257a83"
   name = "github.com/status-im/rendezvous"
   packages = [
     ".",
@@ -818,15 +819,15 @@
     "server",
   ]
   pruneopts = "NUT"
-  revision = "55370cdfd9f288059b03c04e23784bb8829a894c"
+  revision = "fbcc46a78cd43fef95a110df664aab513116a850"
 
 [[projects]]
-  digest = "1:9552f5ea7e82e95910e182bd41b6c71933b50717990a61ac517bfa1cc6f653dc"
+  digest = "1:fe884981c5589ade6ea86ca876be4a744ea1344c6e8cfa17e434fcf270b04598"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "14e1bbfd9ba956e7fc7649e815aa19e4386b26da"
-  version = "v1.2.0"
+  revision = "e25ea1d673d5982b16fd3e51ed2a0d8f91b809d9"
+  version = "v1.3.0"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1017,17 +1018,6 @@
   revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
-  branch = "master"
-  digest = "1:95f24cc9a9a50da8aa144484a7c625c2e30dcbddf8e3bc336d2d92108b8c769e"
-  name = "golang.org/x/tools"
-  packages = [
-    "go/ast/astutil",
-    "imports",
-  ]
-  pruneopts = "NUT"
-  revision = "ac136b6c2db7c4d43955e4bc7174db36dc0539c0"
-
-[[projects]]
   digest = "1:6aba14c40a7d987288b30c37893238d136e027788f27f8bb9c7ad98b15d30040"
   name = "gopkg.in/go-playground/validator.v9"
   packages = ["."]
@@ -1087,15 +1077,17 @@
     "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/eth",
     "github.com/ethereum/go-ethereum/eth/downloader",
+    "github.com/ethereum/go-ethereum/eth/filters",
     "github.com/ethereum/go-ethereum/ethapi",
+    "github.com/ethereum/go-ethereum/ethclient",
     "github.com/ethereum/go-ethereum/event",
     "github.com/ethereum/go-ethereum/les",
     "github.com/ethereum/go-ethereum/log",
     "github.com/ethereum/go-ethereum/metrics",
     "github.com/ethereum/go-ethereum/node",
     "github.com/ethereum/go-ethereum/p2p",
-    "github.com/ethereum/go-ethereum/p2p/discover",
     "github.com/ethereum/go-ethereum/p2p/discv5",
+    "github.com/ethereum/go-ethereum/p2p/enode",
     "github.com/ethereum/go-ethereum/p2p/enr",
     "github.com/ethereum/go-ethereum/p2p/nat",
     "github.com/ethereum/go-ethereum/params",

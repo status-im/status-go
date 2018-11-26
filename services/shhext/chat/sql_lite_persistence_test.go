@@ -51,10 +51,10 @@ func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	s.Require().NoError(err)
 
 	actualKey, err := s.service.GetPrivateKeyBundle([]byte("non-existing"))
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualKey)
 
-	anyPrivateBundle, err := s.service.GetAnyPrivateBundle([]byte("non-existing-id"))
+	anyPrivateBundle, err := s.service.GetAnyPrivateBundle([]byte("non-existing-id"), []string{installationID})
 	s.Require().NoError(err)
 	s.Nil(anyPrivateBundle)
 
@@ -71,7 +71,7 @@ func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	s.Equal(bundle.GetPrivateSignedPreKey(), actualKey, "It returns the same key")
 
 	identity := crypto.CompressPubkey(&key.PublicKey)
-	anyPrivateBundle, err = s.service.GetAnyPrivateBundle(identity)
+	anyPrivateBundle, err = s.service.GetAnyPrivateBundle(identity, []string{installationID})
 	s.Require().NoError(err)
 	s.NotNil(anyPrivateBundle)
 	s.True(proto.Equal(bundle.GetBundle(), anyPrivateBundle.GetBundle()), "It returns the same bundle")
@@ -81,8 +81,8 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key, "1")
@@ -92,18 +92,88 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
 	s.Require().NoError(err)
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
+}
+
+func (s *SQLLitePersistenceTestSuite) TestUpdatedBundle() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
+	s.Nil(actualBundle)
+
+	// Create & add initial bundle
+	bundleContainer, err := NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+
+	bundle := bundleContainer.GetBundle()
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
+
+	// Create & add a new bundle
+	bundleContainer, err = NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+	bundle = bundleContainer.GetBundle()
+	// We set the version
+	bundle.GetSignedPreKeys()["1"].Version = 1
+
+	err = s.service.AddPublicBundle(bundle)
+	s.Require().NoError(err)
+
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err)
+	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
+	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
+}
+
+func (s *SQLLitePersistenceTestSuite) TestOutOfOrderBundles() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
+	s.Nil(actualBundle)
+
+	// Create & add initial bundle
+	bundleContainer, err := NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+
+	bundle1 := bundleContainer.GetBundle()
+	err = s.service.AddPublicBundle(bundle1)
+	s.Require().NoError(err)
+
+	// Create & add a new bundle
+	bundleContainer, err = NewBundleContainer(key, "1")
+	s.Require().NoError(err)
+
+	bundle2 := bundleContainer.GetBundle()
+	// We set the version
+	bundle2.GetSignedPreKeys()["1"].Version = 1
+
+	err = s.service.AddPublicBundle(bundle2)
+	s.Require().NoError(err)
+
+	// Add again the initial bundle
+	err = s.service.AddPublicBundle(bundle1)
+	s.Require().NoError(err)
+
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err)
+	s.Equal(bundle2.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
+	s.Equal(bundle2.GetSignedPreKeys()["1"].GetVersion(), uint32(1))
+	s.Equal(bundle2.GetSignedPreKeys()["1"].GetSignedPreKey(), actualBundle.GetSignedPreKeys()["1"].GetSignedPreKey(), "It sets the right prekeys")
 }
 
 func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key, "1")
@@ -120,13 +190,15 @@ func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	// Adding a different bundle
 	bundleContainer, err = NewBundleContainer(key, "1")
 	s.Require().NoError(err)
-
+	// We set the version
 	bundle = bundleContainer.GetBundle()
+	bundle.GetSignedPreKeys()["1"].Version = 1
+
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
 	// Returns the most recent bundle
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
 	s.Require().NoError(err)
 
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the identity")
@@ -138,8 +210,8 @@ func (s *SQLLitePersistenceTestSuite) TestMultiDevicePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey)
-	s.Require().NoError(err, "It does not return an error if the bundle is not there")
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []string{"1"})
+	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
 	bundleContainer, err := NewBundleContainer(key, "1")
@@ -162,7 +234,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiDevicePublicBundle() {
 	s.Require().NoError(err)
 
 	// Returns the most recent bundle
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey)
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []string{"1", "2"})
 	s.Require().NoError(err)
 
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the identity")
@@ -272,5 +344,137 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 	s.Nil(ratchetInfo, "It returns nil when no bundle is there")
 }
 
+func (s *SQLLitePersistenceTestSuite) TestAddInstallations() {
+	identity := []byte("alice")
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+
+	s.Require().NoError(err)
+
+	enabledInstallations, err := s.service.GetActiveInstallations(5, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal(installations, enabledInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestAddInstallationsLimit() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	installations = []string{"alice-2", "alice-3"}
+	err = s.service.AddInstallations(
+		identity,
+		2,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	installations = []string{"alice-2", "alice-3", "alice-4"}
+	err = s.service.AddInstallations(
+		identity,
+		3,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	enabledInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-2", "alice-3", "alice-4"}, enabledInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestAddInstallationsDisabled() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		false,
+	)
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Nil(actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestDisableInstallation() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DisableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	// We add the installations again
+	installations = []string{"alice-1", "alice-2"}
+	err = s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-2"}, actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
+	identity := []byte("alice")
+
+	installations := []string{"alice-1", "alice-2"}
+	err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DisableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-2"}, actualInstallations)
+
+	err = s.service.EnableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	actualInstallations, err = s.service.GetActiveInstallations(3, identity)
+	s.Require().NoError(err)
+
+	s.Require().Equal([]string{"alice-1", "alice-2"}, actualInstallations)
+
+}
+
 // TODO: Add test for MarkBundleExpired
-// TODO: Add test for AddPublicBundle checking that it expires previous bundles

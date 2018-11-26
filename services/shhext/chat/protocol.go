@@ -61,8 +61,7 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 // BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
 func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte, theirPublicKeys ...*ecdsa.PublicKey) (map[*ecdsa.PublicKey][]byte, error) {
 	response := make(map[*ecdsa.PublicKey][]byte)
-	publicKeys := append(theirPublicKeys, &myIdentityKey.PublicKey)
-	for _, publicKey := range publicKeys {
+	for _, publicKey := range theirPublicKeys {
 		// Encrypt payload
 		encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
 		if err != nil {
@@ -88,7 +87,7 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pa
 	return response, nil
 }
 
-// BuildPairingMessage sends a message to our own devices using DH so that it can be decrypted by any other device
+// BuildPairingMessage sends a message to our own devices using DH so that it can be decrypted by any other device.
 func (p *ProtocolService) BuildPairingMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) ([]byte, error) {
 	// Encrypt payload
 	encryptionResponse, err := p.encryption.EncryptPayloadWithDH(&myIdentityKey.PublicKey, payload)
@@ -106,17 +105,27 @@ func (p *ProtocolService) BuildPairingMessage(myIdentityKey *ecdsa.PrivateKey, p
 	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
 }
 
-// ProcessPublicBundle processes a received X3DH bundle
+// ProcessPublicBundle processes a received X3DH bundle.
 func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *Bundle) ([]IdentityAndIDPair, error) {
 	return p.encryption.ProcessPublicBundle(myIdentityKey, bundle)
 }
 
-// GetBundle retrieves or creates a X3DH bundle, given a private identity key
+// GetBundle retrieves or creates a X3DH bundle, given a private identity key.
 func (p *ProtocolService) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*Bundle, error) {
 	return p.encryption.CreateBundle(myIdentityKey)
 }
 
-// HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message
+// EnableInstallation enables an installation for multi-device sync.
+func (p *ProtocolService) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return p.encryption.EnableInstallation(myIdentityKey, installationID)
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func (p *ProtocolService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	return p.encryption.DisableInstallation(myIdentityKey, installationID)
+}
+
+// HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) (*HandleMessageResponse, error) {
 	if p.encryption == nil {
 		return nil, errors.New("encryption service not initialized")

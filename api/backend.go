@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -256,6 +258,20 @@ func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Byte
 // key that was used to calculate the signature in the message
 func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (gethcommon.Address, error) {
 	return b.personalAPI.Recover(rpcParams)
+}
+
+// SignTypedData accepts data and password. Gets verified account and signs typed data.
+func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string) (hexutil.Bytes, error) {
+	account, err := b.getVerifiedAccount(password)
+	if err != nil {
+		return hexutil.Bytes{}, err
+	}
+	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
+	sig, err := typeddata.Sign(typed, account.AccountKey.PrivateKey, chain)
+	if err != nil {
+		return hexutil.Bytes{}, err
+	}
+	return hexutil.Bytes(sig), err
 }
 
 func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
@@ -501,12 +517,6 @@ func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (stri
 	return chat.ExtractIdentity(bundle)
 }
 
-// DEPRECATED
-// VerifyGroupMembershipSignatures verifies that the signatures are valid
-func (b *StatusBackend) VerifyGroupMembershipSignatures(signaturePairs [][3]string) error {
-	return crypto.VerifySignatures(signaturePairs)
-}
-
 // ExtractGroupMembershipSignatures extract signatures from tuples of content/signature
 func (b *StatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error) {
 	return crypto.ExtractSignatures(signaturePairs)
@@ -520,4 +530,44 @@ func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
 	}
 
 	return crypto.Sign(content, selectedAccount.AccountKey.PrivateKey)
+}
+
+// EnableInstallation enables an installation for multi-device sync.
+func (b *StatusBackend) EnableInstallation(installationID string) error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return err
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	if err := st.EnableInstallation(&selectedAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
+		b.log.Error("error enabling installation", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func (b *StatusBackend) DisableInstallation(installationID string) error {
+	selectedAccount, err := b.AccountManager().SelectedAccount()
+	if err != nil {
+		return err
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	if err := st.DisableInstallation(&selectedAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
+		b.log.Error("error disabling installation", "err", err)
+		return err
+	}
+
+	return nil
 }

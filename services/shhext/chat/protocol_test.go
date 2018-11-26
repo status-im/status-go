@@ -56,7 +56,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	})
 	s.NoError(err)
 
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, payload, &bobKey.PublicKey)
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, payload, &bobKey.PublicKey, &aliceKey.PublicKey)
 
 	s.NoError(err)
 	s.NotNil(marshaledMsg, "It creates a message")

@@ -50,7 +50,9 @@ var (
 	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
 	// Real metrics are collected only if -metrics flag is set
 	requestProcessTimer            = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
+	requestProcessNetTimer         = metrics.NewRegisteredTimer("mailserver/requestProcessNetTime", nil)
 	requestsMeter                  = metrics.NewRegisteredMeter("mailserver/requests", nil)
+	requestsBatchedCounter         = metrics.NewRegisteredCounter("mailserver/requestsBatched", nil)
 	requestErrorsCounter           = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
 	sentEnvelopesMeter             = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
 	sentEnvelopesSizeMeter         = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
@@ -240,7 +242,7 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
-	log.Info("Delivering mail", "peer", peer.ID())
+	log.Info("Delivering mail", "peerID", peerIDString(peer))
 	requestsMeter.Mark(1)
 
 	if peer == nil {
@@ -250,7 +252,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	}
 	if s.exceedsPeerRequests(peer.ID()) {
 		requestErrorsCounter.Inc(1)
-		log.Error("Peer exceeded request per seconds limit", "peerID", peer.ID())
+		log.Error("Peer exceeded request per seconds limit", "peerID", peerIDString(peer))
 		s.trySendHistoricMessageErrorResponse(peer, request, fmt.Errorf("rate limit exceeded"))
 		return
 	}
@@ -274,13 +276,13 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		limit = payload.Limit
 		batch = payload.Batch
 	} else {
-		log.Debug("Failed to decode request", "err", err, "peerID", peer.ID())
+		log.Debug("Failed to decode request", "err", err, "peerID", peerIDString(peer))
 		lower, upper, bloom, limit, cursor, err = s.validateRequest(peer.ID(), request)
 	}
 
 	if err != nil {
 		requestValidationErrorsCounter.Inc(1)
-		log.Error("Mailserver request failed validaton", "peerID", peer.ID())
+		log.Error("Mailserver request failed validaton", "peerID", peerIDString(peer))
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
 		return
 	}
@@ -292,6 +294,10 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		"cursor", cursor,
 		"batch", batch)
 
+	if batch {
+		requestsBatchedCounter.Inc(1)
+	}
+
 	_, lastEnvelopeHash, nextPageCursor, err := s.processRequest(
 		peer,
 		lower, upper,
@@ -301,7 +307,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		batch)
 	if err != nil {
 		processRequestErrorsCounter.Inc(1)
-		log.Error("Error while processing mail server request", "err", err, "peerID", peer.ID())
+		log.Error("Error while processing mail server request", "err", err, "peerID", peerIDString(peer))
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
 		return
 	}
@@ -310,7 +316,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 
 	if err := s.sendHistoricMessageResponse(peer, request, lastEnvelopeHash, nextPageCursor); err != nil {
 		historicResponseErrorsCounter.Inc(1)
-		log.Error("Error sending historic message response", "err", err, "peerID", peer.ID())
+		log.Error("Error sending historic message response", "err", err, "peerID", peerIDString(peer))
 		// we still want to try to report error even it it is a p2p error and it is unlikely
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
 	}
@@ -471,6 +477,9 @@ func (s *WMailServer) processRequest(
 }
 
 func (s *WMailServer) sendEnvelopes(peer *whisper.Peer, envelopes []*whisper.Envelope, batch bool) error {
+	start := time.Now()
+	defer requestProcessNetTimer.UpdateSince(start)
+
 	if batch {
 		return s.w.SendP2PDirect(peer, envelopes...)
 	}
@@ -497,7 +506,7 @@ func (s *WMailServer) trySendHistoricMessageErrorResponse(peer *whisper.Peer, re
 	// if we can't report an error, probably something is wrong with p2p connection,
 	// so we just print a log entry to document this sad fact
 	if err != nil {
-		log.Error("Error while reporting error response", "err", err, "peerID", peer.ID())
+		log.Error("Error while reporting error response", "err", err, "peerID", peerIDString(peer))
 	}
 }
 
@@ -547,7 +556,7 @@ func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (s
 	lowerTime := time.Unix(int64(payload.Lower), 0)
 	upperTime := time.Unix(int64(payload.Upper), 0)
 	if upperTime.Sub(lowerTime) > maxQueryRange {
-		log.Warn("Query range too long", "peerID", peerID, "length", upperTime.Sub(lowerTime), "max", maxQueryRange)
+		log.Warn("Query range too long", "peerID", peerIDBytesString(peerID), "length", upperTime.Sub(lowerTime), "max", maxQueryRange)
 		return payload, fmt.Errorf("query range must be shorted than %d", maxQueryRange)
 	}
 
@@ -637,4 +646,20 @@ func (s *WMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]
 	}
 
 	return msg.Payload[8 : 8+whisper.BloomFilterSize], nil
+}
+
+// peerWithID is a generalization of whisper.Peer.
+// whisper.Peer has all fields and methods, except for ID(), unexported.
+// It makes it impossible to create an instance of it
+// outside of whisper package and test properly.
+type peerWithID interface {
+	ID() []byte
+}
+
+func peerIDString(peer peerWithID) string {
+	return fmt.Sprintf("%x", peer.ID())
+}
+
+func peerIDBytesString(id []byte) string {
+	return fmt.Sprintf("%x", id)
 }

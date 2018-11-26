@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 
 	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -18,10 +19,22 @@ import (
 
 var ErrSessionNotFound = errors.New("session not found")
 
-// If we have no bundles, we use a constant so that the message can reach any device
+// Max number of installations we keep synchronized.
+const maxInstallations = 5
+
+// If we have no bundles, we use a constant so that the message can reach any device.
 const noInstallationID = "none"
 
-// EncryptionService defines a service that is responsible for the encryption aspect of the protocol
+// How many consecutive messages can be skipped in the receiving chain.
+const maxSkip = 1000
+
+// Any message with seqNo <= currentSeq - maxKeep will be deleted.
+const maxKeep = 3000
+
+// How many keys do we store in total per session.
+const maxMessageKeysPerSession = 2000
+
+// EncryptionService defines a service that is responsible for the encryption aspect of the protocol.
 type EncryptionService struct {
 	log            log.Logger
 	persistence    PersistenceService
@@ -31,7 +44,7 @@ type EncryptionService struct {
 
 type IdentityAndIDPair [2]string
 
-// NewEncryptionService creates a new EncryptionService instance
+// NewEncryptionService creates a new EncryptionService instance.
 func NewEncryptionService(p PersistenceService, installationID string) *EncryptionService {
 	logger := log.New("package", "status-go/services/sshext.chat")
 	logger.Info("Initialized encryption service", "installationID", installationID)
@@ -55,13 +68,21 @@ func (s *EncryptionService) keyFromActiveX3DH(theirIdentityKey []byte, theirSign
 // CreateBundle retrieves or creates an X3DH bundle given a private key
 func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle, error) {
 	ourIdentityKeyC := ecrypto.CompressPubkey(&privateKey.PublicKey)
-	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC)
+
+	installationIDs, err := s.persistence.GetActiveInstallations(maxInstallations-1, ourIdentityKeyC)
+	if err != nil {
+		return nil, err
+	}
+
+	installationIDs = append(installationIDs, s.installationID)
+
+	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installationIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	// If the bundle has expired we create a new one
-	if bundleContainer != nil && bundleContainer.Timestamp < time.Now().AddDate(0, 0, -14).UnixNano() {
+	if bundleContainer != nil && bundleContainer.GetBundle().Timestamp < time.Now().AddDate(0, 0, -14).UnixNano() {
 		// Mark sessions has expired
 		if err := s.persistence.MarkBundleExpired(bundleContainer.GetBundle().GetIdentity()); err != nil {
 			return nil, err
@@ -134,6 +155,16 @@ func (s *EncryptionService) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, 
 	return key, nil
 }
 
+func (s *EncryptionService) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	myIdentityKeyC := ecrypto.CompressPubkey(myIdentityKey)
+	return s.persistence.EnableInstallation(myIdentityKeyC, installationID)
+}
+
+func (s *EncryptionService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+	myIdentityKeyC := ecrypto.CompressPubkey(myIdentityKey)
+	return s.persistence.DisableInstallation(myIdentityKeyC, installationID)
+}
+
 // ProcessPublicBundle persists a bundle and returns a list of tuples identity/installationID
 func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *Bundle) ([]IdentityAndIDPair, error) {
 	// Make sure the bundle belongs to who signed it
@@ -142,16 +173,27 @@ func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey,
 		return nil, err
 	}
 	signedPreKeys := b.GetSignedPreKeys()
-	response := make([]IdentityAndIDPair, len(signedPreKeys))
+	var response []IdentityAndIDPair
+	var installationIDs []string
+	myIdentityStr := fmt.Sprintf("0x%x", ecrypto.FromECDSAPub(&myIdentityKey.PublicKey))
 
-	if err = s.persistence.AddPublicBundle(b); err != nil {
+	// Any device from other peers will be considered enabled, ours needs to
+	// be explicitly enabled
+	fromOurIdentity := identity != myIdentityStr
+
+	for installationID := range signedPreKeys {
+		if installationID != s.installationID {
+			installationIDs = append(installationIDs, installationID)
+			response = append(response, IdentityAndIDPair{identity, installationID})
+		}
+	}
+
+	if err = s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installationIDs, fromOurIdentity); err != nil {
 		return nil, err
 	}
 
-	index := 0
-	for installationID := range signedPreKeys {
-		response[index] = IdentityAndIDPair{identity, installationID}
-		index++
+	if err = s.persistence.AddPublicBundle(b); err != nil {
+		return nil, err
 	}
 
 	return response, nil
@@ -251,6 +293,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+			dr.WithMaxSkip(maxSkip),
+			dr.WithMaxKeep(maxKeep),
+			dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	} else {
 		session, err = dr.NewWithRemoteKey(
@@ -259,6 +304,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair.PubKey,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+			dr.WithMaxSkip(maxSkip),
+			dr.WithMaxKeep(maxKeep),
+			dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	}
 
@@ -285,6 +333,9 @@ func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		drInfo.ID,
 		sessionStorage,
 		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		dr.WithMaxSkip(maxSkip),
+		dr.WithMaxKeep(maxKeep),
+		dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 	if err != nil {
@@ -333,6 +384,9 @@ func (s *EncryptionService) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		drInfo.ID,
 		sessionStorage,
 		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		dr.WithMaxSkip(maxSkip),
+		dr.WithMaxKeep(maxKeep),
+		dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 	if err != nil {
@@ -393,8 +447,13 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
+	installationIDs, err := s.persistence.GetActiveInstallations(maxInstallations, theirIdentityKeyC)
+	if err != nil {
+		return nil, err
+	}
+
 	// Get their latest bundle
-	theirBundle, err := s.persistence.GetPublicBundle(theirIdentityKey)
+	theirBundle, err := s.persistence.GetPublicBundle(theirIdentityKey, installationIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -431,9 +490,8 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 			if drInfo.EphemeralKey != nil {
 				dmp.X3DHHeader = &X3DHHeader{
-					Key:            drInfo.EphemeralKey,
-					Id:             drInfo.BundleID,
-					InstallationId: s.installationID,
+					Key: drInfo.EphemeralKey,
+					Id:  drInfo.BundleID,
 				}
 			}
 
@@ -441,50 +499,41 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 			continue
 		}
 
-		// check if a bundle is there
-		theirBundle, err := s.persistence.GetPublicBundle(theirIdentityKey)
+		sharedKey, ourEphemeralKey, err := s.keyFromActiveX3DH(theirIdentityKeyC, theirSignedPreKey, myIdentityKey)
+		if err != nil {
+			return nil, err
+		}
+		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+		ourEphemeralKeyC := ecrypto.CompressPubkey(ourEphemeralKey)
+
+		err = s.persistence.AddRatchetInfo(sharedKey, theirIdentityKeyC, theirSignedPreKey, ourEphemeralKeyC, installationID)
 		if err != nil {
 			return nil, err
 		}
 
-		if theirBundle != nil {
-			sharedKey, ourEphemeralKey, err := s.keyFromActiveX3DH(theirIdentityKeyC, theirSignedPreKey, myIdentityKey)
-			if err != nil {
-				return nil, err
-			}
-			theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
-			ourEphemeralKeyC := ecrypto.CompressPubkey(ourEphemeralKey)
+		x3dhHeader := &X3DHHeader{
+			Key: ourEphemeralKeyC,
+			Id:  theirSignedPreKey,
+		}
 
-			err = s.persistence.AddRatchetInfo(sharedKey, theirIdentityKeyC, theirSignedPreKey, ourEphemeralKeyC, installationID)
-			if err != nil {
-				return nil, err
-			}
+		drInfo, err = s.persistence.GetAnyRatchetInfo(theirIdentityKeyC, installationID)
+		if err != nil {
+			return nil, err
+		}
 
-			x3dhHeader := &X3DHHeader{
-				Key:            ourEphemeralKeyC,
-				Id:             theirSignedPreKey,
-				InstallationId: s.installationID,
-			}
-
-			drInfo, err := s.persistence.GetAnyRatchetInfo(theirIdentityKeyC, installationID)
+		if drInfo != nil {
+			encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 			if err != nil {
 				return nil, err
 			}
 
-			if drInfo != nil {
-				encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
-				if err != nil {
-					return nil, err
-				}
-
-				dmp := &DirectMessageProtocol{
-					Payload:    encryptedPayload,
-					X3DHHeader: x3dhHeader,
-					DRHeader:   drHeader,
-				}
-
-				response[drInfo.InstallationID] = dmp
+			dmp := &DirectMessageProtocol{
+				Payload:    encryptedPayload,
+				X3DHHeader: x3dhHeader,
+				DRHeader:   drHeader,
 			}
+
+			response[drInfo.InstallationID] = dmp
 		}
 	}
 
