@@ -20,17 +20,17 @@ pipeline {
     ))
   }
 
-  environment {
-    STATUS_PATH = 'src/github.com/status-im/status-go'
-    GOPATH = "${env.WORKSPACE}"
-    PATH = "${env.PATH}:${env.GOPATH}/bin"
-  }
-
   stages {
     stage('Build') {
       parallel {
         stage('Android') {
           agent { label 'linux' }
+
+          environment {
+            STATUS_PATH = 'src/github.com/status-im/status-go'
+            GOPATH = "${env.WORKSPACE}"
+            PATH = "${env.PATH}:${env.GOPATH}/bin"
+          }
 
           stages {
             stage('Prep') {
@@ -86,6 +86,12 @@ pipeline {
 
         stage('iOS') {
           agent { label 'macos' }
+
+          environment {
+            STATUS_PATH = 'src/github.com/status-im/status-go'
+            GOPATH = "${env.WORKSPACE}"
+            PATH = "${env.PATH}:${env.GOPATH}/bin"
+          }
 
           stages {
             stage('Prep') {
