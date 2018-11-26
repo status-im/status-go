@@ -30,6 +30,10 @@ pipeline {
             STATUS_PATH = 'src/github.com/status-im/status-go'
             GOPATH = "${env.WORKSPACE}"
             PATH = "${env.PATH}:${env.GOPATH}/bin"
+            ANDROID_HOME = '/usr/lib/android-sdk'
+            ANDROID_SDK_ROOT = '/usr/lib/android-sdk'
+            ANDROID_NDK = '/usr/lib/android-ndk'
+            ANDROID_NDK_HOME = '/usr/lib/android-ndk'
           }
 
           stages {
