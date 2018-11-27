@@ -3,8 +3,8 @@ pipeline {
 
   parameters {
     booleanParam(
-      name: 'GITHUB_RELEASE',
-      description: 'Enable this to create a new GitHub release.',
+      name: 'RELEASE',
+      description: 'Enable to create a new release on GitHub and DigitalOcean Space.',
       defaultValue: false,
     )
   }
@@ -50,13 +50,16 @@ pipeline {
             } } }
             stage('Archive') { steps {
               sh """
-                mv ${env.STATUS_PATH}/build/bin/statusgo-android-16.aar \
+                cp ${env.STATUS_PATH}/build/bin/statusgo-android-16.aar \
                   ${env.WORKSPACE}/status-go-android-${lib.suffix()}.aar
               """
               archiveArtifacts("status-go-android-${lib.suffix()}.aar")
             } }
             stage('Upload') { steps { script {
               lib.uploadArtifact("status-go-android-${lib.suffix()}.aar")
+            } } }
+            stage('Cleanup') { steps { script {
+              sh "rm -f ${env.WORKSPACE}/*.aar"
             } } }
           }
         }
@@ -70,7 +73,7 @@ pipeline {
             } } }
             stage('Archive') { steps {
               sh """
-                mv ${env.STATUS_PATH}/build/bin/statusgo-ios-9.3-framework/status-go-ios.zip \
+                cp ${env.STATUS_PATH}/build/bin/statusgo-ios-9.3-framework/status-go-ios.zip \
                   ${env.WORKSPACE}/status-go-ios-${lib.suffix()}.zip
               """
               archiveArtifacts("status-go-ios-${lib.suffix()}.zip")
@@ -78,22 +81,27 @@ pipeline {
             stage('Upload') { steps { script {
               lib.uploadArtifact("status-go-ios-${lib.suffix()}.zip")
             } } }
+            stage('Cleanup') { steps { script {
+              sh "rm -f ${env.WORKSPACE}/*.zip"
+            } } }
           }
         }
       }
     }
-    stage('Release') { when { expression { params.GITHUB_RELEASE == true } }
+    stage('Release') { when { expression { params.RELEASE == true } }
       steps {
-        sh 'make prepare-release'
-        withCredentials([[
-          $class: 'UsernamePasswordMultiBinding',
-          credentialsId: 'status-im-auto',
-          usernameVariable: 'GITHUB_USER',
-          passwordVariable: 'GITHUB_TOKEN'
-        ]]) {
-          sh "yes | make release release_branch=${gitBranch}"
+        dir(env.STATUS_PATH) {
+          sh 'make prepare-release'
+          withCredentials([[
+            $class: 'UsernamePasswordMultiBinding',
+            credentialsId: 'status-im-auto',
+            usernameVariable: 'GITHUB_USER',
+            passwordVariable: 'GITHUB_TOKEN'
+          ]]) {
+            sh "yes | make release release_branch=${lib.gitBranch()}"
+          }
+          sh 'make clean-release'
         }
-        sh 'make clean-release'
       }
     }
   }
