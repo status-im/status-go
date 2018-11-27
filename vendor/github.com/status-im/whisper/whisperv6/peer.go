@@ -17,6 +17,7 @@
 package whisperv6
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"sync"
@@ -24,6 +25,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -35,11 +37,12 @@ type Peer struct {
 	peer *p2p.Peer
 	ws   p2p.MsgReadWriter
 
-	trusted        bool
-	powRequirement float64
-	bloomMu        sync.Mutex
-	bloomFilter    []byte
-	fullNode       bool
+	trusted              bool
+	powRequirement       float64
+	bloomMu              sync.Mutex
+	bloomFilter          []byte
+	fullNode             bool
+	confirmationsEnabled bool
 
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 
@@ -85,8 +88,9 @@ func (peer *Peer) handshake() error {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
+		confirmationsEnabled := !peer.host.disableConfirmations
 
-		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode)
+		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -133,6 +137,12 @@ func (peer *Peer) handshake() error {
 	isRemotePeerLightNode, err := s.Bool()
 	if isRemotePeerLightNode && isLightNode && isRestrictedLightNodeConnection {
 		return fmt.Errorf("peer [%x] is useless: two light client communication restricted", peer.ID())
+	}
+	confirmationsEnabled, err := s.Bool()
+	if err != nil || !confirmationsEnabled {
+		log.Warn("confirmations are disabled", "peer", peer.ID())
+	} else {
+		peer.confirmationsEnabled = confirmationsEnabled
 	}
 
 	if err := <-errc; err != nil {
@@ -208,19 +218,24 @@ func (peer *Peer) broadcast() error {
 	}
 
 	if len(bundle) > 0 {
-		// transmit the batch of envelopes
-		if err := p2p.Send(peer.ws, messagesCode, bundle); err != nil {
+		batchHash, err := sendBundle(peer.ws, bundle)
+		if err != nil {
+			log.Warn("failed to deliver envelopes", "peer", peer.peer.ID(), "error", err)
 			return err
 		}
 
 		// mark envelopes only if they were successfully sent
 		for _, e := range bundle {
 			peer.mark(e)
-			peer.host.envelopeFeed.Send(EnvelopeEvent{
+			event := EnvelopeEvent{
 				Event: EventEnvelopeSent,
 				Hash:  e.Hash(),
-				Peer:  peer.peer.ID(), // specifically discover.NodeID because it can be pretty printed
-			})
+				Peer:  peer.peer.ID(),
+			}
+			if peer.confirmationsEnabled {
+				event.Batch = batchHash
+			}
+			peer.host.envelopeFeed.Send(event)
 		}
 
 		log.Trace("broadcast", "num. messages", len(bundle))
@@ -265,4 +280,20 @@ func MakeFullNodeBloom() []byte {
 		bloom[i] = 0xFF
 	}
 	return bloom
+}
+
+func sendBundle(rw p2p.MsgWriter, bundle []*Envelope) (rst common.Hash, err error) {
+	data, err := rlp.EncodeToBytes(bundle)
+	if err != nil {
+		return
+	}
+	err = rw.WriteMsg(p2p.Msg{
+		Code:    messagesCode,
+		Size:    uint32(len(data)),
+		Payload: bytes.NewBuffer(data),
+	})
+	if err != nil {
+		return
+	}
+	return crypto.Keccak256Hash(data), nil
 }

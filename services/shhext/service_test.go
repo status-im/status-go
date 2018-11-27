@@ -411,7 +411,8 @@ type TrackerSuite struct {
 
 func (s *TrackerSuite) SetupTest() {
 	s.tracker = &tracker{
-		cache: map[common.Hash]EnvelopeState{},
+		cache:   map[common.Hash]EnvelopeState{},
+		batches: map[common.Hash]map[common.Hash]struct{}{},
 	}
 }
 
@@ -422,6 +423,25 @@ func (s *TrackerSuite) TestConfirmed() {
 	s.tracker.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
+	})
+	s.Contains(s.tracker.cache, testHash)
+	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
+}
+
+func (s *TrackerSuite) TestConfirmedWithAcknowledge() {
+	testBatch := common.Hash{1}
+	s.tracker.Add(testHash)
+	s.Contains(s.tracker.cache, testHash)
+	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventEnvelopeSent,
+		Hash:  testHash,
+		Batch: testBatch,
+	})
+	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventBatchAcknowledged,
+		Batch: testBatch,
 	})
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(EnvelopeSent, s.tracker.cache[testHash])
