@@ -709,7 +709,7 @@ func (s *SQLLiteSessionStorage) Load(id []byte) (*dr.State, error) {
 }
 
 // GetActiveInstallations returns the active installations for a given identity
-func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations uint, identity []byte) ([]string, error) {
+func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations int, identity []byte) ([]string, error) {
 	stmt, err := s.db.Prepare("SELECT installation_id FROM installations WHERE enabled = 1 AND identity = ? ORDER BY timestamp DESC LIMIT ?")
 	if err != nil {
 		return nil, err
