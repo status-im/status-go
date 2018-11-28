@@ -59,7 +59,7 @@ type StatusBackend struct {
 
 // NewStatusBackend create a new NewStatusBackend instance
 func NewStatusBackend() *StatusBackend {
-	defer log.Info("Status backend initialized")
+	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
 
 	statusNode := node.New()
 	accountManager := account.NewManager(statusNode)
