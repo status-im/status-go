@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"reflect"
@@ -25,16 +26,33 @@ func TestEncryptionServiceTestSuite(t *testing.T) {
 
 type EncryptionServiceTestSuite struct {
 	suite.Suite
-	alice *EncryptionService
-	bob   *EncryptionService
+	alice       *EncryptionService
+	bob         *EncryptionService
+	aliceDBPath string
+	bobDBPath   string
 }
 
-func (s *EncryptionServiceTestSuite) initDatabases() {
+func (s *EncryptionServiceTestSuite) initDatabases(baseConfig *EncryptionServiceConfig) {
+
+	aliceDBFile, err := ioutil.TempFile(os.TempDir(), "alice")
+	s.Require().NoError(err)
+	aliceDBPath := aliceDBFile.Name()
+
+	bobDBFile, err := ioutil.TempFile(os.TempDir(), "bob")
+	s.Require().NoError(err)
+	bobDBPath := bobDBFile.Name()
+
+	s.aliceDBPath = aliceDBPath
+	s.bobDBPath = bobDBPath
+
+	if baseConfig == nil {
+		config := DefaultEncryptionServiceConfig(aliceInstallationID)
+		baseConfig = &config
+	}
+
 	const (
-		aliceDBPath = "/tmp/alice.db"
-		aliceDBKey  = "alice"
-		bobDBPath   = "/tmp/bob.db"
-		bobDBKey    = "bob"
+		aliceDBKey = "alice"
+		bobDBKey   = "bob"
 	)
 
 	alicePersistence, err := NewSQLLitePersistence(aliceDBPath, aliceDBKey)
@@ -47,14 +65,20 @@ func (s *EncryptionServiceTestSuite) initDatabases() {
 		panic(err)
 	}
 
-	s.alice = NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig(aliceInstallationID))
-	s.bob = NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig(bobInstallationID))
+	baseConfig.InstallationID = aliceInstallationID
+	s.alice = NewEncryptionService(alicePersistence, *baseConfig)
+
+	baseConfig.InstallationID = bobInstallationID
+	s.bob = NewEncryptionService(bobPersistence, *baseConfig)
 }
 
 func (s *EncryptionServiceTestSuite) SetupTest() {
-	os.Remove("/tmp/alice.db")
-	os.Remove("/tmp/bob.db")
-	s.initDatabases()
+	s.initDatabases(nil)
+}
+
+func (s *EncryptionServiceTestSuite) TearDownTest() {
+	os.Remove(s.aliceDBPath)
+	os.Remove(s.bobDBPath)
 }
 
 func (s *EncryptionServiceTestSuite) TestCreateBundle() {
@@ -749,6 +773,12 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 // A new bundle has been received
 func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 
+	config := DefaultEncryptionServiceConfig("none")
+	// Set up refresh interval to "always"
+	config.BundleRefreshInterval = 1000
+
+	s.initDatabases(&config)
+
 	bobKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -756,23 +786,20 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// Create bundles
-	bobBundle1, err := NewBundleContainer(bobKey, bobInstallationID)
+	bobBundle1, err := s.bob.CreateBundle(bobKey)
 	s.Require().NoError(err)
+	s.Require().Equal(uint32(1), bobBundle1.GetSignedPreKeys()[bobInstallationID].GetVersion())
 
-	err = SignBundle(bobKey, bobBundle1)
+	// Sleep the required time so that bundle is refreshed
+	time.Sleep(time.Duration(config.BundleRefreshInterval) * time.Millisecond)
+
+	// Create bundles
+	bobBundle2, err := s.bob.CreateBundle(bobKey)
 	s.Require().NoError(err)
-
-	bobBundle2, err := NewBundleContainer(bobKey, bobInstallationID)
-	s.Require().NoError(err)
-	// We set the version
-
-	bobBundle2.GetBundle().GetSignedPreKeys()[bobInstallationID].Version = 1
-
-	err = SignBundle(bobKey, bobBundle2)
-	s.Require().NoError(err)
+	s.Require().Equal(uint32(2), bobBundle2.GetSignedPreKeys()[bobInstallationID].GetVersion())
 
 	// We add the first bob bundle
-	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle1.GetBundle())
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle1)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -786,10 +813,10 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 
 	x3dhHeader1 := installationResponse1.GetX3DHHeader()
 	s.NotNil(x3dhHeader1)
-	s.Equal(bobBundle1.GetBundle().GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader1.GetId())
+	s.Equal(bobBundle1.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader1.GetId())
 
 	// We add the second bob bundle
-	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle2.GetBundle())
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle2)
 	s.Require().NoError(err)
 
 	// Alice sends a message
@@ -803,6 +830,6 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 
 	x3dhHeader2 := installationResponse2.GetX3DHHeader()
 	s.NotNil(x3dhHeader2)
-	s.Equal(bobBundle2.GetBundle().GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader2.GetId())
+	s.Equal(bobBundle2.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader2.GetId())
 
 }

@@ -107,7 +107,14 @@ func (s *Service) InitProtocol(address string, password string) error {
 	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
 		return err
 	}
-	persistence, err := chat.NewSQLLitePersistence(filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address)), password)
+	oldPath := filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address))
+	newPath := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
+
+	if err := chat.MigrateDBFile(oldPath, newPath, password); err != nil {
+		return err
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(newPath, password)
 	if err != nil {
 		return err
 	}
