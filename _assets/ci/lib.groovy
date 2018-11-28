@@ -8,7 +8,11 @@ def timestamp() {
 }
 
 def suffix() {
-  return "${timestamp()}-${gitCommit()}"
+  if (params.RELEASE == true) {
+    return 'v' + readFile("${env.WORKSPACE}/${env.STATUS_PATH}/VERSION").trim()
+  } else {
+    return "${timestamp()}-${gitCommit()}"
+  }
 }
 
 def gitBranch() {

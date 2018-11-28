@@ -47,8 +47,8 @@ func (s *EncryptionServiceTestSuite) initDatabases() {
 		panic(err)
 	}
 
-	s.alice = NewEncryptionService(alicePersistence, aliceInstallationID)
-	s.bob = NewEncryptionService(bobPersistence, bobInstallationID)
+	s.alice = NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig(aliceInstallationID))
+	s.bob = NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig(bobInstallationID))
 }
 
 func (s *EncryptionServiceTestSuite) SetupTest() {
@@ -346,7 +346,7 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
 
 	// Bob sends a message
 
-	for i := 0; i < maxSkip; i++ {
+	for i := 0; i < s.alice.config.MaxSkip; i++ {
 		_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		s.Require().NoError(err)
 	}
@@ -401,7 +401,7 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeysError() {
 
 	// Bob sends a message
 
-	for i := 0; i < maxSkip+1; i++ {
+	for i := 0; i < s.alice.config.MaxSkip+1; i++ {
 		_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		s.Require().NoError(err)
 	}
@@ -442,7 +442,7 @@ func (s *EncryptionServiceTestSuite) TestMaxMessageKeysPerSession() {
 
 	// We create just enough messages so that the first key should be deleted
 
-	nMessages := maxMessageKeysPerSession + maxMessageKeysPerSession/maxSkip + 2
+	nMessages := s.alice.config.MaxMessageKeysPerSession + s.alice.config.MaxMessageKeysPerSession/s.alice.config.MaxSkip + 2
 	messages := make([]map[string]*DirectMessageProtocol, nMessages)
 	for i := 0; i < nMessages; i++ {
 		m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
@@ -451,7 +451,7 @@ func (s *EncryptionServiceTestSuite) TestMaxMessageKeysPerSession() {
 		messages[i] = m
 
 		// We decrypt some messages otherwise we hit maxSkip limit
-		if i%maxSkip == 0 {
+		if i%s.alice.config.MaxSkip == 0 {
 			_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, m)
 			s.Require().NoError(err)
 		}
@@ -499,8 +499,8 @@ func (s *EncryptionServiceTestSuite) TestMaxKeep() {
 	s.Require().NoError(err)
 
 	// We decrypt all messages but 1 & 2
-	messages := make([]map[string]*DirectMessageProtocol, maxKeep)
-	for i := 0; i < maxKeep; i++ {
+	messages := make([]map[string]*DirectMessageProtocol, s.alice.config.MaxKeep)
+	for i := 0; i < s.alice.config.MaxKeep; i++ {
 		m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		messages[i] = m
 		s.Require().NoError(err)

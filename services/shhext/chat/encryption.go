@@ -19,40 +19,51 @@ import (
 
 var ErrSessionNotFound = errors.New("session not found")
 
-// Max number of installations we keep synchronized.
-const maxInstallations = 5
-
 // If we have no bundles, we use a constant so that the message can reach any device.
 const noInstallationID = "none"
 
-// How many consecutive messages can be skipped in the receiving chain.
-const maxSkip = 1000
-
-// Any message with seqNo <= currentSeq - maxKeep will be deleted.
-const maxKeep = 3000
-
-// How many keys do we store in total per session.
-const maxMessageKeysPerSession = 2000
-
 // EncryptionService defines a service that is responsible for the encryption aspect of the protocol.
 type EncryptionService struct {
-	log            log.Logger
-	persistence    PersistenceService
-	installationID string
-	mutex          sync.Mutex
+	log         log.Logger
+	persistence PersistenceService
+	config      EncryptionServiceConfig
+	mutex       sync.Mutex
+}
+
+type EncryptionServiceConfig struct {
+	InstallationID string
+	// Max number of installations we keep synchronized.
+	MaxInstallations int
+	// How many consecutive messages can be skipped in the receiving chain.
+	MaxSkip int
+	// Any message with seqNo <= currentSeq - maxKeep will be deleted.
+	MaxKeep int
+	// How many keys do we store in total per session.
+	MaxMessageKeysPerSession int
 }
 
 type IdentityAndIDPair [2]string
 
+// DefaultEncryptionServiceConfig returns the default values used by the encryption service
+func DefaultEncryptionServiceConfig(installationID string) EncryptionServiceConfig {
+	return EncryptionServiceConfig{
+		MaxInstallations:         5,
+		MaxSkip:                  1000,
+		MaxKeep:                  3000,
+		MaxMessageKeysPerSession: 2000,
+		InstallationID:           installationID,
+	}
+}
+
 // NewEncryptionService creates a new EncryptionService instance.
-func NewEncryptionService(p PersistenceService, installationID string) *EncryptionService {
+func NewEncryptionService(p PersistenceService, config EncryptionServiceConfig) *EncryptionService {
 	logger := log.New("package", "status-go/services/sshext.chat")
-	logger.Info("Initialized encryption service", "installationID", installationID)
+	logger.Info("Initialized encryption service", "installationID", config.InstallationID)
 	return &EncryptionService{
-		log:            logger,
-		persistence:    p,
-		installationID: installationID,
-		mutex:          sync.Mutex{},
+		log:         logger,
+		persistence: p,
+		config:      config,
+		mutex:       sync.Mutex{},
 	}
 }
 
@@ -65,16 +76,30 @@ func (s *EncryptionService) keyFromActiveX3DH(theirIdentityKey []byte, theirSign
 	return sharedKey, ephemeralPubKey, nil
 }
 
+func (s *EncryptionService) getDRSession(id []byte) (dr.Session, error) {
+	sessionStorage := s.persistence.GetSessionStorage()
+	return dr.Load(
+		id,
+		sessionStorage,
+		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
+		dr.WithMaxSkip(s.config.MaxSkip),
+		dr.WithMaxKeep(s.config.MaxKeep),
+		dr.WithMaxMessageKeysPerSession(s.config.MaxMessageKeysPerSession),
+		dr.WithCrypto(crypto.EthereumCrypto{}),
+	)
+
+}
+
 // CreateBundle retrieves or creates an X3DH bundle given a private key
 func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle, error) {
 	ourIdentityKeyC := ecrypto.CompressPubkey(&privateKey.PublicKey)
 
-	installationIDs, err := s.persistence.GetActiveInstallations(maxInstallations-1, ourIdentityKeyC)
+	installationIDs, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations-1, ourIdentityKeyC)
 	if err != nil {
 		return nil, err
 	}
 
-	installationIDs = append(installationIDs, s.installationID)
+	installationIDs = append(installationIDs, s.config.InstallationID)
 
 	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installationIDs)
 	if err != nil {
@@ -98,7 +123,7 @@ func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle,
 
 	// needs transaction/mutex to avoid creating multiple bundles
 	// although not a problem
-	bundleContainer, err = NewBundleContainer(privateKey, s.installationID)
+	bundleContainer, err = NewBundleContainer(privateKey, s.config.InstallationID)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +207,7 @@ func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey,
 	fromOurIdentity := identity != myIdentityStr
 
 	for installationID := range signedPreKeys {
-		if installationID != s.installationID {
+		if installationID != s.config.InstallationID {
 			installationIDs = append(installationIDs, installationID)
 			response = append(response, IdentityAndIDPair{identity, installationID})
 		}
@@ -204,7 +229,7 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	msg := msgs[s.installationID]
+	msg := msgs[s.config.InstallationID]
 	if msg == nil {
 		msg = msgs[noInstallationID]
 	}
@@ -293,9 +318,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-			dr.WithMaxSkip(maxSkip),
-			dr.WithMaxKeep(maxKeep),
-			dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
+			dr.WithMaxSkip(s.config.MaxSkip),
+			dr.WithMaxKeep(s.config.MaxKeep),
+			dr.WithMaxMessageKeysPerSession(s.config.MaxMessageKeysPerSession),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	} else {
 		session, err = dr.NewWithRemoteKey(
@@ -304,9 +329,9 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 			keyPair.PubKey,
 			s.persistence.GetSessionStorage(),
 			dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-			dr.WithMaxSkip(maxSkip),
-			dr.WithMaxKeep(maxKeep),
-			dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
+			dr.WithMaxSkip(s.config.MaxSkip),
+			dr.WithMaxKeep(s.config.MaxKeep),
+			dr.WithMaxMessageKeysPerSession(s.config.MaxMessageKeysPerSession),
 			dr.WithCrypto(crypto.EthereumCrypto{}))
 	}
 
@@ -327,17 +352,9 @@ func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		PubKey: publicKey,
 	}
 
-	sessionStorage := s.persistence.GetSessionStorage()
 	// Load session from store first
-	session, err = dr.Load(
-		drInfo.ID,
-		sessionStorage,
-		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-		dr.WithMaxSkip(maxSkip),
-		dr.WithMaxKeep(maxKeep),
-		dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
-		dr.WithCrypto(crypto.EthereumCrypto{}),
-	)
+	session, err = s.getDRSession(drInfo.ID)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -379,16 +396,7 @@ func (s *EncryptionService) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		PubKey: publicKey,
 	}
 
-	sessionStorage := s.persistence.GetSessionStorage()
-	session, err = dr.Load(
-		drInfo.ID,
-		sessionStorage,
-		dr.WithKeysStorage(s.persistence.GetKeysStorage()),
-		dr.WithMaxSkip(maxSkip),
-		dr.WithMaxKeep(maxKeep),
-		dr.WithMaxMessageKeysPerSession(maxMessageKeysPerSession),
-		dr.WithCrypto(crypto.EthereumCrypto{}),
-	)
+	session, err = s.getDRSession(drInfo.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -447,7 +455,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
-	installationIDs, err := s.persistence.GetActiveInstallations(maxInstallations, theirIdentityKeyC)
+	installationIDs, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
 	if err != nil {
 		return nil, err
 	}
@@ -466,7 +474,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 	response := make(map[string]*DirectMessageProtocol)
 
 	for installationID, signedPreKeyContainer := range theirBundle.GetSignedPreKeys() {
-		if s.installationID == installationID {
+		if s.config.InstallationID == installationID {
 			continue
 		}
 
@@ -516,7 +524,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 			Id:  theirSignedPreKey,
 		}
 
-		drInfo, err = s.persistence.GetAnyRatchetInfo(theirIdentityKeyC, installationID)
+		drInfo, err = s.persistence.GetRatchetInfo(theirSignedPreKey, theirIdentityKeyC, installationID)
 		if err != nil {
 			return nil, err
 		}

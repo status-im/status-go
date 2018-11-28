@@ -38,8 +38,8 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	s.alice = NewProtocolService(NewEncryptionService(alicePersistence, "1"))
-	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, "2"))
+	s.alice = NewProtocolService(NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")))
+	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")))
 }
 
 func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
