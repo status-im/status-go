@@ -117,7 +117,7 @@ statusgo-android: ##@cross-compile Build status-go for Android
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	@gomobile bind -target=ios -ldflags="-s -w" -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	@gomobile bind -target=ios/arm64 -ldflags="-s -w" -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
