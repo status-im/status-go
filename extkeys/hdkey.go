@@ -41,6 +41,13 @@ import (
 
 // TODO make sure we're doing this ^^^^ !!!!!!
 
+type KeyPurpose int
+
+const (
+	KeyPurposeWallet KeyPurpose = iota
+	KeyPurposeChat
+)
+
 const (
 	// HardenedKeyStart defines a starting point for hardened key.
 	// Each extended key has 2^31 normal child keys and 2^31 hardened child keys.
@@ -79,6 +86,7 @@ const (
 // errors
 var (
 	ErrInvalidKey                 = errors.New("key is invalid")
+	ErrInvalidKeyPurpose          = errors.New("key purpose is invalid")
 	ErrInvalidSeed                = errors.New("seed is invalid")
 	ErrInvalidSeedLen             = fmt.Errorf("the recommended size of seed is %d-%d bits", MinSeedBytes, MaxSeedBytes)
 	ErrDerivingHardenedFromPublic = errors.New("cannot derive a hardened key from public key")
@@ -95,6 +103,22 @@ var (
 
 	// PublicKeyVersion is version for public key
 	PublicKeyVersion, _ = hex.DecodeString("0488B21E")
+
+	// EthBIP44ParentPath is BIP44 keys parent's derivation path
+	EthBIP44ParentPath = []uint32{
+		HardenedKeyStart + 44,          // purpose
+		HardenedKeyStart + CoinTypeETH, // cointype set to ETH
+		HardenedKeyStart + 0,           // account
+		0,                              // 0 - public, 1 - private
+	}
+
+	// EthEIP1581ChatParentPath is EIP-1581 chat keys parent's derivation path
+	EthEIP1581ChatParentPath = []uint32{
+		HardenedKeyStart + 43,          // purpose
+		HardenedKeyStart + CoinTypeETH, // cointype set to ETH
+		HardenedKeyStart + 1581,        // EIP-1581 subpurpose
+		HardenedKeyStart + 0,           // key_type (chat)
+	}
 )
 
 // ExtendedKey represents BIP44-compliant HD key
@@ -236,9 +260,28 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 	return child, nil
 }
 
+func (k *ExtendedKey) ChildForPurpose(p KeyPurpose, i uint32) (*ExtendedKey, error) {
+	switch p {
+	case KeyPurposeWallet:
+		return k.EthBIP44Child(i)
+	case KeyPurposeChat:
+		return k.EthEIP1581ChatChild(i)
+	default:
+		return nil, ErrInvalidKeyPurpose
+	}
+}
+
 // BIP44Child returns Status CKD#i (where i is child index).
 // BIP44 format is used: m / purpose' / coin_type' / account' / change / address_index
+// BIP44Child is depracated in favour of EthBIP44Child
+// Param coinType is deprecatet; we override it to always use CoinTypeETH.
 func (k *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
+	return k.EthBIP44Child(i)
+}
+
+// BIP44Child returns Status CKD#i (where i is child index).
+// BIP44 format is used: m / purpose' / coin_type' / account' / change / address_index
+func (k *ExtendedKey) EthBIP44Child(i uint32) (*ExtendedKey, error) {
 	if !k.IsPrivate {
 		return nil, ErrInvalidMasterKey
 	}
@@ -248,13 +291,28 @@ func (k *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
 	}
 
 	// m/44'/60'/0'/0/index
-	extKey, err := k.Derive([]uint32{
-		HardenedKeyStart + 44,       // purpose
-		HardenedKeyStart + coinType, // cointype
-		HardenedKeyStart + 0,        // account
-		0,                           // 0 - public, 1 - private
-		i,                           // index
-	})
+	extKey, err := k.Derive(append(EthBIP44ParentPath, i))
+	if err != nil {
+		return nil, err
+	}
+
+	return extKey, nil
+}
+
+// EthEIP1581ChatChild returns the whisper key #i (where i is child index).
+// EthEIP1581ChatChild format is used is the one defined in the EIP-1581:
+// m / 43' / coin_type' / 1581' / key_type / index
+func (k *ExtendedKey) EthEIP1581ChatChild(i uint32) (*ExtendedKey, error) {
+	if !k.IsPrivate {
+		return nil, ErrInvalidMasterKey
+	}
+
+	if k.Depth != 0 {
+		return nil, ErrInvalidMasterKey
+	}
+
+	// m/43'/60'/1581'/0/index
+	extKey, err := k.Derive(append(EthEIP1581ChatParentPath, i))
 	if err != nil {
 		return nil, err
 	}
