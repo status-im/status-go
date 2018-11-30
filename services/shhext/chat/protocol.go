@@ -161,7 +161,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
 		message, err := p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId(), directMessage)
 		if err != nil {
-			return nil, err
+			return response, err
 		}
 		response.Message = message
 
@@ -169,5 +169,5 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 	}
 
 	// Return error
-	return nil, errors.New("no payload")
+	return response, errors.New("no payload")
 }

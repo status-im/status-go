@@ -418,9 +418,16 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 
 	handler := EnvelopeSignalHandler{}
 
+	// Notify of added bundles
+	if response != nil && response.AddedBundles != nil {
+		for _, bundle := range response.AddedBundles {
+			handler.BundleAdded(bundle[0], bundle[1])
+		}
+	}
+
 	// Notify that someone tried to contact us using an invalid bundle
-	if err == chat.ErrSessionNotFound {
-		api.log.Warn("Session not found, sending signal", "err", err)
+	if err == chat.ErrDeviceNotFound && privateKey.PublicKey != *publicKey {
+		api.log.Warn("Device not found, sending signal", "err", err)
 		keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
 		handler := EnvelopeSignalHandler{}
 		handler.DecryptMessageFailed(keyString)
@@ -433,13 +440,6 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 
 	// Add unencrypted payload
 	msg.Payload = response.Message
-
-	// Notify of added bundles
-	if response.AddedBundles != nil {
-		for _, bundle := range response.AddedBundles {
-			handler.BundleAdded(bundle[0], bundle[1])
-		}
-	}
 
 	return nil
 }
