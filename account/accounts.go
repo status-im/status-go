@@ -69,7 +69,7 @@ func (m *Manager) CreateAccount(password string) (address, pubKey, mnemonic stri
 	}
 
 	// import created key into account keystore
-	address, pubKey, err = m.importExtendedKey(extKey, password)
+	address, pubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -124,7 +124,7 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
-	address, pubKey, err = m.importExtendedKey(childKey, password)
+	address, pubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, childKey, password)
 	if err != nil {
 		return
 	}
@@ -148,7 +148,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (address, pubKey str
 	}
 
 	// import re-created key into account keystore
-	address, pubKey, err = m.importExtendedKey(extKey, password)
+	address, pubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
 	if err != nil {
 		return
 	}
@@ -270,14 +270,14 @@ func (m *Manager) Logout() {
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
-func (m *Manager) importExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	keyStore, err := m.geth.AccountKeyStore()
 	if err != nil {
 		return "", "", err
 	}
 
 	// imports extended key, create key file (if necessary)
-	account, err := keyStore.ImportExtendedKey(extKey, password)
+	account, err := keyStore.ImportExtendedKeyForPurpose(keyPurpose, extKey, password)
 	if err != nil {
 		return "", "", err
 	}
