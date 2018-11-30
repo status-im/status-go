@@ -333,6 +333,8 @@ func waitForMailServerResponse(events chan whisper.EnvelopeEvent, requestID comm
 
 func decodeMailServerResponse(event whisper.EnvelopeEvent) (*whisper.MailServerResponse, error) {
 	switch event.Event {
+	case whisper.EventMailServerRequestSent:
+		return nil, nil
 	case whisper.EventMailServerRequestCompleted:
 		resp, ok := event.Data.(*whisper.MailServerResponse)
 		if !ok {
