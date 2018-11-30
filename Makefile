@@ -35,7 +35,7 @@ GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
-ENABLE_METRICS ?= false
+ENABLE_METRICS ?= true
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
