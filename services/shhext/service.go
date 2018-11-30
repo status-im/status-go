@@ -39,6 +39,7 @@ type Service struct {
 	w              *whisper.Whisper
 	config         *ServiceConfig
 	tracker        *tracker
+	server         *p2p.Server
 	nodeID         *ecdsa.PrivateKey
 	deduplicator   *dedup.Deduplicator
 	protocol       *chat.ProtocolService
@@ -57,6 +58,7 @@ type ServiceConfig struct {
 	Debug                   bool
 	PFSEnabled              bool
 	MailServerConfirmations bool
+	EnableConnectionManager bool
 	ConnectionTarget        int
 }
 
@@ -178,22 +180,26 @@ func (s *Service) APIs() []rpc.API {
 // Start is run when a service is started.
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Start(server *p2p.Server) error {
-	s.peerStore.UsePeersProvider(server)
-	connectionsTarget := s.config.ConnectionTarget
-	if connectionsTarget == 0 {
-		connectionsTarget = defaultConnectionsTarget
+	if s.config.EnableConnectionManager {
+		connectionsTarget := s.config.ConnectionTarget
+		if connectionsTarget == 0 {
+			connectionsTarget = defaultConnectionsTarget
+		}
+		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget)
+		s.connManager.Start()
 	}
-	s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget)
-	s.connManager.Start()
 	s.tracker.Start()
 	s.nodeID = server.PrivateKey
+	s.server = server
 	return nil
 }
 
 // Stop is run when a service is stopped.
 // It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Stop() error {
-	s.connManager.Stop()
+	if s.config.EnableConnectionManager {
+		s.connManager.Stop()
+	}
 	s.tracker.Stop()
 	return nil
 }

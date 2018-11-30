@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -152,7 +153,7 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 
 func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
 	if len(rawurl) == 0 {
-		return api.service.peerStore.GetFirstConnected()
+		return mailservers.GetFirstConnected(api.service.server, api.service.peerStore)
 	}
 	return enode.ParseV4(rawurl)
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -274,10 +275,18 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 		initial = nodes[0]
 		return nil
 	}, time.Second, 100*time.Millisecond))
+	hash := common.Hash{1}
 	select {
-	case whisper.input <- whisperv6.EnvelopeEvent{Event: whisperv6.EventMailServerRequestExpired, Peer: initial}:
+	case whisper.input <- whisperv6.EnvelopeEvent{
+		Event: whisperv6.EventMailServerRequestSent, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
-		require.FailNow(t, "can't send an expiry event")
+		require.FailNow(t, "can't send a 'sent' event")
+	}
+	select {
+	case whisper.input <- whisperv6.EnvelopeEvent{
+		Event: whisperv6.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case <-time.After(time.Second):
+		require.FailNow(t, "can't send an 'expiry' event")
 	}
 	require.NoError(t, utils.Eventually(func() error {
 		nodes := server.Nodes()

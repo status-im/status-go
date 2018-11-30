@@ -40,12 +40,6 @@ func TestGetNodeByID(t *testing.T) {
 	require.Nil(t, store.Get(enode.ID{1}))
 }
 
-func TestNoPeersProvider(t *testing.T) {
-	store := NewPeerStore()
-	_, err := store.GetFirstConnected()
-	require.EqualError(t, ErrNoProvider, err.Error())
-}
-
 type fakePeerProvider struct {
 	peers []*p2p.Peer
 }
@@ -57,13 +51,12 @@ func (f fakePeerProvider) Peers() []*p2p.Peer {
 func TestNoConnected(t *testing.T) {
 	provider := fakePeerProvider{}
 	store := NewPeerStore()
-	store.UsePeersProvider(provider)
-	_, err := store.GetFirstConnected()
+	_, err := GetFirstConnected(provider, store)
 	require.EqualError(t, ErrNoConnected, err.Error())
 }
 
 func TestGetFirstConnected(t *testing.T) {
-	numPeers := 3
+	numPeers := 1
 	nodes := make([]*enode.Node, numPeers)
 	peers := make([]*p2p.Peer, numPeers)
 	for i := 0; i < numPeers; i++ {
@@ -74,11 +67,10 @@ func TestGetFirstConnected(t *testing.T) {
 	}
 	store := NewPeerStore()
 	provider := fakePeerProvider{peers}
-	store.UsePeersProvider(provider)
-	_, err := store.GetFirstConnected()
+	_, err := GetFirstConnected(provider, store)
 	require.EqualError(t, ErrNoConnected, err.Error())
 	store.Update(nodes)
-	node, err := store.GetFirstConnected()
+	node, err := GetFirstConnected(provider, store)
 	require.NoError(t, err)
-	require.Equal(t, nodes[0], node)
+	require.Equal(t, nodes[0].ID(), node.ID())
 }

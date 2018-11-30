@@ -3,6 +3,7 @@ package mailservers
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -82,6 +83,7 @@ func (ps *ConnectionManager) Start() {
 		sub := ps.server.SubscribeEvents(events)
 		whisperEvents := make(chan whisperv6.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
+		requests := map[common.Hash]struct{}{}
 		for {
 			select {
 			case <-ps.quit:
@@ -112,12 +114,20 @@ func (ps *ConnectionManager) Start() {
 					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
 				}
 			case ev := <-whisperEvents:
+				// TODO what about completed but with error? what about expired envelopes?
 				switch ev.Event {
+				case whisperv6.EventMailServerRequestSent:
+					requests[ev.Hash] = struct{}{}
+				case whisperv6.EventMailServerRequestCompleted:
+					delete(requests, ev.Hash)
 				case whisperv6.EventMailServerRequestExpired:
+					_, exist := requests[ev.Hash]
+					if !exist {
+						continue
+					}
 					log.Debug("request to a mail server expired, disconnet a peer", "address", ev.Peer)
 					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
 				}
-				// TODO what about completed but with error? what about expired envelopes?
 			}
 		}
 	}()
