@@ -3,6 +3,7 @@ package mailservers
 import (
 	"sync"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -10,8 +11,8 @@ import (
 )
 
 const (
-	peerEventsBuffer    = 10 // sufficient buffer to avoid blocking a feed.
-	whisperEventsBuffer = 20
+	peerEventsBuffer    = 10 // sufficient buffer to avoid blocking a p2p feed.
+	whisperEventsBuffer = 20 // sufficient buffer to avod blocking a whisper envelopes feed.
 )
 
 // PeerAdderRemover is an interface for adding or removing peers.
@@ -20,8 +21,23 @@ type PeerAdderRemover interface {
 	RemovePeer(node *enode.Node)
 }
 
+// PeerEventsSubscriber interface to subscribe for p2p.PeerEvent's.
+type PeerEventsSubscriber interface {
+	SubscribeEvents(chan *p2p.PeerEvent) event.Subscription
+}
+
+//EnvelopeEventScubriber interface to subscribe for whisper.EnvelopeEvent's.
+type EnvelopeEventScubriber interface {
+	SubscribeEnvelopeEvents(chan<- whisperv6.EnvelopeEvent) event.Subscription
+}
+
+type p2pServer interface {
+	PeerAdderRemover
+	PeerEventsSubscriber
+}
+
 // NewConnectionManager creates an instance of ConnectionManager.
-func NewConnectionManager(server *p2p.Server, whisper *whisperv6.Whisper, target int) *ConnectionManager {
+func NewConnectionManager(server p2pServer, whisper EnvelopeEventScubriber, target int) *ConnectionManager {
 	return &ConnectionManager{
 		server:          server,
 		whisper:         whisper,
@@ -35,8 +51,8 @@ type ConnectionManager struct {
 	wg   sync.WaitGroup
 	quit chan struct{}
 
-	server  *p2p.Server
-	whisper *whisperv6.Whisper
+	server  p2pServer
+	whisper EnvelopeEventScubriber
 
 	notifications   chan []*enode.Node
 	connectedTarget int
@@ -49,9 +65,8 @@ func (ps *ConnectionManager) Notify(nodes []*enode.Node) {
 		select {
 		case ps.notifications <- nodes:
 		case <-ps.quit:
-			ps.wg.Done()
-			return
 		}
+		ps.wg.Done()
 	}()
 
 }
@@ -85,7 +100,7 @@ func (ps *ConnectionManager) Start() {
 				for _, n := range newNodes {
 					replace[n.ID()] = n
 				}
-				replaceNodes(ps.server, len(connected), ps.connectedTarget, current, replace)
+				replaceNodes(ps.server, ps.connectedTarget, connected, current, replace)
 				current = replace
 			case ev := <-events:
 				switch ev.Type {
@@ -102,7 +117,7 @@ func (ps *ConnectionManager) Start() {
 					log.Debug("request to a mail server expired, disconnet a peer", "address", ev.Peer)
 					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
 				}
-				// TODO what about completed but with error?
+				// TODO what about completed but with error? what about expired envelopes?
 			}
 		}
 	}()
@@ -123,13 +138,16 @@ func (ps *ConnectionManager) Stop() {
 	ps.quit = nil
 }
 
-func replaceNodes(srv PeerAdderRemover, connected, target int, old, new map[enode.ID]*enode.Node) {
+func replaceNodes(srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, old, new map[enode.ID]*enode.Node) {
 	for nid, n := range old {
 		if _, exist := new[nid]; !exist {
+			if _, exist := connected[nid]; exist {
+				delete(connected, nid)
+			}
 			srv.RemovePeer(n)
 		}
 	}
-	if connected < target {
+	if len(connected) < target {
 		for _, n := range new {
 			srv.AddPeer(n)
 		}
@@ -160,9 +178,9 @@ func nodeDisconnected(srv PeerAdderRemover, peer enode.ID, target int, connected
 	if len(nodes) == 1 { // keep node connected if we don't have another choice
 		return
 	}
-	srv.RemovePeer(n)
+	srv.RemovePeer(n) // remove peer permanently, otherwise p2p.Server will try to reconnect
 	delete(connected, peer)
-	if len(connected) < target { // try to connected with any other selected node
+	if len(connected) < target { // try to connect with any other selected, but not connected node
 		for nid, n := range nodes {
 			_, exist := connected[nid]
 			if exist || peer == nid {
