@@ -38,8 +38,10 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	s.alice = NewProtocolService(NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")))
-	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")))
+	addedBundlesHandler := func(addedBundles []IdentityAndIDPair) {}
+
+	s.alice = NewProtocolService(NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")), addedBundlesHandler)
+	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")), addedBundlesHandler)
 }
 
 func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
@@ -102,9 +104,8 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	s.NoError(err)
 
 	// Bob is able to decrypt the message
-	response, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg[&bobKey.PublicKey])
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg[&bobKey.PublicKey])
 	s.NoError(err)
-	unmarshaledMsg := response.Message
 
 	s.NotNil(unmarshaledMsg)
 

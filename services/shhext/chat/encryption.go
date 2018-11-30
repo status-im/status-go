@@ -18,6 +18,7 @@ import (
 )
 
 var ErrSessionNotFound = errors.New("session not found")
+var ErrDeviceNotFound = errors.New("device not found")
 
 // If we have no bundles, we use a constant so that the message can reach any device.
 const noInstallationID = "none"
@@ -53,7 +54,7 @@ func DefaultEncryptionServiceConfig(installationID string) EncryptionServiceConf
 		MaxSkip:                  1000,
 		MaxKeep:                  3000,
 		MaxMessageKeysPerSession: 2000,
-		BundleRefreshInterval:    14 * 24 * 60 * 60 * 1000,
+		BundleRefreshInterval:    6 * 60 * 60 * 1000,
 		InstallationID:           installationID,
 	}
 }
@@ -238,8 +239,8 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 	}
 
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
-	if msg == nil {
-		return nil, ErrSessionNotFound
+	if msg == nil && myIdentityKey.PublicKey != *theirIdentityKey {
+		return nil, ErrDeviceNotFound
 	}
 	payload := msg.GetPayload()
 
