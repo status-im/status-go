@@ -56,14 +56,15 @@ func TestNoConnected(t *testing.T) {
 }
 
 func TestGetFirstConnected(t *testing.T) {
-	numPeers := 1
+	numPeers := 3
 	nodes := make([]*enode.Node, numPeers)
 	peers := make([]*p2p.Peer, numPeers)
-	for i := 0; i < numPeers; i++ {
-		var err error
-		nodes[i], err = RandomeNode()
-		require.NoError(t, err)
-		peers[i] = p2p.NewPeer(nodes[i].ID(), nodes[i].ID().String(), nil)
+	nodesMap := getNRandomNodes(t, numPeers)
+	i := 0
+	for _, node := range nodesMap {
+		nodes[i] = node
+		peers[i] = p2p.NewPeer(node.ID(), node.ID().String(), nil)
+		i++
 	}
 	store := NewPeerStore()
 	provider := fakePeerProvider{peers}
@@ -72,5 +73,5 @@ func TestGetFirstConnected(t *testing.T) {
 	store.Update(nodes)
 	node, err := GetFirstConnected(provider, store)
 	require.NoError(t, err)
-	require.Equal(t, nodes[0].ID(), node.ID())
+	require.Contains(t, nodesMap, node.ID())
 }

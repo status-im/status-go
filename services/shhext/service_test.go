@@ -237,12 +237,12 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 			NoDiscovery: true,
 		},
 	}) // in-memory node as no data dir
-	s.NoError(err)
+	s.Require().NoError(err)
 	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) { return shh, nil })
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	err = aNode.Start()
-	s.NoError(err)
+	s.Require().NoError(err)
 	defer func() { err := aNode.Stop(); s.NoError(err) }()
 
 	mock := newHandlerMock(1)
@@ -253,7 +253,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		PFSEnabled:     false,
 	}
 	service := New(shh, mock, nil, config)
-	s.NoError(service.Start(aNode.Server()))
+	s.Require().NoError(service.Start(aNode.Server()))
 	api := NewPublicAPI(service)
 
 	// with a peer acting as a mailserver
@@ -265,40 +265,40 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 			ListenAddr:  ":0",
 		},
 	}) // in-memory node as no data dir
-	s.NoError(err)
+	s.Require().NoError(err)
 	err = mailNode.Register(func(*node.ServiceContext) (node.Service, error) {
 		return whisper.New(nil), nil
 	})
 	s.NoError(err)
 	err = mailNode.Start()
-	s.NoError(err)
+	s.Require().NoError(err)
 	defer func() { s.NoError(mailNode.Stop()) }()
 
 	// add mailPeer as a peer
 	waitErr := helpers.WaitForPeerAsync(aNode.Server(), mailNode.Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
 	aNode.Server().AddPeer(mailNode.Server().Self())
-	s.NoError(<-waitErr)
+	s.Require().NoError(<-waitErr)
 
 	var hash []byte
 
 	// send a request with a symmetric key
 	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
-	s.NoError(symKeyErr)
+	s.Require().NoError(symKeyErr)
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailNode.Server().Self().String(),
 		SymKeyID:       symKeyID,
 	})
-	s.NoError(err)
-	s.NotNil(hash)
-	s.NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
+	s.Require().NoError(err)
+	s.Require().NotNil(hash)
+	s.Require().NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 	// Send a request without a symmetric key. In this case,
 	// a public key extracted from MailServerPeer will be used.
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailNode.Server().Self().String(),
 	})
-	s.NoError(err)
-	s.NotNil(hash)
-	s.NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
+	s.Require().NoError(err)
+	s.Require().NotNil(hash)
+	s.Require().NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 }
 
 func (s *ShhExtSuite) TestDebugPostSync() {
@@ -401,11 +401,12 @@ func (s *ShhExtSuite) TearDown() {
 
 func waitForHashInTracker(track *tracker, hash common.Hash, state EnvelopeState, deadline time.Duration) error {
 	after := time.After(deadline)
+	ticker := time.Tick(100 * time.Millisecond)
 	for {
 		select {
 		case <-after:
 			return fmt.Errorf("failed while waiting for %s to get into state %d", hash, state)
-		default:
+		case <-ticker:
 			if track.GetState(hash) == state {
 				return nil
 			}

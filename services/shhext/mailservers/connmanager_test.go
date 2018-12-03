@@ -189,8 +189,10 @@ func TestConnectionManagerAddDrop(t *testing.T) {
 	for _, n := range getNRandomNodes(t, 3) {
 		nodes = append(nodes, n)
 	}
+	// Send 3 random nodes to connection manager.
 	connmanager.Notify(nodes)
 	var initial enode.ID
+	// Wait till connection manager establishes connection with 1 peer.
 	require.NoError(t, utils.Eventually(func() error {
 		nodes := server.Nodes()
 		if len(nodes) != target {
@@ -199,11 +201,13 @@ func TestConnectionManagerAddDrop(t *testing.T) {
 		initial = nodes[0]
 		return nil
 	}, time.Second, 100*time.Millisecond))
+	// Send an event that peer was dropped.
 	select {
 	case server.input <- &p2p.PeerEvent{Peer: initial, Type: p2p.PeerEventTypeDrop}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a drop event")
 	}
+	// Connection manager should establish connection with any other peer from initial list.
 	require.NoError(t, utils.Eventually(func() error {
 		nodes := server.Nodes()
 		if len(nodes) != target {
@@ -227,7 +231,9 @@ func TestConnectionManagerReplace(t *testing.T) {
 	for _, n := range getNRandomNodes(t, 3) {
 		nodes = append(nodes, n)
 	}
+	// Send a single node to connection manager.
 	connmanager.Notify(nodes[:1])
+	// Wait until this node will get connected.
 	require.NoError(t, utils.Eventually(func() error {
 		connected := server.Nodes()
 		if len(connected) != target {
@@ -238,7 +244,9 @@ func TestConnectionManagerReplace(t *testing.T) {
 		}
 		return nil
 	}, time.Second, 100*time.Millisecond))
+	// Replace previously sent node with 2 different nodes.
 	connmanager.Notify(nodes[1:])
+	// Wait until connection manager replaces node connected in the first round.
 	require.NoError(t, utils.Eventually(func() error {
 		connected := server.Nodes()
 		if len(connected) != target {
@@ -265,8 +273,10 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 	for _, n := range getNRandomNodes(t, 2) {
 		nodes = append(nodes, n)
 	}
+	// Send two random nodes to connection manager.
 	connmanager.Notify(nodes)
 	var initial enode.ID
+	// Wait until connection manager establishes connection with one node.
 	require.NoError(t, utils.Eventually(func() error {
 		nodes := server.Nodes()
 		if len(nodes) != target {
@@ -276,12 +286,14 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 		return nil
 	}, time.Second, 100*time.Millisecond))
 	hash := common.Hash{1}
+	// Send event that history request for connected peer was sent.
 	select {
 	case whisper.input <- whisperv6.EnvelopeEvent{
 		Event: whisperv6.EventMailServerRequestSent, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'sent' event")
 	}
+	// And eventually expired.
 	select {
 	case whisper.input <- whisperv6.EnvelopeEvent{
 		Event: whisperv6.EventMailServerRequestExpired, Peer: initial, Hash: hash}:

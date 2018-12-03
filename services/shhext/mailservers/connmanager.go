@@ -27,8 +27,8 @@ type PeerEventsSubscriber interface {
 	SubscribeEvents(chan *p2p.PeerEvent) event.Subscription
 }
 
-//EnvelopeEventScubriber interface to subscribe for whisper.EnvelopeEvent's.
-type EnvelopeEventScubriber interface {
+// EnvelopeEventSubscbriber interface to subscribe for whisper.EnvelopeEvent's.
+type EnvelopeEventSubscbriber interface {
 	SubscribeEnvelopeEvents(chan<- whisperv6.EnvelopeEvent) event.Subscription
 }
 
@@ -38,7 +38,7 @@ type p2pServer interface {
 }
 
 // NewConnectionManager creates an instance of ConnectionManager.
-func NewConnectionManager(server p2pServer, whisper EnvelopeEventScubriber, target int) *ConnectionManager {
+func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscbriber, target int) *ConnectionManager {
 	return &ConnectionManager{
 		server:          server,
 		whisper:         whisper,
@@ -53,7 +53,7 @@ type ConnectionManager struct {
 	quit chan struct{}
 
 	server  p2pServer
-	whisper EnvelopeEventScubriber
+	whisper EnvelopeEventSubscbriber
 
 	notifications   chan []*enode.Node
 	connectedTarget int
@@ -92,18 +92,18 @@ func (ps *ConnectionManager) Start() {
 				ps.wg.Done()
 				return
 			case err := <-sub.Err():
-				log.Error("retry after error to subscribe for p2p events", "error", err)
+				log.Error("retry after error subscribing to p2p events", "error", err)
 				sub = ps.server.SubscribeEvents(events)
 			case err := <-whisperSub.Err():
-				log.Error("retry after error to subscribe for whisper events", "error", err)
+				log.Error("retry after error suscribing to whisper events", "error", err)
 				whisperSub = ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
 			case newNodes := <-ps.notifications:
-				replace := map[enode.ID]*enode.Node{}
+				replacement := map[enode.ID]*enode.Node{}
 				for _, n := range newNodes {
-					replace[n.ID()] = n
+					replacement[n.ID()] = n
 				}
-				replaceNodes(ps.server, ps.connectedTarget, connected, current, replace)
-				current = replace
+				replaceNodes(ps.server, ps.connectedTarget, connected, current, replacement)
+				current = replacement
 			case ev := <-events:
 				switch ev.Type {
 				case p2p.PeerEventTypeAdd:
@@ -125,7 +125,7 @@ func (ps *ConnectionManager) Start() {
 					if !exist {
 						continue
 					}
-					log.Debug("request to a mail server expired, disconnet a peer", "address", ev.Peer)
+					log.Debug("request to a mail server expired, disconncet a peer", "address", ev.Peer)
 					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
 				}
 			}
@@ -177,11 +177,11 @@ func nodeAdded(srv PeerAdderRemover, peer enode.ID, target int, connected map[en
 }
 
 func nodeDisconnected(srv PeerAdderRemover, peer enode.ID, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
-	n, exist := nodes[peer] // not related event
+	n, exist := nodes[peer] // unrelated event
 	if !exist {
 		return
 	}
-	_, exist = connected[peer] // already removed
+	_, exist = connected[peer] // check if already disconnected
 	if !exist {
 		return
 	}
@@ -190,7 +190,7 @@ func nodeDisconnected(srv PeerAdderRemover, peer enode.ID, target int, connected
 	}
 	srv.RemovePeer(n) // remove peer permanently, otherwise p2p.Server will try to reconnect
 	delete(connected, peer)
-	if len(connected) < target { // try to connect with any other selected, but not connected node
+	if len(connected) < target { // try to connect with any other selected (but not connected) node
 		for nid, n := range nodes {
 			_, exist := connected[nid]
 			if exist || peer == nid {

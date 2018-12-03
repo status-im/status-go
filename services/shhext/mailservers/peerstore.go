@@ -13,7 +13,7 @@ var (
 	ErrNoConnected = errors.New("no connected mail servers")
 )
 
-// PeersProvider is an interface for requesting peers.
+// PeersProvider is an interface for requesting list of peers.
 type PeersProvider interface {
 	Peers() []*p2p.Peer
 }
