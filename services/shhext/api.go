@@ -205,7 +205,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, err
 	}
 
-	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout); err != nil {
+	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
 		return nil, err
 	}
 	hash := envelope.Hash()

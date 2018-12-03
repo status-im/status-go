@@ -173,7 +173,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 			Limit:          1,
 			Topic:          topic,
 			SymKeyID:       mailServerKeyID,
-			Timeout:        time.Duration(*timeout) * time.Second,
+			Timeout:        time.Duration(*timeout),
 		})
 	if err != nil {
 		logger.Error("Error requesting historic messages from mailserver", "error", err)
