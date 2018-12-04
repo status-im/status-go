@@ -13,6 +13,8 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
+	fcmlib "github.com/NaySoftware/go-fcm"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
@@ -444,12 +446,10 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 }
 
 // NotifyUsers sends push notifications to users.
-func (b *StatusBackend) NotifyUsers(dataPayloadJSON string, tokens ...string) error {
-	log.Debug("sending push notification")
-
-	err := b.newNotification().Send(dataPayloadJSON, tokens...)
+func (b *StatusBackend) NotifyUsers(message string, payload fcmlib.NotificationPayload, tokens ...string) error {
+	err := b.newNotification().Send(message, payload, tokens...)
 	if err != nil {
-		b.log.Error("NotifyUsers failed", "dataPayloadJSON", dataPayloadJSON, "error", err)
+		b.log.Error("Notify failed", "error", err)
 	}
 
 	return err
