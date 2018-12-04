@@ -449,10 +449,13 @@ func AppStateChange(state string) {
 	statusBackend.AppStateChange(state)
 }
 
-//SetMobileSignalHandler setup geth callback to notify about new signal
+// SetMobileSignalHandler setup geth callback to notify about new signal
+// used for gomobile builds
 func SetMobileSignalHandler(handler SignalHandler) {
 	signal.SetMobileSignalHandler(func(data []byte) {
-		handler.HandleSignal(string(data))
+		if data != nil && len(data) > 0 {
+			handler.HandleSignal(string(data))
+		}
 	})
 }
 
