@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 const (
@@ -40,22 +41,22 @@ func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []by
 // * request completed successfully
 // * request failed
 // If the payload is unknown/unparseable, it returns `nil`
-func CreateMailServerEvent(payload []byte) (*EnvelopeEvent, error) {
+func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
 
 	if len(payload) < common.HashLength {
 		return nil, invalidResponseSizeError(len(payload))
 	}
 
-	event, err := tryCreateMailServerRequestFailedEvent(payload)
+	event, err := tryCreateMailServerRequestFailedEvent(nodeID, payload)
 
 	if err != nil || event != nil {
 		return event, err
 	}
 
-	return tryCreateMailServerRequestCompletedEvent(payload)
+	return tryCreateMailServerRequestCompletedEvent(nodeID, payload)
 }
 
-func tryCreateMailServerRequestFailedEvent(payload []byte) (*EnvelopeEvent, error) {
+func tryCreateMailServerRequestFailedEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
 	if len(payload) < common.HashLength+len(mailServerFailedPayloadPrefix) {
 		return nil, nil
 	}
@@ -75,6 +76,7 @@ func tryCreateMailServerRequestFailedEvent(payload []byte) (*EnvelopeEvent, erro
 	errorMsg = string(remainder)
 
 	event := EnvelopeEvent{
+		Peer:  nodeID,
 		Hash:  requestID,
 		Event: EventMailServerRequestCompleted,
 		Data: &MailServerResponse{
@@ -86,7 +88,7 @@ func tryCreateMailServerRequestFailedEvent(payload []byte) (*EnvelopeEvent, erro
 
 }
 
-func tryCreateMailServerRequestCompletedEvent(payload []byte) (*EnvelopeEvent, error) {
+func tryCreateMailServerRequestCompletedEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
 	// check if payload is
 	// - requestID or
 	// - requestID + lastEnvelopeHash or
@@ -115,6 +117,7 @@ func tryCreateMailServerRequestCompletedEvent(payload []byte) (*EnvelopeEvent, e
 	}
 
 	event := EnvelopeEvent{
+		Peer:  nodeID,
 		Hash:  requestID,
 		Event: EventMailServerRequestCompleted,
 		Data: &MailServerResponse{

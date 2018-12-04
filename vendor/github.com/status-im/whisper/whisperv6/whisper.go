@@ -463,22 +463,12 @@ func (whisper *Whisper) SyncMessages(peerID []byte, req SyncMailRequest) error {
 		return err
 	}
 
-	size, r, err := rlp.EncodeToReader(req)
-	if err != nil {
-		return err
-	}
-
-	return p.ws.WriteMsg(p2p.Msg{Code: p2pSyncRequestCode, Size: uint32(size), Payload: r})
+	return p2p.Send(p.ws, p2pSyncRequestCode, req)
 }
 
 // SendSyncResponse sends a response to a Mail Server with a slice of envelopes.
 func (whisper *Whisper) SendSyncResponse(p *Peer, data SyncResponse) error {
-	size, r, err := rlp.EncodeToReader(data)
-	if err != nil {
-		return err
-	}
-
-	return p.ws.WriteMsg(p2p.Msg{Code: p2pSyncResponseCode, Size: uint32(size), Payload: r})
+	return p2p.Send(p.ws, p2pSyncResponseCode, data)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -1001,6 +991,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			//   1. Sending a request contains an ID,
 			//   2. Each sync reponse contains this ID,
 			//   3. There is a way to call whisper.SyncMessages() and wait for the response.Final to be received for that particular request ID.
+			//   4. If Cursor is not empty, another p2pSyncRequestCode should be sent.
 			if p.trusted && whisper.mailServer != nil {
 				var resp SyncResponse
 				if err = packet.Decode(&resp); err != nil {
@@ -1039,7 +1030,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				event, err := CreateMailServerEvent(payload)
+				event, err := CreateMailServerEvent(p.peer.ID(), payload)
 
 				if err != nil {
 					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)
