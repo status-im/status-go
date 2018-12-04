@@ -62,6 +62,7 @@ var (
 	requestValidationErrorsCounter = metrics.NewRegisteredCounter("mailserver/requestValidationErrors", nil)
 	processRequestErrorsCounter    = metrics.NewRegisteredCounter("mailserver/processRequestErrors", nil)
 	historicResponseErrorsCounter  = metrics.NewRegisteredCounter("mailserver/historicResponseErrors", nil)
+	syncRequestsMeter              = metrics.NewRegisteredMeter("mailserver/syncRequests", nil)
 )
 
 const (
@@ -242,7 +243,10 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
+	defer recoverLevelDBPanics("DeliverMail")
+
 	log.Info("Delivering mail", "peerID", peerIDString(peer))
+
 	requestsMeter.Mark(1)
 
 	if peer == nil {
@@ -256,8 +260,6 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		s.trySendHistoricMessageErrorResponse(peer, request, fmt.Errorf("rate limit exceeded"))
 		return
 	}
-
-	defer recoverLevelDBPanics("DeliverMail")
 
 	var (
 		lower, upper uint32
@@ -288,24 +290,56 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	}
 
 	log.Debug("Processing request",
-		"lower", lower, "upper", upper,
+		"lower", lower,
+		"upper", upper,
 		"bloom", bloom,
 		"limit", limit,
 		"cursor", cursor,
-		"batch", batch)
+		"batch", batch,
+	)
 
 	if batch {
 		requestsBatchedCounter.Inc(1)
 	}
 
-	_, lastEnvelopeHash, nextPageCursor, err := s.processRequest(
-		peer,
-		lower, upper,
+	iter := s.createIterator(lower, upper, cursor)
+	defer iter.Release()
+
+	bundles := make(chan []*whisper.Envelope, 5)
+	errCh := make(chan error)
+
+	go func() {
+		for bundle := range bundles {
+			if err := s.sendEnvelopes(peer, bundle, batch); err != nil {
+				errCh <- err
+				break
+			}
+		}
+		close(errCh)
+	}()
+
+	start := time.Now()
+	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
+		iter,
 		bloom,
-		limit,
-		cursor,
-		batch)
-	if err != nil {
+		int(limit),
+		bundles,
+	)
+	requestProcessTimer.UpdateSince(start)
+
+	// bundles channel can be closed now because the processing finished.
+	close(bundles)
+
+	// Wait for the goroutine to finish the work. It may return an error.
+	if err := <-errCh; err != nil {
+		processRequestErrorsCounter.Inc(1)
+		log.Error("Error while processing mail server request", "err", err, "peerID", peerIDString(peer))
+		s.trySendHistoricMessageErrorResponse(peer, request, err)
+		return
+	}
+
+	// Processing of the request could be finished earlier due to iterator error.
+	if err := iter.Error(); err != nil {
 		processRequestErrorsCounter.Inc(1)
 		log.Error("Error while processing mail server request", "err", err, "peerID", peerIDString(peer))
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
@@ -320,6 +354,80 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		// we still want to try to report error even it it is a p2p error and it is unlikely
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
 	}
+}
+
+// SyncMail syncs mail servers between two Mail Servers.
+func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailRequest) error {
+	log.Info("Started syncing envelopes", "peer", peerIDString(peer), "req", request)
+
+	defer recoverLevelDBPanics("SyncMail")
+
+	syncRequestsMeter.Mark(1)
+
+	// Check rate limiting for a requesting peer.
+	if s.exceedsPeerRequests(peer.ID()) {
+		requestErrorsCounter.Inc(1)
+		log.Error("Peer exceeded request per seconds limit", "peerID", peerIDString(peer))
+		return fmt.Errorf("requests per seconds limit exceeded")
+	}
+
+	iter := s.createIterator(request.Lower, request.Upper, request.Cursor)
+	defer iter.Release()
+
+	bundles := make(chan []*whisper.Envelope, 5)
+	errCh := make(chan error)
+
+	go func() {
+		for bundle := range bundles {
+			resp := whisper.SyncResponse{Envelopes: bundle}
+			if err := s.w.SendSyncResponse(peer, resp); err != nil {
+				errCh <- fmt.Errorf("failed to send sync response: %v", err)
+				break
+			}
+		}
+		close(errCh)
+	}()
+
+	start := time.Now()
+	nextCursor, _ := s.processRequestInBundles(
+		iter,
+		request.Bloom,
+		int(request.Limit),
+		bundles,
+	)
+	requestProcessTimer.UpdateSince(start)
+
+	// bundles channel can be closed now because the processing finished.
+	close(bundles)
+
+	// Wait for the goroutine to finish the work. It may return an error.
+	if err := <-errCh; err != nil {
+		s.w.SendSyncResponse(
+			peer,
+			whisper.SyncResponse{Error: "failed to send a response"},
+		)
+		return err
+	}
+
+	// Processing of the request could be finished earlier due to iterator error.
+	if err := iter.Error(); err != nil {
+		s.w.SendSyncResponse(
+			peer,
+			whisper.SyncResponse{Error: "failed to process all envelopes"},
+		)
+		return fmt.Errorf("levelDB iterator failed: %v", err)
+	}
+
+	log.Info("Finished syncing envelopes", "peer", peerIDString(peer))
+
+	if err := s.w.SendSyncResponse(peer, whisper.SyncResponse{
+		Cursor: nextCursor,
+		Final:  true,
+	}); err != nil {
+		return fmt.Errorf("failed to send the final sync response: %v", err)
+	}
+
+	return nil
 }
 
 // exceedsPeerRequests in case limit its been setup on the current server and limit
@@ -360,45 +468,24 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor cursorType) ite
 	return i
 }
 
-// processRequest processes the current request and re-sends all stored messages
-// accomplishing lower and upper limits. The limit parameter determines the maximum number of
-// messages to be sent back for the current request.
-// The cursor parameter is used for pagination.
-// After sending all the messages, a message of type p2pRequestCompleteCode is sent by the mailserver to
-// the peer.
-func (s *WMailServer) processRequest(
-	peer *whisper.Peer,
-	lower, upper uint32,
-	bloom []byte,
-	limit uint32,
-	cursor cursorType,
-	batch bool,
-) (ret []*whisper.Envelope, lastEnvelopeHash common.Hash, nextPageCursor cursorType, err error) {
-	// Recover from possible goleveldb panics
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("recovered from panic in processRequest: %v", r)
-		}
-	}()
-
+// processRequestInBundles processes envelopes using an iterator and passes them
+// to the output channel in bundles.
+func (s *WMailServer) processRequestInBundles(
+	iter iterator.Iterator, bloom []byte, limit int, output chan<- []*whisper.Envelope,
+) (cursorType, common.Hash) {
 	var (
-		sentEnvelopes     uint32
-		sentEnvelopesSize int64
+		bundle                 []*whisper.Envelope
+		bundleSize             uint32
+		processedEnvelopes     int
+		processedEnvelopesSize int64
+		nextCursor             cursorType
+		lastEnvelopeHash       common.Hash
 	)
 
-	i := s.createIterator(lower, upper, cursor)
-	defer i.Release()
-
-	var (
-		bundle     []*whisper.Envelope
-		bundleSize uint32
-	)
-
-	start := time.Now()
-
-	for i.Prev() {
+	for iter.Prev() {
 		var envelope whisper.Envelope
-		decodeErr := rlp.DecodeBytes(i.Value(), &envelope)
+
+		decodeErr := rlp.DecodeBytes(iter.Value(), &envelope)
 		if decodeErr != nil {
 			log.Error("failed to decode RLP", "err", decodeErr)
 			continue
@@ -409,7 +496,7 @@ func (s *WMailServer) processRequest(
 		}
 
 		newSize := bundleSize + whisper.EnvelopeHeaderLength + uint32(len(envelope.Data))
-		limitReached := limit != noLimits && (int(sentEnvelopes)+len(bundle)) == int(limit)
+		limitReached := limit != noLimits && (processedEnvelopes+len(bundle)) == limit
 		if !limitReached && newSize < s.w.MaxMessageSize() {
 			bundle = append(bundle, &envelope)
 			bundleSize = newSize
@@ -417,30 +504,22 @@ func (s *WMailServer) processRequest(
 			continue
 		}
 
-		if peer == nil {
-			// used for test purposes
-			ret = append(ret, bundle...)
-		} else {
-			err = s.sendEnvelopes(peer, bundle, batch)
-			if err != nil {
-				return
-			}
-		}
+		output <- bundle
+		bundle = bundle[:0]
+		bundleSize = 0
 
-		sentEnvelopes += uint32(len(bundle))
-		sentEnvelopesSize += int64(bundleSize)
+		processedEnvelopes += len(bundle)
+		processedEnvelopesSize += int64(bundleSize)
 
 		if limitReached {
-			bundle = nil
-			bundleSize = 0
-
 			// When the limit is reached, the current retrieved envelope
 			// is not included in the response.
-			// The nextPageCursor is a key used as a limit in a range and
+			// The nextCursor is a key used as a limit in a range and
 			// is not included in the range, hence, we need to get
 			// the previous iterator key.
-			i.Next()
-			nextPageCursor = i.Key()
+			// Because we iterate backwards, we use Next().
+			iter.Next()
+			nextCursor = iter.Key()
 			break
 		} else {
 			// Reset bundle information and add the last read envelope
@@ -452,28 +531,15 @@ func (s *WMailServer) processRequest(
 		lastEnvelopeHash = envelope.Hash()
 	}
 
-	// Send any outstanding envelopes.
+	// There might be some outstanding elements in the bundle.
 	if len(bundle) > 0 && bundleSize > 0 {
-		if peer == nil {
-			ret = append(ret, bundle...)
-		} else {
-			err = s.sendEnvelopes(peer, bundle, batch)
-			if err != nil {
-				return
-			}
-		}
+		output <- bundle
 	}
 
-	requestProcessTimer.UpdateSince(start)
-	sentEnvelopesMeter.Mark(int64(sentEnvelopes))
-	sentEnvelopesSizeMeter.Mark(sentEnvelopesSize)
+	sentEnvelopesMeter.Mark(int64(processedEnvelopes))
+	sentEnvelopesSizeMeter.Mark(processedEnvelopesSize)
 
-	err = i.Error()
-	if err != nil {
-		err = fmt.Errorf("levelDB iterator error: %v", err)
-	}
-
-	return
+	return nextCursor, lastEnvelopeHash
 }
 
 func (s *WMailServer) sendEnvelopes(peer *whisper.Peer, envelopes []*whisper.Envelope, batch bool) error {

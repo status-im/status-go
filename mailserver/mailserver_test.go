@@ -330,16 +330,21 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil, false)
-	s.NoError(err)
-	for _, env := range envelopes {
-		receivedHashes = append(receivedHashes, env.Hash())
+	iter := s.server.createIterator(lower, upper, cursor)
+	bundles := make(chan []*whisper.Envelope, count)
+	cursor, _ = s.server.processRequestInBundles(iter, bloom, int(limit), bundles)
+	close(bundles)
+	for bundle := range bundles {
+		for _, env := range bundle {
+			receivedHashes = append(receivedHashes, env.Hash())
+		}
 	}
+	iter.Release()
 
 	// 10 envelopes sent
 	s.Equal(count, uint32(len(sentEnvelopes)))
 	// 6 envelopes received
-	s.Equal(limit, uint32(len(receivedHashes)))
+	s.Equal(int(limit), len(receivedHashes))
 	// the 6 envelopes received should be in descending order
 	s.Equal(reverseSentHashes[:limit], receivedHashes)
 	// cursor should be the key of the last envelope of the last page
@@ -347,14 +352,19 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 
 	// second page
 	receivedHashes = []common.Hash{}
-	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor, false)
-	s.NoError(err)
-	for _, env := range envelopes {
-		receivedHashes = append(receivedHashes, env.Hash())
+	iter = s.server.createIterator(lower, upper, cursor)
+	bundles = make(chan []*whisper.Envelope, count)
+	cursor, _ = s.server.processRequestInBundles(iter, bloom, int(limit), bundles)
+	close(bundles)
+	for bundle := range bundles {
+		for _, env := range bundle {
+			receivedHashes = append(receivedHashes, env.Hash())
+		}
 	}
+	iter.Release()
 
 	// 4 envelopes received
-	s.Equal(count-limit, uint32(len(receivedHashes)))
+	s.Equal(int(count-limit), len(receivedHashes))
 	// cursor is nil because there are no other pages
 	s.Nil(cursor)
 }
@@ -477,12 +487,17 @@ func (s *MailserverSuite) TestDecodeRequest() {
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	var exist bool
-	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil, false)
-	s.NoError(err)
-	for _, msg := range mail {
-		if msg.Hash() == envelope.Hash() {
-			exist = true
-			break
+	iter := s.server.createIterator(low, upp, nil)
+	defer iter.Release()
+	bundles := make(chan []*whisper.Envelope, 10)
+	s.server.processRequestInBundles(iter, bloom, int(limit), bundles)
+	close(bundles)
+	for bundle := range bundles {
+		for _, msg := range bundle {
+			if msg.Hash() == envelope.Hash() {
+				exist = true
+				break
+			}
 		}
 	}
 	return exist
