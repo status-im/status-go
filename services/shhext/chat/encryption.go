@@ -239,7 +239,7 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 	}
 
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
-	if msg == nil && myIdentityKey.PublicKey != *theirIdentityKey {
+	if msg == nil && *theirIdentityKey != myIdentityKey.PublicKey {
 		return nil, ErrDeviceNotFound
 	}
 	payload := msg.GetPayload()
