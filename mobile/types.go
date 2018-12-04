@@ -75,3 +75,7 @@ type NotifyResult struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
+
+type SignalHandler interface {
+	HandleSignal(string)
+}

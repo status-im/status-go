@@ -449,6 +449,13 @@ func AppStateChange(state string) {
 	statusBackend.AppStateChange(state)
 }
 
+//SetMobileSignalHandler setup geth callback to notify about new signal
+func SetMobileSignalHandler(handler SignalHandler) {
+	signal.SetMobileSignalHandler(func(data []byte) {
+		handler.HandleSignal(string(data))
+	})
+}
+
 // SetSignalEventCallback setup geth callback to notify about new signal
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)

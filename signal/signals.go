@@ -18,6 +18,14 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+type MobileSignalHandler func([]byte)
+
+var mobileSignalHandler MobileSignalHandler = nil
+
+func SetMobileSignalHandler(handler MobileSignalHandler) {
+	mobileSignalHandler = handler
+}
+
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/signal")
 
@@ -44,9 +52,13 @@ func send(typ string, event interface{}) {
 		return
 	}
 
-	str := C.CString(string(data))
-	C.StatusServiceSignalEvent(str)
-	C.free(unsafe.Pointer(str))
+	if mobileSignalHandler != nil {
+		mobileSignalHandler(data)
+	} else {
+		str := C.CString(string(data))
+		C.StatusServiceSignalEvent(str)
+		C.free(unsafe.Pointer(str))
+	}
 }
 
 // NodeNotificationHandler defines a handler able to process incoming node events.
