@@ -207,7 +207,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(err)
 
 	// make sure that no account is selected by default
-	selectedAccount, err := s.Backend.AccountManager().SelectedAccount()
+	selectedAccount, err := s.Backend.AccountManager().SelectedWalletAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
 	s.Nil(selectedAccount)
 
@@ -225,7 +225,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.StopNode())
 
 	// make sure that account is still selected
-	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	selectedAccount, err = s.Backend.AccountManager().SelectedWalletAccount()
 	s.NoError(err)
 	s.NotNil(selectedAccount)
 	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
@@ -234,7 +234,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.Require().NoError(s.Backend.StartNode(&preservedNodeConfig))
 
 	// re-check selected account (account2 MUST be selected)
-	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	selectedAccount, err = s.Backend.AccountManager().SelectedWalletAccount()
 	s.NoError(err)
 	s.NotNil(selectedAccount)
 	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
@@ -247,7 +247,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.Logout())
 	s.RestartTestNode()
 
-	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	selectedAccount, err = s.Backend.AccountManager().SelectedWalletAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
 	s.Nil(selectedAccount)
 }

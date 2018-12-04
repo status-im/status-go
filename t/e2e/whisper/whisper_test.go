@@ -132,6 +132,7 @@ func (s *WhisperTestSuite) TestLogout() {
 	s.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
 }
 
+// FIXME: @gravityblast use chat account
 func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.StartTestBackend()
 
@@ -148,9 +149,9 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey1), "identity already present in whisper")
 
 	// make sure that no account is selected by default
-	selectedAccount, err := s.Backend.AccountManager().SelectedAccount()
+	selectedWalletAccount, err := s.Backend.AccountManager().SelectedWalletAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
-	s.Nil(selectedAccount)
+	s.Nil(selectedWalletAccount)
 
 	// select account
 	err = s.Backend.SelectAccount(address1, "wrongPassword")
@@ -176,10 +177,10 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.Require().NoError(s.Backend.StartNode(&preservedNodeConfig))
 
 	// re-check selected account (account2 MUST be selected)
-	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	selectedWalletAccount, err = s.Backend.AccountManager().SelectedWalletAccount()
 	s.NoError(err)
-	s.NotNil(selectedAccount)
-	s.Equal(selectedAccount.Address.Hex(), address2, "incorrect address selected")
+	s.NotNil(selectedWalletAccount)
+	s.Equal(selectedWalletAccount.Address.Hex(), address2, "incorrect address selected")
 
 	// make sure that Whisper gets identity re-injected
 	whisperService = s.WhisperService()
@@ -201,7 +202,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.False(whisperService.HasKeyPair(pubKey2), "identity not injected into whisper")
 	s.False(whisperService.HasKeyPair(pubKey1), "identity should not be present, but it is still present in whisper")
 
-	selectedAccount, err = s.Backend.AccountManager().SelectedAccount()
+	selectedWalletAccount, err = s.Backend.AccountManager().SelectedWalletAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
-	s.Nil(selectedAccount)
+	s.Nil(selectedWalletAccount)
 }

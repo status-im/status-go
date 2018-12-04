@@ -210,7 +210,7 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 	s.Equal(errKeyStore, err)
 }
 
-func (s *ManagerTestSuite) TestSelectAccount() {
+func (s *ManagerTestSuite) TestSelectWalletAccount() {
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
@@ -252,7 +252,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			err := s.accManager.SelectAccount(testCase.address, testCase.password)
+			err := s.accManager.SelectWalletAccount(testCase.address, testCase.password)
 			s.Equal(testCase.expectedError, err)
 		})
 	}
@@ -261,7 +261,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 func (s *ManagerTestSuite) TestCreateChildAccount() {
 	// First, test the negative case where an account is not selected
 	// and an address is not provided.
-	s.accManager.selectedAccount = nil
+	s.accManager.selectedWalletAccount = nil
 	s.T().Run("fail_noAccount", func(t *testing.T) {
 		s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
 		_, _, err := s.accManager.CreateChildAccount("", s.password)
@@ -271,7 +271,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	// Now, select the test account for rest of the test cases.
 	s.reinitMock()
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.address, s.password)
+	err := s.accManager.SelectWalletAccount(s.address, s.password)
 	s.NoError(err)
 
 	testCases := []struct {
@@ -329,14 +329,14 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 
 func (s *ManagerTestSuite) TestLogout() {
 	s.accManager.Logout()
-	s.Nil(s.accManager.selectedAccount)
+	s.Nil(s.accManager.selectedWalletAccount)
 }
 
 // TestAccounts tests cases for (*Manager).Accounts.
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.address, s.password)
+	err := s.accManager.SelectWalletAccount(s.address, s.password)
 	s.NoError(err)
 
 	// Success
@@ -351,7 +351,7 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.Equal(errAccManager, err)
 
 	// Selected account is nil but doesn't fail
-	s.accManager.selectedAccount = nil
+	s.accManager.selectedWalletAccount = nil
 	s.gethServiceProvider.EXPECT().AccountManager().Return(s.gethAccManager, nil)
 	accs, err = s.accManager.Accounts()
 	s.NoError(err)

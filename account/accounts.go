@@ -35,8 +35,8 @@ type GethServiceProvider interface {
 type Manager struct {
 	geth GethServiceProvider
 
-	mu              sync.RWMutex
-	selectedAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
+	mu                    sync.RWMutex
+	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectWalletAccount()
 }
 
 // NewManager returns new node account manager.
@@ -89,8 +89,8 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 		return "", "", err
 	}
 
-	if parentAddress == "" && m.selectedAccount != nil { // derive from selected account by default
-		parentAddress = m.selectedAccount.Address.Hex()
+	if parentAddress == "" && m.selectedWalletAccount != nil { // derive from selected account by default
+		parentAddress = m.selectedWalletAccount.Address.Hex()
 	}
 
 	if parentAddress == "" {
@@ -130,8 +130,8 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	}
 
 	// update in-memory selected account
-	if m.selectedAccount != nil {
-		m.selectedAccount.AccountKey = accountKey
+	if m.selectedWalletAccount != nil {
+		m.selectedWalletAccount.AccountKey = accountKey
 	}
 
 	return address, pubKey, nil
@@ -214,9 +214,9 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	return key, nil
 }
 
-// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
+// SelectWalletAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
-func (m *Manager) SelectAccount(address, password string) error {
+func (m *Manager) SelectWalletAccount(address, password string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -240,7 +240,7 @@ func (m *Manager) SelectAccount(address, password string) error {
 	if err != nil {
 		return err
 	}
-	m.selectedAccount = &SelectedExtKey{
+	m.selectedWalletAccount = &SelectedExtKey{
 		Address:     account.Address,
 		AccountKey:  accountKey,
 		SubAccounts: subAccounts,
@@ -249,23 +249,23 @@ func (m *Manager) SelectAccount(address, password string) error {
 	return nil
 }
 
-// SelectedAccount returns currently selected account
-func (m *Manager) SelectedAccount() (*SelectedExtKey, error) {
+// SelectedWalletAccount returns currently selected account
+func (m *Manager) SelectedWalletAccount() (*SelectedExtKey, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.selectedAccount == nil {
+	if m.selectedWalletAccount == nil {
 		return nil, ErrNoAccountSelected
 	}
-	return m.selectedAccount, nil
+	return m.selectedWalletAccount, nil
 }
 
-// Logout clears selectedAccount.
+// Logout clears selectedWalletAccount.
 func (m *Manager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.selectedAccount = nil
+	m.selectedWalletAccount = nil
 }
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
@@ -311,20 +311,20 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 		}
 	}
 
-	if m.selectedAccount == nil {
+	if m.selectedWalletAccount == nil {
 		return []gethcommon.Address{}, nil
 	}
 
-	m.refreshSelectedAccount()
+	m.refreshSelectedWalletAccount()
 
 	filtered := make([]gethcommon.Address, 0)
 	for _, account := range addresses {
 		// main account
-		if m.selectedAccount.Address.Hex() == account.Hex() {
+		if m.selectedWalletAccount.Address.Hex() == account.Hex() {
 			filtered = append(filtered, account)
 		} else {
 			// sub accounts
-			for _, subAccount := range m.selectedAccount.SubAccounts {
+			for _, subAccount := range m.selectedWalletAccount.SubAccounts {
 				if subAccount.Address.Hex() == account.Hex() {
 					filtered = append(filtered, account)
 				}
@@ -335,13 +335,13 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	return filtered, nil
 }
 
-// refreshSelectedAccount re-populates list of sub-accounts of the currently selected account (if any)
-func (m *Manager) refreshSelectedAccount() {
-	if m.selectedAccount == nil {
+// refreshSelectedWalletAccount re-populates list of sub-accounts of the currently selected account (if any)
+func (m *Manager) refreshSelectedWalletAccount() {
+	if m.selectedWalletAccount == nil {
 		return
 	}
 
-	accountKey := m.selectedAccount.AccountKey
+	accountKey := m.selectedWalletAccount.AccountKey
 	if accountKey == nil {
 		return
 	}
@@ -351,9 +351,9 @@ func (m *Manager) refreshSelectedAccount() {
 	if err != nil {
 		return
 	}
-	m.selectedAccount = &SelectedExtKey{
-		Address:     m.selectedAccount.Address,
-		AccountKey:  m.selectedAccount.AccountKey,
+	m.selectedWalletAccount = &SelectedExtKey{
+		Address:     m.selectedWalletAccount.Address,
+		AccountKey:  m.selectedWalletAccount.AccountKey,
 		SubAccounts: subAccounts,
 	}
 }
