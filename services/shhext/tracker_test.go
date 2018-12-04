@@ -11,6 +11,8 @@ import (
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 var (
@@ -28,10 +30,12 @@ type TrackerSuite struct {
 }
 
 func (s *TrackerSuite) SetupTest() {
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.Require().NoError(err)
 	s.tracker = &tracker{
 		cache:     map[common.Hash]EnvelopeState{},
 		batches:   map[common.Hash]map[common.Hash]struct{}{},
-		mailPeers: mailservers.NewPeerStore(),
+		mailPeers: mailservers.NewPeerStore(mailservers.NewCache(db)),
 	}
 }
 
@@ -52,7 +56,7 @@ func (s *TrackerSuite) TestConfirmedWithAcknowledge() {
 	pkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	node := enode.NewV4(&pkey.PublicKey, nil, 0, 0)
-	s.tracker.mailPeers.Update([]*enode.Node{node})
+	s.Require().NoError(s.tracker.mailPeers.Update([]*enode.Node{node}))
 	s.tracker.Add(testHash)
 	s.Contains(s.tracker.cache, testHash)
 	s.Equal(EnvelopePosted, s.tracker.cache[testHash])
