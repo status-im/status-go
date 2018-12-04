@@ -402,7 +402,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 
 	// Wait for the goroutine to finish the work. It may return an error.
 	if err := <-errCh; err != nil {
-		s.w.SendSyncResponse(
+		_ = s.w.SendSyncResponse(
 			peer,
 			whisper.SyncResponse{Error: "failed to send a response"},
 		)
@@ -411,7 +411,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 
 	// Processing of the request could be finished earlier due to iterator error.
 	if err := iter.Error(); err != nil {
-		s.w.SendSyncResponse(
+		_ = s.w.SendSyncResponse(
 			peer,
 			whisper.SyncResponse{Error: "failed to process all envelopes"},
 		)
