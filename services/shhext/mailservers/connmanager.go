@@ -2,6 +2,7 @@ package mailservers
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
@@ -38,12 +39,13 @@ type p2pServer interface {
 }
 
 // NewConnectionManager creates an instance of ConnectionManager.
-func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscbriber, target int) *ConnectionManager {
+func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscbriber, target int, timeout time.Duration) *ConnectionManager {
 	return &ConnectionManager{
-		server:          server,
-		whisper:         whisper,
-		connectedTarget: target,
-		notifications:   make(chan []*enode.Node),
+		server:           server,
+		whisper:          whisper,
+		connectedTarget:  target,
+		notifications:    make(chan []*enode.Node),
+		timeoutWaitAdded: timeout,
 	}
 }
 
@@ -55,8 +57,9 @@ type ConnectionManager struct {
 	server  p2pServer
 	whisper EnvelopeEventSubscbriber
 
-	notifications   chan []*enode.Node
-	connectedTarget int
+	notifications    chan []*enode.Node
+	connectedTarget  int
+	timeoutWaitAdded time.Duration
 }
 
 // Notify sends a non-blocking notification about new nodes.
@@ -98,21 +101,9 @@ func (ps *ConnectionManager) Start() {
 				log.Error("retry after error suscribing to whisper events", "error", err)
 				whisperSub = ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
 			case newNodes := <-ps.notifications:
-				replacement := map[enode.ID]*enode.Node{}
-				for _, n := range newNodes {
-					replacement[n.ID()] = n
-				}
-				replaceNodes(ps.server, ps.connectedTarget, connected, current, replacement)
-				current = replacement
+				current = processReplacement(ps.server, ps.connectedTarget, ps.timeoutWaitAdded, newNodes, events, connected, current)
 			case ev := <-events:
-				switch ev.Type {
-				case p2p.PeerEventTypeAdd:
-					log.Debug("connected to a mailserver", "address", ev.Peer)
-					nodeAdded(ps.server, ev.Peer, ps.connectedTarget, connected, current)
-				case p2p.PeerEventTypeDrop:
-					log.Debug("mailserver disconnected", "address", ev.Peer)
-					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
-				}
+				processPeerEvent(ev, ps.server, ps.connectedTarget, connected, current)
 			case ev := <-whisperEvents:
 				// TODO what about completed but with error? what about expired envelopes?
 				switch ev.Event {
@@ -146,6 +137,26 @@ func (ps *ConnectionManager) Stop() {
 	close(ps.quit)
 	ps.wg.Wait()
 	ps.quit = nil
+}
+
+func processReplacement(srv PeerAdderRemover, target int, timeout time.Duration, newNodes []*enode.Node, events <-chan *p2p.PeerEvent, connected map[enode.ID]struct{}, current map[enode.ID]*enode.Node) map[enode.ID]*enode.Node {
+	replacement := map[enode.ID]*enode.Node{}
+	for _, n := range newNodes {
+		replacement[n.ID()] = n
+	}
+	replaceNodes(srv, target, connected, current, replacement)
+	if target == len(connected) {
+		log.Debug("already connected with required target", "target", target)
+		return replacement
+	}
+	if timeout != 0 {
+		log.Debug("waiting defined timeout to establish connections",
+			"timeout", timeout, "target", target)
+		timer := time.NewTimer(timeout)
+		waitForConnections(timeout.C, events, srv, target, connected, current)
+		timer.Stop()
+	}
+	return replacement
 }
 
 func replaceNodes(srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, old, new map[enode.ID]*enode.Node) {
@@ -199,4 +210,30 @@ func nodeDisconnected(srv PeerAdderRemover, peer enode.ID, target int, connected
 			srv.AddPeer(n)
 		}
 	}
+}
+
+func processPeerEvent(ev *p2p.PeerEvent, srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
+	switch ev.Type {
+	case p2p.PeerEventTypeAdd:
+		log.Debug("connected to a mailserver", "address", ev.Peer)
+		nodeAdded(srv, ev.Peer, target, connected, nodes)
+	case p2p.PeerEventTypeDrop:
+		log.Debug("mailserver disconnected", "address", ev.Peer)
+		nodeDisconnected(srv, ev.Peer, target, connected, nodes)
+	}
+}
+
+func waitForConnections(timeout <-chan time.Time, events <-chan *p2p.PeerEvent, srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
+	for {
+		select {
+		case ev := <-events:
+			processPeerEvent(ev, srv, target, connected, nodes)
+			if target == len(connected) {
+				return
+			}
+		case <-timeout:
+			return
+		}
+	}
+
 }

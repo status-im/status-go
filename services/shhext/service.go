@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/node"
@@ -22,6 +23,8 @@ import (
 const (
 	// defaultConnectionsTarget used in Service.Start if configured connection target is 0.
 	defaultConnectionsTarget = 1
+	// defaultTimeoutWaitAdded is a timeout to use to establish initial connections.
+	defaultTimeoutWaitAdded = 5 * time.Second
 )
 
 var errProtocolNotInitialized = errors.New("procotol is not initialized")
@@ -48,8 +51,10 @@ type Service struct {
 	installationID string
 	pfsEnabled     bool
 
-	peerStore   *mailservers.PeerStore
-	connManager *mailservers.ConnectionManager
+	peerStore       *mailservers.PeerStore
+	cache           *mailservers.Cache
+	connManager     *mailservers.ConnectionManager
+	lastUsedMonitor *mailservers.LastUsedConnectionMonitor
 }
 
 type ServiceConfig struct {
@@ -59,6 +64,7 @@ type ServiceConfig struct {
 	PFSEnabled              bool
 	MailServerConfirmations bool
 	EnableConnectionManager bool
+	EnableLastUsedMonitor   bool
 	ConnectionTarget        int
 }
 
@@ -67,7 +73,8 @@ var _ node.Service = (*Service)(nil)
 
 // New returns a new Service. dataDir is a folder path to a network-independent location
 func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config *ServiceConfig) *Service {
-	ps := mailservers.NewPeerStore()
+	cache := mailservers.NewCache(db)
+	ps := mailservers.NewPeerStore(cache)
 	track := &tracker{
 		w:                      w,
 		handler:                handler,
@@ -86,15 +93,19 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		installationID: config.InstallationID,
 		pfsEnabled:     config.PFSEnabled,
 		peerStore:      ps,
+		cache:          cache,
 	}
 }
 
 // UpdateMailservers updates information about selected mail servers.
-func (s *Service) UpdateMailservers(nodes []*enode.Node) {
-	s.peerStore.Update(nodes)
+func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
+	if err := s.peerStore.Update(nodes); err != nil {
+		return err
+	}
 	if s.connManager != nil {
 		s.connManager.Notify(nodes)
 	}
+	return nil
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
@@ -200,8 +211,15 @@ func (s *Service) Start(server *p2p.Server) error {
 		if connectionsTarget == 0 {
 			connectionsTarget = defaultConnectionsTarget
 		}
-		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget)
+		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget, defaultTimeoutWaitAdded)
 		s.connManager.Start()
+		if err := mailservers.EnsureUsedRecordsAddedFirst(s.peerStore, s.connManager); err != nil {
+			return err
+		}
+	}
+	if s.config.EnableLastUsedMonitor {
+		s.lastUsedMonitor = mailservers.NewLastUsedConnectionMonitor(s.peerStore, s.cache, s.w)
+		s.lastUsedMonitor.Start()
 	}
 	s.tracker.Start()
 	s.nodeID = server.PrivateKey
@@ -214,6 +232,9 @@ func (s *Service) Start(server *p2p.Server) error {
 func (s *Service) Stop() error {
 	if s.config.EnableConnectionManager {
 		s.connManager.Stop()
+	}
+	if s.config.EnableLastUsedMonitor {
+		s.lastUsedMonitor.Stop()
 	}
 	s.tracker.Stop()
 	return nil
