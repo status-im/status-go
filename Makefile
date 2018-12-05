@@ -112,7 +112,7 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	@gomobile bind -target=android/arm -ldflags="-s -w" -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	@gomobile bind -target=android -ldflags="-s -w" -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
@@ -137,7 +137,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
-	@echo "Building docker image for bootnode..."`
+	@echo "Building docker image for bootnode..."
 	docker build --file _assets/build/Dockerfile-bootnode . \
 		--build-arg "build_tags=$(BUILD_TAGS)" \
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
