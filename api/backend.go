@@ -11,8 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
-
-	fcmlib "github.com/NaySoftware/go-fcm"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
@@ -58,7 +57,7 @@ type StatusBackend struct {
 
 // NewStatusBackend create a new NewStatusBackend instance
 func NewStatusBackend() *StatusBackend {
-	defer log.Info("Status backend initialized")
+	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
 
 	statusNode := node.New()
 	accountManager := account.NewManager(statusNode)
@@ -445,10 +444,12 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 }
 
 // NotifyUsers sends push notifications to users.
-func (b *StatusBackend) NotifyUsers(message string, payload fcmlib.NotificationPayload, tokens ...string) error {
-	err := b.newNotification().Send(message, payload, tokens...)
+func (b *StatusBackend) NotifyUsers(dataPayloadJSON string, tokens ...string) error {
+	log.Debug("sending push notification")
+
+	err := b.newNotification().Send(dataPayloadJSON, tokens...)
 	if err != nil {
-		b.log.Error("Notify failed", "error", err)
+		b.log.Error("NotifyUsers failed", "dataPayloadJSON", dataPayloadJSON, "error", err)
 	}
 
 	return err
@@ -569,5 +570,23 @@ func (b *StatusBackend) DisableInstallation(installationID string) error {
 		return err
 	}
 
+	return nil
+}
+
+// UpdateMailservers on ShhExtService.
+func (b *StatusBackend) UpdateMailservers(enodes []string) error {
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+	nodes := make([]*enode.Node, len(enodes))
+	for i, rawurl := range enodes {
+		node, err := enode.ParseV4(rawurl)
+		if err != nil {
+			return err
+		}
+		nodes[i] = node
+	}
+	st.UpdateMailservers(nodes)
 	return nil
 }

@@ -40,6 +40,8 @@ type EncryptionServiceConfig struct {
 	MaxKeep int
 	// How many keys do we store in total per session.
 	MaxMessageKeysPerSession int
+	// How long before we refresh the interval in milliseconds
+	BundleRefreshInterval int64
 }
 
 type IdentityAndIDPair [2]string
@@ -51,6 +53,7 @@ func DefaultEncryptionServiceConfig(installationID string) EncryptionServiceConf
 		MaxSkip:                  1000,
 		MaxKeep:                  3000,
 		MaxMessageKeysPerSession: 2000,
+		BundleRefreshInterval:    14 * 24 * 60 * 60 * 1000,
 		InstallationID:           installationID,
 	}
 }
@@ -107,7 +110,7 @@ func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle,
 	}
 
 	// If the bundle has expired we create a new one
-	if bundleContainer != nil && bundleContainer.GetBundle().Timestamp < time.Now().AddDate(0, 0, -14).UnixNano() {
+	if bundleContainer != nil && bundleContainer.GetBundle().Timestamp < time.Now().Add(-1*time.Duration(s.config.BundleRefreshInterval)*time.Millisecond).UnixNano() {
 		// Mark sessions has expired
 		if err := s.persistence.MarkBundleExpired(bundleContainer.GetBundle().GetIdentity()); err != nil {
 			return nil, err

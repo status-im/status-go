@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -74,7 +73,7 @@ func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	anyPrivateBundle, err = s.service.GetAnyPrivateBundle(identity, []string{installationID})
 	s.Require().NoError(err)
 	s.NotNil(anyPrivateBundle)
-	s.True(proto.Equal(bundle.GetBundle(), anyPrivateBundle.GetBundle()), "It returns the same bundle")
+	s.Equal(bundle.GetBundle().GetSignedPreKeys()[installationID].SignedPreKey, anyPrivateBundle.GetBundle().GetSignedPreKeys()[installationID].SignedPreKey, "It returns the same bundle")
 }
 
 func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {

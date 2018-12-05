@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
@@ -56,10 +57,11 @@ type Service struct {
 }
 
 type ServiceConfig struct {
-	DataDir        string
-	InstallationID string
-	Debug          bool
-	PFSEnabled     bool
+	DataDir                 string
+	InstallationID          string
+	Debug                   bool
+	PFSEnabled              bool
+	MailServerConfirmations bool
 }
 
 // Make sure that Service implements node.Service interface.
@@ -68,10 +70,12 @@ var _ node.Service = (*Service)(nil)
 // New returns a new Service. dataDir is a folder path to a network-independent location
 func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config *ServiceConfig) *Service {
 	track := &tracker{
-		w:       w,
-		handler: handler,
-		cache:   map[common.Hash]EnvelopeState{},
-		batches: map[common.Hash]map[common.Hash]struct{}{},
+		w:                      w,
+		handler:                handler,
+		cache:                  map[common.Hash]EnvelopeState{},
+		batches:                map[common.Hash]map[common.Hash]struct{}{},
+		mailservers:            map[enode.ID]struct{}{},
+		mailServerConfirmation: config.MailServerConfirmations,
 	}
 	return &Service{
 		w:              w,
@@ -82,6 +86,11 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		installationID: config.InstallationID,
 		pfsEnabled:     config.PFSEnabled,
 	}
+}
+
+// UpdateMailservers updates information about selected mail servers.
+func (s *Service) UpdateMailservers(nodes []*enode.Node) {
+	s.tracker.UpdateMailservers(nodes)
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
@@ -98,7 +107,14 @@ func (s *Service) InitProtocol(address string, password string) error {
 	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
 		return err
 	}
-	persistence, err := chat.NewSQLLitePersistence(filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address)), password)
+	oldPath := filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address))
+	newPath := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
+
+	if err := chat.MigrateDBFile(oldPath, newPath, password); err != nil {
+		return err
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(newPath, password)
 	if err != nil {
 		return err
 	}
@@ -182,12 +198,16 @@ func (s *Service) Stop() error {
 // tracker responsible for processing events for envelopes that we are interested in
 // and calling specified handler.
 type tracker struct {
-	w       *whisper.Whisper
-	handler EnvelopeEventsHandler
+	w                      *whisper.Whisper
+	handler                EnvelopeEventsHandler
+	mailServerConfirmation bool
 
 	mu      sync.Mutex
 	cache   map[common.Hash]EnvelopeState
 	batches map[common.Hash]map[common.Hash]struct{}
+
+	mailMu      sync.Mutex
+	mailservers map[enode.ID]struct{}
 
 	wg   sync.WaitGroup
 	quit chan struct{}
@@ -214,6 +234,15 @@ func (t *tracker) Add(hash common.Hash) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.cache[hash] = EnvelopePosted
+}
+
+func (t *tracker) UpdateMailservers(nodes []*enode.Node) {
+	t.mailMu.Lock()
+	defer t.mailMu.Unlock()
+	t.mailservers = map[enode.ID]struct{}{}
+	for _, n := range nodes {
+		t.mailservers[n.ID()] = struct{}{}
+	}
 }
 
 // Add request hash to a tracker.
@@ -268,6 +297,12 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 }
 
 func (t *tracker) handleEventEnvelopeSent(event whisper.EnvelopeEvent) {
+	if t.mailServerConfirmation {
+		if !t.isMailserver(event.Peer) {
+			return
+		}
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -292,7 +327,28 @@ func (t *tracker) handleEventEnvelopeSent(event whisper.EnvelopeEvent) {
 	}
 }
 
+func (t *tracker) isMailserver(peer enode.ID) bool {
+	t.mailMu.Lock()
+	defer t.mailMu.Unlock()
+	if len(t.mailservers) == 0 {
+		log.Error("mail servers are empty")
+		return false
+	}
+	_, exist := t.mailservers[peer]
+	if !exist {
+		log.Debug("confirmation received not from a mail server is skipped", "peer", peer)
+		return false
+	}
+	return true
+}
+
 func (t *tracker) handleAcknowledgedBatch(event whisper.EnvelopeEvent) {
+	if t.mailServerConfirmation {
+		if !t.isMailserver(event.Peer) {
+			return
+		}
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
