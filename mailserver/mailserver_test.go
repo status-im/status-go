@@ -330,16 +330,9 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	iter := s.server.createIterator(lower, upper, cursor)
-	bundles := make(chan []*whisper.Envelope, count)
-	cursor, _ = s.server.processRequestInBundles(iter, bloom, int(limit), bundles)
-	close(bundles)
-	for bundle := range bundles {
-		for _, env := range bundle {
-			receivedHashes = append(receivedHashes, env.Hash())
-		}
-	}
-	iter.Release()
+	receivedHashes, cursor, _ = processRequestAndCollectHashes(
+		s.server, lower, upper, cursor, bloom, int(limit),
+	)
 
 	// 10 envelopes sent
 	s.Equal(count, uint32(len(sentEnvelopes)))
@@ -351,17 +344,9 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
 
 	// second page
-	receivedHashes = []common.Hash{}
-	iter = s.server.createIterator(lower, upper, cursor)
-	bundles = make(chan []*whisper.Envelope, count)
-	cursor, _ = s.server.processRequestInBundles(iter, bloom, int(limit), bundles)
-	close(bundles)
-	for bundle := range bundles {
-		for _, env := range bundle {
-			receivedHashes = append(receivedHashes, env.Hash())
-		}
-	}
-	iter.Release()
+	receivedHashes, cursor, _ = processRequestAndCollectHashes(
+		s.server, lower, upper, cursor, bloom, int(limit),
+	)
 
 	// 4 envelopes received
 	s.Equal(int(count-limit), len(receivedHashes))
@@ -486,21 +471,15 @@ func (s *MailserverSuite) TestDecodeRequest() {
 }
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
-	var exist bool
-	iter := s.server.createIterator(low, upp, nil)
-	defer iter.Release()
-	bundles := make(chan []*whisper.Envelope, 10)
-	s.server.processRequestInBundles(iter, bloom, int(limit), bundles)
-	close(bundles)
-	for bundle := range bundles {
-		for _, msg := range bundle {
-			if msg.Hash() == envelope.Hash() {
-				exist = true
-				break
-			}
+	receivedHashes, _, _ := processRequestAndCollectHashes(
+		s.server, low, upp, nil, bloom, int(limit),
+	)
+	for _, hash := range receivedHashes {
+		if hash == envelope.Hash() {
+			return true
 		}
 	}
-	return exist
+	return false
 }
 
 func (s *MailserverSuite) TestBloomFromReceivedMessage() {
@@ -653,6 +632,32 @@ func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.
 func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 	h := crypto.Keccak256Hash([]byte("test sample data"))
 	return generateEnvelopeWithKeys(sentTime, h[:], nil)
+}
+
+func processRequestAndCollectHashes(
+	server *WMailServer, lower, upper uint32, cursor cursorType, bloom []byte, limit int,
+) ([]common.Hash, cursorType, common.Hash) {
+	iter := server.createIterator(lower, upper, cursor)
+	defer iter.Release()
+	bundles := make(chan []*whisper.Envelope, 10)
+	done := make(chan struct{})
+
+	var hashes []common.Hash
+	go func() {
+		for bundle := range bundles {
+			for _, env := range bundle {
+				hashes = append(hashes, env.Hash())
+			}
+		}
+		close(done)
+	}()
+
+	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, bundles)
+	close(bundles)
+
+	<-done
+
+	return hashes, cursor, lastHash
 }
 
 // mockPeerWithID is a struct that conforms to peerWithID interface.
