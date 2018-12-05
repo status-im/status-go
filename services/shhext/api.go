@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -150,6 +151,13 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 	return hash, err
 }
 
+func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
+	if len(rawurl) == 0 {
+		return mailservers.GetFirstConnected(api.service.server, api.service.peerStore)
+	}
+	return enode.ParseV4(rawurl)
+}
+
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hexutil.Bytes, error) {
 	api.log.Info("RequestMessages", "request", r)
@@ -161,9 +169,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
 	}
 
-	var err error
-
-	mailServerNode, err := enode.ParseV4(r.MailServerPeer)
+	mailServerNode, err := api.getPeer(r.MailServerPeer)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
@@ -199,13 +205,10 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, err
 	}
 
-	hash := envelope.Hash()
-	if err := shh.RequestHistoricMessages(mailServerNode.ID().Bytes(), envelope); err != nil {
+	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
 		return nil, err
 	}
-
-	api.service.tracker.AddRequest(hash, time.After(r.Timeout*time.Second))
-
+	hash := envelope.Hash()
 	return hash[:], nil
 }
 

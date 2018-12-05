@@ -173,7 +173,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 			Limit:          1,
 			Topic:          topic,
 			SymKeyID:       mailServerKeyID,
-			Timeout:        time.Duration(*timeout) * time.Second,
+			Timeout:        time.Duration(*timeout),
 		})
 	if err != nil {
 		logger.Error("Error requesting historic messages from mailserver", "error", err)
@@ -333,6 +333,8 @@ func waitForMailServerResponse(events chan whisper.EnvelopeEvent, requestID comm
 
 func decodeMailServerResponse(event whisper.EnvelopeEvent) (*whisper.MailServerResponse, error) {
 	switch event.Event {
+	case whisper.EventMailServerRequestSent:
+		return nil, nil
 	case whisper.EventMailServerRequestCompleted:
 		resp, ok := event.Data.(*whisper.MailServerResponse)
 		if !ok {
