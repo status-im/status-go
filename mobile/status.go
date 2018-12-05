@@ -6,7 +6,6 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
@@ -387,49 +386,33 @@ func makeJSONResponse(err error) string {
 }
 
 // NotifyUsers sends push notifications by given tokens.
-func NotifyUsers(message, payloadJSON, tokensArray string) (outCBytes string) {
-	var (
-		err      error
-		outBytes []byte
-	)
-	errString := ""
+// TODO: remove unusedField
+func NotifyUsers(unusedField, payloadJSON, tokensArray string) string {
+	makeResponse := func(err error) string {
+		result := NotifyResult{}
 
-	defer func() {
-		out := NotifyResult{
-			Status: err == nil,
-			Error:  errString,
+		result.Status = err == nil
+		if err != nil {
+			result.Error = err.Error()
 		}
 
-		outBytes, err = json.Marshal(out)
+		resultJSON, err := json.Marshal(result)
+
 		if err != nil {
 			logger.Error("failed to marshal Notify output", "error", err)
-			outCBytes = makeJSONResponse(err)
-			return
+			return makeJSONResponse(err)
 		}
 
-		outCBytes = string(outBytes)
-	}()
+		return string(resultJSON)
+	}
 
 	tokens, err := ParseJSONArray(tokensArray)
 	if err != nil {
-		errString = err.Error()
-		return
+		return makeResponse(err)
 	}
 
-	var payload fcm.NotificationPayload
-	err = json.Unmarshal([]byte(payloadJSON), &payload)
-	if err != nil {
-		errString = err.Error()
-		return
-	}
-
-	err = statusBackend.NotifyUsers(message, payload, tokens...)
-	if err != nil {
-		errString = err.Error()
-		return
-	}
-
-	return
+	err = statusBackend.NotifyUsers(payloadJSON, tokens...)
+	return makeResponse(err)
 }
 
 // AddPeer adds an enode as a peer.
