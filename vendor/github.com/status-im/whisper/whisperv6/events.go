@@ -17,9 +17,13 @@ const (
 	EventBatchAcknowledged EventType = "batch.acknowleged"
 	// EventEnvelopeAvailable fires when envelop is available for filters
 	EventEnvelopeAvailable EventType = "envelope.available"
+	// EventMailServerRequestSent fires when such request is sent.
+	EventMailServerRequestSent EventType = "mailserver.request.sent"
 	// EventMailServerRequestCompleted fires after mailserver sends all the requested messages
 	EventMailServerRequestCompleted EventType = "mailserver.request.completed"
-	// EventMailServerRequestExpired fires after mailserver the request TTL ends
+	// EventMailServerRequestExpired fires after mailserver the request TTL ends.
+	// This event is independent and concurrent to EventMailServerRequestCompleted.
+	// Request should be considered as expired only if expiry event was received first.
 	EventMailServerRequestExpired EventType = "mailserver.request.expired"
 	// EventMailServerEnvelopeArchived fires after an envelope has been archived
 	EventMailServerEnvelopeArchived EventType = "mailserver.envelope.archived"
