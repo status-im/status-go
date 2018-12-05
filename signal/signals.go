@@ -50,11 +50,11 @@ func send(typ string, event interface{}) {
 		return
 	}
 
-	// if a go implementation of signal handler is set, we use it
+	// If a Go implementation of signal handler is set, let's use it.
 	if mobileSignalHandler != nil {
 		mobileSignalHandler(data)
-		// ... and fallback to C implementation otherwise
 	} else {
+		// ...and fallback to C implementation otherwise.
 		str := C.CString(string(data))
 		C.StatusServiceSignalEvent(str)
 		C.free(unsafe.Pointer(str))
