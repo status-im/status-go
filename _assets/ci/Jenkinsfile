@@ -98,7 +98,7 @@ pipeline {
             usernameVariable: 'GITHUB_USER',
             passwordVariable: 'GITHUB_TOKEN'
           ]]) {
-            sh "yes | make release release_branch=${lib.gitBranch()}"
+            sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
           }
           sh 'make clean-release'
         }

@@ -770,6 +770,39 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	s.Equal(ErrSessionNotFound, err)
 }
 
+// Device is not included in the bundle
+func (s *EncryptionServiceTestSuite) TestDeviceNotIncluded() {
+	bobDevice2InstallationID := "bob2"
+
+	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Create a bundle without saving it
+	bobBundleContainer, err := NewBundleContainer(bobKey, bobDevice2InstallationID)
+	s.Require().NoError(err)
+
+	err = SignBundle(bobKey, bobBundleContainer)
+	s.Require().NoError(err)
+
+	bobBundle := bobBundleContainer.GetBundle()
+
+	// We add bob bundle
+	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle)
+	s.Require().NoError(err)
+
+	// Alice sends a message
+	aliceMessage, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("does not matter"))
+	s.Require().NoError(err)
+
+	// Bob receives the message, and returns a bundlenotfound error
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, aliceMessage)
+	s.Require().Error(err)
+	s.Equal(ErrDeviceNotFound, err)
+}
+
 // A new bundle has been received
 func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 
