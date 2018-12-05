@@ -118,7 +118,15 @@ func (s *Service) InitProtocol(address string, password string) error {
 	if err != nil {
 		return err
 	}
-	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, chat.DefaultEncryptionServiceConfig(s.installationID)))
+
+	addedBundlesHandler := func(addedBundles []chat.IdentityAndIDPair) {
+		handler := EnvelopeSignalHandler{}
+		for _, bundle := range addedBundles {
+			handler.BundleAdded(bundle[0], bundle[1])
+		}
+	}
+
+	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, chat.DefaultEncryptionServiceConfig(s.installationID)), addedBundlesHandler)
 
 	return nil
 }
