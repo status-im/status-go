@@ -29,11 +29,16 @@
 
 [[constraint]]
   name = "github.com/status-im/whisper"
-  branch = "sync-messages"
+  version = "=v1.4.2"
 
 [[override]]
   name = "github.com/golang/protobuf"
   version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/NaySoftware/go-fcm"
+  revision = "024ca6a2c5444c93980f558f91c35a2defebd362"
+  source = "github.com/status-im/go-fcm"
 
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`

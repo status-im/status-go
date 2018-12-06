@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -150,6 +151,13 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 	return hash, err
 }
 
+func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
+	if len(rawurl) == 0 {
+		return mailservers.GetFirstConnected(api.service.server, api.service.peerStore)
+	}
+	return enode.ParseV4(rawurl)
+}
+
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hexutil.Bytes, error) {
 	api.log.Info("RequestMessages", "request", r)
@@ -161,9 +169,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
 	}
 
-	var err error
-
-	mailServerNode, err := enode.ParseV4(r.MailServerPeer)
+	mailServerNode, err := api.getPeer(r.MailServerPeer)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
 	}
@@ -199,13 +205,10 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, err
 	}
 
-	hash := envelope.Hash()
-	if err := shh.RequestHistoricMessages(mailServerNode.ID().Bytes(), envelope); err != nil {
+	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
 		return nil, err
 	}
-
-	api.service.tracker.AddRequest(hash, time.After(r.Timeout*time.Second))
-
+	hash := envelope.Hash()
 	return hash[:], nil
 }
 
@@ -416,11 +419,9 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 
 	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
 
-	handler := EnvelopeSignalHandler{}
-
 	// Notify that someone tried to contact us using an invalid bundle
-	if err == chat.ErrSessionNotFound {
-		api.log.Warn("Session not found, sending signal", "err", err)
+	if err == chat.ErrDeviceNotFound && privateKey.PublicKey != *publicKey {
+		api.log.Warn("Device not found, sending signal", "err", err)
 		keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
 		handler := EnvelopeSignalHandler{}
 		handler.DecryptMessageFailed(keyString)
@@ -432,14 +433,7 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 	}
 
 	// Add unencrypted payload
-	msg.Payload = response.Message
-
-	// Notify of added bundles
-	if response.AddedBundles != nil {
-		for _, bundle := range response.AddedBundles {
-			handler.BundleAdded(bundle[0], bundle[1])
-		}
-	}
+	msg.Payload = response
 
 	return nil
 }

@@ -9,21 +9,18 @@ import (
 )
 
 type ProtocolService struct {
-	log        log.Logger
-	encryption *EncryptionService
-	Enabled    bool
-}
-
-type HandleMessageResponse struct {
-	AddedBundles []IdentityAndIDPair
-	Message      []byte
+	log                 log.Logger
+	encryption          *EncryptionService
+	addedBundlesHandler func([]IdentityAndIDPair)
+	Enabled             bool
 }
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, addedBundlesHandler func([]IdentityAndIDPair)) *ProtocolService {
 	return &ProtocolService{
-		log:        log.New("package", "status-go/services/sshext.chat"),
-		encryption: encryption,
+		log:                 log.New("package", "status-go/services/sshext.chat"),
+		encryption:          encryption,
+		addedBundlesHandler: addedBundlesHandler,
 	}
 }
 
@@ -126,12 +123,10 @@ func (p *ProtocolService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, in
 }
 
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
-func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) (*HandleMessageResponse, error) {
+func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
 	if p.encryption == nil {
 		return nil, errors.New("encryption service not initialized")
 	}
-
-	response := &HandleMessageResponse{}
 
 	// Unmarshal message
 	protocolMessage := &ProtocolMessage{}
@@ -147,14 +142,14 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 		if err != nil {
 			return nil, err
 		}
-		response.AddedBundles = addedBundles
+
+		p.addedBundlesHandler(addedBundles)
 	}
 
 	// Check if it's a public message
 	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
-		response.Message = publicMessage
 		// Nothing to do, as already in cleartext
-		return response, nil
+		return publicMessage, nil
 	}
 
 	// Decrypt message
@@ -163,9 +158,8 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 		if err != nil {
 			return nil, err
 		}
-		response.Message = message
 
-		return response, nil
+		return message, nil
 	}
 
 	// Return error
