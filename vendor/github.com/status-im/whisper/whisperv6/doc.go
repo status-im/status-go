@@ -48,6 +48,8 @@ const (
 	powRequirementCode     = 2   // PoW requirement
 	bloomFilterExCode      = 3   // bloom filter exchange
 	batchAcknowledgedCode  = 11  // confirmation that batch of envelopes was received
+	p2pSyncRequestCode     = 123 // used to sync envelopes between two mail servers
+	p2pSyncResponseCode    = 124 // used to sync envelopes between two mail servers
 	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
 	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
 	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
@@ -89,4 +91,36 @@ const (
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+	SyncMail(*Peer, SyncMailRequest) error
+}
+
+// SyncMailRequest contains details which envelopes should be synced
+// between Mail Servers.
+type SyncMailRequest struct {
+	// Lower is a lower bound of time range for which messages are requested.
+	Lower uint32
+	// Upper is a lower bound of time range for which messages are requested.
+	Upper uint32
+	// Bloom is a bloom filter to filter envelopes.
+	Bloom []byte
+	// Limit is the max number of envelopes to return.
+	Limit uint32
+	// Cursor is used for pagination of the results.
+	Cursor []byte
+}
+
+// SyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type SyncResponse struct {
+	Envelopes []*Envelope
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
+}
+
+// IsFinal returns true if it's the final response for the request.
+// It might be a successful final response (r.Final being true)
+// or an error occured (r.Error being not empty).
+func (r SyncResponse) IsFinal() bool {
+	return r.Final || r.Error != ""
 }

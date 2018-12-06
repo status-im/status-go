@@ -822,12 +822,12 @@
   revision = "fbcc46a78cd43fef95a110df664aab513116a850"
 
 [[projects]]
-  digest = "1:5c62af344925b846377386dec72e06eb3e1e15222542b3d22fe0f0da75c7f090"
+  digest = "1:7f2aeb661efc22a59fff9f7e223c59844e32433c18b3567ad24d23758ecf2f64"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "96d2199ed511430c642d877afe7bacaac5f37426"
-  version = "v1.4.1"
+  revision = "6e5af097a1a80e2e407ff097d4dd22e747768d3b"
+  version = "v1.4.2"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
