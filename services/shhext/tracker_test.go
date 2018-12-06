@@ -29,10 +29,9 @@ type TrackerSuite struct {
 
 func (s *TrackerSuite) SetupTest() {
 	s.tracker = &tracker{
-		cache:                  map[common.Hash]EnvelopeState{},
-		batches:                map[common.Hash]map[common.Hash]struct{}{},
-		mailPeers:              mailservers.NewPeerStore(),
-		mailServerConfirmation: true,
+		cache:     map[common.Hash]EnvelopeState{},
+		batches:   map[common.Hash]map[common.Hash]struct{}{},
+		mailPeers: mailservers.NewPeerStore(),
 	}
 }
 
@@ -141,4 +140,16 @@ func (s *TrackerSuite) TestRequestExpiration() {
 	case <-time.After(10 * time.Second):
 		s.Fail("timed out while waiting for request expiration")
 	}
+}
+
+func (s *TrackerSuite) TestIgnoreNotFromMailserver() {
+	// enables filter in the tracker to drop confirmations from non-mailserver peers
+	s.tracker.mailServerConfirmation = true
+	s.tracker.Add(testHash)
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventEnvelopeSent,
+		Hash:  testHash,
+		Peer:  enode.ID{1}, // could be empty, doesn't impact test behaviour
+	})
+	s.Require().Equal(EnvelopePosted, s.tracker.GetState(testHash))
 }

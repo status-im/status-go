@@ -329,10 +329,11 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		}
 
 		config := &shhext.ServiceConfig{
-			DataDir:        config.BackupDisabledDataDir,
-			InstallationID: config.InstallationID,
-			Debug:          config.DebugAPIEnabled,
-			PFSEnabled:     config.PFSEnabled,
+			DataDir:                 config.BackupDisabledDataDir,
+			InstallationID:          config.InstallationID,
+			Debug:                   config.DebugAPIEnabled,
+			PFSEnabled:              config.PFSEnabled,
+			MailServerConfirmations: config.MailServerConfirmations,
 		}
 
 		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config)
