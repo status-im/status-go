@@ -1,7 +1,6 @@
 package fcm
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/NaySoftware/go-fcm"
@@ -9,7 +8,7 @@ import (
 
 // Notifier manages Push Notifications.
 type Notifier interface {
-	Send(dataPayloadJSON string, tokens ...string) error
+	Send(body string, payload fcm.NotificationPayload, tokens ...string) error
 }
 
 // NotificationConstructor returns constructor of configured instance Notifier interface.
@@ -26,30 +25,30 @@ func NewNotification(key string) NotificationConstructor {
 		client := fcm.NewFcmClient(key).
 			SetDelayWhileIdle(true).
 			SetContentAvailable(true).
-			SetPriority(fcm.Priority_HIGH). // Message needs to be marked as high-priority so that background task in an Android's recipient device can be invoked (https://github.com/invertase/react-native-firebase/blob/d13f0af53f1c8f20db8bc8d4b6f8c6d210e108b9/android/src/main/java/io/invertase/firebase/messaging/RNFirebaseMessagingService.java#L56)
 			SetTimeToLive(fcm.MAX_TTL)
 
 		return &Notification{client}
 	}
 }
 
-// Send sends a push notification to the tokens list.
-func (n *Notification) Send(dataPayloadJSON string, tokens ...string) error {
-	var dataPayload map[string]string
-	err := json.Unmarshal([]byte(dataPayloadJSON), &dataPayload)
-	if err != nil {
-		return err
+// Send send to the tokens list.
+func (n *Notification) Send(body string, payload fcm.NotificationPayload, tokens ...string) error {
+	data := map[string]string{
+		"msg": body,
 	}
 
-	n.client.NewFcmRegIdsMsg(tokens, dataPayload)
-	resp, err := n.client.Send()
-	if err != nil {
-		return err
+	if payload.Title == "" {
+		payload.Title = "Status"
+	}
+	if payload.Body == "" {
+		payload.Body = "You have a new message"
 	}
 
-	if resp != nil && !resp.Ok {
-		return fmt.Errorf("FCM error sending message, code=%d err=%s", resp.StatusCode, resp.Err)
-	}
+	fmt.Println(payload.Title, payload.Body)
 
-	return nil
+	n.client.NewFcmRegIdsMsg(tokens, data)
+	n.client.SetNotificationPayload(&payload)
+	_, err := n.client.Send()
+
+	return err
 }
