@@ -53,7 +53,7 @@ func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error)
 	return s, nil
 }
 
-func MigrateDBFile(oldPath string, newPath string, key string) error {
+func MigrateDBFile(oldPath string, newPath string, oldKey string, newKey string) error {
 	_, err := os.Stat(oldPath)
 
 	// No files, nothing to do
@@ -70,13 +70,12 @@ func MigrateDBFile(oldPath string, newPath string, key string) error {
 		return err
 	}
 
-	// Migrate dev/nightly builds which used ON as a key for debugging
-	db, err := openDB(newPath, "ON")
+	db, err := openDB(newPath, oldKey)
 	if err != nil {
 		return err
 	}
 
-	keyString := fmt.Sprintf("PRAGMA rekey=%s", key)
+	keyString := fmt.Sprintf("PRAGMA rekey = '%s'", newKey)
 
 	if _, err = db.Exec(keyString); err != nil {
 		return err
@@ -92,7 +91,7 @@ func openDB(path string, key string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	keyString := fmt.Sprintf("PRAGMA key=%s", key)
+	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
 
 	// Disable concurrent access as not supported by the driver
 	db.SetMaxOpenConns(1)
