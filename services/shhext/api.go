@@ -74,9 +74,6 @@ type MessagesRequest struct {
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
-	//
-	// It's also possible to authenticate request with MailServerPeer
-	// public key.
 	SymKeyID string `json:"symKeyID"`
 
 	// Timeout is the time to live of the request specified in seconds.
@@ -146,9 +143,6 @@ type SyncMessagesRequest struct {
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
-	//
-	// It's also possible to authenticate request with MailServerPeer
-	// public key.
 	SymKeyID string `json:"symKeyID"`
 }
 
@@ -244,6 +238,8 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	return hash[:], nil
 }
 
+// createSyncMailRequest creates SyncMailRequest. It uses a full bloom filter
+// if no topics is given.
 func createSyncMailRequest(r SyncMessagesRequest) whisper.SyncMailRequest {
 	var bloom []byte
 	if len(r.Topics) > 0 {
