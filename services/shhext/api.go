@@ -534,11 +534,8 @@ func makeEnvelop(
 func makePayload(r MessagesRequest) ([]byte, error) {
 	expectedCursorSize := common.HashLength + 4
 	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil {
-		return nil, err
-	}
-	if len(cursor) != expectedCursorSize {
-		return nil, fmt.Errorf("invalid cursor size, got %d but expected %d", len(cursor), expectedCursorSize)
+	if err != nil || len(cursor) != expectedCursorSize {
+		cursor = nil
 	}
 
 	payload := MessagesRequestPayload{
