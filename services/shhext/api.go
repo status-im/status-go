@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -104,22 +105,6 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 	}
 }
 
-// MessagesRequestPayload is a payload sent to the Mail Server.
-type MessagesRequestPayload struct {
-	// Lower is a lower bound of time range for which messages are requested.
-	Lower uint32
-	// Upper is a lower bound of time range for which messages are requested.
-	Upper uint32
-	// Bloom is a bloom filter to filter envelopes.
-	Bloom []byte
-	// Limit is the max number of envelopes to return.
-	Limit uint32
-	// Cursor is used for pagination of the results.
-	Cursor []byte
-	// Batch set to true indicates that the client supports batched response.
-	Batch bool
-}
-
 // -----
 // PUBLIC API
 // -----
@@ -188,7 +173,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		publicKey = mailServerNode.Pubkey()
 	}
 
-	payload, err := makePayload(r)
+	payload, err := makeMessagesRequestPayload(r)
 	if err != nil {
 		return nil, err
 	}
@@ -473,18 +458,18 @@ func makeEnvelop(
 	return message.Wrap(&params, now)
 }
 
-// makePayload makes a specific payload for MailServer to request historic messages.
-func makePayload(r MessagesRequest) ([]byte, error) {
-	expectedCursorSize := common.HashLength + 4
+// makeMessagesRequestPayload makes a specific payload for MailServer
+// to request historic messages.
+func makeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	cursor, err := hex.DecodeString(r.Cursor)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cursor: %v", err)
 	}
-	if len(cursor) != expectedCursorSize {
-		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", expectedCursorSize, len(cursor))
+	if len(cursor) > 0 && len(cursor) != mailserver.DBKeyLength {
+		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.DBKeyLength, len(cursor))
 	}
 
-	payload := MessagesRequestPayload{
+	payload := mailserver.MessagesRequestPayload{
 		Lower:  r.From,
 		Upper:  r.To,
 		Bloom:  createBloomFilter(r),
