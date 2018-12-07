@@ -240,7 +240,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 
 // createSyncMailRequest creates SyncMailRequest. It uses a full bloom filter
 // if no topics is given.
-func createSyncMailRequest(r SyncMessagesRequest) whisper.SyncMailRequest {
+func createSyncMailRequest(r SyncMessagesRequest) (whisper.SyncMailRequest, error) {
 	var bloom []byte
 	if len(r.Topics) > 0 {
 		bloom = topicsToBloom(r.Topics...)
@@ -248,13 +248,18 @@ func createSyncMailRequest(r SyncMessagesRequest) whisper.SyncMailRequest {
 		bloom = whisper.MakeFullNodeBloom()
 	}
 
+	cursor, err := hex.DecodeString(r.Cursor)
+	if err != nil {
+		return whisper.SyncMailRequest{}, err
+	}
+
 	return whisper.SyncMailRequest{
 		Lower:  r.From,
 		Upper:  r.To,
 		Bloom:  bloom,
 		Limit:  r.Limit,
-		Cursor: common.FromHex(r.Cursor),
-	}
+		Cursor: cursor,
+	}, nil
 }
 
 // SyncMessages sends a request to a given MailServerPeer to sync historic messages.
@@ -265,7 +270,11 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) e
 		return fmt.Errorf("invalid MailServerPeer: %v", err)
 	}
 
-	request := createSyncMailRequest(r)
+	request, err := createSyncMailRequest(r)
+	if err != nil {
+		return fmt.Errorf("failed to create Mail Server request: %v", err)
+	}
+
 	return api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request)
 }
 
