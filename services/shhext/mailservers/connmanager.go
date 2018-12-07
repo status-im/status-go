@@ -153,7 +153,7 @@ func processReplacement(srv PeerAdderRemover, target int, timeout time.Duration,
 		log.Debug("waiting defined timeout to establish connections",
 			"timeout", timeout, "target", target)
 		timer := time.NewTimer(timeout)
-		waitForConnections(timeout.C, events, srv, target, connected, current)
+		waitForConnections(timer.C, events, srv, target, connected, current)
 		timer.Stop()
 	}
 	return replacement

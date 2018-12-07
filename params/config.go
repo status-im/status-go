@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/static"
 	whisper "github.com/status-im/whisper/whisperv6"
 	validator "gopkg.in/go-playground/validator.v9"
@@ -283,6 +284,8 @@ type NodeConfig struct {
 
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
+
+	StatusServiceConfig *shhext.ServiceConfig `json:"StatusServiceConfig,omitempty"`
 
 	// RegisterTopics a list of specific topics where the peer wants to be
 	// discoverable.

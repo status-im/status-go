@@ -33,6 +33,9 @@ func EnsureUsedRecordsAddedFirst(ps *PeerStore, conn NodesNotifee) error {
 		return records[i].LastUsed.After(records[j].LastUsed)
 	})
 	all := recordsToNodes(records)
+	if len(all) == 0 {
+		return nil
+	}
 	if !records[0].LastUsed.IsZero() {
 		conn.Notify(all[:1])
 	}
