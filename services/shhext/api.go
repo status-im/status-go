@@ -45,7 +45,7 @@ var (
 // PAYLOADS
 // -----
 
-// MessagesRequest is a payload send to a MailServer to get messages.
+// MessagesRequest is a RequestMessages() request payload.
 type MessagesRequest struct {
 	// MailServerPeer is MailServer's enode address.
 	MailServerPeer string `json:"mailServerPeer"`
@@ -118,6 +118,38 @@ type MessagesRequestPayload struct {
 	Cursor []byte
 	// Batch set to true indicates that the client supports batched response.
 	Batch bool
+}
+
+// SyncMessagesRequest is a SyncMessages() request payload.
+type SyncMessagesRequest struct {
+	// MailServerPeer is MailServer's enode address.
+	MailServerPeer string `json:"mailServerPeer"`
+
+	// From is a lower bound of time range (optional).
+	// Default is 24 hours back from now.
+	From uint32 `json:"from"`
+
+	// To is a upper bound of time range (optional).
+	// Default is now.
+	To uint32 `json:"to"`
+
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request
+	Limit uint32 `json:"limit"`
+
+	// Cursor is used as starting point for paginated requests
+	Cursor string `json:"cursor"`
+
+	// Topics is a list of Whisper topics.
+	// If empty, a full bloom filter will be used.
+	Topics []whisper.TopicType `json:"topics"`
+
+	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
+	// It's derived from MailServer password.
+	//
+	// It's also possible to authenticate request with MailServerPeer
+	// public key.
+	SymKeyID string `json:"symKeyID"`
 }
 
 // -----
@@ -210,6 +242,35 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	}
 	hash := envelope.Hash()
 	return hash[:], nil
+}
+
+func createSyncMailRequest(r SyncMessagesRequest) whisper.SyncMailRequest {
+	var bloom []byte
+	if len(r.Topics) > 0 {
+		bloom = topicsToBloom(r.Topics...)
+	} else {
+		bloom = whisper.MakeFullNodeBloom()
+	}
+
+	return whisper.SyncMailRequest{
+		Lower:  r.From,
+		Upper:  r.To,
+		Bloom:  bloom,
+		Limit:  r.Limit,
+		Cursor: common.FromHex(r.Cursor),
+	}
+}
+
+// SyncMessages sends a request to a given MailServerPeer to sync historic messages.
+// MailServerPeers needs to be added as a trusted peer first.
+func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) error {
+	mailServerEnode, err := enode.ParseV4(r.MailServerPeer)
+	if err != nil {
+		return fmt.Errorf("invalid MailServerPeer: %v", err)
+	}
+
+	request := createSyncMailRequest(r)
+	return api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request)
 }
 
 // GetNewFilterMessages is a prototype method with deduplication
@@ -477,8 +538,11 @@ func makeEnvelop(
 func makePayload(r MessagesRequest) ([]byte, error) {
 	expectedCursorSize := common.HashLength + 4
 	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil || len(cursor) != expectedCursorSize {
-		cursor = nil
+	if err != nil {
+		return nil, err
+	}
+	if len(cursor) != expectedCursorSize {
+		return nil, fmt.Errorf("invalid cursor size, got %d but expected %d", len(cursor), expectedCursorSize)
 	}
 
 	payload := MessagesRequestPayload{
