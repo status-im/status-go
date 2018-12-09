@@ -239,7 +239,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 }
 
 // createSyncMailRequest creates SyncMailRequest. It uses a full bloom filter
-// if no topics is given.
+// if no topics are given.
 func createSyncMailRequest(r SyncMessagesRequest) (whisper.SyncMailRequest, error) {
 	var bloom []byte
 	if len(r.Topics) > 0 {
@@ -272,7 +272,7 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) e
 
 	request, err := createSyncMailRequest(r)
 	if err != nil {
-		return fmt.Errorf("failed to create Mail Server request: %v", err)
+		return fmt.Errorf("failed to create a sync mail request: %v", err)
 	}
 
 	return api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request)
