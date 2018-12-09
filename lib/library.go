@@ -8,7 +8,6 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/NaySoftware/go-fcm"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
@@ -417,7 +416,7 @@ func makeJSONResponse(err error) *C.char {
 
 // NotifyUsers sends push notifications by given tokens.
 //export NotifyUsers
-func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) {
+func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 	var (
 		err      error
 		outBytes []byte
@@ -432,7 +431,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 
 		outBytes, err = json.Marshal(out)
 		if err != nil {
-			logger.Error("failed to marshal Notify output", "error", err)
+			logger.Error("failed to marshal NotifyUsers output", "error", err)
 			outCBytes = makeJSONResponse(err)
 			return
 		}
@@ -446,14 +445,7 @@ func NotifyUsers(message, payloadJSON, tokensArray *C.char) (outCBytes *C.char) 
 		return
 	}
 
-	var payload fcm.NotificationPayload
-	err = json.Unmarshal([]byte(C.GoString(payloadJSON)), &payload)
-	if err != nil {
-		errString = err.Error()
-		return
-	}
-
-	err = statusBackend.NotifyUsers(C.GoString(message), payload, tokens...)
+	err = statusBackend.NotifyUsers(C.GoString(dataPayloadJSON), tokens...)
 	if err != nil {
 		errString = err.Error()
 		return

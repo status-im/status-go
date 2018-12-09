@@ -303,6 +303,9 @@ type NodeConfig struct {
 
 	// MailServerRegistryAddress is the MailServerRegistry contract address
 	MailServerRegistryAddress string
+
+	// MailServerConfirmations should be true if client wants to receive confirmatons only from a selected mail servers.
+	MailServerConfirmations bool
 }
 
 // Option is an additional setting when creating a NodeConfig

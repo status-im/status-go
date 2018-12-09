@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  branch = "master"
-  digest = "1:5805073c158189c2af2f776b590fc9b88bcc68f2b983842adb08333dbd3c9ae7"
+  digest = "1:ab480b4ff653dc950445e4ac6747c2a063f3dee7b533f68d4314267ce0fd9005"
   name = "github.com/NaySoftware/go-fcm"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "2a6c4f48b49f0d5dbfe621589da4c5405157d7c9"
+  revision = "024ca6a2c5444c93980f558f91c35a2defebd362"
+  source = "github.com/status-im/go-fcm"
 
 [[projects]]
   branch = "master"
@@ -822,12 +822,12 @@
   revision = "fbcc46a78cd43fef95a110df664aab513116a850"
 
 [[projects]]
-  digest = "1:6cb252f27feb57ef0e8406556c259d903c0ecff2ab0d2200ca85773b3561777d"
+  digest = "1:7f2aeb661efc22a59fff9f7e223c59844e32433c18b3567ad24d23758ecf2f64"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "76c24476436f0cf832021be98316a4ee62cc83cc"
-  version = "v1.4.0"
+  revision = "6e5af097a1a80e2e407ff097d4dd22e747768d3b"
+  version = "v1.4.2"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"

@@ -9,7 +9,7 @@ def timestamp() {
 
 def suffix() {
   if (params.RELEASE == true) {
-    return 'v' + readFile("${env.WORKSPACE}/${env.STATUS_PATH}/VERSION").trim()
+    return readFile("${env.WORKSPACE}/${env.STATUS_PATH}/VERSION").trim()
   } else {
     return "${timestamp()}-${gitCommit()}"
   }

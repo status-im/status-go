@@ -5,9 +5,10 @@
 package fcm
 
 import (
-	go_fcm "github.com/NaySoftware/go-fcm"
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	fcm "github.com/NaySoftware/go-fcm"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockFirebaseClient is a mock of FirebaseClient interface
@@ -34,9 +35,9 @@ func (m *MockFirebaseClient) EXPECT() *MockFirebaseClientMockRecorder {
 }
 
 // NewFcmRegIdsMsg mocks base method
-func (m *MockFirebaseClient) NewFcmRegIdsMsg(tokens []string, body interface{}) *go_fcm.FcmClient {
+func (m *MockFirebaseClient) NewFcmRegIdsMsg(tokens []string, body interface{}) *fcm.FcmClient {
 	ret := m.ctrl.Call(m, "NewFcmRegIdsMsg", tokens, body)
-	ret0, _ := ret[0].(*go_fcm.FcmClient)
+	ret0, _ := ret[0].(*fcm.FcmClient)
 	return ret0
 }
 
@@ -46,9 +47,9 @@ func (mr *MockFirebaseClientMockRecorder) NewFcmRegIdsMsg(tokens, body interface
 }
 
 // Send mocks base method
-func (m *MockFirebaseClient) Send() (*go_fcm.FcmResponseStatus, error) {
+func (m *MockFirebaseClient) Send() (*fcm.FcmResponseStatus, error) {
 	ret := m.ctrl.Call(m, "Send")
-	ret0, _ := ret[0].(*go_fcm.FcmResponseStatus)
+	ret0, _ := ret[0].(*fcm.FcmResponseStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -56,16 +57,4 @@ func (m *MockFirebaseClient) Send() (*go_fcm.FcmResponseStatus, error) {
 // Send indicates an expected call of Send
 func (mr *MockFirebaseClientMockRecorder) Send() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockFirebaseClient)(nil).Send))
-}
-
-// SetNotificationPayload mocks base method
-func (m *MockFirebaseClient) SetNotificationPayload(payload *go_fcm.NotificationPayload) *go_fcm.FcmClient {
-	ret := m.ctrl.Call(m, "SetNotificationPayload", payload)
-	ret0, _ := ret[0].(*go_fcm.FcmClient)
-	return ret0
-}
-
-// SetNotificationPayload indicates an expected call of SetNotificationPayload
-func (mr *MockFirebaseClientMockRecorder) SetNotificationPayload(payload interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotificationPayload", reflect.TypeOf((*MockFirebaseClient)(nil).SetNotificationPayload), payload)
 }

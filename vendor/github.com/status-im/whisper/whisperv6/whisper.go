@@ -407,12 +407,40 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
+	return whisper.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
+}
+
+func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *Envelope, timeout time.Duration) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
+	whisper.envelopeFeed.Send(EnvelopeEvent{
+		Peer:  p.peer.ID(),
+		Hash:  envelope.Hash(),
+		Event: EventMailServerRequestSent,
+	})
 	p.trusted = true
-	return p2p.Send(p.ws, p2pRequestCode, envelope)
+	err = p2p.Send(p.ws, p2pRequestCode, envelope)
+	if timeout != 0 {
+		go whisper.expireRequestHistoricMessages(p.peer.ID(), envelope.Hash(), timeout)
+	}
+	return err
+}
+
+func (whisper *Whisper) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-whisper.quit:
+		return
+	case <-timer.C:
+		whisper.envelopeFeed.Send(EnvelopeEvent{
+			Peer:  peer,
+			Hash:  hash,
+			Event: EventMailServerRequestExpired,
+		})
+	}
 }
 
 func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
@@ -422,6 +450,25 @@ func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) 
 	}
 
 	return peer.ws.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
+}
+
+// SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
+func (whisper *Whisper) SyncMessages(peerID []byte, req SyncMailRequest) error {
+	if whisper.mailServer == nil {
+		return errors.New("can not sync messages if Mail Server is not configured")
+	}
+
+	p, err := whisper.getPeer(peerID)
+	if err != nil {
+		return err
+	}
+
+	return p2p.Send(p.ws, p2pSyncRequestCode, req)
+}
+
+// SendSyncResponse sends a response to a Mail Server with a slice of envelopes.
+func (whisper *Whisper) SendSyncResponse(p *Peer, data SyncResponse) error {
+	return p2p.Send(p.ws, p2pSyncResponseCode, data)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -924,6 +971,46 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return fmt.Errorf("invalid direct message: %v", err)
 				}
 			}
+		case p2pSyncRequestCode:
+			// TODO(adam): should we limit who can send this request?
+			if whisper.mailServer != nil {
+				var request SyncMailRequest
+				if err = packet.Decode(&request); err != nil {
+					return fmt.Errorf("failed to decode p2pSyncRequestCode payload: %v", err)
+				}
+
+				if err := whisper.mailServer.SyncMail(p, request); err != nil {
+					log.Error("failed to sync envelopes", "peer", p.peer.ID().String())
+				}
+			} else {
+				log.Debug("requested to sync messages but mail servers is not registered", "peer", p.peer.ID().String())
+			}
+		case p2pSyncResponseCode:
+			// TODO(adam): currently, there is no feedback when a sync response
+			// is received. An idea to fix this:
+			//   1. Sending a request contains an ID,
+			//   2. Each sync reponse contains this ID,
+			//   3. There is a way to call whisper.SyncMessages() and wait for the response.Final to be received for that particular request ID.
+			//   4. If Cursor is not empty, another p2pSyncRequestCode should be sent.
+			if p.trusted && whisper.mailServer != nil {
+				var resp SyncResponse
+				if err = packet.Decode(&resp); err != nil {
+					return fmt.Errorf("failed to decode p2pSyncResponseCode payload: %v", err)
+				}
+
+				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error)
+
+				for _, envelope := range resp.Envelopes {
+					whisper.mailServer.Archive(envelope)
+				}
+
+				if resp.Error != "" {
+					log.Error("failed to sync envelopes", "err", resp.Error)
+				}
+				if resp.Final {
+					log.Info("finished to sync envelopes successfully")
+				}
+			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
 			if whisper.mailServer != nil {
@@ -943,7 +1030,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return errors.New("invalid request response message")
 				}
 
-				event, err := CreateMailServerEvent(payload)
+				event, err := CreateMailServerEvent(p.peer.ID(), payload)
 
 				if err != nil {
 					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)

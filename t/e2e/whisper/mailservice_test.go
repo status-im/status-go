@@ -40,7 +40,9 @@ func (s *MailServiceSuite) TestShhextRequestMessagesRPCMethodAvailability() {
 
 	// This error means that the method is available through inproc communication
 	// as the validation of params occurred.
-	err := client.Call(nil, "shhext_requestMessages", map[string]interface{}{})
+	err := client.Call(nil, "shhext_requestMessages", map[string]interface{}{
+		"mailServerPeer": "xxx",
+	})
 	r.EqualError(err, `invalid mailServerPeer value: invalid URL scheme, want "enode"`)
 
 	// Do the same but using HTTP interface.

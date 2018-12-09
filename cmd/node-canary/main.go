@@ -173,13 +173,20 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 			Limit:          1,
 			Topic:          topic,
 			SymKeyID:       mailServerKeyID,
-			Timeout:        time.Duration(*timeout) * time.Second,
+			Timeout:        time.Duration(*timeout),
 		})
 	if err != nil {
 		logger.Error("Error requesting historic messages from mailserver", "error", err)
 		os.Exit(2)
 	}
 	requestID := common.BytesToHash(requestIDBytes)
+
+	// wait for mailserver request sent event
+	err = waitForMailServerRequestSent(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
+	if err != nil {
+		logger.Error("Error waiting for mailserver request sent event", "error", err)
+		os.Exit(3)
+	}
 
 	// wait for mailserver response
 	resp, err := waitForMailServerResponse(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
@@ -313,6 +320,21 @@ func joinPublicChat(w *whisper.Whisper, rpcClient *rpc.Client, name string) (str
 	return keyID, topic, filterID, err
 }
 
+func waitForMailServerRequestSent(events chan whisper.EnvelopeEvent, requestID common.Hash, timeout time.Duration) error {
+	timeoutTimer := time.NewTimer(timeout)
+	for {
+		select {
+		case event := <-events:
+			if event.Hash == requestID && event.Event == whisper.EventMailServerRequestSent {
+				timeoutTimer.Stop()
+				return nil
+			}
+		case <-timeoutTimer.C:
+			return errors.New("timed out waiting for mailserver request sent")
+		}
+	}
+}
+
 func waitForMailServerResponse(events chan whisper.EnvelopeEvent, requestID common.Hash, timeout time.Duration) (*whisper.MailServerResponse, error) {
 	timeoutTimer := time.NewTimer(timeout)
 	for {
@@ -333,6 +355,8 @@ func waitForMailServerResponse(events chan whisper.EnvelopeEvent, requestID comm
 
 func decodeMailServerResponse(event whisper.EnvelopeEvent) (*whisper.MailServerResponse, error) {
 	switch event.Event {
+	case whisper.EventMailServerRequestSent:
+		return nil, nil
 	case whisper.EventMailServerRequestCompleted:
 		resp, ok := event.Data.(*whisper.MailServerResponse)
 		if !ok {
@@ -343,7 +367,7 @@ func decodeMailServerResponse(event whisper.EnvelopeEvent) (*whisper.MailServerR
 	case whisper.EventMailServerRequestExpired:
 		return nil, errors.New("no messages available from mailserver")
 	default:
-		return nil, errors.New("unexpected event type")
+		return nil, fmt.Errorf("unexpected event type: %v", event.Event)
 	}
 }
 
