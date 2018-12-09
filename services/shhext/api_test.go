@@ -115,7 +115,7 @@ func TestCreateSyncMailRequest(t *testing.T) {
 		{
 			Name: "some topics",
 			Req: SyncMessagesRequest{
-				Topics: []whisper.TopicType{whisper.TopicType{0x01, 0xff, 0xff, 0xff}},
+				Topics: []whisper.TopicType{{0x01, 0xff, 0xff, 0xff}},
 			},
 			Verify: func(t *testing.T, r whisper.SyncMailRequest) {
 				expectedBloom := whisper.TopicToBloom(whisper.TopicType{0x01, 0xff, 0xff, 0xff})
