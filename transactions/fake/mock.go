@@ -38,6 +38,7 @@ func (m *MockPublicTransactionPoolAPI) EXPECT() *MockPublicTransactionPoolAPIMoc
 
 // GasPrice mocks base method
 func (m *MockPublicTransactionPoolAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GasPrice", ctx)
 	ret0, _ := ret[0].(*hexutil.Big)
 	ret1, _ := ret[1].(error)
@@ -46,11 +47,13 @@ func (m *MockPublicTransactionPoolAPI) GasPrice(ctx context.Context) (*hexutil.B
 
 // GasPrice indicates an expected call of GasPrice
 func (mr *MockPublicTransactionPoolAPIMockRecorder) GasPrice(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GasPrice", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).GasPrice), ctx)
 }
 
 // EstimateGas mocks base method
 func (m *MockPublicTransactionPoolAPI) EstimateGas(ctx context.Context, args CallArgs) (hexutil.Uint64, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EstimateGas", ctx, args)
 	ret0, _ := ret[0].(hexutil.Uint64)
 	ret1, _ := ret[1].(error)
@@ -59,11 +62,13 @@ func (m *MockPublicTransactionPoolAPI) EstimateGas(ctx context.Context, args Cal
 
 // EstimateGas indicates an expected call of EstimateGas
 func (mr *MockPublicTransactionPoolAPIMockRecorder) EstimateGas(ctx, args interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EstimateGas", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).EstimateGas), ctx, args)
 }
 
 // GetTransactionCount mocks base method
 func (m *MockPublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTransactionCount", ctx, address, blockNr)
 	ret0, _ := ret[0].(*hexutil.Uint64)
 	ret1, _ := ret[1].(error)
@@ -72,11 +77,13 @@ func (m *MockPublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, 
 
 // GetTransactionCount indicates an expected call of GetTransactionCount
 func (mr *MockPublicTransactionPoolAPIMockRecorder) GetTransactionCount(ctx, address, blockNr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionCount", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).GetTransactionCount), ctx, address, blockNr)
 }
 
 // SendRawTransaction mocks base method
 func (m *MockPublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendRawTransaction", ctx, encodedTx)
 	ret0, _ := ret[0].(common.Hash)
 	ret1, _ := ret[1].(error)
@@ -85,5 +92,6 @@ func (m *MockPublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, e
 
 // SendRawTransaction indicates an expected call of SendRawTransaction
 func (mr *MockPublicTransactionPoolAPIMockRecorder) SendRawTransaction(ctx, encodedTx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendRawTransaction", reflect.TypeOf((*MockPublicTransactionPoolAPI)(nil).SendRawTransaction), ctx, encodedTx)
 }

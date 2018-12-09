@@ -37,6 +37,7 @@ func (m *MockWhisperService) EXPECT() *MockWhisperServiceMockRecorder {
 
 // AddKeyPair mocks base method
 func (m *MockWhisperService) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddKeyPair", key)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
@@ -45,6 +46,7 @@ func (m *MockWhisperService) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 
 // AddKeyPair indicates an expected call of AddKeyPair
 func (mr *MockWhisperServiceMockRecorder) AddKeyPair(key interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddKeyPair", reflect.TypeOf((*MockWhisperService)(nil).AddKeyPair), key)
 }
 
@@ -73,6 +75,7 @@ func (m *MockAccountManager) EXPECT() *MockAccountManagerMockRecorder {
 
 // AddressToDecryptedAccount mocks base method
 func (m *MockAccountManager) AddressToDecryptedAccount(arg0, arg1 string) (accounts.Account, *keystore.Key, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddressToDecryptedAccount", arg0, arg1)
 	ret0, _ := ret[0].(accounts.Account)
 	ret1, _ := ret[1].(*keystore.Key)
@@ -82,11 +85,13 @@ func (m *MockAccountManager) AddressToDecryptedAccount(arg0, arg1 string) (accou
 
 // AddressToDecryptedAccount indicates an expected call of AddressToDecryptedAccount
 func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddressToDecryptedAccount", reflect.TypeOf((*MockAccountManager)(nil).AddressToDecryptedAccount), arg0, arg1)
 }
 
 // SelectAccount mocks base method
 func (m *MockAccountManager) SelectAccount(address, password string) error {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SelectAccount", address, password)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -94,11 +99,13 @@ func (m *MockAccountManager) SelectAccount(address, password string) error {
 
 // SelectAccount indicates an expected call of SelectAccount
 func (mr *MockAccountManagerMockRecorder) SelectAccount(address, password interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelectAccount", reflect.TypeOf((*MockAccountManager)(nil).SelectAccount), address, password)
 }
 
 // CreateAccount mocks base method
 func (m *MockAccountManager) CreateAccount(password string) (string, string, string, error) {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateAccount", password)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
@@ -109,5 +116,6 @@ func (m *MockAccountManager) CreateAccount(password string) (string, string, str
 
 // CreateAccount indicates an expected call of CreateAccount
 func (mr *MockAccountManagerMockRecorder) CreateAccount(password interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccount", reflect.TypeOf((*MockAccountManager)(nil).CreateAccount), password)
 }

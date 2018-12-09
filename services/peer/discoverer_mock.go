@@ -34,6 +34,7 @@ func (m *MockDiscoverer) EXPECT() *MockDiscovererMockRecorder {
 
 // Discover mocks base method
 func (m *MockDiscoverer) Discover(topic string, max, min int) error {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Discover", topic, max, min)
 	ret0, _ := ret[0].(error)
 	return ret0
@@ -41,5 +42,6 @@ func (m *MockDiscoverer) Discover(topic string, max, min int) error {
 
 // Discover indicates an expected call of Discover
 func (mr *MockDiscovererMockRecorder) Discover(topic, max, min interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Discover", reflect.TypeOf((*MockDiscoverer)(nil).Discover), topic, max, min)
 }
