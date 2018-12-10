@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"testing"
@@ -72,6 +73,10 @@ func (s *ShhExtSuite) SetupTest() {
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
 	s.whisper = make([]*whisper.Whisper, 2)
+
+	directory, err := ioutil.TempDir("", "status-go-testing")
+	s.Require().NoError(err)
+
 	for i := range s.nodes {
 		i := i // bind i to be usable in service constructors
 		cfg := &node.Config{
@@ -88,11 +93,12 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
+
 		config := &ServiceConfig{
 			InstallationID:          "1",
-			DataDir:                 os.TempDir(),
+			DataDir:                 directory,
 			Debug:                   true,
-			PFSEnabled:              false,
+			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
 		}
@@ -104,6 +110,11 @@ func (s *ShhExtSuite) SetupTest() {
 		s.nodes[i] = stack
 	}
 	s.services[0].tracker.handler = newHandlerMock(1)
+}
+
+func (s *ShhExtSuite) TestInitProtocol() {
+	err := s.services[0].InitProtocol("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
+	s.NoError(err)
 }
 
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
@@ -184,7 +195,7 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 		InstallationID: "1",
 		DataDir:        os.TempDir(),
 		Debug:          false,
-		PFSEnabled:     false,
+		PFSEnabled:     true,
 	}
 	service := New(shh, mock, nil, config)
 	api := NewPublicAPI(service)
@@ -250,7 +261,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		InstallationID: "1",
 		DataDir:        os.TempDir(),
 		Debug:          false,
-		PFSEnabled:     false,
+		PFSEnabled:     true,
 	}
 	service := New(shh, mock, nil, config)
 	s.Require().NoError(service.Start(aNode.Server()))
