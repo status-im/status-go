@@ -246,6 +246,7 @@ gen-install:
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
+	dep ensure -update github.com/golang/mock
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
