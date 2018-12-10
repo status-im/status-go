@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -13,6 +12,7 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	crypto "github.com/libp2p/go-libp2p-crypto"
 	host "github.com/libp2p/go-libp2p-host"
+	net "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
 	ethv4 "github.com/status-im/go-multiaddr-ethv4"
@@ -38,15 +38,17 @@ func New(identity crypto.PrivKey) (c Client, err error) {
 		return c, err
 	}
 	return Client{
-		identity: identity,
-		h:        h,
+		h: h,
+	}, nil
+}
+
+func NewWithHost(h host.Host) (c Client, err error) {
+	return Client{
+		h: h,
 	}, nil
 }
 
 type Client struct {
-	laddr    ma.Multiaddr
-	identity crypto.PrivKey
-
 	h host.Host
 }
 
@@ -55,7 +57,7 @@ func (c Client) Register(ctx context.Context, srv ma.Multiaddr, topic string, re
 	if err != nil {
 		return err
 	}
-	defer s.Close()
+	defer net.FullClose(s)
 	if err = rlp.Encode(s, protocol.REGISTER); err != nil {
 		return err
 	}
@@ -86,7 +88,7 @@ func (c Client) Discover(ctx context.Context, srv ma.Multiaddr, topic string, li
 	if err != nil {
 		return
 	}
-	defer s.Close()
+	defer net.FullClose(s)
 	if err = rlp.Encode(s, protocol.DISCOVER); err != nil {
 		return
 	}
@@ -112,7 +114,7 @@ func (c Client) Discover(ctx context.Context, srv ma.Multiaddr, topic string, li
 	return val.Records, nil
 }
 
-func (c Client) newStream(ctx context.Context, srv ma.Multiaddr) (rw io.ReadWriteCloser, err error) {
+func (c Client) newStream(ctx context.Context, srv ma.Multiaddr) (rw net.Stream, err error) {
 	pid, err := srv.ValueForProtocol(ethv4.P_ETHv4)
 	if err != nil {
 		return
@@ -132,5 +134,10 @@ func (c Client) newStream(ctx context.Context, srv ma.Multiaddr) (rw io.ReadWrit
 	if err != nil {
 		return nil, err
 	}
-	return InstrumenetedStream{s}, nil
+	return &InstrumentedStream{s}, nil
+}
+
+// Close shutdowns the host and all open connections.
+func (c Client) Close() error {
+	return c.h.Close()
 }
