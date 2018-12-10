@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -66,13 +65,13 @@ var (
 )
 
 const (
+	// DBKeyLength is a size of the envelope key.
+	DBKeyLength = common.HashLength + timestampLength
+
 	timestampLength        = 4
-	dbKeyLength            = common.HashLength + timestampLength
 	requestLimitLength     = 4
 	requestTimeRangeLength = timestampLength * 2
 )
-
-type cursorType []byte
 
 // dbImpl is an interface introduced to be able to test some unexpected
 // panics from leveldb that are difficult to reproduce.
@@ -108,15 +107,29 @@ type DBKey struct {
 	raw       []byte
 }
 
-// NewDbKey creates a new DBKey with the given values.
-func NewDbKey(t uint32, h common.Hash) *DBKey {
+// Bytes returns a bytes representation of the DBKey.
+func (k *DBKey) Bytes() []byte {
+	return k.raw
+}
+
+// NewDBKey creates a new DBKey with the given values.
+func NewDBKey(t uint32, h common.Hash) *DBKey {
 	var k DBKey
 	k.timestamp = t
 	k.hash = h
-	k.raw = make([]byte, dbKeyLength)
+	k.raw = make([]byte, DBKeyLength)
 	binary.BigEndian.PutUint32(k.raw, k.timestamp)
 	copy(k.raw[4:], k.hash[:])
 	return &k
+}
+
+// NewDBKeyFromBytes creates a DBKey from a byte slice.
+func NewDBKeyFromBytes(b []byte) *DBKey {
+	return &DBKey{
+		raw:       b,
+		timestamp: binary.BigEndian.Uint32(b),
+		hash:      common.BytesToHash(b[4:]),
+	}
 }
 
 // Init initializes mailServer.
@@ -226,13 +239,13 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 	log.Debug("Archiving envelope", "hash", env.Hash().Hex())
 
-	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
+	key := NewDBKey(env.Expiry-env.TTL, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
 		archivedErrorsCounter.Inc(1)
 	} else {
-		if err = s.db.Put(key.raw, rawEnvelope, nil); err != nil {
+		if err = s.db.Put(key.Bytes(), rawEnvelope, nil); err != nil {
 			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
 			archivedErrorsCounter.Inc(1)
 		}
@@ -265,7 +278,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		lower, upper uint32
 		bloom        []byte
 		limit        uint32
-		cursor       cursorType
+		cursor       []byte
 		batch        bool
 		err          error
 	)
@@ -274,7 +287,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	if err == nil {
 		lower, upper = payload.Lower, payload.Upper
 		bloom = payload.Bloom
-		cursor = cursorType(payload.Cursor)
+		cursor = payload.Cursor
 		limit = payload.Limit
 		batch = payload.Batch
 	} else {
@@ -452,23 +465,22 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	return false
 }
 
-func (s *WMailServer) createIterator(lower, upper uint32, cursor cursorType) iterator.Iterator {
+func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
 	var (
 		emptyHash common.Hash
-		ku        []byte
-		kl        []byte
+		ku, kl    *DBKey
 	)
 
-	kl = NewDbKey(lower, emptyHash).raw
-	if len(cursor) == dbKeyLength {
-		ku = cursor
+	kl = NewDBKey(lower, emptyHash)
+	if len(cursor) == DBKeyLength {
+		ku = NewDBKeyFromBytes(cursor)
 	} else {
-		ku = NewDbKey(upper+1, emptyHash).raw
+		ku = NewDBKey(upper+1, emptyHash)
 	}
 
-	i := s.db.NewIterator(&util.Range{Start: kl, Limit: ku}, nil)
+	i := s.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
 	// seek to the end as we want to return envelopes in a descending order
-	i.Seek(ku)
+	i.Seek(ku.Bytes())
 
 	return i
 }
@@ -477,13 +489,13 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor cursorType) ite
 // to the output channel in bundles.
 func (s *WMailServer) processRequestInBundles(
 	iter iterator.Iterator, bloom []byte, limit int, output chan<- []*whisper.Envelope,
-) (cursorType, common.Hash) {
+) ([]byte, common.Hash) {
 	var (
 		bundle                 []*whisper.Envelope
 		bundleSize             uint32
 		processedEnvelopes     int
 		processedEnvelopesSize int64
-		nextCursor             cursorType
+		nextCursor             []byte
 		lastEnvelopeHash       common.Hash
 	)
 
@@ -564,7 +576,7 @@ func (s *WMailServer) sendEnvelopes(peer *whisper.Peer, envelopes []*whisper.Env
 	return nil
 }
 
-func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope, lastEnvelopeHash common.Hash, cursor cursorType) error {
+func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, request *whisper.Envelope, lastEnvelopeHash common.Hash, cursor []byte) error {
 	payload := whisper.CreateMailServerRequestCompletedPayload(request.Hash(), lastEnvelopeHash, cursor)
 	return s.w.SendHistoricMessageResponse(peer, payload)
 }
@@ -597,8 +609,8 @@ func (s *WMailServer) openEnvelope(request *whisper.Envelope) *whisper.ReceivedM
 	return nil
 }
 
-func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (shhext.MessagesRequestPayload, error) {
-	var payload shhext.MessagesRequestPayload
+func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (MessagesRequestPayload, error) {
+	var payload MessagesRequestPayload
 
 	if s.pow > 0.0 && request.PoW() < s.pow {
 		return payload, errors.New("PoW too low")
@@ -639,7 +651,7 @@ func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (s
 func (s *WMailServer) validateRequest(
 	peerID []byte,
 	request *whisper.Envelope,
-) (uint32, uint32, []byte, uint32, cursorType, error) {
+) (uint32, uint32, []byte, uint32, []byte, error) {
 	if s.pow > 0.0 && request.PoW() < s.pow {
 		return 0, 0, nil, 0, nil, fmt.Errorf("PoW() is too low")
 	}
@@ -678,8 +690,8 @@ func (s *WMailServer) validateRequest(
 		limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize:])
 	}
 
-	var cursor cursorType
-	if len(decrypted.Payload) == requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength+dbKeyLength {
+	var cursor []byte
+	if len(decrypted.Payload) == requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength+DBKeyLength {
 		cursor = decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength:]
 	}
 
