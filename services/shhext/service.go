@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -108,17 +109,28 @@ func (s *Service) InitProtocol(address string, password string) error {
 		return nil
 	}
 
+	digest := sha3.Sum256([]byte(password))
+	hashedPassword := fmt.Sprintf("%x", digest)
+
 	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
 		return err
 	}
-	oldPath := filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address))
-	newPath := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
+	v0Path := filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address))
+	v1Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
+	v2Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v2.db", s.installationID))
 
-	if err := chat.MigrateDBFile(oldPath, newPath, password); err != nil {
+	if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 		return err
 	}
 
-	persistence, err := chat.NewSQLLitePersistence(newPath, password)
+	if err := chat.MigrateDBFile(v1Path, v2Path, password, hashedPassword); err != nil {
+		// Remove db file as created with a blank password and never used,
+		// and there's no need to rekey in this case
+		os.Remove(v1Path)
+		os.Remove(v2Path)
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(v2Path, hashedPassword)
 	if err != nil {
 		return err
 	}
