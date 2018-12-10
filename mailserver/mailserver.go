@@ -371,6 +371,11 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		return fmt.Errorf("requests per seconds limit exceeded")
 	}
 
+	// TODO(adam): uncomment when a new Whisper version is ready
+	// if err := request.Validate(); err != nil {
+	// 	return fmt.Errorf("request is invalid: %v", err)
+	// }
+
 	iter := s.createIterator(request.Lower, request.Upper, request.Cursor)
 	defer iter.Release()
 
