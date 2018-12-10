@@ -108,15 +108,17 @@ func (ps *ConnectionManager) Start() {
 				// TODO what about completed but with error? what about expired envelopes?
 				switch ev.Event {
 				case whisperv6.EventMailServerRequestSent:
+					log.Debug("sent request to a peer", "hash", ev.Hash, "address", ev.Peer)
 					requests[ev.Hash] = struct{}{}
 				case whisperv6.EventMailServerRequestCompleted:
 					delete(requests, ev.Hash)
 				case whisperv6.EventMailServerRequestExpired:
 					_, exist := requests[ev.Hash]
 					if !exist {
+						log.Debug("request to a peer is not found in local data", "hash", ev.Hash)
 						continue
 					}
-					log.Debug("request to a mail server expired, disconncet a peer", "address", ev.Peer)
+					log.Debug("request to a mail server expired, disconnect a peer", "address", ev.Peer)
 					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
 				}
 			}
@@ -153,7 +155,7 @@ func processReplacement(srv PeerAdderRemover, target int, timeout time.Duration,
 		log.Debug("waiting defined timeout to establish connections",
 			"timeout", timeout, "target", target)
 		timer := time.NewTimer(timeout)
-		waitForConnections(timer.C, events, srv, target, connected, current)
+		waitForConnections(timer.C, events, srv, target, connected, replacement)
 		timer.Stop()
 	}
 	return replacement
@@ -170,6 +172,7 @@ func replaceNodes(srv PeerAdderRemover, target int, connected map[enode.ID]struc
 	}
 	if len(connected) < target {
 		for _, n := range new {
+			log.Debug("adding peer during replacement", "address", n.ID())
 			srv.AddPeer(n)
 		}
 	}
@@ -227,8 +230,10 @@ func waitForConnections(timeout <-chan time.Time, events <-chan *p2p.PeerEvent, 
 	for {
 		select {
 		case ev := <-events:
+			log.Debug("processing peer event", "type", ev.Type, "address", ev.Peer, "nodes", nodes)
 			processPeerEvent(ev, srv, target, connected, nodes)
 			if target == len(connected) {
+				log.Debug("reached number of required connections")
 				return
 			}
 		case <-timeout:
