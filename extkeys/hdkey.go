@@ -113,7 +113,7 @@ var (
 	}
 
 	// EIP1581KeyTypeChat is used as chat key_type in the derivation of EIP1581 keys
-	EIP1581KeyTypeChat uint32 = 0
+	EIP1581KeyTypeChat uint32 = 0x00
 
 	// EthEIP1581ChatParentPath is EIP-1581 chat keys parent's derivation path
 	EthEIP1581ChatParentPath = []uint32{
