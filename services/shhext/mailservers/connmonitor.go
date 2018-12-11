@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.
@@ -34,26 +34,26 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
 	go func() {
-		events := make(chan whisperv6.EnvelopeEvent, whisperEventsBuffer)
+		events := make(chan whisper.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.whisper.SubscribeEnvelopeEvents(events)
+		defer sub.Unsubscribe()
+		defer mon.wg.Done()
 		for {
 			select {
 			case <-mon.quit:
-				sub.Unsubscribe()
-				mon.wg.Done()
 				return
 			case err := <-sub.Err():
 				log.Error("retry after error suscribing to whisper events", "error", err)
-				sub = mon.whisper.SubscribeEnvelopeEvents(events)
+				return
 			case ev := <-events:
 				node := mon.ps.Get(ev.Peer)
 				if node == nil {
 					continue
 				}
-				if ev.Event == whisperv6.EventMailServerRequestCompleted {
+				if ev.Event == whisper.EventMailServerRequestCompleted {
 					err := mon.updateRecord(ev.Peer)
 					if err != nil {
-						log.Error("unable to store that server was used", "peer", ev.Peer, "error", err)
+						log.Error("unable to update storage", "peer", ev.Peer, "error", err)
 					}
 				}
 			}

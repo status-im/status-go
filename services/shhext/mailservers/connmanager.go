@@ -80,30 +80,31 @@ func (ps *ConnectionManager) Start() {
 	ps.quit = make(chan struct{})
 	ps.wg.Add(1)
 	go func() {
-		current := map[enode.ID]*enode.Node{}
-		connected := map[enode.ID]struct{}{}
+		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
+
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
 		whisperEvents := make(chan whisper.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
 		requests := map[common.Hash]struct{}{}
+
+		defer sub.Unsubscribe()
+		defer whisperSub.Unsubscribe()
+		defer ps.wg.Done()
 		for {
 			select {
 			case <-ps.quit:
-				sub.Unsubscribe()
-				whisperSub.Unsubscribe()
-				ps.wg.Done()
 				return
 			case err := <-sub.Err():
 				log.Error("retry after error subscribing to p2p events", "error", err)
-				sub = ps.server.SubscribeEvents(events)
+				return
 			case err := <-whisperSub.Err():
 				log.Error("retry after error suscribing to whisper events", "error", err)
-				whisperSub = ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
+				return
 			case newNodes := <-ps.notifications:
-				current = processReplacement(ps.server, ps.connectedTarget, ps.timeoutWaitAdded, newNodes, events, connected, current)
+				state.processReplacement(newNodes, events)
 			case ev := <-events:
-				processPeerEvent(ev, ps.server, ps.connectedTarget, connected, current)
+				processPeerEvent(state, ev)
 			case ev := <-whisperEvents:
 				// TODO what about completed but with error? what about expired envelopes?
 				switch ev.Event {
@@ -117,7 +118,7 @@ func (ps *ConnectionManager) Start() {
 						continue
 					}
 					log.Debug("request to a mail server expired, disconncet a peer", "address", ev.Peer)
-					nodeDisconnected(ps.server, ev.Peer, ps.connectedTarget, connected, current)
+					state.nodeDisconnected(ev.Peer)
 				}
 			}
 		}
@@ -139,96 +140,122 @@ func (ps *ConnectionManager) Stop() {
 	ps.quit = nil
 }
 
-func processReplacement(srv PeerAdderRemover, target int, timeout time.Duration, newNodes []*enode.Node, events <-chan *p2p.PeerEvent, connected map[enode.ID]struct{}, current map[enode.ID]*enode.Node) map[enode.ID]*enode.Node {
+func (state *internalState) processReplacement(newNodes []*enode.Node, events <-chan *p2p.PeerEvent) {
 	replacement := map[enode.ID]*enode.Node{}
 	for _, n := range newNodes {
 		replacement[n.ID()] = n
 	}
-	replaceNodes(srv, target, connected, current, replacement)
-	if target == len(connected) {
-		log.Debug("already connected with required target", "target", target)
-		return replacement
+	state.replaceNodes(replacement)
+	if state.ReachedTarget() {
+		log.Debug("already connected with required target", "target", state.target)
+		return
 	}
-	if timeout != 0 {
+	if state.timeout != 0 {
 		log.Debug("waiting defined timeout to establish connections",
-			"timeout", timeout, "target", target)
-		timer := time.NewTimer(timeout)
-		waitForConnections(timer.C, events, srv, target, connected, replacement)
+			"timeout", state.timeout, "target", state.target)
+		timer := time.NewTimer(state.timeout)
+		waitForConnections(state, timer.C, events)
 		timer.Stop()
 	}
-	return replacement
 }
 
-func replaceNodes(srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, old, new map[enode.ID]*enode.Node) {
-	for nid, n := range old {
+func newInternalState(srv PeerAdderRemover, target int, timeout time.Duration) *internalState {
+	return &internalState{
+		options:      options{target: target, timeout: timeout},
+		srv:          srv,
+		connected:    map[enode.ID]struct{}{},
+		currentNodes: map[enode.ID]*enode.Node{},
+	}
+}
+
+type options struct {
+	target  int
+	timeout time.Duration
+}
+
+type internalState struct {
+	options
+	srv PeerAdderRemover
+
+	connected    map[enode.ID]struct{}
+	currentNodes map[enode.ID]*enode.Node
+}
+
+func (state *internalState) ReachedTarget() bool {
+	return len(state.connected) >= state.target
+}
+
+func (state *internalState) replaceNodes(new map[enode.ID]*enode.Node) {
+	for nid, n := range state.currentNodes {
 		if _, exist := new[nid]; !exist {
-			if _, exist := connected[nid]; exist {
-				delete(connected, nid)
+			if _, exist := state.connected[nid]; exist {
+				delete(state.connected, nid)
 			}
-			srv.RemovePeer(n)
+			state.srv.RemovePeer(n)
 		}
 	}
-	if len(connected) < target {
+	if !state.ReachedTarget() {
 		for _, n := range new {
-			srv.AddPeer(n)
+			state.srv.AddPeer(n)
 		}
 	}
+	state.currentNodes = new
 }
 
-func nodeAdded(srv PeerAdderRemover, peer enode.ID, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
-	n, exist := nodes[peer]
+func (state *internalState) nodeAdded(peer enode.ID) {
+	n, exist := state.currentNodes[peer]
 	if !exist {
 		return
 	}
-	if len(connected) == target {
-		srv.RemovePeer(n)
+	if state.ReachedTarget() {
+		state.srv.RemovePeer(n)
 	} else {
-		connected[n.ID()] = struct{}{}
+		state.connected[n.ID()] = struct{}{}
 	}
 }
 
-func nodeDisconnected(srv PeerAdderRemover, peer enode.ID, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
-	n, exist := nodes[peer] // unrelated event
+func (state *internalState) nodeDisconnected(peer enode.ID) {
+	n, exist := state.currentNodes[peer] // unrelated event
 	if !exist {
 		return
 	}
-	_, exist = connected[peer] // check if already disconnected
+	_, exist = state.connected[peer] // check if already disconnected
 	if !exist {
 		return
 	}
-	if len(nodes) == 1 { // keep node connected if we don't have another choice
+	if len(state.currentNodes) == 1 { // keep node connected if we don't have another choice
 		return
 	}
-	srv.RemovePeer(n) // remove peer permanently, otherwise p2p.Server will try to reconnect
-	delete(connected, peer)
-	if len(connected) < target { // try to connect with any other selected (but not connected) node
-		for nid, n := range nodes {
-			_, exist := connected[nid]
+	state.srv.RemovePeer(n) // remove peer permanently, otherwise p2p.Server will try to reconnect
+	delete(state.connected, peer)
+	if !state.ReachedTarget() { // try to connect with any other selected (but not connected) node
+		for nid, n := range state.currentNodes {
+			_, exist := state.connected[nid]
 			if exist || peer == nid {
 				continue
 			}
-			srv.AddPeer(n)
+			state.srv.AddPeer(n)
 		}
 	}
 }
 
-func processPeerEvent(ev *p2p.PeerEvent, srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
+func processPeerEvent(state *internalState, ev *p2p.PeerEvent) {
 	switch ev.Type {
 	case p2p.PeerEventTypeAdd:
 		log.Debug("connected to a mailserver", "address", ev.Peer)
-		nodeAdded(srv, ev.Peer, target, connected, nodes)
+		state.nodeAdded(ev.Peer)
 	case p2p.PeerEventTypeDrop:
 		log.Debug("mailserver disconnected", "address", ev.Peer)
-		nodeDisconnected(srv, ev.Peer, target, connected, nodes)
+		state.nodeDisconnected(ev.Peer)
 	}
 }
 
-func waitForConnections(timeout <-chan time.Time, events <-chan *p2p.PeerEvent, srv PeerAdderRemover, target int, connected map[enode.ID]struct{}, nodes map[enode.ID]*enode.Node) {
+func waitForConnections(state *internalState, timeout <-chan time.Time, events <-chan *p2p.PeerEvent) {
 	for {
 		select {
 		case ev := <-events:
-			processPeerEvent(ev, srv, target, connected, nodes)
-			if target == len(connected) {
+			processPeerEvent(state, ev)
+			if state.ReachedTarget() {
 				return
 			}
 		case <-timeout:

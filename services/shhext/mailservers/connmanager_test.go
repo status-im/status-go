@@ -149,12 +149,13 @@ func TestReplaceNodes(t *testing.T) {
 	} {
 		t.Run(tc.description, func(t *testing.T) {
 			peers := newFakePeerAdderRemover()
-			replaceNodes(peers, tc.target, peers.nodes, nil, tc.old)
+			state := newInternalState(peers, tc.target, 0)
+			state.replaceNodes(tc.old)
 			require.Len(t, peers.nodes, len(tc.old))
 			for n := range peers.nodes {
 				require.Contains(t, tc.old, n)
 			}
-			replaceNodes(peers, tc.target, peers.nodes, tc.old, tc.new)
+			state.replaceNodes(tc.new)
 			require.Len(t, peers.nodes, len(tc.new))
 			for n := range peers.nodes {
 				require.Contains(t, tc.new, n)
@@ -167,19 +168,24 @@ func TestPartialReplaceNodesBelowTarget(t *testing.T) {
 	peers := newFakePeerAdderRemover()
 	old := getMapWithRandomNodes(t, 1)
 	new := getMapWithRandomNodes(t, 2)
-	replaceNodes(peers, 2, peers.nodes, nil, old)
+	state := newInternalState(peers, 2, 0)
+	state.replaceNodes(old)
 	mergeOldIntoNew(old, new)
-	replaceNodes(peers, 2, peers.nodes, old, new)
+	state.replaceNodes(new)
 	require.Len(t, peers.nodes, len(new))
 }
 
 func TestPartialReplaceNodesAboveTarget(t *testing.T) {
 	peers := newFakePeerAdderRemover()
-	old := getMapWithRandomNodes(t, 1)
+	initial, err := RandomNode()
+	require.NoError(t, err)
+	old := nodesToMap([]*enode.Node{initial})
 	new := getMapWithRandomNodes(t, 2)
-	replaceNodes(peers, 1, peers.nodes, nil, old)
+	state := newInternalState(peers, 1, 0)
+	state.replaceNodes(old)
+	state.nodeAdded(initial.ID())
 	mergeOldIntoNew(old, new)
-	replaceNodes(peers, 1, peers.nodes, old, new)
+	state.replaceNodes(new)
 	require.Len(t, peers.nodes, 1)
 }
 
@@ -323,9 +329,9 @@ func TestProcessReplacementWaitsForConnections(t *testing.T) {
 	timeout := time.Second
 	nodes := make([]*enode.Node, 2)
 	fillWithRandomNodes(t, nodes)
-	current := nodesToMap(nodes)
-	connected := map[enode.ID]struct{}{}
 	events := make(chan *p2p.PeerEvent)
+	state := newInternalState(srv, target, timeout)
+	state.currentNodes = nodesToMap(nodes)
 	go func() {
 		select {
 		case events <- &p2p.PeerEvent{Peer: nodes[0].ID(), Type: p2p.PeerEventTypeAdd}:
@@ -333,6 +339,6 @@ func TestProcessReplacementWaitsForConnections(t *testing.T) {
 			assert.FailNow(t, "can't send a drop event")
 		}
 	}()
-	processReplacement(srv, target, timeout, nodes, events, connected, current)
-	require.Len(t, connected, 1)
+	state.processReplacement(nodes, events)
+	require.Len(t, state.connected, 1)
 }

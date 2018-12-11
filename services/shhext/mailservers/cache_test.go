@@ -23,14 +23,14 @@ func containsNode(nodes []*enode.Node, node *enode.Node) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("nodes %+s do not containt  %s", nodes, node)
+	return fmt.Errorf("nodes %+s do not contain  %s", nodes, node)
 }
 
 func TestReplaceRecords(t *testing.T) {
 	nodesNumber := 3
 	cache := newInMemCache(t)
 	nodes := make([]*enode.Node, nodesNumber)
-	// First round is a sanity check that record were written.
+	// First round is a sanity check that records were written.
 	fillWithRandomNodes(t, nodes)
 	require.NoError(t, cache.Replace(nodes))
 	records, err := cache.LoadAll()
