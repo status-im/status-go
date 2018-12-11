@@ -590,7 +590,7 @@ func TestChildForPurpose(t *testing.T) {
 
 	eip1581Child, err := masterKey.EthEIP1581ChatChild(0)
 	if err != nil {
-		t.Error("Error dering EIP1581-compliant key")
+		t.Error("Error deriving EIP1581-compliant key")
 	}
 
 	walletChild, err := masterKey.ChildForPurpose(KeyPurposeWallet, 0)
