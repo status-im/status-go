@@ -26,9 +26,9 @@ func NewCleanerWithDB(db dbImpl) *Cleaner {
 // Prune removes messages sent between lower and upper timestamps and returns how many has been removed
 func (c *Cleaner) Prune(lower, upper uint32) (int, error) {
 	var zero common.Hash
-	kl := NewDbKey(lower, zero)
-	ku := NewDbKey(upper, zero)
-	i := c.db.NewIterator(&util.Range{Start: kl.raw, Limit: ku.raw}, nil)
+	kl := NewDBKey(lower, zero)
+	ku := NewDBKey(upper, zero)
+	i := c.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
 	defer i.Release()
 
 	return c.prune(i)
