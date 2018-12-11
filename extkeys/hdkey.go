@@ -274,7 +274,7 @@ func (k *ExtendedKey) ChildForPurpose(p KeyPurpose, i uint32) (*ExtendedKey, err
 // BIP44Child returns Status CKD#i (where i is child index).
 // BIP44 format is used: m / purpose' / coin_type' / account' / change / address_index
 // BIP44Child is depracated in favour of EthBIP44Child
-// Param coinType is deprecatet; we override it to always use CoinTypeETH.
+// Param coinType is deprecated; we override it to always use CoinTypeETH.
 func (k *ExtendedKey) BIP44Child(coinType, i uint32) (*ExtendedKey, error) {
 	return k.EthBIP44Child(i)
 }
