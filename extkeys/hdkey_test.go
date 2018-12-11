@@ -585,7 +585,7 @@ func TestChildForPurpose(t *testing.T) {
 
 	bip44Child, err := masterKey.EthBIP44Child(0)
 	if err != nil {
-		t.Error("Error dering BIP44-compliant key")
+		t.Error("Error deriving BIP44-compliant key")
 	}
 
 	eip1581Child, err := masterKey.EthEIP1581ChatChild(0)
