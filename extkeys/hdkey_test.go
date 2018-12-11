@@ -600,7 +600,7 @@ func TestChildForPurpose(t *testing.T) {
 
 	chatChild, err := masterKey.ChildForPurpose(KeyPurposeChat, 0)
 	if err != nil {
-		t.Error("Error dering EIP1581-compliant key")
+		t.Error("Error deriving EIP1581-compliant key")
 	}
 
 	// Check that ChildForPurpose with KeyPurposeWallet generates a BIP44 key
