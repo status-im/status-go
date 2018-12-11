@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -24,7 +23,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -523,11 +522,11 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	emptyMailboxWhisperService, err := emptyMailbox.StatusNode().WhisperService()
 	s.Require().NoError(err)
 
-	err = helpers.Retry(func() error {
+	err = utils.Eventually(func() error {
 		return emptyMailboxWhisperService.AllowP2PMessagesFromPeer(
 			mailbox.StatusNode().Server().Self().ID().Bytes(),
 		)
-	}, math.MaxInt32, time.Second*5)
+	}, time.Second*5, time.Millisecond*100)
 	s.Require().NoError(err)
 
 	err = emptyMailboxWhisperService.SyncMessages(
@@ -662,16 +661,16 @@ func (d *groupChatParams) Encode() (string, error) {
 
 // Start status node.
 func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
-	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
+	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	nodeConfig.DataDir = datadir
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
 
 	nodeConfig.WhisperConfig.LightClient = true
 
-	if addr, err := GetRemoteURL(); err == nil {
+	if addr, err := utils.GetRemoteURL(); err == nil {
 		nodeConfig.UpstreamConfig.Enabled = true
 		nodeConfig.UpstreamConfig.URL = addr
 	}
@@ -702,11 +701,11 @@ func (s *WhisperMailboxSuite) startMailboxBackendWithCallback(
 		name = "mailserver"
 	}
 
-	mailboxConfig, err := MakeTestNodeConfig(GetNetworkID())
+	mailboxConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.Require().NoError(err)
 
 	mailboxBackend := api.NewStatusBackend()
-	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
+	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
 
 	mailboxConfig.LightEthConfig.Enabled = false
 	mailboxConfig.WhisperConfig.Enabled = true
