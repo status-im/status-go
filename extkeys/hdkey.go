@@ -44,7 +44,7 @@ import (
 type KeyPurpose int
 
 const (
-	KeyPurposeWallet KeyPurpose = iota
+	KeyPurposeWallet KeyPurpose = iota + 1
 	KeyPurposeChat
 )
 
@@ -112,12 +112,15 @@ var (
 		0,                              // 0 - public, 1 - private
 	}
 
+	// EIP1581KeyTypeChat is used as chat key_type in the derivation of EIP1581 keys
+	EIP1581KeyTypeChat = 0
+
 	// EthEIP1581ChatParentPath is EIP-1581 chat keys parent's derivation path
 	EthEIP1581ChatParentPath = []uint32{
-		HardenedKeyStart + 43,          // purpose
-		HardenedKeyStart + CoinTypeETH, // cointype set to ETH
-		HardenedKeyStart + 1581,        // EIP-1581 subpurpose
-		HardenedKeyStart + 0,           // key_type (chat)
+		HardenedKeyStart + 43,                 // purpose
+		HardenedKeyStart + CoinTypeETH,        // cointype set to ETH
+		HardenedKeyStart + 1581,               // EIP-1581 subpurpose
+		HardenedKeyStart + EIP1581KeyTypeChat, // key_type (chat)
 	}
 )
 
@@ -260,6 +263,7 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 	return child, nil
 }
 
+// ChildForPurpose derives the child key at index i using a derivation path based on the purpose.
 func (k *ExtendedKey) ChildForPurpose(p KeyPurpose, i uint32) (*ExtendedKey, error) {
 	switch p {
 	case KeyPurposeWallet:
