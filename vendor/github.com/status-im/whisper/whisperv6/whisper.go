@@ -463,6 +463,10 @@ func (whisper *Whisper) SyncMessages(peerID []byte, req SyncMailRequest) error {
 		return err
 	}
 
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
 	return p2p.Send(p.ws, p2pSyncRequestCode, req)
 }
 
@@ -975,8 +979,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// TODO(adam): should we limit who can send this request?
 			if whisper.mailServer != nil {
 				var request SyncMailRequest
-				if err = packet.Decode(&request); err != nil {
+				if err := packet.Decode(&request); err != nil {
 					return fmt.Errorf("failed to decode p2pSyncRequestCode payload: %v", err)
+				}
+
+				if err := request.Validate(); err != nil {
+					return fmt.Errorf("sync mail request was invalid: %v", err)
 				}
 
 				if err := whisper.mailServer.SyncMail(p, request); err != nil {
