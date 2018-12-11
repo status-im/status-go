@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -522,9 +523,11 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	emptyMailboxWhisperService, err := emptyMailbox.StatusNode().WhisperService()
 	s.Require().NoError(err)
 
-	err = emptyMailboxWhisperService.AllowP2PMessagesFromPeer(
-		mailbox.StatusNode().Server().Self().ID().Bytes(),
-	)
+	err = helpers.Retry(func() error {
+		return emptyMailboxWhisperService.AllowP2PMessagesFromPeer(
+			mailbox.StatusNode().Server().Self().ID().Bytes(),
+		)
+	}, math.MaxInt32, time.Second*5)
 	s.Require().NoError(err)
 
 	err = emptyMailboxWhisperService.SyncMessages(
