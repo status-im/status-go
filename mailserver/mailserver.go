@@ -715,8 +715,8 @@ func (s *WMailServer) checkMsgSignature(msg *whisper.ReceivedMessage, id []byte)
 	return nil
 }
 
-// bloomFromReceivedMessage gor a given whisper.ReceivedMessage it extracts the
-// used bloom filter
+// bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
+// used bloom filter.
 func (s *WMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]byte, error) {
 	payloadSize := len(msg.Payload)
 
