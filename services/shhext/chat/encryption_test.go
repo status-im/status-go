@@ -93,7 +93,7 @@ func (s *EncryptionServiceTestSuite) TestCreateBundle() {
 	s.Equal(aliceBundle1, aliceBundle2, "It returns the same bundle")
 }
 
-// Alice sends Bob an encrypted message with DH using an ephemeral key
+// TestEncryptPayloadNoBundle; Alice sends Bob an encrypted message with DH using an ephemeral key
 // and Bob's identity key.
 // Bob is able to decrypt it.
 // Alice does not re-use the symmetric key
@@ -138,7 +138,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	s.Equal(cleartext, decryptedPayload2, "It correctly decrypts the payload using DH")
 }
 
-// Alice has Bob's bundle
+// TestEncryptPayloadBundle; Alice has Bob's bundle
 // Alice sends Bob an encrypted message with X3DH and DR using an ephemeral key
 // and Bob's bundle.
 func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
@@ -190,7 +190,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	s.Equal(cleartext, decryptedPayload1, "It correctly decrypts the payload using X3DH")
 }
 
-// Alice has Bob's bundle
+// TestConsequentMessagesBundle; Alice has Bob's bundle
 // Alice sends Bob 2 encrypted messages with X3DH and DR using an ephemeral key
 // and Bob's bundle.
 // Alice sends another message. This message should be using a DR
@@ -397,7 +397,7 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
 	s.Require().NoError(err)
 }
 
-// Test that an error is thrown if max skip is reached
+// TestMaxSkipKeysError tests that an error is thrown if max skip is reached
 func (s *EncryptionServiceTestSuite) TestMaxSkipKeysError() {
 	bobText := []byte("text")
 
@@ -737,7 +737,7 @@ func (s *EncryptionServiceTestSuite) TestRandomised() {
 
 // Edge cases
 
-// The bundle is lost
+// TestBundleNotExisting; The bundle is lost
 func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	aliceText := []byte("alice text")
 

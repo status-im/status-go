@@ -103,7 +103,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	s.NotNil(hash)
 }
 
-// TestSendContractCompat tries to send transaction using the legacy "Data"
+// TestSendContractTxCompat tries to send transaction using the legacy "Data"
 // field, which is supported for backward compatibility reasons.
 func (s *TransactionsTestSuite) TestSendContractTxCompat() {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
@@ -114,7 +114,7 @@ func (s *TransactionsTestSuite) TestSendContractTxCompat() {
 	s.testSendContractTx(initFunc, nil, "")
 }
 
-// TestSendContractCompat tries to send transaction using both the legacy
+// TestSendContractTxCollision tries to send transaction using both the legacy
 // "Data" and "Input" fields. Also makes sure that the error is returned if
 // they have different values.
 func (s *TransactionsTestSuite) TestSendContractTxCollision() {

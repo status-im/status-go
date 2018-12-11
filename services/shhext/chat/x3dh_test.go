@@ -174,7 +174,7 @@ func TestExtractIdentity(t *testing.T) {
 	)
 }
 
-// Alice wants to send a message to Bob
+// TestX3dhActive; Alice wants to send a message to Bob
 func TestX3dhActive(t *testing.T) {
 	bobIdentityKey, err := crypto.ToECDSA([]byte(bobPrivateKey))
 	require.NoError(t, err, "Bundle identity key should be generated without errors")
@@ -198,7 +198,7 @@ func TestX3dhActive(t *testing.T) {
 	require.Equal(t, sharedKey, x3dh, "Should generate the correct key")
 }
 
-// Bob receives a message from Alice
+// TestPerformPassiveX3DH; Bob receives a message from Alice
 func TestPerformPassiveX3DH(t *testing.T) {
 	alicePrivateKey, err := crypto.ToECDSA([]byte(alicePrivateKey))
 	require.NoError(t, err, "Private key should be generated without errors")

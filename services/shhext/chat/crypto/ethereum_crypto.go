@@ -21,7 +21,7 @@ import (
 // see function comments for details.
 type EthereumCrypto struct{}
 
-// See the Crypto interface.
+// GenerateDH; See the Crypto interface.
 func (c EthereumCrypto) GenerateDH() (dr.DHPair, error) {
 	keys, err := crypto.GenerateKey()
 	if err != nil {
@@ -41,7 +41,7 @@ func (c EthereumCrypto) GenerateDH() (dr.DHPair, error) {
 
 }
 
-// See the Crypto interface.
+// DH; See the Crypto interface.
 func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
 	tmpKey := dhPair.PrivateKey()
 	privateKey, err := crypto.ToECDSA(tmpKey[:])
@@ -72,7 +72,7 @@ func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
 
 }
 
-// See the Crypto interface.
+// KdfRK; See the Crypto interface.
 func (c EthereumCrypto) KdfRK(rk, dhOut dr.Key) (rootKey, chainKey, headerKey dr.Key) {
 	var (
 		// We can use a non-secret constant as the last argument
@@ -89,7 +89,7 @@ func (c EthereumCrypto) KdfRK(rk, dhOut dr.Key) (rootKey, chainKey, headerKey dr
 	return
 }
 
-// See the Crypto interface.
+// KdfCK; See the Crypto interface.
 func (c EthereumCrypto) KdfCK(ck dr.Key) (chainKey dr.Key, msgKey dr.Key) {
 	const (
 		ckInput = 15
@@ -126,7 +126,7 @@ func (c EthereumCrypto) Encrypt(mk dr.Key, plaintext, ad []byte) []byte {
 	return append(ciphertext, c.computeSignature(authKey[:], ciphertext, ad)...)
 }
 
-// See the Crypto interface.
+// Decrypt; See the Crypto interface.
 func (c EthereumCrypto) Decrypt(mk dr.Key, authCiphertext, ad []byte) ([]byte, error) {
 	var (
 		l          = len(authCiphertext)

@@ -123,7 +123,7 @@ func (s *DebugAPISuite) sendPostConfirmMessage(symID string) string {
 	return s.Backend.CallPrivateRPC(basicCall)
 }
 
-// addPeers adds a peer to the running node
+// addPeerToCurrentNode adds a peer to the running node
 func (s *DebugAPISuite) addPeerToCurrentNode(dir string) {
 	s.Require().NotNil(s.Backend)
 	node1 := s.Backend.StatusNode().GethNode()
@@ -140,7 +140,7 @@ func (s *DebugAPISuite) addPeerToCurrentNode(dir string) {
 	require.NoError(s.T(), <-errCh)
 }
 
-// newNode creates, configures and starts a new peer.
+// newPeer creates, configures and starts a new peer.
 func (s *DebugAPISuite) newPeer(name, dir string) *node.StatusNode {
 	// network id is irrelevant
 	cfg, err := MakeTestNodeConfigWithDataDir(name, dir, 777)

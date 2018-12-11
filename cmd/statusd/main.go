@@ -191,7 +191,7 @@ func setupLogging(config *params.NodeConfig) {
 	}
 }
 
-// startCollectingStats collects various stats about the node and other protocols like Whisper.
+// startCollectingNodeMetrics collects various stats about the node and other protocols like Whisper.
 func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.StatusNode) {
 	logger.Info("Starting collecting node metrics")
 

@@ -117,7 +117,7 @@ func ExtractGroupMembershipSignatures(signaturePairsStr *C.char) *C.char {
 	return C.CString(string(data))
 }
 
-// Sign signs a string containing group membership information
+// SignGroupMembership signs a string containing group membership information
 //export SignGroupMembership
 func SignGroupMembership(content *C.char) *C.char {
 	signature, err := statusBackend.SignGroupMembership(C.GoString(content))
