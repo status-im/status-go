@@ -595,7 +595,7 @@ func TestChildForPurpose(t *testing.T) {
 
 	walletChild, err := masterKey.ChildForPurpose(KeyPurposeWallet, 0)
 	if err != nil {
-		t.Error("Error dering BIP44-compliant key")
+		t.Error("Error deriving BIP44-compliant key")
 	}
 
 	chatChild, err := masterKey.ChildForPurpose(KeyPurposeChat, 0)
