@@ -190,6 +190,7 @@ func TestSyncMessagesErrors(t *testing.T) {
 	testCases := []struct {
 		Name  string
 		Req   SyncMessagesRequest
+		Resp  SyncMessagesResponse
 		Error string
 	}{
 		{
@@ -210,10 +211,11 @@ func TestSyncMessagesErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			api := PublicAPI{}
-			err := api.SyncMessages(context.TODO(), tc.Req)
+			resp, err := api.SyncMessages(context.TODO(), tc.Req)
 			if tc.Error != "" {
 				require.EqualError(t, err, tc.Error)
 			}
+			require.EqualValues(t, tc.Resp, resp)
 		})
 	}
 }

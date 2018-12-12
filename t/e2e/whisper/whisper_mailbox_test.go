@@ -536,7 +536,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	s.Require().NotNil(emptyMailboxRPCClient)
 
 	// Ask to sync the first batch of messages.
-	// We artifically set Limit to 1 in order to test pagination.
+	// We artificially set Limit to 1 in order to test pagination.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
