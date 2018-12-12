@@ -125,10 +125,6 @@ type SyncMessagesRequest struct {
 	// Topics is a list of Whisper topics.
 	// If empty, a full bloom filter will be used.
 	Topics []whisper.TopicType `json:"topics"`
-
-	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
-	// It's derived from MailServer password.
-	SymKeyID string `json:"symKeyID"`
 }
 
 // -----
