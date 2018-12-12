@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1013,14 +1012,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					whisper.mailServer.Archive(envelope)
 				}
 
-				if resp.Error != "" {
-					log.Error("failed to sync envelopes", "err", resp.Error)
-				} else if resp.Final {
-					log.Info("finished to sync envelopes successfully")
-				}
-
 				if resp.Error != "" || resp.Final {
-					log.Info("received syncResponseCode", "err", resp.Error, "final", resp.Final, "cursor", hex.EncodeToString(resp.Cursor))
 					whisper.envelopeFeed.Send(EnvelopeEvent{
 						Event: EventMailServerSyncFinished,
 						Peer:  p.peer.ID(),
