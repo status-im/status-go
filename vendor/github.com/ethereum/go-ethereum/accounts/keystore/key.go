@@ -144,7 +144,7 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 	return key
 }
 
-func newKeyFromExtendedKey(extKey *extkeys.ExtendedKey) (*Key, error) {
+func newKeyForPurposeFromExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey) (*Key, error) {
 	var (
 		extChild1, extChild2 *extkeys.ExtendedKey
 		err                  error
@@ -152,13 +152,13 @@ func newKeyFromExtendedKey(extKey *extkeys.ExtendedKey) (*Key, error) {
 
 	if extKey.Depth == 0 { // we are dealing with master key
 		// CKD#1 - main account
-		extChild1, err = extKey.BIP44Child(extkeys.CoinTypeETH, 0)
+		extChild1, err = extKey.ChildForPurpose(keyPurpose, 0)
 		if err != nil {
 			return &Key{}, err
 		}
 
 		// CKD#2 - sub-accounts root
-		extChild2, err = extKey.BIP44Child(extkeys.CoinTypeETH, 1)
+		extChild2, err = extKey.ChildForPurpose(keyPurpose, 1)
 		if err != nil {
 			return &Key{}, err
 		}
