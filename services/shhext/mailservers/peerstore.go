@@ -19,49 +19,43 @@ type PeersProvider interface {
 }
 
 // NewPeerStore returns an instance of PeerStore.
-func NewPeerStore() *PeerStore {
-	return &PeerStore{nodes: map[enode.ID]*enode.Node{}}
+func NewPeerStore(cache *Cache) *PeerStore {
+	return &PeerStore{
+		nodes: map[enode.ID]*enode.Node{},
+		cache: cache,
+	}
 }
 
 // PeerStore stores list of selected mail servers and keeps N of them connected.
 type PeerStore struct {
 	mu    sync.RWMutex
 	nodes map[enode.ID]*enode.Node
+
+	cache *Cache
 }
 
 // Exist confirms that peers was added to a store.
-func (ps *PeerStore) Exist(peer enode.ID) bool {
+func (ps *PeerStore) Exist(nodeID enode.ID) bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	_, exist := ps.nodes[peer]
+	_, exist := ps.nodes[nodeID]
 	return exist
 }
 
 // Get returns instance of the node with requested ID or nil if ID is not found.
-func (ps *PeerStore) Get(peer enode.ID) *enode.Node {
+func (ps *PeerStore) Get(nodeID enode.ID) *enode.Node {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	return ps.nodes[peer]
+	return ps.nodes[nodeID]
 }
 
 // Update updates peers locally.
-func (ps *PeerStore) Update(nodes []*enode.Node) {
+func (ps *PeerStore) Update(nodes []*enode.Node) error {
 	ps.mu.Lock()
-	defer ps.mu.Unlock()
 	ps.nodes = map[enode.ID]*enode.Node{}
 	for _, n := range nodes {
 		ps.nodes[n.ID()] = n
 	}
-}
-
-// GetFirstConnected returns first connected peer that is also added to a peer store.
-// Raises ErrNoConnected if no peers are added to a peer store.
-func GetFirstConnected(provider PeersProvider, store *PeerStore) (*enode.Node, error) {
-	peers := provider.Peers()
-	for _, p := range peers {
-		if store.Exist(p.ID()) {
-			return p.Node(), nil
-		}
-	}
-	return nil, ErrNoConnected
+	ps.mu.Unlock()
+	return ps.cache.Replace(nodes)
 }

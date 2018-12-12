@@ -11,7 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/status-im/whisper/whisperv6"
+	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,10 +83,10 @@ func newFakeServer() *fakePeerEvents {
 }
 
 type fakeEnvelopeEvents struct {
-	input chan whisperv6.EnvelopeEvent
+	input chan whisper.EnvelopeEvent
 }
 
-func (f fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whisperv6.EnvelopeEvent) event.Subscription {
+func (f fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whisper.EnvelopeEvent) event.Subscription {
 	return event.NewSubscription(func(quit <-chan struct{}) error {
 		for {
 			select {
@@ -101,18 +102,22 @@ func (f fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whisperv6.Enve
 
 func newFakeEnvelopesEvents() fakeEnvelopeEvents {
 	return fakeEnvelopeEvents{
-		input: make(chan whisperv6.EnvelopeEvent),
+		input: make(chan whisper.EnvelopeEvent),
 	}
 }
 
-func getNRandomNodes(t *testing.T, n int) map[enode.ID]*enode.Node {
-	rst := map[enode.ID]*enode.Node{}
-	for i := 0; i < n; i++ {
-		n, err := RandomeNode()
+func fillWithRandomNodes(t *testing.T, nodes []*enode.Node) {
+	var err error
+	for i := range nodes {
+		nodes[i], err = RandomNode()
 		require.NoError(t, err)
-		rst[n.ID()] = n
 	}
-	return rst
+}
+
+func getMapWithRandomNodes(t *testing.T, n int) map[enode.ID]*enode.Node {
+	nodes := make([]*enode.Node, n)
+	fillWithRandomNodes(t, nodes)
+	return nodesToMap(nodes)
 }
 
 func mergeOldIntoNew(old, new map[enode.ID]*enode.Node) {
@@ -131,25 +136,26 @@ func TestReplaceNodes(t *testing.T) {
 	for _, tc := range []testCase{
 		{
 			"InitialReplace",
-			getNRandomNodes(t, 0),
-			getNRandomNodes(t, 3),
+			getMapWithRandomNodes(t, 0),
+			getMapWithRandomNodes(t, 3),
 			2,
 		},
 		{
 			"FullReplace",
-			getNRandomNodes(t, 3),
-			getNRandomNodes(t, 3),
+			getMapWithRandomNodes(t, 3),
+			getMapWithRandomNodes(t, 3),
 			2,
 		},
 	} {
 		t.Run(tc.description, func(t *testing.T) {
 			peers := newFakePeerAdderRemover()
-			replaceNodes(peers, tc.target, peers.nodes, nil, tc.old)
+			state := newInternalState(peers, tc.target, 0)
+			state.replaceNodes(tc.old)
 			require.Len(t, peers.nodes, len(tc.old))
 			for n := range peers.nodes {
 				require.Contains(t, tc.old, n)
 			}
-			replaceNodes(peers, tc.target, peers.nodes, tc.old, tc.new)
+			state.replaceNodes(tc.new)
 			require.Len(t, peers.nodes, len(tc.new))
 			for n := range peers.nodes {
 				require.Contains(t, tc.new, n)
@@ -160,21 +166,26 @@ func TestReplaceNodes(t *testing.T) {
 
 func TestPartialReplaceNodesBelowTarget(t *testing.T) {
 	peers := newFakePeerAdderRemover()
-	old := getNRandomNodes(t, 1)
-	new := getNRandomNodes(t, 2)
-	replaceNodes(peers, 2, peers.nodes, nil, old)
+	old := getMapWithRandomNodes(t, 1)
+	new := getMapWithRandomNodes(t, 2)
+	state := newInternalState(peers, 2, 0)
+	state.replaceNodes(old)
 	mergeOldIntoNew(old, new)
-	replaceNodes(peers, 2, peers.nodes, old, new)
+	state.replaceNodes(new)
 	require.Len(t, peers.nodes, len(new))
 }
 
 func TestPartialReplaceNodesAboveTarget(t *testing.T) {
 	peers := newFakePeerAdderRemover()
-	old := getNRandomNodes(t, 1)
-	new := getNRandomNodes(t, 2)
-	replaceNodes(peers, 1, peers.nodes, nil, old)
+	initial, err := RandomNode()
+	require.NoError(t, err)
+	old := nodesToMap([]*enode.Node{initial})
+	new := getMapWithRandomNodes(t, 2)
+	state := newInternalState(peers, 1, 0)
+	state.replaceNodes(old)
+	state.nodeAdded(initial.ID())
 	mergeOldIntoNew(old, new)
-	replaceNodes(peers, 1, peers.nodes, old, new)
+	state.replaceNodes(new)
 	require.Len(t, peers.nodes, 1)
 }
 
@@ -182,11 +193,11 @@ func TestConnectionManagerAddDrop(t *testing.T) {
 	server := newFakeServer()
 	whisper := newFakeEnvelopesEvents()
 	target := 1
-	connmanager := NewConnectionManager(server, whisper, target)
+	connmanager := NewConnectionManager(server, whisper, target, 0)
 	connmanager.Start()
 	defer connmanager.Stop()
 	nodes := []*enode.Node{}
-	for _, n := range getNRandomNodes(t, 3) {
+	for _, n := range getMapWithRandomNodes(t, 3) {
 		nodes = append(nodes, n)
 	}
 	// Send 3 random nodes to connection manager.
@@ -224,11 +235,11 @@ func TestConnectionManagerReplace(t *testing.T) {
 	server := newFakeServer()
 	whisper := newFakeEnvelopesEvents()
 	target := 1
-	connmanager := NewConnectionManager(server, whisper, target)
+	connmanager := NewConnectionManager(server, whisper, target, 0)
 	connmanager.Start()
 	defer connmanager.Stop()
 	nodes := []*enode.Node{}
-	for _, n := range getNRandomNodes(t, 3) {
+	for _, n := range getMapWithRandomNodes(t, 3) {
 		nodes = append(nodes, n)
 	}
 	// Send a single node to connection manager.
@@ -264,13 +275,13 @@ func TestConnectionManagerReplace(t *testing.T) {
 
 func TestConnectionChangedAfterExpiry(t *testing.T) {
 	server := newFakeServer()
-	whisper := newFakeEnvelopesEvents()
+	whisperMock := newFakeEnvelopesEvents()
 	target := 1
-	connmanager := NewConnectionManager(server, whisper, target)
+	connmanager := NewConnectionManager(server, whisperMock, target, 0)
 	connmanager.Start()
 	defer connmanager.Stop()
 	nodes := []*enode.Node{}
-	for _, n := range getNRandomNodes(t, 2) {
+	for _, n := range getMapWithRandomNodes(t, 2) {
 		nodes = append(nodes, n)
 	}
 	// Send two random nodes to connection manager.
@@ -288,15 +299,15 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 	hash := common.Hash{1}
 	// Send event that history request for connected peer was sent.
 	select {
-	case whisper.input <- whisperv6.EnvelopeEvent{
-		Event: whisperv6.EventMailServerRequestSent, Peer: initial, Hash: hash}:
+	case whisperMock.input <- whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestSent, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'sent' event")
 	}
 	// And eventually expired.
 	select {
-	case whisper.input <- whisperv6.EnvelopeEvent{
-		Event: whisperv6.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}
@@ -310,4 +321,24 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 		}
 		return nil
 	}, time.Second, 100*time.Millisecond))
+}
+
+func TestProcessReplacementWaitsForConnections(t *testing.T) {
+	srv := newFakePeerAdderRemover()
+	target := 1
+	timeout := time.Second
+	nodes := make([]*enode.Node, 2)
+	fillWithRandomNodes(t, nodes)
+	events := make(chan *p2p.PeerEvent)
+	state := newInternalState(srv, target, timeout)
+	state.currentNodes = nodesToMap(nodes)
+	go func() {
+		select {
+		case events <- &p2p.PeerEvent{Peer: nodes[0].ID(), Type: p2p.PeerEventTypeAdd}:
+		case <-time.After(time.Second):
+			assert.FailNow(t, "can't send a drop event")
+		}
+	}()
+	state.processReplacement(nodes, events)
+	require.Len(t, state.connected, 1)
 }

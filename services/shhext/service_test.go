@@ -17,6 +17,8 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 func newHandlerMock(buf int) handlerMock {
@@ -102,7 +104,9 @@ func (s *ShhExtSuite) SetupTest() {
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
 		}
-		s.services[i] = New(s.whisper[i], nil, nil, config)
+		db, err := leveldb.Open(storage.NewMemStorage(), nil)
+		s.Require().NoError(err)
+		s.services[i] = New(s.whisper[i], nil, db, config)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -120,7 +124,7 @@ func (s *ShhExtSuite) TestInitProtocol() {
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	mock := newHandlerMock(1)
 	s.services[0].tracker.handler = mock
-	s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()})
+	s.Require().NoError(s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()}))
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)

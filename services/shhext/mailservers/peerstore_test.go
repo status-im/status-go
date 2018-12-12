@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func RandomeNode() (*enode.Node, error) {
+func RandomNode() (*enode.Node, error) {
 	pkey, err := crypto.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -18,24 +18,24 @@ func RandomeNode() (*enode.Node, error) {
 }
 
 func TestUpdateResetsInternalStorage(t *testing.T) {
-	store := NewPeerStore()
-	r1, err := RandomeNode()
+	store := NewPeerStore(newInMemCache(t))
+	r1, err := RandomNode()
 	require.NoError(t, err)
-	r2, err := RandomeNode()
+	r2, err := RandomNode()
 	require.NoError(t, err)
-	store.Update([]*enode.Node{r1, r2})
+	require.NoError(t, store.Update([]*enode.Node{r1, r2}))
 	require.True(t, store.Exist(r1.ID()))
 	require.True(t, store.Exist(r2.ID()))
-	store.Update([]*enode.Node{r2})
+	require.NoError(t, store.Update([]*enode.Node{r2}))
 	require.False(t, store.Exist(r1.ID()))
 	require.True(t, store.Exist(r2.ID()))
 }
 
 func TestGetNodeByID(t *testing.T) {
-	store := NewPeerStore()
-	r1, err := RandomeNode()
+	store := NewPeerStore(newInMemCache(t))
+	r1, err := RandomNode()
 	require.NoError(t, err)
-	store.Update([]*enode.Node{r1})
+	require.NoError(t, store.Update([]*enode.Node{r1}))
 	require.Equal(t, r1, store.Get(r1.ID()))
 	require.Nil(t, store.Get(enode.ID{1}))
 }
@@ -50,28 +50,7 @@ func (f fakePeerProvider) Peers() []*p2p.Peer {
 
 func TestNoConnected(t *testing.T) {
 	provider := fakePeerProvider{}
-	store := NewPeerStore()
+	store := NewPeerStore(newInMemCache(t))
 	_, err := GetFirstConnected(provider, store)
 	require.EqualError(t, ErrNoConnected, err.Error())
-}
-
-func TestGetFirstConnected(t *testing.T) {
-	numPeers := 3
-	nodes := make([]*enode.Node, numPeers)
-	peers := make([]*p2p.Peer, numPeers)
-	nodesMap := getNRandomNodes(t, numPeers)
-	i := 0
-	for _, node := range nodesMap {
-		nodes[i] = node
-		peers[i] = p2p.NewPeer(node.ID(), node.ID().String(), nil)
-		i++
-	}
-	store := NewPeerStore()
-	provider := fakePeerProvider{peers}
-	_, err := GetFirstConnected(provider, store)
-	require.EqualError(t, ErrNoConnected, err.Error())
-	store.Update(nodes)
-	node, err := GetFirstConnected(provider, store)
-	require.NoError(t, err)
-	require.Contains(t, nodesMap, node.ID())
 }
