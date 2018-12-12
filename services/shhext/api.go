@@ -127,6 +127,18 @@ type SyncMessagesRequest struct {
 	Topics []whisper.TopicType `json:"topics"`
 }
 
+// SyncMessagesResponse is a response from the mail server
+// to which SyncMessagesRequest was sent.
+type SyncMessagesResponse struct {
+	// Cursor from the response can be used to retrieve more messages
+	// for the previous request.
+	Cursor string `json:"cursor"`
+
+	// Error indicates that something wrong happen when sending messages
+	// to the requester.
+	Error string `json:"error"`
+}
+
 // -----
 // PUBLIC API
 // -----
@@ -243,20 +255,55 @@ func createSyncMailRequest(r SyncMessagesRequest) (whisper.SyncMailRequest, erro
 	}, nil
 }
 
+func createSyncMessagesResponse(r whisper.SyncEventResponse) SyncMessagesResponse {
+	return SyncMessagesResponse{
+		Cursor: hex.EncodeToString(r.Cursor),
+		Error:  r.Error,
+	}
+}
+
 // SyncMessages sends a request to a given MailServerPeer to sync historic messages.
 // MailServerPeers needs to be added as a trusted peer first.
-func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) error {
+func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (SyncMessagesResponse, error) {
+	var resp SyncMessagesResponse
+
+	// Wrap the given context to make sure that
+	// the request will timeout after 60 seconds.
+	ctx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
 	mailServerEnode, err := enode.ParseV4(r.MailServerPeer)
 	if err != nil {
-		return fmt.Errorf("invalid MailServerPeer: %v", err)
+		return resp, fmt.Errorf("invalid MailServerPeer: %v", err)
 	}
 
 	request, err := createSyncMailRequest(r)
 	if err != nil {
-		return fmt.Errorf("failed to create a sync mail request: %v", err)
+		return resp, fmt.Errorf("failed to create a sync mail request: %v", err)
 	}
 
-	return api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request)
+	events := make(chan whisper.EnvelopeEvent)
+	sub := api.service.w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	if err := api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request); err != nil {
+		return resp, fmt.Errorf("failed to send a sync request: %v", err)
+	}
+
+	for {
+		select {
+		case event := <-events:
+			if event.Event != whisper.EventMailServerSyncFinished {
+				continue
+			}
+
+			if resp, ok := event.Data.(whisper.SyncEventResponse); ok {
+				return createSyncMessagesResponse(resp), nil
+			}
+		case <-ctx.Done():
+			return resp, ctx.Err()
+		}
+	}
 }
 
 // GetNewFilterMessages is a prototype method with deduplication

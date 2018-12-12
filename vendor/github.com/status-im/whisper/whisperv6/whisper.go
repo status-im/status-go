@@ -1014,10 +1014,18 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				if resp.Error != "" {
 					log.Error("failed to sync envelopes", "err", resp.Error)
-				}
-				if resp.Final {
+				} else if resp.Final {
 					log.Info("finished to sync envelopes successfully")
 				}
+
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Event: EventMailServerSyncFinished,
+					Peer:  p.peer.ID(),
+					Data: SyncEventResponse{
+						Cursor: resp.Cursor,
+						Error:  resp.Error,
+					},
+				})
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
