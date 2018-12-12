@@ -1,6 +1,7 @@
 package whisper
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/status-im/status-go/services/shhext"
 
 	"os"
 
@@ -529,15 +532,49 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	}, time.Second*5, time.Millisecond*100)
 	s.Require().NoError(err)
 
-	err = emptyMailboxWhisperService.SyncMessages(
-		mailbox.StatusNode().Server().Self().ID().Bytes(),
-		whisper.SyncMailRequest{
-			Lower: 0,
-			Upper: uint32(time.Now().Unix()),
-			Bloom: whisper.MakeFullNodeBloom(),
+	emptyMailboxRPCClient := emptyMailbox.StatusNode().RPCPrivateClient()
+	s.Require().NotNil(emptyMailboxRPCClient)
+
+	// Ask to sync the first batch of messages.
+	// We artifically set Limit to 1 in order to test pagination.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	var syncMessagesResponse shhext.SyncMessagesResponse
+	err = emptyMailboxRPCClient.CallContext(
+		ctx,
+		&syncMessagesResponse,
+		"shhext_syncMessages",
+		shhext.SyncMessagesRequest{
+			MailServerPeer: mailbox.StatusNode().Server().Self().String(),
+			From:           0,
+			To:             uint32(time.Now().Unix()),
+			Limit:          1,
 		},
 	)
 	s.Require().NoError(err)
+	s.Require().NotEmpty(syncMessagesResponse.Cursor)
+	s.Require().Empty(syncMessagesResponse.Error)
+
+	// Ask to sync the rest of messages.
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	err = emptyMailboxRPCClient.CallContext(
+		ctx,
+		&syncMessagesResponse,
+		"shhext_syncMessages",
+		shhext.SyncMessagesRequest{
+			MailServerPeer: mailbox.StatusNode().Server().Self().String(),
+			From:           0,
+			To:             uint32(time.Now().Unix()),
+			Limit:          10,
+			Cursor:         syncMessagesResponse.Cursor,
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().Empty(syncMessagesResponse.Cursor)
+	s.Require().Empty(syncMessagesResponse.Error)
 
 	// create and start a client
 	client, stop := s.startBackend("client")
@@ -584,7 +621,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 
 	// get messages
 	messages := s.getMessagesByMessageFilterID(clientRPCClient, messageFilterID)
-	s.Require().NotEmpty(messages)
+	s.Require().Len(messages, envelopesCount)
 }
 
 func (s *WhisperMailboxSuite) waitForEnvelopeEvents(events chan whisper.EnvelopeEvent, hashes []string, event whisper.EventType) {

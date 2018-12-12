@@ -265,30 +265,27 @@ func createSyncMessagesResponse(r whisper.SyncEventResponse) SyncMessagesRespons
 // SyncMessages sends a request to a given MailServerPeer to sync historic messages.
 // MailServerPeers needs to be added as a trusted peer first.
 func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (SyncMessagesResponse, error) {
-	var resp SyncMessagesResponse
-
-	// Wrap the given context to make sure that
-	// the request will timeout after 60 seconds.
-	ctx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
+	var response SyncMessagesResponse
 
 	mailServerEnode, err := enode.ParseV4(r.MailServerPeer)
 	if err != nil {
-		return resp, fmt.Errorf("invalid MailServerPeer: %v", err)
+		return response, fmt.Errorf("invalid MailServerPeer: %v", err)
 	}
 
 	request, err := createSyncMailRequest(r)
 	if err != nil {
-		return resp, fmt.Errorf("failed to create a sync mail request: %v", err)
+		return response, fmt.Errorf("failed to create a sync mail request: %v", err)
 	}
 
+	if err := api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request); err != nil {
+		return response, fmt.Errorf("failed to send a sync request: %v", err)
+	}
+
+	// Wait for the response which is received asynchronously as a p2p packet.
+	// This packet handler will send an event which contains the response payload.
 	events := make(chan whisper.EnvelopeEvent)
 	sub := api.service.w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
-
-	if err := api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request); err != nil {
-		return resp, fmt.Errorf("failed to send a sync request: %v", err)
-	}
 
 	for {
 		select {
@@ -297,11 +294,14 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 				continue
 			}
 
+			log.Info("received EventMailServerSyncFinished event", "data", event.Data)
+
 			if resp, ok := event.Data.(whisper.SyncEventResponse); ok {
 				return createSyncMessagesResponse(resp), nil
 			}
+			return response, fmt.Errorf("did not understand the response event data")
 		case <-ctx.Done():
-			return resp, ctx.Err()
+			return response, ctx.Err()
 		}
 	}
 }

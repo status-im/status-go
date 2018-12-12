@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1006,7 +1007,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return fmt.Errorf("failed to decode p2pSyncResponseCode payload: %v", err)
 				}
 
-				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error)
+				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error, "cursor", resp.Cursor)
 
 				for _, envelope := range resp.Envelopes {
 					whisper.mailServer.Archive(envelope)
@@ -1018,14 +1019,17 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Info("finished to sync envelopes successfully")
 				}
 
-				whisper.envelopeFeed.Send(EnvelopeEvent{
-					Event: EventMailServerSyncFinished,
-					Peer:  p.peer.ID(),
-					Data: SyncEventResponse{
-						Cursor: resp.Cursor,
-						Error:  resp.Error,
-					},
-				})
+				if resp.Error != "" || resp.Final {
+					log.Info("received syncResponseCode", "err", resp.Error, "final", resp.Final, "cursor", hex.EncodeToString(resp.Cursor))
+					whisper.envelopeFeed.Send(EnvelopeEvent{
+						Event: EventMailServerSyncFinished,
+						Peer:  p.peer.ID(),
+						Data: SyncEventResponse{
+							Cursor: resp.Cursor,
+							Error:  resp.Error,
+						},
+					})
+				}
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
