@@ -1,0 +1,48 @@
+diff --git a/accounts/keystore/key.go b/accounts/keystore/key.go
+index f8fbc04..5bb8dc5 100644
+--- a/accounts/keystore/key.go
++++ b/accounts/keystore/key.go
+@@ -144,7 +144,7 @@ func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
+ 	return key
+ }
+ 
+-func newKeyFromExtendedKey(extKey *extkeys.ExtendedKey) (*Key, error) {
++func newKeyForPurposeFromExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey) (*Key, error) {
+ 	var (
+ 		extChild1, extChild2 *extkeys.ExtendedKey
+ 		err                  error
+@@ -152,13 +152,13 @@ func newKeyFromExtendedKey(extKey *extkeys.ExtendedKey) (*Key, error) {
+ 
+ 	if extKey.Depth == 0 { // we are dealing with master key
+ 		// CKD#1 - main account
+-		extChild1, err = extKey.BIP44Child(extkeys.CoinTypeETH, 0)
++		extChild1, err = extKey.ChildForPurpose(keyPurpose, 0)
+ 		if err != nil {
+ 			return &Key{}, err
+ 		}
+ 
+ 		// CKD#2 - sub-accounts root
+-		extChild2, err = extKey.BIP44Child(extkeys.CoinTypeETH, 1)
++		extChild2, err = extKey.ChildForPurpose(keyPurpose, 1)
+ 		if err != nil {
+ 			return &Key{}, err
+ 		}
+diff --git a/accounts/keystore/keystore.go b/accounts/keystore/keystore.go
+index 9f27448..2e3a3e9 100644
+--- a/accounts/keystore/keystore.go
++++ b/accounts/keystore/keystore.go
+@@ -462,7 +462,13 @@ func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (acco
+ // ImportExtendedKey stores ECDSA key (obtained from extended key) along with CKD#2 (root for sub-accounts)
+ // If key file is not found, it is created. Key is encrypted with the given passphrase.
+ func (ks *KeyStore) ImportExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
+-	key, err := newKeyFromExtendedKey(extKey)
++	return ks.ImportExtendedKeyForPurpose(extkeys.KeyPurposeWallet, extKey, passphrase)
++}
++
++// ImportExtendedKeyForPurpose stores ECDSA key (obtained from extended key) along with CKD#2 (root for sub-accounts)
++// If key file is not found, it is created. Key is encrypted with the given passphrase.
++func (ks *KeyStore) ImportExtendedKeyForPurpose(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
++	key, err := newKeyForPurposeFromExtendedKey(keyPurpose, extKey)
+ 	if err != nil {
+ 		zeroKey(key.PrivateKey)
+ 		return accounts.Account{}, err
