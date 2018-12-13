@@ -18,6 +18,8 @@ const (
 	// DeduplicatorCache is used for the db entries used for messages
 	// deduplication cache
 	DeduplicatorCache
+	// MailserversCache is a list of mail servers provided by users.
+	MailserversCache
 )
 
 // Key creates a DB key for a specified service with specified data

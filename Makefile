@@ -219,8 +219,8 @@ prepare-release: clean-release
 	mkdir -p $(RELEASE_DIRECTORY)
 	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
 	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
-	${MAKE} clean
 	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
+	${MAKE} clean
 
 clean-release:
 	rm -rf $(RELEASE_DIRECTORY)

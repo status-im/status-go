@@ -30,8 +30,13 @@ pipeline {
     stage('Prep') {
       steps { script {
         lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
+        version = readFile("${STATUS_PATH}/VERSION").trim()
+        println("Version: ${version}")
         println("Git Branch: ${lib.gitBranch()}")
         println("Git Commit: ${lib.gitCommit()}")
+        /* save and create a dir for artifacts */
+        dest = "${env.WORKSPACE}/pkg"
+        sh "mkdir -p ${dest}"
       } }
     }
     stage('Setup') { steps { dir(env.STATUS_PATH) {
@@ -47,19 +52,13 @@ pipeline {
           stages {
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-android'
+              sh "cp build/bin/statusgo-android-16.aar ${dest}/status-go-android-${lib.suffix()}.aar"
             } } }
             stage('Archive') { steps {
-              sh """
-                cp ${env.STATUS_PATH}/build/bin/statusgo-android-16.aar \
-                  ${env.WORKSPACE}/status-go-android-${lib.suffix()}.aar
-              """
-              archiveArtifacts("status-go-android-${lib.suffix()}.aar")
+              archiveArtifacts("pkg/status-go-android-${lib.suffix()}.aar")
             } }
             stage('Upload') { steps { script {
-              lib.uploadArtifact("status-go-android-${lib.suffix()}.aar")
-            } } }
-            stage('Cleanup') { steps { script {
-              sh "rm -f ${env.WORKSPACE}/*.aar"
+              lib.uploadArtifact("pkg/status-go-android-${lib.suffix()}.aar")
             } } }
           }
         }
@@ -69,40 +68,48 @@ pipeline {
               sh 'make statusgo-ios-simulator'
               dir('build/bin/statusgo-ios-9.3-framework') {
                 sh 'zip -r status-go-ios.zip Statusgo.framework'
+                sh "cp status-go-ios.zip ${dest}/status-go-ios-${lib.suffix()}.zip"
               }
             } } }
             stage('Archive') { steps {
-              sh """
-                cp ${env.STATUS_PATH}/build/bin/statusgo-ios-9.3-framework/status-go-ios.zip \
-                  ${env.WORKSPACE}/status-go-ios-${lib.suffix()}.zip
-              """
-              archiveArtifacts("status-go-ios-${lib.suffix()}.zip")
+              archiveArtifacts("pkg/status-go-ios-${lib.suffix()}.zip")
             } }
             stage('Upload') { steps { script {
-              lib.uploadArtifact("status-go-ios-${lib.suffix()}.zip")
+              lib.uploadArtifact("pkg/status-go-ios-${lib.suffix()}.zip")
             } } }
-            stage('Cleanup') { steps { script {
-              sh "rm -f ${env.WORKSPACE}/*.zip"
+          }
+        }
+        stage('Desktop') {
+          stages {
+            stage('Prepare') { steps { dir(env.STATUS_PATH) {
+              sh "zip -r ${dest}/status-go-desktop-${lib.suffix()}.zip . -x *.git"
+            } } }
+            stage('Archive') { steps {
+              archiveArtifacts("pkg/status-go-desktop-${lib.suffix()}.zip")
+            } }
+            stage('Upload') { steps { script {
+              lib.uploadArtifact("pkg/status-go-desktop-${lib.suffix()}.zip")
             } } }
           }
         }
       }
     }
     stage('Release') { when { expression { params.RELEASE == true } }
-      steps {
-        dir(env.STATUS_PATH) {
-          sh 'make prepare-release'
-          withCredentials([[
-            $class: 'UsernamePasswordMultiBinding',
-            credentialsId: 'status-im-auto',
-            usernameVariable: 'GITHUB_USER',
-            passwordVariable: 'GITHUB_TOKEN'
-          ]]) {
-            sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
-          }
-          sh 'make clean-release'
+      steps { dir(env.STATUS_PATH) {
+        sh 'make prepare-release'
+        withCredentials([[
+          $class: 'UsernamePasswordMultiBinding',
+          credentialsId: 'status-im-auto',
+          usernameVariable: 'GITHUB_USER',
+          passwordVariable: 'GITHUB_TOKEN'
+        ]]) {
+          sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
         }
-      }
+        sh 'make clean-release'
+      } }
     }
+    stage('Cleanup') { steps { script {
+      sh "rm -fr ${dest}"
+    } } }
   }
 }

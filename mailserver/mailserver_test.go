@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -266,8 +265,8 @@ func (s *MailserverSuite) TestArchive() {
 	s.NoError(err)
 
 	s.server.Archive(env)
-	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
-	archivedEnvelope, err := s.server.db.Get(key.raw, nil)
+	key := NewDBKey(env.Expiry-env.TTL, env.Hash())
+	archivedEnvelope, err := s.server.db.Get(key.Bytes(), nil)
 	s.NoError(err)
 
 	s.Equal(rawEnvelope, archivedEnvelope)
@@ -288,10 +287,10 @@ func (s *MailserverSuite) TestManageLimits() {
 func (s *MailserverSuite) TestDBKey() {
 	var h common.Hash
 	i := uint32(time.Now().Unix())
-	k := NewDbKey(i, h)
-	s.Equal(len(k.raw), common.HashLength+4, "wrong DB key length")
-	s.Equal(byte(i%0x100), k.raw[3], "raw representation should be big endian")
-	s.Equal(byte(i/0x1000000), k.raw[0], "big endian expected")
+	k := NewDBKey(i, h)
+	s.Equal(len(k.Bytes()), DBKeyLength, "wrong DB key length")
+	s.Equal(byte(i%0x100), k.Bytes()[3], "raw representation should be big endian")
+	s.Equal(byte(i/0x1000000), k.Bytes()[0], "big endian expected")
 }
 
 func (s *MailserverSuite) TestRequestPaginationLimit() {
@@ -313,8 +312,8 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
 		s.server.Archive(env)
-		key := NewDbKey(env.Expiry-env.TTL, env.Hash())
-		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.raw))
+		key := NewDBKey(env.Expiry-env.TTL, env.Hash())
+		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Bytes()))
 		sentEnvelopes = append(sentEnvelopes, env)
 		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
 	}
@@ -447,7 +446,7 @@ func (s *MailserverSuite) TestDecodeRequest() {
 	s.setupServer(s.server)
 	defer s.server.Close()
 
-	payload := shhext.MessagesRequestPayload{
+	payload := MessagesRequestPayload{
 		Lower:  50,
 		Upper:  100,
 		Bloom:  []byte{0x01},
@@ -635,8 +634,8 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 }
 
 func processRequestAndCollectHashes(
-	server *WMailServer, lower, upper uint32, cursor cursorType, bloom []byte, limit int,
-) ([]common.Hash, cursorType, common.Hash) {
+	server *WMailServer, lower, upper uint32, cursor []byte, bloom []byte, limit int,
+) ([]common.Hash, []byte, common.Hash) {
 	iter := server.createIterator(lower, upper, cursor)
 	defer iter.Release()
 	bundles := make(chan []*whisper.Envelope, 10)

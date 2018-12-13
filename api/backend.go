@@ -587,6 +587,5 @@ func (b *StatusBackend) UpdateMailservers(enodes []string) error {
 		}
 		nodes[i] = node
 	}
-	st.UpdateMailservers(nodes)
-	return nil
+	return st.UpdateMailservers(nodes)
 }
