@@ -19,7 +19,7 @@ func Retry(fn func() error, maxRetries int, timeout time.Duration) error {
 		}
 
 		if tries > maxRetries {
-			return errors.New("too manny retries")
+			return errors.New("too many retries")
 		}
 
 		select {
