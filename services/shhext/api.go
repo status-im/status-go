@@ -134,7 +134,7 @@ type SyncMessagesResponse struct {
 	// for the previous request.
 	Cursor string `json:"cursor"`
 
-	// Error indicates that something wrong happen when sending messages
+	// Error indicates that something wrong happened when sending messages
 	// to the requester.
 	Error string `json:"error"`
 }
