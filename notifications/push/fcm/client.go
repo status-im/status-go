@@ -8,4 +8,5 @@ import (
 type FirebaseClient interface {
 	NewFcmRegIdsMsg(tokens []string, body interface{}) *gofcm.FcmClient
 	Send() (*gofcm.FcmResponseStatus, error)
+	SetNotificationPayload(payload *gofcm.NotificationPayload) *gofcm.FcmClient
 }

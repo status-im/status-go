@@ -55,7 +55,6 @@ type FcmMsg struct {
 	RestrictedPackageName string              `json:"restricted_package_name,omitempty"`
 	DryRun                bool                `json:"dry_run,omitempty"`
 	Condition             string              `json:"condition,omitempty"`
-	MutableContent        bool                `json:"mutable_content,omitempty"`
 }
 
 // FcmMsg represents fcm response message - (tokens and topics)
@@ -179,8 +178,6 @@ func (this *FcmClient) sendOnce() (*FcmResponseStatus, error) {
 	if err != nil {
 		return fcmRespStatus, err
 	}
-
-	fcmRespStatus.Err = string(body)
 
 	fcmRespStatus.StatusCode = response.StatusCode
 
@@ -312,19 +309,6 @@ func (this *FcmClient) SetRestrictedPackageName(pkg string) *FcmClient {
 func (this *FcmClient) SetDryRun(drun bool) *FcmClient {
 
 	this.Message.DryRun = drun
-
-	return this
-}
-
-// SetMutableContent Currently for iOS 10+ devices only. On iOS,
-// use this field to represent mutable-content in the APNs payload.
-// When a notification is sent and this is set to true, the content
-// of the notification can be modified before it is displayed,
-// using a Notification Service app extension.
-// This parameter will be ignored for Android and web.
-func (this *FcmClient) SetMutableContent(mc bool) *FcmClient {
-
-	this.Message.MutableContent = mc
 
 	return this
 }

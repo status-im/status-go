@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  digest = "1:ab480b4ff653dc950445e4ac6747c2a063f3dee7b533f68d4314267ce0fd9005"
+  branch = "master"
+  digest = "1:5805073c158189c2af2f776b590fc9b88bcc68f2b983842adb08333dbd3c9ae7"
   name = "github.com/NaySoftware/go-fcm"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "024ca6a2c5444c93980f558f91c35a2defebd362"
-  source = "github.com/status-im/go-fcm"
+  revision = "2a6c4f48b49f0d5dbfe621589da4c5405157d7c9"
 
 [[projects]]
   branch = "master"
