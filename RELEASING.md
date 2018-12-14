@@ -17,9 +17,9 @@ Additionally, a pre-release can be created and the version can look like as comp
 
 ## Releasing from a branch
 
-TODO: create a script that can do that instead of maual work.
+TODO: create a script that can do that instead of manual work.
 
-1. Make sure that your branch is rebased on develop,
+1. Make sure that your branch is rebased on `develop`,
 1. Change `VERSION` file content to `0.X.Y-beta.Z.$GIT_SHA` where `GIT_SHA` is the commit you want to release,
 1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/) and use your branch. NOTE: do **not** select "RELEASE".
 
@@ -27,18 +27,18 @@ TODO: create a script that can do that instead of maual work.
 
 ## Releasing pre-release from develop
 
-TODO: create a script that can do that instead of maual work.
+TODO: create a script that can do that instead of manual work.
 
-1. Pull develop from origin,
+1. Pull `develop` branch,
 1. Bump `Z` (`0.X.Y-beta.Z`) in the current version (`VERSION` file),
 1. Commit and push the change,
 1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/) and use develop branch. NOTE: do not select "RELEASE".
 
 ## Releasing from develop (regular release)
 
-TODO: create a script that can do that instead of maual work.
+TODO: create a script that can do that instead of manual work.
 
-1. Pull develop from origin,
+1. Pull `develop` branch,
 1. Checkout a new branch `release/0.X`,
 1. Remove `-beta.Z` suffix from the current version (`VERSION` file),
 1. Commit and push the change,
@@ -47,7 +47,7 @@ TODO: create a script that can do that instead of maual work.
 
 ## Releasing from develop (a hot-fix)
 
-TODO: create a script that can do that instead of maual work.
+TODO: create a script that can do that instead of manual work.
 
 1. Checkout a release branch you want to hot fix (branch have a name `release/0.X`),
 1. Bump `Y` (`0.X.Y`) in the current version (`VERSION` file),

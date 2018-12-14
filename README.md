@@ -7,7 +7,7 @@
 
 - [How To Build](https://status.im/build_status/status_go.html)
 - [How To Contribute](CONTRIBUTING.md)
-- [How To Release](RELEASE.md)
+- [How To Release](RELEASING.md)
 
 # License
 
