@@ -5,26 +5,10 @@
 
 # Docs
 
-- [How To Build](https://docs.status.im/docs/build_status_go.html)
+- [How To Build](https://status.im/build_status/status_go.html)
 - [How To Contribute](CONTRIBUTING.md)
+- [How To Release](RELEASE.md)
 
 # License
 
 [Mozilla Public License 2.0](https://github.com/status-im/status-go/blob/develop/LICENSE.md)
-
-### Releasing
-
-To create a release, first increase the `VERSION` file according to semantic versioning.
-
-You can then build the artifacts for the specific platform.
-
-Once done, you can run:
-
-`make prepare-release`
-
-and 
-
-`make release release_branch={{release_branch}}`
-
-Where `release_branch` is the branch you are targeting.
-You will also need to specify some form of credentials, `GITHUB_TOKEN` environment variable for example.
