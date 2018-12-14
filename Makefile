@@ -241,7 +241,8 @@ deploy-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
-	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/jteeuwen/go-bindata
+	go get -u github.com/jteeuwen/go-bindata/go-bindata
 	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools
