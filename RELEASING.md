@@ -32,7 +32,7 @@ TODO: create a script that can do that instead of manual work.
 1. Pull `develop` branch,
 1. Bump `Z` (`0.X.Y-beta.Z`) in the current version (`VERSION` file),
 1. Commit and push the change,
-1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/) and use develop branch. NOTE: do not select "RELEASE".
+1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `develop` branch.
 
 ## Releasing from develop (regular release)
 
