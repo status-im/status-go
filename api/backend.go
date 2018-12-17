@@ -383,15 +383,16 @@ func (b *StatusBackend) Logout() error {
 
 // reSelectAccount selects previously selected account, often, after node restart.
 func (b *StatusBackend) reSelectAccount() error {
-	selectedWalletAccount, err := b.AccountManager().SelectedWalletAccount()
-	if selectedWalletAccount == nil || err == account.ErrNoAccountSelected {
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
+	if selectedChatAccount == nil || err == account.ErrNoAccountSelected {
 		return nil
 	}
+
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
 	case nil:
-		if err := whisperService.SelectKeyPair(selectedWalletAccount.AccountKey.PrivateKey); err != nil {
+		if err := whisperService.SelectKeyPair(selectedChatAccount.AccountKey.PrivateKey); err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
 	default:
@@ -408,11 +409,11 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	err := b.accountManager.SelectWalletAccount(address, password)
+	err := b.accountManager.SelectAccount(address, password)
 	if err != nil {
 		return err
 	}
-	acc, err := b.accountManager.SelectedWalletAccount()
+	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -421,7 +422,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
 	case nil:
-		if err := whisperService.SelectKeyPair(acc.AccountKey.PrivateKey); err != nil {
+		if err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey); err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
 	default:

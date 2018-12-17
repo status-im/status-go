@@ -21,7 +21,7 @@ type WhisperService interface {
 // AccountManager interface to manage account actions
 type AccountManager interface {
 	AddressToDecryptedAccount(string, string) (accounts.Account, *keystore.Key, error)
-	SelectWalletAccount(address, password string) error
+	SelectAccount(address, password string) error
 	CreateAccount(password string) (address, pubKey, mnemonic string, err error)
 }
 

@@ -159,7 +159,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.AccountManager().SelectWalletAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// this call blocks, up until Complete Transaction is called
@@ -193,7 +193,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.AccountManager().SelectWalletAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{

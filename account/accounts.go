@@ -37,6 +37,7 @@ type Manager struct {
 
 	mu                    sync.RWMutex
 	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectWalletAccount()
+	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectWalletAccount()
 }
 
 // NewManager returns new node account manager.
@@ -216,7 +217,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 
 // SelectWalletAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
-func (m *Manager) SelectWalletAccount(address, password string) error {
+func (m *Manager) SelectAccount(address, password string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -240,7 +241,16 @@ func (m *Manager) SelectWalletAccount(address, password string) error {
 	if err != nil {
 		return err
 	}
+
 	m.selectedWalletAccount = &SelectedExtKey{
+		Address:     account.Address,
+		AccountKey:  accountKey,
+		SubAccounts: subAccounts,
+	}
+
+	// Before completely decoupling the wallet and chat keys,
+	// we have a selectedChatAccount with the same key used for the wallet.
+	m.selectedChatAccount = &SelectedExtKey{
 		Address:     account.Address,
 		AccountKey:  accountKey,
 		SubAccounts: subAccounts,
@@ -249,7 +259,7 @@ func (m *Manager) SelectWalletAccount(address, password string) error {
 	return nil
 }
 
-// SelectedWalletAccount returns currently selected account
+// SelectedWalletAccount returns currently selected wallet account
 func (m *Manager) SelectedWalletAccount() (*SelectedExtKey, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -260,12 +270,24 @@ func (m *Manager) SelectedWalletAccount() (*SelectedExtKey, error) {
 	return m.selectedWalletAccount, nil
 }
 
+// SelectedChatAccount returns currently selected chat account
+func (m *Manager) SelectedChatAccount() (*SelectedExtKey, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if m.selectedChatAccount == nil {
+		return nil, ErrNoAccountSelected
+	}
+	return m.selectedChatAccount, nil
+}
+
 // Logout clears selectedWalletAccount.
 func (m *Manager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.selectedWalletAccount = nil
+	m.selectedChatAccount = nil
 }
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.

@@ -210,7 +210,7 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 	s.Equal(errKeyStore, err)
 }
 
-func (s *ManagerTestSuite) TestSelectWalletAccount() {
+func (s *ManagerTestSuite) TestSelectAccount() {
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
@@ -252,7 +252,7 @@ func (s *ManagerTestSuite) TestSelectWalletAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			err := s.accManager.SelectWalletAccount(testCase.address, testCase.password)
+			err := s.accManager.SelectAccount(testCase.address, testCase.password)
 			s.Equal(testCase.expectedError, err)
 		})
 	}
@@ -271,7 +271,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	// Now, select the test account for rest of the test cases.
 	s.reinitMock()
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectWalletAccount(s.address, s.password)
+	err := s.accManager.SelectAccount(s.address, s.password)
 	s.NoError(err)
 
 	testCases := []struct {
@@ -336,7 +336,7 @@ func (s *ManagerTestSuite) TestLogout() {
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectWalletAccount(s.address, s.password)
+	err := s.accManager.SelectAccount(s.address, s.password)
 	s.NoError(err)
 
 	// Success

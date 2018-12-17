@@ -37,7 +37,7 @@ func (api *PublicAPI) Login(context context.Context, req LoginRequest) (res Logi
 		return
 	}
 
-	if err = api.s.am.SelectWalletAccount(req.Addr, req.Password); err != nil {
+	if err = api.s.am.SelectAccount(req.Addr, req.Password); err != nil {
 		return
 	}
 
