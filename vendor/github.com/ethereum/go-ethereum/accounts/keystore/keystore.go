@@ -538,6 +538,7 @@ func zeroKey(k *ecdsa.PrivateKey) {
 	if k == nil {
 		return
 	}
+
 	b := k.D.Bits()
 	for i := range b {
 		b[i] = 0

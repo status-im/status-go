@@ -79,8 +79,7 @@ func main() {
 		log.Crit("Unable to listen on udp", "address", addr, "error", err)
 	}
 
-	realaddr := conn.LocalAddr().(*net.UDPAddr)
-	tab, err := discv5.ListenUDP(nodeKey, conn, realaddr, "", nil)
+	tab, err := discv5.ListenUDP(nodeKey, conn, "", nil)
 	if err != nil {
 		log.Crit("Failed to create discovery v5 table:", "error", err)
 	}
