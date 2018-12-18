@@ -17,6 +17,7 @@ type SendPublicMessageRPC struct {
 // SendDirectMessageRPC represents the RPC payload for the SendDirectMessage RPC method
 type SendDirectMessageRPC struct {
 	Sig     string
+	Chat    string
 	Payload hexutil.Bytes
 	PubKey  hexutil.Bytes
 }
