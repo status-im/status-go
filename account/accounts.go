@@ -36,8 +36,8 @@ type Manager struct {
 	geth GethServiceProvider
 
 	mu                    sync.RWMutex
-	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectWalletAccount()
-	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectWalletAccount()
+	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
+	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectAccount()
 }
 
 // NewManager returns new node account manager.
@@ -215,7 +215,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	return key, nil
 }
 
-// SelectWalletAccount selects current account, by verifying that address has corresponding account which can be decrypted
+// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
 func (m *Manager) SelectAccount(address, password string) error {
 	m.mu.Lock()

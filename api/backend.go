@@ -463,9 +463,8 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 }
 
 // CreateContactCode create or return the latest contact code
-// FIXME: @gravityblast use chat account
 func (b *StatusBackend) CreateContactCode() (string, error) {
-	selectedWalletAccount, err := b.AccountManager().SelectedWalletAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return "", err
 	}
@@ -475,7 +474,7 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 		return "", err
 	}
 
-	bundle, err := st.GetBundle(selectedWalletAccount.AccountKey.PrivateKey)
+	bundle, err := st.GetBundle(selectedChatAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return "", err
 	}
@@ -484,9 +483,8 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 }
 
 // ProcessContactCode process and adds the someone else's bundle
-// FIXME: @gravityblast use chat account
 func (b *StatusBackend) ProcessContactCode(contactCode string) error {
-	selectedWalletAccount, err := b.AccountManager().SelectedWalletAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -502,7 +500,7 @@ func (b *StatusBackend) ProcessContactCode(contactCode string) error {
 		return err
 	}
 
-	if _, err := st.ProcessPublicBundle(selectedWalletAccount.AccountKey.PrivateKey, bundle); err != nil {
+	if _, err := st.ProcessPublicBundle(selectedChatAccount.AccountKey.PrivateKey, bundle); err != nil {
 		b.log.Error("error adding bundle", "err", err)
 		return err
 	}
@@ -526,20 +524,18 @@ func (b *StatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]str
 }
 
 // SignGroupMembership signs a piece of data containing membership information
-// FIXME: @gravityblast use chat account
 func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
-	selectedWalletAccount, err := b.AccountManager().SelectedWalletAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return "", err
 	}
 
-	return crypto.Sign(content, selectedWalletAccount.AccountKey.PrivateKey)
+	return crypto.Sign(content, selectedChatAccount.AccountKey.PrivateKey)
 }
 
 // EnableInstallation enables an installation for multi-device sync.
-// FIXME: @gravityblast use chat account
 func (b *StatusBackend) EnableInstallation(installationID string) error {
-	selectedWalletAccount, err := b.AccountManager().SelectedWalletAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -549,7 +545,7 @@ func (b *StatusBackend) EnableInstallation(installationID string) error {
 		return err
 	}
 
-	if err := st.EnableInstallation(&selectedWalletAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
+	if err := st.EnableInstallation(&selectedChatAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
 		b.log.Error("error enabling installation", "err", err)
 		return err
 	}
@@ -558,9 +554,8 @@ func (b *StatusBackend) EnableInstallation(installationID string) error {
 }
 
 // DisableInstallation disables an installation for multi-device sync.
-// FIXME: @gravityblast use chat account
 func (b *StatusBackend) DisableInstallation(installationID string) error {
-	selectedWalletAccount, err := b.AccountManager().SelectedWalletAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -570,7 +565,7 @@ func (b *StatusBackend) DisableInstallation(installationID string) error {
 		return err
 	}
 
-	if err := st.DisableInstallation(&selectedWalletAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
+	if err := st.DisableInstallation(&selectedChatAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
 		b.log.Error("error disabling installation", "err", err)
 		return err
 	}
