@@ -49,7 +49,7 @@ var logintests = []struct {
 			}
 			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("addressKey", nil)
-			s.am.EXPECT().SelectWalletAccount("address...", "password").Return(nil)
+			s.am.EXPECT().SelectAccount("address...", "password").Return(nil)
 		},
 	},
 	{
@@ -85,7 +85,7 @@ var logintests = []struct {
 			}
 			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", nil)
-			s.am.EXPECT().SelectWalletAccount("address...", "password").Return(errors.New("foo"))
+			s.am.EXPECT().SelectAccount("address...", "password").Return(errors.New("foo"))
 		},
 	},
 }
