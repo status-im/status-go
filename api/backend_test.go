@@ -228,20 +228,22 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(idx int) {
-			result := backend.CallRPC(fmt.Sprintf(
+			result, err := backend.CallRPC(fmt.Sprintf(
 				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
 				idx+1,
 			))
+			assert.NoError(t, err)
 			assert.NotContains(t, result, "error")
 			wg.Done()
 		}(i)
 
 		wg.Add(1)
 		go func(idx int) {
-			result := backend.CallPrivateRPC(fmt.Sprintf(
+			result, err := backend.CallPrivateRPC(fmt.Sprintf(
 				`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":%d}`,
 				idx+1,
 			))
+			assert.NoError(t, err)
 			assert.NotContains(t, result, "error")
 			wg.Done()
 		}(i)
@@ -291,13 +293,30 @@ func TestBlockedRPCMethods(t *testing.T) {
 	defer func() { require.NoError(t, backend.StopNode()) }()
 
 	for idx, m := range rpc.BlockedMethods() {
-		result := backend.CallRPC(fmt.Sprintf(
+		result, err := backend.CallRPC(fmt.Sprintf(
 			`{"jsonrpc":"2.0","method":"%s","params":[],"id":%d}`,
 			m,
 			idx+1,
 		))
+		assert.NoError(t, err)
 		assert.Contains(t, result, fmt.Sprintf(`{"code":-32700,"message":"%s"}`, rpc.ErrMethodNotFound))
 	}
+}
+
+func TestCallRPCWithStoppedNode(t *testing.T) {
+	backend := NewStatusBackend()
+
+	resp, err := backend.CallRPC(
+		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
+	)
+	assert.Equal(t, ErrRPCClientUnavailable, err)
+	assert.Equal(t, "", resp)
+
+	resp, err = backend.CallPrivateRPC(
+		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
+	)
+	assert.Equal(t, ErrRPCClientUnavailable, err)
+	assert.Equal(t, "", resp)
 }
 
 // TODO(adam): add concurrent tests for: SendTransaction

@@ -27,6 +27,8 @@ const (
 	EventMailServerRequestExpired EventType = "mailserver.request.expired"
 	// EventMailServerEnvelopeArchived fires after an envelope has been archived
 	EventMailServerEnvelopeArchived EventType = "mailserver.envelope.archived"
+	// EventMailServerSyncFinished fires when the sync of messages is finished.
+	EventMailServerSyncFinished EventType = "mailserver.sync.finished"
 )
 
 // EnvelopeEvent used for envelopes events.
@@ -36,4 +38,11 @@ type EnvelopeEvent struct {
 	Batch common.Hash
 	Peer  enode.ID
 	Data  interface{}
+}
+
+// SyncEventResponse is a response from the Mail Server
+// form which the peer received envelopes.
+type SyncEventResponse struct {
+	Cursor []byte
+	Error  string
 }

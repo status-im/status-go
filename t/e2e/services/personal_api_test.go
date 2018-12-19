@@ -67,8 +67,8 @@ func (s *PersonalSignSuite) TestPersonalSignUnsupportedMethod() {
 		signDataString,
 		TestConfig.Account1.Address)
 
-	rawResult := s.Backend.CallRPC(basicCall)
-
+	rawResult, err := s.Backend.CallRPC(basicCall)
+	s.NoError(err)
 	s.Contains(rawResult, `"error":{"code":-32700,"message":"method is unsupported by RPC interface"}`)
 }
 
@@ -93,7 +93,7 @@ func (s *PersonalSignSuite) TestPersonalRecoverUnsupportedMethod() {
 		signDataString,
 		"")
 
-	rawResult := s.Backend.CallRPC(basicCall)
-
+	rawResult, err := s.Backend.CallRPC(basicCall)
+	s.NoError(err)
 	s.Contains(rawResult, `"error":{"code":-32700,"message":"method is unsupported by RPC interface"}`)
 }

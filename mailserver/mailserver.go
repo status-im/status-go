@@ -384,6 +384,10 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		return fmt.Errorf("requests per seconds limit exceeded")
 	}
 
+	if err := request.Validate(); err != nil {
+		return fmt.Errorf("request is invalid: %v", err)
+	}
+
 	iter := s.createIterator(request.Lower, request.Upper, request.Cursor)
 	defer iter.Release()
 
@@ -710,8 +714,8 @@ func (s *WMailServer) checkMsgSignature(msg *whisper.ReceivedMessage, id []byte)
 	return nil
 }
 
-// bloomFromReceivedMessage gor a given whisper.ReceivedMessage it extracts the
-// used bloom filter
+// bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
+// used bloom filter.
 func (s *WMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]byte, error) {
 	payloadSize := len(msg.Payload)
 

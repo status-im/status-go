@@ -67,11 +67,13 @@ func (s *TransactionsTestSuite) TestCallUpstreamPrivateRPCSendTransaction() {
 	s.sendTransactionUsingRPCClient(s.Backend.CallPrivateRPC)
 }
 
-func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(callRPCFn func(string) string) {
+func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(
+	callRPCFn func(string) (string, error),
+) {
 	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
 	s.NoError(err)
 
-	result := callRPCFn(`{
+	result, err := callRPCFn(`{
 		"jsonrpc": "2.0",
 		"id": 1,
 		"method": "eth_sendTransaction",
@@ -81,6 +83,7 @@ func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(callRPCFn func(str
 			"value": "0x9184e72a"
 		}]
 	}`)
+	s.NoError(err)
 	s.Contains(result, `"error":{"code":-32700,"message":"method is unsupported by RPC interface"}`)
 }
 

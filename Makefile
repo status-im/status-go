@@ -35,7 +35,7 @@ GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
-ENABLE_METRICS ?= false
+ENABLE_METRICS ?= true
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
@@ -142,7 +142,7 @@ statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a ./lib
+	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) ./lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -241,7 +241,8 @@ deploy-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
-	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/jteeuwen/go-bindata
+	go get -u github.com/jteeuwen/go-bindata/go-bindata
 	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools

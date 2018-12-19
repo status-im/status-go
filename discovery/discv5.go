@@ -49,8 +49,7 @@ func (d *DiscV5) Start() error {
 	if err != nil {
 		return err
 	}
-	realaddr := conn.LocalAddr().(*net.UDPAddr)
-	ntab, err := discv5.ListenUDP(d.prv, conn, realaddr, "", nil)
+	ntab, err := discv5.ListenUDP(d.prv, conn, "", nil)
 	if err != nil {
 		return err
 	}

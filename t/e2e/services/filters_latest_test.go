@@ -45,7 +45,8 @@ func (s *FiltersAPISuite) TestFilters() {
 
 	basicCall := `{"jsonrpc":"2.0","method":"eth_newBlockFilter","params":[],"id":67}`
 
-	response := s.Backend.CallRPC(basicCall)
+	response, err := s.Backend.CallRPC(basicCall)
+	s.NoError(err)
 	filterID := s.filterIDFromRPCResponse(response)
 
 	// we don't check new blocks on private network, because no one mines them
@@ -65,7 +66,8 @@ func (s *FiltersAPISuite) TestFilters() {
 
 	basicCall = fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_uninstallFilter","params":["%s"],"id":67}`, filterID)
 
-	response = s.Backend.CallRPC(basicCall)
+	response, err = s.Backend.CallRPC(basicCall)
+	s.NoError(err)
 	result := s.boolFromRPCResponse(response)
 
 	s.True(result, "filter expected to be removed successfully")
@@ -79,7 +81,8 @@ func (s *FiltersAPISuite) getFirstFilterChange(filterID string) chan string {
 		timeout := time.Now().Add(time.Minute)
 		for time.Now().Before(timeout) {
 			basicCall := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getFilterChanges","params":["%s"],"id":67}`, filterID)
-			response := s.Backend.CallRPC(basicCall)
+			response, err := s.Backend.CallRPC(basicCall)
+			s.NoError(err)
 			filterChanges := s.arrayFromRPCResponse(response)
 			if len(filterChanges) > 0 {
 				result <- filterChanges[0]

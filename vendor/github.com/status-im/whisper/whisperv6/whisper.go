@@ -463,6 +463,10 @@ func (whisper *Whisper) SyncMessages(peerID []byte, req SyncMailRequest) error {
 		return err
 	}
 
+	if err := req.Validate(); err != nil {
+		return err
+	}
+
 	return p2p.Send(p.ws, p2pSyncRequestCode, req)
 }
 
@@ -975,8 +979,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// TODO(adam): should we limit who can send this request?
 			if whisper.mailServer != nil {
 				var request SyncMailRequest
-				if err = packet.Decode(&request); err != nil {
+				if err := packet.Decode(&request); err != nil {
 					return fmt.Errorf("failed to decode p2pSyncRequestCode payload: %v", err)
+				}
+
+				if err := request.Validate(); err != nil {
+					return fmt.Errorf("sync mail request was invalid: %v", err)
 				}
 
 				if err := whisper.mailServer.SyncMail(p, request); err != nil {
@@ -998,17 +1006,21 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					return fmt.Errorf("failed to decode p2pSyncResponseCode payload: %v", err)
 				}
 
-				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error)
+				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error, "cursor", resp.Cursor)
 
 				for _, envelope := range resp.Envelopes {
 					whisper.mailServer.Archive(envelope)
 				}
 
-				if resp.Error != "" {
-					log.Error("failed to sync envelopes", "err", resp.Error)
-				}
-				if resp.Final {
-					log.Info("finished to sync envelopes successfully")
+				if resp.Error != "" || resp.Final {
+					whisper.envelopeFeed.Send(EnvelopeEvent{
+						Event: EventMailServerSyncFinished,
+						Peer:  p.peer.ID(),
+						Data: SyncEventResponse{
+							Cursor: resp.Cursor,
+							Error:  resp.Error,
+						},
+					})
 				}
 			}
 		case p2pRequestCode:
