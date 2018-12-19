@@ -45,14 +45,18 @@ func (s *BaseJSONRPCSuite) AssertAPIMethodExportedPrivately(method string) {
 }
 
 func (s *BaseJSONRPCSuite) isMethodExported(method string, private bool) bool {
-	var result string
+	var (
+		result string
+		err    error
+	)
 
 	cmd := fmt.Sprintf(`{"jsonrpc":"2.0", "method": "%s", "params": []}`, method)
 	if private {
-		result = s.Backend.CallPrivateRPC(cmd)
+		result, err = s.Backend.CallPrivateRPC(cmd)
 	} else {
-		result = s.Backend.CallRPC(cmd)
+		result, err = s.Backend.CallRPC(cmd)
 	}
+	s.NoError(err)
 
 	var response struct {
 		Error *rpcError `json:"error"`

@@ -125,7 +125,8 @@ func (s *StatusAPISuite) testStatusLogin(testParams statusTestParams) *status.Lo
 		`{"jsonrpc":"2.0","method":"status_login","params":[%s],"id":67}`,
 		body)
 
-	result := s.Backend.CallPrivateRPC(basicCall)
+	result, err := s.Backend.CallPrivateRPC(basicCall)
+	s.NoError(err)
 	if testParams.ExpectedError == nil {
 		var r struct {
 			Error  string                `json:"error"`
@@ -164,7 +165,8 @@ func (s *StatusAPISuite) testStatusSignup(testParams statusTestParams) *status.S
 		`{"jsonrpc":"2.0","method":"status_signup","params":[%s],"id":67}`,
 		body)
 
-	result := s.Backend.CallPrivateRPC(basicCall)
+	result, err := s.Backend.CallPrivateRPC(basicCall)
+	s.NoError(err)
 
 	if testParams.ExpectedError == nil {
 		var r struct {
