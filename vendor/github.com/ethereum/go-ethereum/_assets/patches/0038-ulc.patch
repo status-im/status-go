@@ -4,7 +4,7 @@ index b0749d2..d724562 100644
 +++ b/cmd/geth/config.go
 @@ -124,6 +124,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
  	}
- 
+
  	// Apply flags.
 +	utils.SetULC(ctx, &cfg.Eth)
  	utils.SetNodeConfig(ctx, &cfg.Node)
@@ -142,11 +142,11 @@ index d209311..8904dd8 100644
  	abort, results := hc.engine.VerifyHeaders(hc, chain, seals)
  	defer close(abort)
 diff --git a/eth/config.go b/eth/config.go
-index efbaafb..7d1db9f 100644
+index 7c041d1af..f71b8dfee 100644
 --- a/eth/config.go
 +++ b/eth/config.go
-@@ -87,8 +87,12 @@ type Config struct {
- 	NoPruning bool
+@@ -91,8 +91,12 @@ type Config struct {
+ 	Whitelist map[uint64]common.Hash `toml:"-"`
 
  	// Light client options
 -	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
@@ -161,7 +161,7 @@ index efbaafb..7d1db9f 100644
  	// Database options
  	SkipBcVersionCheck bool `toml:"-"`
 diff --git a/eth/gen_config.go b/eth/gen_config.go
-index d401a91..382d4d9 100644
+index 2777aa9e8..6662f820f 100644
 --- a/eth/gen_config.go
 +++ b/eth/gen_config.go
 @@ -23,10 +23,12 @@ func (c Config) MarshalTOML() (interface{}, error) {
@@ -179,9 +179,9 @@ index d401a91..382d4d9 100644
 +		SkipBcVersionCheck      bool       `toml:"-"`
 +		DatabaseHandles         int        `toml:"-"`
  		DatabaseCache           int
- 		TrieCache               int
- 		TrieTimeout             time.Duration
-@@ -51,6 +53,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
+ 		TrieCleanCache          int
+ 		TrieDirtyCache          int
+@@ -54,6 +56,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
  	enc.NoPruning = c.NoPruning
  	enc.LightServ = c.LightServ
  	enc.LightPeers = c.LightPeers
@@ -190,7 +190,7 @@ index d401a91..382d4d9 100644
  	enc.SkipBcVersionCheck = c.SkipBcVersionCheck
  	enc.DatabaseHandles = c.DatabaseHandles
  	enc.DatabaseCache = c.DatabaseCache
-@@ -79,10 +83,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
+@@ -85,10 +89,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
  		NetworkId               *uint64
  		SyncMode                *downloader.SyncMode
  		NoPruning               *bool
@@ -205,9 +205,9 @@ index d401a91..382d4d9 100644
 +		SkipBcVersionCheck      *bool      `toml:"-"`
 +		DatabaseHandles         *int       `toml:"-"`
  		DatabaseCache           *int
- 		TrieCache               *int
- 		TrieTimeout             *time.Duration
-@@ -122,6 +128,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
+ 		TrieCleanCache          *int
+ 		TrieDirtyCache          *int
+@@ -131,6 +137,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
  	if dec.LightPeers != nil {
  		c.LightPeers = *dec.LightPeers
  	}
@@ -342,19 +342,7 @@ index f0d3b18..16cfc00 100644
  }
 
  // fetcherPeerInfo holds fetcher-specific information about each active peer
-@@ -144,9 +152,11 @@ func (f *lightFetcher) syncLoop() {
- 				rq    *distReq
- 				reqID uint64
- 			)
-+
- 			if !f.syncing && !(newAnnounce && s) {
- 				rq, reqID = f.nextRequest()
- 			}
-+
- 			syncing := f.syncing
- 			f.lock.Unlock()
-
-@@ -206,8 +216,11 @@ func (f *lightFetcher) syncLoop() {
+@@ -209,8 +209,11 @@ func (f *lightFetcher) syncLoop() {
  		case p := <-f.syncDone:
  			f.lock.Lock()
  			p.Log().Debug("Done synchronising with peer")
@@ -365,8 +353,8 @@ index f0d3b18..16cfc00 100644
 +				f.newHeaders([]*types.Header{h}, []*big.Int{td})
 +			}
  			f.lock.Unlock()
+ 			f.requestChn <- false
  		}
- 	}
 @@ -223,7 +236,6 @@ func (f *lightFetcher) registerPeer(p *peer) {
 
  	f.lock.Lock()
@@ -397,7 +385,7 @@ index f0d3b18..16cfc00 100644
  		if fp.root != nil {
 @@ -407,25 +422,13 @@ func (f *lightFetcher) requestedID(reqID uint64) bool {
  // to be downloaded starting from the head backwards is also returned
- func (f *lightFetcher) nextRequest() (*distReq, uint64) {
+ func (f *lightFetcher) nextRequest() (*distReq, uint64, bool) {
  	var (
 -		bestHash   common.Hash
 -		bestAmount uint64
@@ -424,12 +412,12 @@ index f0d3b18..16cfc00 100644
 -		}
 -	}
  	if bestTd == f.maxConfirmedTd {
- 		return nil, 0
+ 		return nil, 0, false
  	}
-@@ -435,72 +438,131 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
+@@ -437,72 +437,131 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64, bool) {
  	var rq *distReq
  	reqID := genReqID()
- 	if f.syncing {
+ 	if bestSyncing {
 -		rq = &distReq{
 -			getCost: func(dp distPeer) uint64 {
 -				return 0
@@ -462,7 +450,7 @@ index f0d3b18..16cfc00 100644
 -			canSend: func(dp distPeer) bool {
 +		rq = f.newFetcherDistReq(bestHash, reqID, bestAmount)
 +	}
-+	return rq, reqID
++	return rq, reqID, bestSyncing
 +}
 +
 +// findBestValues retrieves the best values for LES or ULC mode.
@@ -614,7 +602,7 @@ index f0d3b18..16cfc00 100644
 +			return func() { p.RequestHeadersByHash(reqID, cost, bestHash, int(bestAmount), 0, true) }
 +		},
  	}
--	return rq, reqID
+-	return rq, reqID, bestSyncing
  }
 
  // deliverHeaders delivers header download request responses for processing
@@ -2248,53 +2236,6 @@ index 8e2734c..0b5571b 100644
 +	defer self.mu.Unlock()
 +	self.disableCheckFreq = false
 +}
-diff --git a/metrics/counter.go b/metrics/counter.go
-index c7f2b4b..fbb14b8 100644
---- a/metrics/counter.go
-+++ b/metrics/counter.go
-@@ -1,6 +1,8 @@
- package metrics
-
--import "sync/atomic"
-+import (
-+	"sync/atomic"
-+)
-
- // Counters hold an int64 value that can be incremented and decremented.
- type Counter interface {
-@@ -28,6 +30,12 @@ func NewCounter() Counter {
- 	return &StandardCounter{0}
- }
-
-+// NewCounterForced constructs a new StandardCounter and returns it no matter if
-+// the global switch is enabled or not.
-+func NewCounterForced() Counter {
-+	return &StandardCounter{0}
-+}
-+
- // NewRegisteredCounter constructs and registers a new StandardCounter.
- func NewRegisteredCounter(name string, r Registry) Counter {
- 	c := NewCounter()
-@@ -38,6 +46,19 @@ func NewRegisteredCounter(name string, r Registry) Counter {
- 	return c
- }
-
-+// NewRegisteredCounterForced constructs and registers a new StandardCounter
-+// and launches a goroutine no matter the global switch is enabled or not.
-+// Be sure to unregister the counter from the registry once it is of no use to
-+// allow for garbage collection.
-+func NewRegisteredCounterForced(name string, r Registry) Counter {
-+	c := NewCounterForced()
-+	if nil == r {
-+		r = DefaultRegistry
-+	}
-+	r.Register(name, c)
-+	return c
-+}
-+
- // CounterSnapshot is a read-only copy of another Counter.
- type CounterSnapshot int64
-
 diff --git a/mobile/geth.go b/mobile/geth.go
 index e3e2e90..4d674b2 100644
 --- a/mobile/geth.go
@@ -2309,21 +2250,3 @@ index e3e2e90..4d674b2 100644
  }
 
  // defaultNodeConfig contains the default node configuration values to use if all
-diff --git a/p2p/enode/node.go b/p2p/enode/node.go
-index 84088fc..b454ab2 100644
---- a/p2p/enode/node.go
-+++ b/p2p/enode/node.go
-@@ -98,6 +98,13 @@ func (n *Node) Pubkey() *ecdsa.PublicKey {
- 	return &key
- }
-
-+// Record returns the node's record. The return value is a copy and may
-+// be modified by the caller.
-+func (n *Node) Record() *enr.Record {
-+	cpy := n.r
-+	return &cpy
-+}
-+
- // checks whether n is a valid complete node.
- func (n *Node) ValidateComplete() error {
- 	if n.Incomplete() {
