@@ -17,7 +17,7 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
-	"gopkg.in/go-playground/validator.v9"
+	validator "gopkg.in/go-playground/validator.v9"
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -224,14 +224,20 @@ func ResetChainData() *C.char {
 //CallRPC calls public APIs via RPC
 //export CallRPC
 func CallRPC(inputJSON *C.char) *C.char {
-	outputJSON := statusBackend.CallRPC(C.GoString(inputJSON))
+	outputJSON, err := statusBackend.CallRPC(C.GoString(inputJSON))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	return C.CString(outputJSON)
 }
 
 //CallPrivateRPC calls both public and private APIs via RPC
 //export CallPrivateRPC
 func CallPrivateRPC(inputJSON *C.char) *C.char {
-	outputJSON := statusBackend.CallPrivateRPC(C.GoString(inputJSON))
+	outputJSON, err := statusBackend.CallPrivateRPC(C.GoString(inputJSON))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	return C.CString(outputJSON)
 }
 
