@@ -50,11 +50,11 @@ type IdentityAndIDPair [2]string
 // DefaultEncryptionServiceConfig returns the default values used by the encryption service
 func DefaultEncryptionServiceConfig(installationID string) EncryptionServiceConfig {
 	return EncryptionServiceConfig{
-		MaxInstallations:         5,
+		MaxInstallations:         3,
 		MaxSkip:                  1000,
 		MaxKeep:                  3000,
 		MaxMessageKeysPerSession: 2000,
-		BundleRefreshInterval:    6 * 60 * 60 * 1000,
+		BundleRefreshInterval:    24 * 60 * 60 * 1000,
 		InstallationID:           installationID,
 	}
 }
