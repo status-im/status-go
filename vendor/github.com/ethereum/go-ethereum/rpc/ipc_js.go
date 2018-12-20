@@ -1,4 +1,4 @@
-// Copyright 2018 The go-ethereum Authors
+// Copyright 2015 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,13 +14,24 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package state
+// +build js
 
-// Store defines methods required to get, set, delete values for different keys
-// and close the underlying resources.
-type Store interface {
-	Get(key string, i interface{}) (err error)
-	Put(key string, i interface{}) (err error)
-	Delete(key string) (err error)
-	Close() error
+package rpc
+
+import (
+	"context"
+	"errors"
+	"net"
+)
+
+var errNotSupported = errors.New("rpc: not supported")
+
+// ipcListen will create a named pipe on the given endpoint.
+func ipcListen(endpoint string) (net.Listener, error) {
+	return nil, errNotSupported
+}
+
+// newIPCConnection will connect to a named pipe with the given endpoint as name.
+func newIPCConnection(ctx context.Context, endpoint string) (net.Conn, error) {
+	return nil, errNotSupported
 }

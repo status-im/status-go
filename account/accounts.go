@@ -1,7 +1,6 @@
 package account
 
 import (
-	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -408,21 +407,4 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.
 	}
 
 	return keyStore.AccountDecryptedKey(account, password)
-}
-
-func (m *Manager) CreateAddress() (address, pubKey, privKey string, err error) {
-	key, err := crypto.GenerateKey()
-	if err != nil {
-		return "", "", "", err
-	}
-
-	privKeyBytes := crypto.FromECDSA(key)
-	pubKeyBytes := crypto.FromECDSAPub(key.Public().(*ecdsa.PublicKey))
-	addressBytes := crypto.PubkeyToAddress(*key.Public().(*ecdsa.PublicKey))
-
-	privKey = hexutil.Encode(privKeyBytes)
-	pubKey = hexutil.Encode(pubKeyBytes)
-	address = addressBytes.Hex()
-
-	return
 }

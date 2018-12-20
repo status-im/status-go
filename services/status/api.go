@@ -3,6 +3,9 @@ package status
 import (
 	"context"
 	"errors"
+	"fmt"
+
+	"github.com/status-im/status-go/account"
 )
 
 // PublicAPI represents a set of APIs from the `web3.status` namespace.
@@ -66,9 +69,7 @@ func (api *PublicAPI) Signup(context context.Context, req SignupRequest) (res Si
 	return
 }
 
-type CreateAddressRequest struct {
-}
-
+// CreateAddressResponse : json response returned by status_createaccount
 type CreateAddressResponse struct {
 	Address string `json:"address"`
 	Pubkey  string `json:"pubkey"`
@@ -76,9 +77,9 @@ type CreateAddressResponse struct {
 }
 
 // CreateAddress is an implementation of `status_createaccount` or `web3.status.createaccount` API
-func (api *PublicAPI) CreateAddress(context context.Context, req CreateAddressRequest) (res CreateAddressResponse, err error) {
-	if res.Address, res.Pubkey, res.Privkey, err = api.s.am.CreateAddress(); err != nil {
-		err = errors.New("could not create the address : " + err.Error())
+func (api *PublicAPI) CreateAddress(context context.Context) (res CreateAddressResponse, err error) {
+	if res.Address, res.Pubkey, res.Privkey, err = account.CreateAddress(); err != nil {
+		err = fmt.Errorf("could not create an address:  %v", err)
 	}
 
 	return

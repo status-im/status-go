@@ -24,12 +24,12 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "=v1.8.17"
+  version = "=v1.8.20"
   source = "github.com/status-im/go-ethereum"
 
 [[constraint]]
   name = "github.com/status-im/whisper"
-  version = "=v1.4.4"
+  version = "=v1.4.5"
 
 [[override]]
   name = "github.com/golang/protobuf"

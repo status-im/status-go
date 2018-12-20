@@ -23,7 +23,6 @@ type AccountManager interface {
 	AddressToDecryptedAccount(string, string) (accounts.Account, *keystore.Key, error)
 	SelectAccount(address, password string) error
 	CreateAccount(password string) (address, pubKey, mnemonic string, err error)
-	CreateAddress() (address, pubKey, privKey string, err error)
 }
 
 // Service represents our own implementation of status status operations.

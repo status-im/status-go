@@ -22,6 +22,17 @@ func GetOrRegisterCounter(name string, r Registry) Counter {
 	return r.GetOrRegister(name, NewCounter).(Counter)
 }
 
+// GetOrRegisterCounterForced returns an existing Counter or constructs and registers a
+// new Counter no matter the global switch is enabled or not.
+// Be sure to unregister the counter from the registry once it is of no use to
+// allow for garbage collection.
+func GetOrRegisterCounterForced(name string, r Registry) Counter {
+	if nil == r {
+		r = DefaultRegistry
+	}
+	return r.GetOrRegister(name, NewCounterForced).(Counter)
+}
+
 // NewCounter constructs a new StandardCounter.
 func NewCounter() Counter {
 	if !Enabled {
