@@ -119,3 +119,20 @@ func (mr *MockAccountManagerMockRecorder) CreateAccount(password interface{}) *g
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccount", reflect.TypeOf((*MockAccountManager)(nil).CreateAccount), password)
 }
+
+// CreateAddress mocks base method
+func (m *MockAccountManager) CreateAddress() (string, string, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAddress")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(string)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
+}
+
+// CreateAddress indicates an expected call of CreateAddress
+func (mr *MockAccountManagerMockRecorder) CreateAddress() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAddress", reflect.TypeOf((*MockAccountManager)(nil).CreateAddress))
+}

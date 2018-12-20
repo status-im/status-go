@@ -1,6 +1,7 @@
 package account
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/mock/gomock"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
@@ -411,4 +414,18 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 			}
 		})
 	}
+}
+
+func (s *ManagerTestSuite) TestCreateAddress() {
+	addr, pub, priv, err := s.accManager.CreateAddress()
+	s.Equal(true, gethcommon.IsHexAddress(addr))
+	s.NoError(err)
+
+	privECDSA, err := crypto.HexToECDSA(priv[2:])
+	s.NoError(err)
+
+	pubECDSA := privECDSA.Public().(*ecdsa.PublicKey)
+	pubStr := hexutil.Encode(crypto.FromECDSAPub(pubECDSA))
+
+	s.Equal(pub, pubStr)
 }
