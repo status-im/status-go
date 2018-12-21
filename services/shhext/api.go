@@ -499,7 +499,10 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 		return err
 	}
 
-	var publicKey *ecdsa.PublicKey
+	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
+	if err != nil {
+		return err
+	}
 
 	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
 
