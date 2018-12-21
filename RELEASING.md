@@ -34,22 +34,24 @@ TODO: create a script that can do that instead of manual work.
 1. Commit and push the change,
 1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `develop` branch.
 
-## Releasing from develop (regular release)
+## Releasing a new patch (no breaking changes or a hot-fix release)
 
 TODO: create a script that can do that instead of manual work.
 
-1. Pull `develop` branch,
-1. Checkout a new branch `release/0.X`,
-1. Remove `-beta.Z` suffix from the current version (`VERSION` file),
-1. Commit and push the change,
-1. Checkout develop branch, bump `X`, reset `Z` to `0` and commit to develop,
-1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `release/0.X` branch.
-
-## Releasing from develop (a hot-fix)
-
-TODO: create a script that can do that instead of manual work.
-
-1. Checkout a release branch you want to hot fix (branch have a name `release/0.X`),
+1. Checkout a release branch you want to release from (branch have a name `release/0.X`),
+1. Cherry-pick a commit you want to include,
 1. Bump `Y` (`0.X.Y`) in the current version (`VERSION` file),
 1. Commit and push the change to `release/0.X` branch,
 1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `release/0.X` branch name.
+
+## Releasing a new version (breaking changes)
+
+TODO: create a script that can do that instead of manual work.
+
+1. Merge your PR to `develop` branch,
+1. Pull `develop` branch locally,
+1. Bump `X`, reset `Z` to `0` and commit to `develop` with a message "Bump version to 0.X.Y",
+1. Checkout a new branch `release/0.X`,
+1. Remove `-beta.Z` suffix from the current version (`VERSION` file),
+1. Commit and push the change,
+1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `release/0.X` branch.
