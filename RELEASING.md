@@ -10,29 +10,12 @@ We use [semver](https://semver.org/) but as we do not have a stable version yet,
 
 We use `0` as the MAJOR version and bump only MINOR when there are breaking changes and PATCH when there are no breaking changes.
 
-Additionally, a pre-release can be created and the version can look like as complicated as this:
-```
-0.MINOR.PATCH-beta.INDEX.GIT_SHA
-```
+## Custom build
 
-## Releasing from a branch
+1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), 
+1. Leave "RELEASE" **unchecked** and use your branch name.
 
-TODO: create a script that can do that instead of manual work.
-
-1. Make sure that your branch is rebased on `develop`,
-1. Change `VERSION` file content to `0.X.Y-beta.Z.$GIT_SHA` where `GIT_SHA` is the commit you want to release,
-1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/) and use your branch. NOTE: do **not** select "RELEASE".
-
-**NOTE**: remember to change `VERSION` content back before merge.
-
-## Releasing pre-release from develop
-
-TODO: create a script that can do that instead of manual work.
-
-1. Pull `develop` branch,
-1. Bump `Z` (`0.X.Y-beta.Z`) in the current version (`VERSION` file),
-1. Commit and push the change,
-1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `develop` branch.
+After successful build, open it (https://ci.status.im/job/status-go/job/parallel/$BUILD_ID/) in a browser. Artifacts will have a random ID, for example `status-go-android-181221-143603-5708af.aar`, means that `181221-143603-5708af` is a version you can use in [status-react](https://github.com/status-im/status-react).
 
 ## Releasing a new patch (no breaking changes or a hot-fix release)
 
