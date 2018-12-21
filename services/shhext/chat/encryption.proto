@@ -69,6 +69,9 @@ message ProtocolMessage {
   // The device id of the sender
   string installation_id = 2;
 
+  // List of bundles
+  repeated Bundle bundles = 3;
+
   // One to one message, encrypted, indexed by installation_id
   map<string,DirectMessageProtocol> direct_message = 101;
 

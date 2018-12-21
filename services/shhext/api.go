@@ -488,28 +488,18 @@ func (api *PublicAPI) SendGroupMessage(ctx context.Context, msg chat.SendGroupMe
 }
 
 func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
-	var privateKey *ecdsa.PrivateKey
-	var publicKey *ecdsa.PublicKey
 
-	// Msg.Dst is empty is a public message, nothing to do
-	if msg.Dst != nil {
-		// There's probably a better way to do this
-		keyBytes, err := hexutil.Bytes(msg.Dst).MarshalText()
-		if err != nil {
-			return err
-		}
-
-		privateKey, err = api.service.w.GetPrivateKey(string(keyBytes))
-		if err != nil {
-			return err
-		}
-
-		// This needs to be pushed down in the protocol message
-		publicKey, err = crypto.UnmarshalPubkey(msg.Sig)
-		if err != nil {
-			return err
-		}
+	privateKeyID := api.service.w.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return errors.New("no key selected")
 	}
+
+	privateKey, err := api.service.w.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return err
+	}
+
+	var publicKey *ecdsa.PublicKey
 
 	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
 
