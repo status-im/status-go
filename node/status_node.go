@@ -112,9 +112,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 		return err
 	}
 
-	if n.discoveryEnabled() {
-		return n.startDiscovery()
-	}
 	return nil
 }
 
@@ -233,6 +230,17 @@ func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 	}
 
 	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, node)
+}
+
+func (n *StatusNode) StartDiscovery() error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.discoveryEnabled() {
+		return n.startDiscovery()
+	}
+
+	return nil
 }
 
 func (n *StatusNode) startDiscovery() error {

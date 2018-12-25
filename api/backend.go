@@ -166,6 +166,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	signal.SendNodeReady()
 
+	if err := b.statusNode.StartDiscovery(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
