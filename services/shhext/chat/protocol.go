@@ -112,6 +112,11 @@ func (p *ProtocolService) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*Bundle, e
 	return p.encryption.CreateBundle(myIdentityKey)
 }
 
+// GetPublicBundle retrieves a public bundle given an identity
+func (p *ProtocolService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, error) {
+	return p.encryption.GetPublicBundle(theirIdentityKey)
+}
+
 // EnableInstallation enables an installation for multi-device sync.
 func (p *ProtocolService) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
 	return p.encryption.EnableInstallation(myIdentityKey, installationID)

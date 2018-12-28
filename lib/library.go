@@ -60,6 +60,19 @@ func CreateContactCode() *C.char {
 	return cstr
 }
 
+// Get an X3DH bundle
+//export GetContactCode
+func GetContactCode(identityString *C.char) *C.char {
+	bundle, err := statusBackend.GetContactCode(C.GoString(identityString))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	cstr := C.CString(bundle)
+
+	return cstr
+}
+
 //export ProcessContactCode
 func ProcessContactCode(bundleString *C.char) *C.char {
 	err := statusBackend.ProcessContactCode(C.GoString(bundleString))

@@ -13,6 +13,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
+	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
@@ -382,6 +383,15 @@ func (b *StatusBackend) Logout() error {
 		if err := whisperService.DeleteKeyPairs(); err != nil {
 			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 		}
+		st, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.Logout(); err != nil {
+			return err
+		}
+
 	default:
 		return err
 	}
@@ -444,7 +454,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 			return err
 		}
 
-		if err := st.InitProtocol(address, password); err != nil {
+		if err := st.Login(address, password); err != nil {
 			return err
 		}
 	}
@@ -484,6 +494,26 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 	}
 
 	bundle, err := st.GetBundle(selectedAccount.AccountKey.PrivateKey)
+	if err != nil {
+		return "", err
+	}
+
+	return bundle.ToBase64()
+}
+
+// GetContactCode return the latest contact code
+func (b *StatusBackend) GetContactCode(identity string) (string, error) {
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return "", err
+	}
+
+	publicKey, err := ecrypto.UnmarshalPubkey([]byte(identity))
+	if err != nil {
+		return "", err
+	}
+
+	bundle, err := st.GetPublicBundle(publicKey)
 	if err != nil {
 		return "", err
 	}

@@ -450,6 +450,18 @@ func (s *EncryptionService) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicK
 	return response, nil
 }
 
+// GetPublicBundle returns the active installations bundles for a given user
+func (s *EncryptionService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, error) {
+	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+
+	installationIDs, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.persistence.GetPublicBundle(theirIdentityKey, installationIDs)
+}
+
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
 // TODO: refactor this
 // nolint: gocyclo
@@ -459,13 +471,8 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
-	installationIDs, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get their latest bundle
-	theirBundle, err := s.persistence.GetPublicBundle(theirIdentityKey, installationIDs)
+	theirBundle, err := s.GetPublicBundle(theirIdentityKey)
 	if err != nil {
 		return nil, err
 	}

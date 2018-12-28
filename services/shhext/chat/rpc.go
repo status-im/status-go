@@ -11,6 +11,7 @@ import (
 type SendPublicMessageRPC struct {
 	Sig     string
 	Chat    string
+	PFS     bool
 	Payload hexutil.Bytes
 }
 
@@ -27,4 +28,9 @@ type SendGroupMessageRPC struct {
 	Sig     string
 	Payload hexutil.Bytes
 	PubKeys []hexutil.Bytes
+}
+
+// JoinPublicChatRPC represents the RPC payload for the JoinPublicChat RPC method
+type JoinPublicChatRPC struct {
+	Chats []string
 }

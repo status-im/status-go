@@ -6,9 +6,9 @@ import (
 )
 
 var discoveryTopic = "contact-discovery"
-var discoveryTopicBytes = toTopic(discoveryTopic)
+var discoveryTopicBytes = ToWhisperTopic(discoveryTopic)
 
-func toTopic(s string) whisper.TopicType {
+func ToWhisperTopic(s string) whisper.TopicType {
 	return whisper.BytesToTopic(crypto.Keccak256([]byte(s)))
 }
 
@@ -25,7 +25,7 @@ func defaultWhisperMessage() whisper.NewMessage {
 func PublicMessageToWhisper(rpcMsg SendPublicMessageRPC, payload []byte) whisper.NewMessage {
 	msg := defaultWhisperMessage()
 
-	msg.Topic = toTopic(rpcMsg.Chat)
+	msg.Topic = ToWhisperTopic(rpcMsg.Chat)
 
 	msg.Payload = payload
 	msg.Sig = rpcMsg.Sig
@@ -39,7 +39,7 @@ func DirectMessageToWhisper(rpcMsg SendDirectMessageRPC, payload []byte) whisper
 	if rpcMsg.Chat == "" {
 		topicBytes = discoveryTopicBytes
 	} else {
-		topicBytes = toTopic(rpcMsg.Chat)
+		topicBytes = ToWhisperTopic(rpcMsg.Chat)
 	}
 
 	msg := defaultWhisperMessage()

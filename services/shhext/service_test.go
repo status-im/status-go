@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -72,6 +73,8 @@ type ShhExtSuite struct {
 }
 
 func (s *ShhExtSuite) SetupTest() {
+	rand.Seed(time.Now().UnixNano())
+
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
 	s.whisper = make([]*whisper.Whisper, 2)
@@ -116,9 +119,69 @@ func (s *ShhExtSuite) SetupTest() {
 	s.services[0].tracker.handler = newHandlerMock(1)
 }
 
-func (s *ShhExtSuite) TestInitProtocol() {
-	err := s.services[0].InitProtocol("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
-	s.NoError(err)
+func (s *ShhExtSuite) TestLoginLogout() {
+	service := s.services[0]
+	address := "address-1"
+
+	err := service.Login(address, "`090///\nhtaa\rhta9x8923)$$'23")
+	s.Require().NoError(err)
+
+	s.NotNil(service.protocol)
+
+	err = service.Logout()
+
+	s.Require().NoError(err)
+}
+
+func (s *ShhExtSuite) TestGetNewFilterMessages() {
+	service := s.services[0]
+	address := "address-2"
+	publicChat := fmt.Sprintf("%g", rand.Float64())
+
+	err := service.Login(address, "`090///\nhtaa\rhta9x8923)$$'23")
+	s.Require().NoError(err)
+
+	s.NotNil(service.protocol)
+
+	filters, err := service.JoinPublicChats([]string{publicChat})
+	s.Require().NoError(err)
+
+	// Just smoke test it for now, no messages will be fetched as we
+	// don't publish
+	_, err = service.GetNewFilterMessages(filters[0])
+	s.Require().NoError(err)
+
+	err = service.Logout()
+
+	s.Require().NoError(err)
+}
+
+func (s *ShhExtSuite) TestJoinLeavePublicChats() {
+	service := s.services[0]
+
+	err := service.Login("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
+	s.Require().NoError(err)
+
+	publicChats := []string{"test-1", "test-2"}
+	filters, err := service.JoinPublicChats(publicChats)
+	s.Require().NoError(err)
+
+	// Check filters are saved
+	_, found := service.loadedFilters["test-1"]
+	s.True(found)
+	_, found = service.loadedFilters["test-2"]
+	s.True(found)
+
+	s.Require().NotNil(filters)
+
+	err = service.LeavePublicChats(publicChats)
+	s.Require().NoError(err)
+
+	// Check filters are removed
+	_, found = service.loadedFilters["test-1"]
+	s.False(found)
+	_, found = service.loadedFilters["test-2"]
+	s.False(found)
 }
 
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
