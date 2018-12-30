@@ -409,7 +409,8 @@ func (c *NodeConfig) updatePeerLimits() {
 	}
 }
 
-// NewNodeConfig creates new node configuration object with bare-minimum defaults
+// NewNodeConfig creates new node configuration object with bare-minimum defaults.
+// Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	var keyStoreDir, wnodeDir string
 
@@ -528,6 +529,13 @@ func (c *NodeConfig) Validate() error {
 
 	if c.UpstreamConfig.Enabled && c.LightEthConfig.Enabled {
 		return fmt.Errorf("both UpstreamConfig and LightEthConfig are enabled, but they are mutually exclusive")
+	}
+
+	// Whisper's data directory must be relative to the main data directory.
+	if c.WhisperConfig.Enabled {
+		if !strings.Contains(c.WhisperConfig.DataDir, c.DataDir) {
+			return fmt.Errorf("Whisper's DataDir must be relative to DataDir")
+		}
 	}
 
 	if err := c.validateChildStructs(validate); err != nil {
