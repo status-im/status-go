@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gopkg.in/go-playground/validator.v9"
+	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/status-im/status-go/params"
@@ -261,29 +261,13 @@ func TestNodeConfigValidate(t *testing.T) {
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true,
-					"DataDir": "/foo",
+					"DataDir": "/some/dir",
 					"MailserverPassword": "foo"
 				}
 			}`,
 			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
 				require.Equal(t, "foo", config.WhisperConfig.MailServerPassword)
 			},
-		},
-		{
-			Name: "Validate that WhisperConfig.DataDir is checked to not be empty if mailserver is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"WhisperConfig": {
-					"Enabled": true,
-					"EnableMailServer": true,
-					"MailserverPassword": "foo"
-				}
-			}`,
-			Error: "WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true",
 		},
 		{
 			Name: "Validate that WhisperConfig.MailserverPassword and WhisperConfig.MailServerAsymKey are checked to not be empty if mailserver is enabled",
@@ -296,7 +280,7 @@ func TestNodeConfigValidate(t *testing.T) {
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true,
-					"DataDir": "/foo"
+					"DataDir": "/some/dir"
 				}
 			}`,
 			Error: "WhisperConfig.MailServerPassword or WhisperConfig.MailServerAsymKey must be specified when WhisperConfig.EnableMailServer is true",
@@ -312,7 +296,7 @@ func TestNodeConfigValidate(t *testing.T) {
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true,
-					"DataDir": "/foo",
+					"DataDir": "/some/dir",
 					"MailServerAsymKey": "06c365919f1fc8e13ff79a84f1dd14b7e45b869aa5fc0e34940481ee20d32f90"
 				}
 			}`,
@@ -384,30 +368,30 @@ func TestNodeConfigValidate(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("Test Case %s", tc.Name)
+		t.Run(tc.Name, func(t *testing.T) {
+			config, err := params.NewConfigFromJSON(tc.Config)
 
-		config, err := params.NewConfigFromJSON(tc.Config)
-
-		switch err := err.(type) {
-		case validator.ValidationErrors:
-			for _, ve := range err {
-				require.Contains(t, tc.FieldErrors, ve.Field())
-				require.Equal(t, tc.FieldErrors[ve.Field()], ve.Tag())
+			switch err := err.(type) {
+			case validator.ValidationErrors:
+				for _, ve := range err {
+					require.Contains(t, tc.FieldErrors, ve.Field())
+					require.Equal(t, tc.FieldErrors[ve.Field()], ve.Tag())
+				}
+			case error:
+				if tc.Error == "" {
+					require.NoError(t, err)
+				} else {
+					require.Contains(t, err.Error(), tc.Error)
+				}
+			case nil:
+				if tc.Error != "" {
+					require.Error(t, err, "Error should be '%v'", tc.Error)
+				}
+				require.Nil(t, tc.FieldErrors)
+				if tc.CheckFunc != nil {
+					tc.CheckFunc(t, config)
+				}
 			}
-		case error:
-			if tc.Error == "" {
-				require.NoError(t, err)
-			} else {
-				require.Contains(t, err.Error(), tc.Error)
-			}
-		case nil:
-			if tc.Error != "" {
-				require.Error(t, err, "Error should be '%v'", tc.Error)
-			}
-			require.Nil(t, tc.FieldErrors)
-			if tc.CheckFunc != nil {
-				tc.CheckFunc(t, config)
-			}
-		}
+		})
 	}
 }
