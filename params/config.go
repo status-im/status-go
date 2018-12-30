@@ -514,6 +514,7 @@ func loadConfigFromAsset(name string, config *NodeConfig) error {
 //
 //   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
 //
+// nolint: gocyclo
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
 
