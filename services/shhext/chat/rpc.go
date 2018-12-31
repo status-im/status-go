@@ -30,7 +30,7 @@ type SendGroupMessageRPC struct {
 	PubKeys []hexutil.Bytes
 }
 
-// JoinPublicChatRPC represents the RPC payload for the JoinPublicChat RPC method
-type JoinPublicChatRPC struct {
+// JoinPublicChatsRPC represents the RPC payload for the JoinPublicChat RPC method
+type JoinPublicChatsRPC struct {
 	Chats []string
 }

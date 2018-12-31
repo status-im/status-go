@@ -313,12 +313,12 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 }
 
 // JoinPublicChats join a set of public chats deriving the key from the chat name
-func (api *PublicAPI) JoinPublicChats(ctx context.Context, msg chat.JoinPublicChatRPC) ([]string, error) {
+func (api *PublicAPI) JoinPublicChats(ctx context.Context, msg chat.JoinPublicChatsRPC) ([]string, error) {
 	return api.service.JoinPublicChats(msg.Chats)
 }
 
 // JoinPublicChats join a set of public chats deriving the key from the chat name
-func (api *PublicAPI) LeavePublicChats(ctx context.Context, msg chat.JoinPublicChatRPC) error {
+func (api *PublicAPI) LeavePublicChats(ctx context.Context, msg chat.JoinPublicChatsRPC) error {
 	return api.service.LeavePublicChats(msg.Chats)
 }
 

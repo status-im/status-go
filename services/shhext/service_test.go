@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -73,8 +72,6 @@ type ShhExtSuite struct {
 }
 
 func (s *ShhExtSuite) SetupTest() {
-	rand.Seed(time.Now().UnixNano())
-
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
 	s.whisper = make([]*whisper.Whisper, 2)
@@ -129,14 +126,13 @@ func (s *ShhExtSuite) TestLoginLogout() {
 	s.NotNil(service.protocol)
 
 	err = service.Logout()
-
 	s.Require().NoError(err)
 }
 
 func (s *ShhExtSuite) TestGetNewFilterMessages() {
 	service := s.services[0]
 	address := "address-2"
-	publicChat := fmt.Sprintf("%g", rand.Float64())
+	publicChat := "status-go-test-public-chat"
 
 	err := service.Login(address, "`090///\nhtaa\rhta9x8923)$$'23")
 	s.Require().NoError(err)
@@ -152,7 +148,6 @@ func (s *ShhExtSuite) TestGetNewFilterMessages() {
 	s.Require().NoError(err)
 
 	err = service.Logout()
-
 	s.Require().NoError(err)
 }
 
@@ -165,14 +160,13 @@ func (s *ShhExtSuite) TestJoinLeavePublicChats() {
 	publicChats := []string{"test-1", "test-2"}
 	filters, err := service.JoinPublicChats(publicChats)
 	s.Require().NoError(err)
+	s.Require().NotNil(filters)
 
 	// Check filters are saved
 	_, found := service.loadedFilters["test-1"]
 	s.True(found)
 	_, found = service.loadedFilters["test-2"]
 	s.True(found)
-
-	s.Require().NotNil(filters)
 
 	err = service.LeavePublicChats(publicChats)
 	s.Require().NoError(err)

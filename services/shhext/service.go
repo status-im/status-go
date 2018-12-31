@@ -50,7 +50,10 @@ type LoadedFilter struct {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w              *whisper.Whisper
+	w *whisper.Whisper
+	// Here we would like to use whisper service instead of the public api
+	// but at the present time quite a few logic is in the publicAPI, making
+	// it difficult to use the service directly
 	publicAPI      *whisper.PublicWhisperAPI
 	config         *ServiceConfig
 	tracker        *tracker
@@ -279,13 +282,15 @@ func (s *Service) Stop() error {
 
 // JoinPublicChats join a set of public chats deriving the key from the chat name
 func (s *Service) JoinPublicChats(chats []string) ([]string, error) {
-
 	var response []string
-	if s.loadedFilters == nil {
-		s.loadedFilters = make(map[string]LoadedFilter)
-	}
 
 	for _, chatID := range chats {
+		// Don't allow to join multiple times
+		_, found := s.loadedFilters[chatID]
+		if found {
+			continue
+		}
+
 		symKeyID, err := s.w.AddSymKeyFromPassword(chatID)
 		if err != nil {
 			return nil, err
@@ -347,7 +352,7 @@ func (s *Service) Post(ctx context.Context, req whisper.NewMessage) (hash hexuti
 	hash, err = s.publicAPI.Post(ctx, req)
 	if err == nil {
 		var envHash common.Hash
-		copy(envHash[:], hash[:]) // slice can't be used as key
+		envHash.SetBytes(hash)
 		s.tracker.Add(envHash)
 	}
 	return hash, err
@@ -520,7 +525,6 @@ func (s *Service) GetNewFilterMessages(filterID string) ([]*whisper.Message, err
 	if s.pfsEnabled {
 		// Attempt to decrypt message, otherwise leave unchanged
 		for _, msg := range dedupMessages {
-
 			if err := s.processPFSMessage(msg); err != nil {
 				return nil, err
 			}
@@ -532,7 +536,9 @@ func (s *Service) GetNewFilterMessages(filterID string) ([]*whisper.Message, err
 
 // Login initialize the protocol and join the chat for advertising the bundle
 func (s *Service) Login(address string, password string) error {
+	s.loadedFilters = make(map[string]LoadedFilter)
 	return s.InitProtocol(address, password)
+
 }
 
 // Logout cleans up any filter
@@ -547,7 +553,6 @@ func (s *Service) Logout() error {
 }
 
 func (s *Service) processPFSMessage(msg *whisper.Message) error {
-
 	privateKeyID := s.w.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return errors.New("no key selected")
@@ -586,7 +591,6 @@ func (s *Service) processPFSMessage(msg *whisper.Message) error {
 
 // buildPublicMessage sends a public chat message to the underlying transport
 func (s *Service) buildPublicMessage(msg chat.SendPublicMessageRPC) (*whisper.NewMessage, error) {
-
 	filter := s.loadedFilters[msg.Chat]
 	symKeyID := filter.SymKeyID
 
