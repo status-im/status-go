@@ -99,12 +99,6 @@ func (n *StatusNode) Server() *p2p.Server {
 	return n.gethNode.Server()
 }
 
-// StartOptions allows to control some parameters of Start() method.
-type StartOptions struct {
-	Services       []node.ServiceConstructor
-	StartDiscovery bool
-}
-
 // Start starts current StatusNode, failing if it's already started.
 // It accepts a list of services that should be added to the node.
 func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
@@ -112,6 +106,12 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 		Services:       services,
 		StartDiscovery: true,
 	})
+}
+
+// StartOptions allows to control some parameters of Start() method.
+type StartOptions struct {
+	Services       []node.ServiceConstructor
+	StartDiscovery bool
 }
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
