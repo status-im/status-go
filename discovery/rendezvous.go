@@ -93,6 +93,9 @@ func (r *Rendezvous) Stop() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.cancelRootCtx()
+	if err := r.client.Close(); err != nil {
+		return err
+	}
 	r.client = nil
 	return nil
 }
