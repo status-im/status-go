@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	lcrypto "github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -26,9 +25,7 @@ import (
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
-
-	// to access logs in the test with `-log` flag
-	_ "github.com/status-im/status-go/t/utils"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 type PeerPoolSimulationSuite struct {
@@ -75,7 +72,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 	s.discovery = make([]discovery.Discovery, 3)
 	for i := range s.peers {
 		key, _ := crypto.GenerateKey()
-		whisper := whisperv6.New(nil)
+		whisper := whisper.New(nil)
 		peer := &p2p.Server{
 			Config: p2p.Config{
 				MaxPeers:         10,

@@ -43,6 +43,7 @@ var (
 	ErrNoRunningNode          = errors.New("there is no running node")
 	ErrAccountKeyStoreMissing = errors.New("account key store is not set")
 	ErrServiceUnknown         = errors.New("service unknown")
+	ErrDiscoveryRunning       = errors.New("discovery is already running")
 )
 
 // StatusNode abstracts contained geth node and provides helper methods to
@@ -98,25 +99,24 @@ func (n *StatusNode) Server() *p2p.Server {
 	return n.gethNode.Server()
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, services []node.ServiceConstructor) error {
-	if err := n.createNode(config, db); err != nil {
-		return err
-	}
-	n.config = config
-
-	if err := n.start(services); err != nil {
-		return err
-	}
-
-	if err := n.setupRPCClient(); err != nil {
-		return err
-	}
-
-	return nil
+// StartOptions allows to control some parameters of Start() method.
+type StartOptions struct {
+	Services       []node.ServiceConstructor
+	StartDiscovery bool
 }
 
 // Start starts current StatusNode, failing if it's already started.
+// It accepts a list of services that should be added to the node.
 func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
+	return n.StartWithOptions(config, StartOptions{
+		Services:       services,
+		StartDiscovery: true,
+	})
+}
+
+// StartWithOptions starts current StatusNode, failing if it's already started.
+// It takes some options that allows to further configure starting process.
+func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOptions) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -134,13 +134,35 @@ func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceCo
 
 	n.db = db
 
-	err = n.startWithDB(config, db, services)
+	err = n.startWithDB(config, db, options.Services)
+
+	// continue only if there was no error when starting node with a db
+	if err == nil && options.StartDiscovery && n.discoveryEnabled() {
+		err = n.startDiscovery()
+	}
 
 	if err != nil {
 		if dberr := db.Close(); dberr != nil {
 			n.log.Error("error while closing leveldb after node crash", "error", dberr)
 		}
 		n.db = nil
+		return err
+	}
+
+	return nil
+}
+
+func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, services []node.ServiceConstructor) error {
+	if err := n.createNode(config, db); err != nil {
+		return err
+	}
+	n.config = config
+
+	if err := n.start(services); err != nil {
+		return err
+	}
+
+	if err := n.setupRPCClient(); err != nil {
 		return err
 	}
 
@@ -232,6 +254,7 @@ func (n *StatusNode) startRendezvous() (discovery.Discovery, error) {
 	return discovery.NewRendezvous(maddrs, n.gethNode.Server().PrivateKey, node)
 }
 
+// StartDiscovery starts the peers discovery protocols depending on the node config.
 func (n *StatusNode) StartDiscovery() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -244,6 +267,10 @@ func (n *StatusNode) StartDiscovery() error {
 }
 
 func (n *StatusNode) startDiscovery() error {
+	if n.isDiscoveryRunning() {
+		return ErrDiscoveryRunning
+	}
+
 	discoveries := []discovery.Discovery{}
 	if !n.config.NoDiscovery {
 		discoveries = append(discoveries, discovery.NewDiscV5(
@@ -336,6 +363,10 @@ func (n *StatusNode) stop() error {
 	}
 
 	return nil
+}
+
+func (n *StatusNode) isDiscoveryRunning() bool {
+	return n.register != nil || n.peerPool != nil || n.discovery != nil
 }
 
 func (n *StatusNode) stopDiscovery() error {
