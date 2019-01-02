@@ -21,8 +21,8 @@ After successful build, open it (https://ci.status.im/job/status-go/job/parallel
 
 TODO: create a script that can do that instead of manual work.
 
-1. Checkout a release branch you want to release from (branch have a name `release/0.X`),
-1. Cherry-pick a commit you want to include,
+1. Checkout a release branch you want to release from (release branches have names like `release/0.X`),
+1. Cherry-pick a commit you want to include OR merge `develop` branch,
 1. Bump `Y` (`0.X.Y`) in the current version (`VERSION` file),
 1. Commit and push the change to `release/0.X` branch,
 1. Go to [Jenkins job](https://ci.status.im/job/status-go/job/parallel/), select "RELEASE" and use `release/0.X` branch name.
