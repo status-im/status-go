@@ -135,7 +135,13 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 
-	if err = b.statusNode.Start(config, services...); err != nil {
+	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
+		Services: services,
+		// The peers discovery protocols are started manually after
+		// `node.ready` signal is sent.
+		// It was discussed in https://github.com/status-im/status-go/pull/1333.
+		StartDiscovery: false,
+	}); err != nil {
 		return
 	}
 	signal.SendNodeStarted()
@@ -165,6 +171,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 
 	signal.SendNodeReady()
+
+	if err := b.statusNode.StartDiscovery(); err != nil {
+		return err
+	}
 
 	return nil
 }
