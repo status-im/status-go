@@ -444,7 +444,7 @@ func AppStateChange(state string) {
 // used for gomobile builds
 func SetMobileSignalHandler(handler SignalHandler) {
 	signal.SetMobileSignalHandler(func(data []byte) {
-		if data != nil && len(data) > 0 {
+		if len(data) > 0 {
 			handler.HandleSignal(string(data))
 		}
 	})
