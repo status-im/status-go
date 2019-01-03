@@ -8,7 +8,6 @@ import (
 
 type deadline struct {
 	time time.Time
-	refs int
 }
 
 // definitely rename
@@ -52,16 +51,12 @@ func (c *Cleaner) Pop() interface{} {
 	old := c.heap
 	n := len(old)
 	x := old[n-1]
-	c.heap = old[0 : n-1]
-	dl, exist := c.deadlines[x]
+	c.heap = append([]string{}, old[0:n-1]...)
+	_, exist := c.deadlines[x]
 	if !exist {
 		return x
 	}
-	dl.refs--
-	c.deadlines[x] = dl
-	if dl.refs == 0 {
-		delete(c.deadlines, x)
-	}
+	delete(c.deadlines, x)
 	return x
 }
 
@@ -70,10 +65,15 @@ func (c *Cleaner) Add(deadlineTime time.Time, key string) {
 	defer c.mu.Unlock()
 	dl, exist := c.deadlines[key]
 	if !exist {
-		dl = deadline{time: deadlineTime, refs: 1}
+		dl = deadline{time: deadlineTime}
 	} else {
 		dl.time = deadlineTime
-		dl.refs++
+		for i, n := range c.heap {
+			if n == key {
+				heap.Remove(c, i)
+				break
+			}
+		}
 	}
 	c.deadlines[key] = dl
 	heap.Push(c, key)
@@ -92,10 +92,6 @@ func (c *Cleaner) PopSince(now time.Time) (rst []string) {
 	for len(c.heap) != 0 {
 		dl, exist := c.deadlines[c.heap[0]]
 		if !exist {
-			continue
-		}
-		if dl.refs > 1 {
-			heap.Pop(c)
 			continue
 		}
 		if now.After(dl.time) {

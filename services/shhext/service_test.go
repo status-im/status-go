@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"os"
 	"testing"
@@ -16,6 +17,8 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 func newHandlerMock(buf int) handlerMock {
@@ -72,6 +75,10 @@ func (s *ShhExtSuite) SetupTest() {
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
 	s.whisper = make([]*whisper.Whisper, 2)
+
+	directory, err := ioutil.TempDir("", "status-go-testing")
+	s.Require().NoError(err)
+
 	for i := range s.nodes {
 		i := i // bind i to be usable in service constructors
 		cfg := &node.Config{
@@ -89,15 +96,18 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
+
 		config := &ServiceConfig{
 			InstallationID:          "1",
-			DataDir:                 os.TempDir(),
+			DataDir:                 directory,
 			Debug:                   true,
-			PFSEnabled:              false,
+			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
 		}
-		s.services[i] = New(s.whisper[i], nil, nil, config)
+		db, err := leveldb.Open(storage.NewMemStorage(), nil)
+		s.Require().NoError(err)
+		s.services[i] = New(s.whisper[i], nil, db, config)
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -107,10 +117,15 @@ func (s *ShhExtSuite) SetupTest() {
 	s.services[0].tracker.handler = newHandlerMock(1)
 }
 
+func (s *ShhExtSuite) TestInitProtocol() {
+	err := s.services[0].InitProtocol("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
+	s.NoError(err)
+}
+
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	mock := newHandlerMock(1)
 	s.services[0].tracker.handler = mock
-	s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()})
+	s.Require().NoError(s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()}))
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)
@@ -186,7 +201,7 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 		InstallationID: "1",
 		DataDir:        os.TempDir(),
 		Debug:          false,
-		PFSEnabled:     false,
+		PFSEnabled:     true,
 	}
 	service := New(shh, mock, nil, config)
 	api := NewPublicAPI(service)
@@ -253,7 +268,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		InstallationID: "1",
 		DataDir:        os.TempDir(),
 		Debug:          false,
-		PFSEnabled:     false,
+		PFSEnabled:     true,
 	}
 	service := New(shh, mock, nil, config)
 	s.Require().NoError(service.Start(aNode.Server()))

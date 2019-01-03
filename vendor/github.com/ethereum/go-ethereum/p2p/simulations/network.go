@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -116,7 +117,7 @@ func (net *Network) NewNodeWithConfig(conf *adapters.NodeConfig) (*Node, error) 
 		Node:   adapterNode,
 		Config: conf,
 	}
-	log.Trace(fmt.Sprintf("node %v created", conf.ID))
+	log.Trace("Node created", "id", conf.ID)
 	net.nodeMap[conf.ID] = len(net.Nodes)
 	net.Nodes = append(net.Nodes, node)
 
@@ -167,6 +168,7 @@ func (net *Network) Start(id enode.ID) error {
 func (net *Network) startWithSnapshots(id enode.ID, snapshots map[string][]byte) error {
 	net.lock.Lock()
 	defer net.lock.Unlock()
+
 	node := net.getNode(id)
 	if node == nil {
 		return fmt.Errorf("node %v does not exist", id)
@@ -174,13 +176,13 @@ func (net *Network) startWithSnapshots(id enode.ID, snapshots map[string][]byte)
 	if node.Up {
 		return fmt.Errorf("node %v already up", id)
 	}
-	log.Trace(fmt.Sprintf("starting node %v: %v using %v", id, node.Up, net.nodeAdapter.Name()))
+	log.Trace("Starting node", "id", id, "adapter", net.nodeAdapter.Name())
 	if err := node.Start(snapshots); err != nil {
-		log.Warn(fmt.Sprintf("start up failed: %v", err))
+		log.Warn("Node startup failed", "id", id, "err", err)
 		return err
 	}
 	node.Up = true
-	log.Info(fmt.Sprintf("started node %v: %v", id, node.Up))
+	log.Info("Started node", "id", id)
 
 	net.events.Send(NewEvent(node))
 
@@ -209,7 +211,6 @@ func (net *Network) watchPeerEvents(id enode.ID, events chan *p2p.PeerEvent, sub
 		defer net.lock.Unlock()
 		node := net.getNode(id)
 		if node == nil {
-			log.Error("Can not find node for id", "id", id)
 			return
 		}
 		node.Up = false
@@ -240,7 +241,7 @@ func (net *Network) watchPeerEvents(id enode.ID, events chan *p2p.PeerEvent, sub
 
 		case err := <-sub.Err():
 			if err != nil {
-				log.Error(fmt.Sprintf("error getting peer events for node %v", id), "err", err)
+				log.Error("Error in peer event subscription", "id", id, "err", err)
 			}
 			return
 		}
@@ -250,7 +251,6 @@ func (net *Network) watchPeerEvents(id enode.ID, events chan *p2p.PeerEvent, sub
 // Stop stops the node with the given ID
 func (net *Network) Stop(id enode.ID) error {
 	net.lock.Lock()
-	defer net.lock.Unlock()
 	node := net.getNode(id)
 	if node == nil {
 		return fmt.Errorf("node %v does not exist", id)
@@ -258,12 +258,17 @@ func (net *Network) Stop(id enode.ID) error {
 	if !node.Up {
 		return fmt.Errorf("node %v already down", id)
 	}
-	if err := node.Stop(); err != nil {
+	node.Up = false
+	net.lock.Unlock()
+
+	err := node.Stop()
+	if err != nil {
+		net.lock.Lock()
+		node.Up = true
+		net.lock.Unlock()
 		return err
 	}
-	node.Up = false
-	log.Info(fmt.Sprintf("stop node %v: %v", id, node.Up))
-
+	log.Info("Stopped node", "id", id, "err", err)
 	net.events.Send(ControlEvent(node))
 	return nil
 }
@@ -271,7 +276,7 @@ func (net *Network) Stop(id enode.ID) error {
 // Connect connects two nodes together by calling the "admin_addPeer" RPC
 // method on the "one" node so that it connects to the "other" node
 func (net *Network) Connect(oneID, otherID enode.ID) error {
-	log.Debug(fmt.Sprintf("connecting %s to %s", oneID, otherID))
+	log.Debug("Connecting nodes with addPeer", "id", oneID, "other", otherID)
 	conn, err := net.InitConn(oneID, otherID)
 	if err != nil {
 		return err
@@ -481,10 +486,10 @@ func (net *Network) InitConn(oneID, otherID enode.ID) (*Conn, error) {
 
 	err = conn.nodesUp()
 	if err != nil {
-		log.Trace(fmt.Sprintf("nodes not up: %v", err))
+		log.Trace("Nodes not up", "err", err)
 		return nil, fmt.Errorf("nodes not up: %v", err)
 	}
-	log.Debug("InitConn - connection initiated")
+	log.Debug("Connection initiated", "id", oneID, "other", otherID)
 	conn.initiated = time.Now()
 	return conn, nil
 }
@@ -492,9 +497,9 @@ func (net *Network) InitConn(oneID, otherID enode.ID) (*Conn, error) {
 // Shutdown stops all nodes in the network and closes the quit channel
 func (net *Network) Shutdown() {
 	for _, node := range net.Nodes {
-		log.Debug(fmt.Sprintf("stopping node %s", node.ID().TerminalString()))
+		log.Debug("Stopping node", "id", node.ID())
 		if err := node.Stop(); err != nil {
-			log.Warn(fmt.Sprintf("error stopping node %s", node.ID().TerminalString()), "err", err)
+			log.Warn("Can't stop node", "id", node.ID(), "err", err)
 		}
 	}
 	close(net.quitc)
@@ -640,11 +645,18 @@ type NodeSnapshot struct {
 
 // Snapshot creates a network snapshot
 func (net *Network) Snapshot() (*Snapshot, error) {
+	return net.snapshot(nil, nil)
+}
+
+func (net *Network) SnapshotWithServices(addServices []string, removeServices []string) (*Snapshot, error) {
+	return net.snapshot(addServices, removeServices)
+}
+
+func (net *Network) snapshot(addServices []string, removeServices []string) (*Snapshot, error) {
 	net.lock.Lock()
 	defer net.lock.Unlock()
 	snap := &Snapshot{
 		Nodes: make([]NodeSnapshot, len(net.Nodes)),
-		Conns: make([]Conn, len(net.Conns)),
 	}
 	for i, node := range net.Nodes {
 		snap.Nodes[i] = NodeSnapshot{Node: *node}
@@ -656,15 +668,49 @@ func (net *Network) Snapshot() (*Snapshot, error) {
 			return nil, err
 		}
 		snap.Nodes[i].Snapshots = snapshots
+		for _, addSvc := range addServices {
+			haveSvc := false
+			for _, svc := range snap.Nodes[i].Node.Config.Services {
+				if svc == addSvc {
+					haveSvc = true
+					break
+				}
+			}
+			if !haveSvc {
+				snap.Nodes[i].Node.Config.Services = append(snap.Nodes[i].Node.Config.Services, addSvc)
+			}
+		}
+		if len(removeServices) > 0 {
+			var cleanedServices []string
+			for _, svc := range snap.Nodes[i].Node.Config.Services {
+				haveSvc := false
+				for _, rmSvc := range removeServices {
+					if rmSvc == svc {
+						haveSvc = true
+						break
+					}
+				}
+				if !haveSvc {
+					cleanedServices = append(cleanedServices, svc)
+				}
+
+			}
+			snap.Nodes[i].Node.Config.Services = cleanedServices
+		}
 	}
-	for i, conn := range net.Conns {
-		snap.Conns[i] = *conn
+	for _, conn := range net.Conns {
+		if conn.Up {
+			snap.Conns = append(snap.Conns, *conn)
+		}
 	}
 	return snap, nil
 }
 
+var snapshotLoadTimeout = 120 * time.Second
+
 // Load loads a network snapshot
 func (net *Network) Load(snap *Snapshot) error {
+	// Start nodes.
 	for _, n := range snap.Nodes {
 		if _, err := net.NewNodeWithConfig(n.Node.Config); err != nil {
 			return err
@@ -676,6 +722,69 @@ func (net *Network) Load(snap *Snapshot) error {
 			return err
 		}
 	}
+
+	// Prepare connection events counter.
+	allConnected := make(chan struct{}) // closed when all connections are established
+	done := make(chan struct{})         // ensures that the event loop goroutine is terminated
+	defer close(done)
+
+	// Subscribe to event channel.
+	// It needs to be done outside of the event loop goroutine (created below)
+	// to ensure that the event channel is blocking before connect calls are made.
+	events := make(chan *Event)
+	sub := net.Events().Subscribe(events)
+	defer sub.Unsubscribe()
+
+	go func() {
+		// Expected number of connections.
+		total := len(snap.Conns)
+		// Set of all established connections from the snapshot, not other connections.
+		// Key array element 0 is the connection One field value, and element 1 connection Other field.
+		connections := make(map[[2]enode.ID]struct{}, total)
+
+		for {
+			select {
+			case e := <-events:
+				// Ignore control events as they do not represent
+				// connect or disconnect (Up) state change.
+				if e.Control {
+					continue
+				}
+				// Detect only connection events.
+				if e.Type != EventTypeConn {
+					continue
+				}
+				connection := [2]enode.ID{e.Conn.One, e.Conn.Other}
+				// Nodes are still not connected or have been disconnected.
+				if !e.Conn.Up {
+					// Delete the connection from the set of established connections.
+					// This will prevent false positive in case disconnections happen.
+					delete(connections, connection)
+					log.Warn("load snapshot: unexpected disconnection", "one", e.Conn.One, "other", e.Conn.Other)
+					continue
+				}
+				// Check that the connection is from the snapshot.
+				for _, conn := range snap.Conns {
+					if conn.One == e.Conn.One && conn.Other == e.Conn.Other {
+						// Add the connection to the set of established connections.
+						connections[connection] = struct{}{}
+						if len(connections) == total {
+							// Signal that all nodes are connected.
+							close(allConnected)
+							return
+						}
+
+						break
+					}
+				}
+			case <-done:
+				// Load function returned, terminate this goroutine.
+				return
+			}
+		}
+	}()
+
+	// Start connecting.
 	for _, conn := range snap.Conns {
 
 		if !net.GetNode(conn.One).Up || !net.GetNode(conn.Other).Up {
@@ -686,6 +795,14 @@ func (net *Network) Load(snap *Snapshot) error {
 		if err := net.Connect(conn.One, conn.Other); err != nil {
 			return err
 		}
+	}
+
+	select {
+	// Wait until all connections from the snapshot are established.
+	case <-allConnected:
+	// Make sure that we do not wait forever.
+	case <-time.After(snapshotLoadTimeout):
+		return errors.New("snapshot connections not established")
 	}
 	return nil
 }
@@ -708,18 +825,18 @@ func (net *Network) Subscribe(events chan *Event) {
 }
 
 func (net *Network) executeControlEvent(event *Event) {
-	log.Trace("execute control event", "type", event.Type, "event", event)
+	log.Trace("Executing control event", "type", event.Type, "event", event)
 	switch event.Type {
 	case EventTypeNode:
 		if err := net.executeNodeEvent(event); err != nil {
-			log.Error("error executing node event", "event", event, "err", err)
+			log.Error("Error executing node event", "event", event, "err", err)
 		}
 	case EventTypeConn:
 		if err := net.executeConnEvent(event); err != nil {
-			log.Error("error executing conn event", "event", event, "err", err)
+			log.Error("Error executing conn event", "event", event, "err", err)
 		}
 	case EventTypeMsg:
-		log.Warn("ignoring control msg event")
+		log.Warn("Ignoring control msg event")
 	}
 }
 

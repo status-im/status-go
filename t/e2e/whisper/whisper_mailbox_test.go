@@ -1,6 +1,7 @@
 package whisper
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/services/shhext"
+
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -19,9 +22,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/mailserver"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/helpers"
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -39,7 +44,7 @@ func TestWhisperMailboxTestSuite(t *testing.T) {
 func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	var err error
 	// Start mailbox and status node.
-	mailboxBackend, stop := s.startMailboxBackend()
+	mailboxBackend, stop := s.startMailboxBackend("")
 	defer stop()
 	s.Require().True(mailboxBackend.IsNodeRunning())
 	mailboxNode := mailboxBackend.StatusNode().GethNode()
@@ -150,7 +155,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 	var err error
 
 	// Start mailbox, alice, bob, charlie node.
-	mailboxBackend, stop := s.startMailboxBackend()
+	mailboxBackend, stop := s.startMailboxBackend("")
 	defer stop()
 
 	aliceBackend, stop := s.startBackend("alice")
@@ -333,7 +338,7 @@ func (s *WhisperMailboxSuite) TestRequestMessagesInGroupChat() {
 
 func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	// Start mailbox
-	mailbox, stop := s.startMailboxBackend()
+	mailbox, stop := s.startMailboxBackend("")
 	defer stop()
 	s.Require().True(mailbox.IsNodeRunning())
 	mailboxEnode := mailbox.StatusNode().GethNode().Server().NodeInfo().Enode
@@ -456,6 +461,169 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	s.Equal(sentEnvelopesHashes, allReceivedHashes)
 }
 
+// TestSyncBetweenTwoMailServers tests syncing state between two mail servers
+// using `shhext_requestMessages`.
+func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
+	var (
+		chatName = "some-public-chat"
+	)
+
+	// Start mailbox but with mail server disabled.
+	// MailServer will be registered below manually.
+	mailbox, stop := s.startMailboxBackendWithCallback("", func(c *params.NodeConfig) {
+		c.WhisperConfig.EnableMailServer = false
+	})
+	defer stop()
+	s.Require().True(mailbox.IsNodeRunning())
+	mailboxEnode := mailbox.StatusNode().GethNode().Server().NodeInfo().Enode
+
+	// Whisper services
+	mailboxWhisperService, err := mailbox.StatusNode().WhisperService()
+	s.Require().NoError(err)
+
+	// symmetric key for public chats
+	symKeyID, err := mailboxWhisperService.AddSymKeyFromPassword(chatName)
+	s.Require().NoError(err)
+	publicChatSymKey, err := mailboxWhisperService.GetSymKey(symKeyID)
+	s.Require().NoError(err)
+
+	var mailServer mailserver.WMailServer
+	err = mailServer.Init(mailboxWhisperService, &mailbox.StatusNode().Config().WhisperConfig)
+	s.Require().NoError(err)
+	mailboxWhisperService.RegisterServer(&mailServer)
+
+	// envelopes to archive
+	envelopesCount := 5
+	topic := s.createPublicChatTopic(chatName)
+	for i := 0; i < envelopesCount; i++ {
+		params := whisper.MessageParams{
+			Topic:    topic,
+			WorkTime: 10,
+			PoW:      2.0,
+			Payload:  []byte("some-payload"),
+			KeySym:   publicChatSymKey,
+		}
+		sentMessage, err := whisper.NewSentMessage(&params)
+		s.Require().NoError(err)
+		envelope, err := sentMessage.Wrap(&params, time.Now())
+		s.Require().NoError(err)
+
+		mailServer.Archive(envelope)
+	}
+
+	// Start a second mail server which would like to sync the state.
+	emptyMailbox, stopEmptyMailbox := s.startMailboxBackend("empty")
+	defer stopEmptyMailbox()
+	s.Require().True(emptyMailbox.IsNodeRunning())
+
+	emptyMailboxEnode := emptyMailbox.StatusNode().Server().Self().String()
+
+	errCh := helpers.WaitForPeerAsync(emptyMailbox.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
+	s.Require().NoError(emptyMailbox.StatusNode().AddPeer(mailboxEnode))
+	s.Require().NoError(<-errCh)
+
+	emptyMailboxWhisperService, err := emptyMailbox.StatusNode().WhisperService()
+	s.Require().NoError(err)
+
+	err = utils.Eventually(func() error {
+		return emptyMailboxWhisperService.AllowP2PMessagesFromPeer(
+			mailbox.StatusNode().Server().Self().ID().Bytes(),
+		)
+	}, time.Second*5, time.Millisecond*100)
+	s.Require().NoError(err)
+
+	emptyMailboxRPCClient := emptyMailbox.StatusNode().RPCPrivateClient()
+	s.Require().NotNil(emptyMailboxRPCClient)
+
+	// Ask to sync the first batch of messages.
+	// We artificially set Limit to 1 in order to test pagination.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	var syncMessagesResponse shhext.SyncMessagesResponse
+	err = emptyMailboxRPCClient.CallContext(
+		ctx,
+		&syncMessagesResponse,
+		"shhext_syncMessages",
+		shhext.SyncMessagesRequest{
+			MailServerPeer: mailbox.StatusNode().Server().Self().String(),
+			From:           0,
+			To:             uint32(time.Now().Unix()),
+			Limit:          1,
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotEmpty(syncMessagesResponse.Cursor)
+	s.Require().Empty(syncMessagesResponse.Error)
+
+	// Ask to sync the rest of messages.
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	err = emptyMailboxRPCClient.CallContext(
+		ctx,
+		&syncMessagesResponse,
+		"shhext_syncMessages",
+		shhext.SyncMessagesRequest{
+			MailServerPeer: mailbox.StatusNode().Server().Self().String(),
+			From:           0,
+			To:             uint32(time.Now().Unix()),
+			Limit:          10,
+			Cursor:         syncMessagesResponse.Cursor,
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().Empty(syncMessagesResponse.Cursor)
+	s.Require().Empty(syncMessagesResponse.Error)
+
+	// create and start a client
+	client, stop := s.startBackend("client")
+	defer stop()
+	s.Require().True(client.IsNodeRunning())
+	clientWhisperService, err := client.StatusNode().WhisperService()
+	s.Require().NoError(err)
+	clientRPCClient := client.StatusNode().RPCPrivateClient()
+
+	// create filter for messages
+	messagesKeyID, err := clientWhisperService.AddSymKeyFromPassword(chatName)
+	s.Require().NoError(err)
+	messageFilterID := s.createGroupChatMessageFilter(clientRPCClient, messagesKeyID, topic.String())
+
+	// add mailbox password
+	mailServerKeyID, err := clientWhisperService.AddSymKeyFromPassword(mailboxPassword)
+	s.Require().NoError(err)
+
+	// add the second mail server as a peer
+	errCh = helpers.WaitForPeerAsync(
+		client.StatusNode().Server(),
+		emptyMailboxEnode,
+		p2p.PeerEventTypeAdd,
+		5*time.Second)
+	s.Require().NoError(client.StatusNode().AddPeer(emptyMailboxEnode))
+	s.Require().NoError(<-errCh)
+
+	// request for messages
+	mailboxResponseWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	sub := clientWhisperService.SubscribeEnvelopeEvents(mailboxResponseWatcher)
+	defer sub.Unsubscribe()
+
+	requestID := s.requestHistoricMessagesFromLast12Hours(
+		clientWhisperService,
+		clientRPCClient,
+		emptyMailboxEnode,
+		mailServerKeyID,
+		topic.String(),
+		0,
+		"",
+	)
+	response := s.waitForMailServerResponse(mailboxResponseWatcher, requestID)
+	s.Require().NotEqual(common.Hash{}.Bytes(), response.LastEnvelopeHash.Bytes())
+
+	// get messages
+	messages := s.getMessagesByMessageFilterID(clientRPCClient, messageFilterID)
+	s.Require().Len(messages, envelopesCount)
+}
+
 func (s *WhisperMailboxSuite) waitForEnvelopeEvents(events chan whisper.EnvelopeEvent, hashes []string, event whisper.EventType) {
 	check := make(map[string]struct{})
 	for _, hash := range hashes {
@@ -530,16 +698,16 @@ func (d *groupChatParams) Encode() (string, error) {
 
 // Start status node.
 func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
-	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox", name)
+	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
 	backend := api.NewStatusBackend()
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	nodeConfig.DataDir = datadir
 	s.Require().NoError(err)
 	s.Require().False(backend.IsNodeRunning())
 
 	nodeConfig.WhisperConfig.LightClient = true
 
-	if addr, err := GetRemoteURL(); err == nil {
+	if addr, err := utils.GetRemoteURL(); err == nil {
 		nodeConfig.UpstreamConfig.Enabled = true
 		nodeConfig.UpstreamConfig.URL = addr
 	}
@@ -558,11 +726,23 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 }
 
 // Start mailbox node.
-func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func()) {
-	mailboxBackend := api.NewStatusBackend()
-	mailboxConfig, err := MakeTestNodeConfig(GetNetworkID())
+func (s *WhisperMailboxSuite) startMailboxBackend(name string) (*api.StatusBackend, func()) {
+	return s.startMailboxBackendWithCallback(name, nil)
+}
+
+func (s *WhisperMailboxSuite) startMailboxBackendWithCallback(
+	name string,
+	callback func(*params.NodeConfig),
+) (*api.StatusBackend, func()) {
+	if name == "" {
+		name = "mailserver"
+	}
+
+	mailboxConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.Require().NoError(err)
-	datadir := filepath.Join(RootDir, ".ethereumtest/mailbox/mailserver")
+
+	mailboxBackend := api.NewStatusBackend()
+	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
 
 	mailboxConfig.LightEthConfig.Enabled = false
 	mailboxConfig.WhisperConfig.Enabled = true
@@ -572,6 +752,10 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 	mailboxConfig.WhisperConfig.DataDir = filepath.Join(datadir, "data")
 	mailboxConfig.DataDir = datadir
 
+	if callback != nil {
+		callback(mailboxConfig)
+	}
+
 	s.Require().False(mailboxBackend.IsNodeRunning())
 	s.Require().NoError(mailboxBackend.StartNode(mailboxConfig))
 	s.Require().True(mailboxBackend.IsNodeRunning())
@@ -579,7 +763,7 @@ func (s *WhisperMailboxSuite) startMailboxBackend() (*api.StatusBackend, func())
 		s.True(mailboxBackend.IsNodeRunning())
 		s.NoError(mailboxBackend.StopNode())
 		s.False(mailboxBackend.IsNodeRunning())
-		err = os.RemoveAll(datadir)
+		err := os.RemoveAll(datadir)
 		s.Require().NoError(err)
 	}
 }
@@ -608,7 +792,7 @@ func (s *WhisperMailboxSuite) createGroupChatMessageFilter(rpcCli *rpc.Client, s
 	resp := rpcCli.CallRaw(`{
 			"jsonrpc": "2.0",
 			"method": "shh_newMessageFilter", "params": [
-				{"symKeyID": "` + symkeyID + `", "topics": [ "` + topic + `"], "allowP2P":true}
+				{"symKeyID": "` + symkeyID + `", "topics": ["` + topic + `"], "allowP2P": true}
 			],
 			"id": 1
 		}`)
@@ -745,17 +929,20 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 	return common.Hash{}
 }
 
+func (s *WhisperMailboxSuite) createPublicChatTopic(name string) whisper.TopicType {
+	h := sha3.NewKeccak256()
+	_, err := h.Write([]byte(name))
+	if err != nil {
+		s.Fail("error generating topic", "failed gerating topic from chat name, %+v", err)
+	}
+	return whisper.BytesToTopic(h.Sum(nil))
+}
+
 func (s *WhisperMailboxSuite) joinPublicChat(w *whisper.Whisper, rpcClient *rpc.Client, name string) (string, whisper.TopicType, string) {
 	keyID, err := w.AddSymKeyFromPassword(name)
 	s.Require().NoError(err)
 
-	h := sha3.NewKeccak256()
-	_, err = h.Write([]byte(name))
-	if err != nil {
-		s.Fail("error generating topic", "failed gerating topic from chat name, %+v", err)
-	}
-	fullTopic := h.Sum(nil)
-	topic := whisper.BytesToTopic(fullTopic)
+	topic := s.createPublicChatTopic(name)
 
 	filterID := s.createGroupChatMessageFilter(rpcClient, keyID, topic.String())
 

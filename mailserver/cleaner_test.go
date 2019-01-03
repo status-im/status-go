@@ -102,8 +102,8 @@ func countMessages(t *testing.T, db dbImpl) int {
 	)
 
 	now := time.Now()
-	kl := NewDbKey(uint32(0), zero)
-	ku := NewDbKey(uint32(now.Unix()), zero)
+	kl := NewDBKey(uint32(0), zero)
+	ku := NewDBKey(uint32(now.Unix()), zero)
 	i := db.NewIterator(&util.Range{Start: kl.raw, Limit: ku.raw}, nil)
 	defer i.Release()
 

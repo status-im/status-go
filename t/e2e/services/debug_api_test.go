@@ -120,7 +120,9 @@ func (s *DebugAPISuite) sendPostConfirmMessage(symID string) string {
 		`{"jsonrpc":"2.0","method":"debug_postSync","params":[%s],"id":67}`,
 		body)
 
-	return s.Backend.CallPrivateRPC(basicCall)
+	resp, err := s.Backend.CallPrivateRPC(basicCall)
+	s.NoError(err)
+	return resp
 }
 
 // addPeers adds a peer to the running node

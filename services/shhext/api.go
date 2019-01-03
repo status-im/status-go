@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -45,7 +46,7 @@ var (
 // PAYLOADS
 // -----
 
-// MessagesRequest is a payload send to a MailServer to get messages.
+// MessagesRequest is a RequestMessages() request payload.
 type MessagesRequest struct {
 	// MailServerPeer is MailServer's enode address.
 	MailServerPeer string `json:"mailServerPeer"`
@@ -74,9 +75,6 @@ type MessagesRequest struct {
 
 	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
 	// It's derived from MailServer password.
-	//
-	// It's also possible to authenticate request with MailServerPeer
-	// public key.
 	SymKeyID string `json:"symKeyID"`
 
 	// Timeout is the time to live of the request specified in seconds.
@@ -104,20 +102,41 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 	}
 }
 
-// MessagesRequestPayload is a payload sent to the Mail Server.
-type MessagesRequestPayload struct {
-	// Lower is a lower bound of time range for which messages are requested.
-	Lower uint32
-	// Upper is a lower bound of time range for which messages are requested.
-	Upper uint32
-	// Bloom is a bloom filter to filter envelopes.
-	Bloom []byte
-	// Limit is the max number of envelopes to return.
-	Limit uint32
-	// Cursor is used for pagination of the results.
-	Cursor []byte
-	// Batch set to true indicates that the client supports batched response.
-	Batch bool
+// SyncMessagesRequest is a SyncMessages() request payload.
+type SyncMessagesRequest struct {
+	// MailServerPeer is MailServer's enode address.
+	MailServerPeer string `json:"mailServerPeer"`
+
+	// From is a lower bound of time range (optional).
+	// Default is 24 hours back from now.
+	From uint32 `json:"from"`
+
+	// To is a upper bound of time range (optional).
+	// Default is now.
+	To uint32 `json:"to"`
+
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request
+	Limit uint32 `json:"limit"`
+
+	// Cursor is used as starting point for paginated requests
+	Cursor string `json:"cursor"`
+
+	// Topics is a list of Whisper topics.
+	// If empty, a full bloom filter will be used.
+	Topics []whisper.TopicType `json:"topics"`
+}
+
+// SyncMessagesResponse is a response from the mail server
+// to which SyncMessagesRequest was sent.
+type SyncMessagesResponse struct {
+	// Cursor from the response can be used to retrieve more messages
+	// for the previous request.
+	Cursor string `json:"cursor"`
+
+	// Error indicates that something wrong happened when sending messages
+	// to the requester.
+	Error string `json:"error"`
 }
 
 // -----
@@ -188,7 +207,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		publicKey = mailServerNode.Pubkey()
 	}
 
-	payload, err := makePayload(r)
+	payload, err := makeMessagesRequestPayload(r)
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +229,81 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	}
 	hash := envelope.Hash()
 	return hash[:], nil
+}
+
+// createSyncMailRequest creates SyncMailRequest. It uses a full bloom filter
+// if no topics are given.
+func createSyncMailRequest(r SyncMessagesRequest) (whisper.SyncMailRequest, error) {
+	var bloom []byte
+	if len(r.Topics) > 0 {
+		bloom = topicsToBloom(r.Topics...)
+	} else {
+		bloom = whisper.MakeFullNodeBloom()
+	}
+
+	cursor, err := hex.DecodeString(r.Cursor)
+	if err != nil {
+		return whisper.SyncMailRequest{}, err
+	}
+
+	return whisper.SyncMailRequest{
+		Lower:  r.From,
+		Upper:  r.To,
+		Bloom:  bloom,
+		Limit:  r.Limit,
+		Cursor: cursor,
+	}, nil
+}
+
+func createSyncMessagesResponse(r whisper.SyncEventResponse) SyncMessagesResponse {
+	return SyncMessagesResponse{
+		Cursor: hex.EncodeToString(r.Cursor),
+		Error:  r.Error,
+	}
+}
+
+// SyncMessages sends a request to a given MailServerPeer to sync historic messages.
+// MailServerPeers needs to be added as a trusted peer first.
+func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (SyncMessagesResponse, error) {
+	var response SyncMessagesResponse
+
+	mailServerEnode, err := enode.ParseV4(r.MailServerPeer)
+	if err != nil {
+		return response, fmt.Errorf("invalid MailServerPeer: %v", err)
+	}
+
+	request, err := createSyncMailRequest(r)
+	if err != nil {
+		return response, fmt.Errorf("failed to create a sync mail request: %v", err)
+	}
+
+	if err := api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request); err != nil {
+		return response, fmt.Errorf("failed to send a sync request: %v", err)
+	}
+
+	// Wait for the response which is received asynchronously as a p2p packet.
+	// This packet handler will send an event which contains the response payload.
+	events := make(chan whisper.EnvelopeEvent)
+	sub := api.service.w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case event := <-events:
+			if event.Event != whisper.EventMailServerSyncFinished {
+				continue
+			}
+
+			log.Info("received EventMailServerSyncFinished event", "data", event.Data)
+
+			if resp, ok := event.Data.(whisper.SyncEventResponse); ok {
+				return createSyncMessagesResponse(resp), nil
+			}
+			return response, fmt.Errorf("did not understand the response event data")
+		case <-ctx.Done():
+			return response, ctx.Err()
+		}
+	}
 }
 
 // GetNewFilterMessages is a prototype method with deduplication
@@ -394,27 +488,20 @@ func (api *PublicAPI) SendGroupMessage(ctx context.Context, msg chat.SendGroupMe
 }
 
 func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
-	var privateKey *ecdsa.PrivateKey
-	var publicKey *ecdsa.PublicKey
 
-	// Msg.Dst is empty is a public message, nothing to do
-	if msg.Dst != nil {
-		// There's probably a better way to do this
-		keyBytes, err := hexutil.Bytes(msg.Dst).MarshalText()
-		if err != nil {
-			return err
-		}
+	privateKeyID := api.service.w.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return errors.New("no key selected")
+	}
 
-		privateKey, err = api.service.w.GetPrivateKey(string(keyBytes))
-		if err != nil {
-			return err
-		}
+	privateKey, err := api.service.w.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return err
+	}
 
-		// This needs to be pushed down in the protocol message
-		publicKey, err = crypto.UnmarshalPubkey(msg.Sig)
-		if err != nil {
-			return err
-		}
+	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
+	if err != nil {
+		return err
 	}
 
 	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
@@ -473,15 +560,18 @@ func makeEnvelop(
 	return message.Wrap(&params, now)
 }
 
-// makePayload makes a specific payload for MailServer to request historic messages.
-func makePayload(r MessagesRequest) ([]byte, error) {
-	expectedCursorSize := common.HashLength + 4
+// makeMessagesRequestPayload makes a specific payload for MailServer
+// to request historic messages.
+func makeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil || len(cursor) != expectedCursorSize {
-		cursor = nil
+	if err != nil {
+		return nil, fmt.Errorf("invalid cursor: %v", err)
+	}
+	if len(cursor) > 0 && len(cursor) != mailserver.DBKeyLength {
+		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.DBKeyLength, len(cursor))
 	}
 
-	payload := MessagesRequestPayload{
+	payload := mailserver.MessagesRequestPayload{
 		Lower:  r.From,
 		Upper:  r.To,
 		Bloom:  createBloomFilter(r),

@@ -39,6 +39,9 @@ var (
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
 	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
 	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
+	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
+	// This is a normal situation when a node is stopped.
+	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
 )
 
 // StatusBackend implements Status.im service
@@ -132,7 +135,13 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 
-	if err = b.statusNode.Start(config, services...); err != nil {
+	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
+		Services: services,
+		// The peers discovery protocols are started manually after
+		// `node.ready` signal is sent.
+		// It was discussed in https://github.com/status-im/status-go/pull/1333.
+		StartDiscovery: false,
+	}); err != nil {
 		return
 	}
 	signal.SendNodeStarted()
@@ -162,6 +171,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 
 	signal.SendNodeReady()
+
+	if err := b.statusNode.StartDiscovery(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -215,15 +228,21 @@ func (b *StatusBackend) ResetChainData() error {
 }
 
 // CallRPC executes public RPC requests on node's in-proc RPC server.
-func (b *StatusBackend) CallRPC(inputJSON string) string {
+func (b *StatusBackend) CallRPC(inputJSON string) (string, error) {
 	client := b.statusNode.RPCClient()
-	return client.CallRaw(inputJSON)
+	if client == nil {
+		return "", ErrRPCClientUnavailable
+	}
+	return client.CallRaw(inputJSON), nil
 }
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
-func (b *StatusBackend) CallPrivateRPC(inputJSON string) string {
+func (b *StatusBackend) CallPrivateRPC(inputJSON string) (string, error) {
 	client := b.statusNode.RPCPrivateClient()
-	return client.CallRaw(inputJSON)
+	if client == nil {
+		return "", ErrRPCClientUnavailable
+	}
+	return client.CallRaw(inputJSON), nil
 }
 
 // SendTransaction creates a new transaction and waits until it's complete.
@@ -587,6 +606,5 @@ func (b *StatusBackend) UpdateMailservers(enodes []string) error {
 		}
 		nodes[i] = node
 	}
-	st.UpdateMailservers(nodes)
-	return nil
+	return st.UpdateMailservers(nodes)
 }

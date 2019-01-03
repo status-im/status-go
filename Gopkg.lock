@@ -22,6 +22,17 @@
   revision = "5312a61534124124185d41f09206b9fef1d88403"
 
 [[projects]]
+  digest = "1:d1de7e0984d40e19819546c8deb7dc451d3c4c59fd12977773aaa6b528523f7f"
+  name = "github.com/allegro/bigcache"
+  packages = [
+    ".",
+    "queue",
+  ]
+  pruneopts = "NUT"
+  revision = "f31987a23e44c5121ef8c8b2f2ea2e8ffa37b068"
+  version = "v1.1.0"
+
+[[projects]]
   digest = "1:f5322546f652db78b7a8efd35047a61d1e492abca2263e1c647eca49e1c8a354"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
@@ -88,7 +99,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:e221b8d0ccd91e9ee0a2ddda27ec75518dd683de945d01c87816f64ce418bf91"
+  digest = "1:ca77c7225db49544c7bf8ebc93d18e4063f32e60ed4894ff590c1cb8fe315d66"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -158,9 +169,9 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "2ad6673303bb48f8e3c2865386cfa928e92dbcbd"
+  revision = "ffe89538dae6e643cb5dc599fe58c59a29eb75e5"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.17"
+  version = "v1.8.20"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -231,12 +242,12 @@
   version = "v3.5.1"
 
 [[projects]]
-  digest = "1:a62049a8fa554d688c8db4845c65ddcd5986b75f3a851e4fb563c6893d292e38"
+  digest = "1:b60efdeb75d3c0ceed88783ac2495256aba3491a537d0f31401202579fd62a94"
   name = "github.com/golang/mock"
   packages = ["gomock"]
   pruneopts = "NUT"
-  revision = "13f360950a79f5864a972c786a10a50e44b69541"
-  version = "v1.0.0"
+  revision = "51421b967af1f557f93a59e0057aaf15ca02e29c"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:ac761a089c90c1399e2fd0a0aacfe63bd7b4ecd01141c98ca9cf18059f938ea4"
@@ -811,7 +822,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:5fb8fc6a365f62e1d771b8a33c808a111ace9ba3506089f00ec252ec1e257a83"
+  digest = "1:7eae6e73aa5dd99a7ab975fbc4a39cd98cb72c5a5272970735676e099667cf8a"
   name = "github.com/status-im/rendezvous"
   packages = [
     ".",
@@ -819,15 +830,15 @@
     "server",
   ]
   pruneopts = "NUT"
-  revision = "fbcc46a78cd43fef95a110df664aab513116a850"
+  revision = "9e20b11affd0bf0591126a518f3e7b8aa057f88f"
 
 [[projects]]
-  digest = "1:5c62af344925b846377386dec72e06eb3e1e15222542b3d22fe0f0da75c7f090"
+  digest = "1:2c5092efed72e4c33a9d5f2ca6970609ed959a07b08a6b85fe6e7b70df3ed210"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "96d2199ed511430c642d877afe7bacaac5f37426"
-  version = "v1.4.1"
+  revision = "109fa96320654a4f15f158a03245e7cd7457574a"
+  version = "v1.4.5"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"

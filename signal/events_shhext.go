@@ -1,6 +1,8 @@
 package signal
 
 import (
+	"encoding/hex"
+
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -71,7 +73,7 @@ func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash comm
 	sig := MailServerResponseSignal{
 		RequestID:        requestID,
 		LastEnvelopeHash: lastEnvelopeHash,
-		Cursor:           string(cursor),
+		Cursor:           hex.EncodeToString(cursor),
 		ErrorMsg:         errorMsg,
 	}
 	send(EventMailServerRequestCompleted, sig)

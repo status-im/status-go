@@ -107,6 +107,12 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 }
 
 func (t *tracker) handleEventEnvelopeSent(event whisper.EnvelopeEvent) {
+	if t.mailServerConfirmation {
+		if !t.isMailserver(event.Peer) {
+			return
+		}
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 

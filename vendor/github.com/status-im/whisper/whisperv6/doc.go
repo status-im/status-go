@@ -33,6 +33,8 @@ particularly the notion of singular endpoints.
 package whisperv6
 
 import (
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -48,6 +50,8 @@ const (
 	powRequirementCode     = 2   // PoW requirement
 	bloomFilterExCode      = 3   // bloom filter exchange
 	batchAcknowledgedCode  = 11  // confirmation that batch of envelopes was received
+	p2pSyncRequestCode     = 123 // used to sync envelopes between two mail servers
+	p2pSyncResponseCode    = 124 // used to sync envelopes between two mail servers
 	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
 	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
 	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
@@ -78,6 +82,8 @@ const (
 
 	DefaultTTL           = 50 // seconds
 	DefaultSyncAllowance = 10 // seconds
+
+	MaxLimitInSyncMailRequest = 1000
 )
 
 // MailServer represents a mail server, capable of
@@ -89,4 +95,42 @@ const (
 type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+	SyncMail(*Peer, SyncMailRequest) error
+}
+
+// SyncMailRequest contains details which envelopes should be synced
+// between Mail Servers.
+type SyncMailRequest struct {
+	// Lower is a lower bound of time range for which messages are requested.
+	Lower uint32
+	// Upper is a lower bound of time range for which messages are requested.
+	Upper uint32
+	// Bloom is a bloom filter to filter envelopes.
+	Bloom []byte
+	// Limit is the max number of envelopes to return.
+	Limit uint32
+	// Cursor is used for pagination of the results.
+	Cursor []byte
+}
+
+// Validate checks request's fields if they are valid.
+func (r SyncMailRequest) Validate() error {
+	if r.Limit > MaxLimitInSyncMailRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected lower than %d", MaxLimitInSyncMailRequest)
+	}
+
+	if r.Lower > r.Upper {
+		return errors.New("invalid 'Lower' value, can't be greater than 'Upper'")
+	}
+
+	return nil
+}
+
+// SyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type SyncResponse struct {
+	Envelopes []*Envelope
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
 }

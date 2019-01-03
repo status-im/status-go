@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -118,27 +119,39 @@ func (srv *Server) startListener() error {
 	srv.h = h
 	srv.h.SetStreamHandler(protocol.VERSION, func(s net.Stream) {
 		defer s.Close()
-		rs := rlp.NewStream(s, 0)
-		s.SetReadDeadline(time.Now().Add(srv.readTimeout))
-		typ, err := rs.Uint()
-		if err != nil {
-			logger.Error("error reading message type", "error", err)
-			return
-		}
-		s.SetReadDeadline(time.Now().Add(srv.readTimeout))
-		resptype, resp, err := srv.msgParser(protocol.MessageType(typ), rs)
-		if err != nil {
-			logger.Error("error parsing message", "error", err)
-			return
-		}
-		s.SetWriteDeadline(time.Now().Add(srv.writeTimeout))
-		if err = rlp.Encode(s, resptype); err != nil {
-			logger.Error("error writing response", "type", resptype, "error", err)
-			return
-		}
-		s.SetWriteDeadline(time.Now().Add(srv.writeTimeout))
-		if err = rlp.Encode(s, resp); err != nil {
-			logger.Error("error encoding response", "resp", resp, "error", err)
+		for {
+			rs := rlp.NewStream(s, 0)
+			s.SetReadDeadline(time.Now().Add(srv.readTimeout))
+			typ, err := rs.Uint()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				logger.Debug("error reading message type", "error", err)
+				s.Reset()
+				return
+			}
+			s.SetReadDeadline(time.Now().Add(srv.readTimeout))
+			resptype, resp, err := srv.msgParser(protocol.MessageType(typ), rs)
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				logger.Debug("error parsing message", "error", err)
+				s.Reset()
+				return
+			}
+			s.SetWriteDeadline(time.Now().Add(srv.writeTimeout))
+			if err = rlp.Encode(s, resptype); err != nil {
+				logger.Debug("error writing response", "type", resptype, "error", err)
+				s.Reset()
+				return
+			}
+			s.SetWriteDeadline(time.Now().Add(srv.writeTimeout))
+			if err = rlp.Encode(s, resp); err != nil {
+				logger.Debug("error encoding response", "resp", resp, "error", err)
+				s.Reset()
+			}
 		}
 	})
 	addr, err := ma.NewMultiaddr(fmt.Sprintf("/ethv4/%s", h.ID().Pretty()))

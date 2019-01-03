@@ -462,7 +462,13 @@ func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (acco
 // ImportExtendedKey stores ECDSA key (obtained from extended key) along with CKD#2 (root for sub-accounts)
 // If key file is not found, it is created. Key is encrypted with the given passphrase.
 func (ks *KeyStore) ImportExtendedKey(extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
-	key, err := newKeyFromExtendedKey(extKey)
+	return ks.ImportExtendedKeyForPurpose(extkeys.KeyPurposeWallet, extKey, passphrase)
+}
+
+// ImportExtendedKeyForPurpose stores ECDSA key (obtained from extended key) along with CKD#2 (root for sub-accounts)
+// If key file is not found, it is created. Key is encrypted with the given passphrase.
+func (ks *KeyStore) ImportExtendedKeyForPurpose(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, passphrase string) (accounts.Account, error) {
+	key, err := newKeyForPurposeFromExtendedKey(keyPurpose, extKey)
 	if err != nil {
 		zeroKey(key.PrivateKey)
 		return accounts.Account{}, err
@@ -532,6 +538,7 @@ func zeroKey(k *ecdsa.PrivateKey) {
 	if k == nil {
 		return
 	}
+
 	b := k.D.Bits()
 	for i := range b {
 		b[i] = 0

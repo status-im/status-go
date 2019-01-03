@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -266,8 +265,8 @@ func (s *MailserverSuite) TestArchive() {
 	s.NoError(err)
 
 	s.server.Archive(env)
-	key := NewDbKey(env.Expiry-env.TTL, env.Hash())
-	archivedEnvelope, err := s.server.db.Get(key.raw, nil)
+	key := NewDBKey(env.Expiry-env.TTL, env.Hash())
+	archivedEnvelope, err := s.server.db.Get(key.Bytes(), nil)
 	s.NoError(err)
 
 	s.Equal(rawEnvelope, archivedEnvelope)
@@ -288,10 +287,10 @@ func (s *MailserverSuite) TestManageLimits() {
 func (s *MailserverSuite) TestDBKey() {
 	var h common.Hash
 	i := uint32(time.Now().Unix())
-	k := NewDbKey(i, h)
-	s.Equal(len(k.raw), common.HashLength+4, "wrong DB key length")
-	s.Equal(byte(i%0x100), k.raw[3], "raw representation should be big endian")
-	s.Equal(byte(i/0x1000000), k.raw[0], "big endian expected")
+	k := NewDBKey(i, h)
+	s.Equal(len(k.Bytes()), DBKeyLength, "wrong DB key length")
+	s.Equal(byte(i%0x100), k.Bytes()[3], "raw representation should be big endian")
+	s.Equal(byte(i/0x1000000), k.Bytes()[0], "big endian expected")
 }
 
 func (s *MailserverSuite) TestRequestPaginationLimit() {
@@ -313,8 +312,8 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
 		s.server.Archive(env)
-		key := NewDbKey(env.Expiry-env.TTL, env.Hash())
-		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.raw))
+		key := NewDBKey(env.Expiry-env.TTL, env.Hash())
+		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Bytes()))
 		sentEnvelopes = append(sentEnvelopes, env)
 		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
 	}
@@ -330,31 +329,26 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	s.Nil(cursor)
 	s.Equal(params.limit, limit)
 
-	envelopes, _, cursor, err := s.server.processRequest(nil, lower, upper, bloom, limit, nil, false)
-	s.NoError(err)
-	for _, env := range envelopes {
-		receivedHashes = append(receivedHashes, env.Hash())
-	}
+	receivedHashes, cursor, _ = processRequestAndCollectHashes(
+		s.server, lower, upper, cursor, bloom, int(limit),
+	)
 
 	// 10 envelopes sent
 	s.Equal(count, uint32(len(sentEnvelopes)))
 	// 6 envelopes received
-	s.Equal(limit, uint32(len(receivedHashes)))
+	s.Equal(int(limit), len(receivedHashes))
 	// the 6 envelopes received should be in descending order
 	s.Equal(reverseSentHashes[:limit], receivedHashes)
 	// cursor should be the key of the last envelope of the last page
 	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
 
 	// second page
-	receivedHashes = []common.Hash{}
-	envelopes, _, cursor, err = s.server.processRequest(nil, lower, upper, bloom, limit, cursor, false)
-	s.NoError(err)
-	for _, env := range envelopes {
-		receivedHashes = append(receivedHashes, env.Hash())
-	}
+	receivedHashes, cursor, _ = processRequestAndCollectHashes(
+		s.server, lower, upper, cursor, bloom, int(limit),
+	)
 
 	// 4 envelopes received
-	s.Equal(count-limit, uint32(len(receivedHashes)))
+	s.Equal(int(count-limit), len(receivedHashes))
 	// cursor is nil because there are no other pages
 	s.Nil(cursor)
 }
@@ -452,7 +446,7 @@ func (s *MailserverSuite) TestDecodeRequest() {
 	s.setupServer(s.server)
 	defer s.server.Close()
 
-	payload := shhext.MessagesRequestPayload{
+	payload := MessagesRequestPayload{
 		Lower:  50,
 		Upper:  100,
 		Bloom:  []byte{0x01},
@@ -476,16 +470,15 @@ func (s *MailserverSuite) TestDecodeRequest() {
 }
 
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
-	var exist bool
-	mail, _, _, err := s.server.processRequest(nil, low, upp, bloom, limit, nil, false)
-	s.NoError(err)
-	for _, msg := range mail {
-		if msg.Hash() == envelope.Hash() {
-			exist = true
-			break
+	receivedHashes, _, _ := processRequestAndCollectHashes(
+		s.server, low, upp, nil, bloom, int(limit),
+	)
+	for _, hash := range receivedHashes {
+		if hash == envelope.Hash() {
+			return true
 		}
 	}
-	return exist
+	return false
 }
 
 func (s *MailserverSuite) TestBloomFromReceivedMessage() {
@@ -638,6 +631,32 @@ func generateEnvelopeWithKeys(sentTime time.Time, keySym []byte, keyAsym *ecdsa.
 func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 	h := crypto.Keccak256Hash([]byte("test sample data"))
 	return generateEnvelopeWithKeys(sentTime, h[:], nil)
+}
+
+func processRequestAndCollectHashes(
+	server *WMailServer, lower, upper uint32, cursor []byte, bloom []byte, limit int,
+) ([]common.Hash, []byte, common.Hash) {
+	iter := server.createIterator(lower, upper, cursor)
+	defer iter.Release()
+	bundles := make(chan []*whisper.Envelope, 10)
+	done := make(chan struct{})
+
+	var hashes []common.Hash
+	go func() {
+		for bundle := range bundles {
+			for _, env := range bundle {
+				hashes = append(hashes, env.Hash())
+			}
+		}
+		close(done)
+	}()
+
+	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, bundles)
+	close(bundles)
+
+	<-done
+
+	return hashes, cursor, lastHash
 }
 
 // mockPeerWithID is a struct that conforms to peerWithID interface.

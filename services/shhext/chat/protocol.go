@@ -32,7 +32,7 @@ func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, m
 		return nil, err
 	}
 
-	msg.Bundle = bundle
+	msg.Bundles = []*Bundle{bundle}
 
 	// marshal for sending to wire
 	marshaledMessage, err := proto.Marshal(msg)
@@ -135,8 +135,19 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 		return nil, err
 	}
 
-	// Process bundle
+	// Process bundle, deprecated, here for backward compatibility
 	if bundle := protocolMessage.GetBundle(); bundle != nil {
+		// Should we stop processing if the bundle cannot be verified?
+		addedBundles, err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle)
+		if err != nil {
+			return nil, err
+		}
+
+		p.addedBundlesHandler(addedBundles)
+	}
+
+	// Process bundles
+	for _, bundle := range protocolMessage.GetBundles() {
 		// Should we stop processing if the bundle cannot be verified?
 		addedBundles, err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle)
 		if err != nil {

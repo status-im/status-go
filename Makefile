@@ -35,7 +35,7 @@ GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
-ENABLE_METRICS ?= false
+ENABLE_METRICS ?= true
 BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
@@ -120,9 +120,15 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@gomobile bind -target=ios -ldflags="-s -w" -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
+statusgo-linux: xgo ##@cross-compile Build status-go for Linux
+	./_assets/patches/patcher -b . -p geth-xgo
+	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	./_assets/patches/patcher -b . -p geth-xgo -r
+	@echo "Linux cross compilation done."
+
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a ./lib
+	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) ./lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -194,8 +200,8 @@ prepare-release: clean-release
 	mv build/bin/statusgo.aar $(RELEASE_DIRECTORY)/status-go-android.aar
 	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
 	mv build/bin/Statusgo.framework.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
-	${MAKE} clean
 	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
+	${MAKE} clean
 
 clean-release:
 	rm -rf $(RELEASE_DIRECTORY)
@@ -220,11 +226,13 @@ deploy-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
-	go get -u github.com/jteeuwen/go-bindata/...
+	go get -u github.com/jteeuwen/go-bindata
+	go get -u github.com/jteeuwen/go-bindata/go-bindata
 	go get -u github.com/golang/protobuf/protoc-gen-go
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
+	dep ensure -update github.com/golang/mock
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go

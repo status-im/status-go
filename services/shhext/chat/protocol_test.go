@@ -69,7 +69,7 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	s.NoError(err)
 
-	s.NotNilf(unmarshaledMsg.GetBundle(), "It adds a bundle to the message")
+	s.NotNilf(unmarshaledMsg.GetBundles(), "It adds a bundle to the message")
 
 	directMessage := unmarshaledMsg.GetDirectMessage()
 
