@@ -168,6 +168,10 @@ pipeline {
               } }
             }
 
+            stage('Zip') { steps { dir(env.STATUS_PATH) {
+              sh "zip -r ${dest}/status-go-desktop-${lib.suffix()}.zip . -x *.git"
+            }}}
+
             stage('Archive') { steps {
               archiveArtifacts("pkg/status-go-desktop-${lib.suffix()}.zip")
             } }
