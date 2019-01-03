@@ -225,12 +225,20 @@ func ResetChainData() string {
 
 // CallRPC calls public APIs via RPC.
 func CallRPC(inputJSON string) string {
-	return statusBackend.CallRPC(inputJSON)
+	resp, err := statusBackend.CallRPC(inputJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return resp
 }
 
 // CallPrivateRPC calls both public and private APIs via RPC.
 func CallPrivateRPC(inputJSON string) string {
-	return statusBackend.CallPrivateRPC(inputJSON)
+	resp, err := statusBackend.CallPrivateRPC(inputJSON)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return resp
 }
 
 // CreateAccount is equivalent to creating an account from the command line,
