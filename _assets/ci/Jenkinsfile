@@ -155,17 +155,18 @@ pipeline {
           }
 
           stages {
-            stage('Prepare') { steps { dir(env.STATUS_PATH) {
-              lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-              version = readFile("${STATUS_PATH}/VERSION").trim()
-              println("Version: ${version}")
-              println("Git Branch: ${lib.gitBranch()}")
-              println("Git Commit: ${lib.gitCommit()}")
-              /* save and create a dir for artifacts */
-              dest = "${env.WORKSPACE}/pkg"
-              sh "mkdir -p ${dest}"
-              sh "zip -r ${dest}/status-go-desktop-${lib.suffix()}.zip . -x *.git"
-            } } }
+            stage('Prep') {
+              steps { script {
+                lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
+                version = readFile("${STATUS_PATH}/VERSION").trim()
+                println("Version: ${version}")
+                println("Git Branch: ${lib.gitBranch()}")
+                println("Git Commit: ${lib.gitCommit()}")
+                /* save and create a dir for artifacts */
+                dest = "${env.WORKSPACE}/pkg"
+                sh "mkdir -p ${dest}"
+              } }
+            }
 
             stage('Archive') { steps {
               archiveArtifacts("pkg/status-go-desktop-${lib.suffix()}.zip")
