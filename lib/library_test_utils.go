@@ -52,7 +52,6 @@ func init() {
 	nodeConfigJSON = `{
 	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
 	"DataDir": "` + testChainDir + `",
-	"BackupDisabledDataDir": "` + testChainDir + `",
 	"KeyStoreDir": "` + filepath.Join(testChainDir, "keystore") + `",
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"LogLevel": "INFO",
@@ -64,6 +63,9 @@ func init() {
 		"Enabled": true,
 		"DataDir": "` + path.Join(testChainDir, "wnode") + `",
 		"EnableNTPSync": false
+	},
+	"ShhextConfig": {
+	    "BackupDisabledDataDir": "` + testChainDir + `"
 	}
 }`
 }
@@ -925,7 +927,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 }
 
 //nolint: deadcode
-func testValidateNodeConfig(t *testing.T, config string, fn func(APIDetailedResponse)) {
+func testValidateNodeConfig(t *testing.T, config string, fn func(*testing.T, APIDetailedResponse)) {
 	result := ValidateNodeConfig(C.CString(config))
 
 	var resp APIDetailedResponse
@@ -933,7 +935,7 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(APIDetailedResp
 	err := json.Unmarshal([]byte(C.GoString(result)), &resp)
 	require.NoError(t, err)
 
-	fn(resp)
+	fn(t, resp)
 }
 
 // PanicAfter throws panic() after waitSeconds, unless abort channel receives

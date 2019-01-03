@@ -83,7 +83,7 @@ func TestStatusFlag(t *testing.T) {
 		}
 
 		require.Nil(t, err, msg)
-		require.Equal(t, s.enabled, c.StatusServiceEnabled, msg)
+		require.Equal(t, s.enabled, c.EnableStatusService, msg)
 
 		modules := c.FormatAPIModules()
 		if s.public {

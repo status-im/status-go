@@ -248,7 +248,6 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"Name": "test",
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
 		"DataDir": "` + testDir + `",
-		"BackupDisabledDataDir": "` + testDir + `",
 		"KeyStoreDir": "` + path.Join(testDir, "keystore") + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
@@ -261,6 +260,9 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 			"Enabled": true,
 			"DataDir": "` + path.Join(testDir, "wnode") + `",
 			"EnableNTPSync": false
+		},
+		"ShhextConfig": {
+			"BackupDisabledDataDir": "` + testDir + `"
 		}
 	}`
 
