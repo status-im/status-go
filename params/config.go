@@ -409,7 +409,8 @@ func (c *NodeConfig) updatePeerLimits() {
 	}
 }
 
-// NewNodeConfig creates new node configuration object with bare-minimum defaults
+// NewNodeConfig creates new node configuration object with bare-minimum defaults.
+// Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 	var keyStoreDir, wnodeDir string
 
@@ -513,6 +514,7 @@ func loadConfigFromAsset(name string, config *NodeConfig) error {
 //
 //   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
 //
+// nolint: gocyclo
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
 
@@ -532,6 +534,14 @@ func (c *NodeConfig) Validate() error {
 
 	if err := c.validateChildStructs(validate); err != nil {
 		return err
+	}
+
+	// Whisper's data directory must be relative to the main data directory
+	// if EnableMailServer is true.
+	if c.WhisperConfig.Enabled && c.WhisperConfig.EnableMailServer {
+		if !strings.HasPrefix(c.WhisperConfig.DataDir, c.DataDir) {
+			return fmt.Errorf("WhisperConfig.DataDir must start with DataDir fragment")
+		}
 	}
 
 	if !c.NoDiscovery && len(c.ClusterConfig.BootNodes) == 0 {
@@ -633,10 +643,10 @@ func (c *WhisperConfig) Validate(validate *validator.Validate) error {
 		if c.DataDir == "" {
 			return fmt.Errorf("WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true")
 		}
+
 		if c.MailServerPassword == "" && c.MailServerAsymKey == "" {
 			return fmt.Errorf("WhisperConfig.MailServerPassword or WhisperConfig.MailServerAsymKey must be specified when WhisperConfig.EnableMailServer is true")
 		}
-
 		if c.MailServerAsymKey != "" {
 			if _, err := crypto.HexToECDSA(c.MailServerAsymKey); err != nil {
 				return fmt.Errorf("WhisperConfig.MailServerAsymKey is invalid: %s", c.MailServerAsymKey)
