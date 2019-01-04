@@ -539,8 +539,8 @@ func (c *NodeConfig) Validate() error {
 	// Whisper's data directory must be relative to the main data directory
 	// if EnableMailServer is true.
 	if c.WhisperConfig.Enabled && c.WhisperConfig.EnableMailServer {
-		if !strings.Contains(c.WhisperConfig.DataDir, c.DataDir) {
-			return fmt.Errorf("WhisperConfig.DataDir must be relative to DataDir")
+		if !strings.HasPrefix(c.WhisperConfig.DataDir, c.DataDir) {
+			return fmt.Errorf("WhisperConfig.DataDir must start with DataDir fragment")
 		}
 	}
 

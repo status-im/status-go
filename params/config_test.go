@@ -251,6 +251,23 @@ func TestNodeConfigValidate(t *testing.T) {
 			Error: "WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true",
 		},
 		{
+			Name: "Validate that WhisperConfig.DataDir is checked to not be empty if mailserver is enabled",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/some/dir",
+				"BackupDisabledDataDir": "/some/dir",
+				"KeyStoreDir": "/some/dir",
+				"NoDiscovery": true,
+				"WhisperConfig": {
+					"Enabled": true,
+					"EnableMailServer": true,
+					"MailserverPassword": "foo",
+					"DataDir": "/other/dir"
+				}
+			}`,
+			Error: "WhisperConfig.DataDir must start with DataDir fragment",
+		},
+		{
 			Name: "Validate that check for WhisperConfig.DataDir passes if it is not empty and mailserver is enabled",
 			Config: `{
 				"NetworkId": 1,
