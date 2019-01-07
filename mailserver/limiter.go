@@ -22,10 +22,13 @@ func newRateLimiter(duration time.Duration) *rateLimiter {
 }
 
 func (l *rateLimiter) Start() {
+	cancel := make(chan struct{})
+
 	l.Lock()
-	l.cancel = make(chan struct{})
+	l.cancel = cancel
 	l.Unlock()
-	go l.cleanUp(time.Second, l.cancel)
+
+	go l.cleanUp(time.Second, cancel)
 }
 
 func (l *rateLimiter) Stop() {
