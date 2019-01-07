@@ -1,7 +1,6 @@
 package mailserver
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -84,8 +83,6 @@ func (c *cleaner) schedule(period time.Duration, cancel <-chan struct{}) {
 // Prune removes messages sent between lower and upper timestamps
 // and returns how many have been removed.
 func (c *cleaner) Prune(lower, upper uint32) (int, error) {
-	fmt.Printf("============= prune from %d to %d\n", lower, upper)
-
 	var zero common.Hash
 	kl := NewDBKey(lower, zero)
 	ku := NewDBKey(upper, zero)

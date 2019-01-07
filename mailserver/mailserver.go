@@ -194,7 +194,6 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 	log.Debug("Archiving envelope", "hash", env.Hash().Hex())
 
 	key := NewDBKey(env.Expiry-env.TTL, env.Hash())
-	fmt.Printf("========== archive %d\n", env.Expiry-env.TTL)
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
