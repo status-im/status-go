@@ -8,16 +8,18 @@ import (
 type rateLimiter struct {
 	sync.RWMutex
 
-	duration time.Duration // duration of the limit
+	lifespan time.Duration // duration of the limit
 	db       map[string]time.Time
 
+	period time.Duration
 	cancel chan struct{}
 }
 
 func newRateLimiter(duration time.Duration) *rateLimiter {
 	return &rateLimiter{
-		duration: duration,
+		lifespan: duration,
 		db:       make(map[string]time.Time),
+		period:   time.Second,
 	}
 }
 
@@ -28,7 +30,7 @@ func (l *rateLimiter) Start() {
 	l.cancel = cancel
 	l.Unlock()
 
-	go l.cleanUp(time.Second, cancel)
+	go l.cleanUp(l.period, cancel)
 }
 
 func (l *rateLimiter) Stop() {
@@ -53,7 +55,7 @@ func (l *rateLimiter) IsAllowed(id string) bool {
 	defer l.RUnlock()
 
 	if lastRequestTime, ok := l.db[id]; ok {
-		return lastRequestTime.Add(l.duration).Before(time.Now())
+		return lastRequestTime.Add(l.lifespan).Before(time.Now())
 	}
 
 	return true
@@ -79,7 +81,7 @@ func (l *rateLimiter) deleteExpired() {
 
 	now := time.Now()
 	for id, lastRequestTime := range l.db {
-		if lastRequestTime.Add(l.duration).Before(now) {
+		if lastRequestTime.Add(l.lifespan).Before(now) {
 			delete(l.db, id)
 		}
 	}

@@ -78,6 +78,26 @@ func TestRemoveExpiredRateLimits(t *testing.T) {
 	}
 }
 
+func TestCleaningUpExpiredRateLimits(t *testing.T) {
+	l := newRateLimiter(5 * time.Second)
+	l.period = time.Millisecond * 10
+	l.Start()
+	defer l.Stop()
+
+	l.db["peer01"] = time.Now().Add(-1 * time.Second)
+	l.db["peer02"] = time.Now().Add(-2 * time.Second)
+	l.db["peer03"] = time.Now().Add(-10 * time.Second)
+
+	time.Sleep(time.Millisecond * 20)
+
+	_, ok := l.db["peer01"]
+	assert.True(t, ok)
+	_, ok = l.db["peer02"]
+	assert.True(t, ok)
+	_, ok = l.db["peer03"]
+	assert.False(t, ok)
+}
+
 func TestAddingLimts(t *testing.T) {
 	peerID := "peerAdding"
 	l := newRateLimiter(time.Duration(5) * time.Second)
