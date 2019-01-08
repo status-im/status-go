@@ -21,6 +21,17 @@ import (
 // A safe max number of rows
 const maxNumberOfRows = 100000000
 
+// The default number of kdf iterations in sqlcipher (from version 3.0.0)
+// https://github.com/sqlcipher/sqlcipher/blob/fda4c68bb474da7e955be07a2b807bda1bb19bd2/CHANGELOG.md#300---2013-11-05
+// https://www.zetetic.net/sqlcipher/sqlcipher-api/#kdf_iter
+const defaultKdfIterationsNumber = 64000
+
+// The reduced number of kdf iterations (for performance reasons) which is
+// currently used for derivation of the database key
+// https://github.com/status-im/status-go/pull/1343
+// https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
+const kdfIterationsNumber = 3200
+
 // SQLLitePersistence represents a persistence service tied to an SQLite database
 type SQLLitePersistence struct {
 	db             *sql.DB
@@ -70,7 +81,7 @@ func MigrateDBFile(oldPath string, newPath string, oldKey string, newKey string)
 		return err
 	}
 
-	db, err := openDB(newPath, oldKey)
+	db, err := openDB(newPath, oldKey, defaultKdfIterationsNumber)
 	if err != nil {
 		return err
 	}
@@ -85,7 +96,66 @@ func MigrateDBFile(oldPath string, newPath string, oldKey string, newKey string)
 
 }
 
-func openDB(path string, key string) (*sql.DB, error) {
+// MigrateDBKeyKdfIterations changes the number of kdf iterations executed
+// during the database key derivation. This change is necessary because
+// of performance reasons.
+// https://github.com/status-im/status-go/pull/1343
+// `sqlcipher_export` is used for migration, check out this link for details:
+// https://www.zetetic.net/sqlcipher/sqlcipher-api/#sqlcipher_export
+func MigrateDBKeyKdfIterations(oldPath string, newPath string, key string) error {
+	_, err := os.Stat(oldPath)
+
+	// No files, nothing to do
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	// Any other error, throws
+	if err != nil {
+		return err
+	}
+
+	db, err := openDB(oldPath, key, defaultKdfIterationsNumber)
+	if err != nil {
+		return err
+	}
+
+	attach := fmt.Sprintf(
+		"ATTACH DATABASE '%s' AS newdb KEY '%s'",
+		newPath,
+		key)
+
+	if _, err = db.Exec(attach); err != nil {
+		return err
+	}
+
+	changeKdfIter := fmt.Sprintf(
+		"PRAGMA newdb.kdf_iter = %d",
+		kdfIterationsNumber)
+
+	if _, err = db.Exec(changeKdfIter); err != nil {
+		return err
+	}
+
+	exportDB := "SELECT sqlcipher_export('newdb')"
+
+	if _, err = db.Exec(exportDB); err != nil {
+		return err
+	}
+
+	if err = db.Close(); err != nil {
+		return err
+	}
+
+	if err = os.Remove(oldPath); err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func openDB(path string, key string, kdfIter int) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
@@ -104,7 +174,9 @@ func openDB(path string, key string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if _, err = db.Exec("PRAGMA cypher_page_size=4096"); err != nil {
+	kdfString := fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIter)
+
+	if _, err = db.Exec(kdfString); err != nil {
 		return nil, err
 	}
 	return db, nil
@@ -136,7 +208,7 @@ func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
 
 // Open opens a file at the specified path
 func (s *SQLLitePersistence) Open(path string, key string) error {
-	db, err := openDB(path, key)
+	db, err := openDB(path, key, kdfIterationsNumber)
 	if err != nil {
 		return err
 	}
