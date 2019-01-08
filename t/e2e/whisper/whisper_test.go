@@ -110,15 +110,7 @@ func (s *WhisperTestSuite) TestSelectAccount() {
 	// select another account, make sure that previous account is wiped out from Whisper cache
 	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
 	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
-	// get the chat key of the selected account
-	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
-	s.NoError(err)
-
-	// Chat account public key should be the same key received when creating the account
-	selectedChatPubKey := hexutil.Encode(crypto.FromECDSAPub(&selectedChatAccount.AccountKey.PrivateKey.PublicKey))
-	s.Equal(selectedChatPubKey, pubKey)
-
-	s.True(whisperService.HasKeyPair(selectedChatPubKey), "identity not injected into whisper")
+	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
 }
 
 func (s *WhisperTestSuite) TestLogout() {
@@ -134,22 +126,11 @@ func (s *WhisperTestSuite) TestLogout() {
 
 	// make sure that identity doesn't exist (yet) in Whisper
 	s.False(whisperService.HasKeyPair(pubKey), "identity already present in whisper")
-
-	// select account
 	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
-
-	// Get the chat account
-	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
-	s.NoError(err)
-
-	// Chat account public key should be the same key received when creating the account
-	selectedChatPubKey := hexutil.Encode(crypto.FromECDSAPub(&selectedChatAccount.AccountKey.PrivateKey.PublicKey))
-	s.Equal(selectedChatPubKey, pubKey)
-
-	s.True(whisperService.HasKeyPair(selectedChatPubKey), "identity not injected into whisper")
+	s.True(whisperService.HasKeyPair(pubKey), "identity not injected into whisper")
 
 	s.NoError(s.Backend.Logout())
-	s.False(whisperService.HasKeyPair(selectedChatPubKey), "identity not cleared from whisper")
+	s.False(whisperService.HasKeyPair(pubKey), "identity not cleared from whisper")
 }
 
 func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
@@ -242,4 +223,33 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
 	s.Nil(selectedChatAccount)
+}
+
+func (s *WhisperTestSuite) TestWalletAndChatPubKeyAreTheSame() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	whisperService, err := s.Backend.StatusNode().WhisperService()
+	s.NoError(err)
+
+	// create an account
+	address, pubKey, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	s.NoError(err)
+
+	// select account
+	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
+
+	// pubKey should be injected in whisper
+	s.True(whisperService.HasKeyPair(pubKey), "identity not injected in whisper")
+
+	// Get the chat account
+	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
+	s.NoError(err)
+
+	// Get the wallet account
+	selectedWalletAccount, err := s.Backend.AccountManager().SelectedWalletAccount()
+	s.NoError(err)
+
+	// selectedChatAccount and selectedWalletAccount should have the same key
+	s.Equal(selectedChatAccount.AccountKey, selectedWalletAccount.AccountKey)
 }
