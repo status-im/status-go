@@ -233,23 +233,17 @@ func (s *WhisperTestSuite) TestSelectedChatKeyIsUsedInWhisper() {
 	s.NoError(err)
 
 	// create an account
-	address, pubKey, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	address, _, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// select account
 	s.NoError(s.Backend.SelectAccount(address, TestConfig.Account1.Password))
 
-	// pubKey should be injected in whisper
-	s.True(whisperService.HasKeyPair(pubKey), "identity not injected in whisper")
-
 	// Get the chat account
 	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
 	s.NoError(err)
 
-	// Get the wallet account
-	selectedWalletAccount, err := s.Backend.AccountManager().SelectedWalletAccount()
-	s.NoError(err)
-
-	// selectedChatAccount and selectedWalletAccount should have the same key
-	s.Equal(selectedChatAccount.AccountKey, selectedWalletAccount.AccountKey)
+	// chat key should be injected in whisper
+	selectedChatPubKey := hexutil.Encode(crypto.FromECDSAPub(&selectedChatAccount.AccountKey.PrivateKey.PublicKey))
+	s.True(whisperService.HasKeyPair(selectedChatPubKey), "identity not injected in whisper")
 }
