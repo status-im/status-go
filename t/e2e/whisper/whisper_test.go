@@ -225,7 +225,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.Nil(selectedChatAccount)
 }
 
-func (s *WhisperTestSuite) TestWalletAndChatPubKeyAreTheSame() {
+func (s *WhisperTestSuite) TestSelectedChatKeyIsUsedInWhisper() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 

@@ -254,6 +254,13 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			err := s.accManager.SelectAccount(testCase.address, testCase.password)
 			s.Equal(testCase.expectedError, err)
+
+			selectedWalletAccount, err := s.accManager.SelectedWalletAccount()
+			s.NoError(err)
+			selectedChatAccount, err := s.accManager.SelectedChatAccount()
+			s.NoError(err)
+
+			s.Equal(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
 		})
 	}
 }
