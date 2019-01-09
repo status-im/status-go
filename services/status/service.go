@@ -22,7 +22,7 @@ type WhisperService interface {
 type AccountManager interface {
 	AddressToDecryptedAccount(string, string) (accounts.Account, *keystore.Key, error)
 	SelectAccount(walletAddress, chatAddress, password string) error
-	CreateAccount(password string) (address, pubKey, mnemonic string, err error)
+	CreateAccount(password string) (walletAddress, walletPubKey, chatAddress, chatPubKey, mnemonic string, err error)
 }
 
 // Service represents our own implementation of status status operations.

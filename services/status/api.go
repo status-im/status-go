@@ -54,14 +54,16 @@ type SignupRequest struct {
 
 // SignupResponse : json response returned by status_signup.
 type SignupResponse struct {
-	Address  string `json:"address"`
-	Pubkey   string `json:"pubkey"`
-	Mnemonic string `json:"mnemonic"`
+	Address     string `json:"address"`
+	Pubkey      string `json:"pubkey"`
+	ChatAddress string `json:"chatAddress"`
+	ChatPubkey  string `json:"chatPubkey"`
+	Mnemonic    string `json:"mnemonic"`
 }
 
 // Signup is an implementation of `status_signup` or `web3.status.signup` API
 func (api *PublicAPI) Signup(context context.Context, req SignupRequest) (res SignupResponse, err error) {
-	if res.Address, res.Pubkey, res.Mnemonic, err = api.s.am.CreateAccount(req.Password); err != nil {
+	if res.Address, res.Pubkey, res.ChatAddress, res.ChatPubkey, res.Mnemonic, err = api.s.am.CreateAccount(req.Password); err != nil {
 		err = errors.New("could not create the specified account : " + err.Error())
 		return
 	}
