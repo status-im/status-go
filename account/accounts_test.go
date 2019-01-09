@@ -254,6 +254,13 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			err := s.accManager.SelectAccount(testCase.address, testCase.password)
 			s.Equal(testCase.expectedError, err)
+
+			selectedWalletAccount, err := s.accManager.SelectedWalletAccount()
+			s.NoError(err)
+			selectedChatAccount, err := s.accManager.SelectedChatAccount()
+			s.NoError(err)
+
+			s.Equal(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
 		})
 	}
 }
@@ -261,7 +268,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 func (s *ManagerTestSuite) TestCreateChildAccount() {
 	// First, test the negative case where an account is not selected
 	// and an address is not provided.
-	s.accManager.selectedAccount = nil
+	s.accManager.selectedWalletAccount = nil
 	s.T().Run("fail_noAccount", func(t *testing.T) {
 		s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
 		_, _, err := s.accManager.CreateChildAccount("", s.password)
@@ -329,7 +336,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 
 func (s *ManagerTestSuite) TestLogout() {
 	s.accManager.Logout()
-	s.Nil(s.accManager.selectedAccount)
+	s.Nil(s.accManager.selectedWalletAccount)
 }
 
 // TestAccounts tests cases for (*Manager).Accounts.
@@ -351,7 +358,7 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.Equal(errAccManager, err)
 
 	// Selected account is nil but doesn't fail
-	s.accManager.selectedAccount = nil
+	s.accManager.selectedWalletAccount = nil
 	s.gethServiceProvider.EXPECT().AccountManager().Return(s.gethAccManager, nil)
 	accs, err = s.accManager.Accounts()
 	s.NoError(err)
