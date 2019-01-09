@@ -14,6 +14,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/golang/mock/gomock"
 	. "github.com/status-im/status-go/t/utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -130,17 +131,25 @@ func TestManagerTestSuite(t *testing.T) {
 
 	// Initial test - create test account
 	gethServiceProvider.EXPECT().AccountKeyStore().Return(keyStore, nil)
-	addr, pubKey, mnemonic, err := accManager.CreateAccount(testPassword)
+	walletAddr, walletPubKey, chatAddr, chatPubKey, mnemonic, err := accManager.CreateAccount(testPassword)
 	require.NoError(t, err)
-	require.NotEmpty(t, addr)
-	require.NotEmpty(t, pubKey)
+	require.NotEmpty(t, chatAddr)
+	require.NotEmpty(t, chatPubKey)
+	require.NotEmpty(t, chatAddr)
+	require.NotEmpty(t, chatPubKey)
 	require.NotEmpty(t, mnemonic)
+
+	// Before the complete decouple of the keys, wallet and chat keys are the same
+	assert.Equal(t, walletAddr, chatAddr)
+	assert.Equal(t, walletPubKey, chatPubKey)
 
 	s := &ManagerTestSuite{
 		testAccount: testAccount{
 			"test-password",
-			addr,
-			pubKey,
+			walletAddr,
+			walletPubKey,
+			chatAddr,
+			chatPubKey,
 			mnemonic,
 		},
 		gethServiceProvider: gethServiceProvider,
@@ -167,10 +176,12 @@ type ManagerTestSuite struct {
 }
 
 type testAccount struct {
-	password string
-	address  string
-	pubKey   string
-	mnemonic string
+	password      string
+	walletAddress string
+	walletPubKey  string
+	chatAddress   string
+	chatPubKey    string
+	mnemonic      string
 }
 
 // reinitMock is for reassigning a new mock node manager to account manager.
@@ -190,23 +201,25 @@ func (s *ManagerTestSuite) SetupTest() {
 func (s *ManagerTestSuite) TestCreateAccount() {
 	// Don't fail on empty password
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
-	_, _, _, err := s.accManager.CreateAccount(s.password)
+	_, _, _, _, _, err := s.accManager.CreateAccount(s.password)
 	s.NoError(err)
 
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(nil, errKeyStore)
-	_, _, _, err = s.accManager.CreateAccount(s.password)
+	_, _, _, _, _, err = s.accManager.CreateAccount(s.password)
 	s.Equal(errKeyStore, err)
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
-	addr, pubKey, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
+	walletAddr, walletPubKey, chatAddr, chatPubKey, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.NoError(err)
-	s.Equal(s.address, addr)
-	s.Equal(s.pubKey, pubKey)
+	s.Equal(s.walletAddress, walletAddr)
+	s.Equal(s.walletPubKey, walletPubKey)
+	s.Equal(s.chatAddress, chatAddr)
+	s.Equal(s.chatPubKey, chatPubKey)
 
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(nil, errKeyStore)
-	_, _, err = s.accManager.RecoverAccount(s.password, s.mnemonic)
+	_, _, _, _, err = s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.Equal(errKeyStore, err)
 }
 
@@ -214,35 +227,48 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
-		address               string
+		walletAddress         string
+		chatAddress           string
 		password              string
 		expectedError         error
 	}{
 		{
 			"success",
 			[]interface{}{s.keyStore, nil},
-			s.address,
+			s.walletAddress,
+			s.chatAddress,
 			s.password,
 			nil,
 		},
 		{
 			"fail_keyStore",
 			[]interface{}{nil, errKeyStore},
-			s.address,
+			s.walletAddress,
+			s.chatAddress,
 			s.password,
 			errKeyStore,
 		},
 		{
-			"fail_wrongAddress",
+			"fail_wrongWalletAddress",
 			[]interface{}{s.keyStore, nil},
-			"wrong-address",
+			"wrong-wallet-address",
+			s.chatAddress,
+			s.password,
+			ErrAddressToAccountMappingFailure,
+		},
+		{
+			"fail_wrongChatAddress",
+			[]interface{}{s.keyStore, nil},
+			s.walletAddress,
+			"wrong-chat-address",
 			s.password,
 			ErrAddressToAccountMappingFailure,
 		},
 		{
 			"fail_wrongPassword",
 			[]interface{}{s.keyStore, nil},
-			s.address,
+			s.walletAddress,
+			s.chatAddress,
 			"wrong-password",
 			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
 		},
@@ -252,15 +278,24 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			err := s.accManager.SelectAccount(testCase.address, testCase.password)
+			err := s.accManager.SelectAccount(testCase.walletAddress, testCase.chatAddress, testCase.password)
 			s.Equal(testCase.expectedError, err)
 
-			selectedWalletAccount, err := s.accManager.SelectedWalletAccount()
-			s.NoError(err)
-			selectedChatAccount, err := s.accManager.SelectedChatAccount()
-			s.NoError(err)
+			selectedWalletAccount, walletErr := s.accManager.SelectedWalletAccount()
+			selectedChatAccount, chatErr := s.accManager.SelectedChatAccount()
 
-			s.Equal(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
+			if testCase.expectedError == nil {
+				s.Equal(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
+				s.NoError(walletErr)
+				s.NoError(chatErr)
+			} else {
+				s.Nil(selectedWalletAccount)
+				s.Nil(selectedChatAccount)
+				s.Error(ErrNoAccountSelected)
+				s.Error(ErrNoAccountSelected)
+			}
+
+			s.accManager.Logout()
 		})
 	}
 }
@@ -278,40 +313,45 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 	// Now, select the test account for rest of the test cases.
 	s.reinitMock()
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.address, s.password)
+	err := s.accManager.SelectAccount(s.walletAddress, s.chatAddress, s.password)
 	s.NoError(err)
 
 	testCases := []struct {
 		name                  string
-		address               string
+		walletAddress         string
+		chatAddress           string
 		password              string
 		accountKeyStoreReturn []interface{}
 		expectedError         error
 	}{
 		{
 			"success",
-			s.address,
+			s.walletAddress,
+			s.chatAddress,
 			s.password,
 			[]interface{}{s.keyStore, nil},
 			nil,
 		},
 		{
 			"fail_keyStore",
-			s.address,
+			s.walletAddress,
+			s.chatAddress,
 			s.password,
 			[]interface{}{nil, errKeyStore},
 			errKeyStore,
 		},
 		{
-			"fail_wrongAddress",
+			"fail_wrongWalletAddress",
 			"wrong-address",
+			s.chatAddress,
 			s.password,
 			[]interface{}{s.keyStore, nil},
 			ErrAddressToAccountMappingFailure,
 		},
 		{
 			"fail_wrongPassword",
-			s.address,
+			s.walletAddress,
+			s.chatAddress,
 			"wrong-password",
 			[]interface{}{s.keyStore, nil},
 			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
@@ -322,7 +362,7 @@ func (s *ManagerTestSuite) TestCreateChildAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			childAddr, childPubKey, err := s.accManager.CreateChildAccount(testCase.address, testCase.password)
+			childAddr, childPubKey, err := s.accManager.CreateChildAccount(testCase.walletAddress, testCase.password)
 			if testCase.expectedError != nil {
 				s.Equal(testCase.expectedError, err)
 			} else {
@@ -343,7 +383,7 @@ func (s *ManagerTestSuite) TestLogout() {
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.address, s.password)
+	err := s.accManager.SelectAccount(s.walletAddress, s.chatAddress, s.password)
 	s.NoError(err)
 
 	// Success
@@ -369,37 +409,37 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 	testCases := []struct {
 		name                  string
 		accountKeyStoreReturn []interface{}
-		address               string
+		walletAddress         string
 		password              string
 		expectedError         error
 	}{
 		{
 			"success",
 			[]interface{}{s.keyStore, nil},
-			s.address,
+			s.walletAddress,
 			s.password,
 			nil,
 		},
 		{
 			"fail_keyStore",
 			[]interface{}{nil, errKeyStore},
-			s.address,
+			s.walletAddress,
 			s.password,
 			errKeyStore,
 		},
 		{
-			"fail_wrongAddress",
+			"fail_wrongWalletAddress",
 			[]interface{}{s.keyStore, nil},
-			"wrong-address",
+			"wrong-wallet-address",
 			s.password,
 			ErrAddressToAccountMappingFailure,
 		},
 		{
 			"fail_wrongPassword",
 			[]interface{}{s.keyStore, nil},
-			s.address,
+			s.walletAddress,
 			"wrong-password",
-			errors.New("could not decrypt key with given passphrase"),
+			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
 		},
 	}
 
@@ -407,7 +447,7 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			acc, key, err := s.accManager.AddressToDecryptedAccount(testCase.address, testCase.password)
+			acc, key, err := s.accManager.AddressToDecryptedAccount(testCase.walletAddress, testCase.password)
 			if testCase.expectedError != nil {
 				s.Equal(testCase.expectedError, err)
 			} else {

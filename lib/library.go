@@ -245,7 +245,7 @@ func CallPrivateRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
+	walletAddress, walletPubKey, chatAddress, chatPubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -254,10 +254,12 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: mnemonic,
-		Error:    errString,
+		Address:     walletAddress,
+		PubKey:      walletPubKey,
+		ChatAddress: chatAddress,
+		ChatPubKey:  chatPubKey,
+		Mnemonic:    mnemonic,
+		Error:       errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
@@ -315,7 +317,7 @@ func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 // if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 //export Login
 func Login(address, password *C.char) *C.char {
-	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(password))
+	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 
