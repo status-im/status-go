@@ -407,15 +407,18 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	s.muRateLimiter.RLock()
 	defer s.muRateLimiter.RUnlock()
 
-	if s.rateLimiter != nil {
-		peerID := string(peer)
-		if !s.rateLimiter.IsAllowed(peerID) {
-			log.Info("peerID exceeded the number of requests per second")
-			return true
-		}
-		s.rateLimiter.Add(peerID)
+	if s.rateLimiter == nil {
+		return false
 	}
-	return false
+
+	peerID := string(peer)
+	if s.rateLimiter.IsAllowed(peerID) {
+		s.rateLimiter.Add(peerID)
+		return false
+	}
+
+	log.Info("peerID exceeded the number of requests per second")
+	return true
 }
 
 func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
@@ -426,7 +429,7 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterato
 
 	kl = NewDBKey(lower, emptyHash)
 	if len(cursor) == DBKeyLength {
-		ku = NewDBKeyFromBytes(cursor)
+		ku = mustNewDBKeyFromBytes(cursor)
 	} else {
 		ku = NewDBKey(upper+1, emptyHash)
 	}
