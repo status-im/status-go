@@ -78,7 +78,7 @@ type WMailServer struct {
 	muRateLimiter sync.RWMutex
 	rateLimiter   *rateLimiter
 
-	cleaner *cleaner // removes old envelopes
+	cleaner *dbCleaner // removes old envelopes
 }
 
 // Init initializes mailServer.
@@ -128,7 +128,7 @@ func (s *WMailServer) setupRateLimiter(limit time.Duration) {
 }
 
 func (s *WMailServer) setupCleaner(retention time.Duration) {
-	s.cleaner = newCleanerWithDB(s.db, retention)
+	s.cleaner = newDBCleaner(s.db, retention)
 	s.cleaner.Start()
 }
 

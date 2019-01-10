@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	cleanerBatchSize = 1000
-	cleanerPeriod    = time.Hour
+	dbCleanerBatchSize = 1000
+	dbCleanerPeriod    = time.Hour
 )
 
-// cleaner removes old messages from a db.
-type cleaner struct {
+// dbCleaner removes old messages from a db.
+type dbCleaner struct {
 	sync.RWMutex
 
 	db        dbImpl
@@ -28,19 +28,19 @@ type cleaner struct {
 	cancel chan struct{}
 }
 
-// NewCleanerWithDB returns a new cleaner for db.
-func newCleanerWithDB(db dbImpl, retention time.Duration) *cleaner {
-	return &cleaner{
+// newDBCleaner returns a new cleaner for db.
+func newDBCleaner(db dbImpl, retention time.Duration) *dbCleaner {
+	return &dbCleaner{
 		db:        db,
 		retention: retention,
 
-		batchSize: cleanerBatchSize,
-		period:    cleanerPeriod,
+		batchSize: dbCleanerBatchSize,
+		period:    dbCleanerPeriod,
 	}
 }
 
 // Start starts a loop that cleans up old messages.
-func (c *cleaner) Start() {
+func (c *dbCleaner) Start() {
 	cancel := make(chan struct{})
 
 	c.Lock()
@@ -51,7 +51,7 @@ func (c *cleaner) Start() {
 }
 
 // Stops stops the cleaning loop.
-func (c *cleaner) Stop() {
+func (c *dbCleaner) Stop() {
 	c.Lock()
 	defer c.Unlock()
 
@@ -62,16 +62,14 @@ func (c *cleaner) Stop() {
 	c.cancel = nil
 }
 
-func (c *cleaner) schedule(period time.Duration, cancel <-chan struct{}) {
+func (c *dbCleaner) schedule(period time.Duration, cancel <-chan struct{}) {
 	t := time.NewTicker(period)
 	defer t.Stop()
 
 	for {
 		select {
 		case <-t.C:
-			lower := uint32(0)
-			upper := uint32(time.Now().Add(-c.retention).Unix())
-			if _, err := c.Prune(lower, upper); err != nil {
+			if _, err := c.PruneEntriesOlderThan(time.Now().Add(-c.retention)); err != nil {
 				log.Error("failed to prune data", "err", err)
 			}
 		case <-cancel:
@@ -80,19 +78,19 @@ func (c *cleaner) schedule(period time.Duration, cancel <-chan struct{}) {
 	}
 }
 
-// Prune removes messages sent between lower and upper timestamps
+// PruneEntriesOlderThan removes messages sent between lower and upper timestamps
 // and returns how many have been removed.
-func (c *cleaner) Prune(lower, upper uint32) (int, error) {
+func (c *dbCleaner) PruneEntriesOlderThan(t time.Time) (int, error) {
 	var zero common.Hash
-	kl := NewDBKey(lower, zero)
-	ku := NewDBKey(upper, zero)
+	kl := NewDBKey(0, zero)
+	ku := NewDBKey(uint32(t.Unix()), zero)
 	i := c.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
 	defer i.Release()
 
 	return c.prune(i)
 }
 
-func (c *cleaner) prune(i iterator.Iterator) (int, error) {
+func (c *dbCleaner) prune(i iterator.Iterator) (int, error) {
 	batch := leveldb.Batch{}
 	removed := 0
 

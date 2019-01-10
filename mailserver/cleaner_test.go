@@ -18,7 +18,7 @@ func TestCleaner(t *testing.T) {
 	now := time.Now()
 	server := setupTestServer(t)
 	defer server.Close()
-	cleaner := newCleanerWithDB(server.db, time.Hour)
+	cleaner := newDBCleaner(server.db, time.Hour)
 
 	archiveEnvelope(t, now.Add(-10*time.Second), server)
 	archiveEnvelope(t, now.Add(-3*time.Second), server)
@@ -38,7 +38,7 @@ func TestCleanerSchedule(t *testing.T) {
 	server := setupTestServer(t)
 	defer server.Close()
 
-	cleaner := newCleanerWithDB(server.db, time.Hour)
+	cleaner := newDBCleaner(server.db, time.Hour)
 	cleaner.period = time.Millisecond * 10
 	cleaner.Start()
 	defer cleaner.Stop()
@@ -59,7 +59,7 @@ func benchmarkCleanerPrune(b *testing.B, messages int, batchSize int) {
 	server := setupTestServer(t)
 	defer server.Close()
 
-	cleaner := newCleanerWithDB(server.db, time.Hour)
+	cleaner := newDBCleaner(server.db, time.Hour)
 	cleaner.batchSize = batchSize
 
 	for i := 0; i < messages; i++ {
@@ -102,9 +102,8 @@ func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whi
 	return env
 }
 
-func testPrune(t *testing.T, u time.Time, expected int, c *cleaner, s *WMailServer) {
-	upper := uint32(u.Unix())
-	n, err := c.Prune(0, upper)
+func testPrune(t *testing.T, u time.Time, expected int, c *dbCleaner, s *WMailServer) {
+	n, err := c.PruneEntriesOlderThan(u)
 	require.NoError(t, err)
 	require.Equal(t, expected, n)
 }
