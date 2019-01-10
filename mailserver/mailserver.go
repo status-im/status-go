@@ -391,30 +391,28 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	s.muRateLimiter.RLock()
 	defer s.muRateLimiter.RUnlock()
 
-	if s.rateLimiter != nil {
-		peerID := string(peer)
-		if !s.rateLimiter.IsAllowed(peerID) {
-			log.Info("peerID exceeded the number of requests per second")
-			return true
-		}
-		s.rateLimiter.Add(peerID)
+	if s.rateLimiter == nil {
+		return false
 	}
+
+	peerID := string(peer)
+	if !s.rateLimiter.IsAllowed(peerID) {
+		log.Info("peerID exceeded the number of requests per second")
+		return true
+	}
+	s.rateLimiter.Add(peerID)
 	return false
 }
 
-func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) (iterator.Iterator, error) {
+func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
 	var (
 		emptyHash common.Hash
-		err       error
 		ku, kl    *DBKey
 	)
 
 	kl = NewDBKey(lower, emptyHash)
 	if len(cursor) > 0 {
-		ku, err = NewDBKeyFromBytes(cursor)
-		if err != nil {
-			return nil, err
-		}
+		ku = mustNewDBKeyFromBytes(cursor)
 	} else {
 		ku = NewDBKey(upper+1, emptyHash)
 	}
@@ -423,7 +421,7 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) (iterat
 	// seek to the end as we want to return envelopes in a descending order
 	i.Seek(ku.Bytes())
 
-	return i, nil
+	return i
 }
 
 // processRequestInBundles processes envelopes using an iterator and passes them
