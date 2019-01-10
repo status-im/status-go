@@ -402,15 +402,19 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	return false
 }
 
-func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
+func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) (iterator.Iterator, error) {
 	var (
 		emptyHash common.Hash
+		err       error
 		ku, kl    *DBKey
 	)
 
 	kl = NewDBKey(lower, emptyHash)
-	if len(cursor) == DBKeyLength {
-		ku = NewDBKeyFromBytes(cursor)
+	if len(cursor) > 0 {
+		ku, err = NewDBKeyFromBytes(cursor)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		ku = NewDBKey(upper+1, emptyHash)
 	}
@@ -419,7 +423,7 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterato
 	// seek to the end as we want to return envelopes in a descending order
 	i.Seek(ku.Bytes())
 
-	return i
+	return i, nil
 }
 
 // processRequestInBundles processes envelopes using an iterator and passes them

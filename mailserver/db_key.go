@@ -2,6 +2,7 @@ package mailserver
 
 import (
 	"encoding/binary"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -9,6 +10,12 @@ import (
 const (
 	// DBKeyLength is a size of the envelope key.
 	DBKeyLength = common.HashLength + timestampLength
+)
+
+var (
+	// ErrInvalidByteSize is returned when DBKey can't be created
+	// from a byte slice because it has invalid length.
+	ErrInvalidByteSize = errors.New("byte slice has invalid length")
 )
 
 // DBKey key to be stored on db.
@@ -35,10 +42,14 @@ func NewDBKey(t uint32, h common.Hash) *DBKey {
 }
 
 // NewDBKeyFromBytes creates a DBKey from a byte slice.
-func NewDBKeyFromBytes(b []byte) *DBKey {
+func NewDBKeyFromBytes(b []byte) (*DBKey, error) {
+	if len(b) != DBKeyLength {
+		return nil, ErrInvalidByteSize
+	}
+
 	return &DBKey{
 		raw:       b,
 		timestamp: binary.BigEndian.Uint32(b),
 		hash:      common.BytesToHash(b[4:]),
-	}
+	}, nil
 }
