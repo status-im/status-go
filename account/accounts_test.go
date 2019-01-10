@@ -33,7 +33,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 	require.NoError(t, ImportTestAccount(keyStoreDir, GetAccount1PKFile()))
 	require.NoError(t, ImportTestAccount(keyStoreDir, GetAccount2PKFile()))
 
-	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.Address))
+	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.WalletAddress))
 
 	testCases := []struct {
 		name          string
@@ -45,21 +45,21 @@ func TestVerifyAccountPassword(t *testing.T) {
 		{
 			"correct address, correct password (decrypt should succeed)",
 			keyStoreDir,
-			TestConfig.Account1.Address,
+			TestConfig.Account1.WalletAddress,
 			TestConfig.Account1.Password,
 			nil,
 		},
 		{
 			"correct address, correct password, non-existent key store",
 			filepath.Join(keyStoreDir, "non-existent-folder"),
-			TestConfig.Account1.Address,
+			TestConfig.Account1.WalletAddress,
 			TestConfig.Account1.Password,
 			fmt.Errorf("cannot traverse key store folder: lstat %s/non-existent-folder: no such file or directory", keyStoreDir),
 		},
 		{
 			"correct address, correct password, empty key store (pk is not there)",
 			emptyKeyStoreDir,
-			TestConfig.Account1.Address,
+			TestConfig.Account1.WalletAddress,
 			TestConfig.Account1.Password,
 			fmt.Errorf("cannot locate account for address: %s", account1Address.Hex()),
 		},
@@ -73,7 +73,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 		{
 			"correct address, wrong password",
 			keyStoreDir,
-			TestConfig.Account1.Address,
+			TestConfig.Account1.WalletAddress,
 			"wrong password", // wrong password
 			errors.New("could not decrypt key with given passphrase"),
 		},
@@ -108,7 +108,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 
 	accManager := NewManager(nil)
 
-	address := gethcommon.HexToAddress(TestConfig.Account3.Address)
+	address := gethcommon.HexToAddress(TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account3.Password)
 	require.NoError(t, err)
 }

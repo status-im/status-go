@@ -69,9 +69,9 @@ type AccountInfo struct {
 	// PubKey is the wallet public key
 	PubKey string `json:"pubkey"`
 	// ChatAddress is the ethereum address of the key used for chat
-	ChatAddress string `json:"address"`
+	ChatAddress string `json:"chatAddress"`
 	// ChatPubKey is the chat public key used as whisper identity
-	ChatPubKey string `json:"pubkey"`
+	ChatPubKey string `json:"chatPubkey"`
 	// Mnemonic is the account mnemonic
 	Mnemonic string `json:"mnemonic"`
 	// Error contains a possible error generated during the creation of the account

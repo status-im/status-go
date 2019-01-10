@@ -49,7 +49,7 @@ var logintests = []struct {
 			}
 			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("addressKey", nil)
-			s.am.EXPECT().SelectAccount("address...", "password").Return(nil)
+			s.am.EXPECT().SelectAccount("address...", "address...", "password").Return(nil)
 		},
 	},
 	{
@@ -85,7 +85,7 @@ var logintests = []struct {
 			}
 			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", nil)
-			s.am.EXPECT().SelectAccount("address...", "password").Return(errors.New("foo"))
+			s.am.EXPECT().SelectAccount("address...", "address...", "password").Return(errors.New("foo"))
 		},
 	},
 }
@@ -118,7 +118,7 @@ var signuptests = []struct {
 		},
 		expectedError: nil,
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return("addr", "pubkey", "mnemonic", nil)
+			s.am.EXPECT().CreateAccount("password").Return("addr", "pubkey", "addr", "pubkey", "mnemonic", nil)
 		},
 	},
 	{
@@ -130,7 +130,7 @@ var signuptests = []struct {
 		},
 		expectedError: errors.New("could not create the specified account : foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return("", "", "", errors.New("foo"))
+			s.am.EXPECT().CreateAccount("password").Return("", "", "", "", "", errors.New("foo"))
 		},
 	},
 }

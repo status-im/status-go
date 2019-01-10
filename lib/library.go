@@ -288,7 +288,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	address, pubKey, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	walletAddress, walletPubKey, chatAddress, chatPubKey, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := ""
 	if err != nil {
@@ -297,10 +297,12 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: C.GoString(mnemonic),
-		Error:    errString,
+		Address:     walletAddress,
+		PubKey:      walletPubKey,
+		ChatAddress: chatAddress,
+		ChatPubKey:  chatPubKey,
+		Mnemonic:    C.GoString(mnemonic),
+		Error:       errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))

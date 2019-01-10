@@ -36,6 +36,7 @@ func (s *AccountsTestSuite) TestRPCEthAccounts() {
 		"method": "eth_accounts",
 		"params": []
     }`)
+
 	s.Equal(expectedResponse, resp)
 }
 
