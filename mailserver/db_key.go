@@ -18,7 +18,7 @@ var (
 	ErrInvalidByteSize = errors.New("byte slice has invalid length")
 )
 
-// DBKey key to be stored on db.
+// DBKey key to be stored in a db.
 type DBKey struct {
 	timestamp uint32
 	hash      common.Hash
@@ -31,9 +31,9 @@ func (k *DBKey) Bytes() []byte {
 }
 
 // NewDBKey creates a new DBKey with the given values.
-func NewDBKey(t uint32, h common.Hash) *DBKey {
+func NewDBKey(timestamp uint32, h common.Hash) *DBKey {
 	var k DBKey
-	k.timestamp = t
+	k.timestamp = timestamp
 	k.hash = h
 	k.raw = make([]byte, DBKeyLength)
 	binary.BigEndian.PutUint32(k.raw, k.timestamp)
