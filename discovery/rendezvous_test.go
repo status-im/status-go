@@ -83,6 +83,12 @@ func TestRendezvousRegisterAndDiscoverExitGracefully(t *testing.T) {
 	require.EqualError(t, errDiscoveryIsStopped, err.Error())
 }
 
+func TestStopStoppedNode(t *testing.T) {
+	r, err := NewRendezvous(make([]ma.Multiaddr, 1), nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, r.Stop())
+}
+
 func BenchmarkRendezvousStart(b *testing.B) {
 	identity, err := crypto.GenerateKey()
 	require.NoError(b, err)

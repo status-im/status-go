@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
@@ -247,7 +246,7 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) (string, error) {
 
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash gethcommon.Hash, err error) {
-	verifiedAccount, err := b.getVerifiedAccount(password)
+	verifiedAccount, err := b.getVerifiedWalletAccount(password)
 	if err != nil {
 		return hash, err
 	}
@@ -265,7 +264,7 @@ func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, passwo
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
 func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Bytes, error) {
-	verifiedAccount, err := b.getVerifiedAccount(rpcParams.Password)
+	verifiedAccount, err := b.getVerifiedWalletAccount(rpcParams.Password)
 	if err != nil {
 		return hexutil.Bytes{}, err
 	}
@@ -280,7 +279,7 @@ func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (gethcommon.Ad
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
 func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string) (hexutil.Bytes, error) {
-	account, err := b.getVerifiedAccount(password)
+	account, err := b.getVerifiedWalletAccount(password)
 	if err != nil {
 		return hexutil.Bytes{}, err
 	}
@@ -292,19 +291,19 @@ func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string
 	return hexutil.Bytes(sig), err
 }
 
-func (b *StatusBackend) getVerifiedAccount(password string) (*account.SelectedExtKey, error) {
-	selectedAccount, err := b.accountManager.SelectedAccount()
+func (b *StatusBackend) getVerifiedWalletAccount(password string) (*account.SelectedExtKey, error) {
+	selectedWalletAccount, err := b.accountManager.SelectedWalletAccount()
 	if err != nil {
 		b.log.Error("failed to get a selected account", "err", err)
 		return nil, err
 	}
 	config := b.StatusNode().Config()
-	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedAccount.Address.String(), password)
+	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedWalletAccount.Address.String(), password)
 	if err != nil {
-		b.log.Error("failed to verify account", "account", selectedAccount.Address.String(), "error", err)
+		b.log.Error("failed to verify account", "account", selectedWalletAccount.Address.String(), "error", err)
 		return nil, err
 	}
-	return selectedAccount, nil
+	return selectedWalletAccount, nil
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -403,15 +402,16 @@ func (b *StatusBackend) Logout() error {
 
 // reSelectAccount selects previously selected account, often, after node restart.
 func (b *StatusBackend) reSelectAccount() error {
-	selectedAccount, err := b.AccountManager().SelectedAccount()
-	if selectedAccount == nil || err == account.ErrNoAccountSelected {
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
+	if selectedChatAccount == nil || err == account.ErrNoAccountSelected {
 		return nil
 	}
+
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
 	case nil:
-		if err := whisperService.SelectKeyPair(selectedAccount.AccountKey.PrivateKey); err != nil {
+		if err := whisperService.SelectKeyPair(selectedChatAccount.AccountKey.PrivateKey); err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
 	default:
@@ -432,7 +432,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	if err != nil {
 		return err
 	}
-	acc, err := b.accountManager.SelectedAccount()
+	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -441,7 +441,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
 	case nil:
-		if err := whisperService.SelectKeyPair(acc.AccountKey.PrivateKey); err != nil {
+		if err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey); err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
 	default:
@@ -483,7 +483,7 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 
 // CreateContactCode create or return the latest contact code
 func (b *StatusBackend) CreateContactCode() (string, error) {
-	selectedAccount, err := b.AccountManager().SelectedAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return "", err
 	}
@@ -493,7 +493,7 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 		return "", err
 	}
 
-	bundle, err := st.GetBundle(selectedAccount.AccountKey.PrivateKey)
+	bundle, err := st.GetBundle(selectedChatAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return "", err
 	}
@@ -503,7 +503,7 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 
 // ProcessContactCode process and adds the someone else's bundle
 func (b *StatusBackend) ProcessContactCode(contactCode string) error {
-	selectedAccount, err := b.AccountManager().SelectedAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -519,7 +519,7 @@ func (b *StatusBackend) ProcessContactCode(contactCode string) error {
 		return err
 	}
 
-	if _, err := st.ProcessPublicBundle(selectedAccount.AccountKey.PrivateKey, bundle); err != nil {
+	if _, err := st.ProcessPublicBundle(selectedChatAccount.AccountKey.PrivateKey, bundle); err != nil {
 		b.log.Error("error adding bundle", "err", err)
 		return err
 	}
@@ -544,17 +544,17 @@ func (b *StatusBackend) ExtractGroupMembershipSignatures(signaturePairs [][2]str
 
 // SignGroupMembership signs a piece of data containing membership information
 func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
-	selectedAccount, err := b.AccountManager().SelectedAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return "", err
 	}
 
-	return crypto.Sign(content, selectedAccount.AccountKey.PrivateKey)
+	return crypto.Sign(content, selectedChatAccount.AccountKey.PrivateKey)
 }
 
 // EnableInstallation enables an installation for multi-device sync.
 func (b *StatusBackend) EnableInstallation(installationID string) error {
-	selectedAccount, err := b.AccountManager().SelectedAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -564,7 +564,7 @@ func (b *StatusBackend) EnableInstallation(installationID string) error {
 		return err
 	}
 
-	if err := st.EnableInstallation(&selectedAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
+	if err := st.EnableInstallation(&selectedChatAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
 		b.log.Error("error enabling installation", "err", err)
 		return err
 	}
@@ -574,7 +574,7 @@ func (b *StatusBackend) EnableInstallation(installationID string) error {
 
 // DisableInstallation disables an installation for multi-device sync.
 func (b *StatusBackend) DisableInstallation(installationID string) error {
-	selectedAccount, err := b.AccountManager().SelectedAccount()
+	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if err != nil {
 		return err
 	}
@@ -584,7 +584,7 @@ func (b *StatusBackend) DisableInstallation(installationID string) error {
 		return err
 	}
 
-	if err := st.DisableInstallation(&selectedAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
+	if err := st.DisableInstallation(&selectedChatAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
 		b.log.Error("error disabling installation", "err", err)
 		return err
 	}
