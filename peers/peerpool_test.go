@@ -448,6 +448,9 @@ func (s *PeerPoolSimulationSuite) TestUpdateTopicLimits() {
 func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 	s.setupEthV5()
 
+	// eliminate peer we won't use
+	s.peers[2].Stop()
+
 	// Buffered channels must be used because we expect the events
 	// to be in the same order. Use a buffer length greater than
 	// the expected number of events to avoid deadlock.
@@ -515,5 +518,4 @@ func (s *PeerPoolSimulationSuite) TestMailServerPeersDiscovery() {
 	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
 	s.Equal(s.peers[0].Self().ID().String(), disconnectedPeer.String())
 	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Len(<-summaries, 0)
 }

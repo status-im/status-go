@@ -173,7 +173,7 @@ func (s *MailserverSuite) TestInit() {
 			}
 
 			if tc.config.MailServerRateLimit > 0 {
-				s.NotNil(mailServer.limiter)
+				s.NotNil(mailServer.rateLimiter)
 			}
 		})
 	}
@@ -273,15 +273,15 @@ func (s *MailserverSuite) TestArchive() {
 }
 
 func (s *MailserverSuite) TestManageLimits() {
-	s.server.limiter = newLimiter(time.Duration(5) * time.Millisecond)
+	s.server.rateLimiter = newRateLimiter(time.Duration(5) * time.Millisecond)
 	s.False(s.server.exceedsPeerRequests([]byte("peerID")))
-	s.Equal(1, len(s.server.limiter.db))
-	firstSaved := s.server.limiter.db["peerID"]
+	s.Equal(1, len(s.server.rateLimiter.db))
+	firstSaved := s.server.rateLimiter.db["peerID"]
 
 	// second call when limit is not accomplished does not store a new limit
 	s.True(s.server.exceedsPeerRequests([]byte("peerID")))
-	s.Equal(1, len(s.server.limiter.db))
-	s.Equal(firstSaved, s.server.limiter.db["peerID"])
+	s.Equal(1, len(s.server.rateLimiter.db))
+	s.Equal(firstSaved, s.server.rateLimiter.db["peerID"])
 }
 
 func (s *MailserverSuite) TestDBKey() {
