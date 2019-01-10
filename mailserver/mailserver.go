@@ -411,7 +411,7 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterato
 	)
 
 	kl = NewDBKey(lower, emptyHash)
-	if len(cursor) > 0 {
+	if len(cursor) != DBKeyLength {
 		ku = mustNewDBKeyFromBytes(cursor)
 	} else {
 		ku = NewDBKey(upper+1, emptyHash)
