@@ -11,7 +11,7 @@ const (
 	DBKeyLength = common.HashLength + timestampLength
 )
 
-// DBKey key to be stored on db.
+// DBKey key to be stored in a db.
 type DBKey struct {
 	timestamp uint32
 	hash      common.Hash
