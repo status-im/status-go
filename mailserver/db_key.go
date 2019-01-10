@@ -24,7 +24,7 @@ func (k *DBKey) Bytes() []byte {
 }
 
 // NewDBKey creates a new DBKey with the given values.
-func NewDBKey(t uint32, h common.Hash) *DBKey {
+func NewDBKey(timestamp uint32, h common.Hash) *DBKey {
 	var k DBKey
 	k.timestamp = t
 	k.hash = h
