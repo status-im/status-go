@@ -130,6 +130,7 @@ func (s *Service) InitProtocol(address string, password string) error {
 	v1Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
 	v2Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v2.db", s.installationID))
 	v3Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v3.db", s.installationID))
+	v4Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v4.db", s.installationID))
 
 	if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 		return err
@@ -147,7 +148,13 @@ func (s *Service) InitProtocol(address string, password string) error {
 		os.Remove(v3Path)
 	}
 
-	persistence, err := chat.NewSQLLitePersistence(v3Path, hashedPassword)
+	// Fix IOS not encrypting database
+	if err := chat.MigrateDBFile(v3Path, v4Path, "", hashedPassword); err != nil {
+		os.Remove(v3Path)
+		os.Remove(v4Path)
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(v4Path, hashedPassword)
 	if err != nil {
 		return err
 	}
