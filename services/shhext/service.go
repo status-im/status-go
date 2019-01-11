@@ -129,6 +129,7 @@ func (s *Service) InitProtocol(address string, password string) error {
 	v0Path := filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address))
 	v1Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
 	v2Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v2.db", s.installationID))
+	v3Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v3.db", s.installationID))
 
 	if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 		return err
@@ -141,7 +142,12 @@ func (s *Service) InitProtocol(address string, password string) error {
 		os.Remove(v2Path)
 	}
 
-	persistence, err := chat.NewSQLLitePersistence(v2Path, hashedPassword)
+	if err := chat.MigrateDBKeyKdfIterations(v2Path, v3Path, hashedPassword); err != nil {
+		os.Remove(v2Path)
+		os.Remove(v3Path)
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(v3Path, hashedPassword)
 	if err != nil {
 		return err
 	}
