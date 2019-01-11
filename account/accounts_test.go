@@ -139,7 +139,7 @@ func TestManagerTestSuite(t *testing.T) {
 	require.NotEmpty(t, chatPubKey)
 	require.NotEmpty(t, mnemonic)
 
-	// Before the complete decouple of the keys, wallet and chat keys are the same
+	// Before the complete decoupling of the keys, wallet and chat keys are the same
 	assert.Equal(t, walletAddr, chatAddr)
 	assert.Equal(t, walletPubKey, chatPubKey)
 
@@ -291,8 +291,8 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			} else {
 				s.Nil(selectedWalletAccount)
 				s.Nil(selectedChatAccount)
-				s.Error(ErrNoAccountSelected)
-				s.Error(ErrNoAccountSelected)
+				s.Equal(walletErr, ErrNoAccountSelected)
+				s.Equal(chatErr, ErrNoAccountSelected)
 			}
 
 			s.accManager.Logout()

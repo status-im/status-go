@@ -47,7 +47,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	s.True(ok, "identity not injected")
 
 	// account2
-	_, accountKey2, err := accountManager.AddressToDecryptedAccount(TestConfig.Account2.WalletAddress, TestConfig.Account2.Password)
+	_, accountKey2, err := accountManager.AddressToDecryptedAccount(TestConfig.Account2.ChatAddress, TestConfig.Account2.Password)
 	s.NoError(err)
 	key2ID, err := whisperService.AddKeyPair(accountKey2.PrivateKey)
 	s.NoError(err)

@@ -244,7 +244,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 
 	// make sure that account is still selected
 	selectedWalletAccount, err = s.Backend.AccountManager().SelectedWalletAccount()
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.NotNil(selectedWalletAccount)
 	s.Equal(selectedWalletAccount.Address.Hex(), walletAddress2, "incorrect wallet address selected")
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
