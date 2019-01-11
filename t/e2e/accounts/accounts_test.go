@@ -251,7 +251,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
 	s.NoError(err)
 	s.NotNil(selectedChatAccount)
-	s.Equal(selectedChatAccount.Address.Hex(), accountInfo2.WalletAddress, "incorrect chat address selected")
+	s.Equal(selectedChatAccount.Address.Hex(), accountInfo2.ChatAddress, "incorrect chat address selected")
 
 	// now restart node using RestartNode() method, and make sure that account is still available
 	s.RestartTestNode()

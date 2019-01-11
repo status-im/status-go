@@ -130,7 +130,7 @@ func TestManagerTestSuite(t *testing.T) {
 	testPassword := "test-password"
 
 	// Initial test - create test account
-	gethServiceProvider.EXPECT().AccountKeyStore().Return(keyStore, nil)
+	gethServiceProvider.EXPECT().AccountKeyStore().Times(2).Return(keyStore, nil)
 	accountInfo, mnemonic, err := accManager.CreateAccount(testPassword)
 	require.NoError(t, err)
 	require.NotEmpty(t, accountInfo.WalletAddress)
@@ -139,9 +139,8 @@ func TestManagerTestSuite(t *testing.T) {
 	require.NotEmpty(t, accountInfo.ChatPubKey)
 	require.NotEmpty(t, mnemonic)
 
-	// Before the complete decoupling of the keys, wallet and chat keys are the same
-	assert.Equal(t, accountInfo.WalletAddress, accountInfo.ChatAddress)
-	assert.Equal(t, accountInfo.WalletPubKey, accountInfo.ChatPubKey)
+	assert.NotEqual(t, accountInfo.WalletAddress, accountInfo.ChatAddress)
+	assert.NotEqual(t, accountInfo.WalletPubKey, accountInfo.ChatPubKey)
 
 	s := &ManagerTestSuite{
 		testAccount: testAccount{
@@ -200,7 +199,7 @@ func (s *ManagerTestSuite) SetupTest() {
 
 func (s *ManagerTestSuite) TestCreateAccount() {
 	// Don't fail on empty password
-	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	s.gethServiceProvider.EXPECT().AccountKeyStore().Times(2).Return(s.keyStore, nil)
 	_, _, err := s.accManager.CreateAccount(s.password)
 	s.NoError(err)
 
@@ -210,7 +209,7 @@ func (s *ManagerTestSuite) TestCreateAccount() {
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
-	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	s.gethServiceProvider.EXPECT().AccountKeyStore().Times(2).Return(s.keyStore, nil)
 	accountInfo, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.NoError(err)
 	s.Equal(s.walletAddress, accountInfo.WalletAddress)
@@ -277,7 +276,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 	for _, testCase := range testCases {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
-			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
+			s.gethServiceProvider.EXPECT().AccountKeyStore().Times(2).Return(testCase.accountKeyStoreReturn...).AnyTimes()
 			err := s.accManager.SelectAccount(testCase.walletAddress, testCase.chatAddress, testCase.password)
 			s.Equal(testCase.expectedError, err)
 
@@ -285,7 +284,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			selectedChatAccount, chatErr := s.accManager.SelectedChatAccount()
 
 			if testCase.expectedError == nil {
-				s.Equal(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
+				s.NotEqual(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
 				s.NoError(walletErr)
 				s.NoError(chatErr)
 			} else {
