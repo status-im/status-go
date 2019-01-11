@@ -89,13 +89,13 @@ func (s *StatusAPISuite) TestStatusSignupSuccess() {
 	res := s.testStatusSignup(statusTestParams{
 		Password: pwd,
 	})
-	s.NotEmpty(res.Address)
-	s.NotEmpty(res.Pubkey)
+	s.NotEmpty(res.WalletAddress)
+	s.NotEmpty(res.WalletPubkey)
 	s.Equal(12, len(strings.Split(res.Mnemonic, " ")))
 
 	// I should be able to login with the newly created account
 	_ = s.testStatusLogin(statusTestParams{
-		Address:  res.Address,
+		Address:  res.WalletAddress,
 		Password: pwd,
 	})
 }
