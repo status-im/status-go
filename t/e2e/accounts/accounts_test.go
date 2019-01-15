@@ -146,11 +146,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	accountInfoCheck, err := s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
 	s.NoError(err, "recover acc failed")
 
-	s.True(accountInfo.WalletAddress == accountInfoCheck.WalletAddress &&
-		accountInfo.WalletPubKey == accountInfoCheck.WalletPubKey &&
-		accountInfo.ChatAddress == accountInfoCheck.ChatAddress &&
-		accountInfo.ChatPubKey == accountInfoCheck.ChatPubKey,
-		"incorrect accound details recovered")
+	s.EqualValues(accountInfo, accountInfoCheck, "incorrect accound details recovered")
 
 	// now test recovering, but make sure that acc/key file is removed i.e. simulate recovering on a new device
 	acc, err := account.ParseAccountString(accountInfo.WalletAddress)
@@ -164,11 +160,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 
 	accountInfoCheck, err = s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
 	s.NoError(err, "recover acc failed (for non-cached acc)")
-	s.True(accountInfo.WalletAddress == accountInfoCheck.WalletAddress &&
-		accountInfo.WalletPubKey == accountInfoCheck.WalletPubKey &&
-		accountInfo.ChatAddress == accountInfoCheck.ChatAddress &&
-		accountInfo.ChatPubKey == accountInfoCheck.ChatPubKey,
-		"incorrect acc details recovered (for non-cached acc)")
+	s.EqualValues(accountInfo, accountInfoCheck, "incorrect acc details recovered (for non-cached acc)")
 
 	// make sure that extended key exists and is imported ok too
 	_, key, err = keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
@@ -178,11 +170,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	// make sure that calling import several times, just returns from cache (no error is expected)
 	accountInfoCheck, err = s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
 	s.NoError(err, "recover acc failed (for non-cached acc)")
-	s.True(accountInfo.WalletAddress == accountInfoCheck.WalletAddress &&
-		accountInfo.WalletPubKey == accountInfoCheck.WalletPubKey &&
-		accountInfo.ChatAddress == accountInfoCheck.ChatAddress &&
-		accountInfo.ChatPubKey == accountInfoCheck.ChatPubKey,
-		"incorrect acc details recovered (for non-cached acc)")
+	s.EqualValues(accountInfo, accountInfoCheck, "incorrect acc details recovered (for non-cached acc)")
 }
 
 func (s *AccountsTestSuite) TestSelectAccount() {
