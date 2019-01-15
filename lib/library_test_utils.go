@@ -223,21 +223,21 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	walletAddress1, walletPubKey1, _, chatPubKey1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	account1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
-	t.Logf("account created: {address: %s, key: %s}", walletAddress1, walletPubKey1)
+	t.Logf("account created: {address: %s, key: %s}", account1.WalletAddress, account1.WalletPubKey)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasKeyPair(chatPubKey1) {
+	if whisperService.HasKeyPair(account1.ChatPubKey) {
 		t.Error("identity already present in whisper")
 	}
 
 	// select account
 	loginResponse := APIResponse{}
-	rawResponse := Login(C.CString(walletAddress1), C.CString(TestConfig.Account1.Password))
+	rawResponse := Login(C.CString(account1.WalletAddress), C.CString(TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -248,7 +248,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 		t.Errorf("could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasKeyPair(chatPubKey1) {
+	if !whisperService.HasKeyPair(account1.ChatPubKey) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
@@ -308,7 +308,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 	if err != nil {
 		t.Errorf("whisper service not running: %v", err)
 	}
-	if !whisperService.HasKeyPair(chatPubKey1) {
+	if !whisperService.HasKeyPair(account1.ChatPubKey) {
 		t.Errorf("identity evicted from whisper on node restart: %v", err)
 	}
 
@@ -494,12 +494,12 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	keyStore, _ := statusBackend.StatusNode().AccountKeyStore()
 
 	// create an account
-	walletAddress, walletPubKey, chatAddress, chatPubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo, mnemonic, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
-	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", walletAddress, walletPubKey, mnemonic)
+	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", accountInfo.WalletAddress, accountInfo.WalletPubKey, mnemonic)
 
 	// try recovering using password + mnemonic
 	recoverAccountResponse := AccountInfo{}
@@ -517,16 +517,16 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	walletAddressCheck, walletPubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
 	chatAddressCheck, chatPubKeyCheck := recoverAccountResponse.ChatAddress, recoverAccountResponse.ChatPubKey
 
-	if walletAddress != walletAddressCheck || walletPubKey != walletPubKeyCheck {
+	if accountInfo.WalletAddress != walletAddressCheck || accountInfo.WalletPubKey != walletPubKeyCheck {
 		t.Error("recover wallet account details failed to pull the correct details")
 	}
 
-	if chatAddress != chatAddressCheck || chatPubKey != chatPubKeyCheck {
+	if accountInfo.ChatAddress != chatAddressCheck || accountInfo.ChatPubKey != chatPubKeyCheck {
 		t.Error("recover chat account details failed to pull the correct details")
 	}
 
 	// now test recovering, but make sure that account/key file is removed i.e. simulate recovering on a new device
-	account, err := account.ParseAccountString(walletAddress)
+	account, err := account.ParseAccountString(accountInfo.WalletAddress)
 	if err != nil {
 		t.Errorf("can not get account from address: %v", err)
 	}
@@ -555,12 +555,12 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 		return false
 	}
 	walletAddressCheck, walletPubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if walletAddress != walletAddressCheck || walletPubKey != walletPubKeyCheck {
+	if accountInfo.WalletAddress != walletAddressCheck || accountInfo.WalletPubKey != walletPubKeyCheck {
 		t.Error("recover wallet account details failed to pull the correct details (for non-cached account)")
 	}
 
 	chatAddressCheck, chatPubKeyCheck = recoverAccountResponse.ChatAddress, recoverAccountResponse.ChatPubKey
-	if chatAddress != chatAddressCheck || chatPubKey != chatPubKeyCheck {
+	if accountInfo.ChatAddress != chatAddressCheck || accountInfo.ChatPubKey != chatPubKeyCheck {
 		t.Error("recover chat account details failed to pull the correct details (for non-cached account)")
 	}
 
@@ -588,12 +588,12 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 		return false
 	}
 	walletAddressCheck, walletPubKeyCheck = recoverAccountResponse.Address, recoverAccountResponse.PubKey
-	if walletAddress != walletAddressCheck || walletPubKey != walletPubKeyCheck {
+	if accountInfo.WalletAddress != walletAddressCheck || accountInfo.WalletPubKey != walletPubKeyCheck {
 		t.Error("recover wallet account details failed to pull the correct details (for non-cached account)")
 	}
 
 	chatAddressCheck, chatPubKeyCheck = recoverAccountResponse.ChatAddress, recoverAccountResponse.ChatPubKey
-	if chatAddress != chatAddressCheck || chatPubKey != chatPubKeyCheck {
+	if accountInfo.ChatAddress != chatAddressCheck || accountInfo.ChatPubKey != chatPubKeyCheck {
 		t.Error("recover chat account details failed to pull the correct details (for non-cached account)")
 	}
 
@@ -627,28 +627,28 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	// create an account
-	walletAddress1, walletPubKey1, _, chatPubKey1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
-	t.Logf("Account created: {address: %s, key: %s}", walletAddress1, walletPubKey1)
+	t.Logf("Account created: {address: %s, key: %s}", accountInfo1.WalletAddress, accountInfo1.WalletPubKey)
 
-	walletAddress2, walletPubKey2, _, chatPubKey2, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo2, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Error("Test failed: could not create account")
 		return false
 	}
-	t.Logf("Account created: {address: %s, key: %s}", walletAddress2, walletPubKey2)
+	t.Logf("Account created: {address: %s, key: %s}", accountInfo2.WalletAddress, accountInfo2.WalletPubKey)
 
 	// make sure that identity is not (yet injected)
-	if whisperService.HasKeyPair(chatPubKey1) {
+	if whisperService.HasKeyPair(accountInfo1.ChatPubKey) {
 		t.Error("identity already present in whisper")
 	}
 
 	// try selecting with wrong password
 	loginResponse := APIResponse{}
-	rawResponse := Login(C.CString(walletAddress1), C.CString("wrongPassword"))
+	rawResponse := Login(C.CString(accountInfo1.WalletAddress), C.CString("wrongPassword"))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -661,7 +661,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	loginResponse = APIResponse{}
-	rawResponse = Login(C.CString(walletAddress1), C.CString(TestConfig.Account1.Password))
+	rawResponse = Login(C.CString(accountInfo1.WalletAddress), C.CString(TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -672,17 +672,17 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasKeyPair(chatPubKey1) {
+	if !whisperService.HasKeyPair(accountInfo1.ChatPubKey) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	if whisperService.HasKeyPair(chatPubKey2) {
+	if whisperService.HasKeyPair(accountInfo2.ChatPubKey) {
 		t.Error("identity already present in whisper")
 	}
 
 	loginResponse = APIResponse{}
-	rawResponse = Login(C.CString(walletAddress2), C.CString(TestConfig.Account1.Password))
+	rawResponse = Login(C.CString(accountInfo2.WalletAddress), C.CString(TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -693,10 +693,10 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 		t.Errorf("Test failed: could not select account: %v", loginResponse.Error)
 		return false
 	}
-	if !whisperService.HasKeyPair(chatPubKey2) {
+	if !whisperService.HasKeyPair(accountInfo2.ChatPubKey) {
 		t.Errorf("identity not injected into whisper: %v", err)
 	}
-	if whisperService.HasKeyPair(chatPubKey1) {
+	if whisperService.HasKeyPair(accountInfo1.ChatPubKey) {
 		t.Error("identity should be removed, but it is still present in whisper")
 	}
 
@@ -711,25 +711,25 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// create an account
-	walletAddress, _, chatAddress, chatPubKey, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("could not create account: %v", err)
 		return false
 	}
 
 	// make sure that identity doesn't exist (yet) in Whisper
-	if whisperService.HasKeyPair(chatPubKey) {
+	if whisperService.HasKeyPair(accountInfo.ChatPubKey) {
 		t.Error("identity already present in whisper")
 		return false
 	}
 
 	// select/login
-	err = statusBackend.SelectAccount(walletAddress, chatAddress, TestConfig.Account1.Password)
+	err = statusBackend.SelectAccount(accountInfo.WalletAddress, accountInfo.ChatAddress, TestConfig.Account1.Password)
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
 	}
-	if !whisperService.HasKeyPair(chatPubKey) {
+	if !whisperService.HasKeyPair(accountInfo.ChatPubKey) {
 		t.Error("identity not injected into whisper")
 		return false
 	}
@@ -748,7 +748,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// now, logout and check if identity is removed indeed
-	if whisperService.HasKeyPair(chatPubKey) {
+	if whisperService.HasKeyPair(accountInfo.ChatPubKey) {
 		t.Error("identity not cleared from whisper")
 		return false
 	}

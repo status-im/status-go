@@ -51,12 +51,13 @@ func NewManager(geth GethServiceProvider) *Manager {
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func (m *Manager) CreateAccount(password string) (walletAddress, walletPubKey, chatAddress, chatPubKey, mnemonic string, err error) {
+func (m *Manager) CreateAccount(password string) (*Info, string, error) {
+	info := &Info{}
 	// generate mnemonic phrase
 	mn := extkeys.NewMnemonic()
-	mnemonic, err = mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
+	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
 	if err != nil {
-		return "", "", "", "", "", fmt.Errorf("can not create mnemonic seed: %v", err)
+		return nil, "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
 
 	// Generate extended master key (see BIP32)
@@ -66,19 +67,19 @@ func (m *Manager) CreateAccount(password string) (walletAddress, walletPubKey, c
 	// for expert users, to be able to add a passphrase to the generation of the seed.
 	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
-		return "", "", "", "", "", fmt.Errorf("can not create master extended key: %v", err)
+		return nil, "", fmt.Errorf("can not create master extended key: %v", err)
 	}
 
 	// import created key into account keystore
-	walletAddress, walletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
+	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
 	if err != nil {
-		return "", "", "", "", "", err
+		return nil, "", err
 	}
 
-	chatAddress = walletAddress
-	chatPubKey = walletPubKey
+	info.ChatAddress = info.WalletAddress
+	info.ChatPubKey = info.WalletPubKey
 
-	return walletAddress, walletPubKey, chatAddress, chatPubKey, mnemonic, nil
+	return info, mnemonic, nil
 }
 
 // CreateChildAccount creates sub-account for an account identified by parent address.
@@ -143,24 +144,25 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
-func (m *Manager) RecoverAccount(password, mnemonic string) (walletAddress, walletPubKey, chatAddress, chatPubKey string, err error) {
+func (m *Manager) RecoverAccount(password, mnemonic string) (*Info, error) {
+	info := &Info{}
 	// re-create extended key (see BIP32)
 	mn := extkeys.NewMnemonic()
 	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
-		return "", "", "", "", ErrInvalidMasterKeyCreated
+		return nil, ErrInvalidMasterKeyCreated
 	}
 
 	// import re-created key into account keystore
-	walletAddress, walletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
+	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	chatAddress = walletAddress
-	chatPubKey = walletPubKey
+	info.ChatAddress = info.WalletAddress
+	info.ChatPubKey = info.WalletPubKey
 
-	return walletAddress, walletPubKey, chatAddress, chatPubKey, nil
+	return info, nil
 }
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.

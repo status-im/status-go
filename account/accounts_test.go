@@ -131,25 +131,25 @@ func TestManagerTestSuite(t *testing.T) {
 
 	// Initial test - create test account
 	gethServiceProvider.EXPECT().AccountKeyStore().Return(keyStore, nil)
-	walletAddr, walletPubKey, chatAddr, chatPubKey, mnemonic, err := accManager.CreateAccount(testPassword)
+	accountInfo, mnemonic, err := accManager.CreateAccount(testPassword)
 	require.NoError(t, err)
-	require.NotEmpty(t, chatAddr)
-	require.NotEmpty(t, chatPubKey)
-	require.NotEmpty(t, chatAddr)
-	require.NotEmpty(t, chatPubKey)
+	require.NotEmpty(t, accountInfo.WalletAddress)
+	require.NotEmpty(t, accountInfo.WalletPubKey)
+	require.NotEmpty(t, accountInfo.ChatAddress)
+	require.NotEmpty(t, accountInfo.ChatPubKey)
 	require.NotEmpty(t, mnemonic)
 
 	// Before the complete decoupling of the keys, wallet and chat keys are the same
-	assert.Equal(t, walletAddr, chatAddr)
-	assert.Equal(t, walletPubKey, chatPubKey)
+	assert.Equal(t, accountInfo.WalletAddress, accountInfo.ChatAddress)
+	assert.Equal(t, accountInfo.WalletPubKey, accountInfo.ChatPubKey)
 
 	s := &ManagerTestSuite{
 		testAccount: testAccount{
 			"test-password",
-			walletAddr,
-			walletPubKey,
-			chatAddr,
-			chatPubKey,
+			accountInfo.WalletAddress,
+			accountInfo.WalletPubKey,
+			accountInfo.ChatAddress,
+			accountInfo.ChatPubKey,
 			mnemonic,
 		},
 		gethServiceProvider: gethServiceProvider,
@@ -201,25 +201,25 @@ func (s *ManagerTestSuite) SetupTest() {
 func (s *ManagerTestSuite) TestCreateAccount() {
 	// Don't fail on empty password
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
-	_, _, _, _, _, err := s.accManager.CreateAccount(s.password)
+	_, _, err := s.accManager.CreateAccount(s.password)
 	s.NoError(err)
 
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(nil, errKeyStore)
-	_, _, _, _, _, err = s.accManager.CreateAccount(s.password)
+	_, _, err = s.accManager.CreateAccount(s.password)
 	s.Equal(errKeyStore, err)
 }
 
 func (s *ManagerTestSuite) TestRecoverAccount() {
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
-	walletAddr, walletPubKey, chatAddr, chatPubKey, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
+	accountInfo, err := s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.NoError(err)
-	s.Equal(s.walletAddress, walletAddr)
-	s.Equal(s.walletPubKey, walletPubKey)
-	s.Equal(s.chatAddress, chatAddr)
-	s.Equal(s.chatPubKey, chatPubKey)
+	s.Equal(s.walletAddress, accountInfo.WalletAddress)
+	s.Equal(s.walletPubKey, accountInfo.WalletPubKey)
+	s.Equal(s.chatAddress, accountInfo.ChatAddress)
+	s.Equal(s.chatPubKey, accountInfo.ChatPubKey)
 
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(nil, errKeyStore)
-	_, _, _, _, err = s.accManager.RecoverAccount(s.password, s.mnemonic)
+	_, err = s.accManager.RecoverAccount(s.password, s.mnemonic)
 	s.Equal(errKeyStore, err)
 }
 

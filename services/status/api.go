@@ -63,10 +63,17 @@ type SignupResponse struct {
 
 // Signup is an implementation of `status_signup` or `web3.status.signup` API
 func (api *PublicAPI) Signup(context context.Context, req SignupRequest) (res SignupResponse, err error) {
-	if res.WalletAddress, res.WalletPubkey, res.ChatAddress, res.ChatPubkey, res.Mnemonic, err = api.s.am.CreateAccount(req.Password); err != nil {
+	accountInfo, mnemonic, err := api.s.am.CreateAccount(req.Password)
+	if err != nil {
 		err = errors.New("could not create the specified account : " + err.Error())
 		return
 	}
+
+	res.WalletAddress = accountInfo.WalletAddress
+	res.WalletPubkey = accountInfo.WalletPubKey
+	res.ChatAddress = accountInfo.ChatAddress
+	res.ChatPubkey = accountInfo.ChatPubKey
+	res.Mnemonic = mnemonic
 
 	return
 }

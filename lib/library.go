@@ -245,7 +245,7 @@ func CallPrivateRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	walletAddress, walletPubKey, chatAddress, chatPubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
+	info, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -254,10 +254,10 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:     walletAddress,
-		PubKey:      walletPubKey,
-		ChatAddress: chatAddress,
-		ChatPubKey:  chatPubKey,
+		Address:     info.WalletAddress,
+		PubKey:      info.WalletPubKey,
+		ChatAddress: info.ChatAddress,
+		ChatPubKey:  info.ChatPubKey,
 		Mnemonic:    mnemonic,
 		Error:       errString,
 	}
@@ -288,7 +288,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	walletAddress, walletPubKey, chatAddress, chatPubKey, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	info, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := ""
 	if err != nil {
@@ -297,10 +297,10 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:     walletAddress,
-		PubKey:      walletPubKey,
-		ChatAddress: chatAddress,
-		ChatPubKey:  chatPubKey,
+		Address:     info.WalletAddress,
+		PubKey:      info.WalletPubKey,
+		ChatAddress: info.ChatAddress,
+		ChatPubKey:  info.ChatPubKey,
 		Mnemonic:    C.GoString(mnemonic),
 		Error:       errString,
 	}

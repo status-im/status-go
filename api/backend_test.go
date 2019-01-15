@@ -144,9 +144,9 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wgCreateAccounts.Add(1)
 		go func(pass string) {
-			walletAddress, _, chatAddress, _, _, err := backend.AccountManager().CreateAccount(pass)
+			accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
 			assert.NoError(t, err)
-			addressCh <- [...]string{walletAddress, chatAddress, pass}
+			addressCh <- [...]string{accountInfo.WalletAddress, accountInfo.ChatAddress, pass}
 			wgCreateAccounts.Done()
 		}("password-00" + string(i))
 	}

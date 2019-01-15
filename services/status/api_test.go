@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/golang/mock/gomock"
+	"github.com/status-im/status-go/account"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -118,7 +119,13 @@ var signuptests = []struct {
 		},
 		expectedError: nil,
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return("addr", "pubkey", "addr", "pubkey", "mnemonic", nil)
+			accountInfo := &account.Info{
+				WalletAddress: "addr",
+				WalletPubKey:  "pubkey",
+				ChatAddress:   "addr",
+				ChatPubKey:    "pubkey",
+			}
+			s.am.EXPECT().CreateAccount("password").Return(accountInfo, "mnemonic", nil)
 		},
 	},
 	{
@@ -130,7 +137,7 @@ var signuptests = []struct {
 		},
 		expectedError: errors.New("could not create the specified account : foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return("", "", "", "", "", errors.New("foo"))
+			s.am.EXPECT().CreateAccount("password").Return(nil, "", errors.New("foo"))
 		},
 	},
 }
