@@ -41,6 +41,8 @@ func newDBCleaner(db dbImpl, retention time.Duration) *dbCleaner {
 
 // Start starts a loop that cleans up old messages.
 func (c *dbCleaner) Start() {
+	log.Info("Starting cleaning envelopes", "period", c.period, "retention", c.retention)
+
 	cancel := make(chan struct{})
 
 	c.Lock()
@@ -69,9 +71,11 @@ func (c *dbCleaner) schedule(period time.Duration, cancel <-chan struct{}) {
 	for {
 		select {
 		case <-t.C:
-			if _, err := c.PruneEntriesOlderThan(time.Now().Add(-c.retention)); err != nil {
+			count, err := c.PruneEntriesOlderThan(time.Now().Add(-c.retention))
+			if err != nil {
 				log.Error("failed to prune data", "err", err)
 			}
+			log.Info("Prunned some some messages successfully", "count", count)
 		case <-cancel:
 			return
 		}
