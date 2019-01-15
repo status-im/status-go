@@ -242,6 +242,26 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 	s.Contains(err.Error(), "Query range is invalid: from > to (10 > 5)")
 }
 
+func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
+	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
+	s.Require().NoError(<-waitErr)
+	client, err := s.nodes[0].Attach()
+	s.NoError(err)
+	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
+		MailServerPeer: s.nodes[1].Server().Self().String(),
+		Topics:         []whisper.TopicType{{1}},
+	}))
+	s.EqualError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
+		MailServerPeer: s.nodes[1].Server().Self().String(),
+		Topics:         []whisper.TopicType{{1}},
+	}), "another request with the same topics was sent less than 3s ago. Please wait for a bit longer, or set `force` to true in request parameters")
+	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
+		MailServerPeer: s.nodes[1].Server().Self().String(),
+		Topics:         []whisper.TopicType{{2}},
+	}))
+}
+
 func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	var err error
 
@@ -301,6 +321,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailNode.Server().Self().String(),
 		SymKeyID:       symKeyID,
+		Force:          true,
 	})
 	s.Require().NoError(err)
 	s.Require().NotNil(hash)
@@ -309,6 +330,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	// a public key extracted from MailServerPeer will be used.
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
 		MailServerPeer: mailNode.Server().Self().String(),
+		Force:          true,
 	})
 	s.Require().NoError(err)
 	s.Require().NotNil(hash)

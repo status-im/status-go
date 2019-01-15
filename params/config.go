@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -315,6 +316,8 @@ type ShhextConfig struct {
 	EnableLastUsedMonitor bool
 	// ConnectionTarget will be used by connection manager. It will ensure that we connected with configured number of servers.
 	ConnectionTarget int
+	// RequestsDelay used to ensure that no similar requests are sent within short periods of time.
+	RequestsDelay time.Duration
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found

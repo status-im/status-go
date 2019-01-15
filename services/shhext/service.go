@@ -41,17 +41,18 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w              *whisper.Whisper
-	config         params.ShhextConfig
-	tracker        *tracker
-	server         *p2p.Server
-	nodeID         *ecdsa.PrivateKey
-	deduplicator   *dedup.Deduplicator
-	protocol       *chat.ProtocolService
-	debug          bool
-	dataDir        string
-	installationID string
-	pfsEnabled     bool
+	w                *whisper.Whisper
+	config           params.ShhextConfig
+	tracker          *tracker
+	requestsRegistry *RequestsRegistry
+	server           *p2p.Server
+	nodeID           *ecdsa.PrivateKey
+	deduplicator     *dedup.Deduplicator
+	protocol         *chat.ProtocolService
+	debug            bool
+	dataDir          string
+	installationID   string
+	pfsEnabled       bool
 
 	peerStore       *mailservers.PeerStore
 	cache           *mailservers.Cache
@@ -66,6 +67,11 @@ var _ node.Service = (*Service)(nil)
 func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config params.ShhextConfig) *Service {
 	cache := mailservers.NewCache(db)
 	ps := mailservers.NewPeerStore(cache)
+	delay := defaultRequestsDelay
+	if config.RequestsDelay != 0 {
+		delay = config.RequestsDelay
+	}
+	requestsRegistry := NewRequestsRegistry(delay)
 	track := &tracker{
 		w:                      w,
 		handler:                handler,
@@ -73,18 +79,20 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		batches:                map[common.Hash]map[common.Hash]struct{}{},
 		mailPeers:              ps,
 		mailServerConfirmation: config.MailServerConfirmations,
+		requestsRegistry:       requestsRegistry,
 	}
 	return &Service{
-		w:              w,
-		config:         config,
-		tracker:        track,
-		deduplicator:   dedup.NewDeduplicator(w, db),
-		debug:          config.DebugAPIEnabled,
-		dataDir:        config.BackupDisabledDataDir,
-		installationID: config.InstallationID,
-		pfsEnabled:     config.PFSEnabled,
-		peerStore:      ps,
-		cache:          cache,
+		w:                w,
+		config:           config,
+		tracker:          track,
+		requestsRegistry: requestsRegistry,
+		deduplicator:     dedup.NewDeduplicator(w, db),
+		debug:            config.DebugAPIEnabled,
+		dataDir:          config.BackupDisabledDataDir,
+		installationID:   config.InstallationID,
+		pfsEnabled:       config.PFSEnabled,
+		peerStore:        ps,
+		cache:            cache,
 	}
 }
 

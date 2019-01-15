@@ -33,9 +33,10 @@ func (s *TrackerSuite) SetupTest() {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
 	s.tracker = &tracker{
-		cache:     map[common.Hash]EnvelopeState{},
-		batches:   map[common.Hash]map[common.Hash]struct{}{},
-		mailPeers: mailservers.NewPeerStore(mailservers.NewCache(db)),
+		cache:            map[common.Hash]EnvelopeState{},
+		batches:          map[common.Hash]map[common.Hash]struct{}{},
+		mailPeers:        mailservers.NewPeerStore(mailservers.NewCache(db)),
+		requestsRegistry: NewRequestsRegistry(0),
 	}
 }
 
