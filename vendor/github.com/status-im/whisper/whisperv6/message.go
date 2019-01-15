@@ -75,6 +75,7 @@ type ReceivedMessage struct {
 
 	SymKeyHash   common.Hash // The Keccak256Hash of the key
 	EnvelopeHash common.Hash // Message envelope hash to act as a unique id
+	History      bool
 }
 
 func isMessageSigned(flags byte) bool {
