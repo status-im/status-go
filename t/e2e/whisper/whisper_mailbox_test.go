@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/mailserver"
@@ -29,6 +28,7 @@ import (
 	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/crypto/sha3"
 )
 
 const mailboxPassword = "status-offline-inbox"

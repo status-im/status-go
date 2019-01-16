@@ -99,7 +99,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:ca77c7225db49544c7bf8ebc93d18e4063f32e60ed4894ff590c1cb8fe315d66"
+  digest = "1:11fb76e8d45f1b8e6812a61ea031e976afae1e21aa5f2aeac94322cbdaab31fc"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -134,7 +134,6 @@
     "crypto/bn256/google",
     "crypto/ecies",
     "crypto/secp256k1",
-    "crypto/sha3",
     "eth",
     "eth/downloader",
     "eth/fetcher",
@@ -169,9 +168,9 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "ffe89538dae6e643cb5dc599fe58c59a29eb75e5"
+  revision = "5c51e27be022a4c5056791060884eb1cd6d6d3d4"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.20"
+  version = "v1.8.21"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -837,8 +836,8 @@
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "109fa96320654a4f15f158a03245e7cd7457574a"
-  version = "v1.4.5"
+  revision = "9cdf6385f8a9d8a1cc5ab90dcbbc8cd7efca1e86"
+  version = "v1.4.6"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1085,7 +1084,6 @@
     "github.com/ethereum/go-ethereum/core/types",
     "github.com/ethereum/go-ethereum/crypto",
     "github.com/ethereum/go-ethereum/crypto/ecies",
-    "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/eth",
     "github.com/ethereum/go-ethereum/eth/downloader",
     "github.com/ethereum/go-ethereum/eth/filters",
@@ -1128,6 +1126,7 @@
     "github.com/syndtr/goleveldb/leveldb/util",
     "golang.org/x/crypto/hkdf",
     "golang.org/x/crypto/pbkdf2",
+    "golang.org/x/crypto/sha3",
     "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/text/unicode/norm",
     "gopkg.in/go-playground/validator.v9",
