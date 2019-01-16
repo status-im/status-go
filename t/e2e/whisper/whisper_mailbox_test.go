@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/mailserver"
@@ -29,6 +28,7 @@ import (
 	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/crypto/sha3"
 )
 
 const mailboxPassword = "status-offline-inbox"
@@ -930,7 +930,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 }
 
 func (s *WhisperMailboxSuite) createPublicChatTopic(name string) whisper.TopicType {
-	h := sha3.NewKeccak256()
+	h := sha3.NewLegacyKeccak256()
 	_, err := h.Write([]byte(name))
 	if err != nil {
 		s.Fail("error generating topic", "failed gerating topic from chat name, %+v", err)

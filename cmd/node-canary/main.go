@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -24,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
 	whisper "github.com/status-im/whisper/whisperv6"
+	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -306,7 +306,7 @@ func joinPublicChat(w *whisper.Whisper, rpcClient *rpc.Client, name string) (str
 		return "", whisper.TopicType{}, "", err
 	}
 
-	h := sha3.NewKeccak256()
+	h := sha3.NewLegacyKeccak256()
 	_, err = h.Write([]byte(name))
 	if err != nil {
 		return "", whisper.TopicType{}, "", err
