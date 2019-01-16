@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	bytes32Type, _ = abi.NewType("bytes32")
-	int256Type, _  = abi.NewType("int256")
+	bytes32Type, _ = abi.NewType("bytes32", nil)
+	int256Type, _  = abi.NewType("int256", nil)
 )
 
 // deps runs breadth-first traversal starting from target and collects all
@@ -126,7 +126,7 @@ func toABITypeAndValue(f Field, data map[string]json.RawMessage, types Types) (v
 }
 
 func atomicType(f Field, data map[string]json.RawMessage) (val interface{}, typ abi.Type, err error) {
-	typ, err = abi.NewType(f.Type)
+	typ, err = abi.NewType(f.Type, nil)
 	if err != nil {
 		return
 	}

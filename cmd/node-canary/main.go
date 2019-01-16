@@ -306,7 +306,7 @@ func joinPublicChat(w *whisper.Whisper, rpcClient *rpc.Client, name string) (str
 		return "", whisper.TopicType{}, "", err
 	}
 
-	h := sha3.NewKeccak256()
+	h := sha3.NewLegacyKeccak256()
 	_, err = h.Write([]byte(name))
 	if err != nil {
 		return "", whisper.TopicType{}, "", err

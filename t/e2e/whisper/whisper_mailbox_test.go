@@ -930,7 +930,7 @@ func (s *WhisperMailboxSuite) requestHistoricMessages(w *whisper.Whisper, rpcCli
 }
 
 func (s *WhisperMailboxSuite) createPublicChatTopic(name string) whisper.TopicType {
-	h := sha3.NewKeccak256()
+	h := sha3.NewLegacyKeccak256()
 	_, err := h.Write([]byte(name))
 	if err != nil {
 		s.Fail("error generating topic", "failed gerating topic from chat name, %+v", err)
