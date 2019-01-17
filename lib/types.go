@@ -64,18 +64,14 @@ func (e APIError) Error() string {
 
 // AccountInfo represents account's info.
 type AccountInfo struct {
-	// Address is the wallet address
-	Address string `json:"address"`
-	// PubKey is the wallet public key
-	PubKey string `json:"pubkey"`
-	// ChatAddress is the ethereum address of the key used for chat
-	ChatAddress string `json:"chatAddress"`
-	// ChatPubKey is the chat public key used as whisper identity
-	ChatPubKey string `json:"chatPubkey"`
-	// Mnemonic is the account mnemonic
-	Mnemonic string `json:"mnemonic"`
-	// Error contains a possible error generated during the creation of the account
-	Error string `json:"error"`
+	Address       string `json:"address"`
+	PubKey        string `json:"pubkey"`
+	WalletAddress string `json:"walletAddress"`
+	WalletPubKey  string `json:"walletPubKey"`
+	ChatAddress   string `json:"chatAddress"`
+	ChatPubKey    string `json:"chatPubKey"`
+	Mnemonic      string `json:"mnemonic"`
+	Error         string `json:"error"`
 }
 
 // NotifyResult is a JSON returned from notify message.

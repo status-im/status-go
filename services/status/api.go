@@ -54,8 +54,10 @@ type SignupRequest struct {
 
 // SignupResponse : json response returned by status_signup.
 type SignupResponse struct {
-	WalletAddress string `json:"address"`
-	WalletPubkey  string `json:"pubkey"`
+	Address       string `json:"address"`
+	Pubkey        string `json:"pubkey"`
+	WalletAddress string `json:"walletAddress"`
+	WalletPubkey  string `json:"walletPubKey"`
 	ChatAddress   string `json:"chatAddress"`
 	ChatPubkey    string `json:"chatPubkey"`
 	Mnemonic      string `json:"mnemonic"`
@@ -69,6 +71,8 @@ func (api *PublicAPI) Signup(context context.Context, req SignupRequest) (res Si
 		return
 	}
 
+	res.Address = accountInfo.WalletAddress
+	res.Pubkey = accountInfo.WalletPubKey
 	res.WalletAddress = accountInfo.WalletAddress
 	res.WalletPubkey = accountInfo.WalletPubKey
 	res.ChatAddress = accountInfo.ChatAddress

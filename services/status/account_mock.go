@@ -105,10 +105,10 @@ func (mr *MockAccountManagerMockRecorder) SelectAccount(walletAddress, chatAddre
 }
 
 // CreateAccount mocks base method
-func (m *MockAccountManager) CreateAccount(password string) (*account.Info, string, error) {
+func (m *MockAccountManager) CreateAccount(password string) (account.Info, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateAccount", password)
-	ret0, _ := ret[0].(*account.Info)
+	ret0, _ := ret[0].(account.Info)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2

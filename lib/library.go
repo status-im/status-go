@@ -254,12 +254,14 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:     info.WalletAddress,
-		PubKey:      info.WalletPubKey,
-		ChatAddress: info.ChatAddress,
-		ChatPubKey:  info.ChatPubKey,
-		Mnemonic:    mnemonic,
-		Error:       errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
@@ -297,12 +299,14 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:     info.WalletAddress,
-		PubKey:      info.WalletPubKey,
-		ChatAddress: info.ChatAddress,
-		ChatPubKey:  info.ChatPubKey,
-		Mnemonic:    C.GoString(mnemonic),
-		Error:       errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      C.GoString(mnemonic),
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))

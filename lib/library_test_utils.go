@@ -378,6 +378,12 @@ func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
 		t.Errorf("could not create account: %s", err)
 		return false
 	}
+
+	if createAccountResponse.Address != createAccountResponse.WalletAddress ||
+		createAccountResponse.PubKey != createAccountResponse.WalletPubKey {
+		t.Error("for backward compatibility pubkey/address should be equal to walletAddress/walletPubKey")
+	}
+
 	walletAddress, walletPubKey, chatAddress, _, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey,
 		createAccountResponse.ChatAddress, createAccountResponse.ChatPubKey, createAccountResponse.Mnemonic
 	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", walletAddress, walletPubKey, mnemonic)
@@ -514,6 +520,12 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 		t.Errorf("recover account failed: %v", recoverAccountResponse.Error)
 		return false
 	}
+
+	if recoverAccountResponse.Address != recoverAccountResponse.WalletAddress ||
+		recoverAccountResponse.PubKey != recoverAccountResponse.WalletPubKey {
+		t.Error("for backward compatibility pubkey/address should be equal to walletAddress/walletPubKey")
+	}
+
 	walletAddressCheck, walletPubKeyCheck := recoverAccountResponse.Address, recoverAccountResponse.PubKey
 	chatAddressCheck, chatPubKeyCheck := recoverAccountResponse.ChatAddress, recoverAccountResponse.ChatPubKey
 

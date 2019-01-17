@@ -119,7 +119,7 @@ var signuptests = []struct {
 		},
 		expectedError: nil,
 		prepareExpectations: func(s *StatusSuite) {
-			accountInfo := &account.Info{
+			accountInfo := account.Info{
 				WalletAddress: "addr",
 				WalletPubKey:  "pubkey",
 				ChatAddress:   "addr",
@@ -137,7 +137,7 @@ var signuptests = []struct {
 		},
 		expectedError: errors.New("could not create the specified account : foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return(nil, "", errors.New("foo"))
+			s.am.EXPECT().CreateAccount("password").Return(account.Info{}, "", errors.New("foo"))
 		},
 	},
 }
