@@ -420,9 +420,19 @@ func makeJSONResponse(err error) *C.char {
 	return C.CString(string(outBytes))
 }
 
-// NotifyUsers sends push notifications by given tokens.
-//export NotifyUsers
-func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
+// SendDataNotification sends push notifications by given tokens.
+// dataPayloadJSON is a JSON string that looks like this:
+// {
+// 	"data": {
+// 		"msg-v2": {
+// 			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
+// 			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
+// 			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
+// 		}
+// 	}
+// }
+//export SendDataNotification
+func SendDataNotification(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 	var (
 		err      error
 		outBytes []byte
@@ -430,14 +440,14 @@ func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 	errString := ""
 
 	defer func() {
-		out := NotifyResult{
+		out := SendDataNotificationResult{
 			Status: err == nil,
 			Error:  errString,
 		}
 
 		outBytes, err = json.Marshal(out)
 		if err != nil {
-			logger.Error("failed to marshal NotifyUsers output", "error", err)
+			logger.Error("failed to marshal SendDataNotification output", "error", err)
 			outCBytes = makeJSONResponse(err)
 			return
 		}
@@ -451,7 +461,7 @@ func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 		return
 	}
 
-	err = statusBackend.NotifyUsers(C.GoString(dataPayloadJSON), tokens...)
+	err = statusBackend.SendDataNotification(C.GoString(dataPayloadJSON), tokens...)
 	if err != nil {
 		errString = err.Error()
 		return
