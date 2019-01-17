@@ -56,14 +56,16 @@ func TestNewConfigFromJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpDir) // nolint: errcheck
-
-	c, err := params.NewConfigFromJSON(`{
+	json := `{
 		"NetworkId": 3,
 		"DataDir": "` + tmpDir + `",
-		"BackupDisabledDataDir": "` + tmpDir + `",
 		"KeyStoreDir": "` + tmpDir + `",
-		"NoDiscovery": true
-	}`)
+		"NoDiscovery": true,
+		"ShhextConfig": {
+			"BackupDisabledDataDir": "` + tmpDir + `"
+		}
+	}`
+	c, err := params.NewConfigFromJSON(json)
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), c.NetworkID)
 	require.Equal(t, tmpDir, c.DataDir)
@@ -105,7 +107,10 @@ func TestNodeConfigValidate(t *testing.T) {
 				"DataDir": "/tmp/data",
 				"BackupDisabledDataDir": "/tmp/data",
 				"KeyStoreDir": "/tmp/data",
-				"NoDiscovery": true
+				"NoDiscovery": true,
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 		},
 		{
@@ -135,7 +140,10 @@ func TestNodeConfigValidate(t *testing.T) {
 				"DataDir": "/some/dir",
 				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
-				"Name": "invalid/name"
+				"Name": "invalid/name",
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 			FieldErrors: map[string]string{
 				"Name": "excludes",
@@ -149,7 +157,10 @@ func TestNodeConfigValidate(t *testing.T) {
 				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
-				"NodeKey": "foo"
+				"NodeKey": "foo",
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 			Error: "NodeKey is invalid",
 		},
@@ -164,6 +175,9 @@ func TestNodeConfigValidate(t *testing.T) {
 				"UpstreamConfig": {
 					"Enabled": true,
 					"URL": "[bad.url]"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Error: "'[bad.url]' is invalid",
@@ -179,6 +193,9 @@ func TestNodeConfigValidate(t *testing.T) {
 				"UpstreamConfig": {
 					"Enabled": false,
 					"URL": "[bad.url]"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 		},
@@ -193,6 +210,9 @@ func TestNodeConfigValidate(t *testing.T) {
 				"UpstreamConfig": {
 					"Enabled": true,
 					"URL": "` + params.MainnetEthereumNetworkURL + `"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 		},
@@ -203,7 +223,10 @@ func TestNodeConfigValidate(t *testing.T) {
 				"DataDir": "/some/dir",
 				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": false
+				"NoDiscovery": false,
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 			Error: "NoDiscovery is false, but ClusterConfig.BootNodes is empty",
 		},
@@ -215,7 +238,10 @@ func TestNodeConfigValidate(t *testing.T) {
 				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
-				"Rendezvous": true
+				"Rendezvous": true,
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 			Error: "Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty",
 		},
@@ -224,12 +250,14 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"Rendezvous": false,
 				"ClusterConfig": {
 					"RendezvousNodes": ["a"]
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Error: "Rendezvous is disabled, but ClusterConfig.RendezvousNodes is not empty",
@@ -239,13 +267,15 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true,
 					"MailserverPassword": "foo"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Error: "WhisperConfig.DataDir must be specified when WhisperConfig.EnableMailServer is true",
@@ -255,14 +285,16 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true,
-					"MailserverPassword": "foo",
-					"DataDir": "/other/dir"
+					"DataDir": "/other/dir",
+					"MailserverPassword": "foo"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Error: "WhisperConfig.DataDir must start with DataDir fragment",
@@ -272,7 +304,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
@@ -280,6 +311,9 @@ func TestNodeConfigValidate(t *testing.T) {
 					"EnableMailServer": true,
 					"DataDir": "/some/dir",
 					"MailserverPassword": "foo"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
@@ -291,13 +325,15 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true,
 					"DataDir": "/some/dir"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Error: "WhisperConfig.MailServerPassword or WhisperConfig.MailServerAsymKey must be specified when WhisperConfig.EnableMailServer is true",
@@ -307,7 +343,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
@@ -315,6 +350,9 @@ func TestNodeConfigValidate(t *testing.T) {
 					"EnableMailServer": true,
 					"DataDir": "/some/dir",
 					"MailServerAsymKey": "06c365919f1fc8e13ff79a84f1dd14b7e45b869aa5fc0e34940481ee20d32f90"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
@@ -326,7 +364,6 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
@@ -334,6 +371,9 @@ func TestNodeConfigValidate(t *testing.T) {
 					"EnableMailServer": true,
 					"DataDir": "/foo",
 					"MailServerAsymKey": "bar"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Error: "WhisperConfig.MailServerAsymKey is invalid",
@@ -343,13 +383,15 @@ func TestNodeConfigValidate(t *testing.T) {
 			Config: `{
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
-				"PFSEnabled": true,
-				"BackupDisabledDataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": true,
 					"DataDir": "/foo"
+				},
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/some/dir",
+					"PFSEnabled": true
 				}
 			}`,
 			Error: "PFSEnabled is true, but InstallationID is empty",
@@ -360,7 +402,9 @@ func TestNodeConfigValidate(t *testing.T) {
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir"
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
 				require.Equal(t, []string{"localhost"}, config.HTTPVirtualHosts)
@@ -373,9 +417,11 @@ func TestNodeConfigValidate(t *testing.T) {
 				"NetworkId": 1,
 				"DataDir": "/some/dir",
 				"KeyStoreDir": "/some/dir",
-				"BackupDisabledDataDir": "/some/dir",
 				"HTTPVirtualHosts": ["my.domain.com"],
-				"HTTPCors": ["http://my.domain.com:8080"]
+				"HTTPCors": ["http://my.domain.com:8080"],
+				"ShhextConfig": {
+					"BackupDisabledDataDir": "/tmp"
+				}
 			}`,
 			CheckFunc: func(t *testing.T, config *params.NodeConfig) {
 				require.Equal(t, []string{"my.domain.com"}, config.HTTPVirtualHosts)
@@ -387,7 +433,6 @@ func TestNodeConfigValidate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			config, err := params.NewConfigFromJSON(tc.Config)
-
 			switch err := err.(type) {
 			case validator.ValidationErrors:
 				for _, ve := range err {
