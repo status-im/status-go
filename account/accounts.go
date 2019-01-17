@@ -51,13 +51,13 @@ func NewManager(geth GethServiceProvider) *Manager {
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func (m *Manager) CreateAccount(password string) (*Info, string, error) {
-	info := &Info{}
+func (m *Manager) CreateAccount(password string) (Info, string, error) {
+	info := Info{}
 	// generate mnemonic phrase
 	mn := extkeys.NewMnemonic()
 	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
 	if err != nil {
-		return nil, "", fmt.Errorf("can not create mnemonic seed: %v", err)
+		return info, "", fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
 
 	// Generate extended master key (see BIP32)
@@ -67,13 +67,13 @@ func (m *Manager) CreateAccount(password string) (*Info, string, error) {
 	// for expert users, to be able to add a passphrase to the generation of the seed.
 	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
-		return nil, "", fmt.Errorf("can not create master extended key: %v", err)
+		return info, "", fmt.Errorf("can not create master extended key: %v", err)
 	}
 
 	// import created key into account keystore
 	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
 	if err != nil {
-		return nil, "", err
+		return info, "", err
 	}
 
 	info.ChatAddress = info.WalletAddress
@@ -144,19 +144,19 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 
 // RecoverAccount re-creates master key using given details.
 // Once master key is re-generated, it is inserted into keystore (if not already there).
-func (m *Manager) RecoverAccount(password, mnemonic string) (*Info, error) {
-	info := &Info{}
+func (m *Manager) RecoverAccount(password, mnemonic string) (Info, error) {
+	info := Info{}
 	// re-create extended key (see BIP32)
 	mn := extkeys.NewMnemonic()
 	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
 	if err != nil {
-		return nil, ErrInvalidMasterKeyCreated
+		return info, ErrInvalidMasterKeyCreated
 	}
 
 	// import re-created key into account keystore
 	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
 	if err != nil {
-		return nil, err
+		return info, err
 	}
 
 	info.ChatAddress = info.WalletAddress
