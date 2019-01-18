@@ -70,8 +70,8 @@ type AccountInfo struct {
 	Error    string `json:"error"`
 }
 
-// NotifyResult is a JSON returned from notify message.
-type NotifyResult struct {
+// SendDataNotificationResult is a JSON returned from notify message.
+type SendDataNotificationResult struct {
 	Status bool   `json:"status"`
 	Error  string `json:"error,omitempty"`
 }
