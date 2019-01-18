@@ -64,7 +64,7 @@ func (e APIError) Error() string {
 
 // AccountInfo represents account's info.
 type AccountInfo struct {
-	Address       string `json:"address"`
+	Address       string `json:"address"` // DEPRECATED
 	PubKey        string `json:"pubkey"` // DEPRECATED
 	WalletAddress string `json:"walletAddress"`
 	WalletPubKey  string `json:"walletPubKey"`
