@@ -246,7 +246,7 @@ func CallPrivateRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
+	info, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -255,10 +255,14 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: mnemonic,
-		Error:    errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
@@ -287,7 +291,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	address, pubKey, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	info, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := ""
 	if err != nil {
@@ -296,10 +300,14 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: C.GoString(mnemonic),
-		Error:    errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      C.GoString(mnemonic),
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
@@ -316,7 +324,7 @@ func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 // if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 //export Login
 func Login(address, password *C.char) *C.char {
-	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(password))
+	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 

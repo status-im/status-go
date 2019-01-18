@@ -1,14 +1,17 @@
 {
   "Account1": {
-    "Address": "0xbF164ca341326a03b547c05B343b2E21eFAe24b9",
+    "WalletAddress": "0xbF164ca341326a03b547c05B343b2E21eFAe24b9",
+    "ChatAddress": "0xbF164ca341326a03b547c05B343b2E21eFAe24b9",
     "Password": "password"
   },
   "Account2": {
-    "Address": "0x205a5d0E72ff65079FCaBB4A63E33d28aA6Def2C",
+    "WalletAddress": "0x205a5d0E72ff65079FCaBB4A63E33d28aA6Def2C",
+    "ChatAddress": "0x205a5d0E72ff65079FCaBB4A63E33d28aA6Def2C",
     "Password": "password"
   },
   "Account3": {
-    "Address": "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
+    "WalletAddress": "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
+    "ChatAddress": "0x3ad34e698d4806afd08b359b920f5c6b62b68ee4",
     "Password": "password"
   }
 }

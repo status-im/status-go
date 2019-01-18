@@ -3,11 +3,10 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"testing"
 	"time"
-
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/node"
@@ -174,7 +173,7 @@ func (s *RPCTestSuite) TestCallContextResult() {
 	defer cancel()
 
 	var balance hexutil.Big
-	err := client.CallContext(ctx, &balance, "eth_getBalance", TestConfig.Account1.Address, "latest")
+	err := client.CallContext(ctx, &balance, "eth_getBalance", TestConfig.Account1.WalletAddress, "latest")
 	s.NoError(err)
 	s.True(balance.ToInt().Cmp(big.NewInt(0)) > 0, "balance should be higher than 0")
 }

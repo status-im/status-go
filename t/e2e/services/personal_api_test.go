@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/params"
-	"github.com/stretchr/testify/suite"
-
 	. "github.com/status-im/status-go/t/utils"
+	"github.com/stretchr/testify/suite"
 )
 
 const (
@@ -65,7 +64,7 @@ func (s *PersonalSignSuite) TestPersonalSignUnsupportedMethod() {
 	basicCall := fmt.Sprintf(
 		`{"jsonrpc":"2.0","method":"personal_sign","params":["%s", "%s"],"id":67}`,
 		signDataString,
-		TestConfig.Account1.Address)
+		TestConfig.Account1.WalletAddress)
 
 	rawResult, err := s.Backend.CallRPC(basicCall)
 	s.NoError(err)

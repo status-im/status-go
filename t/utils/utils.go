@@ -19,11 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
-
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
 
@@ -307,8 +305,9 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 }
 
 type account struct {
-	Address  string
-	Password string
+	WalletAddress string
+	ChatAddress   string
+	Password      string
 }
 
 // testConfig contains shared (among different test packages) parameters

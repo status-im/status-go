@@ -9,9 +9,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/status"
-	"github.com/stretchr/testify/suite"
-
 	. "github.com/status-im/status-go/t/utils"
+	"github.com/stretchr/testify/suite"
 )
 
 type statusTestParams struct {
@@ -62,7 +61,7 @@ func (s *StatusAPISuite) TestAccessibleStatusAPIs() {
 
 func (s *StatusAPISuite) TestStatusLoginSuccess() {
 	addressKeyID := s.testStatusLogin(statusTestParams{
-		Address:  TestConfig.Account1.Address,
+		Address:  TestConfig.Account1.WalletAddress,
 		Password: TestConfig.Account1.Password,
 	})
 	s.NotEmpty(addressKeyID)
@@ -90,13 +89,13 @@ func (s *StatusAPISuite) TestStatusSignupSuccess() {
 	res := s.testStatusSignup(statusTestParams{
 		Password: pwd,
 	})
-	s.NotEmpty(res.Address)
-	s.NotEmpty(res.Pubkey)
+	s.NotEmpty(res.WalletAddress)
+	s.NotEmpty(res.WalletPubkey)
 	s.Equal(12, len(strings.Split(res.Mnemonic, " ")))
 
 	// I should be able to login with the newly created account
 	_ = s.testStatusLogin(statusTestParams{
-		Address:  res.Address,
+		Address:  res.WalletAddress,
 		Password: pwd,
 	})
 }

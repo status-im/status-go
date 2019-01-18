@@ -70,7 +70,7 @@ func (s *TransactionsTestSuite) TestCallUpstreamPrivateRPCSendTransaction() {
 func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(
 	callRPCFn func(string) (string, error),
 ) {
-	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	result, err := callRPCFn(`{
@@ -78,7 +78,7 @@ func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(
 		"id": 1,
 		"method": "eth_sendTransaction",
 		"params": [{
-			"from": "` + TestConfig.Account1.Address + `",
+			"from": "` + TestConfig.Account1.WalletAddress + `",
 			"to": "0xd46e8dd67c5d32be8058bb8eb970870f07244567",
 			"value": "0x9184e72a"
 		}]
@@ -94,11 +94,11 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
-	err := s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	args := transactions.SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
+		From: account.FromAddress(TestConfig.Account1.WalletAddress),
 	}
 
 	hash, err := s.Backend.SendTransaction(args, TestConfig.Account1.Password)
@@ -162,7 +162,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// this call blocks, up until Complete Transaction is called
@@ -171,7 +171,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 
 	gas := uint64(params.DefaultGas)
 	args := transactions.SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
+		From: account.FromAddress(TestConfig.Account1.WalletAddress),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
 		Gas: (*hexutil.Uint64)(&gas),
@@ -196,12 +196,12 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
-		From:  account.FromAddress(TestConfig.Account1.Address),
-		To:    account.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, TestConfig.Account1.Password)
 	s.NoError(err)
@@ -216,12 +216,12 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err = s.Backend.SelectAccount(TestConfig.Account1.Address, TestConfig.Account1.Password)
+	err = s.Backend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
 	s.NoError(err)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
-		From:     account.FromAddress(TestConfig.Account1.Address),
-		To:       account.ToAddress(TestConfig.Account2.Address),
+		From:     account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:       account.ToAddress(TestConfig.Account2.WalletAddress),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
 		Value:    (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, TestConfig.Account1.Password)
