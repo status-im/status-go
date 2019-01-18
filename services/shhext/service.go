@@ -147,7 +147,7 @@ func (s *Service) InitProtocol(address string, password string) error {
 	}
 
 	// Fix IOS not encrypting database
-	if err := chat.MigrateDBFile(v3Path, v4Path, "", hashedPassword); err != nil {
+	if err := chat.EncryptDatabase(v3Path, v4Path, hashedPassword); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
