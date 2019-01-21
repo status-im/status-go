@@ -44,6 +44,28 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")), addedBundlesHandler)
 }
 
+func (s *ProtocolServiceTestSuite) TestBuildPublicMessage() {
+	aliceKey, err := crypto.GenerateKey()
+	s.NoError(err)
+
+	payload, err := proto.Marshal(&ChatMessagePayload{
+		Content:     "Test content",
+		ClockValue:  1,
+		ContentType: "a",
+		MessageType: "some type",
+	})
+	s.NoError(err)
+
+	marshaledMsg, err := s.alice.BuildPublicMessage(aliceKey, payload)
+	s.NoError(err)
+	s.NotNil(marshaledMsg, "It creates a message")
+
+	unmarshaledMsg := &ProtocolMessage{}
+	err = proto.Unmarshal(marshaledMsg, unmarshaledMsg)
+	s.NoError(err)
+	s.NotNilf(unmarshaledMsg.GetBundles(), "It adds a bundle to the message")
+}
+
 func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	bobKey, err := crypto.GenerateKey()
 	s.NoError(err)
@@ -59,24 +81,19 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	s.NoError(err)
 
 	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, payload, &bobKey.PublicKey, &aliceKey.PublicKey)
-
 	s.NoError(err)
 	s.NotNil(marshaledMsg, "It creates a message")
 	s.NotNil(marshaledMsg[&aliceKey.PublicKey], "It creates a single message")
 
 	unmarshaledMsg := &ProtocolMessage{}
 	err = proto.Unmarshal(marshaledMsg[&bobKey.PublicKey], unmarshaledMsg)
-
 	s.NoError(err)
-
-	s.NotNilf(unmarshaledMsg.GetBundles(), "It adds a bundle to the message")
+	s.NotNilf(unmarshaledMsg.GetBundle(), "It adds a bundle to the message")
 
 	directMessage := unmarshaledMsg.GetDirectMessage()
-
 	s.NotNilf(directMessage, "It sets the direct message")
 
 	encryptedPayload := directMessage["none"].GetPayload()
-
 	s.NotNilf(encryptedPayload, "It sets the payload of the message")
 
 	s.NotEqualf(payload, encryptedPayload, "It encrypts the payload")
