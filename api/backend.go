@@ -9,6 +9,7 @@ import (
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -483,6 +484,50 @@ func (b *StatusBackend) SendDataNotification(dataPayloadJSON string, tokens ...s
 	}
 
 	return err
+}
+
+func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	chatKey, err := ethcrypto.HexToECDSA(chatKeyHex)
+	if err != nil {
+		return err
+	}
+
+	err = b.accountManager.InjectChatAccount(chatKey)
+	if err != nil {
+		return err
+	}
+
+	chatAccount, err := b.accountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+
+	whisperService, err := b.statusNode.WhisperService()
+	switch err {
+	case node.ErrServiceUnknown: // Whisper was never registered
+	case nil:
+		if err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey); err != nil {
+			return ErrWhisperIdentityInjectionFailure
+		}
+	default:
+		return err
+	}
+
+	if whisperService != nil {
+		st, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.InitProtocol(chatAccount.Address.Hex(), encryptionKeyHex); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {

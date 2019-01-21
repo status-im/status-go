@@ -327,6 +327,11 @@ func Login(address, password *C.char) *C.char {
 	return makeJSONResponse(err)
 }
 
+func LoginWithKeycard(chatKeyData, encryptionKeyData *C.char) *C.char {
+	err := statusBackend.InjectChatAccount(C.GoString(chatKeyData), C.GoString(encryptionKeyData))
+	return makeJSONResponse(err)
+}
+
 //Logout is equivalent to clearing whisper identities
 //export Logout
 func Logout() *C.char {
