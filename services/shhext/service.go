@@ -234,7 +234,12 @@ func (s *Service) Start(server *p2p.Server) error {
 		if connectionsTarget == 0 {
 			connectionsTarget = defaultConnectionsTarget
 		}
-		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget, defaultTimeoutWaitAdded)
+		maxFailures := s.config.MaxServerFailures
+		// if not defined change server on first expired event
+		if maxFailures == 0 {
+			maxFailures = 1
+		}
+		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget, maxFailures, defaultTimeoutWaitAdded)
 		s.connManager.Start()
 		if err := mailservers.EnsureUsedRecordsAddedFirst(s.peerStore, s.connManager); err != nil {
 			return err
