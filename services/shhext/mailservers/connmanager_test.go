@@ -86,7 +86,7 @@ type fakeEnvelopeEvents struct {
 	input chan whisper.EnvelopeEvent
 }
 
-func (f fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whisper.EnvelopeEvent) event.Subscription {
+func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whisper.EnvelopeEvent) event.Subscription {
 	return event.NewSubscription(func(quit <-chan struct{}) error {
 		for {
 			select {
@@ -100,8 +100,8 @@ func (f fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whisper.Envelo
 	})
 }
 
-func newFakeEnvelopesEvents() fakeEnvelopeEvents {
-	return fakeEnvelopeEvents{
+func newFakeEnvelopesEvents() *fakeEnvelopeEvents {
+	return &fakeEnvelopeEvents{
 		input: make(chan whisper.EnvelopeEvent),
 	}
 }
@@ -193,7 +193,7 @@ func TestConnectionManagerAddDrop(t *testing.T) {
 	server := newFakeServer()
 	whisper := newFakeEnvelopesEvents()
 	target := 1
-	connmanager := NewConnectionManager(server, whisper, target, 0)
+	connmanager := NewConnectionManager(server, whisper, target, 1, 0)
 	connmanager.Start()
 	defer connmanager.Stop()
 	nodes := []*enode.Node{}
@@ -235,7 +235,7 @@ func TestConnectionManagerReplace(t *testing.T) {
 	server := newFakeServer()
 	whisper := newFakeEnvelopesEvents()
 	target := 1
-	connmanager := NewConnectionManager(server, whisper, target, 0)
+	connmanager := NewConnectionManager(server, whisper, target, 1, 0)
 	connmanager.Start()
 	defer connmanager.Stop()
 	nodes := []*enode.Node{}
@@ -273,13 +273,9 @@ func TestConnectionManagerReplace(t *testing.T) {
 	}, time.Second, 100*time.Millisecond))
 }
 
-func TestConnectionChangedAfterExpiry(t *testing.T) {
-	server := newFakeServer()
-	whisperMock := newFakeEnvelopesEvents()
-	target := 1
-	connmanager := NewConnectionManager(server, whisperMock, target, 0)
+func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whisperMock *fakeEnvelopeEvents, target, maxFailures int, hash common.Hash) (*ConnectionManager, enode.ID) {
+	connmanager := NewConnectionManager(server, whisperMock, target, maxFailures, 0)
 	connmanager.Start()
-	defer connmanager.Stop()
 	nodes := []*enode.Node{}
 	for _, n := range getMapWithRandomNodes(t, 2) {
 		nodes = append(nodes, n)
@@ -296,7 +292,6 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 		initial = nodes[0]
 		return nil
 	}, time.Second, 100*time.Millisecond))
-	hash := common.Hash{1}
 	// Send event that history request for connected peer was sent.
 	select {
 	case whisperMock.input <- whisper.EnvelopeEvent{
@@ -304,7 +299,67 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'sent' event")
 	}
+	return connmanager, initial
+}
+
+func TestConnectionChangedAfterExpiry(t *testing.T) {
+	server := newFakeServer()
+	whisperMock := newFakeEnvelopesEvents()
+	target := 1
+	maxFailures := 1
+	hash := common.Hash{1}
+	connmanager, initial := setupTestConnectionAfterExpiry(t, server, whisperMock, target, maxFailures, hash)
+	defer connmanager.Stop()
+
 	// And eventually expired.
+	select {
+	case whisperMock.input <- whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case <-time.After(time.Second):
+		require.FailNow(t, "can't send an 'expiry' event")
+	}
+	require.NoError(t, utils.Eventually(func() error {
+		nodes := server.Nodes()
+		if len(nodes) != target {
+			return fmt.Errorf("unexpected number of connected servers: %d", len(nodes))
+		}
+		if nodes[0] == initial {
+			return fmt.Errorf("connected node wasn't changed from %s", initial)
+		}
+		return nil
+	}, time.Second, 100*time.Millisecond))
+}
+
+func TestConnectionChangedAfterSecondExpiry(t *testing.T) {
+	server := newFakeServer()
+	whisperMock := newFakeEnvelopesEvents()
+	target := 1
+	maxFailures := 2
+	hash := common.Hash{1}
+	connmanager, initial := setupTestConnectionAfterExpiry(t, server, whisperMock, target, maxFailures, hash)
+	defer connmanager.Stop()
+
+	// First expired is sent. Nothing should happen.
+	select {
+	case whisperMock.input <- whisper.EnvelopeEvent{
+		Event: whisper.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case <-time.After(time.Second):
+		require.FailNow(t, "can't send an 'expiry' event")
+	}
+
+	// we use 'eventually' as 'consistently' because this function will retry for a given timeout while error is received
+	require.EqualError(t, utils.Eventually(func() error {
+		nodes := server.Nodes()
+		if len(nodes) != target {
+			return fmt.Errorf("unexpected number of connected servers: %d", len(nodes))
+		}
+		if nodes[0] == initial {
+			return fmt.Errorf("connected node wasn't changed from %s", initial)
+		}
+		return nil
+	}, time.Second, 100*time.Millisecond), fmt.Sprintf("connected node wasn't changed from %s", initial))
+
+	// second expiry event
 	select {
 	case whisperMock.input <- whisper.EnvelopeEvent{
 		Event: whisper.EventMailServerRequestExpired, Peer: initial, Hash: hash}:

@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -20,6 +22,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+)
+
+const (
+	// internal whisper protocol codes
+	statusCode             = 0
+	p2pRequestCompleteCode = 125
 )
 
 func newHandlerMock(buf int) handlerMock {
@@ -448,4 +456,91 @@ func waitForHashInTracker(track *tracker, hash common.Hash, state EnvelopeState,
 			}
 		}
 	}
+}
+
+func TestRequestMessagesSync(t *testing.T) {
+	suite.Run(t, new(RequestMessagesSyncSuite))
+}
+
+type RequestMessagesSyncSuite struct {
+	suite.Suite
+
+	localAPI  *PublicAPI
+	localNode *enode.Node
+	remoteRW  *p2p.MsgPipeRW
+}
+
+func (s *RequestMessagesSyncSuite) SetupTest() {
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.Require().NoError(err)
+	conf := &whisper.Config{
+		MinimumAcceptedPOW: 0,
+		MaxMessageSize:     100 << 10,
+	}
+	w := whisper.New(conf)
+	pkey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	node := enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
+	peer := p2p.NewPeer(node.ID(), "1", []p2p.Cap{{"shh", 6}})
+	rw1, rw2 := p2p.MsgPipe()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(peer, rw2)
+		errorc <- err
+	}()
+	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	s.Require().NoError(p2p.SendItems(rw1, statusCode, whisper.ProtocolVersion, whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
+
+	service := New(w, nil, db, params.ShhextConfig{})
+
+	s.localAPI = NewPublicAPI(service)
+	s.localNode = node
+	s.remoteRW = rw1
+}
+
+func (s *RequestMessagesSyncSuite) TestExpired() {
+	// intentionally discarding all requests, so that request will timeout
+	go func() {
+		msg, err := s.remoteRW.ReadMsg()
+		s.Require().NoError(err)
+		s.Require().NoError(msg.Discard())
+	}()
+	s.Require().EqualError(s.localAPI.RequestMessagesSync(RetryConfig{
+		BaseTimeout: time.Second,
+	}, MessagesRequest{
+		MailServerPeer: s.localNode.String(),
+	}), "failed to request messages after 1 retries")
+}
+
+func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
+	go func() {
+		attempt := 0
+		for {
+			attempt++
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			if attempt < target {
+				s.Require().NoError(msg.Discard())
+				continue
+			}
+			var e whisper.Envelope
+			s.Require().NoError(msg.Decode(&e))
+			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, whisper.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, []byte{})))
+		}
+	}()
+	s.Require().NoError(s.localAPI.RequestMessagesSync(RetryConfig{
+		BaseTimeout: time.Second,
+		MaxRetries:  target,
+	}, MessagesRequest{
+		MailServerPeer: s.localNode.String(),
+		Force:          true, // force true is convenient here because timeout is less then default delay (3s)
+	}))
+}
+
+func (s *RequestMessagesSyncSuite) TestCompletedFromFirstAttempt() {
+	s.testCompletedFromAttempt(1)
+}
+
+func (s *RequestMessagesSyncSuite) TestCompletedFromSecondAttempt() {
+	s.testCompletedFromAttempt(2)
 }

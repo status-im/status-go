@@ -180,6 +180,58 @@ func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
 	return enode.ParseV4(rawurl)
 }
 
+// RetryConfig specifies configuration for retries with timeout and max amount of retries.
+type RetryConfig struct {
+	BaseTimeout time.Duration
+	// StepTimeout defines duration increase per each retry.
+	StepTimeout time.Duration
+	MaxRetries  int
+}
+
+// RequestMessagesSync repeats MessagesRequest using configuration in retry conf.
+func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) error {
+	shh := api.service.w
+	events := make(chan whisper.EnvelopeEvent, 10)
+	sub := shh.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+	var (
+		requestID hexutil.Bytes
+		err       error
+		retries   int
+	)
+	for retries <= conf.MaxRetries {
+		r.Timeout = conf.BaseTimeout + conf.StepTimeout*time.Duration(retries)
+		// FIXME this weird conversion is required because MessagesRequest expects seconds but defines time.Duration
+		r.Timeout = time.Duration(int(r.Timeout.Seconds()))
+		requestID, err = api.RequestMessages(context.Background(), r)
+		if err != nil {
+			return err
+		}
+		err = waitForExpiredOrCompleted(common.BytesToHash(requestID), events)
+		if err == nil {
+			return nil
+		}
+		retries++
+		api.log.Error("History request failed with %s. Making retry #%d", retries)
+	}
+	return fmt.Errorf("failed to request messages after %d retries", retries)
+}
+
+func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.EnvelopeEvent) error {
+	for {
+		ev := <-events
+		if ev.Hash != requestID {
+			continue
+		}
+		switch ev.Event {
+		case whisper.EventMailServerRequestCompleted:
+			return nil
+		case whisper.EventMailServerRequestExpired:
+			return errors.New("request expired")
+		}
+	}
+}
+
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hexutil.Bytes, error) {
 	api.log.Info("RequestMessages", "request", r)

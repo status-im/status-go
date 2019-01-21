@@ -318,6 +318,9 @@ type ShhextConfig struct {
 	ConnectionTarget int
 	// RequestsDelay used to ensure that no similar requests are sent within short periods of time.
 	RequestsDelay time.Duration
+
+	// MaxServerFailures defines maximum allowed expired requests before server will be swapped to another one.
+	MaxServerFailures int
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
