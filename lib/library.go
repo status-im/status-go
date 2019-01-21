@@ -327,6 +327,9 @@ func Login(address, password *C.char) *C.char {
 	return makeJSONResponse(err)
 }
 
+//LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
+// It purges all the previous identities from Whisper, and injects the key as shh identity.
+// export LoginWithKeycard
 func LoginWithKeycard(chatKeyData, encryptionKeyData *C.char) *C.char {
 	err := statusBackend.InjectChatAccount(C.GoString(chatKeyData), C.GoString(encryptionKeyData))
 	return makeJSONResponse(err)
