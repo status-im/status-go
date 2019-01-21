@@ -1,6 +1,7 @@
 package account
 
 import (
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pborman/uuid"
+
 	"github.com/status-im/status-go/extkeys"
 )
 
@@ -241,6 +244,27 @@ func (m *Manager) SelectAccount(walletAddress, chatAddress, password string) err
 
 	m.selectedWalletAccount = selectedWalletAccount
 	m.selectedChatAccount = selectedChatAccount
+
+	return nil
+}
+
+// InjectChatAccount initializes selectedChatAccount with privKey
+func (m *Manager) InjectChatAccount(privKey *ecdsa.PrivateKey) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	address := crypto.PubkeyToAddress(privKey.PublicKey)
+	id := uuid.NewRandom()
+	key := &keystore.Key{
+		Id:         id,
+		Address:    address,
+		PrivateKey: privKey,
+	}
+
+	m.selectedChatAccount = &SelectedExtKey{
+		Address:    address,
+		AccountKey: key,
+	}
 
 	return nil
 }
