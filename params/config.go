@@ -2,6 +2,7 @@ package params
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -283,7 +284,7 @@ type NodeConfig struct {
 	WhisperConfig WhisperConfig `json:"WhisperConfig," validate:"structonly"`
 
 	// ShhextConfig keeps configuration for service running under shhext namespace.
-	ShhextConfig ShhextConfig `json:"ShhextConfig," validate:"required"`
+	ShhextConfig ShhextConfig `json:"ShhextConfig," validate:"structonly"`
 
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
@@ -302,12 +303,12 @@ type NodeConfig struct {
 
 // ShhextConfig defines options used by shhext service.
 type ShhextConfig struct {
+	PFSEnabled bool
 	// BackupDisabledDataDir is the file system folder the node should use for any data storage needs that it doesn't want backed up.
-	BackupDisabledDataDir string `validate:"required"`
+	BackupDisabledDataDir string
 	// InstallationId id of the current installation
 	InstallationID  string
 	DebugAPIEnabled bool
-	PFSEnabled      bool
 	// MailServerConfirmations should be true if client wants to receive confirmatons only from a selected mail servers.
 	MailServerConfirmations bool
 	// EnableConnectionManager turns on management of the mail server connections if true.
@@ -322,7 +323,13 @@ type ShhextConfig struct {
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
 func (c *ShhextConfig) Validate(validate *validator.Validate) error {
-	return validate.Struct(c)
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+	if c.PFSEnabled && len(c.BackupDisabledDataDir) == 0 {
+		return errors.New("field BackupDisabledDataDir is required if PFSEnabled is true")
+	}
+	return nil
 }
 
 // Option is an additional setting when creating a NodeConfig
