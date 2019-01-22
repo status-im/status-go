@@ -46,9 +46,6 @@ func TestValidateNodeConfig(t *testing.T) {
 					"EnableMailServer": true,
 					"DataDir": "/tmp",
 					"MailServerPassword": "status-offline-inbox"
-				},
-				"ShhextConfig": {
-					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Callback: noErrorsCallback,
@@ -69,9 +66,6 @@ func TestValidateNodeConfig(t *testing.T) {
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": false
-				},
-				"ShhextConfig": {
-					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Callback: func(t *testing.T, resp APIDetailedResponse) {
@@ -97,9 +91,7 @@ func TestValidateNodeConfig(t *testing.T) {
 			}`,
 			Callback: func(t *testing.T, resp APIDetailedResponse) {
 				require.False(t, resp.Status)
-				require.Equal(t, 1, len(resp.FieldErrors))
-				require.Equal(t, "NodeConfig.ShhextConfig.BackupDisabledDataDir", resp.FieldErrors[0].Parameter)
-				require.Contains(t, resp.Message, "validation: validation failed")
+				require.Contains(t, resp.Message, "validation: field BackupDisabledDataDir is required if PFSEnabled is true")
 			},
 		},
 		{
@@ -110,9 +102,6 @@ func TestValidateNodeConfig(t *testing.T) {
 				"NoDiscovery": true,
 				"WhisperConfig": {
 					"Enabled": false
-				},
-				"ShhextConfig": {
-					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Callback: func(t *testing.T, resp APIDetailedResponse) {
@@ -132,9 +121,6 @@ func TestValidateNodeConfig(t *testing.T) {
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": true
-				},
-				"ShhextConfig": {
-					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Callback: func(t *testing.T, resp APIDetailedResponse) {
@@ -153,9 +139,6 @@ func TestValidateNodeConfig(t *testing.T) {
 				"WhisperConfig": {
 					"Enabled": true,
 					"EnableMailServer": false
-				},
-				"ShhextConfig": {
-					"BackupDisabledDataDir": "/tmp"
 				}
 			}`,
 			Callback: noErrorsCallback,
@@ -165,15 +148,14 @@ func TestValidateNodeConfig(t *testing.T) {
 			Config: `{}`,
 			Callback: func(t *testing.T, resp APIDetailedResponse) {
 				required := map[string]string{
-					"NodeConfig.NetworkID":                          "required",
-					"NodeConfig.DataDir":                            "required",
-					"NodeConfig.ShhextConfig.BackupDisabledDataDir": "required",
-					"NodeConfig.KeyStoreDir":                        "required",
+					"NodeConfig.NetworkID":   "required",
+					"NodeConfig.DataDir":     "required",
+					"NodeConfig.KeyStoreDir": "required",
 				}
 
 				require.False(t, resp.Status)
 				require.Contains(t, resp.Message, "validation: validation failed")
-				require.Equal(t, 4, len(resp.FieldErrors))
+				require.Equal(t, 3, len(resp.FieldErrors))
 
 				for _, err := range resp.FieldErrors {
 					require.Contains(t, required, err.Parameter, err.Error())
