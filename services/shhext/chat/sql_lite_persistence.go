@@ -983,11 +983,13 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 			return err
 		}
 
-		// We update timestamp if present without changing enabled
+		// We update timestamp if present without changing enabled, only if this is a new bundle
 		if err != sql.ErrNoRows {
 			stmt, err = tx.Prepare(`UPDATE installations
 					        SET timestamp = ?,  enabled = ?
-						WHERE identity = ? AND installation_id = ?`)
+						WHERE identity = ?
+						AND installation_id = ?
+						AND timestamp < ?`)
 			if err != nil {
 				return err
 			}
@@ -997,6 +999,7 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 				oldEnabled,
 				identity,
 				installationID,
+				timestamp,
 			)
 			if err != nil {
 				return err

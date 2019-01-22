@@ -80,13 +80,12 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	})
 	s.NoError(err)
 
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, payload, &bobKey.PublicKey, &aliceKey.PublicKey)
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
 	s.NotNil(marshaledMsg, "It creates a message")
-	s.NotNil(marshaledMsg[&aliceKey.PublicKey], "It creates a single message")
 
 	unmarshaledMsg := &ProtocolMessage{}
-	err = proto.Unmarshal(marshaledMsg[&bobKey.PublicKey], unmarshaledMsg)
+	err = proto.Unmarshal(marshaledMsg, unmarshaledMsg)
 	s.NoError(err)
 	s.NotNilf(unmarshaledMsg.GetBundle(), "It adds a bundle to the message")
 
@@ -116,12 +115,12 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	s.NoError(err)
 
 	// Message is sent with DH
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, marshaledPayload, &bobKey.PublicKey)
+	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, marshaledPayload)
 
 	s.NoError(err)
 
 	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg[&bobKey.PublicKey])
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg)
 	s.NoError(err)
 
 	s.NotNil(unmarshaledMsg)

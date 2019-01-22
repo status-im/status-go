@@ -501,3 +501,21 @@ func SetMobileSignalHandler(handler SignalHandler) {
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
 }
+
+// Get an X3DH bundle
+//export GetContactCode
+func GetContactCode(identity string) string {
+	bundle, err := statusBackend.GetContactCode(identity)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		ContactCode string `json:"code"`
+	}{ContactCode: bundle})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}

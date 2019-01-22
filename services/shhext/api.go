@@ -422,7 +422,7 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
-func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) ([]hexutil.Bytes, error) {
+func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
 	if !api.service.pfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -438,29 +438,26 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	}
 
 	// This is transport layer-agnostic
-	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, msg.Payload, publicKey)
+	var protocolMessage []byte
+
+	if msg.DH {
+		protocolMessage, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
+	} else {
+		protocolMessage, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	var response []hexutil.Bytes
+	// Enrich with transport layer info
+	whisperMessage := chat.DirectMessageToWhisper(msg, protocolMessage)
 
-	for key, message := range protocolMessages {
-		msg.PubKey = crypto.FromECDSAPub(key)
-		// Enrich with transport layer info
-		whisperMessage := chat.DirectMessageToWhisper(msg, message)
-
-		// And dispatch
-		hash, err := api.Post(ctx, whisperMessage)
-		if err != nil {
-			return nil, err
-		}
-		response = append(response, hash)
-
-	}
-	return response, nil
+	// And dispatch
+	return api.Post(ctx, whisperMessage)
 }
 
+// DEPRECATED: use SendDirectMessage with DH flag
 // SendPairingMessage sends a 1:1 chat message to our own devices to initiate a pairing session
 func (api *PublicAPI) SendPairingMessage(ctx context.Context, msg chat.SendDirectMessageRPC) ([]hexutil.Bytes, error) {
 	if !api.service.pfsEnabled {
@@ -477,7 +474,7 @@ func (api *PublicAPI) SendPairingMessage(ctx context.Context, msg chat.SendDirec
 		return nil, err
 	}
 
-	protocolMessage, err := api.service.protocol.BuildPairingMessage(privateKey, msg.Payload)
+	protocolMessage, err := api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -494,57 +491,6 @@ func (api *PublicAPI) SendPairingMessage(ctx context.Context, msg chat.SendDirec
 	}
 	response = append(response, hash)
 
-	return response, nil
-}
-
-// SendGroupMessage sends a group messag chat message to the underlying transport
-func (api *PublicAPI) SendGroupMessage(ctx context.Context, msg chat.SendGroupMessageRPC) ([]hexutil.Bytes, error) {
-	if !api.service.pfsEnabled {
-		return nil, ErrPFSNotEnabled
-	}
-
-	// To be completely agnostic from whisper we should not be using whisper to store the key
-	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
-	if err != nil {
-		return nil, err
-	}
-
-	var keys []*ecdsa.PublicKey
-
-	for _, k := range msg.PubKeys {
-		publicKey, err := crypto.UnmarshalPubkey(k)
-		if err != nil {
-			return nil, err
-		}
-		keys = append(keys, publicKey)
-	}
-
-	// This is transport layer-agnostic
-	protocolMessages, err := api.service.protocol.BuildDirectMessage(privateKey, msg.Payload, keys...)
-	if err != nil {
-		return nil, err
-	}
-
-	var response []hexutil.Bytes
-
-	for key, message := range protocolMessages {
-		directMessage := chat.SendDirectMessageRPC{
-			PubKey:  crypto.FromECDSAPub(key),
-			Payload: msg.Payload,
-			Sig:     msg.Sig,
-		}
-
-		// Enrich with transport layer info
-		whisperMessage := chat.DirectMessageToWhisper(directMessage, message)
-
-		// And dispatch
-		hash, err := api.Post(ctx, whisperMessage)
-		if err != nil {
-			return nil, err
-		}
-		response = append(response, hash)
-
-	}
 	return response, nil
 }
 
@@ -567,21 +513,26 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 
 	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
 
-	// Notify that someone tried to contact us using an invalid bundle
-	if err == chat.ErrDeviceNotFound && privateKey.PublicKey != *publicKey {
-		api.log.Warn("Device not found, sending signal", "err", err)
-		keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
-		handler := EnvelopeSignalHandler{}
-		handler.DecryptMessageFailed(keyString)
-		return nil
-	} else if err != nil {
-		// Ignore errors for now as those might be non-pfs messages
+	switch err {
+	case nil:
+		// Set the decrypted payload
+		msg.Payload = response
+	case chat.ErrDeviceNotFound:
+		// Notify that someone tried to contact us using an invalid bundle
+		if privateKey.PublicKey != *publicKey {
+			api.log.Warn("Device not found, sending signal", "err", err)
+			keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
+			handler := EnvelopeSignalHandler{}
+			handler.DecryptMessageFailed(keyString)
+		}
+	case chat.ErrNotProtocolMessage:
+		// Not using encryption, pass directly to the layer below
+		api.log.Debug("Not a protocol message", "err", err)
+	default:
+		// Log and pass to the client, even if failed to decrypt
 		api.log.Error("Failed handling message with error", "err", err)
-		return nil
-	}
 
-	// Add unencrypted payload
-	msg.Payload = response
+	}
 
 	return nil
 }

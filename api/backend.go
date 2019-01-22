@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -551,6 +552,35 @@ func (b *StatusBackend) CreateContactCode() (string, error) {
 	bundle, err := st.GetBundle(selectedChatAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return "", err
+	}
+
+	return bundle.ToBase64()
+}
+
+// GetContactCode return the latest contact code
+func (b *StatusBackend) GetContactCode(identity string) (string, error) {
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return "", err
+	}
+
+	publicKeyBytes, err := hex.DecodeString(identity)
+	if err != nil {
+		return "", err
+	}
+
+	publicKey, err := ethcrypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return "", err
+	}
+
+	bundle, err := st.GetPublicBundle(publicKey)
+	if err != nil {
+		return "", err
+	}
+
+	if bundle == nil {
+		return "", nil
 	}
 
 	return bundle.ToBase64()
