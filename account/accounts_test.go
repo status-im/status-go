@@ -302,6 +302,8 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 }
 
 func (s *ManagerTestSuite) TestInjectChatAccount() {
+	s.accManager.Logout()
+
 	privKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 

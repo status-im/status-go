@@ -490,6 +490,8 @@ func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) e
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	b.accountManager.Logout()
+
 	chatKey, err := ethcrypto.HexToECDSA(chatKeyHex)
 	if err != nil {
 		return err
