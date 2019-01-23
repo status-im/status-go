@@ -497,7 +497,7 @@ func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) e
 		return err
 	}
 
-	err = b.accountManager.InjectChatAccount(chatKey)
+	err = b.accountManager.SetChatAccount(chatKey)
 	if err != nil {
 		return err
 	}

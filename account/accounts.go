@@ -248,8 +248,8 @@ func (m *Manager) SelectAccount(walletAddress, chatAddress, password string) err
 	return nil
 }
 
-// InjectChatAccount initializes selectedChatAccount with privKey
-func (m *Manager) InjectChatAccount(privKey *ecdsa.PrivateKey) error {
+// SetChatAccount initializes selectedChatAccount with privKey
+func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

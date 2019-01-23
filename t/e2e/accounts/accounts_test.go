@@ -202,7 +202,7 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	s.NoError(s.Backend.SelectAccount(accountInfo2.WalletAddress, accountInfo2.ChatAddress, TestConfig.Account1.Password))
 }
 
-func (s *AccountsTestSuite) TestInjectChatAccount() {
+func (s *AccountsTestSuite) TestSetChatAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 

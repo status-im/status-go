@@ -301,7 +301,7 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 	}
 }
 
-func (s *ManagerTestSuite) TestInjectChatAccount() {
+func (s *ManagerTestSuite) TestSetChatAccount() {
 	s.accManager.Logout()
 
 	privKey, err := crypto.GenerateKey()
@@ -309,7 +309,7 @@ func (s *ManagerTestSuite) TestInjectChatAccount() {
 
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
-	err = s.accManager.InjectChatAccount(privKey)
+	err = s.accManager.SetChatAccount(privKey)
 	s.Require().NoError(err)
 
 	selectedChatAccount, err := s.accManager.SelectedChatAccount()
