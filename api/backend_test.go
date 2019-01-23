@@ -1,11 +1,15 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
@@ -178,6 +182,45 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestBackendInjectChatAccount(t *testing.T) {
+	backend := NewStatusBackend()
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+	err = backend.StartNode(config)
+	require.NoError(t, err)
+
+	chatPrivKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	encryptionPrivKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	chatPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(chatPrivKey))
+	chatPubKeyHex := hexutil.Encode(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
+	encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
+
+	whisperService, err := backend.StatusNode().WhisperService()
+	require.NoError(t, err)
+
+	// public key should not be already in whisper
+	require.False(t, whisperService.HasKeyPair(chatPubKeyHex), "identity already present in whisper")
+
+	// call InjectChatAccount
+	require.NoError(t, backend.InjectChatAccount(chatPrivKeyHex, encryptionPrivKeyHex))
+
+	// public key should now be in whisper
+	require.True(t, whisperService.HasKeyPair(chatPubKeyHex), "identity not injected into whisper")
+
+	// wallet account should not be selected
+	walletAcc, err := backend.AccountManager().SelectedWalletAccount()
+	require.Nil(t, walletAcc)
+	require.Equal(t, account.ErrNoAccountSelected, err)
+
+	// selected chat account should have the key injected previously
+	chatAcc, err := backend.AccountManager().SelectedChatAccount()
+	require.Nil(t, err)
+	require.Equal(t, chatPrivKey, chatAcc.AccountKey.PrivateKey)
 }
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
