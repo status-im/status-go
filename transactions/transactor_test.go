@@ -21,14 +21,12 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/suite"
-
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/transactions/fake"
-
 	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/transactions/fake"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestTransactorSuite(t *testing.T) {
@@ -120,7 +118,7 @@ func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig
 func (s *TransactorSuite) TestGasValues() {
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
-		Address:    account.FromAddress(TestConfig.Account1.Address),
+		Address:    account.FromAddress(TestConfig.Account1.WalletAddress),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
 	testCases := []struct {
@@ -154,8 +152,8 @@ func (s *TransactorSuite) TestGasValues() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
 			args := SendTxArgs{
-				From:     account.FromAddress(TestConfig.Account1.Address),
-				To:       account.ToAddress(TestConfig.Account2.Address),
+				From:     account.FromAddress(TestConfig.Account1.WalletAddress),
+				To:       account.ToAddress(TestConfig.Account2.WalletAddress),
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
 			}
@@ -170,14 +168,14 @@ func (s *TransactorSuite) TestGasValues() {
 
 func (s *TransactorSuite) TestArgsValidation() {
 	args := SendTxArgs{
-		From:  account.FromAddress(TestConfig.Account1.Address),
-		To:    account.ToAddress(TestConfig.Account2.Address),
+		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Data:  hexutil.Bytes([]byte{0x01, 0x02}),
 		Input: hexutil.Bytes([]byte{0x02, 0x01}),
 	}
 	s.False(args.Valid())
 	selectedAccount := &account.SelectedExtKey{
-		Address: account.FromAddress(TestConfig.Account1.Address),
+		Address: account.FromAddress(TestConfig.Account1.WalletAddress),
 	}
 	_, err := s.manager.SendTransaction(args, selectedAccount)
 	s.EqualError(err, ErrInvalidSendTxArgs.Error())
@@ -185,8 +183,8 @@ func (s *TransactorSuite) TestArgsValidation() {
 
 func (s *TransactorSuite) TestAccountMismatch() {
 	args := SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
-		To:   account.ToAddress(TestConfig.Account2.Address),
+		From: account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:   account.ToAddress(TestConfig.Account2.WalletAddress),
 	}
 
 	var err error
@@ -197,7 +195,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 
 	// mismatched accounts
 	selectedAccount := &account.SelectedExtKey{
-		Address: account.FromAddress(TestConfig.Account2.Address),
+		Address: account.FromAddress(TestConfig.Account2.WalletAddress),
 	}
 	_, err = s.manager.SendTransaction(args, selectedAccount)
 	s.EqualError(err, ErrInvalidTxSender.Error())
@@ -214,15 +212,15 @@ func (s *TransactorSuite) TestLocalNonce() {
 	txCount := 3
 	key, _ := crypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
-		Address:    account.FromAddress(TestConfig.Account1.Address),
+		Address:    account.FromAddress(TestConfig.Account1.WalletAddress),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
 	nonce := hexutil.Uint64(0)
 
 	for i := 0; i < txCount; i++ {
 		args := SendTxArgs{
-			From: account.FromAddress(TestConfig.Account1.Address),
-			To:   account.ToAddress(TestConfig.Account2.Address),
+			From: account.FromAddress(TestConfig.Account1.WalletAddress),
+			To:   account.ToAddress(TestConfig.Account2.WalletAddress),
 		}
 		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil)
 
@@ -234,8 +232,8 @@ func (s *TransactorSuite) TestLocalNonce() {
 
 	nonce = hexutil.Uint64(5)
 	args := SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
-		To:   account.ToAddress(TestConfig.Account2.Address),
+		From: account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:   account.ToAddress(TestConfig.Account2.WalletAddress),
 	}
 
 	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil)
@@ -249,8 +247,8 @@ func (s *TransactorSuite) TestLocalNonce() {
 	testErr := errors.New("test")
 	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), selectedAccount.Address, gethrpc.PendingBlockNumber).Return(nil, testErr)
 	args = SendTxArgs{
-		From: account.FromAddress(TestConfig.Account1.Address),
-		To:   account.ToAddress(TestConfig.Account2.Address),
+		From: account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:   account.ToAddress(TestConfig.Account2.WalletAddress),
 	}
 
 	_, err = s.manager.SendTransaction(args, selectedAccount)

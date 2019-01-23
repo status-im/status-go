@@ -236,15 +236,15 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 		if !nodeConfig.IPCEnabled {
 			return nil, errStatusServiceRequiresIPC
 		}
-		nodeConfig.StatusServiceEnabled = true
+		nodeConfig.EnableStatusService = true
 	case "http":
 		if !nodeConfig.HTTPEnabled {
 			return nil, errStatusServiceRequiresHTTP
 		}
-		nodeConfig.StatusServiceEnabled = true
+		nodeConfig.EnableStatusService = true
 		nodeConfig.AddAPIModule("status")
 	case "":
-		nodeConfig.StatusServiceEnabled = false
+		nodeConfig.EnableStatusService = false
 	default:
 		return nil, errStatusServiceInvalidFlag
 	}

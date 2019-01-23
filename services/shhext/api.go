@@ -80,6 +80,9 @@ type MessagesRequest struct {
 	// Timeout is the time to live of the request specified in seconds.
 	// Default is 10 seconds
 	Timeout time.Duration `json:"timeout"`
+
+	// Force ensures that requests will bypass enforced delay.
+	Force bool `json:"force"`
 }
 
 func (r *MessagesRequest) setDefaults(now time.Time) {
@@ -223,11 +226,17 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	if err != nil {
 		return nil, err
 	}
+	hash := envelope.Hash()
+	if !r.Force {
+		err = api.service.requestsRegistry.Register(hash, r.Topics)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
 		return nil, err
 	}
-	hash := envelope.Hash()
 	return hash[:], nil
 }
 

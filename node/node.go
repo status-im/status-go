@@ -235,7 +235,7 @@ func activatePersonalService(stack *node.Node, config *params.NodeConfig) error 
 }
 
 func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
-	if !config.StatusServiceEnabled {
+	if !config.EnableStatusService {
 		logger.Info("Status service api is disabled")
 		return nil
 	}
@@ -327,17 +327,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		if err := ctx.Service(&whisper); err != nil {
 			return nil, err
 		}
-
-		config := &shhext.ServiceConfig{
-			DataDir:                 config.BackupDisabledDataDir,
-			InstallationID:          config.InstallationID,
-			Debug:                   config.DebugAPIEnabled,
-			PFSEnabled:              config.PFSEnabled,
-			MailServerConfirmations: config.MailServerConfirmations,
-		}
-
-		svc := shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config)
-		return svc, nil
+		return shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
 	})
 }
 

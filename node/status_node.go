@@ -335,12 +335,13 @@ func (n *StatusNode) Stop() error {
 
 // stop will stop current StatusNode. A stopped node cannot be resumed.
 func (n *StatusNode) stop() error {
-	if n.discoveryEnabled() {
+	if n.isDiscoveryRunning() {
 		if err := n.stopDiscovery(); err != nil {
-			n.log.Error("Error stopping the PeerPool", "error", err)
+			n.log.Error("Error stopping the discovery components", "error", err)
 		}
 		n.register = nil
 		n.peerPool = nil
+		n.discovery = nil
 	}
 
 	if err := n.gethNode.Stop(); err != nil {

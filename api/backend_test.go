@@ -138,15 +138,15 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 	var wgCreateAccounts sync.WaitGroup
 	count := 3
-	addressCh := make(chan [2]string, count) // use buffered channel to avoid blocking
+	addressCh := make(chan [3]string, count) // use buffered channel to avoid blocking
 
 	// create new accounts concurrently
 	for i := 0; i < count; i++ {
 		wgCreateAccounts.Add(1)
 		go func(pass string) {
-			address, _, _, err := backend.AccountManager().CreateAccount(pass)
+			accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
 			assert.NoError(t, err)
-			addressCh <- [...]string{address, pass}
+			addressCh <- [...]string{accountInfo.WalletAddress, accountInfo.ChatAddress, pass}
 			wgCreateAccounts.Done()
 		}("password-00" + string(i))
 	}
@@ -159,8 +159,8 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 	for tuple := range addressCh {
 		wg.Add(1)
-		go func(tuple [2]string) {
-			assert.NoError(t, backend.SelectAccount(tuple[0], tuple[1]))
+		go func(tuple [3]string) {
+			assert.NoError(t, backend.SelectAccount(tuple[0], tuple[1], tuple[2]))
 			wg.Done()
 		}(tuple)
 
@@ -320,3 +320,19 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 }
 
 // TODO(adam): add concurrent tests for: SendTransaction
+
+func TestStartStopMultipleTimes(t *testing.T) {
+	backend := NewStatusBackend()
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+	config.NoDiscovery = false
+	// doesn't have to be running. just any valid enode to bypass validation.
+	config.ClusterConfig.BootNodes = []string{
+		"enode://e8a7c03b58911e98bbd66accb2a55d57683f35b23bf9dfca89e5e244eb5cc3f25018b4112db507faca34fb69ffb44b362f79eda97a669a8df29c72e654416784@0.0.0.0:30404",
+	}
+	require.NoError(t, err)
+	require.NoError(t, backend.StartNode(config))
+	require.NoError(t, backend.StopNode())
+	require.NoError(t, backend.StartNode(config))
+	require.NoError(t, backend.StopNode())
+}
