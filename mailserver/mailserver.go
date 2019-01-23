@@ -77,6 +77,8 @@ type WMailServer struct {
 
 	muRateLimiter sync.RWMutex
 	rateLimiter   *rateLimiter
+
+	cleaner *dbCleaner // removes old envelopes
 }
 
 // Init initializes mailServer.
@@ -97,7 +99,10 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 	if err := s.setupRequestMessageDecryptor(config); err != nil {
 		return err
 	}
-	s.setupRateLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+
+	if config.MailServerRateLimit > 0 {
+		s.setupRateLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+	}
 
 	// Open database in the last step in order not to init with error
 	// and leave the database open by accident.
@@ -107,16 +112,24 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 	}
 	s.db = database
 
+	if config.MailServerDataRetention > 0 {
+		// MailServerDataRetention is a number of days.
+		s.setupCleaner(time.Duration(config.MailServerDataRetention) * time.Hour * 24)
+	}
+
 	return nil
 }
 
 // setupRateLimiter in case limit is bigger than 0 it will setup an automated
 // limit db cleanup.
 func (s *WMailServer) setupRateLimiter(limit time.Duration) {
-	if limit > 0 {
-		s.rateLimiter = newRateLimiter(limit)
-		s.rateLimiter.Start()
-	}
+	s.rateLimiter = newRateLimiter(limit)
+	s.rateLimiter.Start()
+}
+
+func (s *WMailServer) setupCleaner(retention time.Duration) {
+	s.cleaner = newDBCleaner(s.db, retention)
+	s.cleaner.Start()
 }
 
 // setupRequestMessageDecryptor setup a Whisper filter to decrypt
@@ -159,6 +172,9 @@ func (s *WMailServer) Close() {
 	}
 	if s.rateLimiter != nil {
 		s.rateLimiter.Stop()
+	}
+	if s.cleaner != nil {
+		s.cleaner.Stop()
 	}
 }
 

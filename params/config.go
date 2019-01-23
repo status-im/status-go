@@ -70,11 +70,11 @@ type WhisperConfig struct {
 	// MailServerAsymKey is an hex-encoded asymmetric key to decrypt messages sent to MailServer.
 	MailServerAsymKey string
 
-	// RateLimit minimum time between queries to mail server per peer
+	// MailServerRateLimit minimum time between queries to mail server per peer.
 	MailServerRateLimit int
 
-	// MailServerCleanupPeriod time in seconds to wait to run mail server cleanup
-	MailServerCleanupPeriod int
+	// MailServerDataRetention is a number of days data should be stored by MailServer.
+	MailServerDataRetention int
 
 	// TTL time to live for messages, in seconds
 	TTL int
