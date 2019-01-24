@@ -112,14 +112,22 @@ func (s *Service) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
 }
 
-// InitProtocol create an instance of ProtocolService given an address and password
-func (s *Service) InitProtocol(address string, password string) error {
+// InitProtocolWithPassword creates an instance of ProtocolService given an address and password used to generate an encryption key.
+func (s *Service) InitProtocolWithPassword(address string, password string) error {
+	digest := sha3.Sum256([]byte(password))
+	encKey := fmt.Sprintf("%x", digest)
+	return s.initProtocol(address, encKey, password)
+}
+
+// InitProtocolWithEncyptionKey creates an instance of ProtocolService given an address and encryption key.
+func (s *Service) InitProtocolWithEncyptionKey(address string, encKey string) error {
+	return s.initProtocol(address, encKey, "")
+}
+
+func (s *Service) initProtocol(address, encKey, password string) error {
 	if !s.pfsEnabled {
 		return nil
 	}
-
-	digest := sha3.Sum256([]byte(password))
-	hashedPassword := fmt.Sprintf("%x", digest)
 
 	if err := os.MkdirAll(filepath.Clean(s.dataDir), os.ModePerm); err != nil {
 		return err
@@ -130,29 +138,31 @@ func (s *Service) InitProtocol(address string, password string) error {
 	v3Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v3.db", s.installationID))
 	v4Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v4.db", s.installationID))
 
-	if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
-		return err
+	if password != "" {
+		if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
+			return err
+		}
+
+		if err := chat.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
+			// Remove db file as created with a blank password and never used,
+			// and there's no need to rekey in this case
+			os.Remove(v1Path)
+			os.Remove(v2Path)
+		}
 	}
 
-	if err := chat.MigrateDBFile(v1Path, v2Path, password, hashedPassword); err != nil {
-		// Remove db file as created with a blank password and never used,
-		// and there's no need to rekey in this case
-		os.Remove(v1Path)
-		os.Remove(v2Path)
-	}
-
-	if err := chat.MigrateDBKeyKdfIterations(v2Path, v3Path, hashedPassword); err != nil {
+	if err := chat.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
 		os.Remove(v2Path)
 		os.Remove(v3Path)
 	}
 
 	// Fix IOS not encrypting database
-	if err := chat.EncryptDatabase(v3Path, v4Path, hashedPassword); err != nil {
+	if err := chat.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
 
-	persistence, err := chat.NewSQLLitePersistence(v4Path, hashedPassword)
+	persistence, err := chat.NewSQLLitePersistence(v4Path, encKey)
 	if err != nil {
 		return err
 	}
