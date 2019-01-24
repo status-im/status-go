@@ -486,6 +486,7 @@ func (b *StatusBackend) SendDataNotification(dataPayloadJSON string, tokens ...s
 	return err
 }
 
+// InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.
 func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
