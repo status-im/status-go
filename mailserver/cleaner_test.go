@@ -17,8 +17,8 @@ import (
 func TestCleaner(t *testing.T) {
 	now := time.Now()
 	server := setupTestServer(t)
-	cleaner := NewCleanerWithDB(server.db)
 	defer server.Close()
+	cleaner := newDBCleaner(server.db, time.Hour)
 
 	archiveEnvelope(t, now.Add(-10*time.Second), server)
 	archiveEnvelope(t, now.Add(-3*time.Second), server)
@@ -26,9 +26,30 @@ func TestCleaner(t *testing.T) {
 
 	testMessagesCount(t, 3, server)
 
-	testPrune(t, now.Add(-5*time.Second), 2, cleaner, server)
+	testPrune(t, now.Add(-5*time.Second), 1, cleaner, server)
 	testPrune(t, now.Add(-2*time.Second), 1, cleaner, server)
-	testPrune(t, now, 0, cleaner, server)
+	testPrune(t, now, 1, cleaner, server)
+
+	testMessagesCount(t, 0, server)
+}
+
+func TestCleanerSchedule(t *testing.T) {
+	now := time.Now()
+	server := setupTestServer(t)
+	defer server.Close()
+
+	cleaner := newDBCleaner(server.db, time.Hour)
+	cleaner.period = time.Millisecond * 10
+	cleaner.Start()
+	defer cleaner.Stop()
+
+	archiveEnvelope(t, now.Add(-3*time.Hour), server)
+	archiveEnvelope(t, now.Add(-2*time.Hour), server)
+	archiveEnvelope(t, now.Add(-1*time.Minute), server)
+
+	time.Sleep(time.Millisecond * 50)
+
+	testMessagesCount(t, 1, server)
 }
 
 func benchmarkCleanerPrune(b *testing.B, messages int, batchSize int) {
@@ -38,7 +59,7 @@ func benchmarkCleanerPrune(b *testing.B, messages int, batchSize int) {
 	server := setupTestServer(t)
 	defer server.Close()
 
-	cleaner := NewCleanerWithDB(server.db)
+	cleaner := newDBCleaner(server.db, time.Hour)
 	cleaner.batchSize = batchSize
 
 	for i := 0; i < messages; i++ {
@@ -81,13 +102,10 @@ func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whi
 	return env
 }
 
-func testPrune(t *testing.T, u time.Time, expected int, c *Cleaner, s *WMailServer) {
-	upper := uint32(u.Unix())
-	_, err := c.Prune(0, upper)
+func testPrune(t *testing.T, u time.Time, expected int, c *dbCleaner, s *WMailServer) {
+	n, err := c.PruneEntriesOlderThan(u)
 	require.NoError(t, err)
-
-	count := countMessages(t, s.db)
-	require.Equal(t, expected, count)
+	require.Equal(t, expected, n)
 }
 
 func testMessagesCount(t *testing.T, expected int, s *WMailServer) {

@@ -72,9 +72,9 @@ func TestEncodeData(t *testing.T) {
 		result      func(testCase) common.Hash
 	}
 
-	bytes32, _ := abi.NewType("bytes32")
-	addr, _ := abi.NewType("address")
-	boolT, _ := abi.NewType("bool")
+	bytes32, _ := abi.NewType("bytes32", nil)
+	addr, _ := abi.NewType("address", nil)
+	boolT, _ := abi.NewType("bool", nil)
 
 	for _, tc := range []testCase{
 		{
@@ -175,8 +175,8 @@ func TestEncodeData(t *testing.T) {
 			}},
 			"A",
 			func(tc testCase) common.Hash {
-				intBig, _ := abi.NewType("int128")
-				uintBig, _ := abi.NewType("uint128")
+				intBig, _ := abi.NewType("int128", nil)
+				uintBig, _ := abi.NewType("uint128", nil)
 				args := abi.Arguments{{Type: bytes32},
 					{Type: intBig}, {Type: intBig}, {Type: uintBig}, {Type: uintBig}}
 				typehash := typeHash(tc.target, tc.types)

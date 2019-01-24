@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/t/e2e"
 
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/utils"
 )
 
 const (
@@ -71,19 +71,19 @@ func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debu
 	s.Backend = api.NewStatusBackend()
 	s.NotNil(s.Backend)
 
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
 
 	nodeConfig.IPCEnabled = false
-	nodeConfig.StatusServiceEnabled = statusServiceEnabled
-	nodeConfig.DebugAPIEnabled = debugAPIEnabled
-	if nodeConfig.DebugAPIEnabled {
+	nodeConfig.EnableStatusService = statusServiceEnabled
+	nodeConfig.ShhextConfig.DebugAPIEnabled = debugAPIEnabled
+	if debugAPIEnabled {
 		nodeConfig.AddAPIModule("debug")
 	}
 	nodeConfig.HTTPHost = "" // to make sure that no HTTP interface is started
 
 	if upstreamEnabled {
-		networkURL, err := GetRemoteURL()
+		networkURL, err := utils.GetRemoteURL()
 		s.NoError(err)
 
 		nodeConfig.UpstreamConfig.Enabled = true

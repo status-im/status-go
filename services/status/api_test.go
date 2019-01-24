@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/golang/mock/gomock"
+	"github.com/status-im/status-go/account"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -49,7 +50,7 @@ var logintests = []struct {
 			}
 			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("addressKey", nil)
-			s.am.EXPECT().SelectAccount("address...", "password").Return(nil)
+			s.am.EXPECT().SelectAccount("address...", "address...", "password").Return(nil)
 		},
 	},
 	{
@@ -85,7 +86,7 @@ var logintests = []struct {
 			}
 			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", nil)
-			s.am.EXPECT().SelectAccount("address...", "password").Return(errors.New("foo"))
+			s.am.EXPECT().SelectAccount("address...", "address...", "password").Return(errors.New("foo"))
 		},
 	},
 }
@@ -112,25 +113,31 @@ var signuptests = []struct {
 	{
 		name: "success signup",
 		expectedResponse: SignupResponse{
-			Address:  "addr",
-			Pubkey:   "pubkey",
-			Mnemonic: "mnemonic",
+			WalletAddress: "addr",
+			WalletPubkey:  "pubkey",
+			Mnemonic:      "mnemonic",
 		},
 		expectedError: nil,
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return("addr", "pubkey", "mnemonic", nil)
+			accountInfo := account.Info{
+				WalletAddress: "addr",
+				WalletPubKey:  "pubkey",
+				ChatAddress:   "addr",
+				ChatPubKey:    "pubkey",
+			}
+			s.am.EXPECT().CreateAccount("password").Return(accountInfo, "mnemonic", nil)
 		},
 	},
 	{
 		name: "success signup",
 		expectedResponse: SignupResponse{
-			Address:  "",
-			Pubkey:   "",
-			Mnemonic: "",
+			WalletAddress: "",
+			WalletPubkey:  "",
+			Mnemonic:      "",
 		},
 		expectedError: errors.New("could not create the specified account : foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return("", "", "", errors.New("foo"))
+			s.am.EXPECT().CreateAccount("password").Return(account.Info{}, "", errors.New("foo"))
 		},
 	},
 }
@@ -141,8 +148,8 @@ func (s *StatusSuite) TestSignup() {
 
 		var ctx context.Context
 		res, err := s.api.Signup(ctx, SignupRequest{Password: "password"})
-		s.Equal(t.expectedResponse.Address, res.Address, "failed scenario : "+t.name)
-		s.Equal(t.expectedResponse.Pubkey, res.Pubkey, "failed scenario : "+t.name)
+		s.Equal(t.expectedResponse.WalletAddress, res.WalletAddress, "failed scenario : "+t.name)
+		s.Equal(t.expectedResponse.WalletPubkey, res.WalletPubkey, "failed scenario : "+t.name)
 		s.Equal(t.expectedResponse.Mnemonic, res.Mnemonic, "failed scenario : "+t.name)
 		s.Equal(t.expectedError, err, "failed scenario : "+t.name)
 	}

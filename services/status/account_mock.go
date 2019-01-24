@@ -9,6 +9,7 @@ import (
 	accounts "github.com/ethereum/go-ethereum/accounts"
 	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	gomock "github.com/golang/mock/gomock"
+	account "github.com/status-im/status-go/account"
 	reflect "reflect"
 )
 
@@ -90,28 +91,27 @@ func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(arg0, arg1 i
 }
 
 // SelectAccount mocks base method
-func (m *MockAccountManager) SelectAccount(address, password string) error {
+func (m *MockAccountManager) SelectAccount(walletAddress, chatAddress, password string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SelectAccount", address, password)
+	ret := m.ctrl.Call(m, "SelectAccount", walletAddress, chatAddress, password)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SelectAccount indicates an expected call of SelectAccount
-func (mr *MockAccountManagerMockRecorder) SelectAccount(address, password interface{}) *gomock.Call {
+func (mr *MockAccountManagerMockRecorder) SelectAccount(walletAddress, chatAddress, password interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelectAccount", reflect.TypeOf((*MockAccountManager)(nil).SelectAccount), address, password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelectAccount", reflect.TypeOf((*MockAccountManager)(nil).SelectAccount), walletAddress, chatAddress, password)
 }
 
 // CreateAccount mocks base method
-func (m *MockAccountManager) CreateAccount(password string) (string, string, string, error) {
+func (m *MockAccountManager) CreateAccount(password string) (account.Info, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateAccount", password)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(account.Info)
 	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(string)
-	ret3, _ := ret[3].(error)
-	return ret0, ret1, ret2, ret3
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // CreateAccount indicates an expected call of CreateAccount

@@ -9,16 +9,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -40,17 +41,18 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w              *whisper.Whisper
-	config         *ServiceConfig
-	tracker        *tracker
-	server         *p2p.Server
-	nodeID         *ecdsa.PrivateKey
-	deduplicator   *dedup.Deduplicator
-	protocol       *chat.ProtocolService
-	debug          bool
-	dataDir        string
-	installationID string
-	pfsEnabled     bool
+	w                *whisper.Whisper
+	config           params.ShhextConfig
+	tracker          *tracker
+	requestsRegistry *RequestsRegistry
+	server           *p2p.Server
+	nodeID           *ecdsa.PrivateKey
+	deduplicator     *dedup.Deduplicator
+	protocol         *chat.ProtocolService
+	debug            bool
+	dataDir          string
+	installationID   string
+	pfsEnabled       bool
 
 	peerStore       *mailservers.PeerStore
 	cache           *mailservers.Cache
@@ -58,24 +60,18 @@ type Service struct {
 	lastUsedMonitor *mailservers.LastUsedConnectionMonitor
 }
 
-type ServiceConfig struct {
-	DataDir                 string
-	InstallationID          string
-	Debug                   bool
-	PFSEnabled              bool
-	MailServerConfirmations bool
-	EnableConnectionManager bool
-	EnableLastUsedMonitor   bool
-	ConnectionTarget        int
-}
-
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service. dataDir is a folder path to a network-independent location
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config *ServiceConfig) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config params.ShhextConfig) *Service {
 	cache := mailservers.NewCache(db)
 	ps := mailservers.NewPeerStore(cache)
+	delay := defaultRequestsDelay
+	if config.RequestsDelay != 0 {
+		delay = config.RequestsDelay
+	}
+	requestsRegistry := NewRequestsRegistry(delay)
 	track := &tracker{
 		w:                      w,
 		handler:                handler,
@@ -83,18 +79,20 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		batches:                map[common.Hash]map[common.Hash]struct{}{},
 		mailPeers:              ps,
 		mailServerConfirmation: config.MailServerConfirmations,
+		requestsRegistry:       requestsRegistry,
 	}
 	return &Service{
-		w:              w,
-		config:         config,
-		tracker:        track,
-		deduplicator:   dedup.NewDeduplicator(w, db),
-		debug:          config.Debug,
-		dataDir:        config.DataDir,
-		installationID: config.InstallationID,
-		pfsEnabled:     config.PFSEnabled,
-		peerStore:      ps,
-		cache:          cache,
+		w:                w,
+		config:           config,
+		tracker:          track,
+		requestsRegistry: requestsRegistry,
+		deduplicator:     dedup.NewDeduplicator(w, db),
+		debug:            config.DebugAPIEnabled,
+		dataDir:          config.BackupDisabledDataDir,
+		installationID:   config.InstallationID,
+		pfsEnabled:       config.PFSEnabled,
+		peerStore:        ps,
+		cache:            cache,
 	}
 }
 
@@ -129,6 +127,8 @@ func (s *Service) InitProtocol(address string, password string) error {
 	v0Path := filepath.Join(s.dataDir, fmt.Sprintf("%x.db", address))
 	v1Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.db", s.installationID))
 	v2Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v2.db", s.installationID))
+	v3Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v3.db", s.installationID))
+	v4Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v4.db", s.installationID))
 
 	if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 		return err
@@ -141,7 +141,18 @@ func (s *Service) InitProtocol(address string, password string) error {
 		os.Remove(v2Path)
 	}
 
-	persistence, err := chat.NewSQLLitePersistence(v2Path, hashedPassword)
+	if err := chat.MigrateDBKeyKdfIterations(v2Path, v3Path, hashedPassword); err != nil {
+		os.Remove(v2Path)
+		os.Remove(v3Path)
+	}
+
+	// Fix IOS not encrypting database
+	if err := chat.EncryptDatabase(v3Path, v4Path, hashedPassword); err != nil {
+		os.Remove(v3Path)
+		os.Remove(v4Path)
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(v4Path, hashedPassword)
 	if err != nil {
 		return err
 	}
@@ -223,7 +234,12 @@ func (s *Service) Start(server *p2p.Server) error {
 		if connectionsTarget == 0 {
 			connectionsTarget = defaultConnectionsTarget
 		}
-		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget, defaultTimeoutWaitAdded)
+		maxFailures := s.config.MaxServerFailures
+		// if not defined change server on first expired event
+		if maxFailures == 0 {
+			maxFailures = 1
+		}
+		s.connManager = mailservers.NewConnectionManager(server, s.w, connectionsTarget, maxFailures, defaultTimeoutWaitAdded)
 		s.connManager.Start()
 		if err := mailservers.EnsureUsedRecordsAddedFirst(s.peerStore, s.connManager); err != nil {
 			return err

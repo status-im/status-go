@@ -39,11 +39,12 @@ type p2pServer interface {
 }
 
 // NewConnectionManager creates an instance of ConnectionManager.
-func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscbriber, target int, timeout time.Duration) *ConnectionManager {
+func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscbriber, target, maxFailures int, timeout time.Duration) *ConnectionManager {
 	return &ConnectionManager{
 		server:           server,
 		whisper:          whisper,
 		connectedTarget:  target,
+		maxFailures:      maxFailures,
 		notifications:    make(chan []*enode.Node),
 		timeoutWaitAdded: timeout,
 	}
@@ -60,6 +61,7 @@ type ConnectionManager struct {
 	notifications    chan []*enode.Node
 	connectedTarget  int
 	timeoutWaitAdded time.Duration
+	maxFailures      int
 }
 
 // Notify sends a non-blocking notification about new nodes.
@@ -81,12 +83,12 @@ func (ps *ConnectionManager) Start() {
 	ps.wg.Add(1)
 	go func() {
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
-
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
 		whisperEvents := make(chan whisper.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
 		requests := map[common.Hash]struct{}{}
+		failuresPerServer := map[enode.ID]int{}
 
 		defer sub.Unsubscribe()
 		defer whisperSub.Unsubscribe()
@@ -106,19 +108,24 @@ func (ps *ConnectionManager) Start() {
 			case ev := <-events:
 				processPeerEvent(state, ev)
 			case ev := <-whisperEvents:
-				// TODO what about completed but with error? what about expired envelopes?
+				// TODO treat failed requests the same way as expired
 				switch ev.Event {
 				case whisper.EventMailServerRequestSent:
 					requests[ev.Hash] = struct{}{}
 				case whisper.EventMailServerRequestCompleted:
+					// reset failures count on first success
+					failuresPerServer[ev.Peer] = 0
 					delete(requests, ev.Hash)
 				case whisper.EventMailServerRequestExpired:
 					_, exist := requests[ev.Hash]
 					if !exist {
 						continue
 					}
+					failuresPerServer[ev.Peer]++
 					log.Debug("request to a mail server expired, disconncet a peer", "address", ev.Peer)
-					state.nodeDisconnected(ev.Peer)
+					if failuresPerServer[ev.Peer] >= ps.maxFailures {
+						state.nodeDisconnected(ev.Peer)
+					}
 				}
 			}
 		}

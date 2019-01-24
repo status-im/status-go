@@ -37,6 +37,8 @@ type tracker struct {
 
 	mailPeers *mailservers.PeerStore
 
+	requestsRegistry *RequestsRegistry
+
 	wg   sync.WaitGroup
 	quit chan struct{}
 }
@@ -194,7 +196,7 @@ func (t *tracker) handleRequestSent(event whisper.EnvelopeEvent) {
 func (t *tracker) handleEventMailServerRequestCompleted(event whisper.EnvelopeEvent) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
+	t.requestsRegistry.Unregister(event.Hash)
 	state, ok := t.cache[event.Hash]
 	if !ok || state != MailServerRequestSent {
 		return
@@ -211,7 +213,7 @@ func (t *tracker) handleEventMailServerRequestCompleted(event whisper.EnvelopeEv
 func (t *tracker) handleEventMailServerRequestExpired(event whisper.EnvelopeEvent) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
+	t.requestsRegistry.Unregister(event.Hash)
 	state, ok := t.cache[event.Hash]
 	if !ok || state != MailServerRequestSent {
 		return

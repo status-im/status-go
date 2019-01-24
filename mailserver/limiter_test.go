@@ -48,16 +48,16 @@ func TestIsAllowed(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.info, func(*testing.T) {
-			l := newLimiter(tc.t)
+			l := newRateLimiter(tc.t)
 			l.db = tc.db()
-			assert.Equal(t, tc.shouldBeAllowed, l.isAllowed(peerID))
+			assert.Equal(t, tc.shouldBeAllowed, l.IsAllowed(peerID))
 		})
 	}
 }
 
 func TestRemoveExpiredRateLimits(t *testing.T) {
 	peer := "peer"
-	l := newLimiter(time.Duration(5) * time.Second)
+	l := newRateLimiter(time.Duration(5) * time.Second)
 	for i := 0; i < 10; i++ {
 		peerID := fmt.Sprintf("%s%d", peer, i)
 		l.db[peerID] = time.Now().Add(time.Duration(i*(-2)) * time.Second)
@@ -78,11 +78,31 @@ func TestRemoveExpiredRateLimits(t *testing.T) {
 	}
 }
 
+func TestCleaningUpExpiredRateLimits(t *testing.T) {
+	l := newRateLimiter(5 * time.Second)
+	l.period = time.Millisecond * 10
+	l.Start()
+	defer l.Stop()
+
+	l.db["peer01"] = time.Now().Add(-1 * time.Second)
+	l.db["peer02"] = time.Now().Add(-2 * time.Second)
+	l.db["peer03"] = time.Now().Add(-10 * time.Second)
+
+	time.Sleep(time.Millisecond * 20)
+
+	_, ok := l.db["peer01"]
+	assert.True(t, ok)
+	_, ok = l.db["peer02"]
+	assert.True(t, ok)
+	_, ok = l.db["peer03"]
+	assert.False(t, ok)
+}
+
 func TestAddingLimts(t *testing.T) {
 	peerID := "peerAdding"
-	l := newLimiter(time.Duration(5) * time.Second)
+	l := newRateLimiter(time.Duration(5) * time.Second)
 	pre := time.Now()
-	l.add(peerID)
+	l.Add(peerID)
 	post := time.Now()
 	assert.True(t, l.db[peerID].After(pre))
 	assert.True(t, l.db[peerID].Before(post))

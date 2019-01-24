@@ -245,7 +245,7 @@ func CallPrivateRPC(inputJSON *C.char) *C.char {
 // just modified to handle the function arg passing
 //export CreateAccount
 func CreateAccount(password *C.char) *C.char {
-	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
+	info, mnemonic, err := statusBackend.AccountManager().CreateAccount(C.GoString(password))
 
 	errString := ""
 	if err != nil {
@@ -254,10 +254,14 @@ func CreateAccount(password *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: mnemonic,
-		Error:    errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
@@ -286,7 +290,7 @@ func CreateChildAccount(parentAddress, password *C.char) *C.char {
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
-	address, pubKey, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
+	info, err := statusBackend.AccountManager().RecoverAccount(C.GoString(password), C.GoString(mnemonic))
 
 	errString := ""
 	if err != nil {
@@ -295,10 +299,14 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: C.GoString(mnemonic),
-		Error:    errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      C.GoString(mnemonic),
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
@@ -315,7 +323,7 @@ func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 // if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 //export Login
 func Login(address, password *C.char) *C.char {
-	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(password))
+	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
 }
 
@@ -420,9 +428,19 @@ func makeJSONResponse(err error) *C.char {
 	return C.CString(string(outBytes))
 }
 
-// NotifyUsers sends push notifications by given tokens.
-//export NotifyUsers
-func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
+// SendDataNotification sends push notifications by given tokens.
+// dataPayloadJSON is a JSON string that looks like this:
+// {
+// 	"data": {
+// 		"msg-v2": {
+// 			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
+// 			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
+// 			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
+// 		}
+// 	}
+// }
+//export SendDataNotification
+func SendDataNotification(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 	var (
 		err      error
 		outBytes []byte
@@ -430,14 +448,14 @@ func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 	errString := ""
 
 	defer func() {
-		out := NotifyResult{
+		out := SendDataNotificationResult{
 			Status: err == nil,
 			Error:  errString,
 		}
 
 		outBytes, err = json.Marshal(out)
 		if err != nil {
-			logger.Error("failed to marshal NotifyUsers output", "error", err)
+			logger.Error("failed to marshal SendDataNotification output", "error", err)
 			outCBytes = makeJSONResponse(err)
 			return
 		}
@@ -451,7 +469,7 @@ func NotifyUsers(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
 		return
 	}
 
-	err = statusBackend.NotifyUsers(C.GoString(dataPayloadJSON), tokens...)
+	err = statusBackend.SendDataNotification(C.GoString(dataPayloadJSON), tokens...)
 	if err != nil {
 		errString = err.Error()
 		return

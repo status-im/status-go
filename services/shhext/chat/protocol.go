@@ -24,7 +24,7 @@ func NewProtocolService(encryption *EncryptionService, addedBundlesHandler func(
 	}
 }
 
-func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage) ([]byte, error) {
+func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage, sendSingle bool) ([]byte, error) {
 	// Get a bundle
 	bundle, err := p.encryption.CreateBundle(myIdentityKey)
 	if err != nil {
@@ -32,7 +32,13 @@ func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, m
 		return nil, err
 	}
 
-	msg.Bundles = []*Bundle{bundle}
+	if sendSingle {
+		// DEPRECATED: This is only for backward compatibility, remove once not
+		// an issue anymore
+		msg.Bundle = bundle
+	} else {
+		msg.Bundles = []*Bundle{bundle}
+	}
 
 	// marshal for sending to wire
 	marshaledMessage, err := proto.Marshal(msg)
@@ -52,7 +58,7 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 		PublicMessage:  payload,
 	}
 
-	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
+	return p.addBundleAndMarshal(myIdentityKey, protocolMessage, false)
 }
 
 // BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
@@ -72,7 +78,7 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pa
 			DirectMessage:  encryptionResponse,
 		}
 
-		payload, err := p.addBundleAndMarshal(myIdentityKey, protocolMessage)
+		payload, err := p.addBundleAndMarshal(myIdentityKey, protocolMessage, true)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +105,7 @@ func (p *ProtocolService) BuildPairingMessage(myIdentityKey *ecdsa.PrivateKey, p
 		DirectMessage:  encryptionResponse,
 	}
 
-	return p.addBundleAndMarshal(myIdentityKey, protocolMessage)
+	return p.addBundleAndMarshal(myIdentityKey, protocolMessage, true)
 }
 
 // ProcessPublicBundle processes a received X3DH bundle.

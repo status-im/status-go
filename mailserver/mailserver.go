@@ -27,7 +27,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
@@ -46,28 +45,9 @@ const (
 var (
 	errDirectoryNotProvided        = errors.New("data directory not provided")
 	errDecryptionMethodNotProvided = errors.New("decryption method is not provided")
-	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
-	// Real metrics are collected only if -metrics flag is set
-	requestProcessTimer            = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
-	requestProcessNetTimer         = metrics.NewRegisteredTimer("mailserver/requestProcessNetTime", nil)
-	requestsMeter                  = metrics.NewRegisteredMeter("mailserver/requests", nil)
-	requestsBatchedCounter         = metrics.NewRegisteredCounter("mailserver/requestsBatched", nil)
-	requestErrorsCounter           = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
-	sentEnvelopesMeter             = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
-	sentEnvelopesSizeMeter         = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
-	archivedMeter                  = metrics.NewRegisteredMeter("mailserver/archivedEnvelopes", nil)
-	archivedSizeMeter              = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
-	archivedErrorsCounter          = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
-	requestValidationErrorsCounter = metrics.NewRegisteredCounter("mailserver/requestValidationErrors", nil)
-	processRequestErrorsCounter    = metrics.NewRegisteredCounter("mailserver/processRequestErrors", nil)
-	historicResponseErrorsCounter  = metrics.NewRegisteredCounter("mailserver/historicResponseErrors", nil)
-	syncRequestsMeter              = metrics.NewRegisteredMeter("mailserver/syncRequests", nil)
 )
 
 const (
-	// DBKeyLength is a size of the envelope key.
-	DBKeyLength = common.HashLength + timestampLength
-
 	timestampLength        = 4
 	requestLimitLength     = 4
 	requestTimeRangeLength = timestampLength * 2
@@ -95,41 +75,10 @@ type WMailServer struct {
 	symFilter  *whisper.Filter
 	asymFilter *whisper.Filter
 
-	muLimiter sync.RWMutex
-	limiter   *limiter
-	tick      *ticker
-}
+	muRateLimiter sync.RWMutex
+	rateLimiter   *rateLimiter
 
-// DBKey key to be stored on db.
-type DBKey struct {
-	timestamp uint32
-	hash      common.Hash
-	raw       []byte
-}
-
-// Bytes returns a bytes representation of the DBKey.
-func (k *DBKey) Bytes() []byte {
-	return k.raw
-}
-
-// NewDBKey creates a new DBKey with the given values.
-func NewDBKey(t uint32, h common.Hash) *DBKey {
-	var k DBKey
-	k.timestamp = t
-	k.hash = h
-	k.raw = make([]byte, DBKeyLength)
-	binary.BigEndian.PutUint32(k.raw, k.timestamp)
-	copy(k.raw[4:], k.hash[:])
-	return &k
-}
-
-// NewDBKeyFromBytes creates a DBKey from a byte slice.
-func NewDBKeyFromBytes(b []byte) *DBKey {
-	return &DBKey{
-		raw:       b,
-		timestamp: binary.BigEndian.Uint32(b),
-		hash:      common.BytesToHash(b[4:]),
-	}
+	cleaner *dbCleaner // removes old envelopes
 }
 
 // Init initializes mailServer.
@@ -150,7 +99,10 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 	if err := s.setupRequestMessageDecryptor(config); err != nil {
 		return err
 	}
-	s.setupLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+
+	if config.MailServerRateLimit > 0 {
+		s.setupRateLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
+	}
 
 	// Open database in the last step in order not to init with error
 	// and leave the database open by accident.
@@ -160,16 +112,24 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 	}
 	s.db = database
 
+	if config.MailServerDataRetention > 0 {
+		// MailServerDataRetention is a number of days.
+		s.setupCleaner(time.Duration(config.MailServerDataRetention) * time.Hour * 24)
+	}
+
 	return nil
 }
 
-// setupLimiter in case limit is bigger than 0 it will setup an automated
+// setupRateLimiter in case limit is bigger than 0 it will setup an automated
 // limit db cleanup.
-func (s *WMailServer) setupLimiter(limit time.Duration) {
-	if limit > 0 {
-		s.limiter = newLimiter(limit)
-		s.setupMailServerCleanup(limit)
-	}
+func (s *WMailServer) setupRateLimiter(limit time.Duration) {
+	s.rateLimiter = newRateLimiter(limit)
+	s.rateLimiter.Start()
+}
+
+func (s *WMailServer) setupCleaner(retention time.Duration) {
+	s.cleaner = newDBCleaner(s.db, retention)
+	s.cleaner.Start()
 }
 
 // setupRequestMessageDecryptor setup a Whisper filter to decrypt
@@ -203,15 +163,6 @@ func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig)
 	return nil
 }
 
-// setupMailServerCleanup periodically runs an expired entries deleteion for
-// stored limits.
-func (s *WMailServer) setupMailServerCleanup(period time.Duration) {
-	if s.tick == nil {
-		s.tick = &ticker{}
-	}
-	go s.tick.run(period, s.limiter.deleteExpired)
-}
-
 // Close the mailserver and its associated db connection.
 func (s *WMailServer) Close() {
 	if s.db != nil {
@@ -219,8 +170,11 @@ func (s *WMailServer) Close() {
 			log.Error(fmt.Sprintf("s.db.Close failed: %s", err))
 		}
 	}
-	if s.tick != nil {
-		s.tick.stop()
+	if s.rateLimiter != nil {
+		s.rateLimiter.Stop()
+	}
+	if s.cleaner != nil {
+		s.cleaner.Stop()
 	}
 }
 
@@ -450,18 +404,21 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 // exceedsPeerRequests in case limit its been setup on the current server and limit
 // allows the query, it will store/update new query time for the current peer.
 func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
-	s.muLimiter.RLock()
-	defer s.muLimiter.RUnlock()
+	s.muRateLimiter.RLock()
+	defer s.muRateLimiter.RUnlock()
 
-	if s.limiter != nil {
-		peerID := string(peer)
-		if !s.limiter.isAllowed(peerID) {
-			log.Info("peerID exceeded the number of requests per second")
-			return true
-		}
-		s.limiter.add(peerID)
+	if s.rateLimiter == nil {
+		return false
 	}
-	return false
+
+	peerID := string(peer)
+	if s.rateLimiter.IsAllowed(peerID) {
+		s.rateLimiter.Add(peerID)
+		return false
+	}
+
+	log.Info("peerID exceeded the number of requests per second")
+	return true
 }
 
 func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
@@ -472,7 +429,7 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterato
 
 	kl = NewDBKey(lower, emptyHash)
 	if len(cursor) == DBKeyLength {
-		ku = NewDBKeyFromBytes(cursor)
+		ku = mustNewDBKeyFromBytes(cursor)
 	} else {
 		ku = NewDBKey(upper+1, emptyHash)
 	}

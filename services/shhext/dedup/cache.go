@@ -3,11 +3,11 @@ package dedup
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 	"github.com/status-im/status-go/db"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"golang.org/x/crypto/sha3"
 )
 
 // cache represents a cache of whisper messages with a limit of 2 days.
