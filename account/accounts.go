@@ -249,7 +249,7 @@ func (m *Manager) SelectAccount(walletAddress, chatAddress, password string) err
 }
 
 // SetChatAccount initializes selectedChatAccount with privKey
-func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
+func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -265,8 +265,6 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) error {
 		Address:    address,
 		AccountKey: key,
 	}
-
-	return nil
 }
 
 // SelectedWalletAccount returns currently selected wallet account
