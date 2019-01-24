@@ -127,12 +127,10 @@ func (s *ShhExtSuite) SetupTest() {
 }
 
 func (s *ShhExtSuite) TestInitProtocol() {
-	pass := "`090///\nhtaa\rhta9x8923)$$'23"
-
-	err := s.services[0].InitProtocolWithPassword("example-address", pass)
+	err := s.services[0].InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
 	s.NoError(err)
 
-	digest := sha3.Sum256([]byte(pass))
+	digest := sha3.Sum256([]byte("`090///\nhtaa\rhta9x8923)$$'23"))
 	encKey := fmt.Sprintf("%x", digest)
 	err = s.services[0].InitProtocolWithEncyptionKey("example-address", encKey)
 	s.NoError(err)
