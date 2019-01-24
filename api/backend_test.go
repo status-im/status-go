@@ -190,6 +190,9 @@ func TestBackendInjectChatAccount(t *testing.T) {
 	require.NoError(t, err)
 	err = backend.StartNode(config)
 	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, backend.StopNode())
+	}()
 
 	chatPrivKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
