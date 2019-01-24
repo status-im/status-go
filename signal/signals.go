@@ -22,7 +22,7 @@ import (
 type MobileSignalHandler func([]byte)
 
 // storing the current signal handler here
-var mobileSignalHandler MobileSignalHandler = nil
+var mobileSignalHandler MobileSignalHandler
 
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/signal")

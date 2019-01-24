@@ -64,10 +64,14 @@ func (e APIError) Error() string {
 
 // AccountInfo represents account's info.
 type AccountInfo struct {
-	Address  string `json:"address"`
-	PubKey   string `json:"pubkey"`
-	Mnemonic string `json:"mnemonic"`
-	Error    string `json:"error"`
+	Address       string `json:"address"` // DEPRECATED
+	PubKey        string `json:"pubkey"`  // DEPRECATED
+	WalletAddress string `json:"walletAddress"`
+	WalletPubKey  string `json:"walletPubKey"`
+	ChatAddress   string `json:"chatAddress"`
+	ChatPubKey    string `json:"chatPubKey"`
+	Mnemonic      string `json:"mnemonic"`
+	Error         string `json:"error"`
 }
 
 // NotifyResult is a JSON returned from notify message.
@@ -76,6 +80,14 @@ type NotifyResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
+// SignalHandler defines a minimal interface
+// a signal handler needs to implement.
 type SignalHandler interface {
 	HandleSignal(string)
+}
+
+// SendDataNotificationResult is a JSON returned from notify message.
+type SendDataNotificationResult struct {
+	Status bool   `json:"status"`
+	Error  string `json:"error,omitempty"`
 }

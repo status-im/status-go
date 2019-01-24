@@ -244,7 +244,7 @@ func CallPrivateRPC(inputJSON string) string {
 // CreateAccount is equivalent to creating an account from the command line,
 // just modified to handle the function arg passing.
 func CreateAccount(password string) string {
-	address, pubKey, mnemonic, err := statusBackend.AccountManager().CreateAccount(password)
+	info, mnemonic, err := statusBackend.AccountManager().CreateAccount(password)
 
 	errString := ""
 	if err != nil {
@@ -253,10 +253,14 @@ func CreateAccount(password string) string {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: mnemonic,
-		Error:    errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return string(outBytes)
@@ -283,7 +287,7 @@ func CreateChildAccount(parentAddress, password string) string {
 
 // RecoverAccount re-creates master key using given details.
 func RecoverAccount(password, mnemonic string) string {
-	address, pubKey, err := statusBackend.AccountManager().RecoverAccount(password, mnemonic)
+	info, err := statusBackend.AccountManager().RecoverAccount(password, mnemonic)
 
 	errString := ""
 	if err != nil {
@@ -292,10 +296,14 @@ func RecoverAccount(password, mnemonic string) string {
 	}
 
 	out := AccountInfo{
-		Address:  address,
-		PubKey:   pubKey,
-		Mnemonic: (mnemonic),
-		Error:    errString,
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
 	}
 	outBytes, _ := json.Marshal(out)
 	return string(outBytes)
@@ -311,7 +319,7 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity.
 func Login(address, password string) string {
-	err := statusBackend.SelectAccount(address, password)
+	err := statusBackend.SelectAccount(address, address, password)
 	return makeJSONResponse(err)
 }
 
@@ -393,34 +401,54 @@ func makeJSONResponse(err error) string {
 	return string(outBytes)
 }
 
-// NotifyUsers sends push notifications by given tokens.
-// TODO: remove unusedField
-func NotifyUsers(unusedField, payloadJSON, tokensArray string) string {
-	makeResponse := func(err error) string {
-		result := NotifyResult{}
+// SendDataNotification sends push notifications by given tokens.
+// dataPayloadJSON is a JSON string that looks like this:
+// {
+// 	"data": {
+// 		"msg-v2": {
+// 			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
+// 			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
+// 			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
+// 		}
+// 	}
+// }
+func SendDataNotification(dataPayloadJSON, tokensArray string) (result string) {
+	var (
+		err       error
+		errString string
+	)
 
-		result.Status = err == nil
-		if err != nil {
-			result.Error = err.Error()
+	defer func() {
+		out := SendDataNotificationResult{
+			Status: err == nil,
+			Error:  errString,
 		}
 
-		resultJSON, err := json.Marshal(result)
+		var resultBytes []byte
 
+		resultBytes, err = json.Marshal(out)
 		if err != nil {
-			logger.Error("failed to marshal Notify output", "error", err)
-			return makeJSONResponse(err)
+			logger.Error("failed to marshal SendDataNotification output", "error", err)
+			result = makeJSONResponse(err)
+			return
 		}
 
-		return string(resultJSON)
-	}
+		result = string(resultBytes)
+	}()
 
-	tokens, err := ParseJSONArray(tokensArray)
+	tokens, err := ParseJSONArray((tokensArray))
 	if err != nil {
-		return makeResponse(err)
+		errString = err.Error()
+		return ""
 	}
 
-	err = statusBackend.NotifyUsers(payloadJSON, tokens...)
-	return makeResponse(err)
+	err = statusBackend.SendDataNotification(dataPayloadJSON, tokens...)
+	if err != nil {
+		errString = err.Error()
+		return ""
+	}
+
+	return ""
 }
 
 // AddPeer adds an enode as a peer.
