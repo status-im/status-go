@@ -11,6 +11,7 @@ package main
 
 import "C"
 import (
+	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -26,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
@@ -123,6 +125,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"account select/login",
 			testAccountSelect,
+		},
+		{
+			"login with keycard",
+			testLoginWithKeycard,
 		},
 		{
 			"account logout",
@@ -712,6 +718,53 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 	if whisperService.HasKeyPair(accountInfo1.ChatPubKey) {
 		t.Error("identity should be removed, but it is still present in whisper")
+	}
+
+	return true
+}
+
+func testLoginWithKeycard(t *testing.T) bool { //nolint: gocyclo
+	chatPrivKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Errorf("error generating chat key")
+		return false
+	}
+	chatPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(chatPrivKey))
+
+	encryptionPrivKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Errorf("error generating encryption key")
+		return false
+	}
+	encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
+
+	whisperService, err := statusBackend.StatusNode().WhisperService()
+	if err != nil {
+		t.Errorf("whisper service not running: %v", err)
+	}
+
+	chatPubKeyHex := hexutil.Encode(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
+	if whisperService.HasKeyPair(chatPubKeyHex) {
+		t.Error("identity already present in whisper")
+		return false
+	}
+
+	loginResponse := APIResponse{}
+	rawResponse := LoginWithKeycard(C.CString(chatPrivKeyHex), C.CString(encryptionPrivKeyHex))
+
+	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
+		t.Errorf("cannot decode LoginWithKeycard response (%s): %v", C.GoString(rawResponse), err)
+		return false
+	}
+
+	if loginResponse.Error != "" {
+		t.Errorf("Test failed: could not login with keycard: %v", err)
+		return false
+	}
+
+	if !whisperService.HasKeyPair(chatPubKeyHex) {
+		t.Error("identity not present in whisper after logging in with keycard")
+		return false
 	}
 
 	return true
