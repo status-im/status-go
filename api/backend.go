@@ -456,7 +456,7 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 			return err
 		}
 
-		if err := st.InitProtocol(chatAddress, password); err != nil {
+		if err := st.InitProtocolWithPassword(chatAddress, password); err != nil {
 			return err
 		}
 	}
@@ -521,7 +521,7 @@ func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) e
 			return err
 		}
 
-		if err := st.InitProtocol(chatAccount.Address.Hex(), encryptionKeyHex); err != nil {
+		if err := st.InitProtocolWithEncyptionKey(chatAccount.Address.Hex(), encryptionKeyHex); err != nil {
 			return err
 		}
 	}
