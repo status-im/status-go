@@ -19,11 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/logutils"
-
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
-
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
 
@@ -248,7 +246,6 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"Name": "test",
 		"NetworkId": ` + strconv.Itoa(networkID) + `,
 		"DataDir": "` + testDir + `",
-		"BackupDisabledDataDir": "` + testDir + `",
 		"KeyStoreDir": "` + path.Join(testDir, "keystore") + `",
 		"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
@@ -261,6 +258,9 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 			"Enabled": true,
 			"DataDir": "` + path.Join(testDir, "wnode") + `",
 			"EnableNTPSync": false
+		},
+		"ShhextConfig": {
+			"BackupDisabledDataDir": "` + testDir + `"
 		}
 	}`
 
@@ -305,8 +305,9 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 }
 
 type account struct {
-	Address  string
-	Password string
+	WalletAddress string
+	ChatAddress   string
+	Password      string
 }
 
 // testConfig contains shared (among different test packages) parameters

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/node"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
@@ -36,11 +37,9 @@ func testMailserverPeer(t *testing.T) {
 
 	shhService := createWhisperService()
 	shhAPI := whisper.NewPublicWhisperAPI(shhService)
-	config := &shhext.ServiceConfig{
-		DataDir:        os.TempDir(),
-		InstallationID: "1",
-		Debug:          false,
-		PFSEnabled:     false,
+	config := params.ShhextConfig{
+		BackupDisabledDataDir: os.TempDir(),
+		InstallationID:        "1",
 	}
 	mailService := shhext.New(shhService, nil, nil, config)
 	shhextAPI := shhext.NewPublicAPI(mailService)

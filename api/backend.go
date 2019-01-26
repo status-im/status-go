@@ -421,17 +421,18 @@ func (b *StatusBackend) reSelectAccount() error {
 	return nil
 }
 
-// SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
-// using provided password. Once verification is done, decrypted key is injected into Whisper (as a single identity,
+// SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
+// using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func (b *StatusBackend) SelectAccount(address, password string) error {
+func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	err := b.accountManager.SelectAccount(address, password)
+	err := b.accountManager.SelectAccount(walletAddress, chatAddress, password)
 	if err != nil {
 		return err
 	}
+
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
@@ -454,7 +455,7 @@ func (b *StatusBackend) SelectAccount(address, password string) error {
 			return err
 		}
 
-		if err := st.InitProtocol(address, password); err != nil {
+		if err := st.InitProtocol(chatAddress, password); err != nil {
 			return err
 		}
 	}

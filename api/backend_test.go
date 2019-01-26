@@ -138,15 +138,15 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 	var wgCreateAccounts sync.WaitGroup
 	count := 3
-	addressCh := make(chan [2]string, count) // use buffered channel to avoid blocking
+	addressCh := make(chan [3]string, count) // use buffered channel to avoid blocking
 
 	// create new accounts concurrently
 	for i := 0; i < count; i++ {
 		wgCreateAccounts.Add(1)
 		go func(pass string) {
-			address, _, _, err := backend.AccountManager().CreateAccount(pass)
+			accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
 			assert.NoError(t, err)
-			addressCh <- [...]string{address, pass}
+			addressCh <- [...]string{accountInfo.WalletAddress, accountInfo.ChatAddress, pass}
 			wgCreateAccounts.Done()
 		}("password-00" + string(i))
 	}
@@ -159,8 +159,8 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 	for tuple := range addressCh {
 		wg.Add(1)
-		go func(tuple [2]string) {
-			assert.NoError(t, backend.SelectAccount(tuple[0], tuple[1]))
+		go func(tuple [3]string) {
+			assert.NoError(t, backend.SelectAccount(tuple[0], tuple[1], tuple[2]))
 			wg.Done()
 		}(tuple)
 

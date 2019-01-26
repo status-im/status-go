@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
@@ -40,17 +41,18 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w              *whisper.Whisper
-	config         *ServiceConfig
-	tracker        *tracker
-	server         *p2p.Server
-	nodeID         *ecdsa.PrivateKey
-	deduplicator   *dedup.Deduplicator
-	protocol       *chat.ProtocolService
-	debug          bool
-	dataDir        string
-	installationID string
-	pfsEnabled     bool
+	w                *whisper.Whisper
+	config           params.ShhextConfig
+	tracker          *tracker
+	requestsRegistry *RequestsRegistry
+	server           *p2p.Server
+	nodeID           *ecdsa.PrivateKey
+	deduplicator     *dedup.Deduplicator
+	protocol         *chat.ProtocolService
+	debug            bool
+	dataDir          string
+	installationID   string
+	pfsEnabled       bool
 
 	peerStore       *mailservers.PeerStore
 	cache           *mailservers.Cache
@@ -58,24 +60,18 @@ type Service struct {
 	lastUsedMonitor *mailservers.LastUsedConnectionMonitor
 }
 
-type ServiceConfig struct {
-	DataDir                 string
-	InstallationID          string
-	Debug                   bool
-	PFSEnabled              bool
-	MailServerConfirmations bool
-	EnableConnectionManager bool
-	EnableLastUsedMonitor   bool
-	ConnectionTarget        int
-}
-
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service. dataDir is a folder path to a network-independent location
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config *ServiceConfig) *Service {
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config params.ShhextConfig) *Service {
 	cache := mailservers.NewCache(db)
 	ps := mailservers.NewPeerStore(cache)
+	delay := defaultRequestsDelay
+	if config.RequestsDelay != 0 {
+		delay = config.RequestsDelay
+	}
+	requestsRegistry := NewRequestsRegistry(delay)
 	track := &tracker{
 		w:                      w,
 		handler:                handler,
@@ -83,18 +79,20 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		batches:                map[common.Hash]map[common.Hash]struct{}{},
 		mailPeers:              ps,
 		mailServerConfirmation: config.MailServerConfirmations,
+		requestsRegistry:       requestsRegistry,
 	}
 	return &Service{
-		w:              w,
-		config:         config,
-		tracker:        track,
-		deduplicator:   dedup.NewDeduplicator(w, db),
-		debug:          config.Debug,
-		dataDir:        config.DataDir,
-		installationID: config.InstallationID,
-		pfsEnabled:     config.PFSEnabled,
-		peerStore:      ps,
-		cache:          cache,
+		w:                w,
+		config:           config,
+		tracker:          track,
+		requestsRegistry: requestsRegistry,
+		deduplicator:     dedup.NewDeduplicator(w, db),
+		debug:            config.DebugAPIEnabled,
+		dataDir:          config.BackupDisabledDataDir,
+		installationID:   config.InstallationID,
+		pfsEnabled:       config.PFSEnabled,
+		peerStore:        ps,
+		cache:            cache,
 	}
 }
 
@@ -149,7 +147,7 @@ func (s *Service) InitProtocol(address string, password string) error {
 	}
 
 	// Fix IOS not encrypting database
-	if err := chat.MigrateDBFile(v3Path, v4Path, "", hashedPassword); err != nil {
+	if err := chat.EncryptDatabase(v3Path, v4Path, hashedPassword); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}

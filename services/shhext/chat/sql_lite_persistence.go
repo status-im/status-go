@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
+	sqlite "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 	dr "github.com/status-im/doubleratchet"
 	"github.com/status-im/migrate"
 	"github.com/status-im/migrate/database/sqlcipher"
@@ -31,6 +31,8 @@ const defaultKdfIterationsNumber = 64000
 // https://github.com/status-im/status-go/pull/1343
 // https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
 const kdfIterationsNumber = 3200
+
+const exportDB = "SELECT sqlcipher_export('newdb')"
 
 // SQLLitePersistence represents a persistence service tied to an SQLite database
 type SQLLitePersistence struct {
@@ -115,6 +117,16 @@ func MigrateDBKeyKdfIterations(oldPath string, newPath string, key string) error
 		return err
 	}
 
+	isEncrypted, err := sqlite.IsEncrypted(oldPath)
+	if err != nil {
+		return err
+	}
+
+	// Nothing to do, move db to the next migration
+	if !isEncrypted {
+		return os.Rename(oldPath, newPath)
+	}
+
 	db, err := openDB(oldPath, key, defaultKdfIterationsNumber)
 	if err != nil {
 		return err
@@ -137,7 +149,62 @@ func MigrateDBKeyKdfIterations(oldPath string, newPath string, key string) error
 		return err
 	}
 
-	exportDB := "SELECT sqlcipher_export('newdb')"
+	if _, err = db.Exec(exportDB); err != nil {
+		return err
+	}
+
+	if err = db.Close(); err != nil {
+		return err
+	}
+
+	return os.Remove(oldPath)
+}
+
+// EncryptDatabase encrypts an unencrypted database with key
+func EncryptDatabase(oldPath string, newPath string, key string) error {
+	_, err := os.Stat(oldPath)
+
+	// No files, nothing to do
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	// Any other error, throws
+	if err != nil {
+		return err
+	}
+
+	isEncrypted, err := sqlite.IsEncrypted(oldPath)
+	if err != nil {
+		return err
+	}
+
+	// Nothing to do, already encrypted
+	if isEncrypted {
+		return os.Rename(oldPath, newPath)
+	}
+
+	db, err := openDB(oldPath, "", defaultKdfIterationsNumber)
+	if err != nil {
+		return err
+	}
+
+	attach := fmt.Sprintf(
+		"ATTACH DATABASE '%s' AS newdb KEY '%s'",
+		newPath,
+		key)
+
+	if _, err = db.Exec(attach); err != nil {
+		return err
+	}
+
+	changeKdfIter := fmt.Sprintf(
+		"PRAGMA newdb.kdf_iter = %d",
+		kdfIterationsNumber)
+
+	if _, err = db.Exec(changeKdfIter); err != nil {
+		return err
+	}
 
 	if _, err = db.Exec(exportDB); err != nil {
 		return err
@@ -147,12 +214,7 @@ func MigrateDBKeyKdfIterations(oldPath string, newPath string, key string) error
 		return err
 	}
 
-	if err = os.Remove(oldPath); err != nil {
-		return err
-	}
-
-	return nil
-
+	return os.Remove(oldPath)
 }
 
 func openDB(path string, key string, kdfIter int) (*sql.DB, error) {
