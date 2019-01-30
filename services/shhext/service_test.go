@@ -550,3 +550,28 @@ func (s *RequestMessagesSyncSuite) TestCompletedFromFirstAttempt() {
 func (s *RequestMessagesSyncSuite) TestCompletedFromSecondAttempt() {
 	s.testCompletedFromAttempt(2)
 }
+
+func (s *RequestMessagesSyncSuite) TestRequestWithCursor() {
+	target := 2
+	attempt := 0
+	go func() {
+		cursor := make([]byte, 36) // cursor is expected to be atleast 36 bytes
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			attempt++
+			s.Require().NoError(err)
+			var e whisper.Envelope
+			s.Require().NoError(msg.Decode(&e))
+			if attempt == target {
+				cursor = nil
+			}
+			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, whisper.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, cursor)))
+		}
+	}()
+	s.Require().NoError(s.localAPI.RequestMessagesSync(RetryConfig{}, MessagesRequest{
+		MailServerPeer: s.localNode.String(),
+		Force:          true,
+		Limit:          10,
+	}))
+	s.Require().Equal(target, attempt, "unexpected number of attempts was made")
+}

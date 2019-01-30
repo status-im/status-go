@@ -195,19 +195,18 @@ func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) e
 	sub := shh.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 	var (
-		requestID hexutil.Bytes
-		err       error
-		retries   int
+		err     error
+		retries int
 	)
+	// set defaults early so that they wont be overwritten on every internal request
+	r.setDefaults(api.service.w.GetCurrentTime())
+
 	for retries <= conf.MaxRetries {
 		r.Timeout = conf.BaseTimeout + conf.StepTimeout*time.Duration(retries)
 		// FIXME this weird conversion is required because MessagesRequest expects seconds but defines time.Duration
 		r.Timeout = time.Duration(int(r.Timeout.Seconds()))
-		requestID, err = api.RequestMessages(context.Background(), r)
-		if err != nil {
-			return err
-		}
-		err = waitForExpiredOrCompleted(common.BytesToHash(requestID), events)
+		// FIXME this context is not used
+		err = api.requestUntilCursorIsEmpty(context.Background(), r, events)
 		if err == nil {
 			return nil
 		}
@@ -217,7 +216,24 @@ func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) e
 	return fmt.Errorf("failed to request messages after %d retries", retries)
 }
 
-func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.EnvelopeEvent) error {
+func (api *PublicAPI) requestUntilCursorIsEmpty(context context.Context, r MessagesRequest, events <-chan whisper.EnvelopeEvent) error {
+	for {
+		requestID, err := api.RequestMessages(context, r)
+		if err != nil {
+			return err
+		}
+		cursor, err := waitForExpiredOrCompleted(common.BytesToHash(requestID), events)
+		if err != nil {
+			return err
+		}
+		if len(cursor) == 0 {
+			return nil
+		}
+		r.Cursor = hex.EncodeToString(cursor)
+	}
+}
+
+func waitForExpiredOrCompleted(requestID common.Hash, events <-chan whisper.EnvelopeEvent) ([]byte, error) {
 	for {
 		ev := <-events
 		if ev.Hash != requestID {
@@ -225,9 +241,13 @@ func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.Envelo
 		}
 		switch ev.Event {
 		case whisper.EventMailServerRequestCompleted:
-			return nil
+			response, ok := ev.Data.(*whisper.MailServerResponse)
+			if !ok {
+				return nil, errors.New("received unexpected object instead of the MailServerResponse")
+			}
+			return response.Cursor, nil
 		case whisper.EventMailServerRequestExpired:
-			return errors.New("request expired")
+			return nil, errors.New("request expired")
 		}
 	}
 }
