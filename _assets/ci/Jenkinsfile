@@ -24,7 +24,7 @@ pipeline {
     stage('Build') {
       parallel {
         stage('Android') {
-          agent { label 'macos' }
+          agent { label 'linux' }
 
           environment {
             STATUS_PATH = 'src/github.com/status-im/status-go'
