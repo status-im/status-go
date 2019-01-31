@@ -45,8 +45,8 @@ pipeline {
                 println("Git Branch: ${lib.gitBranch()}")
                 println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
-                dest = "${env.WORKSPACE}/pkg-android"
-                sh "mkdir -p ${dest}"
+                destAndroid = "${env.WORKSPACE}/pkg-android"
+                sh "mkdir -p ${destAndroid}"
               } }
             }
 
@@ -60,7 +60,7 @@ pipeline {
 
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-android'
-              sh "cp build/bin/statusgo-android-16.aar ${dest}/status-go-android-${lib.suffix()}.aar"
+              sh "cp build/bin/statusgo-android-16.aar ${destAndroid}/status-go-android-${lib.suffix()}.aar"
             } } }
 
             stage('Archive') { steps {
@@ -89,7 +89,7 @@ pipeline {
             }
 
             stage('Cleanup') { steps { script {
-              sh "rm -fr ${dest}"
+              sh "rm -fr ${destAndroid}"
             } } }
           }
         } // Android
@@ -112,8 +112,8 @@ pipeline {
                 println("Git Branch: ${lib.gitBranch()}")
                 println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
-                dest = "${env.WORKSPACE}/pkg-ios"
-                sh "mkdir -p ${dest}"
+                destIOS = "${env.WORKSPACE}/pkg-ios"
+                sh "mkdir -p ${destIOS}"
               } }
             }
 
@@ -129,7 +129,7 @@ pipeline {
               sh 'make statusgo-ios'
               dir('build/bin') {
                 sh 'zip -r status-go-ios.zip Statusgo.framework'
-                sh "cp status-go-ios.zip ${dest}/status-go-ios-${lib.suffix()}.zip"
+                sh "cp status-go-ios.zip ${destIOS}/status-go-ios-${lib.suffix()}.zip"
               }
             } } }
 
@@ -142,7 +142,7 @@ pipeline {
             } } }
 
             stage('Cleanup') { steps { script {
-              sh "rm -fr ${dest}"
+              sh "rm -fr ${destIOS}"
             } } }
           }
         } // iOS
