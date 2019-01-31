@@ -45,7 +45,7 @@ pipeline {
                 println("Git Branch: ${lib.gitBranch()}")
                 println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
-                dest = "${env.WORKSPACE}/pkg"
+                dest = "${env.WORKSPACE}/pkg-android"
                 sh "mkdir -p ${dest}"
               } }
             }
@@ -64,11 +64,11 @@ pipeline {
             } } }
 
             stage('Archive') { steps {
-              archiveArtifacts("pkg/status-go-android-${lib.suffix()}.aar")
+              archiveArtifacts("pkg-android/status-go-android-${lib.suffix()}.aar")
             } }
 
             stage('Upload') { steps { script {
-              lib.uploadArtifact("pkg/status-go-android-${lib.suffix()}.aar")
+              lib.uploadArtifact("pkg-android/status-go-android-${lib.suffix()}.aar")
             } } }
 
             stage('Release') { when { expression { params.RELEASE == true } }
@@ -112,7 +112,7 @@ pipeline {
                 println("Git Branch: ${lib.gitBranch()}")
                 println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
-                dest = "${env.WORKSPACE}/pkg"
+                dest = "${env.WORKSPACE}/pkg-ios"
                 sh "mkdir -p ${dest}"
               } }
             }
@@ -134,11 +134,11 @@ pipeline {
             } } }
 
             stage('Archive') { steps {
-              archiveArtifacts("pkg/status-go-ios-${lib.suffix()}.zip")
+              archiveArtifacts("pkg-ios/status-go-ios-${lib.suffix()}.zip")
             } }
 
             stage('Upload') { steps { script {
-              lib.uploadArtifact("pkg/status-go-ios-${lib.suffix()}.zip")
+              lib.uploadArtifact("pkg-ios/status-go-ios-${lib.suffix()}.zip")
             } } }
 
             stage('Cleanup') { steps { script {
@@ -163,7 +163,7 @@ pipeline {
                 println("Git Branch: ${lib.gitBranch()}")
                 println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
-                dest = "${env.WORKSPACE}/pkg"
+                dest = "${env.WORKSPACE}/pkg-desktop"
                 sh "mkdir -p ${dest}"
               } }
             }
@@ -173,11 +173,11 @@ pipeline {
             }}}
 
             stage('Archive') { steps {
-              archiveArtifacts("pkg/status-go-desktop-${lib.suffix()}.zip")
+              archiveArtifacts("pkg-desktop/status-go-desktop-${lib.suffix()}.zip")
             } }
 
             stage('Upload') { steps { script {
-              lib.uploadArtifact("pkg/status-go-desktop-${lib.suffix()}.zip")
+              lib.uploadArtifact("pkg-desktop/status-go-desktop-${lib.suffix()}.zip")
             } } }
 
             stage('Release') { when { expression { params.RELEASE == true } }
