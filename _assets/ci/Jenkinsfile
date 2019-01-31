@@ -1,5 +1,5 @@
 pipeline {
-  agent none
+  agent { label 'linux' }
 
   parameters {
     booleanParam(
@@ -20,7 +20,23 @@ pipeline {
     ))
   }
 
+  environment {
+    STATUS_PATH = 'src/github.com/status-im/status-go'
+    GOPATH = "${env.WORKSPACE}"
+    PATH = "${env.PATH}:${env.GOPATH}/bin"
+  }
+
   stages {
+    stage('Prep') {
+      steps { script {
+        lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
+        version = readFile("${STATUS_PATH}/VERSION").trim()
+        println("Version: ${version}")
+        println("Git Branch: ${lib.gitBranch()}")
+        println("Git Commit: ${lib.gitCommit()}")
+      } }
+    } // stage(Prep)
+
     stage('Build') {
       parallel {
         stage('Android') {
@@ -39,11 +55,6 @@ pipeline {
           stages {
             stage('Prep') {
               steps { script {
-                lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-                version = readFile("${STATUS_PATH}/VERSION").trim()
-                println("Version: ${version}")
-                println("Git Branch: ${lib.gitBranch()}")
-                println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
                 destAndroid = "${env.WORKSPACE}/pkg-android"
                 sh "mkdir -p ${destAndroid}"
@@ -60,10 +71,11 @@ pipeline {
 
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-android'
-              sh "cp build/bin/statusgo-android-16.aar ${destAndroid}/status-go-android-${lib.suffix()}.aar"
+              sh "cp build/bin/statusgo.aar ${destAndroid}/status-go-android-${lib.suffix()}.aar"
             } } }
 
             stage('Archive') { steps {
+              stash(name: 'android', includes: "${env.STATUS_PATH}/build/bin/statusgo.aar")
               archiveArtifacts("pkg-android/status-go-android-${lib.suffix()}.aar")
             } }
 
@@ -71,28 +83,11 @@ pipeline {
               lib.uploadArtifact("pkg-android/status-go-android-${lib.suffix()}.aar")
             } } }
 
-            stage('Release') { when { expression { params.RELEASE == true } }
-              steps {
-                dir(env.STATUS_PATH) {
-                  sh 'make prepare-release'
-                  withCredentials([[
-                    $class: 'UsernamePasswordMultiBinding',
-                    credentialsId: 'status-im-auto',
-                    usernameVariable: 'GITHUB_USER',
-                    passwordVariable: 'GITHUB_TOKEN'
-                  ]]) {
-                    sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
-                  }
-                  sh 'make clean-release'
-                }
-              }
-            }
-
             stage('Cleanup') { steps { script {
               sh "rm -fr ${destAndroid}"
             } } }
           }
-        } // Android
+        } // stage(Android)
 
         stage('iOS') {
           agent { label 'macos' }
@@ -106,11 +101,6 @@ pipeline {
           stages {
             stage('Prep') {
               steps { script {
-                lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-                version = readFile("${STATUS_PATH}/VERSION").trim()
-                println("Version: ${version}")
-                println("Git Branch: ${lib.gitBranch()}")
-                println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
                 destIOS = "${env.WORKSPACE}/pkg-ios"
                 sh "mkdir -p ${destIOS}"
@@ -134,6 +124,7 @@ pipeline {
             } } }
 
             stage('Archive') { steps {
+              stash(name: 'ios', includes: "${env.STATUS_PATH}/build/bin/status-go-ios.zip")
               archiveArtifacts("pkg-ios/status-go-ios-${lib.suffix()}.zip")
             } }
 
@@ -145,7 +136,7 @@ pipeline {
               sh "rm -fr ${destIOS}"
             } } }
           }
-        } // iOS
+        } // stage(iOS)
 
         stage('Desktop') {
           agent { label 'linux' }
@@ -157,11 +148,6 @@ pipeline {
           stages {
             stage('Prep') {
               steps { script {
-                lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-                version = readFile("${STATUS_PATH}/VERSION").trim()
-                println("Version: ${version}")
-                println("Git Branch: ${lib.gitBranch()}")
-                println("Git Commit: ${lib.gitCommit()}")
                 /* save and create a dir for artifacts */
                 dest = "${env.WORKSPACE}/pkg-desktop"
                 sh "mkdir -p ${dest}"
@@ -180,29 +166,31 @@ pipeline {
               lib.uploadArtifact("pkg-desktop/status-go-desktop-${lib.suffix()}.zip")
             } } }
 
-            stage('Release') { when { expression { params.RELEASE == true } }
-              steps {
-                dir(env.STATUS_PATH) {
-                  sh 'make prepare-release'
-                  withCredentials([[
-                    $class: 'UsernamePasswordMultiBinding',
-                    credentialsId: 'status-im-auto',
-                    usernameVariable: 'GITHUB_USER',
-                    passwordVariable: 'GITHUB_TOKEN'
-                  ]]) {
-                    sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
-                  }
-                  sh 'make clean-release'
-                }
-              }
-            }
-
             stage('Cleanup') { steps { script {
               sh "rm -fr ${dest}"
             } } }
           }
-        } // Desktop
+        } // stage(Desktop)
       } // parallel
-    } // stage
+    } // stage(Build)
+
+    stage('Release') { when { expression { params.RELEASE == true } }
+      steps {
+        dir(env.STATUS_PATH) {
+          unstash 'ios'
+          unstash 'android'
+          sh 'make prepare-release'
+          withCredentials([[
+            $class: 'UsernamePasswordMultiBinding',
+            credentialsId: 'status-im-auto',
+            usernameVariable: 'GITHUB_USER',
+            passwordVariable: 'GITHUB_TOKEN'
+          ]]) {
+            sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
+          }
+          sh 'make clean-release'
+        }
+      }
+    } // stage(Release)
   } // stages
 }
