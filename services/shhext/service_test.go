@@ -138,7 +138,7 @@ func (s *ShhExtSuite) TestInitProtocol() {
 
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	mock := newHandlerMock(1)
-	s.services[0].tracker.handler = mock
+	s.services[0].monitor.handler = mock
 	s.Require().NoError(s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()}))
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	symID, err := s.whisper[0].GenerateSymKey()
@@ -164,7 +164,7 @@ func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 
 func (s *ShhExtSuite) TestWaitMessageExpired() {
 	mock := newHandlerMock(1)
-	s.services[0].tracker.handler = mock
+	s.services[0].monitor.handler = mock
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)
 	client, err := s.nodes[0].Attach()

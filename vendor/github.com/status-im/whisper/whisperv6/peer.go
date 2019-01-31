@@ -144,7 +144,6 @@ func (peer *Peer) handshake() error {
 	} else {
 		peer.confirmationsEnabled = confirmationsEnabled
 	}
-
 	if err := <-errc; err != nil {
 		return fmt.Errorf("peer [%x] failed to send status packet: %v", peer.ID(), err)
 	}

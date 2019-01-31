@@ -322,6 +322,15 @@ type ShhextConfig struct {
 
 	// MaxServerFailures defines maximum allowed expired requests before server will be swapped to another one.
 	MaxServerFailures int
+
+	// MessageResendConfig defines configuration for resending not delivered message
+	MessageResendConfig MessageResendConfig
+}
+
+type MessageResendConfig struct {
+	MaxRetries  int
+	BaseTimeout time.Duration
+	StepTimeout time.Duration
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found

@@ -43,6 +43,7 @@ type EnvelopeEventsHandler interface {
 type Service struct {
 	w                *whisper.Whisper
 	config           params.ShhextConfig
+	monitor          *EnvelopesMonitor
 	tracker          *tracker
 	requestsRegistry *RequestsRegistry
 	server           *p2p.Server
@@ -72,19 +73,26 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		delay = config.RequestsDelay
 	}
 	requestsRegistry := NewRequestsRegistry(delay)
-	track := &tracker{
+	envelopesMonitor := &EnvelopesMonitor{
+		config:                 config.MessageResendConfig,
 		w:                      w,
 		handler:                handler,
-		cache:                  map[common.Hash]EnvelopeState{},
+		cache:                  map[common.Hash]*deliveryState{},
 		batches:                map[common.Hash]map[common.Hash]struct{}{},
 		mailPeers:              ps,
 		mailServerConfirmation: config.MailServerConfirmations,
-		requestsRegistry:       requestsRegistry,
+	}
+	track := &tracker{
+		w:                w,
+		handler:          handler,
+		cache:            map[common.Hash]EnvelopeState{},
+		requestsRegistry: requestsRegistry,
 	}
 	return &Service{
 		w:                w,
 		config:           config,
 		tracker:          track,
+		monitor:          envelopesMonitor,
 		requestsRegistry: requestsRegistry,
 		deduplicator:     dedup.NewDeduplicator(w, db),
 		debug:            config.DebugAPIEnabled,
@@ -259,6 +267,7 @@ func (s *Service) Start(server *p2p.Server) error {
 		s.lastUsedMonitor = mailservers.NewLastUsedConnectionMonitor(s.peerStore, s.cache, s.w)
 		s.lastUsedMonitor.Start()
 	}
+	s.monitor.Start()
 	s.tracker.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
@@ -274,6 +283,7 @@ func (s *Service) Stop() error {
 	if s.config.EnableLastUsedMonitor {
 		s.lastUsedMonitor.Stop()
 	}
+	s.monitor.Stop()
 	s.tracker.Stop()
 	return nil
 }

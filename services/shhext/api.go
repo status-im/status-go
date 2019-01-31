@@ -148,6 +148,7 @@ type SyncMessagesResponse struct {
 
 // PublicAPI extends whisper public API.
 type PublicAPI struct {
+	w         *whisper.Whisper
 	service   *Service
 	publicAPI *whisper.PublicWhisperAPI
 	log       log.Logger
@@ -157,6 +158,7 @@ type PublicAPI struct {
 func NewPublicAPI(s *Service) *PublicAPI {
 	return &PublicAPI{
 		service:   s,
+		w:         s.w,
 		publicAPI: whisper.NewPublicWhisperAPI(s.w),
 		log:       log.New("package", "status-go/services/sshext.PublicAPI"),
 	}
@@ -164,13 +166,17 @@ func NewPublicAPI(s *Service) *PublicAPI {
 
 // Post shamelessly copied from whisper codebase with slight modifications.
 func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash hexutil.Bytes, err error) {
-	hash, err = api.publicAPI.Post(ctx, req)
-	if err == nil {
-		var envHash common.Hash
-		copy(envHash[:], hash[:]) // slice can't be used as key
-		api.service.tracker.Add(envHash)
+	env, err := api.publicAPI.CreateEnvelope(req)
+	if err != nil {
+		return nil, err
 	}
-	return hash, err
+	err = api.w.Send(env)
+	if err == nil {
+		api.service.monitor.Add(env)
+		hash := env.Hash()
+		return hash[:], nil
+	}
+	return nil, err
 }
 
 func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {

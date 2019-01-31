@@ -230,6 +230,20 @@ type newMessageOverride struct {
 // Post posts a message on the Whisper network.
 // returns the hash of the message in case of success.
 func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+	env, err := api.CreateEnvelope(req)
+	if err != nil {
+		return nil, err
+	}
+	var result []byte
+	err = api.w.Send(env)
+	if err == nil {
+		hash := env.Hash()
+		result = hash[:]
+	}
+	return result, err
+}
+
+func (api *PublicWhisperAPI) CreateEnvelope(req NewMessage) (*Envelope, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -282,38 +296,16 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 	if err != nil {
 		return nil, err
 	}
-
-	var result []byte
 	env, err := whisperMsg.Wrap(params, api.w.GetCurrentTime())
 	if err != nil {
 		return nil, err
-	}
-
-	// send to specific node (skip PoW check)
-	if len(req.TargetPeer) > 0 {
-		n, err := enode.ParseV4(req.TargetPeer)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse target peer: %s", err)
-		}
-		err = api.w.SendP2PMessage(n.ID().Bytes(), env)
-		if err == nil {
-			hash := env.Hash()
-			result = hash[:]
-		}
-		return result, err
 	}
 
 	// ensure that the message PoW meets the node's minimum accepted PoW
 	if req.PowTarget < api.w.MinPow() {
 		return nil, ErrTooLowPoW
 	}
-
-	err = api.w.Send(env)
-	if err == nil {
-		hash := env.Hash()
-		result = hash[:]
-	}
-	return result, err
+	return env, nil
 }
 
 // UninstallFilter is alias for Unsubscribe
