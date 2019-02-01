@@ -184,7 +184,7 @@ pipeline {
 
           dir("${env.STATUS_PATH}/build/bin") {
             unstash 'ios' // zip file
-            sh 'unzip status-go-ios.zip'
+            sh 'yes | unzip status-go-ios.zip'
             sh 'pwd'
             sh 'ls'
             unstash 'android'
