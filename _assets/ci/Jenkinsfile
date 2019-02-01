@@ -185,10 +185,14 @@ pipeline {
 
           dir("build/bin") {
             unstash 'ios' // zip file
-            sh 'yes | unzip status-go-ios.zip'
             sh 'pwd'
             sh 'ls'
+
+            sh 'yes | unzip status-go-ios.zip'
+
             unstash 'android'
+            sh 'pwd'
+            sh 'ls'
           }
 
           sh 'pwd'
