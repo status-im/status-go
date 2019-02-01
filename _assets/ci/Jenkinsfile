@@ -75,9 +75,10 @@ pipeline {
             } } }
 
             stage('Archive') { steps {
-              stash(name: 'android', includes: "${env.STATUS_PATH}/build/bin/statusgo.aar")
+              dir("${env.STATUS_PATH}/build/bin") {
+                stash(name: 'ios', includes: 'statusgo.aar')
+              }
               archiveArtifacts("pkg-android/status-go-android-${lib.suffix()}.aar")
-              stash(name: 'android', includes: "${env.STATUS_PATH}/build/bin/statusgo.aar")
             } }
 
             stage('Upload') { steps { script {
