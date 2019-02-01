@@ -182,7 +182,7 @@ pipeline {
         dir(env.STATUS_PATH) {
           sh "mkdir -p ${env.STATUS_PATH}/build/bin"
 
-          dir("${env.STATUS_PATH}/build/bin") {
+          dir("build/bin") {
             unstash 'ios' // zip file
             sh 'yes | unzip status-go-ios.zip'
             sh 'pwd'
