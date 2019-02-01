@@ -127,6 +127,8 @@ pipeline {
 
             stage('Archive') { steps {
               dir("${env.STATUS_PATH}/build/bin") {
+                sh 'pwd'
+                sh 'ls'
                 stash(name: 'ios', includes: 'status-go-ios.zip')
               }
               archiveArtifacts("pkg-ios/status-go-ios-${lib.suffix()}.zip")
@@ -187,13 +189,13 @@ pipeline {
             sh 'pwd'
             sh 'ls'
 
-            unstash 'ios' // zip file
+            unstash(name: 'ios') // zip file
             sh 'pwd'
             sh 'ls'
 
             sh 'yes | unzip status-go-ios.zip'
 
-            unstash 'android'
+            unstash(name: 'android')
             sh 'pwd'
             sh 'ls'
           }
