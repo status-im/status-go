@@ -179,14 +179,16 @@ pipeline {
 
     stage('Release') { when { expression { params.RELEASE == true } }
       steps {
-        outputDir = "${env.STATUS_PATH}/build/bin"
-        sh "mkdir -p ${outputDir}"
-        dir(outputDir) {
-          unstash 'ios' // zip file
-          sh 'unzip status-go-ios.zip'
-          unstash 'android'
-        }
         dir(env.STATUS_PATH) {
+          outputDir = "${env.STATUS_PATH}/build/bin"
+          sh "mkdir -p ${outputDir}"
+
+          dir(outputDir) {
+            unstash 'ios' // zip file
+            sh 'unzip status-go-ios.zip'
+            unstash 'android'
+          }
+
           sh 'make prepare-release'
           withCredentials([[
             $class: 'UsernamePasswordMultiBinding',
