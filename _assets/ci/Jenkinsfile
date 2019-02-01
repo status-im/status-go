@@ -184,6 +184,9 @@ pipeline {
           sh "mkdir -p ${env.STATUS_PATH}/build/bin"
 
           dir("build/bin") {
+            sh 'pwd'
+            sh 'ls'
+
             unstash 'ios' // zip file
             sh 'pwd'
             sh 'ls'
