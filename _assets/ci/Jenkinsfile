@@ -65,9 +65,9 @@ pipeline {
               sh 'make setup-build'
             } } }
 
-            stage('Lint') { steps { dir(env.STATUS_PATH) {
-              sh 'make ci'
-            } } }
+            //stage('Lint') { steps { dir(env.STATUS_PATH) {
+            //  sh 'make ci'
+            //} } }
 
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-android'
@@ -111,9 +111,9 @@ pipeline {
               sh 'make setup-build'
             } } }
 
-            stage('Lint') { steps { dir(env.STATUS_PATH) {
-              sh 'make ci'
-            } } }
+            //stage('Lint') { steps { dir(env.STATUS_PATH) {
+            //  sh 'make ci'
+            //} } }
 
             stage('Compile') { steps { dir(env.STATUS_PATH) {
               sh 'make statusgo-ios'
@@ -124,7 +124,9 @@ pipeline {
             } } }
 
             stage('Archive') { steps {
-              stash(name: 'ios', includes: "${env.STATUS_PATH}/build/bin/status-go-ios.zip")
+              dir("${env.STATUS_PATH}/build/bin/Statusgo.framework") {
+                stash(name: 'ios', includes: '**')
+              }
               archiveArtifacts("pkg-ios/status-go-ios-${lib.suffix()}.zip")
             } }
 
