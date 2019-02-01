@@ -180,10 +180,9 @@ pipeline {
     stage('Release') { when { expression { params.RELEASE == true } }
       steps {
         dir(env.STATUS_PATH) {
-          def outputDir = "${env.STATUS_PATH}/build/bin"
-          sh "mkdir -p ${outputDir}"
+          sh "mkdir -p ${env.STATUS_PATH}/build/bin"
 
-          dir(outputDir) {
+          dir("${env.STATUS_PATH}/build/bin") {
             unstash 'ios' // zip file
             sh 'unzip status-go-ios.zip'
             unstash 'android'
