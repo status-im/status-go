@@ -187,7 +187,7 @@ install-os-dependencies:
 
 setup-dev: setup-build install-os-dependencies gen-install update-fleet-config ##@other Prepare project for development
 
-setup-build: dep-install lint-install mock-install deploy-install gomobile-install ##@other Prepare project for build
+setup-build: dep-install lint-install mock-install release-install gomobile-install ##@other Prepare project for build
 
 setup: setup-build setup-dev ##@other Prepare project for development and building
 
@@ -226,7 +226,7 @@ else
 	gomobile init
 endif
 
-deploy-install:
+release-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
