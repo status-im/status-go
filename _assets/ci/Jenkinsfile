@@ -84,10 +84,6 @@ pipeline {
             stage('Upload') { steps { script {
               lib.uploadArtifact("pkg-android/status-go-android-${lib.suffix()}.aar")
             } } }
-
-            stage('Cleanup') { steps { script {
-              sh "rm -fr ${destAndroid}"
-            } } }
           }
         } // stage(Android)
 
@@ -137,10 +133,6 @@ pipeline {
             stage('Upload') { steps { script {
               lib.uploadArtifact("pkg-ios/status-go-ios-${lib.suffix()}.zip")
             } } }
-
-            stage('Cleanup') { steps { script {
-              sh "rm -fr ${destIOS}"
-            } } }
           }
         } // stage(iOS)
 
@@ -170,10 +162,6 @@ pipeline {
 
             stage('Upload') { steps { script {
               lib.uploadArtifact("pkg-desktop/status-go-desktop-${lib.suffix()}.zip")
-            } } }
-
-            stage('Cleanup') { steps { script {
-              sh "rm -fr ${dest}"
             } } }
           }
         } // stage(Desktop)
