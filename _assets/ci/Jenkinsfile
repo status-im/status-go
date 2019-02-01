@@ -205,6 +205,7 @@ pipeline {
             sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
           }
           sh 'make clean-release'
+          sh "rm -fr ${env.STATUS_PATH}/build/bin"
         }
       }
     } // stage(Release)
