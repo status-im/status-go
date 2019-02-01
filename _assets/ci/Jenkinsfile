@@ -180,7 +180,7 @@ pipeline {
     stage('Release') { when { expression { params.RELEASE == true } }
       steps {
         dir(env.STATUS_PATH) {
-          outputDir = "${env.STATUS_PATH}/build/bin"
+          def outputDir = "${env.STATUS_PATH}/build/bin"
           sh "mkdir -p ${outputDir}"
 
           dir(outputDir) {
