@@ -15,6 +15,7 @@ func TestUpdateNodeMetricsPeersCounter(t *testing.T) {
 		P2P: p2p.Config{
 			MaxPeers: 10,
 		},
+		NoUSB: true,
 	})
 	require.NoError(t, err)
 	require.NoError(t, n.Start())

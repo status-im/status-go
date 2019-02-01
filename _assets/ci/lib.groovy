@@ -1,3 +1,7 @@
+def getVersion() {
+  return readFile("${env.STATUS_PATH}/VERSION").trim()
+}
+
 def gitCommit() {
   return GIT_COMMIT.take(6)
 }
@@ -49,4 +53,33 @@ def uploadArtifact(path) {
   return "https://${bucket}.${domain}/${getFilename(path)}"
 }
 
+def buildBranch(name = null, buildType = null) {
+  /* need to drop origin/ to match definitions of child jobs */
+  def branchName = env.GIT_BRANCH.replace('origin/', '')
+  /* always pass the BRANCH and BUILD_TYPE params with current branch */
+  def resp = build(
+    job: name,
+    /* this allows us to analize the job even after failure */
+    propagate: false,
+    parameters: [
+      [name: 'BRANCH',     value: branchName,    $class: 'StringParameterValue'],
+  ])
+  /* BlueOcean seems to not show child-build links */
+  println "Build: ${resp.getAbsoluteUrl()} (${resp.result})"
+  if (resp.result != 'SUCCESS') {
+    error("Build Failed")
+  }
+  return resp
+}
+
+def copyArts(projectName, buildNo) {
+  copyArtifacts(
+    projectName: projectName,
+    target: 'pkg',
+    flatten: true,
+    selector: specific("${buildNo}")
+  )
+}
+
 return this
+

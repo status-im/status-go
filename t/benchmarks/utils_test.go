@@ -30,6 +30,7 @@ func createNode() (*node.Node, error) {
 			MaxPeers:    1,
 			NAT:         nat.Any(),
 		},
+		NoUSB: true,
 	})
 }
 

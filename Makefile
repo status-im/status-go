@@ -1,4 +1,4 @@
-.PHONY: statusgo statusd-prune all test xgo clean help
+.PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
 
 RELEASE_TAG := $(shell cat VERSION)
@@ -41,11 +41,6 @@ BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
-
-XGO_GO ?= latest
-XGOVERSION ?= 1.10.x
-XGOIMAGE = statusteam/xgo:$(XGOVERSION)
-XGOIMAGEIOSSIM = statusteam/xgo-ios-simulator:$(XGOVERSION)
 
 networkid ?= StatusChain
 gotest_extraflags =
@@ -115,30 +110,21 @@ statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
 
+statusgo-android: ##@cross-compile Build status-go for Android
+	@echo "Building status-go for Android..."
+	@gomobile bind -target=android -ldflags="-s -w" -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	@echo "Android cross compilation done in build/bin/statusgo.aar"
+
+statusgo-ios: ##@cross-compile Build status-go for iOS
+	@echo "Building status-go for iOS..."
+	@gomobile bind -target=ios -ldflags="-s -w" -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
+
 statusgo-linux: xgo ##@cross-compile Build status-go for Linux
 	./_assets/patches/patcher -b . -p geth-xgo
 	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	./_assets/patches/patcher -b . -p geth-xgo -r
 	@echo "Linux cross compilation done."
-
-statusgo-android: xgo ##@cross-compile Build status-go for Android
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=android-16/aar -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "Android cross compilation done."
-
-statusgo-ios: xgo	##@cross-compile Build status-go for iOS
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "iOS framework cross compilation done."
-
-statusgo-ios-simulator: xgo	##@cross-compile Build status-go for iOS Simulator
-	@docker pull $(XGOIMAGEIOSSIM)
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGEIOSSIM) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=ios-9.3/framework -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./lib
-	./_assets/patches/patcher -b . -p geth-xgo -r
-	@echo "iOS framework cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
@@ -196,20 +182,14 @@ endif
 	docker push $(BOOTNODE_IMAGE_NAME):latest
 	docker push $(DOCKER_IMAGE_NAME):latest
 
-xgo-docker-images: ##@docker Build xgo docker images
-	@echo "Building xgo docker images..."
-	docker build _assets/build/xgo/base -t $(XGOIMAGE)
-	docker build _assets/build/xgo/ios-simulator -t $(XGOIMAGEIOSSIM)
-
-xgo:
-	docker pull $(XGOIMAGE)
-	go get github.com/status-im/xgo
-	mkdir -p $(GOBIN)
-
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup: install-os-dependencies dep-install lint-install mock-install deploy-install gen-install update-fleet-config ##@other Prepare project for first build
+setup-dev: setup-build install-os-dependencies gen-install update-fleet-config ##@other Prepare project for development
+
+setup-build: dep-install lint-install mock-install release-install gomobile-install ##@other Prepare project for build
+
+setup: setup-build setup-dev ##@other Prepare project for development and building
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/migrations
@@ -217,8 +197,9 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIRECTORY)
-	mv build/bin/statusgo-android-16.aar $(RELEASE_DIRECTORY)/status-go-android.aar
-	mv build/bin/statusgo-ios-9.3-framework/status-go-ios.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
+	mv build/bin/statusgo.aar $(RELEASE_DIRECTORY)/status-go-android.aar
+	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
+	mv build/bin/Statusgo.framework.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
 	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
 	${MAKE} clean
 
@@ -237,7 +218,15 @@ release:
 	    echo "Aborting." && exit 1; \
 	fi
 
-deploy-install:
+gomobile-install:
+	go get -u golang.org/x/mobile/cmd/gomobile
+ifdef NDK_GOMOBILE
+	gomobile init -ndk $(NDK_GOMOBILE)
+else
+	gomobile init
+endif
+
+release-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
@@ -289,7 +278,8 @@ test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 canary-test: node-canary
-	_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.beta.json
+	# TODO: uncomment that!
+	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.beta.json
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build

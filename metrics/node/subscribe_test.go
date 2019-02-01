@@ -9,13 +9,13 @@ import (
 )
 
 func TestSubscribeServerEventsWithoutServer(t *testing.T) {
-	gethNode, err := node.New(&node.Config{})
+	gethNode, err := node.New(&node.Config{NoUSB: true})
 	require.NoError(t, err)
 	require.EqualError(t, SubscribeServerEvents(context.TODO(), gethNode), "server is unavailable")
 }
 
 func TestSubscribeServerEvents(t *testing.T) {
-	gethNode, err := node.New(&node.Config{})
+	gethNode, err := node.New(&node.Config{NoUSB: true})
 	require.NoError(t, err)
 	err = gethNode.Start()
 	require.NoError(t, err)

@@ -30,6 +30,7 @@ func NewDevNode(faucet common.Address) (*node.Node, error) {
 	cfg.IPCPath = ipc.Name()
 	cfg.HTTPModules = []string{"eth"}
 	cfg.DataDir = ""
+	cfg.NoUSB = true
 	cfg.P2P.MaxPeers = 0
 	cfg.P2P.ListenAddr = ":0"
 	cfg.P2P.NoDiscovery = true

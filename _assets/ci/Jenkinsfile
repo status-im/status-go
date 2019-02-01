@@ -24,6 +24,8 @@ pipeline {
     STATUS_PATH = 'src/github.com/status-im/status-go'
     GOPATH = "${env.WORKSPACE}"
     PATH = "${env.PATH}:${env.GOPATH}/bin"
+    /* This will override the var in Makefile */
+    RELEASE_DIRECTORY = "${env.WORKSPACE}/pkg"
   }
 
   stages {
@@ -34,82 +36,70 @@ pipeline {
         println("Version: ${version}")
         println("Git Branch: ${lib.gitBranch()}")
         println("Git Commit: ${lib.gitCommit()}")
-        /* save and create a dir for artifacts */
-        dest = "${env.WORKSPACE}/pkg"
-        sh "mkdir -p ${dest}"
       } }
-    }
+    } // stage(Prep)
+
     stage('Setup') { steps { dir(env.STATUS_PATH) {
-      sh 'make setup'
-      sh 'make xgo'
-    } } }
-    stage('Lint') { steps { dir(env.STATUS_PATH) {
-      sh 'make ci'
-    } } }
+      /* install release tools */
+      sh 'make release-install'
+    } } } // stage(Setup)
+
     stage('Build') {
       parallel {
-        stage('Android') {
-          stages {
-            stage('Compile') { steps { dir(env.STATUS_PATH) {
-              sh 'make statusgo-android'
-              sh "cp build/bin/statusgo-android-16.aar ${dest}/status-go-android-${lib.suffix()}.aar"
-            } } }
-            stage('Archive') { steps {
-              archiveArtifacts("pkg/status-go-android-${lib.suffix()}.aar")
-            } }
-            stage('Upload') { steps { script {
-              lib.uploadArtifact("pkg/status-go-android-${lib.suffix()}.aar")
-            } } }
-          }
+        stage('iOS') { steps { script {
+          ios = lib.buildBranch('status-go/platforms/ios')
+        } } }
+        stage('Android') { steps { script {
+          android = lib.buildBranch('status-go/platforms/android')
+        } } }
+        stage('Linux') { steps { script {
+          linux = lib.buildBranch('status-go/platforms/linux')
+        } } }
+      } // parallel
+    } // stage(Build)
+
+    stage('Archive') {
+      steps { script {
+        sh("rm -f ${env.RELEASE_DIRECTORY}/*")
+        lib.copyArts('status-go/platforms/ios', ios.number)
+        lib.copyArts('status-go/platforms/android', android.number)
+        lib.copyArts('status-go/platforms/linux', linux.number)
+        dir(env.RELEASE_DIRECTORY) {
+          /* generate sha256 checksums for upload */
+          sh 'sha256sum * | tee checksum.sha256'
+          archiveArtifacts('*')
         }
-        stage('iOS') {
-          stages {
-            stage('Compile') { steps { dir(env.STATUS_PATH) {
-              sh 'make statusgo-ios-simulator'
-              dir('build/bin/statusgo-ios-9.3-framework') {
-                sh 'zip -r status-go-ios.zip Statusgo.framework'
-                sh "cp status-go-ios.zip ${dest}/status-go-ios-${lib.suffix()}.zip"
-              }
-            } } }
-            stage('Archive') { steps {
-              archiveArtifacts("pkg/status-go-ios-${lib.suffix()}.zip")
-            } }
-            stage('Upload') { steps { script {
-              lib.uploadArtifact("pkg/status-go-ios-${lib.suffix()}.zip")
-            } } }
-          }
+      } }
+    } // stage(Archive)
+
+    stage('Release') { when { expression { params.RELEASE == true } }
+      steps {
+        /* rename build files to not include versions */
+        dir(env.RELEASE_DIRECTORY) {
+          sh 'mv status-go-ios-*.zip status-go-ios.zip'
+          sh 'mv status-go-android-*.aar status-go-android.aar'
+          sh 'mv status-go-desktop-*.zip status-go-desktop.zip'
         }
-        stage('Desktop') {
-          stages {
-            stage('Prepare') { steps { dir(env.STATUS_PATH) {
-              sh "zip -r ${dest}/status-go-desktop-${lib.suffix()}.zip . -x *.git"
-            } } }
-            stage('Archive') { steps {
-              archiveArtifacts("pkg/status-go-desktop-${lib.suffix()}.zip")
-            } }
-            stage('Upload') { steps { script {
-              lib.uploadArtifact("pkg/status-go-desktop-${lib.suffix()}.zip")
-            } } }
+        /* perform the release */
+        dir(env.STATUS_PATH) {
+          withCredentials([[
+            $class: 'UsernamePasswordMultiBinding',
+            credentialsId: 'status-im-auto',
+            usernameVariable: 'GITHUB_USER',
+            passwordVariable: 'GITHUB_TOKEN'
+          ]]) {
+            sh """
+              yes | make release \
+                RELEASE_BRANCH=${lib.gitBranch()} \
+                RELEASE_DIRECTORY=${env.RELEASE_DIRECTORY}
+            """
           }
         }
       }
-    }
-    stage('Release') { when { expression { params.RELEASE == true } }
-      steps { dir(env.STATUS_PATH) {
-        sh 'make prepare-release'
-        withCredentials([[
-          $class: 'UsernamePasswordMultiBinding',
-          credentialsId: 'status-im-auto',
-          usernameVariable: 'GITHUB_USER',
-          passwordVariable: 'GITHUB_TOKEN'
-        ]]) {
-          sh "yes | make release RELEASE_BRANCH=${lib.gitBranch()}"
-        }
-        sh 'make clean-release'
-      } }
-    }
-    stage('Cleanup') { steps { script {
-      sh "rm -fr ${dest}"
-    } } }
-  }
+    } // stage(Release)
+    
+    stage('Cleanup') { steps { dir(env.STATUS_PATH) {
+      sh 'make clean-release'
+    } } } // stage(Cleanup)
+  } // stages
 }
