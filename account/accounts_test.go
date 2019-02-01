@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/mock/gomock"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/assert"
@@ -298,6 +299,26 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			s.accManager.Logout()
 		})
 	}
+}
+
+func (s *ManagerTestSuite) TestSetChatAccount() {
+	s.accManager.Logout()
+
+	privKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	address := crypto.PubkeyToAddress(privKey.PublicKey)
+
+	s.accManager.SetChatAccount(privKey)
+	selectedChatAccount, err := s.accManager.SelectedChatAccount()
+	s.Require().NoError(err)
+	s.Require().NotNil(selectedChatAccount)
+	s.Equal(privKey, selectedChatAccount.AccountKey.PrivateKey)
+	s.Equal(address, selectedChatAccount.Address)
+
+	selectedWalletAccount, err := s.accManager.SelectedWalletAccount()
+	s.Error(err)
+	s.Nil(selectedWalletAccount)
 }
 
 func (s *ManagerTestSuite) TestCreateChildAccount() {

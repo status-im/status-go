@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -127,7 +128,12 @@ func (s *ShhExtSuite) SetupTest() {
 }
 
 func (s *ShhExtSuite) TestInitProtocol() {
-	err := s.services[0].InitProtocol("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
+	err := s.services[0].InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
+	s.NoError(err)
+
+	digest := sha3.Sum256([]byte("`090///\nhtaa\rhta9x8923)$$'23"))
+	encKey := fmt.Sprintf("%x", digest)
+	err = s.services[0].InitProtocolWithEncyptionKey("example-address", encKey)
 	s.NoError(err)
 }
 

@@ -1,10 +1,12 @@
 package accounts
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -198,6 +200,26 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
 	s.NoError(s.Backend.SelectAccount(accountInfo2.WalletAddress, accountInfo2.ChatAddress, TestConfig.Account1.Password))
+}
+
+func (s *AccountsTestSuite) TestSetChatAccount() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	chatPrivKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	chatPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(chatPrivKey))
+
+	encryptionPrivKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
+
+	err = s.Backend.InjectChatAccount(chatPrivKeyHex, encryptionPrivKeyHex)
+	s.Require().NoError(err)
+
+	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
+	s.Require().NoError(err)
+	s.Equal(chatPrivKey, selectedChatAccount.AccountKey.PrivateKey)
 }
 
 func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {

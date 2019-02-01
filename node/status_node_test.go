@@ -279,9 +279,33 @@ func TestStatusNodeRendezvousDiscovery(t *testing.T) {
 			// not necessarily with id, just valid multiaddr
 			RendezvousNodes: []string{"/ip4/127.0.0.1/tcp/34012", "/ip4/127.0.0.1/tcp/34011"},
 		},
+		// use custom address to test the all possibilities
+		AdvertiseAddr: "127.0.0.1",
 	}
 	n := New()
 	require.NoError(t, n.Start(&config))
+	require.NotNil(t, n.discovery)
+	require.True(t, n.discovery.Running())
+	require.IsType(t, &discovery.Rendezvous{}, n.discovery)
+}
+
+func TestStatusNodeStartDiscoveryManual(t *testing.T) {
+	config := params.NodeConfig{
+		Rendezvous:  true,
+		NoDiscovery: true,
+		ClusterConfig: params.ClusterConfig{
+			Enabled: true,
+			// not necessarily with id, just valid multiaddr
+			RendezvousNodes: []string{"/ip4/127.0.0.1/tcp/34012", "/ip4/127.0.0.1/tcp/34011"},
+		},
+		// use custom address to test the all possibilities
+		AdvertiseAddr: "127.0.0.1",
+	}
+	n := New()
+	require.NoError(t, n.StartWithOptions(&config, StartOptions{}))
+	require.Nil(t, n.discovery)
+	// start discovery manually
+	require.NoError(t, n.StartDiscovery())
 	require.NotNil(t, n.discovery)
 	require.True(t, n.discovery.Running())
 	require.IsType(t, &discovery.Rendezvous{}, n.discovery)

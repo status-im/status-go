@@ -18,6 +18,10 @@
 # (for the full dependency list see `Gopkg.lock`)
 
 [[constraint]]
+  name = "github.com/beevik/ntp"
+  version = "=0.2.0"
+
+[[constraint]]
   # `btcutil` is required to be compatible with `btcd`
   name = "github.com/btcsuite/btcutil"
   revision = "dcd4997b0664bcfd6ef48e4ae9da8396e08b1cd9"
@@ -28,24 +32,140 @@
   source = "github.com/status-im/go-ethereum"
 
 [[constraint]]
-  name = "github.com/status-im/whisper"
-  version = "=v1.4.6"
-
-[[override]]
   name = "github.com/golang/protobuf"
-  version = "1.1.0"
+  version = "=1.2.0"
+
+[[constraint]]
+  name = "github.com/libp2p/go-libp2p-crypto"
+  version = "=v1.6.2"
 
 [[constraint]]
   name = "github.com/NaySoftware/go-fcm"
-  revision = "024ca6a2c5444c93980f558f91c35a2defebd362"
   source = "github.com/status-im/go-fcm"
+  version = "=v1.0.0-status"
+
+[[constraint]]
+  name = "github.com/status-im/whisper"
+  version = "=v1.4.6"
+
+[[constraint]]
+  name = "golang.org/x/text"
+  revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
+
+# * * * * * `status-im/rendezvous` dependencies * * * * *
+# When upgrading upstream, upgrade these values with releases/tags.
+[[override]]
+  name = "github.com/status-im/go-multiaddr-ethv4"
+  version = "=v1.0.0"
+
+# * * * * * `status-im/migrate` dependencies * * * * *
+# When upgrading upstream, upgrade these values with releases/tags.
+[[override]]
+  name = "github.com/mutecomm/go-sqlcipher"
+  revision = "f799951b4ab269c2ce24913961af2cb5d681cc43"
+
+# * * * * * `status-im/whisper` dependencies * * * * *
+# When upgrading upstream, upgrade these values with releases/tags.
+[[override]]
+  name = "golang.org/x/sync"
+  revision = "fd80eb99c8f653c847d294a001bdf2a3a6f768f5"
+
+[[override]]
+  name = "golang.org/x/crypto"
+  revision = "ff983b9c42bc9fbf91556e191cc8efb585c16908"
+
+# * * * * * `go-libp2p` dependencies * * * * *
+# When upgrading upstream, upgrade these values with releases/tags.
+[[override]]
+  name = "github.com/gxed/GoEndian"
+  revision = "0f5c6873267e5abf306ffcdfcfa4bf77517ef4a7"
+
+[[override]]
+  name = "github.com/gxed/eventfd"
+  revision = "80a92cca79a8041496ccc9dd773fcb52a57ec6f9"
+
+[[override]]
+  name = "golang.org/x/sys"
+  revision = "11551d06cbcc94edc80a0facaccbda56473c19c1"
+
+[[override]]
+  name = "github.com/whyrusleeping/go-logging"
+  revision = "0457bb6b88fc1973573aaf6b5145d8d3ae972390"
+
+[[override]]
+  name = "github.com/whyrusleeping/go-notifier"
+  revision = "097c5d47330ff6a823f67e3515faa13566a62c6f"
+
+[[override]]
+  name = "github.com/whyrusleeping/go-smux-multistream"
+  revision = "c707bf3c25fa380b20b54907790efde288775938"
+
+[[override]]
+  name = "github.com/whyrusleeping/go-smux-yamux"
+  revision = "eac25f3e2d47aae211e457e7664b52634c95eea8"
+
+[[override]]
+  name = "github.com/whyrusleeping/mafmt"
+  revision = "1dc32401ee9fdd3f6cdb3405ec984d5dae877b2a"
+
+[[override]]
+  name = "github.com/whyrusleeping/multiaddr-filter"
+  revision = "e903e4adabd70b78bc9293b6ee4f359afb3f9f59"
+
+[[override]]
+  name = "github.com/whyrusleeping/yamux"
+  revision = "35d045d4429ecf19430a2b94efc590bc40f2f7af"
+
+# * * * * * `go-libp2p-crypto` dependencies * * * * *
+# When upgrading upstream, upgrade these values with releases/tags.
+[[override]]
+  name = "github.com/agl/ed2551"
+  revision = "5312a61534124124185d41f09206b9fef1d88403"
+
+[[override]]
+  name = "github.com/agl/ed25519"
+  revision = "5312a61534124124185d41f09206b9fef1d88403"
+
+[[override]]
+  name = "github.com/gxed/hashland"
+  revision = "d9f6b97f8db22dd1e090fd0bbbe98f09cc7dd0a8"
+
+[[override]]
+  name = "github.com/jbenet/go-temp-err-catcher"
+  revision = "aac704a3f4f27190b4ccc05f303a4931fd1241ff"
+
+[[override]]
+  name = "github.com/jbenet/goprocess"
+  revision = "b497e2f366b8624394fb2e89c10ab607bebdde0b"
+
+[[override]]
+  name = "github.com/libp2p/go-conn-security-multistream"
+  revision = "df26ef91ad66a626a4b7147fd95d18962395a20e"
+
+[[override]]
+  name = "github.com/minio/blake2b-simd"
+  revision = "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4"
+
+[[override]]
+  name = "github.com/minio/sha256-simd"
+  revision = "ad98a36ba0da87206e3378c556abbfeaeaa98668"
+
+# * * * * * `go-libp2p-peer` dependencies * * * * *
+# When upgrading upstream, upgrade these values with releases/tags.
+[[override]]
+  name = "github.com/mr-tron/base58"
+  revision = "4df4dc6e86a912614d09719d10cad427b087cbfb"
 
 # * * * * * `go-ethereum` dependencies * * * * *
 # Pinned down SHAs from `go-ethereum/vendor/vendor.json`
-# When upgrading upstream, upgrade these values too.
+# When upgrading upstream, upgrade these values with releases/tags.
 [[override]]
   name = "github.com/aristanetworks/goarista"
   revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
+
+[[override]]
+  name = "github.com/fjl/memsize"
+  revision = "f6d5545993d68e9e42df43eb57958f898dea3623"
 
 [[override]]
   name = "github.com/btcsuite/btcd"
@@ -90,6 +210,14 @@
 [[override]]
   name = "github.com/mattn/go-isatty"
   revision = "3fb116b820352b7f0c281308a4d6250c22d94e27"
+
+[[override]]
+  name = "gopkg.in/natefinch/npipe.v2"
+  revision = "c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6"
+
+[[override]]
+  name = "gopkg.in/olebedev/go-duktape.v3"
+  revision = "abf0ba0be5d5d36b1f9266463cc320b9a5ab224e"
 
 [[override]]
   name = "github.com/pborman/uuid"
@@ -138,13 +266,13 @@
   name = "github.com/syndtr/goleveldb"
   revision = "5d6fca44a948d2be89a9702de7717f0168403d3d"
 
-[[constraint]]
-  name = "github.com/beevik/ntp"
-  version = "0.2.0"
-
 [[override]]
   name = "github.com/multiformats/go-multiaddr"
   revision = "f36800afeb9c141e1adb7da099e6f010dfd4c419"
+
+[[override]]
+  name = "golang.org/x/net"
+  revision = "5ccada7d0a7ba9aeb5d3aca8d3501b4c2a509fec"
 
 # 1.0.8
 [[override]]
@@ -157,7 +285,7 @@
 
 [[constraint]]
   name = "github.com/status-im/rendezvous"
-  branch = "master"
+  version = "=v1.1.0"
 
 [[override]]
   name = "github.com/deckarep/golang-set"
@@ -165,8 +293,8 @@
 
 [[constraint]]
   name = "github.com/status-im/doubleratchet"
-  revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
+  version = "=v1.0.0"
 
 [[constraint]]
   name = "github.com/status-im/migrate"
-  branch = "master"
+  version = "=v3.5.1-status"

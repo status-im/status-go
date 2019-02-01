@@ -215,7 +215,8 @@ func (n *StatusNode) discoverNode() (*enode.Node, error) {
 		return nil, nil
 	}
 
-	discNode := n.gethNode.Server().Self()
+	server := n.gethNode.Server()
+	discNode := server.Self()
 
 	if n.config.AdvertiseAddr == "" {
 		return discNode, nil
@@ -225,7 +226,7 @@ func (n *StatusNode) discoverNode() (*enode.Node, error) {
 
 	r := discNode.Record()
 	r.Set(enr.IP(net.ParseIP(n.config.AdvertiseAddr)))
-	if err := enode.SignV4(r, n.Server().PrivateKey); err != nil {
+	if err := enode.SignV4(r, server.PrivateKey); err != nil {
 		return nil, err
 	}
 	return enode.New(enode.ValidSchemes[r.IdentityScheme()], r)

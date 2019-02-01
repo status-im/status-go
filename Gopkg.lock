@@ -8,9 +8,9 @@
   pruneopts = "NUT"
   revision = "024ca6a2c5444c93980f558f91c35a2defebd362"
   source = "github.com/status-im/go-fcm"
+  version = "v1.0.0-status"
 
 [[projects]]
-  branch = "master"
   digest = "1:4cf11742b199ab3aacf26b00187e72f7ff8ba2145f363b74f295d54f098f79e4"
   name = "github.com/agl/ed25519"
   packages = [
@@ -181,7 +181,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
   digest = "1:3589601135d1e1a969f04643c4517d8a1b416564bbdb0b853e94f96faf2922c6"
   name = "github.com/fjl/memsize"
   packages = [
@@ -275,7 +274,6 @@
   version = "v1.2.0"
 
 [[projects]]
-  branch = "master"
   digest = "1:cb7e1d7ed4e663366eabc30a739a7c5cba439b7dbe39ede548f6ba0adc7fbe55"
   name = "github.com/gxed/GoEndian"
   packages = ["."]
@@ -283,7 +281,6 @@
   revision = "0f5c6873267e5abf306ffcdfcfa4bf77517ef4a7"
 
 [[projects]]
-  branch = "master"
   digest = "1:72398b35192e5b9822e70ac5ee589c89c625728cd7e8e4333b33540edebfcb0b"
   name = "github.com/gxed/eventfd"
   packages = ["."]
@@ -291,7 +288,6 @@
   revision = "80a92cca79a8041496ccc9dd773fcb52a57ec6f9"
 
 [[projects]]
-  branch = "master"
   digest = "1:148fd43daa0987df14b2d1105f86d8ba1d8a2b1f3c45ac81932edc4055739e1c"
   name = "github.com/gxed/hashland"
   packages = ["keccakpg"]
@@ -352,7 +348,6 @@
   revision = "1fa385a6f45828c83361136b45b1a21a12139493"
 
 [[projects]]
-  branch = "master"
   digest = "1:c32c7a628507cc6d2e61cfc09f2671bef4a04491ca2ec0cda1e8689f9c00611f"
   name = "github.com/jbenet/go-temp-err-catcher"
   packages = ["."]
@@ -360,7 +355,6 @@
   revision = "aac704a3f4f27190b4ccc05f303a4931fd1241ff"
 
 [[projects]]
-  branch = "master"
   digest = "1:af36a5dd3adea2a316125b04745b86e14e3600b930d61f4eefc0daa030feca74"
   name = "github.com/jbenet/goprocess"
   packages = [
@@ -399,7 +393,6 @@
   version = "v0.1.4"
 
 [[projects]]
-  branch = "master"
   digest = "1:16c1e843e58abb9821f93dfff5b462be0c39f366734dbda720e500cee3daec22"
   name = "github.com/libp2p/go-conn-security-multistream"
   packages = ["."]
@@ -653,7 +646,6 @@
   revision = "3fb116b820352b7f0c281308a4d6250c22d94e27"
 
 [[projects]]
-  branch = "master"
   digest = "1:98484fb2302322e215bb28a39d44d74e0091a972517aa44b8525e329be15529d"
   name = "github.com/minio/blake2b-simd"
   packages = ["."]
@@ -661,7 +653,6 @@
   revision = "3f5f724cb5b182a5c278d6d3d55b40e7f8c2efb4"
 
 [[projects]]
-  branch = "master"
   digest = "1:cf04232ab92b4e6344c71e8141fd843024a95295993a4dd2e04ef8e4baba2d0b"
   name = "github.com/minio/sha256-simd"
   packages = ["."]
@@ -715,7 +706,6 @@
   version = "v0.3.7"
 
 [[projects]]
-  branch = "master"
   digest = "1:95dadf033e1fccc1644f78f743119ec9d2dbaea508cb827ed7057bc0da003178"
   name = "github.com/mutecomm/go-sqlcipher"
   packages = ["."]
@@ -798,17 +788,17 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
+  version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
   digest = "1:f3044238fc5d70eca12cc181b1e6d5270570d85a7b7046686381e618a783a7d6"
   name = "github.com/status-im/go-multiaddr-ethv4"
   packages = ["."]
   pruneopts = "NUT"
   revision = "cbcba3a7c121e29718d9011ffc9e2b78ac6d5c99"
+  version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
   digest = "1:7607ae0e3b67bdf37a65dc42f866a90bcbe543308e92184c51e33a4cca842ecb"
   name = "github.com/status-im/migrate"
   packages = [
@@ -817,10 +807,10 @@
     "source/go_bindata",
   ]
   pruneopts = "NUT"
-  revision = "57d2e2abe46f80680b96640a8ce62d8187bee7e8"
+  revision = "3bde36291b5c3b2aaa00e52c7c7d405630b06ba4"
+  version = "v3.5.1-status"
 
 [[projects]]
-  branch = "master"
   digest = "1:7eae6e73aa5dd99a7ab975fbc4a39cd98cb72c5a5272970735676e099667cf8a"
   name = "github.com/status-im/rendezvous"
   packages = [
@@ -830,6 +820,7 @@
   ]
   pruneopts = "NUT"
   revision = "9e20b11affd0bf0591126a518f3e7b8aa057f88f"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:2c5092efed72e4c33a9d5f2ca6970609ed959a07b08a6b85fe6e7b70df3ed210"
@@ -871,7 +862,6 @@
   revision = "5d6fca44a948d2be89a9702de7717f0168403d3d"
 
 [[projects]]
-  branch = "master"
   digest = "1:9237bfe664b67a1bc5787df18e48516b77442cb988912259b811865d654baafc"
   name = "github.com/whyrusleeping/go-logging"
   packages = ["."]
@@ -887,7 +877,6 @@
   version = "v0.2.23"
 
 [[projects]]
-  branch = "master"
   digest = "1:00ceb1bc58ee33818960b132008495b996aa093d49a734798fea4aa424c6b787"
   name = "github.com/whyrusleeping/go-notifier"
   packages = ["."]
@@ -903,7 +892,6 @@
   version = "v3.0.10"
 
 [[projects]]
-  branch = "master"
   digest = "1:034974ede3f03ded434d94543c753c7410b44f8232e0e7c4356c3d81d03d0feb"
   name = "github.com/whyrusleeping/go-smux-multistream"
   packages = ["."]
@@ -911,7 +899,6 @@
   revision = "c707bf3c25fa380b20b54907790efde288775938"
 
 [[projects]]
-  branch = "master"
   digest = "1:90bc4b9a674e44590070d5469362b83ec64005d4454a1340b0c96b47c9e306a8"
   name = "github.com/whyrusleeping/go-smux-yamux"
   packages = ["."]
@@ -919,7 +906,6 @@
   revision = "eac25f3e2d47aae211e457e7664b52634c95eea8"
 
 [[projects]]
-  branch = "master"
   digest = "1:f007f0475a929f645ed0c0ec392bad39f74931c79b2d905c994b3f4b8f0ccd86"
   name = "github.com/whyrusleeping/mafmt"
   packages = ["."]
@@ -927,7 +913,6 @@
   revision = "1dc32401ee9fdd3f6cdb3405ec984d5dae877b2a"
 
 [[projects]]
-  branch = "master"
   digest = "1:7b014e573e2f4e3cf7bca9fa6e58629b957e5ea86d2a811126b60c6949ac7280"
   name = "github.com/whyrusleeping/multiaddr-filter"
   packages = ["."]
@@ -935,7 +920,6 @@
   revision = "e903e4adabd70b78bc9293b6ee4f359afb3f9f59"
 
 [[projects]]
-  branch = "master"
   digest = "1:48348786b4372fd3a62b3c404d3359b619efb284bb7ff4a03ef3ad7222312ff1"
   name = "github.com/whyrusleeping/yamux"
   packages = ["."]
@@ -943,7 +927,6 @@
   revision = "35d045d4429ecf19430a2b94efc590bc40f2f7af"
 
 [[projects]]
-  branch = "master"
   digest = "1:9e739fd81e4238cd35ca1d5c87fa5039f575661b2b79a55e576602fa18f4b2a5"
   name = "golang.org/x/crypto"
   packages = [
@@ -961,7 +944,6 @@
   revision = "ff983b9c42bc9fbf91556e191cc8efb585c16908"
 
 [[projects]]
-  branch = "master"
   digest = "1:b8f880e5062932f7b2ae4d4747d1dc1de12818156e3df80f7476f102dda15381"
   name = "golang.org/x/net"
   packages = [
@@ -979,7 +961,6 @@
   revision = "5ccada7d0a7ba9aeb5d3aca8d3501b4c2a509fec"
 
 [[projects]]
-  branch = "master"
   digest = "1:9f303486d623f840492bfeb48eb906a94e9d3fe638a761639b72ce64bf7bfcc3"
   name = "golang.org/x/sync"
   packages = ["syncmap"]
@@ -987,7 +968,6 @@
   revision = "fd80eb99c8f653c847d294a001bdf2a3a6f768f5"
 
 [[projects]]
-  branch = "master"
   digest = "1:40800a1a379be16c1ecc68d1c8cc912f6e468f95238117be9b54979d0cbb6819"
   name = "golang.org/x/sys"
   packages = [
@@ -999,7 +979,6 @@
   revision = "11551d06cbcc94edc80a0facaccbda56473c19c1"
 
 [[projects]]
-  branch = "master"
   digest = "1:90acd68908852e1e1e68bfaed10bdf357252b041e619f6be6f159f6a015d1404"
   name = "golang.org/x/text"
   packages = [
@@ -1036,7 +1015,6 @@
   version = "v9.9.3"
 
 [[projects]]
-  branch = "v2"
   digest = "1:85815bf6f46dc1855ae4e236b496bfa463f04fce83f700d74357ef220476abb7"
   name = "gopkg.in/natefinch/npipe.v2"
   packages = ["."]
@@ -1044,7 +1022,6 @@
   revision = "c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6"
 
 [[projects]]
-  branch = "v3"
   digest = "1:a89e535f62f8346453f303d854fc6200873e16b55ef67626a28d4ccbe5f1e868"
   name = "gopkg.in/olebedev/go-duktape.v3"
   packages = ["."]
