@@ -310,3 +310,6 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	@echo "Updating static assets..."
 	@go generate ./static
 	@echo "Done"
+
+run-mailserver: ##@Easy way to run a mailserver locally with Docker
+	cd _assets/compose/mailserver/ && $(MAKE)

@@ -1,0 +1,14 @@
+version: "3"
+services:
+  mailserver:
+    container_name: '${CONTAINER_NAME}'
+    image: statusteam/status-go:latest
+    entrypoint: statusd
+    restart: always
+    command: -log=${LOG_LEVEL} -log-without-color -c=/config.json -dir=/data
+    ports:
+      - '127.0.0.1:${RPC_PORT}:${RPC_PORT}'
+      - '0.0.0.0:${LISTEN_PORT}:30303'
+    volumes:
+      - '${PWD}/config.json:/config.json'
+      - '${DATA_PATH}:/data'
