@@ -66,3 +66,6 @@ Session.vim
 /.idea/
 /.vscode/
 /cmd/*/.ethereum/
+
+# created for running container
+_assets/compose/mailserver/config.json
