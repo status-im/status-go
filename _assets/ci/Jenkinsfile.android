@@ -12,6 +12,7 @@ pipeline {
   }
 
   environment {
+    BUILD_PLATFORM   = 'android'
     STATUS_PATH      = 'src/github.com/status-im/status-go'
     CI_DIR           = "${env.STATUS_PATH}/_assets/ci"
     GOPATH           = "${env.WORKSPACE}"
@@ -54,7 +55,7 @@ pipeline {
     } }
 
     stage('Upload') { steps { script {
-      lib.uploadArtifact("pkg/${artifact}")
+      env.PKG_URL = lib.uploadArtifact("pkg/${artifact}")
     } } }
 
     stage('Cleanup') { steps { dir(env.STATUS_PATH) {
@@ -62,4 +63,8 @@ pipeline {
       sh "rm -fr ${dest}"
     } } }
   } // stages
+  post {
+    success { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(true) } }
+    failure { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(false) } }
+  } // post
 } // pipeline
