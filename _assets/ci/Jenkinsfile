@@ -22,8 +22,9 @@ pipeline {
 
   environment {
     STATUS_PATH = 'src/github.com/status-im/status-go'
-    GOPATH = "${env.WORKSPACE}"
-    PATH = "${env.PATH}:${env.GOPATH}/bin"
+    CI_DIR      = "${env.STATUS_PATH}/_assets/ci"
+    GOPATH      = "${env.WORKSPACE}"
+    PATH        = "${env.PATH}:${env.GOPATH}/bin"
     /* This will override the var in Makefile */
     RELEASE_DIRECTORY = "${env.WORKSPACE}/pkg"
   }
