@@ -60,7 +60,7 @@ pipeline {
 
     stage('Archive') {
       steps { script {
-        sh("rm -f ${env.RELEASE_DIRECTORY}/*")
+        sh("rm -fr ${env.RELEASE_DIRECTORY}/*")
         lib.copyArts('status-go/platforms/ios', ios.number)
         lib.copyArts('status-go/platforms/android', android.number)
         lib.copyArts('status-go/platforms/linux', linux.number)
