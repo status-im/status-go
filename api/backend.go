@@ -262,6 +262,17 @@ func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, passwo
 	return
 }
 
+func (b *StatusBackend) SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
+	hash, err = b.transactor.SendTransactionWithSignature(sendArgs, sig)
+	if err != nil {
+		return
+	}
+
+	go b.rpcFilters.TriggerTransactionSentToUpstreamEvent(hash)
+
+	return
+}
+
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
 func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Bytes, error) {
