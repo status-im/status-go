@@ -323,6 +323,13 @@ func Login(address, password string) string {
 	return makeJSONResponse(err)
 }
 
+// LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
+// It purges all the previous identities from Whisper, and injects the key as shh identity.
+func LoginWithKeycard(chatKeyData, encryptionKeyData string) string {
+	err := statusBackend.InjectChatAccount(chatKeyData, encryptionKeyData)
+	return makeJSONResponse(err)
+}
+
 // Logout is equivalent to clearing whisper identities.
 func Logout() string {
 	err := statusBackend.Logout()
