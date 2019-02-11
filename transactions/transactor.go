@@ -69,6 +69,8 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 	return
 }
 
+// SendTransactionWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
+// It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
 	chainID := big.NewInt(int64(t.networkID))
 	signer := types.NewEIP155Signer(chainID)
@@ -113,6 +115,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
 	}
+
 	return signedTx.Hash(), nil
 }
 
