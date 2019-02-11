@@ -69,6 +69,53 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 	return
 }
 
+func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
+	chainID := big.NewInt(int64(t.networkID))
+	signer := types.NewEIP155Signer(chainID)
+
+	nonce := uint64(*args.Nonce)
+	to := *args.To
+	value := (*big.Int)(args.Value)
+	gas := uint64(*args.Gas)
+	gasPrice := (*big.Int)(args.GasPrice)
+	data := args.GetInput()
+
+	var tx *types.Transaction
+	if args.To != nil {
+		t.log.Info("New transaction",
+			"From", args.From,
+			"To", *args.To,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+		)
+		tx = types.NewTransaction(nonce, to, value, gas, gasPrice, data)
+	} else {
+		// contract creation is rare enough to log an expected address
+		t.log.Info("New contract",
+			"From", args.From,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+			"Contract address", crypto.CreateAddress(args.From, nonce),
+		)
+		tx = types.NewContractCreation(nonce, value, gas, gasPrice, data)
+	}
+
+	signedTx, err := tx.WithSignature(signer, sig)
+	if err != nil {
+		return hash, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
+		return hash, err
+	}
+	return signedTx.Hash(), nil
+}
+
 // make sure that only account which created the tx can complete it
 func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.SelectedExtKey) error {
 	if selectedAccount == nil {
