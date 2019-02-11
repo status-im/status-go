@@ -3,6 +3,7 @@ package main
 // #include <stdlib.h>
 import "C"
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -377,6 +378,28 @@ func SendTransaction(txArgsJSON, password *C.char) *C.char {
 		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
 	}
 	hash, err := statusBackend.SendTransaction(params, C.GoString(password))
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+	return C.CString(prepareJSONResponseWithCode(hash.String(), err, code))
+}
+
+// SendTransactionWithSignature converts RPC args and calls backend.SendTransactionWithSignature
+//export SendTransactionWithSignature
+func SendTransactionWithSignature(txArgsJSON, sigString *C.char) *C.char {
+	var params transactions.SendTxArgs
+	err := json.Unmarshal([]byte(C.GoString(txArgsJSON)), &params)
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+
+	sig, err := hex.DecodeString(C.GoString(sigString))
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+
+	hash, err := statusBackend.SendTransactionWithSignature(params, sig)
 	code := codeUnknown
 	if c, ok := errToCodeMap[err]; ok {
 		code = c
