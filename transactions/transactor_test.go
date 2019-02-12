@@ -286,6 +286,7 @@ func (s *TransactorSuite) TestContractCreation() {
 
 func (s *TransactorSuite) TestSendTransactionWithSignature_IncrementingNonce() {
 	privKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
 	nonce := hexutil.Uint64(0)
