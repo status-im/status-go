@@ -204,6 +204,14 @@ func (s *Service) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installatio
 	return s.protocol.EnableInstallation(myIdentityKey, installationID)
 }
 
+func (s *Service) GetPublicBundle(identityKey *ecdsa.PublicKey) (*chat.Bundle, error) {
+	if s.protocol == nil {
+		return nil, errProtocolNotInitialized
+	}
+
+	return s.protocol.GetPublicBundle(identityKey)
+}
+
 // DisableInstallation disables an installation for multi-device sync.
 func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
 	if s.protocol == nil {

@@ -70,6 +70,24 @@ func ProcessContactCode(bundleString *C.char) *C.char {
 	return nil
 }
 
+// Get an X3DH bundle
+//export GetContactCode
+func GetContactCode(identityString *C.char) *C.char {
+	bundle, err := statusBackend.GetContactCode(C.GoString(identityString))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		ContactCode string `json:"code"`
+	}{ContactCode: bundle})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
 //export ExtractIdentityFromContactCode
 func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
 	bundle := C.GoString(bundleString)

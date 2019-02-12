@@ -15,6 +15,8 @@ type ProtocolService struct {
 	Enabled             bool
 }
 
+var ErrNotProtocolMessage = errors.New("Not a protocol message")
+
 // NewProtocolService creates a new ProtocolService instance
 func NewProtocolService(encryption *EncryptionService, addedBundlesHandler func([]IdentityAndIDPair)) *ProtocolService {
 	return &ProtocolService{
@@ -62,38 +64,27 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 }
 
 // BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
-func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte, theirPublicKeys ...*ecdsa.PublicKey) (map[*ecdsa.PublicKey][]byte, error) {
-	response := make(map[*ecdsa.PublicKey][]byte)
-	for _, publicKey := range theirPublicKeys {
-		// Encrypt payload
-		encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
-		if err != nil {
-			p.log.Error("encryption-service", "error encrypting payload", err)
-			return nil, err
-		}
-
-		// Build message
-		protocolMessage := &ProtocolMessage{
-			InstallationId: p.encryption.config.InstallationID,
-			DirectMessage:  encryptionResponse,
-		}
-
-		payload, err := p.addBundleAndMarshal(myIdentityKey, protocolMessage, true)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(payload) != 0 {
-			response[publicKey] = payload
-		}
+func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+	// Encrypt payload
+	encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
+	if err != nil {
+		p.log.Error("encryption-service", "error encrypting payload", err)
+		return nil, err
 	}
-	return response, nil
+
+	// Build message
+	protocolMessage := &ProtocolMessage{
+		InstallationId: p.encryption.config.InstallationID,
+		DirectMessage:  encryptionResponse,
+	}
+
+	return p.addBundleAndMarshal(myIdentityKey, protocolMessage, true)
 }
 
-// BuildPairingMessage sends a message to our own devices using DH so that it can be decrypted by any other device.
-func (p *ProtocolService) BuildPairingMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) ([]byte, error) {
+// BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.
+func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *ecdsa.PublicKey, payload []byte) ([]byte, error) {
 	// Encrypt payload
-	encryptionResponse, err := p.encryption.EncryptPayloadWithDH(&myIdentityKey.PublicKey, payload)
+	encryptionResponse, err := p.encryption.EncryptPayloadWithDH(destination, payload)
 	if err != nil {
 		p.log.Error("encryption-service", "error encrypting payload", err)
 		return nil, err
@@ -128,6 +119,11 @@ func (p *ProtocolService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, in
 	return p.encryption.DisableInstallation(myIdentityKey, installationID)
 }
 
+// GetPublicBundle retrieves a public bundle given an identity
+func (p *ProtocolService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, error) {
+	return p.encryption.GetPublicBundle(theirIdentityKey)
+}
+
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
 	if p.encryption == nil {
@@ -138,7 +134,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 	protocolMessage := &ProtocolMessage{}
 
 	if err := proto.Unmarshal(payload, protocolMessage); err != nil {
-		return nil, err
+		return nil, ErrNotProtocolMessage
 	}
 
 	// Process bundle, deprecated, here for backward compatibility
