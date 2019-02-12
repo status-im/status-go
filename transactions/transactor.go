@@ -71,11 +71,12 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 
 // SendTransactionWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
+// Since the transactions is already signed, we assume it was validated and used the right nonce.
 func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
 	chainID := big.NewInt(int64(t.networkID))
 	signer := types.NewEIP155Signer(chainID)
 
-	nonce := uint64(*args.Nonce)
+	txNonce := uint64(*args.Nonce)
 	to := *args.To
 	value := (*big.Int)(args.Value)
 	gas := uint64(*args.Gas)
@@ -91,7 +92,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 			"GasPrice", gasPrice,
 			"Value", value,
 		)
-		tx = types.NewTransaction(nonce, to, value, gas, gasPrice, data)
+		tx = types.NewTransaction(txNonce, to, value, gas, gasPrice, data)
 	} else {
 		// contract creation is rare enough to log an expected address
 		t.log.Info("New contract",
@@ -99,9 +100,45 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 			"Gas", gas,
 			"GasPrice", gasPrice,
 			"Value", value,
-			"Contract address", crypto.CreateAddress(args.From, nonce),
+			"Contract address", crypto.CreateAddress(args.From, txNonce),
 		)
-		tx = types.NewContractCreation(nonce, value, gas, gasPrice, data)
+		tx = types.NewContractCreation(txNonce, value, gas, gasPrice, data)
+	}
+
+	var (
+		localNonce          uint64
+		remoteNonce         uint64
+		nonceNeedsIncrement bool
+	)
+
+	t.addrLock.LockAddr(args.From)
+	if val, ok := t.localNonce.Load(args.From); ok {
+		localNonce = val.(uint64)
+	}
+
+	defer func() {
+		// nonce should be incremented only if tx completed without error
+		// and if no other transactions have been sent while signing the current one.
+		if err == nil && nonceNeedsIncrement {
+			t.localNonce.Store(args.From, txNonce+1)
+		}
+		t.addrLock.UnlockAddr(args.From)
+
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+	remoteNonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	if err != nil {
+		return hash, err
+	}
+
+	// We can't change the transaction nonce because the transaction is already signed.
+	// We still allow sending a transaction even if it's not the last one, it might be used to
+	// "override" a pending one.
+	// If the nonce is the last one we know, we increment it.
+	if txNonce >= localNonce && txNonce >= remoteNonce {
+		nonceNeedsIncrement = true
 	}
 
 	signedTx, err := tx.WithSignature(signer, sig)
@@ -109,7 +146,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		return hash, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
