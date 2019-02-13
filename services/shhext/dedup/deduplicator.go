@@ -18,6 +18,11 @@ type Deduplicator struct {
 	log             log.Logger
 }
 
+type DeduplicateMessage struct {
+	DedupID []byte           `json:"id"`
+	Message *whisper.Message `json:"message"`
+}
+
 // NewDeduplicator creates a new deduplicator
 func NewDeduplicator(keyPairProvider keyPairProvider, db *leveldb.DB) *Deduplicator {
 	return &Deduplicator{
@@ -30,15 +35,19 @@ func NewDeduplicator(keyPairProvider keyPairProvider, db *leveldb.DB) *Deduplica
 // Deduplicate receives a list of whisper messages and
 // returns the list of the messages that weren't filtered previously for the
 // specified filter.
-func (d *Deduplicator) Deduplicate(messages []*whisper.Message) []*whisper.Message {
-	result := make([]*whisper.Message, 0)
+func (d *Deduplicator) Deduplicate(messages []*whisper.Message) []DeduplicateMessage {
+	result := make([]DeduplicateMessage, 0)
+	selectedKeyPairID := d.keyPairProvider.SelectedKeyPairID()
 
 	for _, message := range messages {
-		if has, err := d.cache.Has(d.keyPairProvider.SelectedKeyPairID(), message); !has {
+		if has, err := d.cache.Has(selectedKeyPairID, message); !has {
 			if err != nil {
 				d.log.Error("error while deduplicating messages: search cache failed", "err", err)
 			}
-			result = append(result, message)
+			result = append(result, DeduplicateMessage{
+				DedupID: d.cache.KeyToday(selectedKeyPairID, message),
+				Message: message,
+			})
 		}
 	}
 
@@ -49,4 +58,10 @@ func (d *Deduplicator) Deduplicate(messages []*whisper.Message) []*whisper.Messa
 // out.
 func (d *Deduplicator) AddMessages(messages []*whisper.Message) error {
 	return d.cache.Put(d.keyPairProvider.SelectedKeyPairID(), messages)
+}
+
+// AddMessageByID adds a message to the deduplicator DB, so it will be filtered
+// out.
+func (d *Deduplicator) AddMessageByID(messageIDs [][]byte) error {
+	return d.cache.PutIDs(messageIDs)
 }

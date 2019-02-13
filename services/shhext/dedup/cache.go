@@ -22,7 +22,7 @@ func newCache(db *leveldb.DB) *cache {
 }
 
 func (d *cache) Has(filterID string, message *whisper.Message) (bool, error) {
-	has, err := d.db.Has(d.keyToday(filterID, message), nil)
+	has, err := d.db.Has(d.KeyToday(filterID, message), nil)
 
 	if err != nil {
 		return false, err
@@ -38,7 +38,22 @@ func (d *cache) Put(filterID string, messages []*whisper.Message) error {
 	batch := leveldb.Batch{}
 
 	for _, msg := range messages {
-		batch.Put(d.keyToday(filterID, msg), []byte{})
+		batch.Put(d.KeyToday(filterID, msg), []byte{})
+	}
+
+	err := d.db.Write(&batch, nil)
+	if err != nil {
+		return err
+	}
+
+	return d.cleanOldEntries()
+}
+
+func (d *cache) PutIDs(messageIDs [][]byte) error {
+	batch := leveldb.Batch{}
+
+	for _, id := range messageIDs {
+		batch.Put(id, []byte{})
 	}
 
 	err := d.db.Write(&batch, nil)
@@ -78,7 +93,7 @@ func (d *cache) keyYesterday(filterID string, message *whisper.Message) []byte {
 	return prefixedKey(d.yesterdayDateString(), filterID, message)
 }
 
-func (d *cache) keyToday(filterID string, message *whisper.Message) []byte {
+func (d *cache) KeyToday(filterID string, message *whisper.Message) []byte {
 	return prefixedKey(d.todayDateString(), filterID, message)
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
@@ -368,7 +369,7 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 }
 
 // GetNewFilterMessages is a prototype method with deduplication
-func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message, error) {
+func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.DeduplicateMessage, error) {
 	msgs, err := api.publicAPI.GetFilterMessages(filterID)
 	if err != nil {
 		return nil, err
@@ -378,9 +379,9 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message,
 
 	if api.service.pfsEnabled {
 		// Attempt to decrypt message, otherwise leave unchanged
-		for _, msg := range dedupMessages {
+		for _, dedupMessage := range dedupMessages {
 
-			if err := api.processPFSMessage(msg); err != nil {
+			if err := api.processPFSMessage(dedupMessage); err != nil {
 				return nil, err
 			}
 		}
@@ -393,6 +394,16 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]*whisper.Message,
 // the client side.
 func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) error {
 	return api.service.deduplicator.AddMessages(messages)
+}
+
+// ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
+// the client side.
+func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
+	if err := api.service.protocol.ConfirmMessagesProcessed(messageIDs); err != nil {
+		return err
+	}
+
+	return api.service.deduplicator.AddMessageByID(messageIDs)
 }
 
 // SendPublicMessage sends a public chat message to the underlying transport
@@ -494,7 +505,8 @@ func (api *PublicAPI) SendPairingMessage(ctx context.Context, msg chat.SendDirec
 	return response, nil
 }
 
-func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
+func (api *PublicAPI) processPFSMessage(dedupMessage dedup.DeduplicateMessage) error {
+	msg := dedupMessage.Message
 
 	privateKeyID := api.service.w.SelectedKeyPairID()
 	if privateKeyID == "" {
@@ -511,7 +523,7 @@ func (api *PublicAPI) processPFSMessage(msg *whisper.Message) error {
 		return err
 	}
 
-	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload)
+	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload, dedupMessage.DedupID)
 
 	switch err {
 	case nil:

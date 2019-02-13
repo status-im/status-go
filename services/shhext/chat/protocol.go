@@ -124,8 +124,13 @@ func (p *ProtocolService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*B
 	return p.encryption.GetPublicBundle(theirIdentityKey)
 }
 
+// ConfirmMessagesProcessed confirms and deletes message keys for the given messages
+func (p *ProtocolService) ConfirmMessagesProcessed(messageIDs [][]byte) error {
+	return p.encryption.ConfirmMessagesProcessed(messageIDs)
+}
+
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
-func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte, messageID []byte) ([]byte, error) {
 	if p.encryption == nil {
 		return nil, errors.New("encryption service not initialized")
 	}
@@ -167,7 +172,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 	// Decrypt message
 	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
-		message, err := p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId(), directMessage)
+		message, err := p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId(), directMessage, messageID)
 		if err != nil {
 			return nil, err
 		}
