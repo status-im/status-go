@@ -73,6 +73,10 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
 func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
+	if !args.Valid() {
+		return hash, ErrInvalidSendTxArgs
+	}
+
 	chainID := big.NewInt(int64(t.networkID))
 	signer := types.NewEIP155Signer(chainID)
 
