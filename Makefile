@@ -112,7 +112,6 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	env
 	@gomobile bind -target=android -ldflags="-s -w" -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
