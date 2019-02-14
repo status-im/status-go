@@ -220,6 +220,7 @@ release:
 
 gomobile-install:
 	go get -u golang.org/x/mobile/cmd/gomobile
+	env
 ifdef NDK_GOMOBILE
 	gomobile init -ndk $(NDK_GOMOBILE)
 else
