@@ -3,6 +3,7 @@ package transactions
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"reflect"
@@ -284,51 +285,90 @@ func (s *TransactorSuite) TestContractCreation() {
 	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
 }
 
-func (s *TransactorSuite) TestSendTransactionWithSignature_IncrementingNonce() {
+func (s *TransactorSuite) TestSendTransactionWithSignature() {
 	privKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
-	nonce := hexutil.Uint64(0)
-	from := address
-	to := address
-	value := (*hexutil.Big)(big.NewInt(10))
-	gas := hexutil.Uint64(21000)
-	gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
-	data := []byte{}
-	chainID := big.NewInt(int64(s.nodeConfig.NetworkID))
-
-	args := SendTxArgs{
-		From:     from,
-		To:       &to,
-		Gas:      &gas,
-		GasPrice: gasPrice,
-		Value:    value,
-		Nonce:    &nonce,
-		Data:     nil,
+	scenarios := []struct {
+		localNonce  hexutil.Uint64
+		txNonce     hexutil.Uint64
+		expectError bool
+	}{
+		{
+			localNonce:  hexutil.Uint64(0),
+			txNonce:     hexutil.Uint64(0),
+			expectError: false,
+		},
+		{
+			localNonce:  hexutil.Uint64(1),
+			txNonce:     hexutil.Uint64(0),
+			expectError: true,
+		},
+		{
+			localNonce:  hexutil.Uint64(0),
+			txNonce:     hexutil.Uint64(1),
+			expectError: true,
+		},
 	}
 
-	// simulate transaction signed externally
-	signer := types.NewEIP155Signer(chainID)
-	tx := types.NewTransaction(uint64(nonce), to, (*big.Int)(value), uint64(gas), (*big.Int)(gasPrice), data)
-	hash := signer.Hash(tx)
-	sig, err := crypto.Sign(hash[:], privKey)
-	s.Require().NoError(err)
-	txWithSig, err := tx.WithSignature(signer, sig)
-	s.Require().NoError(err)
-	expectedEncodedTx, err := rlp.EncodeToBytes(txWithSig)
-	s.Require().NoError(err)
+	for _, scenario := range scenarios {
+		desc := fmt.Sprintf("local nonce: %d, tx nonce: %d, expect error: %v", scenario.localNonce, scenario.txNonce, scenario.expectError)
+		s.T().Run(desc, func(t *testing.T) {
+			s.manager.localNonce.Store(address, uint64(scenario.localNonce))
 
-	s.txServiceMock.EXPECT().
-		GetTransactionCount(gomock.Any(), address, gethrpc.PendingBlockNumber).
-		Return(&nonce, nil)
+			nonce := hexutil.Uint64(scenario.txNonce)
+			from := address
+			to := address
+			value := (*hexutil.Big)(big.NewInt(10))
+			gas := hexutil.Uint64(21000)
+			gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
+			data := []byte{}
+			chainID := big.NewInt(int64(s.nodeConfig.NetworkID))
 
-	s.txServiceMock.EXPECT().
-		SendRawTransaction(gomock.Any(), hexutil.Bytes(expectedEncodedTx)).
-		Return(gethcommon.Hash{}, nil)
+			args := SendTxArgs{
+				From:     from,
+				To:       &to,
+				Gas:      &gas,
+				GasPrice: gasPrice,
+				Value:    value,
+				Nonce:    &nonce,
+				Data:     nil,
+			}
 
-	_, err = s.manager.SendTransactionWithSignature(args, sig)
-	s.NoError(err)
-	resultNonce, _ := s.manager.localNonce.Load(args.From)
-	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
+			// simulate transaction signed externally
+			signer := types.NewEIP155Signer(chainID)
+			tx := types.NewTransaction(uint64(nonce), to, (*big.Int)(value), uint64(gas), (*big.Int)(gasPrice), data)
+			hash := signer.Hash(tx)
+			sig, err := crypto.Sign(hash[:], privKey)
+			s.Require().NoError(err)
+			txWithSig, err := tx.WithSignature(signer, sig)
+			s.Require().NoError(err)
+			expectedEncodedTx, err := rlp.EncodeToBytes(txWithSig)
+			s.Require().NoError(err)
+
+			s.txServiceMock.EXPECT().
+				GetTransactionCount(gomock.Any(), address, gethrpc.PendingBlockNumber).
+				Return(&scenario.localNonce, nil)
+
+			if !scenario.expectError {
+				s.txServiceMock.EXPECT().
+					SendRawTransaction(gomock.Any(), hexutil.Bytes(expectedEncodedTx)).
+					Return(gethcommon.Hash{}, nil)
+			}
+
+			_, err = s.manager.SendTransactionWithSignature(args, sig)
+			if scenario.expectError {
+				s.Error(err)
+				// local nonce should not be incremented
+				resultNonce, _ := s.manager.localNonce.Load(args.From)
+				s.Equal(uint64(scenario.localNonce), resultNonce.(uint64))
+			} else {
+				s.NoError(err)
+				// local nonce should be incremented
+				resultNonce, _ := s.manager.localNonce.Load(args.From)
+				s.Equal(uint64(nonce)+1, resultNonce.(uint64))
+			}
+		})
+	}
 }

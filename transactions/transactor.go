@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -23,6 +24,16 @@ const (
 
 	defaultGas = 90000
 )
+
+type ErrBadNonce struct {
+	nonce       uint64
+	localNonce  uint64
+	remoteNonce uint64
+}
+
+func (e *ErrBadNonce) Error() string {
+	return fmt.Sprintf("bad nonce %d. local nonce: %d, remote nonce: %d", e.nonce, e.localNonce, e.remoteNonce)
+}
 
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
@@ -110,9 +121,8 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	}
 
 	var (
-		localNonce          uint64
-		remoteNonce         uint64
-		nonceNeedsIncrement bool
+		localNonce  uint64
+		remoteNonce uint64
 	)
 
 	t.addrLock.LockAddr(args.From)
@@ -123,11 +133,10 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	defer func() {
 		// nonce should be incremented only if tx completed without error
 		// and if no other transactions have been sent while signing the current one.
-		if err == nil && nonceNeedsIncrement {
+		if err == nil {
 			t.localNonce.Store(args.From, txNonce+1)
 		}
 		t.addrLock.UnlockAddr(args.From)
-
 	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
@@ -137,12 +146,8 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		return hash, err
 	}
 
-	// We can't change the transaction nonce because the transaction is already signed.
-	// We still allow sending a transaction even if it's not the last one, it might be used to
-	// "override" a pending one.
-	// If the nonce is the last one we know, we increment it.
-	if txNonce >= localNonce && txNonce >= remoteNonce {
-		nonceNeedsIncrement = true
+	if tx.Nonce() != localNonce || tx.Nonce() != remoteNonce {
+		return hash, &ErrBadNonce{tx.Nonce(), localNonce, remoteNonce}
 	}
 
 	signedTx, err := tx.WithSignature(signer, sig)
