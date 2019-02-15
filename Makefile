@@ -6,24 +6,28 @@ RELEASE_BRANCH := "develop"
 RELEASE_DIRECTORY := /tmp/release-$(RELEASE_TAG)
 PRE_RELEASE := "1"
 
+# sets Makefile GOPATH2 var to the first entry in the GOPATH env var
+GOPATH2 := $(word 1, $(subst :, ,$(shell go env GOPATH)))
+
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-ifndef GOPATH
+ifndef GOPATH2
 	$(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. \
 	For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
 endif
 
 
-EXPECTED_PATH=$(shell go env GOPATH)/src/github.com/status-im/status-go
+EXPECTED_PATH=$(GOPATH2)/src/github.com/status-im/status-go
 ifneq ($(CURDIR),$(EXPECTED_PATH))
 define NOT_IN_GOPATH_ERROR
 
 Current dir is $(CURDIR), which seems to be different from your GOPATH.
 Please, build status-go from GOPATH for proper build.
+If your GOPATH has multiple entries, build status-go from the first entry in your GOPATH.
   GOPATH       = $(shell go env GOPATH)
   Current dir  = $(CURDIR)
-  Expected dir = $(EXPECTED_PATH))
+  Expected dir = $(EXPECTED_PATH)
 See https://golang.org/doc/code.html#GOPATH for more info
 
 endef
