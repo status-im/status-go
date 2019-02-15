@@ -1,6 +1,7 @@
 package statusgo
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -368,6 +369,27 @@ func SendTransaction(txArgsJSON, password string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	hash, err := statusBackend.SendTransaction(params, password)
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+	return prepareJSONResponseWithCode(hash.String(), err, code)
+}
+
+// SendTransactionWithSignature converts RPC args and calls backend.SendTransactionWithSignature
+func SendTransactionWithSignature(txArgsJSON, sigString string) string {
+	var params transactions.SendTxArgs
+	err := json.Unmarshal([]byte(txArgsJSON), &params)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	sig, err := hex.DecodeString(sigString)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	hash, err := statusBackend.SendTransactionWithSignature(params, sig)
 	code := codeUnknown
 	if c, ok := errToCodeMap[err]; ok {
 		code = c

@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -23,6 +24,16 @@ const (
 
 	defaultGas = 90000
 )
+
+type ErrBadNonce struct {
+	nonce       uint64
+	localNonce  uint64
+	remoteNonce uint64
+}
+
+func (e *ErrBadNonce) Error() string {
+	return fmt.Sprintf("bad nonce %d. local nonce: %d, remote nonce: %d", e.nonce, e.localNonce, e.remoteNonce)
+}
 
 // Transactor validates, signs transactions.
 // It uses upstream to propagate transactions to the Ethereum network.
@@ -67,6 +78,91 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash gethcommon.Hash, err error) {
 	hash, err = t.validateAndPropagate(verifiedAccount, sendArgs)
 	return
+}
+
+// SendTransactionWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
+// It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
+// Since the transactions is already signed, we assume it was validated and used the right nonce.
+func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
+	if !args.Valid() {
+		return hash, ErrInvalidSendTxArgs
+	}
+
+	chainID := big.NewInt(int64(t.networkID))
+	signer := types.NewEIP155Signer(chainID)
+
+	txNonce := uint64(*args.Nonce)
+	to := *args.To
+	value := (*big.Int)(args.Value)
+	gas := uint64(*args.Gas)
+	gasPrice := (*big.Int)(args.GasPrice)
+	data := args.GetInput()
+
+	var tx *types.Transaction
+	if args.To != nil {
+		t.log.Info("New transaction",
+			"From", args.From,
+			"To", *args.To,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+		)
+		tx = types.NewTransaction(txNonce, to, value, gas, gasPrice, data)
+	} else {
+		// contract creation is rare enough to log an expected address
+		t.log.Info("New contract",
+			"From", args.From,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+			"Contract address", crypto.CreateAddress(args.From, txNonce),
+		)
+		tx = types.NewContractCreation(txNonce, value, gas, gasPrice, data)
+	}
+
+	var (
+		localNonce  uint64
+		remoteNonce uint64
+	)
+
+	t.addrLock.LockAddr(args.From)
+	if val, ok := t.localNonce.Load(args.From); ok {
+		localNonce = val.(uint64)
+	}
+
+	defer func() {
+		// nonce should be incremented only if tx completed without error
+		// and if no other transactions have been sent while signing the current one.
+		if err == nil {
+			t.localNonce.Store(args.From, txNonce+1)
+		}
+		t.addrLock.UnlockAddr(args.From)
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+	remoteNonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	if err != nil {
+		return hash, err
+	}
+
+	if tx.Nonce() != localNonce || tx.Nonce() != remoteNonce {
+		return hash, &ErrBadNonce{tx.Nonce(), localNonce, remoteNonce}
+	}
+
+	signedTx, err := tx.WithSignature(signer, sig)
+	if err != nil {
+		return hash, err
+	}
+
+	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+
+	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
+		return hash, err
+	}
+
+	return signedTx.Hash(), nil
 }
 
 // make sure that only account which created the tx can complete it
