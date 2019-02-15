@@ -317,7 +317,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 		s.T().Run(desc, func(t *testing.T) {
 			s.manager.localNonce.Store(address, uint64(scenario.localNonce))
 
-			nonce := hexutil.Uint64(scenario.txNonce)
+			nonce := scenario.txNonce
 			from := address
 			to := address
 			value := (*hexutil.Big)(big.NewInt(10))
