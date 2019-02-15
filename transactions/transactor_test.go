@@ -372,3 +372,38 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 		})
 	}
 }
+
+func (s *TransactorSuite) TestHashTransaction() {
+	privKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	address := crypto.PubkeyToAddress(privKey.PublicKey)
+
+	localNonce := hexutil.Uint64(1)
+	s.manager.localNonce.Store(address, localNonce)
+
+	txNonce := hexutil.Uint64(0)
+	from := address
+	to := address
+	value := (*hexutil.Big)(big.NewInt(10))
+	gas := hexutil.Uint64(21000)
+	gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
+
+	args := SendTxArgs{
+		From:     from,
+		To:       &to,
+		Gas:      &gas,
+		GasPrice: gasPrice,
+		Value:    value,
+		Nonce:    &txNonce,
+		Data:     nil,
+	}
+
+	s.txServiceMock.EXPECT().
+		GetTransactionCount(gomock.Any(), address, gethrpc.PendingBlockNumber).
+		Return(&localNonce, nil)
+
+	newArgs, _, err := s.manager.HashTransaction(args)
+	s.Require().NoError(err)
+	s.Equal(localNonce, newArgs.Nonce)
+	// s.NotEqual(emptyHash, hash)
+}

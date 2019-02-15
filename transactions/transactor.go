@@ -9,6 +9,7 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -93,33 +94,11 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	signer := types.NewEIP155Signer(chainID)
 
 	txNonce := uint64(*args.Nonce)
-	to := *args.To
 	value := (*big.Int)(args.Value)
 	gas := uint64(*args.Gas)
 	gasPrice := (*big.Int)(args.GasPrice)
-	data := args.GetInput()
 
-	var tx *types.Transaction
-	if args.To != nil {
-		t.log.Info("New transaction",
-			"From", args.From,
-			"To", *args.To,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-		)
-		tx = types.NewTransaction(txNonce, to, value, gas, gasPrice, data)
-	} else {
-		// contract creation is rare enough to log an expected address
-		t.log.Info("New contract",
-			"From", args.From,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-			"Contract address", crypto.CreateAddress(args.From, txNonce),
-		)
-		tx = types.NewContractCreation(txNonce, value, gas, gasPrice, data)
-	}
+	tx := t.buildTransaction(txNonce, args.From, args.To, value, gas, gasPrice, args.GetInput())
 
 	var (
 		localNonce  uint64
@@ -232,33 +211,11 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 
 	newNonce := hexutil.Uint64(nonce)
 	newGas := hexutil.Uint64(gas)
-
 	validatedArgs.Nonce = &newNonce
 	validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
 	validatedArgs.Gas = &newGas
 
-	var tx *types.Transaction
-	if args.To != nil {
-		t.log.Info("New transaction",
-			"From", args.From,
-			"To", *args.To,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-		)
-		tx = types.NewTransaction(nonce, *validatedArgs.To, value, gas, gasPrice, validatedArgs.GetInput())
-	} else {
-		// contract creation is rare enough to log an expected address
-		t.log.Info("New contract",
-			"From", args.From,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-			"Contract address", crypto.CreateAddress(args.From, nonce),
-		)
-		tx = types.NewContractCreation(nonce, value, gas, gasPrice, validatedArgs.GetInput())
-	}
-
+	tx := t.buildTransaction(nonce, validatedArgs.From, validatedArgs.To, value, gas, gasPrice, validatedArgs.GetInput())
 	hash = types.NewEIP155Signer(chainID).Hash(tx)
 
 	return validatedArgs, hash, nil
@@ -378,4 +335,31 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		return hash, err
 	}
 	return signedTx.Hash(), nil
+}
+
+func (t *Transactor) buildTransaction(nonce uint64, from common.Address, to *common.Address, value *big.Int, gas uint64, gasPrice *big.Int, data hexutil.Bytes) *types.Transaction {
+	var tx *types.Transaction
+
+	if to != nil {
+		t.log.Info("New transaction",
+			"From", from,
+			"To", *to,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+		)
+		tx = types.NewTransaction(nonce, *to, value, gas, gasPrice, data)
+	} else {
+		// contract creation is rare enough to log an expected address
+		t.log.Info("New contract",
+			"From", from,
+			"Gas", gas,
+			"GasPrice", gasPrice,
+			"Value", value,
+			"Contract address", crypto.CreateAddress(from, nonce),
+		)
+		tx = types.NewContractCreation(nonce, value, gas, gasPrice, data)
+	}
+
+	return tx
 }
