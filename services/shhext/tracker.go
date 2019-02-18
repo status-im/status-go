@@ -96,6 +96,7 @@ func (t *tracker) handleEnvelopeEvents() {
 func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 	handlers := map[whisper.EventType]func(whisper.EnvelopeEvent){
 		whisper.EventEnvelopeSent:               t.handleEventEnvelopeSent,
+		whisper.EventEnvelopeReceived:           t.handleEventEnvelopeReceived,
 		whisper.EventEnvelopeExpired:            t.handleEventEnvelopeExpired,
 		whisper.EventBatchAcknowledged:          t.handleAcknowledgedBatch,
 		whisper.EventMailServerRequestSent:      t.handleRequestSent,
@@ -136,6 +137,25 @@ func (t *tracker) handleEventEnvelopeSent(event whisper.EnvelopeEvent) {
 		if t.handler != nil {
 			t.handler.EnvelopeSent(event.Hash)
 		}
+	}
+}
+
+func (t *tracker) handleEventEnvelopeReceived(event whisper.EnvelopeEvent) {
+	if t.mailServerConfirmation {
+		if !t.isMailserver(event.Peer) {
+			return
+		}
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	state, ok := t.cache[event.Hash]
+	if !ok || state != EnvelopePosted {
+		return
+	}
+	log.Debug("expected envelope received", "hash", event.Hash, "peer", event.Peer)
+	delete(t.cache, event.Hash)
+	if t.handler != nil {
+		t.handler.EnvelopeSent(event.Hash)
 	}
 }
 

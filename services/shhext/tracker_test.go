@@ -94,6 +94,15 @@ func (s *TrackerSuite) TestRemoved() {
 	s.NotContains(s.tracker.cache, testHash)
 }
 
+func (s *TrackerSuite) TestReceived() {
+	s.tracker.Add(testHash)
+	s.Contains(s.tracker.cache, testHash)
+	s.tracker.handleEvent(whisper.EnvelopeEvent{
+		Event: whisper.EventEnvelopeReceived,
+		Hash:  testHash})
+	s.NotContains(s.tracker.cache, testHash)
+}
+
 func (s *TrackerSuite) TestRequestCompleted() {
 	mock := newHandlerMock(1)
 	s.tracker.handler = mock
