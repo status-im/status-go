@@ -660,7 +660,6 @@
   revision = "ad98a36ba0da87206e3378c556abbfeaeaa98668"
 
 [[projects]]
-  branch = "master"
   digest = "1:b9b9f43a8a410d633e6547f89e830926741070941f2243d4d3a0bb154f565c9e"
   name = "github.com/mr-tron/base58"
   packages = ["base58"]
@@ -823,12 +822,12 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:2c5092efed72e4c33a9d5f2ca6970609ed959a07b08a6b85fe6e7b70df3ed210"
+  branch = "env-received-event"
+  digest = "1:f5c403c710c6afc54214e8d58c203573c4b982a9f7b7f1b3ec458b2fa7a12793"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "9cdf6385f8a9d8a1cc5ab90dcbbc8cd7efca1e86"
-  version = "v1.4.6"
+  revision = "135b098b5e2cb95e70ecefbaddb7b17313583b85"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"

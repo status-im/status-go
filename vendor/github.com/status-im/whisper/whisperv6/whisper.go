@@ -885,6 +885,11 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				}
 				if cached {
+					whisper.envelopeFeed.Send(EnvelopeEvent{
+						Event: EventEnvelopeReceived,
+						Hash:  env.Hash(),
+						Peer:  p.peer.ID(),
+					})
 					p.mark(env)
 				}
 			}
