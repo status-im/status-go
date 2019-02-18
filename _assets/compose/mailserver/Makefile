@@ -7,15 +7,15 @@ RESET  := $(shell tput -Txterm sgr0)
 BOLD   := $(shell tput bold)
 
 # Settings
-export LOG_LEVEL = INFO
-export LISTEN_PORT ?= 30303
-export RPC_PORT ?= 8545
-export API_MODULES = eth,net,web3,admin
+export LOG_LEVEL      ?= INFO
+export LISTEN_PORT    ?= 30303
+export RPC_PORT       ?= 8545
+export API_MODULES    ?= eth,net,web3,admin
 export CONTAINER_NAME ?= status-go-mailserver
-export DATA_PATH ?= /var/tmp/status-go-mail
-export FLEET_NAME = eth.beta
+export DATA_PATH      ?= /var/tmp/status-go-mail
+export FLEET_NAME     ?= eth.beta
 # Necessary to make mailserver available publicly
-export PUBLIC_IP ?= $(shell curl -s https://ipecho.net/plain)
+export PUBLIC_IP      ?= $(shell curl -s https://ipecho.net/plain)
 
 all: checks start show info enode
 
