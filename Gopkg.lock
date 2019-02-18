@@ -823,11 +823,11 @@
 
 [[projects]]
   branch = "env-received-event"
-  digest = "1:f5c403c710c6afc54214e8d58c203573c4b982a9f7b7f1b3ec458b2fa7a12793"
+  digest = "1:a90c426c6ea51783f383128eb66570f39df327b947cd305d8360a58328ef2089"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "135b098b5e2cb95e70ecefbaddb7b17313583b85"
+  revision = "ce8adebb4984a8a9a9d438aaf5159b10fc2cfe7c"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
