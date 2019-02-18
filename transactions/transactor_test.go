@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/contracts/ens/contract"
@@ -378,9 +379,7 @@ func (s *TransactorSuite) TestHashTransaction() {
 	s.Require().NoError(err)
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 
-	localNonce := hexutil.Uint64(1)
-	s.manager.localNonce.Store(address, localNonce)
-
+	remoteNonce := hexutil.Uint64(1)
 	txNonce := hexutil.Uint64(0)
 	from := address
 	to := address
@@ -400,10 +399,13 @@ func (s *TransactorSuite) TestHashTransaction() {
 
 	s.txServiceMock.EXPECT().
 		GetTransactionCount(gomock.Any(), address, gethrpc.PendingBlockNumber).
-		Return(&localNonce, nil)
+		Return(&remoteNonce, nil)
 
-	newArgs, _, err := s.manager.HashTransaction(args)
+	newArgs, hash, err := s.manager.HashTransaction(args)
 	s.Require().NoError(err)
-	s.Equal(localNonce, newArgs.Nonce)
-	// s.NotEqual(emptyHash, hash)
+	// args should be updated with the right nonce
+	s.NotEqual(*args.Nonce, *newArgs.Nonce)
+	s.Equal(remoteNonce, *newArgs.Nonce)
+
+	s.NotEqual(common.Hash{}, hash)
 }
