@@ -7,6 +7,7 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
@@ -395,6 +396,31 @@ func SendTransactionWithSignature(txArgsJSON, sigString string) string {
 		code = c
 	}
 	return prepareJSONResponseWithCode(hash.String(), err, code)
+}
+
+// HashTransaction validate the transaction and returns new txArgs and the transaction hash.
+func HashTransaction(txArgsJSON string) string {
+	var params transactions.SendTxArgs
+	err := json.Unmarshal([]byte(txArgsJSON), &params)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	newTxArgs, hash, err := statusBackend.HashTransaction(params)
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+
+	result := struct {
+		Transaction transactions.SendTxArgs `json:"transaction"`
+		Hash        common.Hash             `json:"hash"`
+	}{
+		Transaction: newTxArgs,
+		Hash:        hash,
+	}
+
+	return prepareJSONResponseWithCode(result, err, code)
 }
 
 // StartCPUProfile runs pprof for CPU.

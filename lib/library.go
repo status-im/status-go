@@ -9,6 +9,7 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
@@ -423,6 +424,32 @@ func SendTransactionWithSignature(txArgsJSON, sigString *C.char) *C.char {
 		code = c
 	}
 	return C.CString(prepareJSONResponseWithCode(hash.String(), err, code))
+}
+
+// HashTransaction validate the transaction and returns new txArgs and the transaction hash.
+//export HashTransaction
+func HashTransaction(txArgsJSON *C.char) *C.char {
+	var params transactions.SendTxArgs
+	err := json.Unmarshal([]byte(C.GoString(txArgsJSON)), &params)
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+
+	newTxArgs, hash, err := statusBackend.HashTransaction(params)
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+
+	result := struct {
+		Transaction transactions.SendTxArgs `json:"transaction"`
+		Hash        common.Hash             `json:"hash"`
+	}{
+		Transaction: newTxArgs,
+		Hash:        hash,
+	}
+
+	return C.CString(prepareJSONResponseWithCode(result, err, code))
 }
 
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
