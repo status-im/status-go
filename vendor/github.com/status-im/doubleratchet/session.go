@@ -10,6 +10,9 @@ type Session interface {
 
 	// RatchetDecrypt is called to AEAD-decrypt messages.
 	RatchetDecrypt(m Message, associatedData []byte) ([]byte, error)
+
+	//DeleteMk remove a message key from the database
+	DeleteMk(Key, uint32) error
 }
 
 type sessionState struct {
@@ -101,6 +104,11 @@ func (s *sessionState) RatchetEncrypt(plaintext, ad []byte) (Message, error) {
 	return Message{h, ct}, nil
 }
 
+// DeleteMk deletes a message key
+func (s *sessionState) DeleteMk(dh Key, n uint32) error {
+	return s.MkSkipped.DeleteMk(dh, uint(n))
+}
+
 // RatchetDecrypt is called to decrypt messages.
 func (s *sessionState) RatchetDecrypt(m Message, ad []byte) ([]byte, error) {
 	// Is the message one of the skipped?
@@ -114,7 +122,6 @@ func (s *sessionState) RatchetDecrypt(m Message, ad []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("can't decrypt skipped message: %s", err)
 		}
-		_ = s.MkSkipped.DeleteMk(m.Header.DH, uint(m.Header.N))
 		if err := s.store(); err != nil {
 			return nil, err
 		}
@@ -149,11 +156,20 @@ func (s *sessionState) RatchetDecrypt(m Message, ad []byte) ([]byte, error) {
 		return nil, fmt.Errorf("can't decrypt: %s", err)
 	}
 
+	// Append current key, waiting for confirmation
+	skippedKeys := append(skippedKeys1, skippedKeys2...)
+	skippedKeys = append(skippedKeys, skippedKey{
+		key: sc.DHr,
+		nr:  uint(m.Header.N),
+		mk:  mk,
+		seq: sc.KeysCount,
+	})
+
 	// Increment the number of keys
 	sc.KeysCount++
 
 	// Apply changes.
-	if err := s.applyChanges(sc, s.id, append(skippedKeys1, skippedKeys2...)); err != nil {
+	if err := s.applyChanges(sc, s.id, skippedKeys); err != nil {
 		return nil, err
 	}
 

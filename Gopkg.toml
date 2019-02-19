@@ -293,7 +293,7 @@
 
 [[constraint]]
   name = "github.com/status-im/doubleratchet"
-  version = "=v1.0.0"
+  version = "=v2.0.0"
 
 [[constraint]]
   name = "github.com/status-im/migrate"

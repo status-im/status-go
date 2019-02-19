@@ -120,7 +120,7 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	s.NoError(err)
 
 	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg)
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg, []byte("message-id"))
 	s.NoError(err)
 
 	s.NotNil(unmarshaledMsg)

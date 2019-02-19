@@ -660,7 +660,6 @@
   revision = "ad98a36ba0da87206e3378c556abbfeaeaa98668"
 
 [[projects]]
-  branch = "master"
   digest = "1:b9b9f43a8a410d633e6547f89e830926741070941f2243d4d3a0bb154f565c9e"
   name = "github.com/mr-tron/base58"
   packages = ["base58"]
@@ -783,12 +782,12 @@
   version = "v1.1"
 
 [[projects]]
-  digest = "1:41fb72d7a71f37f1f9c766d965178636ecda21b429b1f2e3fff42cfc31279751"
+  digest = "1:821730d8591dde31a0d53b286b5fb9fb7f02f601e0f32a6b759c97934587c0a7"
   name = "github.com/status-im/doubleratchet"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "4dcb6cba284ae9f97129e2a98b9277f629d9dbc4"
-  version = "v1.0.0"
+  revision = "f2aeb83683d753011e9cffda29be0bf6524e1b65"
+  version = "v2.0.0"
 
 [[projects]]
   digest = "1:f3044238fc5d70eca12cc181b1e6d5270570d85a7b7046686381e618a783a7d6"

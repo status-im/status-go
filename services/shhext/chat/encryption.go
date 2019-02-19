@@ -3,16 +3,16 @@ package chat
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/log"
 	dr "github.com/status-im/doubleratchet"
-
-	"sync"
-	"time"
 
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
 )
@@ -23,11 +23,17 @@ var ErrDeviceNotFound = errors.New("device not found")
 // If we have no bundles, we use a constant so that the message can reach any device.
 const noInstallationID = "none"
 
+type ConfirmationData struct {
+	header *dr.MessageHeader
+	drInfo *RatchetInfo
+}
+
 // EncryptionService defines a service that is responsible for the encryption aspect of the protocol.
 type EncryptionService struct {
 	log         log.Logger
 	persistence PersistenceService
 	config      EncryptionServiceConfig
+	messageIDs  map[string]*ConfirmationData
 	mutex       sync.Mutex
 }
 
@@ -68,6 +74,7 @@ func NewEncryptionService(p PersistenceService, config EncryptionServiceConfig) 
 		persistence: p,
 		config:      config,
 		mutex:       sync.Mutex{},
+		messageIDs:  make(map[string]*ConfirmationData),
 	}
 }
 
@@ -92,6 +99,36 @@ func (s *EncryptionService) getDRSession(id []byte) (dr.Session, error) {
 		dr.WithCrypto(crypto.EthereumCrypto{}),
 	)
 
+}
+
+func confirmationIDString(id []byte) string {
+	return hex.EncodeToString(id)
+}
+
+// ConfirmMessagesProcessed confirms and deletes message keys for the given messages
+func (s *EncryptionService) ConfirmMessagesProcessed(messageIDs [][]byte) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for _, idByte := range messageIDs {
+		id := confirmationIDString(idByte)
+		confirmationData, ok := s.messageIDs[id]
+		if !ok {
+			s.log.Warn("Could not confirm message", "messageID", id)
+			continue
+		}
+
+		// Load session from store first
+		session, err := s.getDRSession(confirmationData.drInfo.ID)
+		if err != nil {
+			return err
+		}
+
+		if err := session.DeleteMk(confirmationData.header.DH, confirmationData.header.N); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CreateBundle retrieves or creates an X3DH bundle given a private key
@@ -229,7 +266,7 @@ func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey,
 }
 
 // DecryptPayload decrypts the payload of a DirectMessageProtocol, given an identity private key and the sender's public key
-func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*DirectMessageProtocol) ([]byte, error) {
+func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*DirectMessageProtocol, messageID []byte) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -300,6 +337,12 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 			s.log.Error("Could not find a session")
 			return nil, ErrSessionNotFound
 		}
+
+		confirmationData := &ConfirmationData{
+			header: &drMessage.Header,
+			drInfo: drInfo,
+		}
+		s.messageIDs[confirmationIDString(messageID)] = confirmationData
 
 		return s.decryptUsingDR(theirIdentityKey, drInfo, drMessage)
 	}
