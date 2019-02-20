@@ -83,7 +83,6 @@ func (m *EnvelopesMonitor) handleEvent(event whisper.EnvelopeEvent) {
 		whisper.EventBatchAcknowledged: m.handleAcknowledgedBatch,
 		whisper.EventEnvelopeReceived:  m.handleEventEnvelopeReceived,
 	}
-
 	if handler, ok := handlers[event.Event]; ok {
 		handler(event)
 	}
