@@ -274,25 +274,13 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 
 	var tx *types.Transaction
 	if args.To != nil {
-		t.log.Info("New transaction",
-			"From", args.From,
-			"To", *args.To,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-		)
 		tx = types.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
+		t.logNewTx(args, gas, gasPrice, value)
 	} else {
-		// contract creation is rare enough to log an expected address
-		t.log.Info("New contract",
-			"From", args.From,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-			"Contract address", crypto.CreateAddress(args.From, nonce),
-		)
 		tx = types.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+		t.logNewContract(args, gas, gasPrice, value, nonce)
 	}
+
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
@@ -315,24 +303,11 @@ func (t *Transactor) buildTransaction(args SendTxArgs) *types.Transaction {
 	var tx *types.Transaction
 
 	if args.To != nil {
-		t.log.Info("New transaction",
-			"From", args.From,
-			"To", *args.To,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-		)
 		tx = types.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
+		t.logNewTx(args, gas, gasPrice, value)
 	} else {
-		// contract creation is rare enough to log an expected address
-		t.log.Info("New contract",
-			"From", args.From,
-			"Gas", gas,
-			"GasPrice", gasPrice,
-			"Value", value,
-			"Contract address", crypto.CreateAddress(args.From, nonce),
-		)
 		tx = types.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+		t.logNewContract(args, gas, gasPrice, value, nonce)
 	}
 
 	return tx
@@ -366,4 +341,24 @@ func (t *Transactor) getTransactionNonce(args SendTxArgs) (newNonce uint64, err 
 	}
 
 	return newNonce, nil
+}
+
+func (t *Transactor) logNewTx(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int) {
+	t.log.Info("New transaction",
+		"From", args.From,
+		"To", *args.To,
+		"Gas", gas,
+		"GasPrice", gasPrice,
+		"Value", value,
+	)
+}
+
+func (t *Transactor) logNewContract(args SendTxArgs, gas uint64, gasPrice *big.Int, value *big.Int, nonce uint64) {
+	t.log.Info("New contract",
+		"From", args.From,
+		"Gas", gas,
+		"GasPrice", gasPrice,
+		"Value", value,
+		"Contract address", crypto.CreateAddress(args.From, nonce),
+	)
 }
