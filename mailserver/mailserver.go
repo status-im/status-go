@@ -295,6 +295,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		iter,
 		bloom,
 		int(limit),
+		time.Minute,
 		bundles,
 		cancelProcessing,
 	)
@@ -369,6 +370,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		iter,
 		request.Bloom,
 		int(request.Limit),
+		time.Minute,
 		bundles,
 		cancelProcessing,
 	)
@@ -450,6 +452,7 @@ func (s *WMailServer) processRequestInBundles(
 	iter iterator.Iterator,
 	bloom []byte,
 	limit int,
+	timeout time.Duration,
 	output chan<- []*whisper.Envelope,
 	cancel <-chan struct{},
 ) ([]byte, common.Hash) {
@@ -551,7 +554,7 @@ func (s *WMailServer) processRequestInBundles(
 			log.Error("[mailserver:processRequestInBundles] failed to push all batches",
 				"requestID", requestID)
 			break
-		case <-time.After(time.Minute):
+		case <-time.After(timeout):
 			log.Error("[mailserver:processRequestInBundles] timed out pushing a batch",
 				"requestID", requestID)
 			break

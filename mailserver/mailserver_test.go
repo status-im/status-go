@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -318,16 +319,13 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
 	}
 
-	params := s.defaultServerParams(sentEnvelopes[0])
-	params.low = uint32(now.Add(time.Duration(-count) * time.Second).Unix())
-	params.upp = uint32(now.Unix())
-	params.limit = 6
-	request := s.createRequest(params)
-	src := crypto.FromECDSAPub(&params.key.PublicKey)
-	lower, upper, bloom, limit, cursor, err := s.server.validateRequest(src, request)
-	s.True(err == nil)
+	reqLimit := uint32(6)
+	peerID, request, err := s.prepareRequest(sentEnvelopes, reqLimit)
+	s.NoError(err)
+	lower, upper, bloom, limit, cursor, err := s.server.validateRequest(peerID, request)
+	s.NoError(err)
 	s.Nil(cursor)
-	s.Equal(params.limit, limit)
+	s.Equal(reqLimit, limit)
 
 	receivedHashes, cursor, _ = processRequestAndCollectHashes(
 		s.server, lower, upper, cursor, bloom, int(limit),
@@ -469,6 +467,102 @@ func (s *MailserverSuite) TestDecodeRequest() {
 	s.Equal(payload, decodedPayload)
 }
 
+func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
+	s.setupServer(s.server)
+	defer s.server.Close()
+
+	var archievedEnvelopes []*whisper.Envelope
+
+	now := time.Now()
+	count := uint32(10)
+
+	// Archieve some envelopes.
+	for i := count; i > 0; i-- {
+		sentTime := now.Add(time.Duration(-i) * time.Second)
+		env, err := generateEnvelope(sentTime)
+		s.NoError(err)
+		s.server.Archive(env)
+		archievedEnvelopes = append(archievedEnvelopes, env)
+	}
+
+	// Prepare a request.
+	peerID, request, err := s.prepareRequest(archievedEnvelopes, 5)
+	s.NoError(err)
+	lower, upper, bloom, limit, cursor, err := s.server.validateRequest(peerID, request)
+	s.NoError(err)
+
+	testCases := []struct {
+		Name    string
+		Timeout time.Duration
+		Verify  func(
+			iterator.Iterator,
+			time.Duration, // processRequestInBundles timeout
+			chan []*whisper.Envelope,
+		)
+	}{
+		{
+			Name:    "finish processing using `done` channel",
+			Timeout: time.Second * 5,
+			Verify: func(
+				iter iterator.Iterator,
+				timeout time.Duration,
+				bundles chan []*whisper.Envelope,
+			) {
+				done := make(chan struct{})
+				processFinished := make(chan struct{})
+
+				go func() {
+					s.server.processRequestInBundles(iter, bloom, int(limit), timeout, bundles, done)
+					close(processFinished)
+				}()
+				go close(done)
+
+				select {
+				case <-processFinished:
+				case <-time.After(time.Second):
+					s.FailNow("waiting for processing finish timed out")
+				}
+			},
+		},
+		{
+			Name:    "finish processing due to timeout",
+			Timeout: time.Second,
+			Verify: func(
+				iter iterator.Iterator,
+				timeout time.Duration,
+				bundles chan []*whisper.Envelope,
+			) {
+				done := make(chan struct{}) // won't be closed because we test timeout of `processRequestInBundles()`
+				processFinished := make(chan struct{})
+
+				go func() {
+					s.server.processRequestInBundles(iter, bloom, int(limit), time.Second, bundles, done)
+					close(processFinished)
+				}()
+
+				select {
+				case <-processFinished:
+				case <-time.After(time.Second * 5):
+					s.FailNow("waiting for processing finish timed out")
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		s.T().Run(tc.Name, func(t *testing.T) {
+			iter := s.server.createIterator(lower, upper, cursor)
+			defer iter.Release()
+
+			// Nothing reads from this unbuffered channel which simulates a situation
+			// when a connection between a peer and mail server was dropped.
+			bundles := make(chan []*whisper.Envelope)
+
+			tc.Verify(iter, tc.Timeout, bundles)
+		})
+	}
+}
+
 func (s *MailserverSuite) messageExists(envelope *whisper.Envelope, low, upp uint32, bloom []byte, limit uint32) bool {
 	receivedHashes, _, _ := processRequestAndCollectHashes(
 		s.server, low, upp, nil, bloom, int(limit),
@@ -536,6 +630,26 @@ func (s *MailserverSuite) setupServer(server *WMailServer) {
 	if err != nil {
 		s.T().Fatalf("failed to create symmetric key for mail request: %s", err)
 	}
+}
+
+func (s *MailserverSuite) prepareRequest(envelopes []*whisper.Envelope, limit uint32) (
+	[]byte, *whisper.Envelope, error,
+) {
+	if len(envelopes) == 0 {
+		return nil, nil, errors.New("envelopes is empty")
+	}
+
+	now := time.Now()
+
+	params := s.defaultServerParams(envelopes[0])
+	params.low = uint32(now.Add(time.Duration(-len(envelopes)) * time.Second).Unix())
+	params.upp = uint32(now.Unix())
+	params.limit = limit
+
+	request := s.createRequest(params)
+	peerID := crypto.FromECDSAPub(&params.key.PublicKey)
+
+	return peerID, request, nil
 }
 
 func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTestParams {
@@ -651,7 +765,7 @@ func processRequestAndCollectHashes(
 		close(done)
 	}()
 
-	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, bundles, done)
+	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, time.Minute, bundles, done)
 
 	<-done
 
