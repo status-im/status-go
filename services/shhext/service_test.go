@@ -126,7 +126,7 @@ func (s *ShhExtSuite) SetupTest() {
 		s.Require().NoError(stack.Start())
 		s.nodes[i] = stack
 	}
-	s.services[0].tracker.handler = newHandlerMock(1)
+	s.services[0].envelopesMonitor.handler = newHandlerMock(1)
 }
 
 func (s *ShhExtSuite) TestInitProtocol() {
@@ -141,7 +141,7 @@ func (s *ShhExtSuite) TestInitProtocol() {
 
 func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	mock := newHandlerMock(1)
-	s.services[0].tracker.handler = mock
+	s.services[0].envelopesMonitor.handler = mock
 	s.Require().NoError(s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()}))
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	symID, err := s.whisper[0].GenerateSymKey()
@@ -167,7 +167,7 @@ func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 
 func (s *ShhExtSuite) TestWaitMessageExpired() {
 	mock := newHandlerMock(1)
-	s.services[0].tracker.handler = mock
+	s.services[0].envelopesMonitor.handler = mock
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)
 	client, err := s.nodes[0].Attach()
@@ -362,7 +362,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	})
 	s.Require().NoError(err)
 	s.Require().NotNil(hash)
-	s.Require().NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
+	s.Require().NoError(waitForHashInMonitor(api.service.mailMonitor, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 	// Send a request without a symmetric key. In this case,
 	// a public key extracted from MailServerPeer will be used.
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
@@ -371,12 +371,12 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	})
 	s.Require().NoError(err)
 	s.Require().NotNil(hash)
-	s.Require().NoError(waitForHashInTracker(api.service.tracker, common.BytesToHash(hash), MailServerRequestSent, time.Second))
+	s.Require().NoError(waitForHashInMonitor(api.service.mailMonitor, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 }
 
 func (s *ShhExtSuite) TestDebugPostSync() {
 	mock := newHandlerMock(1)
-	s.services[0].tracker.handler = mock
+	s.services[0].envelopesMonitor.handler = mock
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
@@ -445,7 +445,7 @@ func (s *ShhExtSuite) TestDebugPostSync() {
 
 func (s *ShhExtSuite) TestEnvelopeExpiredOnDebugPostSync() {
 	mock := newHandlerMock(1)
-	s.services[0].tracker.handler = mock
+	s.services[0].envelopesMonitor.handler = mock
 	symID, err := s.whisper[0].GenerateSymKey()
 	s.NoError(err)
 	client, err := s.nodes[0].Attach()
@@ -472,7 +472,7 @@ func (s *ShhExtSuite) TearDown() {
 	}
 }
 
-func waitForHashInTracker(track *tracker, hash common.Hash, state EnvelopeState, deadline time.Duration) error {
+func waitForHashInMonitor(mon *MailRequestMonitor, hash common.Hash, state EnvelopeState, deadline time.Duration) error {
 	after := time.After(deadline)
 	ticker := time.Tick(100 * time.Millisecond)
 	for {
@@ -480,7 +480,7 @@ func waitForHashInTracker(track *tracker, hash common.Hash, state EnvelopeState,
 		case <-after:
 			return fmt.Errorf("failed while waiting for %s to get into state %d", hash, state)
 		case <-ticker:
-			if track.GetState(hash) == state {
+			if mon.GetState(hash) == state {
 				return nil
 			}
 		}
@@ -495,8 +495,8 @@ type WhisperNodeMockSuite struct {
 	localNode       *enode.Node
 	remoteRW        *p2p.MsgPipeRW
 
-	localService *Service
-	localTracker *tracker
+	localService         *Service
+	localEnvelopeMonitor *EnvelopesMonitor
 }
 
 func (s *WhisperNodeMockSuite) SetupTest() {
@@ -522,8 +522,8 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 
 	s.localService = New(w, nil, db, params.ShhextConfig{MailServerConfirmations: true})
 	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
-	s.localTracker = s.localService.tracker
-	s.localTracker.Start()
+	s.localEnvelopeMonitor = s.localService.envelopesMonitor
+	s.localEnvelopeMonitor.Start()
 
 	s.localWhisperAPI = whisper.NewPublicWhisperAPI(w)
 	s.localAPI = NewPublicAPI(s.localService)
@@ -605,7 +605,7 @@ func (s *WhisperConfirmationSuite) TestEnvelopeReceived() {
 	envHash := common.BytesToHash(envBytes)
 	s.Require().NoError(err)
 	s.Require().NoError(utils.Eventually(func() error {
-		if state := s.localTracker.GetState(envHash); state != EnvelopePosted {
+		if state := s.localEnvelopeMonitor.GetState(envHash); state != EnvelopePosted {
 			return fmt.Errorf("envelope with hash %s wasn't posted", envHash.String())
 		}
 		return nil
@@ -629,7 +629,7 @@ func (s *WhisperConfirmationSuite) TestEnvelopeReceived() {
 
 	// wait for message to be removed because it was delivered by remoteRW
 	s.Require().NoError(utils.Eventually(func() error {
-		if state := s.localTracker.GetState(envHash); state != NotRegistered {
+		if state := s.localEnvelopeMonitor.GetState(envHash); state != NotRegistered {
 			return fmt.Errorf("envelope with hash %s wasn't removed from tracker", envHash.String())
 		}
 		return nil
