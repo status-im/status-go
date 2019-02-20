@@ -205,10 +205,6 @@ func (peer *Peer) expire() {
 // broadcast iterates over the collection of envelopes and transmits yet unknown
 // ones over the network.
 func (peer *Peer) broadcast() error {
-	if peer.peer.IsFlaky() {
-		log.Trace("Waiting for a peer to restore communication", "ID", peer.peer.ID())
-		return nil
-	}
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {

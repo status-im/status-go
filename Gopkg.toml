@@ -46,7 +46,7 @@
 
 [[constraint]]
   name = "github.com/status-im/whisper"
-  branch = "env-received-event"
+  version = "=v1.4.8"
 
 [[constraint]]
   name = "golang.org/x/text"

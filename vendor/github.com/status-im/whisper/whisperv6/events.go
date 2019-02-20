@@ -14,6 +14,8 @@ const (
 	// EventEnvelopeExpired fires when envelop expired
 	EventEnvelopeExpired EventType = "envelope.expired"
 	// EventEnvelopeReceived is sent once envelope was received from a peer.
+	// EventEnvelopeReceived must be sent to the feed even if envelope was previously in the cache.
+	// And event, ideally, should contain information about peer that sent envelope to us.
 	EventEnvelopeReceived EventType = "envelope.received"
 	// EventBatchAcknowledged is sent when batch of envelopes was acknowleged by a peer.
 	EventBatchAcknowledged EventType = "batch.acknowleged"

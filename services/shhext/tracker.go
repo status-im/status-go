@@ -1,7 +1,6 @@
 package shhext
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -106,7 +105,6 @@ func (t *tracker) handleEvent(event whisper.EnvelopeEvent) {
 	}
 
 	if handler, ok := handlers[event.Event]; ok {
-		fmt.Println("received event")
 		handler(event)
 	}
 }
