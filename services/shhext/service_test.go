@@ -278,6 +278,23 @@ func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
 	}))
 }
 
+func (s *ShhExtSuite) TestFailedRequestUnregistered() {
+	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
+	s.Require().NoError(<-waitErr)
+	client, err := s.nodes[0].Attach()
+	topics := []whisper.TopicType{{1}}
+	s.NoError(err)
+	s.EqualError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
+		MailServerPeer: "enode://19872f94b1e776da3a13e25afa71b47dfa99e658afd6427ea8d6e03c22a99f13590205a8826443e95a37eee1d815fc433af7a8ca9a8d0df7943d1f55684045b7@0.0.0.0:30305",
+		Topics:         topics,
+	}), "Could not find peer with ID: 10841e6db5c02fc331bf36a8d2a9137a1696d9d3b6b1f872f780e02aa8ec5bba")
+	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
+		MailServerPeer: s.nodes[1].Server().Self().String(),
+		Topics:         topics,
+	}))
+}
+
 func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	var err error
 

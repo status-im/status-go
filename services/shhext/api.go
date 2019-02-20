@@ -280,6 +280,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 		return nil, err
 	}
 	hash := envelope.Hash()
+
 	if !r.Force {
 		err = api.service.requestsRegistry.Register(hash, r.Topics)
 		if err != nil {
@@ -288,8 +289,12 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r MessagesRequest) (hex
 	}
 
 	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
+		if !r.Force {
+			api.service.requestsRegistry.Unregister(hash)
+		}
 		return nil, err
 	}
+
 	return hash[:], nil
 }
 
