@@ -27,13 +27,12 @@ const (
 )
 
 type ErrBadNonce struct {
-	nonce       uint64
-	localNonce  uint64
-	remoteNonce uint64
+	nonce         uint64
+	expectedNonce uint64
 }
 
 func (e *ErrBadNonce) Error() string {
-	return fmt.Sprintf("bad nonce %d. local nonce: %d, remote nonce: %d", e.nonce, e.localNonce, e.remoteNonce)
+	return fmt.Sprintf("bad nonce. expected %d, got %d", e.expectedNonce, e.nonce)
 }
 
 // Transactor validates, signs transactions.
@@ -93,17 +92,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	signer := types.NewEIP155Signer(chainID)
 
 	tx := t.buildTransaction(args)
-
-	var (
-		localNonce  uint64
-		remoteNonce uint64
-	)
-
 	t.addrLock.LockAddr(args.From)
-	if val, ok := t.localNonce.Load(args.From); ok {
-		localNonce = val.(uint64)
-	}
-
 	defer func() {
 		// nonce should be incremented only if tx completed without error
 		// and if no other transactions have been sent while signing the current one.
@@ -113,15 +102,13 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		t.addrLock.UnlockAddr(args.From)
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
-	remoteNonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	expectedNonce, err := t.getTransactionNonce(args)
 	if err != nil {
 		return hash, err
 	}
 
-	if tx.Nonce() != localNonce || tx.Nonce() != remoteNonce {
-		return hash, &ErrBadNonce{tx.Nonce(), localNonce, remoteNonce}
+	if tx.Nonce() != expectedNonce {
+		return hash, &ErrBadNonce{tx.Nonce(), expectedNonce}
 	}
 
 	signedTx, err := tx.WithSignature(signer, sig)
@@ -129,7 +116,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		return hash, err
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
 
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
@@ -151,27 +138,14 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 		t.addrLock.UnlockAddr(args.From)
 	}()
 
-	var localNonce uint64
-	if val, ok := t.localNonce.Load(args.From); ok {
-		localNonce = val.(uint64)
-	}
-
-	var nonce uint64
-	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
-	defer cancel()
-	nonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	nonce, err := t.getTransactionNonce(validatedArgs)
 	if err != nil {
 		return validatedArgs, hash, err
-	}
-	// if upstream node returned nonce higher than ours we will use it, as it probably means
-	// that another client was used for sending transactions
-	if localNonce > nonce {
-		nonce = localNonce
 	}
 
 	gasPrice := (*big.Int)(args.GasPrice)
 	if args.GasPrice == nil {
-		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 		gasPrice, err = t.gasCalculator.SuggestGasPrice(ctx)
 		if err != nil {
@@ -184,7 +158,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 
 	var gas uint64
 	if args.Gas == nil {
-		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
 		gas, err = t.gasCalculator.EstimateGas(ctx, ethereum.CallMsg{
 			From:     args.From,
@@ -362,4 +336,34 @@ func (t *Transactor) buildTransaction(args SendTxArgs) *types.Transaction {
 	}
 
 	return tx
+}
+
+func (t *Transactor) getTransactionNonce(args SendTxArgs) (newNonce uint64, err error) {
+	var (
+		localNonce  uint64
+		remoteNonce uint64
+	)
+
+	// get the local nonce
+	if val, ok := t.localNonce.Load(args.From); ok {
+		localNonce = val.(uint64)
+	}
+
+	// get the remote nonce
+	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
+	defer cancel()
+	remoteNonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	if err != nil {
+		return newNonce, err
+	}
+
+	// if upstream node returned nonce higher than ours we will use it, as it probably means
+	// that another client was used for sending transactions
+	if remoteNonce > localNonce {
+		newNonce = remoteNonce
+	} else {
+		newNonce = localNonce
+	}
+
+	return newNonce, nil
 }
