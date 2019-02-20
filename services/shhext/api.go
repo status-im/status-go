@@ -169,7 +169,7 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash he
 	if err == nil {
 		var envHash common.Hash
 		copy(envHash[:], hash[:]) // slice can't be used as key
-		api.service.tracker.Add(envHash)
+		api.service.envelopesMonitor.Add(envHash)
 	}
 	return hash, err
 }
