@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
+	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -28,6 +29,7 @@ import (
 const (
 	// internal whisper protocol codes
 	statusCode             = 0
+	messagesCode           = 1
 	p2pRequestCompleteCode = 125
 )
 
@@ -485,19 +487,19 @@ func waitForHashInTracker(track *tracker, hash common.Hash, state EnvelopeState,
 	}
 }
 
-func TestRequestMessagesSync(t *testing.T) {
-	suite.Run(t, new(RequestMessagesSyncSuite))
-}
-
-type RequestMessagesSyncSuite struct {
+type WhisperNodeMockSuite struct {
 	suite.Suite
 
-	localAPI  *PublicAPI
-	localNode *enode.Node
-	remoteRW  *p2p.MsgPipeRW
+	localWhisperAPI *whisper.PublicWhisperAPI
+	localAPI        *PublicAPI
+	localNode       *enode.Node
+	remoteRW        *p2p.MsgPipeRW
+
+	localService *Service
+	localTracker *tracker
 }
 
-func (s *RequestMessagesSyncSuite) SetupTest() {
+func (s *WhisperNodeMockSuite) SetupTest() {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
 	conf := &whisper.Config{
@@ -518,11 +520,23 @@ func (s *RequestMessagesSyncSuite) SetupTest() {
 	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
 	s.Require().NoError(p2p.SendItems(rw1, statusCode, whisper.ProtocolVersion, whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
-	service := New(w, nil, db, params.ShhextConfig{})
+	s.localService = New(w, nil, db, params.ShhextConfig{MailServerConfirmations: true})
+	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
+	s.localTracker = s.localService.tracker
+	s.localTracker.Start()
 
-	s.localAPI = NewPublicAPI(service)
+	s.localWhisperAPI = whisper.NewPublicWhisperAPI(w)
+	s.localAPI = NewPublicAPI(s.localService)
 	s.localNode = node
 	s.remoteRW = rw1
+}
+
+func TestRequestMessagesSync(t *testing.T) {
+	suite.Run(t, new(RequestMessagesSyncSuite))
+}
+
+type RequestMessagesSyncSuite struct {
+	WhisperNodeMockSuite
 }
 
 func (s *RequestMessagesSyncSuite) TestExpired() {
@@ -570,4 +584,54 @@ func (s *RequestMessagesSyncSuite) TestCompletedFromFirstAttempt() {
 
 func (s *RequestMessagesSyncSuite) TestCompletedFromSecondAttempt() {
 	s.testCompletedFromAttempt(2)
+}
+
+func TestWhisperConfirmations(t *testing.T) {
+	suite.Run(t, new(WhisperConfirmationSuite))
+}
+
+type WhisperConfirmationSuite struct {
+	WhisperNodeMockSuite
+}
+
+func (s *WhisperConfirmationSuite) TestEnvelopeReceived() {
+	symID, err := s.localWhisperAPI.GenerateSymKeyFromPassword(context.TODO(), "test")
+	s.Require().NoError(err)
+	envBytes, err := s.localAPI.Post(context.TODO(), whisper.NewMessage{
+		SymKeyID: symID,
+		TTL:      1000,
+		Topic:    whisper.TopicType{0x01},
+	})
+	envHash := common.BytesToHash(envBytes)
+	s.Require().NoError(err)
+	s.Require().NoError(utils.Eventually(func() error {
+		if state := s.localTracker.GetState(envHash); state != EnvelopePosted {
+			return fmt.Errorf("envelope with hash %s wasn't posted", envHash.String())
+		}
+		return nil
+	}, 2*time.Second, 100*time.Millisecond))
+
+	// enable auto-replies once message got registered internally
+	go func() {
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			if msg.Code != messagesCode {
+				s.Require().NoError(msg.Discard())
+				continue
+			}
+			// reply with same envelopes. we could probably just write same data to remoteRW, but this works too.
+			var envs []*whisper.Envelope
+			s.Require().NoError(msg.Decode(&envs))
+			s.Require().NoError(p2p.Send(s.remoteRW, messagesCode, envs))
+		}
+	}()
+
+	// wait for message to be removed because it was delivered by remoteRW
+	s.Require().NoError(utils.Eventually(func() error {
+		if state := s.localTracker.GetState(envHash); state != NotRegistered {
+			return fmt.Errorf("envelope with hash %s wasn't removed from tracker", envHash.String())
+		}
+		return nil
+	}, 2*time.Second, 100*time.Millisecond))
 }

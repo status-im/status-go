@@ -876,7 +876,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("failed to decode envelopes, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid envelopes")
 			}
-
 			trouble := false
 			for _, env := range envelopes {
 				cached, err := whisper.add(env, whisper.LightClientMode())
@@ -884,6 +883,11 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					trouble = true
 					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				}
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Event: EventEnvelopeReceived,
+					Hash:  env.Hash(),
+					Peer:  p.peer.ID(),
+				})
 				if cached {
 					p.mark(env)
 				}
