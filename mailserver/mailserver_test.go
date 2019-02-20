@@ -651,7 +651,7 @@ func processRequestAndCollectHashes(
 		close(done)
 	}()
 
-	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, bundles)
+	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, bundles, done)
 
 	<-done
 
