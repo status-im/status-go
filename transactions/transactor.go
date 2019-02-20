@@ -9,7 +9,6 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -93,12 +92,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	chainID := big.NewInt(int64(t.networkID))
 	signer := types.NewEIP155Signer(chainID)
 
-	txNonce := uint64(*args.Nonce)
-	value := (*big.Int)(args.Value)
-	gas := uint64(*args.Gas)
-	gasPrice := (*big.Int)(args.GasPrice)
-
-	tx := t.buildTransaction(txNonce, args.From, args.To, value, gas, gasPrice, args.GetInput())
+	tx := t.buildTransaction(args)
 
 	var (
 		localNonce  uint64
@@ -114,7 +108,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		// nonce should be incremented only if tx completed without error
 		// and if no other transactions have been sent while signing the current one.
 		if err == nil {
-			t.localNonce.Store(args.From, txNonce+1)
+			t.localNonce.Store(args.From, uint64(*args.Nonce)+1)
 		}
 		t.addrLock.UnlockAddr(args.From)
 	}()
@@ -174,6 +168,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	if localNonce > nonce {
 		nonce = localNonce
 	}
+
 	gasPrice := (*big.Int)(args.GasPrice)
 	if args.GasPrice == nil {
 		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
@@ -215,7 +210,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	validatedArgs.GasPrice = (*hexutil.Big)(gasPrice)
 	validatedArgs.Gas = &newGas
 
-	tx := t.buildTransaction(nonce, validatedArgs.From, validatedArgs.To, value, gas, gasPrice, validatedArgs.GetInput())
+	tx := t.buildTransaction(validatedArgs)
 	hash = types.NewEIP155Signer(chainID).Hash(tx)
 
 	return validatedArgs, hash, nil
@@ -337,28 +332,33 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	return signedTx.Hash(), nil
 }
 
-func (t *Transactor) buildTransaction(nonce uint64, from common.Address, to *common.Address, value *big.Int, gas uint64, gasPrice *big.Int, data hexutil.Bytes) *types.Transaction {
+func (t *Transactor) buildTransaction(args SendTxArgs) *types.Transaction {
+	nonce := uint64(*args.Nonce)
+	value := (*big.Int)(args.Value)
+	gas := uint64(*args.Gas)
+	gasPrice := (*big.Int)(args.GasPrice)
+
 	var tx *types.Transaction
 
-	if to != nil {
+	if args.To != nil {
 		t.log.Info("New transaction",
-			"From", from,
-			"To", *to,
+			"From", args.From,
+			"To", *args.To,
 			"Gas", gas,
 			"GasPrice", gasPrice,
 			"Value", value,
 		)
-		tx = types.NewTransaction(nonce, *to, value, gas, gasPrice, data)
+		tx = types.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
 	} else {
 		// contract creation is rare enough to log an expected address
 		t.log.Info("New contract",
-			"From", from,
+			"From", args.From,
 			"Gas", gas,
 			"GasPrice", gasPrice,
 			"Value", value,
-			"Contract address", crypto.CreateAddress(from, nonce),
+			"Contract address", crypto.CreateAddress(args.From, nonce),
 		)
-		tx = types.NewContractCreation(nonce, value, gas, gasPrice, data)
+		tx = types.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
 	}
 
 	return tx
