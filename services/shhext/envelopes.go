@@ -1,6 +1,8 @@
 package shhext
 
 import (
+	"context"
+	"hash/fnv"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,15 +12,30 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
+const (
+	maxAttempts = 3
+)
+
+func messageID(message whisper.NewMessage) common.Hash {
+	hash := fnv.New32()
+	hash.Write(message.Payload)
+	hash.Write(message.Topic[:])
+	return common.BytesToHash(hash.Sum(nil))
+}
+
 // EnvelopesMonitor is responsible for monitoring whisper envelopes state.
 type EnvelopesMonitor struct {
 	w                      *whisper.Whisper
+	whisperAPI             *whisper.PublicWhisperAPI
 	handler                EnvelopeEventsHandler
 	mailServerConfirmation bool
 
 	mu      sync.Mutex
 	cache   map[common.Hash]EnvelopeState
 	batches map[common.Hash]map[common.Hash]struct{}
+
+	messages map[common.Hash]whisper.NewMessage
+	attempts map[common.Hash]int
 
 	mailPeers *mailservers.PeerStore
 
@@ -43,10 +60,12 @@ func (m *EnvelopesMonitor) Stop() {
 }
 
 // Add hash to a tracker.
-func (m *EnvelopesMonitor) Add(hash common.Hash) {
+func (m *EnvelopesMonitor) Add(envelopeHash common.Hash, message whisper.NewMessage) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.cache[hash] = EnvelopePosted
+	m.cache[envelopeHash] = EnvelopePosted
+	m.messages[envelopeHash] = message
+	m.attempts[envelopeHash] = 1
 }
 
 func (m *EnvelopesMonitor) GetState(hash common.Hash) EnvelopeState {
@@ -158,11 +177,31 @@ func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event whisper.EnvelopeEven
 	if state, ok := m.cache[event.Hash]; ok {
 		delete(m.cache, event.Hash)
 		if state == EnvelopeSent {
+			delete(m.messages, event.Hash)
+			delete(m.attempts, event.Hash)
 			return
 		}
-		log.Debug("envelope expired", "hash", event.Hash, "state", state)
-		if m.handler != nil {
-			m.handler.EnvelopeExpired(event.Hash)
+		message, exist := m.messages[event.Hash]
+		if !exist {
+			log.Error("message was deleted erroneously", "envelope hash", event.Hash)
+		}
+		mid := messageID(message)
+		attempt := m.attempts[event.Hash]
+		if attempt < maxAttempts {
+			hex, err := m.whisperAPI.Post(context.TODO(), message)
+			if err != nil {
+				log.Error("failed to retry sending message", "messageID", mid, "attempt", attempt+1)
+			}
+			m.cache[common.BytesToHash(hex)] = EnvelopePosted
+			m.messages[common.BytesToHash(hex)] = message
+			m.attempts[common.BytesToHash(hex)] = attempt + 1
+		} else {
+			delete(m.messages, event.Hash)
+			delete(m.attempts, event.Hash)
+			log.Debug("envelope expired", "hash", event.Hash, "state", state)
+			if m.handler != nil {
+				m.handler.EnvelopeExpired(event.Hash)
+			}
 		}
 	}
 }

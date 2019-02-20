@@ -81,6 +81,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 	}
 	envelopesMonitor := &EnvelopesMonitor{
 		w:                      w,
+		whisperAPI:             whisper.NewPublicWhisperAPI(w),
 		handler:                handler,
 		cache:                  map[common.Hash]EnvelopeState{},
 		batches:                map[common.Hash]map[common.Hash]struct{}{},
