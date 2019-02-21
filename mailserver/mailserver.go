@@ -51,6 +51,7 @@ const (
 	timestampLength        = 4
 	requestLimitLength     = 4
 	requestTimeRangeLength = timestampLength * 2
+	processRequestTimeout  = time.Minute
 )
 
 // dbImpl is an interface introduced to be able to test some unexpected
@@ -295,7 +296,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		iter,
 		bloom,
 		int(limit),
-		time.Minute,
+		processRequestTimeout,
 		bundles,
 		cancelProcessing,
 	)
@@ -370,7 +371,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		iter,
 		request.Bloom,
 		int(request.Limit),
-		time.Minute,
+		processRequestTimeout,
 		bundles,
 		cancelProcessing,
 	)
@@ -551,7 +552,7 @@ func (s *WMailServer) processRequestInBundles(
 		// the consumer of `output` channel exits prematurely.
 		// In such a case, we should stop pushing batches and exit.
 		case <-cancel:
-			log.Error("[mailserver:processRequestInBundles] failed to push all batches",
+			log.Info("[mailserver:processRequestInBundles] failed to push all batches",
 				"requestID", requestID)
 			break
 		case <-time.After(timeout):
