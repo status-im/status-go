@@ -79,15 +79,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		cache:            map[common.Hash]EnvelopeState{},
 		requestsRegistry: requestsRegistry,
 	}
-	envelopesMonitor := &EnvelopesMonitor{
-		w:                      w,
-		whisperAPI:             whisper.NewPublicWhisperAPI(w),
-		handler:                handler,
-		cache:                  map[common.Hash]EnvelopeState{},
-		batches:                map[common.Hash]map[common.Hash]struct{}{},
-		mailPeers:              ps,
-		mailServerConfirmation: config.MailServerConfirmations,
-	}
+	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps)
 	return &Service{
 		w:                w,
 		config:           config,
