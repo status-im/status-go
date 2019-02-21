@@ -274,6 +274,11 @@ func (b *StatusBackend) SendTransactionWithSignature(sendArgs transactions.SendT
 	return
 }
 
+// HashTransaction validate the transaction and returns new sendArgs and the transaction hash.
+func (b *StatusBackend) HashTransaction(sendArgs transactions.SendTxArgs) (transactions.SendTxArgs, gethcommon.Hash, error) {
+	return b.transactor.HashTransaction(sendArgs)
+}
+
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
 func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Bytes, error) {

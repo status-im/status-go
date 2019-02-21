@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/contracts/ens/contract"
@@ -371,4 +372,40 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			}
 		})
 	}
+}
+
+func (s *TransactorSuite) TestHashTransaction() {
+	privKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	address := crypto.PubkeyToAddress(privKey.PublicKey)
+
+	remoteNonce := hexutil.Uint64(1)
+	txNonce := hexutil.Uint64(0)
+	from := address
+	to := address
+	value := (*hexutil.Big)(big.NewInt(10))
+	gas := hexutil.Uint64(21000)
+	gasPrice := (*hexutil.Big)(big.NewInt(2000000000))
+
+	args := SendTxArgs{
+		From:     from,
+		To:       &to,
+		Gas:      &gas,
+		GasPrice: gasPrice,
+		Value:    value,
+		Nonce:    &txNonce,
+		Data:     nil,
+	}
+
+	s.txServiceMock.EXPECT().
+		GetTransactionCount(gomock.Any(), address, gethrpc.PendingBlockNumber).
+		Return(&remoteNonce, nil)
+
+	newArgs, hash, err := s.manager.HashTransaction(args)
+	s.Require().NoError(err)
+	// args should be updated with the right nonce
+	s.NotEqual(*args.Nonce, *newArgs.Nonce)
+	s.Equal(remoteNonce, *newArgs.Nonce)
+
+	s.NotEqual(common.Hash{}, hash)
 }
