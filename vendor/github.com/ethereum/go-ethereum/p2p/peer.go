@@ -23,7 +23,6 @@ import (
 	"net"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/mclock"
@@ -45,10 +44,7 @@ const (
 
 	snappyProtocolVersion = 5
 
-	pingInterval = 1 * time.Second
-	// watchdogInterval intentionally lower than ping interval.
-	// this way we reduce potential flaky window size.
-	watchdogInterval = 200 * time.Millisecond
+	pingInterval = 15 * time.Second
 )
 
 const (
@@ -110,7 +106,6 @@ type Peer struct {
 	log     log.Logger
 	created mclock.AbsTime
 
-	flaky    int32
 	wg       sync.WaitGroup
 	protoErr chan error
 	closed   chan struct{}
@@ -128,11 +123,6 @@ func NewPeer(id enode.ID, name string, caps []Cap) *Peer {
 	peer := newPeer(conn, nil)
 	close(peer.closed) // ensures Disconnect doesn't block
 	return peer
-}
-
-// IsFlaky returns true if there was no incoming traffic recently.
-func (p *Peer) IsFlaky() bool {
-	return atomic.LoadInt32(&p.flaky) == 1
 }
 
 // ID returns the node's public key.
@@ -211,10 +201,8 @@ func (p *Peer) run() (remoteRequested bool, err error) {
 		readErr    = make(chan error, 1)
 		reason     DiscReason // sent to the peer
 	)
-	p.wg.Add(3)
-	reads := make(chan struct{}, 10) // channel for reads
-	go p.readLoop(readErr, reads)
-	go p.watchdogLoop(reads)
+	p.wg.Add(2)
+	go p.readLoop(readErr)
 	go p.pingLoop()
 
 	// Start all protocol handlers.
@@ -252,8 +240,35 @@ loop:
 
 	close(p.closed)
 	p.rw.close(reason)
-	p.wg.Wait()
+
+	if shutdownErr := p.shutdownWithTimeout(5 * time.Second); shutdownErr != nil {
+		p.Log().Error("Timeout while waiting for the peer to shut down", "err", err)
+	}
+
 	return remoteRequested, err
+}
+
+func (p *Peer) shutdownWithTimeout(timeout time.Duration) error {
+	/* A watchdog for the waitGroup (p.wg)
+	* When a peer shuts down we give 5 seconds for all protocols to finish,
+	* but we continue the process anyway (and print a warning message).
+	* Otherwise, this peer will be stuck in the list of peers (`admin_peers`)
+	* and won't be able to reconnect until the app is restarted.
+	* */
+	c := make(chan struct{})
+
+	go func() {
+		p.wg.Wait()
+		close(c)
+	}()
+
+	select {
+	case <-c:
+		p.Log().Debug("Peer stopped successfully")
+		return nil
+	case <-time.After(timeout):
+		return errors.New("WATCHDOG_ENGAGED. A few goroutines leaked.")
+	}
 }
 
 func (p *Peer) pingLoop() {
@@ -274,24 +289,7 @@ func (p *Peer) pingLoop() {
 	}
 }
 
-func (p *Peer) watchdogLoop(reads <-chan struct{}) {
-	defer p.wg.Done()
-	hb := time.NewTimer(watchdogInterval)
-	defer hb.Stop()
-	for {
-		select {
-		case <-reads:
-			atomic.StoreInt32(&p.flaky, 0)
-		case <-hb.C:
-			atomic.StoreInt32(&p.flaky, 1)
-		case <-p.closed:
-			return
-		}
-		hb.Reset(watchdogInterval)
-	}
-}
-
-func (p *Peer) readLoop(errc chan<- error, reads chan<- struct{}) {
+func (p *Peer) readLoop(errc chan<- error) {
 	defer p.wg.Done()
 	for {
 		msg, err := p.rw.ReadMsg()
@@ -304,7 +302,6 @@ func (p *Peer) readLoop(errc chan<- error, reads chan<- struct{}) {
 			errc <- err
 			return
 		}
-		reads <- struct{}{}
 	}
 }
 
