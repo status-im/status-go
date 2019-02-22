@@ -1,0 +1,62 @@
+diff --git a/node/api.go b/node/api.go
+index 4a434843e..bb1c01119 100644
+--- a/node/api.go
++++ b/node/api.go
+@@ -75,6 +75,24 @@ func (api *PrivateAdminAPI) RemovePeer(url string) (bool, error) {
+ 	return true, nil
+ }
+ 
++// DeletePeer disconnects and deletes forcefully a remote node.
++func (api *PrivateAdminAPI) DeletePeer(url string) (bool, error) {
++	// Make sure the server is running, fail otherwise
++	server := api.node.Server()
++	if server == nil {
++		return false, ErrNodeStopped
++	}
++	// Try to remove the url as a static peer and return
++	node, err := enode.ParseV4(url)
++	if err != nil {
++		return false, fmt.Errorf("invalid enode: %v", err)
++	}
++	if err := server.DeletePeer(node); err != nil {
++		return false, err
++	}
++	return true, nil
++}
++
+ // AddTrustedPeer allows a remote node to always connect, even if slots are full
+ func (api *PrivateAdminAPI) AddTrustedPeer(url string) (bool, error) {
+ 	// Make sure the server is running, fail otherwise
+diff --git a/p2p/server.go b/p2p/server.go
+index b8c69bad8..715ab0872 100644
+--- a/p2p/server.go
++++ b/p2p/server.go
+@@ -327,6 +327,28 @@ func (srv *Server) RemovePeer(node *enode.Node) {
+ 	}
+ }
+ 
++// DeletePeer deletes the given node forcefully.
++func (srv *Server) DeletePeer(node *enode.Node) error {
++	var peer *Peer
++	for _, p := range srv.Peers() {
++		if p.ID() == node.ID() {
++			peer = p
++			break
++		}
++	}
++
++	if peer == nil {
++		return errors.New("peer not found")
++	}
++
++	select {
++	case srv.delpeer <- peerDrop{peer, errors.New("forced delete"), true}:
++	case <-srv.quit:
++	}
++
++	return nil
++}
++
+ // AddTrustedPeer adds the given node to a reserved whitelist which allows the
+ // node to always connect, even if the slot are full.
+ func (srv *Server) AddTrustedPeer(node *enode.Node) {

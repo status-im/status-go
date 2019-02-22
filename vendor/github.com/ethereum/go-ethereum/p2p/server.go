@@ -52,7 +52,7 @@ const (
 
 	// Maximum time allowed for reading a complete message.
 	// This is effectively the amount of time a connection can be idle.
-	frameReadTimeout = 10 * time.Second
+	frameReadTimeout = 30 * time.Second
 
 	// Maximum amount of time allowed for writing a complete message.
 	frameWriteTimeout = 20 * time.Second
@@ -325,6 +325,36 @@ func (srv *Server) RemovePeer(node *enode.Node) {
 	case srv.removestatic <- node:
 	case <-srv.quit:
 	}
+}
+
+// DeletePeer deletes the given node forcefully.
+func (srv *Server) DeletePeer(node *enode.Node) error {
+	peerIDStr := node.ID().String()
+
+	srv.log.Info("DeletePeer called", "peerID", peerIDStr)
+
+	var peer *Peer
+	for _, p := range srv.Peers() {
+		if p.ID() == node.ID() {
+			peer = p
+			break
+		}
+	}
+
+	if peer == nil {
+		err := errors.New("peer not found")
+		srv.log.Info("DeletePeer failed to match a peer", "peerID", peerIDStr, "err", err)
+		return err
+	}
+
+	select {
+	case srv.delpeer <- peerDrop{peer, errors.New("forced delete"), true}:
+	case <-srv.quit:
+	}
+
+	srv.log.Info("DeletePeer passed the request to delpeer channel", "peerID", peerIDStr)
+
+	return nil
 }
 
 // AddTrustedPeer adds the given node to a reserved whitelist which allows the
