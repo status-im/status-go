@@ -621,6 +621,12 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 
 	// get messages
 	messages := s.getMessagesByMessageFilterID(clientRPCClient, messageFilterID)
+	// call once again because some messages can be delievered later
+	time.Sleep(time.Millisecond * 500)
+	messages = append(
+		messages,
+		s.getMessagesByMessageFilterID(clientRPCClient, messageFilterID)...)
+
 	s.Require().Len(messages, envelopesCount)
 }
 
