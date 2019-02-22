@@ -113,7 +113,6 @@ func (s *ShhExtSuite) SetupTest() {
 		config := params.ShhextConfig{
 			InstallationID:          "1",
 			BackupDisabledDataDir:   directory,
-			DebugAPIEnabled:         true,
 			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
@@ -434,7 +433,7 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
 	s.Require().NoError(p2p.SendItems(rw1, statusCode, whisper.ProtocolVersion, whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
-	s.localService = New(w, nil, db, params.ShhextConfig{MailServerConfirmations: true})
+	s.localService = New(w, nil, db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
 	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
 
 	s.localEnvelopesMonitor = s.localService.envelopesMonitor
@@ -549,8 +548,8 @@ func (s *WhisperConfirmationSuite) TestEnvelopeReceived() {
 
 	// wait for message to be removed because it was delivered by remoteRW
 	s.Require().NoError(utils.Eventually(func() error {
-		if state := s.localEnvelopesMonitor.GetMessageState(envHash); state != NotRegistered {
-			return fmt.Errorf("envelope with hash %s wasn't removed from tracker", envHash.String())
+		if state := s.localEnvelopesMonitor.GetMessageState(envHash); state == EnvelopePosted {
+			return fmt.Errorf("envelope with hash %s wasn't posted", envHash.String())
 		}
 		return nil
 	}, 2*time.Second, 100*time.Millisecond))
@@ -590,8 +589,8 @@ func (s *WhisperRetriesSuite) TestUseAllAvaiableAttempts() {
 	s.Require().NotNil(s.PostMessage(message))
 	s.Require().NoError(utils.Eventually(func() error {
 		madeAttempts := atomic.LoadInt32(&attempts)
-		if madeAttempts != int32(maxAttempts) {
-			return fmt.Errorf("made unexpected number of attempts to deliver a message: %d != %d", maxAttempts, madeAttempts)
+		if madeAttempts != int32(s.localEnvelopesMonitor.maxAttempts) {
+			return fmt.Errorf("made unexpected number of attempts to deliver a message: %d != %d", s.localEnvelopesMonitor.maxAttempts, madeAttempts)
 		}
 		return nil
 	}, 10*time.Second, 500*time.Millisecond))

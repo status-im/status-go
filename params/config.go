@@ -307,8 +307,7 @@ type ShhextConfig struct {
 	// BackupDisabledDataDir is the file system folder the node should use for any data storage needs that it doesn't want backed up.
 	BackupDisabledDataDir string
 	// InstallationId id of the current installation
-	InstallationID  string
-	DebugAPIEnabled bool
+	InstallationID string
 	// MailServerConfirmations should be true if client wants to receive confirmatons only from a selected mail servers.
 	MailServerConfirmations bool
 	// EnableConnectionManager turns on management of the mail server connections if true.
@@ -322,6 +321,9 @@ type ShhextConfig struct {
 
 	// MaxServerFailures defines maximum allowed expired requests before server will be swapped to another one.
 	MaxServerFailures int
+
+	// MaxMessageDeliveryAttempts defines how many times we will try to deliver not-acknowledged envelopes.
+	MaxMessageDeliveryAttempts int
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found

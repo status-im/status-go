@@ -168,6 +168,8 @@ func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hexutil
 	hexID, err := api.publicAPI.Post(ctx, req)
 	if err == nil {
 		api.service.envelopesMonitor.Add(common.BytesToHash(hexID), req)
+	} else {
+		return nil, err
 	}
 	mID := messageID(req)
 	return mID[:], err

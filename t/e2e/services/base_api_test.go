@@ -76,7 +76,6 @@ func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debu
 
 	nodeConfig.IPCEnabled = false
 	nodeConfig.EnableStatusService = statusServiceEnabled
-	nodeConfig.ShhextConfig.DebugAPIEnabled = debugAPIEnabled
 	if debugAPIEnabled {
 		nodeConfig.AddAPIModule("debug")
 	}
