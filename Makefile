@@ -112,11 +112,13 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
+	@gomobile init
 	@gomobile bind -target=android -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
+	@gomobile init
 	@gomobile bind -target=ios -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
