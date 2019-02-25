@@ -169,6 +169,18 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		os.Remove(v4Path)
 	}
 
+	// Desktop was passing a network dependent directory, which meant that
+	// if running on testnet it would not access the right db. This copies
+	// the db from mainnet to the root location.
+	networkDependentPath := filepath.Join(s.dataDir, "ethereum", "mainnet_rpc", fmt.Sprintf("%s.v4.db", s.installationID))
+	if _, err := os.Stat(networkDependentPath); err == nil {
+		if err := os.Rename(networkDependentPath, v4Path); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+
 	persistence, err := chat.NewSQLLitePersistence(v4Path, encKey)
 	if err != nil {
 		return err
