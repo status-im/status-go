@@ -52,10 +52,6 @@ pipeline {
       sh 'make setup-build'
     } } }
 
-    stage('Test') { steps { dir(env.STATUS_PATH) {
-      sh 'make ci'
-    } } }
-
     stage('Compile') { steps { dir(env.STATUS_PATH) {
       sh 'make statusgo-ios'
       dir('build/bin') {
