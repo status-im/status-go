@@ -220,11 +220,7 @@ release:
 
 gomobile-install:
 	go get -u golang.org/x/mobile/cmd/gomobile
-ifdef NDK_GOMOBILE
-	gomobile init -ndk $(NDK_GOMOBILE)
-else
 	gomobile init
-endif
 
 release-install:
 	go get -u github.com/c4milo/github-release

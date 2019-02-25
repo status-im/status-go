@@ -2,6 +2,8 @@ pipeline {
   agent { label 'linux' }
 
   options {
+    timestamps()
+    disableConcurrentBuilds()
     /* Go requires a certain directory structure */
     checkoutToSubdirectory('src/github.com/status-im/status-go')
     /* manage how many builds we keep */
@@ -19,8 +21,9 @@ pipeline {
     PATH             = "${env.PATH}:${env.GOPATH}/bin"
     ANDROID_HOME     = '/usr/lib/android-sdk'
     ANDROID_SDK_ROOT = '/usr/lib/android-sdk'
-    ANDROID_NDK      = '/usr/lib/android-ndk'
-    ANDROID_NDK_HOME = '/usr/lib/android-ndk'
+    /* gomobile requires a specific NDK version */
+    ANDROID_NDK      = "${env.NDK_GOMOBILE}"
+    ANDROID_NDK_HOME = "${env.NDK_GOMOBILE}"
   }
 
   stages {
