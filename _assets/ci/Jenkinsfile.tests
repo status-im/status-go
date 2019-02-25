@@ -7,11 +7,6 @@ pipeline {
       defaultValue: 'develop',
       description: 'Name of branch to build.'
     )
-    booleanParam(
-      name: 'RELEASE',
-      defaultValue: false,
-      description: 'Enable to create build for release.',
-    )
   }
 
   options {
@@ -41,31 +36,34 @@ pipeline {
       println("Version: ${lib.getVersion()}")
       println("Git Branch: ${lib.gitBranch()}")
       println("Git Commit: ${lib.gitCommit()}")
-      /* save and create a dir for artifacts */
-      dest = "${env.WORKSPACE}/pkg"
-      sh "mkdir -p ${dest}"
-      /* for easier reuse */
-      artifact = "status-go-desktop-${lib.suffix()}.zip"
     } } }
 
     stage('Setup') { steps { dir(env.STATUS_PATH) {
       sh 'make setup-build'
     } } }
 
-    stage('Compress') { steps { dir(env.STATUS_PATH) {
-      sh "zip -q -r ${dest}/${artifact} . -x *.git"
+    stage('Lint') { steps { dir(env.STATUS_PATH) {
+      sh 'make lint'
     } } }
 
-    stage('Archive') { steps {
-      archiveArtifacts("pkg/${artifact}")
-    } }
+    stage('Mock') { steps { dir(env.STATUS_PATH) {
+      sh 'make mock'
+    } } }
 
-    stage('Upload') { steps { script {
-      env.PKG_URL = lib.uploadArtifact("pkg/${artifact}")
+    stage('Dep-Ensure') { steps { dir(env.STATUS_PATH) {
+      sh 'make dep-ensure'
+    } } }
+
+    stage('Canary') { steps { dir(env.STATUS_PATH) {
+      sh 'make canary-test'
+    } } }
+
+    stage('Unit Tests') { steps { dir(env.STATUS_PATH) {
+      sh 'make test-unit'
+    } } }
+
+    stage('Race E2E Tests') { steps { dir(env.STATUS_PATH) {
+      sh 'make test-e2e-race'
     } } }
   } // stages
-  post {
-    success { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(true) } }
-    failure { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(false) } }
-  } // post
 } // pipeline
