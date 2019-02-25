@@ -1,6 +1,19 @@
 pipeline {
   agent { label 'macos' }
 
+  parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
+    booleanParam(
+      name: 'RELEASE',
+      defaultValue: false,
+      description: 'Enable to create build for release.',
+    )
+  }
+
   options {
     timestamps()
     disableConcurrentBuilds()
