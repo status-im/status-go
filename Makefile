@@ -220,7 +220,6 @@ release:
 
 gomobile-install:
 	go get -u golang.org/x/mobile/cmd/gomobile
-	gomobile init
 
 release-install:
 	go get -u github.com/c4milo/github-release

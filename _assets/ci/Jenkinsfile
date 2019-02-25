@@ -2,10 +2,15 @@ pipeline {
   agent { label 'linux' }
 
   parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'develop',
+      description: 'Name of branch to build.'
+    )
     booleanParam(
       name: 'RELEASE',
-      description: 'Enable to create a new release on GitHub and DigitalOcean Space.',
       defaultValue: false,
+      description: 'Enable to create a new release on GitHub and DigitalOcean Space.',
     )
   }
 

@@ -62,8 +62,10 @@ def buildBranch(name = null, buildType = null) {
     /* this allows us to analize the job even after failure */
     propagate: false,
     parameters: [
-      [name: 'BRANCH',     value: branchName,    $class: 'StringParameterValue'],
-  ])
+      [name: 'BRANCH',  value: branchName,     $class: 'StringParameterValue'],
+      [name: 'RELEASE', value: params.RELEASE, $class: 'BooleanParameterValue'],
+    ]
+  )
   /* BlueOcean seems to not show child-build links */
   println "Build: ${resp.getAbsoluteUrl()} (${resp.result})"
   if (resp.result != 'SUCCESS') {
