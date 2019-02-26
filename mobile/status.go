@@ -46,7 +46,7 @@ func StartNode(configJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	if err := logutils.OverrideRootLog(true, "INFO", "", true); err != nil {
+	if err := logutils.OverrideRootLog(true, config.LogLevel, config.LogFile, true); err != nil {
 		return makeJSONResponse(err)
 	}
 
