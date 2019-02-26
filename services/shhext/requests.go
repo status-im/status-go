@@ -22,11 +22,11 @@ type requestMeta struct {
 
 // NewRequestsRegistry creates instance of the RequestsRegistry and returns pointer to it.
 func NewRequestsRegistry(delay time.Duration) *RequestsRegistry {
-	return &RequestsRegistry{
-		delay:        delay,
-		uidToTopics:  map[common.Hash]common.Hash{},
-		byTopicsHash: map[common.Hash]requestMeta{},
+	r := &RequestsRegistry{
+		delay: delay,
 	}
+	r.Clear()
+	return r
 }
 
 // RequestsRegistry keeps map for all requests with timestamp when they were made.
@@ -71,6 +71,14 @@ func (r *RequestsRegistry) Unregister(uid common.Hash) {
 	if meta.lastUID == uid {
 		delete(r.byTopicsHash, topicsHash)
 	}
+}
+
+// Clear recreates all structures used for caching requests.
+func (r *RequestsRegistry) Clear() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.uidToTopics = map[common.Hash]common.Hash{}
+	r.byTopicsHash = map[common.Hash]requestMeta{}
 }
 
 // topicsToHash returns non-cryptographic hash of the topics.
