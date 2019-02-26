@@ -302,6 +302,7 @@ func (s *Service) Stop() error {
 	if s.config.EnableLastUsedMonitor {
 		s.lastUsedMonitor.Stop()
 	}
+	s.requestsRegistry.Clear()
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
 	return nil
