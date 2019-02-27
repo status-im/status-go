@@ -369,7 +369,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 
 	defer recoverLevelDBPanics("SyncMail")
 
-	requestID := fmt.Sprintf("%d", time.Now().UnixNano())
+	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000))
 
 	syncRequestsMeter.Mark(1)
 
