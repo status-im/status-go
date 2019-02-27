@@ -512,7 +512,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 				processFinished := make(chan struct{})
 
 				go func() {
-					s.server.processRequestInBundles(iter, bloom, int(limit), timeout, bundles, done)
+					s.server.processRequestInBundles(iter, bloom, int(limit), timeout, "req-01", bundles, done)
 					close(processFinished)
 				}()
 				go close(done)
@@ -536,7 +536,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 				processFinished := make(chan struct{})
 
 				go func() {
-					s.server.processRequestInBundles(iter, bloom, int(limit), time.Second, bundles, done)
+					s.server.processRequestInBundles(iter, bloom, int(limit), time.Second, "req-01", bundles, done)
 					close(processFinished)
 				}()
 
@@ -765,7 +765,7 @@ func processRequestAndCollectHashes(
 		close(done)
 	}()
 
-	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, time.Minute, bundles, done)
+	cursor, lastHash := server.processRequestInBundles(iter, bloom, limit, time.Minute, "req-01", bundles, done)
 
 	<-done
 

@@ -318,6 +318,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		bloom,
 		int(limit),
 		processRequestTimeout,
+		requestID,
 		bundles,
 		cancelProcessing,
 	)
@@ -368,6 +369,8 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 
 	defer recoverLevelDBPanics("SyncMail")
 
+	requestID := fmt.Sprintf("%d", time.Now().UnixNano())
+
 	syncRequestsMeter.Mark(1)
 
 	// Check rate limiting for a requesting peer.
@@ -406,6 +409,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		request.Bloom,
 		int(request.Limit),
 		processRequestTimeout,
+		requestID,
 		bundles,
 		cancelProcessing,
 	)
