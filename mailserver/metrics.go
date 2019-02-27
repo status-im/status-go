@@ -19,4 +19,5 @@ var (
 	processRequestErrorsCounter    = metrics.NewRegisteredCounter("mailserver/processRequestErrors", nil)
 	historicResponseErrorsCounter  = metrics.NewRegisteredCounter("mailserver/historicResponseErrors", nil)
 	syncRequestsMeter              = metrics.NewRegisteredMeter("mailserver/syncRequests", nil)
+	deliverMailTimer               = metrics.NewRegisteredTimer("mailserver/deliverMailTime", nil)
 )
