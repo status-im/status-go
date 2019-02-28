@@ -114,7 +114,7 @@ func (s *EncryptionService) ConfirmMessagesProcessed(messageIDs [][]byte) error 
 		id := confirmationIDString(idByte)
 		confirmationData, ok := s.messageIDs[id]
 		if !ok {
-			s.log.Warn("Could not confirm message", "messageID", id)
+			s.log.Debug("Could not confirm message", "messageID", id)
 			continue
 		}
 

@@ -465,7 +465,7 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installat
 func (s *SQLLitePersistence) GetPrivateKeyBundle(bundleID []byte) ([]byte, error) {
 	stmt, err := s.db.Prepare(`SELECT private_key
 				   FROM bundles
-				   WHERE expired = 0 AND signed_pre_key = ? LIMIT 1`)
+				   WHERE signed_pre_key = ? LIMIT 1`)
 	if err != nil {
 		return nil, err
 	}
