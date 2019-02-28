@@ -858,6 +858,10 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.NotNil(x3dhHeader1)
 	s.Equal(bobBundle1.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader1.GetId())
 
+	// Bob decrypts the message
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse1, defaultMessageID)
+	s.Require().NoError(err)
+
 	// We add the second bob bundle
 	_, err = s.alice.ProcessPublicBundle(aliceKey, bobBundle2)
 	s.Require().NoError(err)
@@ -875,6 +879,9 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.NotNil(x3dhHeader2)
 	s.Equal(bobBundle2.GetSignedPreKeys()[bobInstallationID].GetSignedPreKey(), x3dhHeader2.GetId())
 
+	// Bob decrypts the message
+	_, err = s.bob.DecryptPayload(bobKey, &aliceKey.PublicKey, aliceInstallationID, encryptionResponse2, defaultMessageID)
+	s.Require().NoError(err)
 }
 
 func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
