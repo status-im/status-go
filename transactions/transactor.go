@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -25,6 +26,8 @@ const (
 
 	defaultGas = 90000
 )
+
+var ErrInvalidSignatureSize = errors.New("signature size must be 65")
 
 type ErrBadNonce struct {
 	nonce         uint64
@@ -86,6 +89,10 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
+	}
+
+	if len(sig) != 65 {
+		return hash, ErrInvalidSignatureSize
 	}
 
 	chainID := big.NewInt(int64(t.networkID))
