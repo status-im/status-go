@@ -67,7 +67,7 @@ func init() {
 	flag.Var(&configFiles, "c", "JSON configuration file(s). Multiple configuration files can be specified, and will be merged in occurrence order")
 
 	colors := terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLog(true, "ERROR", "", colors); err != nil {
+	if err := logutils.OverrideRootLog(true, "ERROR", logutils.FileOptions{}, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 
@@ -181,12 +181,7 @@ func setupLogging(config *params.NodeConfig) {
 	}
 
 	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
-	if err := logutils.OverrideRootLog(
-		logEnabled(config),
-		config.LogLevel,
-		config.LogFile,
-		colors,
-	); err != nil {
+	if err := logutils.OverrideRootLogWithConfig(config, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
 	}
 }
@@ -218,10 +213,6 @@ func startCollectingNodeMetrics(interruptCh <-chan struct{}, statusNode *node.St
 	}()
 
 	<-interruptCh
-}
-
-func logEnabled(config *params.NodeConfig) bool {
-	return config.LogLevel != "" || config.LogFile != ""
 }
 
 var (

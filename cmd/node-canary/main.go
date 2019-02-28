@@ -91,7 +91,7 @@ func init() {
 		colors = terminal.IsTerminal(int(os.Stdin.Fd()))
 	}
 
-	if err := logutils.OverrideRootLog(*logLevel != "", *logLevel, *logFile, colors); err != nil {
+	if err := logutils.OverrideRootLog(*logLevel != "", *logLevel, logutils.FileOptions{Filename: *logFile}, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %s", err)
 	}
 }

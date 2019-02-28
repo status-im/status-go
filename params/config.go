@@ -265,6 +265,15 @@ type NodeConfig struct {
 	// LogLevel defines minimum log level. Valid names are "ERROR", "WARN", "INFO", "DEBUG", and "TRACE".
 	LogLevel string `validate:"eq=ERROR|eq=WARN|eq=INFO|eq=DEBUG|eq=TRACE"`
 
+	// LogMaxBackups defines number of rotated log files that will be stored.
+	LogMaxBackups int
+
+	// LogMaxSize after current size is reached log file will be rotated
+	LogMaxSize int
+
+	// LogCompressRotated if true all rotated files will be gzipped.
+	LogCompressRotated bool
+
 	// LogToStderr defines whether logged info should also be output to os.Stderr
 	LogToStderr bool
 
@@ -378,6 +387,9 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	c.ListenAddr = ":30303"
 	c.LogEnabled = true
 	c.LogLevel = "INFO"
+	c.LogMaxSize = 100
+	c.LogCompressRotated = true
+	c.LogMaxBackups = 3
 	c.LogToStderr = true
 	c.WhisperConfig.Enabled = true
 	c.WhisperConfig.EnableNTPSync = true
