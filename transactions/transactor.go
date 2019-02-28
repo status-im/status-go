@@ -25,8 +25,11 @@ const (
 	sendTxTimeout = 300 * time.Second
 
 	defaultGas = 90000
+
+	validSignatureSize = 65
 )
 
+// ErrInvalidSignatureSize is returned if a signature is not 65 bytes to avoid panic from go-ethereum
 var ErrInvalidSignatureSize = errors.New("signature size must be 65")
 
 type ErrBadNonce struct {
@@ -91,7 +94,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		return hash, ErrInvalidSendTxArgs
 	}
 
-	if len(sig) != 65 {
+	if len(sig) != validSignatureSize {
 		return hash, ErrInvalidSignatureSize
 	}
 
