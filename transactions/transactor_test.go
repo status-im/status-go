@@ -374,6 +374,12 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 	}
 }
 
+func (s *TransactorSuite) TestSendTransactionWithSignature_InvalidSignature() {
+	args := SendTxArgs{}
+	_, err := s.manager.SendTransactionWithSignature(args, []byte{})
+	s.Equal(ErrInvalidSignatureSize, err)
+}
+
 func (s *TransactorSuite) TestHashTransaction() {
 	privKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)

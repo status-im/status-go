@@ -3,6 +3,7 @@ package transactions
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -24,7 +25,12 @@ const (
 	sendTxTimeout = 300 * time.Second
 
 	defaultGas = 90000
+
+	validSignatureSize = 65
 )
+
+// ErrInvalidSignatureSize is returned if a signature is not 65 bytes to avoid panic from go-ethereum
+var ErrInvalidSignatureSize = errors.New("signature size must be 65")
 
 type ErrBadNonce struct {
 	nonce         uint64
@@ -86,6 +92,10 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
+	}
+
+	if len(sig) != validSignatureSize {
+		return hash, ErrInvalidSignatureSize
 	}
 
 	chainID := big.NewInt(int64(t.networkID))
