@@ -5,6 +5,7 @@ import "C"
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"unsafe"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -507,13 +509,13 @@ func makeJSONResponse(err error) *C.char {
 // SendDataNotification sends push notifications by given tokens.
 // dataPayloadJSON is a JSON string that looks like this:
 // {
-// 	"data": {
-// 		"msg-v2": {
-// 			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
-// 			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
-// 			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
-// 		}
-// 	}
+//	"data": {
+//		"msg-v2": {
+//			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
+//			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
+//			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
+//		}
+//	}
 // }
 //export SendDataNotification
 func SendDataNotification(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
@@ -590,4 +592,22 @@ func AppStateChange(state *C.char) {
 //export SetSignalEventCallback
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
+}
+
+// ExportNodeLogs reads current node log and returns content to a caller.
+//export ExportNodeLogs
+func ExportNodeLogs() *C.char {
+	node := statusBackend.StatusNode()
+	if node == nil {
+		return makeJSONResponse(errors.New("node is not running"))
+	}
+	config := node.Config()
+	if config == nil {
+		return makeJSONResponse(errors.New("config and log file are not available"))
+	}
+	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFile))
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
+	}
+	return C.CString(string(data))
 }
