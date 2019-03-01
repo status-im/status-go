@@ -21,22 +21,22 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
 	s.monitor = &EnvelopesMonitor{
-		cache:     map[common.Hash]EnvelopeState{},
+		envelopes: map[common.Hash]EnvelopeState{},
 		batches:   map[common.Hash]map[common.Hash]struct{}{},
 		mailPeers: mailservers.NewPeerStore(mailservers.NewCache(db)),
 	}
 }
 
 func (s *EnvelopesMonitorSuite) TestConfirmed() {
-	s.monitor.Add(testHash)
-	s.Contains(s.monitor.cache, testHash)
-	s.Equal(EnvelopePosted, s.monitor.cache[testHash])
+	s.monitor.Add(testHash, whisper.NewMessage{})
+	s.Contains(s.monitor.envelopes, testHash)
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
 	s.monitor.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
 	})
-	s.Contains(s.monitor.cache, testHash)
-	s.Equal(EnvelopeSent, s.monitor.cache[testHash])
+	s.Contains(s.monitor.envelopes, testHash)
+	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
 }
 
 func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
@@ -45,22 +45,22 @@ func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
 	s.Require().NoError(err)
 	node := enode.NewV4(&pkey.PublicKey, nil, 0, 0)
 	s.Require().NoError(s.monitor.mailPeers.Update([]*enode.Node{node}))
-	s.monitor.Add(testHash)
-	s.Contains(s.monitor.cache, testHash)
-	s.Equal(EnvelopePosted, s.monitor.cache[testHash])
+	s.monitor.Add(testHash, whisper.NewMessage{})
+	s.Contains(s.monitor.envelopes, testHash)
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
 	s.monitor.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
 		Batch: testBatch,
 	})
-	s.Equal(EnvelopePosted, s.monitor.cache[testHash])
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
 	s.monitor.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventBatchAcknowledged,
 		Batch: testBatch,
 		Peer:  node.ID(),
 	})
-	s.Contains(s.monitor.cache, testHash)
-	s.Equal(EnvelopeSent, s.monitor.cache[testHash])
+	s.Contains(s.monitor.envelopes, testHash)
+	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
 }
 
 func (s *EnvelopesMonitorSuite) TestIgnored() {
@@ -68,23 +68,23 @@ func (s *EnvelopesMonitorSuite) TestIgnored() {
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
 	})
-	s.NotContains(s.monitor.cache, testHash)
+	s.NotContains(s.monitor.envelopes, testHash)
 }
 
 func (s *EnvelopesMonitorSuite) TestRemoved() {
-	s.monitor.Add(testHash)
-	s.Contains(s.monitor.cache, testHash)
+	s.monitor.Add(testHash, whisper.NewMessage{})
+	s.Contains(s.monitor.envelopes, testHash)
 	s.monitor.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeExpired,
 		Hash:  testHash,
 	})
-	s.NotContains(s.monitor.cache, testHash)
+	s.NotContains(s.monitor.envelopes, testHash)
 }
 
 func (s *EnvelopesMonitorSuite) TestIgnoreNotFromMailserver() {
 	// enables filter in the tracker to drop confirmations from non-mailserver peers
 	s.monitor.mailServerConfirmation = true
-	s.monitor.Add(testHash)
+	s.monitor.Add(testHash, whisper.NewMessage{})
 	s.monitor.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeSent,
 		Hash:  testHash,
@@ -94,10 +94,10 @@ func (s *EnvelopesMonitorSuite) TestIgnoreNotFromMailserver() {
 }
 
 func (s *EnvelopesMonitorSuite) TestReceived() {
-	s.monitor.Add(testHash)
-	s.Contains(s.monitor.cache, testHash)
+	s.monitor.Add(testHash, whisper.NewMessage{})
+	s.Contains(s.monitor.envelopes, testHash)
 	s.monitor.handleEvent(whisper.EnvelopeEvent{
 		Event: whisper.EventEnvelopeReceived,
 		Hash:  testHash})
-	s.NotContains(s.monitor.cache, testHash)
+	s.NotContains(s.monitor.envelopes, testHash)
 }

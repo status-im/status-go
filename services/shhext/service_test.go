@@ -2,12 +2,12 @@ package shhext
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
 	"net"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,6 +30,7 @@ const (
 	// internal whisper protocol codes
 	statusCode             = 0
 	messagesCode           = 1
+	batchAcknowledgeCode   = 11
 	p2pRequestCompleteCode = 125
 )
 
@@ -112,7 +113,6 @@ func (s *ShhExtSuite) SetupTest() {
 		config := params.ShhextConfig{
 			InstallationID:          "1",
 			BackupDisabledDataDir:   directory,
-			DebugAPIEnabled:         true,
 			PFSEnabled:              true,
 			MailServerConfirmations: true,
 			ConnectionTarget:        10,
@@ -149,17 +149,19 @@ func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	client, err := s.nodes[0].Attach()
 	s.NoError(err)
 	var hash common.Hash
-	s.NoError(client.Call(&hash, "shhext_post", whisper.NewMessage{
+	message := whisper.NewMessage{
 		SymKeyID:  symID,
 		PowTarget: whisper.DefaultMinimumPoW,
 		PowTime:   200,
 		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
 		Payload:   []byte("hello"),
-	}))
+	}
+	mid := messageID(message)
+	s.NoError(client.Call(&hash, "shhext_post", message))
 	s.NoError(err)
 	select {
 	case confirmed := <-mock.confirmations:
-		s.Equal(hash, confirmed)
+		s.Equal(mid, confirmed)
 	case <-time.After(5 * time.Second):
 		s.Fail("timed out while waiting for confirmation")
 	}
@@ -173,18 +175,20 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 	client, err := s.nodes[0].Attach()
 	s.NoError(err)
 	var hash common.Hash
-	s.NoError(client.Call(&hash, "shhext_post", whisper.NewMessage{
+	message := whisper.NewMessage{
 		SymKeyID:  symID,
 		PowTarget: whisper.DefaultMinimumPoW,
 		PowTime:   200,
 		TTL:       1,
 		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
 		Payload:   []byte("hello"),
-	}))
+	}
+	mid := messageID(message)
+	s.NoError(client.Call(&hash, "shhext_post", message))
 	s.NoError(err)
 	select {
 	case expired := <-mock.expirations:
-		s.Equal(hash, expired)
+		s.Equal(mid, expired)
 	case confirmed := <-mock.confirmations:
 		s.Fail("unexpected confirmation for hash", confirmed)
 	case <-time.After(10 * time.Second):
@@ -374,98 +378,6 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	s.Require().NoError(waitForHashInMonitor(api.service.mailMonitor, common.BytesToHash(hash), MailServerRequestSent, time.Second))
 }
 
-func (s *ShhExtSuite) TestDebugPostSync() {
-	mock := newHandlerMock(1)
-	s.services[0].envelopesMonitor.handler = mock
-	symID, err := s.whisper[0].GenerateSymKey()
-	s.NoError(err)
-	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
-	client, err := s.nodes[0].Attach()
-	s.NoError(err)
-	var hash common.Hash
-
-	var testCases = []struct {
-		name            string
-		msg             whisper.NewMessage
-		postSyncTimeout time.Duration
-		expectedErr     error
-	}{
-		{
-			name: "timeout",
-			msg: whisper.NewMessage{
-				SymKeyID:  symID,
-				PowTarget: whisper.DefaultMinimumPoW,
-				PowTime:   200,
-				Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
-				Payload:   []byte("hello"),
-			},
-			postSyncTimeout: postSyncTimeout,
-			expectedErr:     nil,
-		},
-		{
-			name: "invalid message",
-			msg: whisper.NewMessage{
-				PowTarget: whisper.DefaultMinimumPoW,
-				PowTime:   200,
-				Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
-				Payload:   []byte("hello"),
-			},
-			postSyncTimeout: postSyncTimeout,
-			expectedErr:     whisper.ErrSymAsym,
-		},
-		{
-			name: "context deadline exceeded",
-			msg: whisper.NewMessage{
-				SymKeyID:  symID,
-				PowTarget: whisper.DefaultMinimumPoW,
-				PowTime:   10,
-				Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
-				TTL:       100,
-				Payload:   []byte("hello"),
-			},
-			postSyncTimeout: 1 * time.Millisecond,
-			expectedErr:     errors.New("context deadline exceeded"),
-		},
-	}
-
-	for _, tc := range testCases {
-		s.T().Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), tc.postSyncTimeout)
-			defer cancel()
-			err := client.CallContext(ctx, &hash, "debug_postSync", tc.msg)
-
-			if tc.expectedErr != nil {
-				s.Equal(tc.expectedErr.Error(), err.Error())
-			} else {
-				s.NoError(err)
-			}
-		})
-	}
-}
-
-func (s *ShhExtSuite) TestEnvelopeExpiredOnDebugPostSync() {
-	mock := newHandlerMock(1)
-	s.services[0].envelopesMonitor.handler = mock
-	symID, err := s.whisper[0].GenerateSymKey()
-	s.NoError(err)
-	client, err := s.nodes[0].Attach()
-	s.NoError(err)
-	var hash common.Hash
-
-	ctx, cancel := context.WithTimeout(context.Background(), postSyncTimeout)
-	defer cancel()
-	err = client.CallContext(ctx, &hash, "debug_postSync", whisper.NewMessage{
-		SymKeyID:  symID,
-		PowTarget: whisper.DefaultMinimumPoW,
-		PowTime:   200,
-		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
-		Payload:   []byte("hello"),
-		TTL:       1,
-	})
-
-	s.Equal(errEnvelopeExpired.Error(), err.Error())
-}
-
 func (s *ShhExtSuite) TearDown() {
 	for _, n := range s.nodes {
 		s.NoError(n.Stop())
@@ -495,8 +407,8 @@ type WhisperNodeMockSuite struct {
 	localNode       *enode.Node
 	remoteRW        *p2p.MsgPipeRW
 
-	localService         *Service
-	localEnvelopeMonitor *EnvelopesMonitor
+	localService          *Service
+	localEnvelopesMonitor *EnvelopesMonitor
 }
 
 func (s *WhisperNodeMockSuite) SetupTest() {
@@ -507,6 +419,7 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 		MaxMessageSize:     100 << 10,
 	}
 	w := whisper.New(conf)
+	s.Require().NoError(w.Start(nil))
 	pkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	node := enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
@@ -520,15 +433,29 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
 	s.Require().NoError(p2p.SendItems(rw1, statusCode, whisper.ProtocolVersion, whisper.ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
-	s.localService = New(w, nil, db, params.ShhextConfig{MailServerConfirmations: true})
+	s.localService = New(w, nil, db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
 	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
-	s.localEnvelopeMonitor = s.localService.envelopesMonitor
-	s.localEnvelopeMonitor.Start()
+
+	s.localEnvelopesMonitor = s.localService.envelopesMonitor
+	s.localEnvelopesMonitor.Start()
 
 	s.localWhisperAPI = whisper.NewPublicWhisperAPI(w)
 	s.localAPI = NewPublicAPI(s.localService)
 	s.localNode = node
 	s.remoteRW = rw1
+}
+
+func (s *WhisperNodeMockSuite) PostMessage(message whisper.NewMessage) common.Hash {
+	envBytes, err := s.localAPI.Post(context.TODO(), message)
+	envHash := common.BytesToHash(envBytes)
+	s.Require().NoError(err)
+	s.Require().NoError(utils.Eventually(func() error {
+		if state := s.localEnvelopesMonitor.GetMessageState(envHash); state != EnvelopePosted {
+			return fmt.Errorf("envelope with hash %s wasn't posted", envHash.String())
+		}
+		return nil
+	}, 2*time.Second, 100*time.Millisecond))
+	return envHash
 }
 
 func TestRequestMessagesSync(t *testing.T) {
@@ -597,19 +524,11 @@ type WhisperConfirmationSuite struct {
 func (s *WhisperConfirmationSuite) TestEnvelopeReceived() {
 	symID, err := s.localWhisperAPI.GenerateSymKeyFromPassword(context.TODO(), "test")
 	s.Require().NoError(err)
-	envBytes, err := s.localAPI.Post(context.TODO(), whisper.NewMessage{
+	envHash := s.PostMessage(whisper.NewMessage{
 		SymKeyID: symID,
 		TTL:      1000,
 		Topic:    whisper.TopicType{0x01},
 	})
-	envHash := common.BytesToHash(envBytes)
-	s.Require().NoError(err)
-	s.Require().NoError(utils.Eventually(func() error {
-		if state := s.localEnvelopeMonitor.GetState(envHash); state != EnvelopePosted {
-			return fmt.Errorf("envelope with hash %s wasn't posted", envHash.String())
-		}
-		return nil
-	}, 2*time.Second, 100*time.Millisecond))
 
 	// enable auto-replies once message got registered internally
 	go func() {
@@ -629,9 +548,102 @@ func (s *WhisperConfirmationSuite) TestEnvelopeReceived() {
 
 	// wait for message to be removed because it was delivered by remoteRW
 	s.Require().NoError(utils.Eventually(func() error {
-		if state := s.localEnvelopeMonitor.GetState(envHash); state != NotRegistered {
-			return fmt.Errorf("envelope with hash %s wasn't removed from tracker", envHash.String())
+		if state := s.localEnvelopesMonitor.GetMessageState(envHash); state == EnvelopePosted {
+			return fmt.Errorf("envelope with hash %s wasn't posted", envHash.String())
 		}
 		return nil
 	}, 2*time.Second, 100*time.Millisecond))
+}
+
+func TestWhisperRetriesSuite(t *testing.T) {
+	suite.Run(t, new(WhisperRetriesSuite))
+}
+
+type WhisperRetriesSuite struct {
+	WhisperNodeMockSuite
+}
+
+func (s *WhisperRetriesSuite) TestUseAllAvaiableAttempts() {
+	var attempts int32
+	go func() {
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			s.Require().NoError(msg.Discard())
+			if msg.Code != messagesCode {
+				continue
+			}
+			atomic.AddInt32(&attempts, 1)
+		}
+	}()
+	symID, err := s.localWhisperAPI.GenerateSymKeyFromPassword(context.TODO(), "test")
+	s.Require().NoError(err)
+	message := whisper.NewMessage{
+		SymKeyID:  symID,
+		PowTarget: whisper.DefaultMinimumPoW,
+		PowTime:   200,
+		TTL:       1,
+		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+		Payload:   []byte("hello"),
+	}
+	s.Require().NotNil(s.PostMessage(message))
+	s.Require().NoError(utils.Eventually(func() error {
+		madeAttempts := atomic.LoadInt32(&attempts)
+		if madeAttempts != int32(s.localEnvelopesMonitor.maxAttempts) {
+			return fmt.Errorf("made unexpected number of attempts to deliver a message: %d != %d", s.localEnvelopesMonitor.maxAttempts, madeAttempts)
+		}
+		return nil
+	}, 10*time.Second, 500*time.Millisecond))
+}
+
+func (s *WhisperRetriesSuite) testDelivery(target int) {
+	go func() {
+		attempt := 0
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			if msg.Code != messagesCode {
+				s.Require().NoError(msg.Discard())
+				continue
+			}
+			attempt++
+			if attempt != target {
+				s.Require().NoError(msg.Discard())
+				continue
+			}
+			data, err := ioutil.ReadAll(msg.Payload)
+			s.Require().NoError(err)
+			// without this hack event from the whisper read loop will be sent sooner than event from write loop
+			// i don't think that this is realistic situation and can be reproduced only in test with in-memory
+			// connection mock
+			time.Sleep(time.Nanosecond)
+			s.Require().NoError(p2p.Send(s.remoteRW, batchAcknowledgeCode, crypto.Keccak256Hash(data)))
+		}
+	}()
+	symID, err := s.localWhisperAPI.GenerateSymKeyFromPassword(context.TODO(), "test")
+	s.Require().NoError(err)
+	message := whisper.NewMessage{
+		SymKeyID:  symID,
+		PowTarget: whisper.DefaultMinimumPoW,
+		PowTime:   200,
+		TTL:       1,
+		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
+		Payload:   []byte("hello"),
+	}
+	mID := messageID(message)
+	s.Require().NotNil(s.PostMessage(message))
+	s.Require().NoError(utils.Eventually(func() error {
+		if state := s.localEnvelopesMonitor.GetMessageState(mID); state != EnvelopeSent {
+			return fmt.Errorf("message with ID %s wasn't sent", mID.String())
+		}
+		return nil
+	}, 3*time.Second, 100*time.Millisecond))
+}
+
+func (s *WhisperRetriesSuite) TestDeliveredFromFirstAttempt() {
+	s.testDelivery(1)
+}
+
+func (s *WhisperRetriesSuite) TestDeliveredFromSecondAttempt() {
+	s.testDelivery(2)
 }

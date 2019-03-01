@@ -50,7 +50,6 @@ type Service struct {
 	nodeID           *ecdsa.PrivateKey
 	deduplicator     *dedup.Deduplicator
 	protocol         *chat.ProtocolService
-	debug            bool
 	dataDir          string
 	installationID   string
 	pfsEnabled       bool
@@ -79,14 +78,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		cache:            map[common.Hash]EnvelopeState{},
 		requestsRegistry: requestsRegistry,
 	}
-	envelopesMonitor := &EnvelopesMonitor{
-		w:                      w,
-		handler:                handler,
-		cache:                  map[common.Hash]EnvelopeState{},
-		batches:                map[common.Hash]map[common.Hash]struct{}{},
-		mailPeers:              ps,
-		mailServerConfirmation: config.MailServerConfirmations,
-	}
+	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps, config.MaxMessageDeliveryAttempts)
 	return &Service{
 		w:                w,
 		config:           config,
@@ -94,7 +86,6 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 		mailMonitor:      mailMonitor,
 		requestsRegistry: requestsRegistry,
 		deduplicator:     dedup.NewDeduplicator(w, db),
-		debug:            config.DebugAPIEnabled,
 		dataDir:          config.BackupDisabledDataDir,
 		installationID:   config.InstallationID,
 		pfsEnabled:       config.PFSEnabled,
@@ -250,16 +241,6 @@ func (s *Service) APIs() []rpc.API {
 			Public:    true,
 		},
 	}
-
-	if s.debug {
-		apis = append(apis, rpc.API{
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewDebugAPI(s),
-			Public:    true,
-		})
-	}
-
 	return apis
 }
 

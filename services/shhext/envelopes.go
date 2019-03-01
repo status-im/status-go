@@ -1,6 +1,8 @@
 package shhext
 
 import (
+	"context"
+	"hash/fnv"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -10,15 +12,51 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
+func messageID(message whisper.NewMessage) common.Hash {
+	hash := fnv.New32()
+	_, _ = hash.Write(message.Payload)
+	_, _ = hash.Write(message.Topic[:])
+	return common.BytesToHash(hash.Sum(nil))
+}
+
+// NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
+func NewEnvelopesMonitor(w *whisper.Whisper, handler EnvelopeEventsHandler, mailServerConfirmation bool, mailPeers *mailservers.PeerStore, maxAttempts int) *EnvelopesMonitor {
+	return &EnvelopesMonitor{
+		w:                      w,
+		whisperAPI:             whisper.NewPublicWhisperAPI(w),
+		handler:                handler,
+		mailServerConfirmation: mailServerConfirmation,
+		mailPeers:              mailPeers,
+		maxAttempts:            maxAttempts,
+
+		// key is envelope hash (event.Hash)
+		envelopes: map[common.Hash]EnvelopeState{},
+		messages:  map[common.Hash]whisper.NewMessage{},
+		attempts:  map[common.Hash]int{},
+
+		// key is messageID
+		messageToEnvelope: map[common.Hash]common.Hash{},
+
+		// key is hash of the batch (event.Batch)
+		batches: map[common.Hash]map[common.Hash]struct{}{},
+	}
+}
+
 // EnvelopesMonitor is responsible for monitoring whisper envelopes state.
 type EnvelopesMonitor struct {
 	w                      *whisper.Whisper
+	whisperAPI             *whisper.PublicWhisperAPI
 	handler                EnvelopeEventsHandler
 	mailServerConfirmation bool
+	maxAttempts            int
 
-	mu      sync.Mutex
-	cache   map[common.Hash]EnvelopeState
-	batches map[common.Hash]map[common.Hash]struct{}
+	mu        sync.Mutex
+	envelopes map[common.Hash]EnvelopeState
+	batches   map[common.Hash]map[common.Hash]struct{}
+
+	messageToEnvelope map[common.Hash]common.Hash
+	messages          map[common.Hash]whisper.NewMessage
+	attempts          map[common.Hash]int
 
 	mailPeers *mailservers.PeerStore
 
@@ -43,16 +81,33 @@ func (m *EnvelopesMonitor) Stop() {
 }
 
 // Add hash to a tracker.
-func (m *EnvelopesMonitor) Add(hash common.Hash) {
+func (m *EnvelopesMonitor) Add(envelopeHash common.Hash, message whisper.NewMessage) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.cache[hash] = EnvelopePosted
+	m.envelopes[envelopeHash] = EnvelopePosted
+	m.messages[envelopeHash] = message
+	m.attempts[envelopeHash] = 1
+	m.messageToEnvelope[messageID(message)] = envelopeHash
 }
 
 func (m *EnvelopesMonitor) GetState(hash common.Hash) EnvelopeState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	state, exist := m.cache[hash]
+	state, exist := m.envelopes[hash]
+	if !exist {
+		return NotRegistered
+	}
+	return state
+}
+
+func (m *EnvelopesMonitor) GetMessageState(mID common.Hash) EnvelopeState {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	envelope, exist := m.messageToEnvelope[mID]
+	if !exist {
+		return NotRegistered
+	}
+	state, exist := m.envelopes[envelope]
 	if !exist {
 		return NotRegistered
 	}
@@ -83,7 +138,6 @@ func (m *EnvelopesMonitor) handleEvent(event whisper.EnvelopeEvent) {
 		whisper.EventBatchAcknowledged: m.handleAcknowledgedBatch,
 		whisper.EventEnvelopeReceived:  m.handleEventEnvelopeReceived,
 	}
-
 	if handler, ok := handlers[event.Event]; ok {
 		handler(event)
 	}
@@ -99,7 +153,7 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event whisper.EnvelopeEvent) 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	state, ok := m.cache[event.Hash]
+	state, ok := m.envelopes[event.Hash]
 	// if we didn't send a message using extension - skip it
 	// if message was already confirmed - skip it
 	if !ok || state == EnvelopeSent {
@@ -113,9 +167,9 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event whisper.EnvelopeEvent) 
 		m.batches[event.Batch][event.Hash] = struct{}{}
 		log.Debug("waiting for a confirmation", "batch", event.Batch)
 	} else {
-		m.cache[event.Hash] = EnvelopeSent
+		m.envelopes[event.Hash] = EnvelopeSent
 		if m.handler != nil {
-			m.handler.EnvelopeSent(event.Hash)
+			m.handler.EnvelopeSent(messageID(m.messages[event.Hash]))
 		}
 	}
 }
@@ -140,13 +194,13 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event whisper.EnvelopeEvent) 
 	}
 	log.Debug("received a confirmation", "batch", event.Batch, "peer", event.Peer)
 	for hash := range envelopes {
-		state, ok := m.cache[hash]
+		state, ok := m.envelopes[hash]
 		if !ok || state == EnvelopeSent {
 			continue
 		}
-		m.cache[hash] = EnvelopeSent
+		m.envelopes[hash] = EnvelopeSent
 		if m.handler != nil {
-			m.handler.EnvelopeSent(hash)
+			m.handler.EnvelopeSent(messageID(m.messages[hash]))
 		}
 	}
 	delete(m.batches, event.Batch)
@@ -155,15 +209,33 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event whisper.EnvelopeEvent) 
 func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event whisper.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	if state, ok := m.cache[event.Hash]; ok {
-		delete(m.cache, event.Hash)
+	if state, ok := m.envelopes[event.Hash]; ok {
+		message, exist := m.messages[event.Hash]
+		if !exist {
+			log.Error("message was deleted erroneously", "envelope hash", event.Hash)
+		}
+		mID := messageID(message)
+		attempt := m.attempts[event.Hash]
+		m.clearMessageState(event.Hash)
 		if state == EnvelopeSent {
 			return
 		}
-		log.Debug("envelope expired", "hash", event.Hash, "state", state)
-		if m.handler != nil {
-			m.handler.EnvelopeExpired(event.Hash)
+		if attempt < m.maxAttempts {
+			log.Debug("retrying to send a message", "message id", mID, "attempt", attempt+1)
+			hex, err := m.whisperAPI.Post(context.TODO(), message)
+			if err != nil {
+				log.Error("failed to retry sending message", "message id", mID, "attempt", attempt+1)
+			}
+			envelopeID := common.BytesToHash(hex)
+			m.messageToEnvelope[mID] = envelopeID
+			m.envelopes[envelopeID] = EnvelopePosted
+			m.messages[envelopeID] = message
+			m.attempts[envelopeID] = attempt + 1
+		} else {
+			log.Debug("envelope expired", "hash", event.Hash, "state", state)
+			if m.handler != nil {
+				m.handler.EnvelopeExpired(mID)
+			}
 		}
 	}
 }
@@ -176,13 +248,23 @@ func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event whisper.EnvelopeEve
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	state, ok := m.cache[event.Hash]
+	state, ok := m.envelopes[event.Hash]
 	if !ok || state != EnvelopePosted {
 		return
 	}
 	log.Debug("expected envelope received", "hash", event.Hash, "peer", event.Peer)
-	delete(m.cache, event.Hash)
+	m.envelopes[event.Hash] = EnvelopeSent
 	if m.handler != nil {
-		m.handler.EnvelopeSent(event.Hash)
+		m.handler.EnvelopeSent(messageID(m.messages[event.Hash]))
 	}
+}
+
+// clearMessageState removes all message and envelope state.
+// not thread-safe, should be protected on a higher level.
+func (m *EnvelopesMonitor) clearMessageState(envelopeID common.Hash) {
+	delete(m.envelopes, envelopeID)
+	mID := messageID(m.messages[envelopeID])
+	delete(m.messageToEnvelope, mID)
+	delete(m.messages, envelopeID)
+	delete(m.attempts, envelopeID)
 }

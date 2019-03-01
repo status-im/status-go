@@ -164,14 +164,15 @@ func NewPublicAPI(s *Service) *PublicAPI {
 }
 
 // Post shamelessly copied from whisper codebase with slight modifications.
-func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hash hexutil.Bytes, err error) {
-	hash, err = api.publicAPI.Post(ctx, req)
+func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hexutil.Bytes, error) {
+	hexID, err := api.publicAPI.Post(ctx, req)
 	if err == nil {
-		var envHash common.Hash
-		copy(envHash[:], hash[:]) // slice can't be used as key
-		api.service.envelopesMonitor.Add(envHash)
+		api.service.envelopesMonitor.Add(common.BytesToHash(hexID), req)
+	} else {
+		return nil, err
 	}
-	return hash, err
+	mID := messageID(req)
+	return mID[:], err
 }
 
 func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
