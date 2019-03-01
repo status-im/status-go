@@ -46,7 +46,7 @@ func StartNode(configJSON string) string {
 		return makeJSONResponse(err)
 	}
 
-	if err := logutils.OverrideRootLog(true, config.LogLevel, config.LogFile, true); err != nil {
+	if err := logutils.OverrideRootLogWithConfig(config, false); err != nil {
 		return makeJSONResponse(err)
 	}
 
@@ -459,13 +459,13 @@ func makeJSONResponse(err error) string {
 // SendDataNotification sends push notifications by given tokens.
 // dataPayloadJSON is a JSON string that looks like this:
 // {
-// 	"data": {
-// 		"msg-v2": {
-// 			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
-// 			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
-// 			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
-// 		}
-// 	}
+//	"data": {
+//		"msg-v2": {
+//			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
+//			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
+//			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
+//		}
+//	}
 // }
 func SendDataNotification(dataPayloadJSON, tokensArray string) (result string) {
 	var (

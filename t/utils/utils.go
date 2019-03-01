@@ -70,7 +70,7 @@ func init() {
 
 	// set up logger
 	loggerEnabled := *logLevel != ""
-	if err := logutils.OverrideRootLog(loggerEnabled, *logLevel, "", true); err != nil {
+	if err := logutils.OverrideRootLog(loggerEnabled, *logLevel, logutils.FileOptions{}, true); err != nil {
 		panic(err)
 	}
 

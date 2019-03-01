@@ -298,3 +298,7 @@
 [[constraint]]
   name = "github.com/status-im/migrate"
   version = "=v3.5.1-status"
+
+[[constraint]]
+  name = "gopkg.in/natefinch/lumberjack.v2"
+  version = "2.1.0"
