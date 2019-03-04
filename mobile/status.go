@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 	validator "gopkg.in/go-playground/validator.v9"
@@ -347,6 +348,22 @@ func SignMessage(rpcParams string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	result, err := statusBackend.SignMessage(params)
+	return prepareJSONResponse(result.String(), err)
+}
+
+// SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
+// if password matches selected account.
+//export SignTypedData
+func SignTypedData(data, password string) string {
+	var typed typeddata.TypedData
+	err := json.Unmarshal([]byte(data), &typed)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	if err := typed.Validate(); err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	result, err := statusBackend.SignTypedData(typed, password)
 	return prepareJSONResponse(result.String(), err)
 }
 
