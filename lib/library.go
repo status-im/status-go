@@ -5,6 +5,7 @@ import "C"
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"unsafe"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -590,4 +592,22 @@ func AppStateChange(state *C.char) {
 //export SetSignalEventCallback
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
+}
+
+// ExportNodeLogs reads current node log and returns content to a caller.
+//export ExportNodeLogs
+func ExportNodeLogs() *C.char {
+	node := statusBackend.StatusNode()
+	if node == nil {
+		return makeJSONResponse(errors.New("node is not running"))
+	}
+	config := node.Config()
+	if config == nil {
+		return makeJSONResponse(errors.New("config and log file are not available"))
+	}
+	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFile))
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
+	}
+	return C.CString(string(data))
 }

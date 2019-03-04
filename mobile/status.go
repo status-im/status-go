@@ -3,6 +3,7 @@ package statusgo
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"unsafe"
@@ -10,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -582,5 +584,23 @@ func GetContactCode(identity string) string {
 		return makeJSONResponse(err)
 	}
 
+	return string(data)
+}
+
+// ExportNodeLogs reads current node log and returns content to a caller.
+//export ExportNodeLogs
+func ExportNodeLogs() string {
+	node := statusBackend.StatusNode()
+	if node == nil {
+		return makeJSONResponse(errors.New("node is not running"))
+	}
+	config := node.Config()
+	if config == nil {
+		return makeJSONResponse(errors.New("config and log file are not available"))
+	}
+	data, err := json.Marshal(exportlogs.ExportFromBaseFile(config.LogFile))
+	if err != nil {
+		return makeJSONResponse(fmt.Errorf("error marshalling to json: %v", err))
+	}
 	return string(data)
 }
