@@ -8,8 +8,19 @@ import (
 	"github.com/status-im/status-go/params"
 )
 
+// OverrideWithStdLogger overwrites ethereum's root logger with a logger from golang std lib.
+func OverrideWithStdLogger(config *params.NodeConfig) error {
+	return enableRootLog(config.LogLevel, NewStdHandler(log.LogfmtFormat()))
+}
+
 // OverrideRootLogWithConfig derives all configuration from params.NodeConfig and configures logger using it.
 func OverrideRootLogWithConfig(config *params.NodeConfig, colors bool) error {
+	if !config.LogEnabled {
+		return nil
+	}
+	if config.LogMobileSystem {
+		return OverrideWithStdLogger(config)
+	}
 	return OverrideRootLog(config.LogEnabled, config.LogLevel, FileOptions{
 		Filename:   config.LogFile,
 		MaxSize:    config.LogMaxSize,
@@ -26,18 +37,8 @@ func OverrideRootLog(enabled bool, levelStr string, fileOpts FileOptions, termin
 		disableRootLog()
 		return nil
 	}
-
-	return enableRootLog(levelStr, fileOpts, terminal)
-}
-
-func disableRootLog() {
-	log.Root().SetHandler(log.DiscardHandler())
-}
-
-func enableRootLog(levelStr string, fileOpts FileOptions, terminal bool) error {
 	var (
 		handler log.Handler
-		err     error
 	)
 	if fileOpts.Filename != "" {
 		handler = FileHandlerWithRotation(fileOpts, log.LogfmtFormat())
@@ -45,6 +46,14 @@ func enableRootLog(levelStr string, fileOpts FileOptions, terminal bool) error {
 		handler = log.StreamHandler(os.Stderr, log.TerminalFormat(terminal))
 	}
 
+	return enableRootLog(levelStr, handler)
+}
+
+func disableRootLog() {
+	log.Root().SetHandler(log.DiscardHandler())
+}
+
+func enableRootLog(levelStr string, handler log.Handler) error {
 	if levelStr == "" {
 		levelStr = "INFO"
 	}
