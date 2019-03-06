@@ -43,13 +43,6 @@ var locationEnabled uint32
 // padded to to aid in alignment.
 var locationLength uint32
 
-// fieldPadding is a global map with maximum field value lengths seen until now
-// to allow padding log contexts in a bit smarter way.
-var fieldPadding = make(map[string]int)
-
-// fieldPaddingLock is a global mutex protecting the field padding map.
-var fieldPaddingLock sync.RWMutex
-
 type Format interface {
 	Format(r *Record) []byte
 }
@@ -168,20 +161,6 @@ func logfmt(buf *bytes.Buffer, ctx []interface{}, color int, term bool) {
 		if !ok {
 			k, v = errorKey, formatLogfmtValue(k, term)
 		}
-
-		// XXX: we should probably check that all of your key bytes aren't invalid
-		fieldPaddingLock.RLock()
-		padding := fieldPadding[k]
-		fieldPaddingLock.RUnlock()
-
-		length := utf8.RuneCountInString(v)
-		if padding < length {
-			padding = length
-
-			fieldPaddingLock.Lock()
-			fieldPadding[k] = padding
-			fieldPaddingLock.Unlock()
-		}
 		if color > 0 {
 			fmt.Fprintf(buf, "\x1b[%dm%s\x1b[0m=", color, k)
 		} else {
@@ -189,9 +168,6 @@ func logfmt(buf *bytes.Buffer, ctx []interface{}, color int, term bool) {
 			buf.WriteByte('=')
 		}
 		buf.WriteString(v)
-		if i < len(ctx)-2 {
-			buf.Write(bytes.Repeat([]byte{' '}, padding-length))
-		}
 	}
 	buf.WriteByte('\n')
 }
