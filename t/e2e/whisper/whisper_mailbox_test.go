@@ -435,8 +435,14 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	// wait for last envelope sent by the mailserver to be available for filters
 	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
 	// get messages
-	firstPageHashes := getMessages()
-	s.Equal(3, len(firstPageHashes))
+	firstPageHashes := []string{}
+	s.Require().NoError(utils.Eventually(func() error {
+		firstPageHashes = append(firstPageHashes, getMessages()...)
+		if lth := len(firstPageHashes); lth != 3 {
+			return fmt.Errorf("first page didn't receive enough envelopes. received %d", lth)
+		}
+		return nil
+	}, 5*time.Second, 100*time.Millisecond))
 
 	// second page
 	// send request
@@ -449,8 +455,14 @@ func (s *WhisperMailboxSuite) TestRequestMessagesWithPagination() {
 	// wait for last envelope sent by the mailserver to be available for filters
 	s.waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
 	// get messages
-	secondPageHashes := getMessages()
-	s.Equal(2, len(secondPageHashes))
+	secondPageHashes := []string{}
+	s.Require().NoError(utils.Eventually(func() error {
+		secondPageHashes = append(secondPageHashes, getMessages()...)
+		if lth := len(secondPageHashes); lth != 2 {
+			return fmt.Errorf("second page didn't receive enough envelopes. received %d", lth)
+		}
+		return nil
+	}, 5*time.Second, 100*time.Millisecond))
 
 	allReceivedHashes := append(firstPageHashes, secondPageHashes...)
 	s.Equal(envelopesCount, len(allReceivedHashes))
