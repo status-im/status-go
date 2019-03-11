@@ -40,7 +40,10 @@ import (
 
 const (
 	maxQueryRange = 24 * time.Hour
-	noLimits      = 0
+	defaultLimit  = 2000
+	// When we default the upper limit, we want to extend the range a bit
+	// to accommodate for envelopes with slightly higher timestamp, in seconds
+	whisperTTLSafeThreshold = 60
 )
 
 var (
@@ -263,6 +266,10 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 			"peerID", peerID,
 			"requestID", requestID)
 		lower, upper, bloom, limit, cursor, err = s.validateRequest(peer.ID(), request)
+	}
+
+	if limit == 0 {
+		limit = defaultLimit
 	}
 
 	if err != nil {
@@ -535,7 +542,7 @@ func (s *WMailServer) processRequestInBundles(
 		lastEnvelopeHash = envelope.Hash()
 		processedEnvelopes++
 		envelopeSize := whisper.EnvelopeHeaderLength + uint32(len(envelope.Data))
-		limitReached := limit != noLimits && processedEnvelopes == limit
+		limitReached := processedEnvelopes == limit
 		newSize := bundleSize + envelopeSize
 
 		// If we still have some room for messages, add and continue
@@ -676,16 +683,13 @@ func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (M
 		return payload, fmt.Errorf("failed to decode data: %v", err)
 	}
 
+	if payload.Upper == 0 {
+		payload.Upper = uint32(time.Now().Unix() + whisperTTLSafeThreshold)
+	}
+
 	if payload.Upper < payload.Lower {
 		log.Error("Query range is invalid: lower > upper", "lower", payload.Lower, "upper", payload.Upper)
 		return payload, errors.New("query range is invalid: lower > upper")
-	}
-
-	lowerTime := time.Unix(int64(payload.Lower), 0)
-	upperTime := time.Unix(int64(payload.Upper), 0)
-	if upperTime.Sub(lowerTime) > maxQueryRange {
-		log.Warn("Query range too long", "peerID", peerIDBytesString(peerID), "length", upperTime.Sub(lowerTime), "max", maxQueryRange)
-		return payload, fmt.Errorf("query range must be shorted than %d", maxQueryRange)
 	}
 
 	return payload, nil
