@@ -694,3 +694,42 @@ func (s *RequestMessages2Suite) TestSuccess() {
 		Error:  "",
 	}, resp)
 }
+
+func (s *RequestMessages2Suite) TestExpired() {
+	go func() {
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			s.Require().NoError(msg.Discard())
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
+	defer cancel()
+
+	resp, err := s.localAPI.RequestMessagesNew(ctx, MessagesRequest{
+		MailServerPeer: s.localNode.String(),
+		Timeout:        1,
+	})
+	s.Require().EqualError(err, "request expired")
+	s.Require().Equal(MessagesResponse{}, resp)
+}
+
+func (s *RequestMessages2Suite) TestNoEvent() {
+	go func() {
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			s.Require().NoError(msg.Discard())
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	resp, err := s.localAPI.RequestMessagesNew(ctx, MessagesRequest{
+		MailServerPeer: s.localNode.String(),
+	})
+	s.Require().EqualError(err, "receiving an event took too long")
+	s.Require().Equal(MessagesResponse{}, resp)
+}

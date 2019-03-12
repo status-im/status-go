@@ -343,7 +343,7 @@ func (api *PublicAPI) RequestMessagesNew(ctx context.Context, r MessagesRequest)
 			}
 			return response, fmt.Errorf("invalid event data type")
 		case <-ctx.Done():
-			return response, ctx.Err()
+			return response, fmt.Errorf("receiving an event took too long")
 		}
 	}
 }
