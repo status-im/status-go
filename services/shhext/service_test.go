@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -646,4 +647,50 @@ func (s *WhisperRetriesSuite) TestDeliveredFromFirstAttempt() {
 
 func (s *WhisperRetriesSuite) TestDeliveredFromSecondAttempt() {
 	s.testDelivery(2)
+}
+
+type RequestMessages2Suite struct {
+	WhisperNodeMockSuite
+}
+
+func TestRequestMessages2Suite(t *testing.T) {
+	suite.Run(t, new(RequestMessages2Suite))
+}
+
+func (s *RequestMessages2Suite) TestSuccess() {
+	const cursorSize = 36 // taken from mailserver_response.go from whisperv6 package
+	cursor := [cursorSize]byte{}
+	cursor[0] = 0x01
+
+	go func() {
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+
+			var e whisper.Envelope
+			s.Require().NoError(msg.Decode(&e))
+
+			s.Require().NoError(p2p.Send(
+				s.remoteRW,
+				p2pRequestCompleteCode,
+				whisper.CreateMailServerRequestCompletedPayload(
+					e.Hash(),
+					common.Hash{},
+					cursor[:],
+				),
+			))
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	resp, err := s.localAPI.RequestMessagesNew(ctx, MessagesRequest{
+		MailServerPeer: s.localNode.String(),
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(MessagesResponse{
+		Cursor: hex.EncodeToString(cursor[:]),
+		Error:  "",
+	}, resp)
 }

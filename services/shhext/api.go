@@ -106,6 +106,24 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 	}
 }
 
+func (r MessagesRequest) validate() error {
+	if r.From > r.To {
+		return fmt.Errorf("query range is invalid: from > to (%d > %d)", r.From, r.To)
+	}
+	return nil
+}
+
+// MessagesResponse is a response for shhext_requestMessages2 method.
+type MessagesResponse struct {
+	// Cursor from the response can be used to retrieve more messages
+	// for the previous request.
+	Cursor string `json:"cursor"`
+
+	// Error indicates that something wrong happened when sending messages
+	// to the requester.
+	Error string `json:"error"`
+}
+
 // SyncMessagesRequest is a SyncMessages() request payload.
 type SyncMessagesRequest struct {
 	// MailServerPeer is MailServer's enode address.
@@ -230,6 +248,102 @@ func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.Envelo
 			return nil
 		case whisper.EventMailServerRequestExpired:
 			return errors.New("request expired")
+		}
+	}
+}
+
+// RequestMessagesNew requests historic messages from a mail server
+// and blocks until the response from the mail server arrives.
+// nolint: gocyclo
+func (api *PublicAPI) RequestMessagesNew(ctx context.Context, r MessagesRequest) (MessagesResponse, error) {
+	log.Info("[shhext/PublicAPI.RequestMessagesNew] called", "request", r)
+
+	var response MessagesResponse
+
+	shh := api.service.w
+	now := api.service.w.GetCurrentTime()
+
+	r.setDefaults(now)
+
+	if err := r.validate(); err != nil {
+		return response, err
+	}
+
+	mailServerNode, err := api.getPeer(r.MailServerPeer)
+	if err != nil {
+		return response, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
+	}
+
+	var (
+		symKey    []byte
+		publicKey *ecdsa.PublicKey
+	)
+
+	if r.SymKeyID != "" {
+		symKey, err = shh.GetSymKey(r.SymKeyID)
+		if err != nil {
+			return response, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+		}
+	} else {
+		publicKey = mailServerNode.Pubkey()
+	}
+
+	payload, err := makeMessagesRequestPayload(r)
+	if err != nil {
+		return response, err
+	}
+
+	envelope, err := makeEnvelop(
+		payload,
+		symKey,
+		publicKey,
+		api.service.nodeID,
+		shh.MinPow(),
+		now,
+	)
+	if err != nil {
+		return response, err
+	}
+	hash := envelope.Hash()
+
+	if err := shh.RequestHistoricMessagesWithTimeout(
+		mailServerNode.ID().Bytes(),
+		envelope,
+		r.Timeout*time.Second,
+	); err != nil {
+		return response, err
+	}
+
+	// Wait for the response which is received asynchronously as a p2p packet.
+	// This packet handler will send an event which contains the response payload.
+	events := make(chan whisper.EnvelopeEvent)
+	sub := api.service.w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		case event := <-events:
+			if event.Event == whisper.EventMailServerRequestExpired && event.Hash == hash {
+				log.Info("[shhext/PublicAPI.RequestMessagesNew] received EventMailServerRequestExpired event")
+				return response, fmt.Errorf("request expired")
+			}
+
+			if event.Event != whisper.EventMailServerRequestCompleted || event.Hash != hash {
+				continue
+			}
+
+			log.Info("[shhext/PublicAPI.RequestMessagesNew] received EventMailServerRequestCompleted", "data", event.Data)
+
+			if resp, ok := event.Data.(*whisper.MailServerResponse); ok {
+				response.Cursor = hex.EncodeToString(resp.Cursor)
+				if resp.Error != nil {
+					response.Error = resp.Error.Error()
+				}
+				return response, nil
+			}
+			return response, fmt.Errorf("invalid event data type")
+		case <-ctx.Done():
+			return response, ctx.Err()
 		}
 	}
 }
