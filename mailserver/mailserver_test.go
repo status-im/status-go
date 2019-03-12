@@ -467,6 +467,32 @@ func (s *MailserverSuite) TestDecodeRequest() {
 	s.Equal(payload, decodedPayload)
 }
 
+func (s *MailserverSuite) TestDecodeRequestNoUpper() {
+	s.setupServer(s.server)
+	defer s.server.Close()
+
+	payload := MessagesRequestPayload{
+		Lower:  50,
+		Bloom:  []byte{0x01},
+		Limit:  10,
+		Cursor: []byte{},
+		Batch:  true,
+	}
+	data, err := rlp.EncodeToBytes(payload)
+	s.Require().NoError(err)
+
+	id, err := s.shh.NewKeyPair()
+	s.Require().NoError(err)
+	srcKey, err := s.shh.GetPrivateKey(id)
+	s.Require().NoError(err)
+
+	env := s.createEnvelope(whisper.TopicType{0x01}, data, srcKey)
+
+	decodedPayload, err := s.server.decodeRequest(nil, env)
+	s.Require().NoError(err)
+	s.NotEqual(0, decodedPayload.Upper)
+}
+
 func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 	s.setupServer(s.server)
 	defer s.server.Close()
