@@ -28,7 +28,7 @@
 
 [[constraint]]
   name = "github.com/ethereum/go-ethereum"
-  version = "=v1.8.21"
+  version = "=v1.8.23"
   source = "github.com/status-im/go-ethereum"
 
 [[constraint]]
@@ -46,7 +46,7 @@
 
 [[constraint]]
   name = "github.com/status-im/whisper"
-  version = "=v1.4.8"
+  version = "=v1.4.9"
 
 [[constraint]]
   name = "golang.org/x/text"

@@ -99,7 +99,7 @@
   revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
 
 [[projects]]
-  digest = "1:f3a1decfa9d9febe78b7fa707c21d4ce11e69bebb84b42f4c06486668acc00be"
+  digest = "1:8f16e573a3e96b4aa472b059fa38c4f60cdb6a95aee38dd5d22e947a64a0c343"
   name = "github.com/ethereum/go-ethereum"
   packages = [
     ".",
@@ -168,9 +168,9 @@
     "trie",
   ]
   pruneopts = "T"
-  revision = "fbf6423d2e83512382fbf640d72ca7822b0d3590"
+  revision = "79d7e1c5e0769a0e7b721840dee57fe8a8f002b9"
   source = "github.com/status-im/go-ethereum"
-  version = "v1.8.21"
+  version = "v1.8.23"
 
 [[projects]]
   digest = "1:5ac7ecd476a2355a5201229081df2e5f57333ecf703e1f69dde699ae34169c1b"
@@ -790,6 +790,14 @@
   version = "v2.0.0"
 
 [[projects]]
+  digest = "1:3c4f89f913a30aea9dd60b867af93e06ecccad08182b063bbf9ff7fb338122f3"
+  name = "github.com/status-im/go-ethereum"
+  packages = ["common/hexutil"]
+  pruneopts = "NUT"
+  revision = "79d7e1c5e0769a0e7b721840dee57fe8a8f002b9"
+  version = "v1.8.23"
+
+[[projects]]
   digest = "1:f3044238fc5d70eca12cc181b1e6d5270570d85a7b7046686381e618a783a7d6"
   name = "github.com/status-im/go-multiaddr-ethv4"
   packages = ["."]
@@ -826,8 +834,8 @@
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "88b3fdf3bd4b497ee3312b4c7b471cce167f40aa"
-  version = "v1.4.8"
+  revision = "f60fda29e21f802bc20bc20b4924dc22fe8a0514"
+  version = "v1.4.9"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
@@ -1093,6 +1101,7 @@
     "github.com/mutecomm/go-sqlcipher",
     "github.com/pborman/uuid",
     "github.com/status-im/doubleratchet",
+    "github.com/status-im/go-ethereum/common/hexutil",
     "github.com/status-im/migrate",
     "github.com/status-im/migrate/database/sqlcipher",
     "github.com/status-im/migrate/source/go_bindata",
