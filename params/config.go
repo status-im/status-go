@@ -726,6 +726,8 @@ func getUpstreamURL(networkID uint64) string {
 		return RopstenEthereumNetworkURL
 	case RinkebyNetworkID:
 		return RinkebyEthereumNetworkURL
+	case GoerliNetworkID:
+		return GoerliEthereumNetworkURL
 	}
 
 	return ""
