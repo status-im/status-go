@@ -474,14 +474,22 @@ func (s *RequestMessagesSyncSuite) TestExpired() {
 		s.Require().NoError(err)
 		s.Require().NoError(msg.Discard())
 	}()
-	s.Require().EqualError(s.localAPI.RequestMessagesSync(RetryConfig{
-		BaseTimeout: time.Second,
-	}, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-	}), "failed to request messages after 1 retries")
+	_, err := s.localAPI.RequestMessagesSync(
+		RetryConfig{
+			BaseTimeout: time.Second,
+		},
+		MessagesRequest{
+			MailServerPeer: s.localNode.String(),
+		},
+	)
+	s.Require().EqualError(err, "failed to request messages after 1 retries")
 }
 
 func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
+	const cursorSize = 36 // taken from mailserver_response.go from whisperv6 package
+	cursor := [cursorSize]byte{}
+	cursor[0] = 0x01
+
 	go func() {
 		attempt := 0
 		for {
@@ -494,16 +502,21 @@ func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
 			}
 			var e whisper.Envelope
 			s.Require().NoError(msg.Decode(&e))
-			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, whisper.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, []byte{})))
+			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, whisper.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, cursor[:])))
 		}
 	}()
-	s.Require().NoError(s.localAPI.RequestMessagesSync(RetryConfig{
-		BaseTimeout: time.Second,
-		MaxRetries:  target,
-	}, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-		Force:          true, // force true is convenient here because timeout is less then default delay (3s)
-	}))
+	resp, err := s.localAPI.RequestMessagesSync(
+		RetryConfig{
+			BaseTimeout: time.Second,
+			MaxRetries:  target,
+		},
+		MessagesRequest{
+			MailServerPeer: s.localNode.String(),
+			Force:          true, // force true is convenient here because timeout is less then default delay (3s)
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().Equal(MessagesResponse{Cursor: hex.EncodeToString(cursor[:])}, resp)
 }
 
 func (s *RequestMessagesSyncSuite) TestCompletedFromFirstAttempt() {
@@ -647,89 +660,4 @@ func (s *WhisperRetriesSuite) TestDeliveredFromFirstAttempt() {
 
 func (s *WhisperRetriesSuite) TestDeliveredFromSecondAttempt() {
 	s.testDelivery(2)
-}
-
-type RequestMessages2Suite struct {
-	WhisperNodeMockSuite
-}
-
-func TestRequestMessages2Suite(t *testing.T) {
-	suite.Run(t, new(RequestMessages2Suite))
-}
-
-func (s *RequestMessages2Suite) TestSuccess() {
-	const cursorSize = 36 // taken from mailserver_response.go from whisperv6 package
-	cursor := [cursorSize]byte{}
-	cursor[0] = 0x01
-
-	go func() {
-		for {
-			msg, err := s.remoteRW.ReadMsg()
-			s.Require().NoError(err)
-
-			var e whisper.Envelope
-			s.Require().NoError(msg.Decode(&e))
-
-			s.Require().NoError(p2p.Send(
-				s.remoteRW,
-				p2pRequestCompleteCode,
-				whisper.CreateMailServerRequestCompletedPayload(
-					e.Hash(),
-					common.Hash{},
-					cursor[:],
-				),
-			))
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-
-	resp, err := s.localAPI.RequestMessagesNew(ctx, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-	})
-	s.Require().NoError(err)
-	s.Require().Equal(MessagesResponse{
-		Cursor: hex.EncodeToString(cursor[:]),
-		Error:  "",
-	}, resp)
-}
-
-func (s *RequestMessages2Suite) TestExpired() {
-	go func() {
-		for {
-			msg, err := s.remoteRW.ReadMsg()
-			s.Require().NoError(err)
-			s.Require().NoError(msg.Discard())
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
-	defer cancel()
-
-	resp, err := s.localAPI.RequestMessagesNew(ctx, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-		Timeout:        1,
-	})
-	s.Require().EqualError(err, "request expired")
-	s.Require().Equal(MessagesResponse{}, resp)
-}
-
-func (s *RequestMessages2Suite) TestNoEvent() {
-	go func() {
-		for {
-			msg, err := s.remoteRW.ReadMsg()
-			s.Require().NoError(err)
-			s.Require().NoError(msg.Discard())
-		}
-	}()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
-	defer cancel()
-
-	resp, err := s.localAPI.RequestMessagesNew(ctx, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-	})
-	s.Require().EqualError(err, "receiving an event took too long")
-	s.Require().Equal(MessagesResponse{}, resp)
 }
