@@ -114,7 +114,7 @@ type MessagesResponse struct {
 
 	// Error indicates that something wrong happened when sending messages
 	// to the requester.
-	Error string `json:"error"`
+	Error error `json:"error"`
 }
 
 // SyncMessagesRequest is a SyncMessages() request payload.
@@ -225,9 +225,7 @@ func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) (
 		mailServerResp, err := waitForExpiredOrCompleted(common.BytesToHash(requestID), events)
 		if err == nil {
 			resp.Cursor = hex.EncodeToString(mailServerResp.Cursor)
-			if mailServerResp.Error != nil {
-				resp.Error = mailServerResp.Error.Error()
-			}
+			resp.Error = mailServerResp.Error
 			return resp, nil
 		}
 		retries++
