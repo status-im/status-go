@@ -174,6 +174,8 @@ func calculateGenesis(networkID uint64) (*core.Genesis, error) {
 		genesis = core.DefaultTestnetGenesisBlock()
 	case params.RinkebyNetworkID:
 		genesis = core.DefaultRinkebyGenesisBlock()
+	case params.GoerliNetworkID:
+		genesis = core.DefaultGoerliGenesisBlock()
 	case params.StatusChainNetworkID:
 		var err error
 		if genesis, err = defaultStatusChainGenesisBlock(); err != nil {

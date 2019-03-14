@@ -52,6 +52,7 @@ var (
 		params.RopstenNetworkID:     "Ropsten",
 		params.RinkebyNetworkID:     "Rinkeby",
 		params.StatusChainNetworkID: "StatusChain",
+		params.GoerliNetworkID:      "Goerli",
 	}
 
 	// All general log messages in this package should be routed through this logger.
@@ -133,6 +134,8 @@ func GetRemoteURLFromNetworkID(id int) (url string, err error) {
 		url = params.RinkebyEthereumNetworkURL
 	case params.RopstenNetworkID:
 		url = params.RopstenEthereumNetworkURL
+	case params.GoerliNetworkID:
+		url = params.GoerliEthereumNetworkURL
 	default:
 		err = ErrNoRemoteURL
 	}
@@ -151,6 +154,8 @@ func GetHeadHashFromNetworkID(id int) string {
 		return "0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"
 	case params.StatusChainNetworkID:
 		return "0xe9d8920a99dc66a9557a87d51f9d14a34ec50aae04298e0f142187427d3c832e"
+	case params.GoerliNetworkID:
+		return "0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a"
 	}
 	// Every other ID must break the test.
 	panic(fmt.Sprintf("invalid network id: %d", id))
@@ -178,6 +183,8 @@ func GetNetworkID() int {
 		return params.RopstenNetworkID
 	case fmt.Sprintf("%d", params.StatusChainNetworkID), "statuschain":
 		return params.StatusChainNetworkID
+	case fmt.Sprintf("%d", params.GoerliNetworkID), "goerli":
+		return params.GoerliNetworkID
 	}
 	// Every other selected network must break the test.
 	panic(fmt.Sprintf("invalid selected network: %q", *networkSelected))

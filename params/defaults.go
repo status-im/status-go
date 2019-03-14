@@ -39,6 +39,10 @@ const (
 	// allow us avoid syncing node.
 	RinkebyEthereumNetworkURL = "https://rinkeby.infura.io/nKmXgiFgc2KqtoQ8BCGJ"
 
+	// GoerliEthereumNetworkURL is an open RPC endpoint to Goerli network
+	// Other RPC endpoints are available here: http://goerli.blockscout.com/
+	GoerliEthereumNetworkURL = "http://goerli.blockscout.com/"
+
 	// MainNetworkID is id of the main network
 	MainNetworkID = 1
 
@@ -47,6 +51,9 @@ const (
 
 	// RinkebyNetworkID is id of a test network (on PoA)
 	RinkebyNetworkID = 4
+
+	// GoerliNetworkID is id of goerli test network (PoA)
+	GoerliNetworkID = 5
 
 	// StatusChainNetworkID is id of a test network (private chain)
 	StatusChainNetworkID = 777

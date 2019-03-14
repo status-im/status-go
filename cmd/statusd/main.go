@@ -49,8 +49,8 @@ var (
 		"network-id",
 		params.RopstenNetworkID,
 		fmt.Sprintf(
-			"A network ID: %d (Mainnet), %d (Ropsten), %d (Rinkeby)",
-			params.MainNetworkID, params.RopstenNetworkID, params.RinkebyNetworkID,
+			"A network ID: %d (Mainnet), %d (Ropsten), %d (Rinkeby), %d (Goerli)",
+			params.MainNetworkID, params.RopstenNetworkID, params.RinkebyNetworkID, params.GoerliNetworkID,
 		),
 	)
 
