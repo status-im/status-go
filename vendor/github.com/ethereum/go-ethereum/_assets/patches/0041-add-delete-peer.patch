@@ -28,15 +28,19 @@ index 4a434843e..bb1c01119 100644
  func (api *PrivateAdminAPI) AddTrustedPeer(url string) (bool, error) {
  	// Make sure the server is running, fail otherwise
 diff --git a/p2p/server.go b/p2p/server.go
-index b8c69bad8..715ab0872 100644
+index 566f01ffc..43db1be6f 100644
 --- a/p2p/server.go
 +++ b/p2p/server.go
-@@ -327,6 +327,28 @@ func (srv *Server) RemovePeer(node *enode.Node) {
+@@ -327,6 +327,36 @@ func (srv *Server) RemovePeer(node *enode.Node) {
  	}
  }
  
 +// DeletePeer deletes the given node forcefully.
 +func (srv *Server) DeletePeer(node *enode.Node) error {
++	peerIDStr := node.ID().String()
++
++	srv.log.Info("DeletePeer called", "peerID", peerIDStr)
++
 +	var peer *Peer
 +	for _, p := range srv.Peers() {
 +		if p.ID() == node.ID() {
@@ -46,13 +50,17 @@ index b8c69bad8..715ab0872 100644
 +	}
 +
 +	if peer == nil {
-+		return errors.New("peer not found")
++		err := errors.New("peer not found")
++		srv.log.Info("DeletePeer failed to match a peer", "peerID", peerIDStr, "err", err)
++		return err
 +	}
 +
 +	select {
 +	case srv.delpeer <- peerDrop{peer, errors.New("forced delete"), true}:
 +	case <-srv.quit:
 +	}
++
++	srv.log.Info("DeletePeer passed the request to delpeer channel", "peerID", peerIDStr)
 +
 +	return nil
 +}
