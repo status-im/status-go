@@ -46,10 +46,6 @@ pipeline {
       sh 'make lint'
     } } }
 
-    stage('Mock') { steps { dir(env.STATUS_PATH) {
-      sh 'make mock'
-    } } }
-
     stage('Dep-Ensure') { steps { dir(env.STATUS_PATH) {
       sh 'make dep-ensure'
     } } }
