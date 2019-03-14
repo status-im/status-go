@@ -187,9 +187,9 @@ endif
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup-dev: setup-build install-os-dependencies gen-install ##@other Prepare project for development
+setup-dev: setup-build mock-install install-os-dependencies gen-install ##@other Prepare project for development
 
-setup-build: dep-install lint-install mock-install release-install gomobile-install ##@other Prepare project for build
+setup-build: dep-install lint-install release-install gomobile-install ##@other Prepare project for build
 
 setup: setup-build setup-dev ##@other Prepare project for development and building
 
@@ -286,9 +286,9 @@ lint:
 	@echo "lint"
 	@golangci-lint run ./...
 
-ci: lint mock dep-ensure canary-test test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint dep-ensure canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
-ci-race: lint mock dep-ensure canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
+ci-race: lint dep-ensure canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
