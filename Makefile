@@ -106,6 +106,11 @@ node-canary: ##@build Build P2P node canary using status-go deps
 	go build -i -o $(GOBIN)/node-canary -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/node-canary/
 	@echo "Compilation done."
 
+mailserver-tools: ##@build Build mailserver-tools
+	go build -i -o $(GOBIN)/mailserver-tools -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/mailserver-tools/
+	@echo "Compilation done."
+
+
 statusgo-cross: statusgo-android statusgo-ios
 	@echo "Full cross compilation done."
 	@ls -ld $(GOBIN)/statusgo-*
