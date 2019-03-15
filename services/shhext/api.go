@@ -106,6 +106,17 @@ func (r *MessagesRequest) setDefaults(now time.Time) {
 	}
 }
 
+// MessagesResponse is a response for shhext_requestMessages2 method.
+type MessagesResponse struct {
+	// Cursor from the response can be used to retrieve more messages
+	// for the previous request.
+	Cursor string `json:"cursor"`
+
+	// Error indicates that something wrong happened when sending messages
+	// to the requester.
+	Error error `json:"error"`
+}
+
 // SyncMessagesRequest is a SyncMessages() request payload.
 type SyncMessagesRequest struct {
 	// MailServerPeer is MailServer's enode address.
@@ -191,7 +202,9 @@ type RetryConfig struct {
 }
 
 // RequestMessagesSync repeats MessagesRequest using configuration in retry conf.
-func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) error {
+func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) (MessagesResponse, error) {
+	var resp MessagesResponse
+
 	shh := api.service.w
 	events := make(chan whisper.EnvelopeEvent, 10)
 	sub := shh.SubscribeEnvelopeEvents(events)
@@ -207,19 +220,21 @@ func (api *PublicAPI) RequestMessagesSync(conf RetryConfig, r MessagesRequest) e
 		r.Timeout = time.Duration(int(r.Timeout.Seconds()))
 		requestID, err = api.RequestMessages(context.Background(), r)
 		if err != nil {
-			return err
+			return resp, err
 		}
-		err = waitForExpiredOrCompleted(common.BytesToHash(requestID), events)
+		mailServerResp, err := waitForExpiredOrCompleted(common.BytesToHash(requestID), events)
 		if err == nil {
-			return nil
+			resp.Cursor = hex.EncodeToString(mailServerResp.Cursor)
+			resp.Error = mailServerResp.Error
+			return resp, nil
 		}
 		retries++
-		api.log.Error("History request failed with %s. Making retry #%d", retries)
+		api.log.Error("[RequestMessagesSync] failed", "err", err, "retries", retries)
 	}
-	return fmt.Errorf("failed to request messages after %d retries", retries)
+	return resp, fmt.Errorf("failed to request messages after %d retries", retries)
 }
 
-func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.EnvelopeEvent) error {
+func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.EnvelopeEvent) (*whisper.MailServerResponse, error) {
 	for {
 		ev := <-events
 		if ev.Hash != requestID {
@@ -227,9 +242,13 @@ func waitForExpiredOrCompleted(requestID common.Hash, events chan whisper.Envelo
 		}
 		switch ev.Event {
 		case whisper.EventMailServerRequestCompleted:
-			return nil
+			data, ok := ev.Data.(*whisper.MailServerResponse)
+			if ok {
+				return data, nil
+			}
+			return nil, errors.New("invalid event data type")
 		case whisper.EventMailServerRequestExpired:
-			return errors.New("request expired")
+			return nil, errors.New("request expired")
 		}
 	}
 }

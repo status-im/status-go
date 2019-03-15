@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -473,14 +474,22 @@ func (s *RequestMessagesSyncSuite) TestExpired() {
 		s.Require().NoError(err)
 		s.Require().NoError(msg.Discard())
 	}()
-	s.Require().EqualError(s.localAPI.RequestMessagesSync(RetryConfig{
-		BaseTimeout: time.Second,
-	}, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-	}), "failed to request messages after 1 retries")
+	_, err := s.localAPI.RequestMessagesSync(
+		RetryConfig{
+			BaseTimeout: time.Second,
+		},
+		MessagesRequest{
+			MailServerPeer: s.localNode.String(),
+		},
+	)
+	s.Require().EqualError(err, "failed to request messages after 1 retries")
 }
 
 func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
+	const cursorSize = 36 // taken from mailserver_response.go from whisperv6 package
+	cursor := [cursorSize]byte{}
+	cursor[0] = 0x01
+
 	go func() {
 		attempt := 0
 		for {
@@ -493,16 +502,21 @@ func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
 			}
 			var e whisper.Envelope
 			s.Require().NoError(msg.Decode(&e))
-			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, whisper.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, []byte{})))
+			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, whisper.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, cursor[:])))
 		}
 	}()
-	s.Require().NoError(s.localAPI.RequestMessagesSync(RetryConfig{
-		BaseTimeout: time.Second,
-		MaxRetries:  target,
-	}, MessagesRequest{
-		MailServerPeer: s.localNode.String(),
-		Force:          true, // force true is convenient here because timeout is less then default delay (3s)
-	}))
+	resp, err := s.localAPI.RequestMessagesSync(
+		RetryConfig{
+			BaseTimeout: time.Second,
+			MaxRetries:  target,
+		},
+		MessagesRequest{
+			MailServerPeer: s.localNode.String(),
+			Force:          true, // force true is convenient here because timeout is less then default delay (3s)
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().Equal(MessagesResponse{Cursor: hex.EncodeToString(cursor[:])}, resp)
 }
 
 func (s *RequestMessagesSyncSuite) TestCompletedFromFirstAttempt() {
