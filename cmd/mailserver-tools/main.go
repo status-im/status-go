@@ -59,7 +59,7 @@ func main() {
 		exitErr(err)
 	}
 
-	fmt.Printf("For topic '%s' there are %d envelopes\n", *topicName, counter)
+	fmt.Printf("%d", counter)
 }
 
 func exitErr(err error) {
