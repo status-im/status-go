@@ -69,3 +69,4 @@ Session.vim
 
 # created for running container
 _assets/compose/mailserver/config.json
+_assets/compose/bootnode/keys
