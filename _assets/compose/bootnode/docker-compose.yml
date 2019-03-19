@@ -1,0 +1,15 @@
+version: "3"
+services:
+  mailserver:
+    container_name: '${CONTAINER_NAME}'
+    image: ${CONTAINER_IMAGE}
+    entrypoint: bootnode
+    restart: always
+    command: |
+      -verbosity=${LOG_LEVEL}
+      -nodekey=/keys/nodekey
+      -addr=0.0.0.0:${LISTEN_PORT}
+    ports:
+      - '0.0.0.0:${LISTEN_PORT}:${LISTEN_PORT}'
+    volumes:
+      - '${PWD}/keys:/keys'
