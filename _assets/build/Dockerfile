@@ -16,6 +16,9 @@ RUN cd /go/src/github.com/status-im/status-go && \
 # Copy the binary to the second image
 FROM alpine:latest
 
+# used to get enode address
+RUN apk add --no-cache socat jq
+
 LABEL maintainer="support@status.im"
 LABEL source="https://github.com/status-im/status-go"
 LABEL description="status-go is an underlying part of Status - a browser, messenger, and gateway to a decentralized world."
