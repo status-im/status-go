@@ -1,9 +1,12 @@
 package node
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"reflect"
@@ -332,4 +335,42 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	node, err = n.discoverNode()
 	require.NoError(t, err)
 	require.Equal(t, net.ParseIP("127.0.0.2").To4(), node.IP())
+}
+
+func TestChaosModeChangeRPCClientsUpstreamURL(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, `{
+			"id": 1,
+			"jsonrpc": "2.0",
+			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
+		}`)
+	}))
+	defer ts.Close()
+
+	config := params.NodeConfig{
+		NoDiscovery: true,
+		ListenAddr:  "127.0.0.1:0",
+		UpstreamConfig: params.UpstreamRPCConfig{
+			Enabled: true,
+			URL:     ts.URL,
+		},
+	}
+	n := New()
+	require.NoError(t, n.Start(&config))
+	defer func() { require.NoError(t, n.Stop()) }()
+	require.NotNil(t, n.RPCClient())
+
+	client := n.RPCClient()
+	require.NotNil(t, client)
+
+	var err error
+
+	err = client.Call(nil, "net_version")
+	require.NoError(t, err)
+
+	err = n.ChaosModeChangeRPCClientsUpstreamURL(params.MainnetEthereumNetworkURL)
+	require.NoError(t, err)
+	// not it should errored as 500 is always returned
+	err = client.Call(nil, "net_version")
+	require.EqualError(t, err, `500 Internal Server Error "500 Internal Server Error"`)
 }

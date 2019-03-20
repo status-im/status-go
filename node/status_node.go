@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -639,10 +640,14 @@ func (n *StatusNode) RPCPrivateClient() *rpc.Client {
 	return n.rpcPrivateClient
 }
 
-// ChangeRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
-// if defined, without restarting the node.
-// This is required for the Chaos Unicorn Day
-func (n *StatusNode) ChangeRPCClientsUpstreamURL(url string) error {
+// ChaosModeChangeRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
+// if defined, without restarting the node. This is required for the Chaos Unicorn Day.
+// Additionally, if the passed URL is Infura, it changes it to httpstat.us/500.
+func (n *StatusNode) ChaosModeChangeRPCClientsUpstreamURL(url string) error {
+	if strings.Contains(url, "infura.io") {
+		url = "https://httpstat.us/500"
+	}
+
 	publicClient := n.RPCClient()
 	if publicClient != nil {
 		if err := publicClient.UpdateUpstreamURL(url); err != nil {

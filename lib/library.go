@@ -611,3 +611,16 @@ func ExportNodeLogs() *C.char {
 	}
 	return C.CString(string(data))
 }
+
+// ChaosModeSetUpstreamURL changes the upstream RPC client URL, if enabled.
+// Additionally, if the custom URL is infura, it changes it to https://httpstat.us/500.
+//export ChaosModeSetUpstreamURL
+func ChaosModeSetUpstreamURL(url *C.char) *C.char {
+	node := statusBackend.StatusNode()
+	if node == nil {
+		return makeJSONResponse(errors.New("node is not running"))
+	}
+
+	err := node.ChaosModeChangeRPCClientsUpstreamURL(C.GoString(url))
+	return makeJSONResponse(err)
+}

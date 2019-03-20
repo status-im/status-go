@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -609,15 +608,11 @@ func ExportNodeLogs() string {
 // ChaosModeSetUpstreamURL changes the upstream RPC client URL, if enabled.
 // Additionally, if the custom URL is infura, it changes it to https://httpstat.us/500.
 func ChaosModeSetUpstreamURL(url string) string {
-	if strings.Contains(url, "infura.io") {
-		url = "https://httpstat.us/500"
-	}
-
 	node := statusBackend.StatusNode()
 	if node == nil {
 		return makeJSONResponse(errors.New("node is not running"))
 	}
 
-	err := node.ChangeRPCClientsUpstreamURL(url)
+	err := node.ChaosModeChangeRPCClientsUpstreamURL(url)
 	return makeJSONResponse(err)
 }
