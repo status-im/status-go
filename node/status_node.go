@@ -639,6 +639,27 @@ func (n *StatusNode) RPCPrivateClient() *rpc.Client {
 	return n.rpcPrivateClient
 }
 
+// ChangeRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
+// if defined, without restarting the node.
+// This is required for the Chaos Unicorn Day
+func (n *StatusNode) ChangeRPCClientsUpstreamURL(url string) error {
+	publicClient := n.RPCClient()
+	if publicClient != nil {
+		if err := publicClient.UpdateUpstreamURL(url); err != nil {
+			return err
+		}
+	}
+
+	privateClient := n.RPCPrivateClient()
+	if privateClient != nil {
+		if err := privateClient.UpdateUpstreamURL(url); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // EnsureSync waits until blockchain synchronization
 // is complete and returns.
 func (n *StatusNode) EnsureSync(ctx context.Context) error {
