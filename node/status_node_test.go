@@ -363,9 +363,7 @@ func TestChaosModeChangeRPCClientsUpstreamURL(t *testing.T) {
 	client := n.RPCClient()
 	require.NotNil(t, client)
 
-	var err error
-
-	err = client.Call(nil, "net_version")
+	err := client.Call(nil, "net_version")
 	require.NoError(t, err)
 
 	// act
