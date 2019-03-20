@@ -605,8 +605,7 @@ func ExportNodeLogs() string {
 	return string(data)
 }
 
-// ChaosModeSetUpstreamURL changes the upstream RPC client URL, if enabled.
-// Additionally, if the custom URL is infura, it changes it to https://httpstat.us/500.
+// ChaosModeSetUpstreamURL changes the URL of the upstream RPC client.
 func ChaosModeSetUpstreamURL(url string) string {
 	node := statusBackend.StatusNode()
 	if node == nil {

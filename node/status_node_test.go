@@ -368,9 +368,11 @@ func TestChaosModeChangeRPCClientsUpstreamURL(t *testing.T) {
 	err = client.Call(nil, "net_version")
 	require.NoError(t, err)
 
+	// act
 	err = n.ChaosModeChangeRPCClientsUpstreamURL(params.MainnetEthereumNetworkURL)
 	require.NoError(t, err)
-	// not it should errored as 500 is always returned
+
+	// assert
 	err = client.Call(nil, "net_version")
 	require.EqualError(t, err, `500 Internal Server Error "500 Internal Server Error"`)
 }
