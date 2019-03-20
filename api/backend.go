@@ -709,3 +709,12 @@ func (b *StatusBackend) UpdateMailservers(enodes []string) error {
 	}
 	return st.UpdateMailservers(nodes)
 }
+
+// HashMessage calculates the hash of a message to be safely signed by the keycard
+// The hash is calulcated as
+//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+// This gives context to the signed message and prevents signing of transactions.
+func (b *StatusBackend) HashMessage(data []byte) []byte {
+	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
+	return ethcrypto.Keccak256([]byte(msg))
+}

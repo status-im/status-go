@@ -442,6 +442,20 @@ func HashTransaction(txArgsJSON string) string {
 	return prepareJSONResponseWithCode(result, err, code)
 }
 
+// HashMessage is calculates the hash of a message to be safely signed by the keycard
+// The hash is calulcated as
+//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+// This gives context to the signed message and prevents signing of transactions.
+func HashMessage(messageString string) string {
+	message, err := hex.DecodeString(messageString)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	hash := statusBackend.HashMessage(message)
+	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, codeUnknown)
+}
+
 // StartCPUProfile runs pprof for CPU.
 func StartCPUProfile(dataDir string) string {
 	err := profiling.StartCPUProfile(dataDir)

@@ -454,6 +454,21 @@ func HashTransaction(txArgsJSON *C.char) *C.char {
 	return C.CString(prepareJSONResponseWithCode(result, err, code))
 }
 
+// HashMessage is calculates the hash of a message to be safely signed by the keycard
+// The hash is calulcated as
+//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+// This gives context to the signed message and prevents signing of transactions.
+//export HashTransaction
+func HashMessage(messageString *C.char) *C.char {
+	message, err := hex.DecodeString(C.GoString(messageString))
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+
+	hash := statusBackend.HashMessage(message)
+	return C.CString(prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, codeUnknown))
+}
+
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
 //export SignTypedData
