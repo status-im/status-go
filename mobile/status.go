@@ -452,7 +452,7 @@ func HashMessage(messageString string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 
-	hash := statusBackend.HashMessage(message)
+	hash := api.HashMessage(message)
 	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, codeUnknown)
 }
 
