@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -637,6 +638,35 @@ func (n *StatusNode) RPCPrivateClient() *rpc.Client {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.rpcPrivateClient
+}
+
+// ChaosModeCheckRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
+// if defined, without restarting the node. This is required for the Chaos Unicorn Day.
+// Additionally, if the passed URL is Infura, it changes it to httpstat.us/500.
+func (n *StatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
+	url := n.config.UpstreamConfig.URL
+
+	if on {
+		if strings.Contains(url, "infura.io") {
+			url = "https://httpstat.us/500"
+		}
+	}
+
+	publicClient := n.RPCClient()
+	if publicClient != nil {
+		if err := publicClient.UpdateUpstreamURL(url); err != nil {
+			return err
+		}
+	}
+
+	privateClient := n.RPCPrivateClient()
+	if privateClient != nil {
+		if err := privateClient.UpdateUpstreamURL(url); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // EnsureSync waits until blockchain synchronization
