@@ -308,5 +308,8 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	@go generate ./static
 	@echo "Done"
 
-run-mailserver: ##@Easy way to run a mailserver locally with Docker
+run-bootnode: ##@Easy way to run a bootnode locally with Docker Compose
+	cd _assets/compose/bootnode/ && $(MAKE)
+
+run-mailserver: ##@Easy way to run a mailserver locally with Docker Compose
 	cd _assets/compose/mailserver/ && $(MAKE)

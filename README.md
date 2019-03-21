@@ -8,7 +8,8 @@
 - [How To Build](https://status.im/build_status/status_go.html)
 - [How To Contribute](CONTRIBUTING.md)
 - [How To Release](RELEASING.md)
-- [How To run a Mailserver](_assets/compose/mailserver/README.md)
+- [How To run a Bootnode](_assets/compose/bootnode)
+- [How To run a Mailserver](_assets/compose/mailserver)
 
 # License
 
