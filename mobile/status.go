@@ -442,7 +442,7 @@ func HashTransaction(txArgsJSON string) string {
 	return prepareJSONResponseWithCode(result, err, code)
 }
 
-// HashMessage is calculates the hash of a message to be safely signed by the keycard
+// HashMessage calculates the hash of a message to be safely signed by the keycard
 // The hash is calulcated as
 //   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
 // This gives context to the signed message and prevents signing of transactions.
