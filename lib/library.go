@@ -612,14 +612,14 @@ func ExportNodeLogs() *C.char {
 	return C.CString(string(data))
 }
 
-// ChaosModeSetUpstreamURL changes the URL of the upstream RPC client.
-//export ChaosModeSetUpstreamURL
-func ChaosModeSetUpstreamURL(url *C.char) *C.char {
+// ChaosModeUpdate changes the URL of the upstream RPC client.
+//export ChaosModeUpdate
+func ChaosModeUpdate(on C.int) *C.char {
 	node := statusBackend.StatusNode()
 	if node == nil {
 		return makeJSONResponse(errors.New("node is not running"))
 	}
 
-	err := node.ChaosModeChangeRPCClientsUpstreamURL(C.GoString(url))
+	err := node.ChaosModeCheckRPCClientsUpstreamURL(on == 1)
 	return makeJSONResponse(err)
 }

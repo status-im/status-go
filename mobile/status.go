@@ -605,13 +605,13 @@ func ExportNodeLogs() string {
 	return string(data)
 }
 
-// ChaosModeSetUpstreamURL changes the URL of the upstream RPC client.
-func ChaosModeSetUpstreamURL(url string) string {
+// ChaosModeUpdate sets the Chaos Mode on or off.
+func ChaosModeUpdate(on bool) string {
 	node := statusBackend.StatusNode()
 	if node == nil {
 		return makeJSONResponse(errors.New("node is not running"))
 	}
 
-	err := node.ChaosModeChangeRPCClientsUpstreamURL(url)
+	err := node.ChaosModeCheckRPCClientsUpstreamURL(on)
 	return makeJSONResponse(err)
 }

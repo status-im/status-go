@@ -337,12 +337,12 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 	require.Equal(t, net.ParseIP("127.0.0.2").To4(), node.IP())
 }
 
-func TestChaosModeChangeRPCClientsUpstreamURL(t *testing.T) {
+func TestChaosModeCheckRPCClientsUpstreamURL(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{
 			"id": 1,
 			"jsonrpc": "2.0",
-			"result": "0x234234e22b9ffc2387e18636e0534534a3d0c56b0243567432453264c16e78a2adc"
+			"result": 1
 		}`)
 	}))
 	defer ts.Close()
@@ -352,7 +352,8 @@ func TestChaosModeChangeRPCClientsUpstreamURL(t *testing.T) {
 		ListenAddr:  "127.0.0.1:0",
 		UpstreamConfig: params.UpstreamRPCConfig{
 			Enabled: true,
-			URL:     ts.URL,
+			// put "infura.io" substring to simulate blocking an actual infura.io URLs
+			URL: ts.URL + "?actualURL=infura.io",
 		},
 	}
 	n := New()
@@ -367,10 +368,18 @@ func TestChaosModeChangeRPCClientsUpstreamURL(t *testing.T) {
 	require.NoError(t, err)
 
 	// act
-	err = n.ChaosModeChangeRPCClientsUpstreamURL(params.MainnetEthereumNetworkURL)
+	err = n.ChaosModeCheckRPCClientsUpstreamURL(true)
 	require.NoError(t, err)
 
 	// assert
 	err = client.Call(nil, "net_version")
 	require.EqualError(t, err, `500 Internal Server Error "500 Internal Server Error"`)
+
+	// act
+	err = n.ChaosModeCheckRPCClientsUpstreamURL(false)
+	require.NoError(t, err)
+
+	// assert
+	err = client.Call(nil, "net_version")
+	require.NoError(t, err)
 }
