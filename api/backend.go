@@ -315,7 +315,7 @@ func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (common.Hash, e
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.Hash(typed, chain)
 	if err != nil {
-		return hexutil.Bytes{}, err
+		return common.Hash{}, err
 	}
 	return hash, err
 }

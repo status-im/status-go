@@ -27,10 +27,7 @@ func encodeData(typed TypedData) (rst common.Hash, err error) {
 
 // Sign TypedData with a given private key. Verify that chainId in the typed data matches currently selected chain.
 func Sign(typed TypedData, prv *ecdsa.PrivateKey, chain *big.Int) ([]byte, error) {
-	if err := typed.ValidateChainID(chain); err != nil {
-		return nil, err
-	}
-	hash, err := encodeData(typed)
+	hash, err := Hash(typed, chain)
 	if err != nil {
 		return nil, err
 	}
@@ -40,13 +37,4 @@ func Sign(typed TypedData, prv *ecdsa.PrivateKey, chain *big.Int) ([]byte, error
 	}
 	sig[64] += 27
 	return sig, nil
-}
-
-// Hash generates a hash of TypedData and verifies that chainId in the typed data matches currently selected chain.
-func Hash(typed TypedData, chain *big.Int) (common.Hash, error) {
-	if err := typed.ValidateChainID(chain); err != nil {
-		return nil, err
-	}
-
-	return encodeData(typed)
 }

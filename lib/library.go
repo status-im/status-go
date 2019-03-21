@@ -485,6 +485,21 @@ func SignTypedData(data, password *C.char) *C.char {
 	return C.CString(prepareJSONResponse(result.String(), err))
 }
 
+// HashTypedData unmarshalls data into TypedData, validates it and hashes it.
+//export HashTypedData
+func HashTypedData(data *C.char) *C.char {
+	var typed typeddata.TypedData
+	err := json.Unmarshal([]byte(C.GoString(data)), &typed)
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+	if err := typed.Validate(); err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+	result, err := statusBackend.HashTypedData(typed)
+	return C.CString(prepareJSONResponse(result.String(), err))
+}
+
 //StartCPUProfile runs pprof for cpu
 //export StartCPUProfile
 func StartCPUProfile(dataDir *C.char) *C.char {

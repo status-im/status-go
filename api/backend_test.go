@@ -2,17 +2,20 @@ package api
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -381,4 +384,50 @@ func TestStartStopMultipleTimes(t *testing.T) {
 	require.NoError(t, backend.StopNode())
 	require.NoError(t, backend.StartNode(config))
 	require.NoError(t, backend.StopNode())
+}
+
+func TestHashTypedData(t *testing.T) {
+	backend := NewStatusBackend()
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+	err = backend.StartNode(config)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, backend.StopNode())
+	}()
+
+	eip712Domain := "EIP712Domain"
+	mytypes := typeddata.Types{
+		eip712Domain: []typeddata.Field{
+			{Name: "name", Type: "string"},
+			{Name: "version", Type: "string"},
+			{Name: "chainId", Type: "uint256"},
+			{Name: "verifyingContract", Type: "address"},
+		},
+		"Text": []typeddata.Field{
+			{Name: "body", Type: "string"},
+		},
+	}
+
+	domain := map[string]json.RawMessage{
+		"name":              json.RawMessage(`"Ether Text"`),
+		"version":           json.RawMessage(`"1"`),
+		"chainId":           json.RawMessage(fmt.Sprintf("%d", params.StatusChainNetworkID)),
+		"verifyingContract": json.RawMessage(`"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`),
+	}
+	msg := map[string]json.RawMessage{
+		"body": json.RawMessage(`"Hello, Bob!"`),
+	}
+
+	typed := typeddata.TypedData{
+		Types:       mytypes,
+		PrimaryType: "Text",
+		Domain:      domain,
+		Message:     msg,
+	}
+
+	hash, err := backend.HashTypedData(typed)
+	require.NoError(t, err)
+	assert.NotEqual(t, common.Hash{}, hash)
+	assert.Equal(t, common.Hash{0x0}, common.Hash{})
 }

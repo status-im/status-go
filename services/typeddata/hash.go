@@ -19,6 +19,15 @@ var (
 	int256Type, _  = abi.NewType("int256", nil)
 )
 
+// Hash generates a hash of TypedData and verifies that chainId in the typed data matches currently selected chain.
+func Hash(typed TypedData, chain *big.Int) (common.Hash, error) {
+	if err := typed.ValidateChainID(chain); err != nil {
+		return common.Hash{}, err
+	}
+
+	return encodeData(typed)
+}
+
 // deps runs breadth-first traversal starting from target and collects all
 // found composite dependencies types into result slice. target always will be first
 // in the result array. all other dependencies are sorted alphabetically.
