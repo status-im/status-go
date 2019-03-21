@@ -31,6 +31,8 @@ type Handler func(context.Context, ...interface{}) (interface{}, error)
 // scheme. It automatically decides where RPC call
 // goes - Upstream or Local node.
 type Client struct {
+	sync.RWMutex
+
 	upstreamEnabled bool
 	upstreamURL     string
 
@@ -70,6 +72,25 @@ func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Clie
 	c.router = newRouter(c.upstreamEnabled)
 
 	return &c, nil
+}
+
+// UpdateUpstreamURL changes the upstream RPC client URL, if the upstream is enabled.
+func (c *Client) UpdateUpstreamURL(url string) error {
+	if c.upstream == nil {
+		return nil
+	}
+
+	rpcClient, err := gethrpc.Dial(url)
+	if err != nil {
+		return err
+	}
+
+	c.Lock()
+	c.upstream = rpcClient
+	c.upstreamURL = url
+	c.Unlock()
+
+	return nil
 }
 
 // Call performs a JSON-RPC call with the given arguments and unmarshals into
@@ -118,7 +139,10 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 	}
 
 	if c.router.routeRemote(method) {
-		return c.upstream.CallContext(ctx, result, method, args...)
+		c.RLock()
+		client := c.upstream
+		c.RUnlock()
+		return client.CallContext(ctx, result, method, args...)
 	}
 
 	return c.local.CallContext(ctx, result, method, args...)

@@ -632,3 +632,14 @@ func ExportNodeLogs() string {
 	}
 	return string(data)
 }
+
+// ChaosModeUpdate sets the Chaos Mode on or off.
+func ChaosModeUpdate(on bool) string {
+	node := statusBackend.StatusNode()
+	if node == nil {
+		return makeJSONResponse(errors.New("node is not running"))
+	}
+
+	err := node.ChaosModeCheckRPCClientsUpstreamURL(on)
+	return makeJSONResponse(err)
+}
