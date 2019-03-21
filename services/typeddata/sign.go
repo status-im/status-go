@@ -41,3 +41,12 @@ func Sign(typed TypedData, prv *ecdsa.PrivateKey, chain *big.Int) ([]byte, error
 	sig[64] += 27
 	return sig, nil
 }
+
+// Hash generates a hash of TypedData and verifies that chainId in the typed data matches currently selected chain.
+func Hash(typed TypedData, chain *big.Int) (common.Hash, error) {
+	if err := typed.ValidateChainID(chain); err != nil {
+		return nil, err
+	}
+
+	return encodeData(typed)
+}
