@@ -57,6 +57,14 @@ func (r *RequestsRegistry) Register(uid common.Hash, topics []whisper.TopicType)
 	return nil
 }
 
+// Has returns true if given uid is stored in registry.
+func (r *RequestsRegistry) Has(uid common.Hash) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, exist := r.uidToTopics[uid]
+	return exist
+}
+
 // Unregister removes request with given UID from registry.
 func (r *RequestsRegistry) Unregister(uid common.Hash) {
 	r.mu.Lock()
