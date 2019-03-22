@@ -196,7 +196,7 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event whisper.EnvelopeEvent) 
 	log.Debug("received a confirmation", "batch", event.Batch, "peer", event.Peer)
 	envelopeErrors, ok := event.Data.([]whisper.EnvelopeError)
 	if event.Data != nil && !ok {
-		log.Warn("received unexpected data for the confirmation event", "batch", event.Batch)
+		log.Error("received unexpected data in the the confirmation event", "batch", event.Batch)
 	}
 	failedEnvelopes := map[common.Hash]struct{}{}
 	for i := range envelopeErrors {
