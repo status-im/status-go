@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"context"
+	"errors"
 	"hash/fnv"
 	"sync"
 
@@ -193,7 +194,30 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event whisper.EnvelopeEvent) 
 		log.Debug("batch is not found", "batch", event.Batch)
 	}
 	log.Debug("received a confirmation", "batch", event.Batch, "peer", event.Peer)
+	envelopeErrors, ok := event.Data.([]whisper.EnvelopeError)
+	if !ok {
+		log.Error("received unexpected data in the the confirmation event", "batch", event.Batch)
+	}
+	failedEnvelopes := map[common.Hash]struct{}{}
+	for i := range envelopeErrors {
+		envelopeError := envelopeErrors[i]
+		_, exist := m.envelopes[envelopeError.Hash]
+		if exist {
+			log.Warn("envelope that was posted by us is discarded", "hash", envelopeError.Hash, "peer", event.Peer, "error", envelopeError.Description)
+			var err error
+			switch envelopeError.Code {
+			case whisper.EnvelopeTimeNotSynced:
+				err = errors.New("envelope wasn't delivered due to time sync issues")
+			}
+			m.handleEnvelopeFailure(envelopeError.Hash, err)
+		}
+		failedEnvelopes[envelopeError.Hash] = struct{}{}
+	}
+
 	for hash := range envelopes {
+		if _, exist := failedEnvelopes[hash]; exist {
+			continue
+		}
 		state, ok := m.envelopes[hash]
 		if !ok || state == EnvelopeSent {
 			continue
@@ -209,14 +233,20 @@ func (m *EnvelopesMonitor) handleAcknowledgedBatch(event whisper.EnvelopeEvent) 
 func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event whisper.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if state, ok := m.envelopes[event.Hash]; ok {
-		message, exist := m.messages[event.Hash]
+	m.handleEnvelopeFailure(event.Hash, errors.New("envelope expired due to connectivity issues"))
+}
+
+// handleEnvelopeFailure is a common code path for processing envelopes failures. not thread safe, lock
+// must be used on a higher level.
+func (m *EnvelopesMonitor) handleEnvelopeFailure(hash common.Hash, err error) {
+	if state, ok := m.envelopes[hash]; ok {
+		message, exist := m.messages[hash]
 		if !exist {
-			log.Error("message was deleted erroneously", "envelope hash", event.Hash)
+			log.Error("message was deleted erroneously", "envelope hash", hash)
 		}
 		mID := messageID(message)
-		attempt := m.attempts[event.Hash]
-		m.clearMessageState(event.Hash)
+		attempt := m.attempts[hash]
+		m.clearMessageState(hash)
 		if state == EnvelopeSent {
 			return
 		}
@@ -232,9 +262,9 @@ func (m *EnvelopesMonitor) handleEventEnvelopeExpired(event whisper.EnvelopeEven
 			m.messages[envelopeID] = message
 			m.attempts[envelopeID] = attempt + 1
 		} else {
-			log.Debug("envelope expired", "hash", event.Hash, "state", state)
+			log.Debug("envelope expired", "hash", hash, "state", state)
 			if m.handler != nil {
-				m.handler.EnvelopeExpired(mID)
+				m.handler.EnvelopeExpired(mID, err)
 			}
 		}
 	}

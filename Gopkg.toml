@@ -46,7 +46,7 @@
 
 [[constraint]]
   name = "github.com/status-im/whisper"
-  version = "=v1.4.9"
+  branch = "messages-response-with-errors"
 
 [[constraint]]
   name = "golang.org/x/text"

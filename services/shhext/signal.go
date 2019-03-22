@@ -14,8 +14,8 @@ func (h EnvelopeSignalHandler) EnvelopeSent(hash common.Hash) {
 }
 
 // EnvelopeExpired triggered when envelope is expired but wasn't delivered to any peer.
-func (h EnvelopeSignalHandler) EnvelopeExpired(hash common.Hash) {
-	signal.SendEnvelopeExpired(hash)
+func (h EnvelopeSignalHandler) EnvelopeExpired(hash common.Hash, err error) {
+	signal.SendEnvelopeExpired(hash, err)
 }
 
 // MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
