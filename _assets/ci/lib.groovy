@@ -1,5 +1,5 @@
 def getVersion() {
-  return readFile("${env.STATUS_PATH}/VERSION").trim()
+  return readFile("${env.WORKSPACE}/${env.STATUS_PATH}/VERSION").trim()
 }
 
 def gitCommit() {
@@ -13,7 +13,7 @@ def timestamp() {
 
 def suffix() {
   if (params.RELEASE == true) {
-    return readFile("${env.WORKSPACE}/${env.STATUS_PATH}/VERSION").trim()
+    return getVersion()
   } else {
     return "${timestamp()}-${gitCommit()}"
   }
