@@ -166,6 +166,9 @@ push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
+clean-docker-images:
+	docker rmi -f $(shell docker image ls --filter="reference=$(DOCKER_IMAGE_NAME)" --quiet)
+
 # See https://www.gnu.org/software/make/manual/html_node/Target_002dspecific.html to understand this magic.
 push-docker-images-latest: GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
 push-docker-images-latest: GIT_LOCAL  = $(shell git rev-parse @)
