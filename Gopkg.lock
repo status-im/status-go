@@ -830,12 +830,12 @@
   version = "v1.1.0"
 
 [[projects]]
-  branch = "messages-response-with-errors"
   digest = "1:ff23c911716ddbe23acccecf0a88bb99e89132b221a3be8dbad6a8377fd6f3a0"
   name = "github.com/status-im/whisper"
   packages = ["whisperv6"]
   pruneopts = "NUT"
-  revision = "e24f0a42ab864746c8550d724499dcc9f0d5f6f5"
+  revision = "3a4601b568649ac152afa76551ea9c332464b867"
+  version = "v1.4.10"
 
 [[projects]]
   digest = "1:572c783a763db6383aca3179976eb80e4c900f52eba56cba8bb2e3cea7ce720e"
