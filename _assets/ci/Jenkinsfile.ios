@@ -49,7 +49,7 @@ pipeline {
     } } }
 
     stage('Setup') { steps { dir(env.STATUS_PATH) {
-      sh 'make setup-build'
+      sh 'unset TMPDIR && make setup-build'
     } } }
 
     stage('Compile') { steps { dir(env.STATUS_PATH) {
