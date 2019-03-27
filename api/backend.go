@@ -313,7 +313,7 @@ func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string
 // HashTypedData generates the hash of TypedData.
 func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (common.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
-	hash, err := typeddata.Hash(typed, chain)
+	hash, err := typeddata.ValidateAndHash(typed, chain)
 	if err != nil {
 		return common.Hash{}, err
 	}

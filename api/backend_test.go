@@ -429,5 +429,4 @@ func TestHashTypedData(t *testing.T) {
 	hash, err := backend.HashTypedData(typed)
 	require.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, hash)
-	assert.Equal(t, common.Hash{0x0}, common.Hash{})
 }

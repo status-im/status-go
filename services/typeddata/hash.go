@@ -19,8 +19,8 @@ var (
 	int256Type, _  = abi.NewType("int256", nil)
 )
 
-// Hash generates a hash of TypedData and verifies that chainId in the typed data matches currently selected chain.
-func Hash(typed TypedData, chain *big.Int) (common.Hash, error) {
+// ValidateAndHash generates a hash of TypedData and verifies that chainId in the typed data matches currently selected chain.
+func ValidateAndHash(typed TypedData, chain *big.Int) (common.Hash, error) {
 	if err := typed.ValidateChainID(chain); err != nil {
 		return common.Hash{}, err
 	}
