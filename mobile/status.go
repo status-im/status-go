@@ -369,6 +369,20 @@ func SignTypedData(data, password string) string {
 	return prepareJSONResponse(result.String(), err)
 }
 
+// HashTypedData unmarshalls data into TypedData, validates it and hashes it.
+func HashTypedData(data string) string {
+	var typed typeddata.TypedData
+	err := json.Unmarshal([]byte(data), &typed)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	if err := typed.Validate(); err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	result, err := statusBackend.HashTypedData(typed)
+	return prepareJSONResponse(result.String(), err)
+}
+
 // Recover unmarshals rpc params {signDataString, signedData} and passes
 // them onto backend.
 func Recover(rpcParams string) string {

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -307,6 +308,16 @@ func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string
 		return hexutil.Bytes{}, err
 	}
 	return hexutil.Bytes(sig), err
+}
+
+// HashTypedData generates the hash of TypedData.
+func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (common.Hash, error) {
+	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
+	hash, err := typeddata.ValidateAndHash(typed, chain)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return hash, err
 }
 
 func (b *StatusBackend) getVerifiedWalletAccount(password string) (*account.SelectedExtKey, error) {
