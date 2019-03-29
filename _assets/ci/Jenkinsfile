@@ -62,7 +62,7 @@ pipeline {
           linux = lib.buildBranch('status-go/platforms/linux')
         } } }
         stage('Docker') { steps { script {
-          linux = lib.buildBranch('status-go/platforms/docker')
+          dock = lib.buildBranch('status-go/platforms/docker')
         } } }
       } // parallel
     } // stage(Build)
