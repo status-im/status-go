@@ -242,7 +242,7 @@ func (b *StatusBackend) CallRPC(inputJSON string) (string, error) {
 	return client.CallRaw(inputJSON), nil
 }
 
-// GetNodesFromContract returns a list of mailservers
+// GetNodesFromContract returns a list of nodes from the contract
 func (b *StatusBackend) GetNodesFromContract(rpcEndpoint string, contractAddress string) ([]string, error) {
 	var response []string
 
@@ -259,12 +259,20 @@ func (b *StatusBackend) GetNodesFromContract(rpcEndpoint string, contractAddress
 		return response, err
 	}
 
-	node, err := contract.Nodes(nil, big.NewInt(0))
+	nodeCount, err := contract.NodeCount(nil)
 	if err != nil {
 		return response, err
 	}
 
-	response = append(response, node)
+	one := big.NewInt(1)
+	for i := big.NewInt(0); i.Cmp(nodeCount) < 0; i.Add(i, one) {
+		node, err := contract.Nodes(nil, i)
+		if err != nil {
+			return response, err
+		}
+		response = append(response, node)
+	}
+
 	return response, nil
 }
 
