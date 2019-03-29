@@ -653,3 +653,24 @@ func ChaosModeUpdate(on C.int) *C.char {
 	err := node.ChaosModeCheckRPCClientsUpstreamURL(on == 1)
 	return makeJSONResponse(err)
 }
+
+// GetNodesFromContract returns a list of nodes from a contract
+//export GetNodesFromContract
+func GetNodesFromContract(rpcEndpoint *C.char, contractAddress *C.char) *C.char {
+	nodes, err := statusBackend.GetNodesFromContract(
+		C.GoString(rpcEndpoint),
+		C.GoString(contractAddress),
+	)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Nodes []string `json:"result"`
+	}{Nodes: nodes})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}

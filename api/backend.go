@@ -7,15 +7,18 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"
@@ -31,7 +34,8 @@ import (
 
 const (
 	//todo(jeka): should be removed
-	fcmServerKey = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
+	fcmServerKey         = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
+	contractQueryTimeout = 1000 * time.Millisecond
 )
 
 var (
@@ -236,6 +240,32 @@ func (b *StatusBackend) CallRPC(inputJSON string) (string, error) {
 		return "", ErrRPCClientUnavailable
 	}
 	return client.CallRaw(inputJSON), nil
+}
+
+// GetNodesFromContract returns a list of mailservers
+func (b *StatusBackend) GetNodesFromContract(rpcEndpoint string, contractAddress string) ([]string, error) {
+	var response []string
+
+	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
+	defer cancel()
+
+	ethclient, err := ethclient.DialContext(ctx, rpcEndpoint)
+	if err != nil {
+		return response, err
+	}
+
+	contract, err := registry.NewNodes(gethcommon.HexToAddress(contractAddress), ethclient)
+	if err != nil {
+		return response, err
+	}
+
+	node, err := contract.Nodes(nil, big.NewInt(0))
+	if err != nil {
+		return response, err
+	}
+
+	response = append(response, node)
+	return response, nil
 }
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
