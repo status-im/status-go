@@ -26,7 +26,7 @@ To simply start a container run `make`, other commands include:
 All settings are passed through environment variables:
 
 * `PUBLIC_IP` - Your IP visible from the internet and advertised by the Bootnode.
-* `LISTEN_PORT` - Bootnode port, by default it's `30303` but you might want to use `443`.
+* `LISTEN_PORT` - Bootnode UDP port, by default it's `30303` but you might want to use `443`.
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).
 * `API_MODULES` - API modules to be made available via the `RPC_PORT`.
 * `CONTAINER_NAME` - Name of the container that will be created.

@@ -52,7 +52,7 @@ enode: keys/nodeaddr
 
 info:
 	@echo "$(GREEN)Your bootnode is listening on:$(RESET) $(BOLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RESET)"
-	@echo "$(YELLOW)Make sure that address and port are available from the internet!$(RESET)"
+	@echo "$(YELLOW)Make sure that address and UDP port are available from the internet!$(RESET)"
 	@echo "$(GREEN)Your enode address is:$(RESET)"
 
 
