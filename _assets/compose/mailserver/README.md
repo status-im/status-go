@@ -25,11 +25,13 @@ To simply start a container run `make`, other commands include:
 All settings are passed through environment variables:
 
 * `PUBLIC_IP` - Your IP visible from the internet and advertised by the Mailserver.
-* `LISTEN_PORT` - Mailserver TCP port, by default it's `30303` but you might want to use `443`.
+* `LISTEN_PORT` - Mailserver TCP & UDP port, by default it's `30303` but you might want to use `443`.
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).
 * `API_MODULES` - API modules to be made available via the `RPC_PORT`.
 * `DATA_PATH` - Location of Mailserver storage and keys. (Default: `/var/tmp/status-go-mail`)
 * `CONTAINER_NAME` - Name of the container that will be created.
+* `REGISTER_TOPIC` - Mynamic mailserver discovery topic. (Default: `whispermail`)
+* `MAIL_PASSWORD` - Basic HTTP auth password for mailserver. (Default: `status-offline-inbox`)
 * `LOG_LEVEL` - Set level of log messages to show. (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)
 
 # Known Issues
