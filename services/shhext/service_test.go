@@ -3,6 +3,7 @@ package shhext
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -13,10 +14,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
@@ -680,4 +683,240 @@ func (s *WhisperRetriesSuite) TestDeliveredFromFirstAttempt() {
 
 func (s *WhisperRetriesSuite) TestDeliveredFromSecondAttempt() {
 	s.testDelivery(2)
+}
+
+func TestRequestWithTrackingHistorySuite(t *testing.T) {
+	suite.Run(t, new(RequestWithTrackingHistorySuite))
+}
+
+type RequestWithTrackingHistorySuite struct {
+	suite.Suite
+
+	envelopeSymkey   string
+	envelopeSymkeyID string
+
+	localWhisperAPI *whisper.PublicWhisperAPI
+	localAPI        *PublicAPI
+	localService    *Service
+	mailSymKey      string
+
+	remoteMailserver *mailserver.WMailServer
+	remoteNode       *enode.Node
+	remoteWhisper    *whisper.Whisper
+}
+
+func (s *RequestWithTrackingHistorySuite) SetupTest() {
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.Require().NoError(err)
+	conf := &whisper.Config{
+		MinimumAcceptedPOW: 0,
+		MaxMessageSize:     100 << 10,
+	}
+	local := whisper.New(conf)
+	s.Require().NoError(local.Start(nil))
+
+	s.localWhisperAPI = whisper.NewPublicWhisperAPI(local)
+	s.localService = New(local, nil, db, params.ShhextConfig{})
+	localPkey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.Require().NoError(s.localService.Start(&p2p.Server{Config: p2p.Config{PrivateKey: localPkey}}))
+	s.localAPI = NewPublicAPI(s.localService)
+
+	remote := whisper.New(conf)
+	s.remoteWhisper = remote
+	s.Require().NoError(remote.Start(nil))
+	s.remoteMailserver = &mailserver.WMailServer{}
+	remote.RegisterServer(s.remoteMailserver)
+	password := "test"
+	tmpdir, err := ioutil.TempDir("", "tracking-history-tests-")
+	s.Require().NoError(err)
+	s.Require().NoError(s.remoteMailserver.Init(remote, &params.WhisperConfig{
+		DataDir:            tmpdir,
+		MailServerPassword: password,
+	}))
+
+	pkey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	// we need proper enode for a remote node. it will be used when mail server request is made
+	s.remoteNode = enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
+	remotePeer := p2p.NewPeer(s.remoteNode.ID(), "1", []p2p.Cap{{"shh", 6}})
+	localPeer := p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"shh", 6}})
+	// FIXME close this in tear down
+	rw1, rw2 := p2p.MsgPipe()
+	go local.HandlePeer(remotePeer, rw1)
+	go remote.HandlePeer(localPeer, rw2)
+
+	s.mailSymKey, err = s.localWhisperAPI.GenerateSymKeyFromPassword(context.Background(), password)
+	s.Require().NoError(err)
+
+	s.envelopeSymkey = "topics"
+	s.envelopeSymkeyID, err = s.localWhisperAPI.GenerateSymKeyFromPassword(context.Background(), s.envelopeSymkey)
+}
+
+func (s *RequestWithTrackingHistorySuite) postEnvelopes(topics ...whisper.TopicType) []hexutil.Bytes {
+	var (
+		rst = make([]hexutil.Bytes, len(topics))
+		err error
+	)
+	for i, t := range topics {
+		rst[i], err = s.localWhisperAPI.Post(context.Background(), whisper.NewMessage{
+			SymKeyID: s.envelopeSymkeyID,
+			TTL:      10,
+			Topic:    t,
+		})
+		s.Require().NoError(err)
+	}
+	return rst
+
+}
+
+func (s *RequestWithTrackingHistorySuite) waitForArchival(hexes []hexutil.Bytes) {
+	events := make(chan whisper.EnvelopeEvent, 2)
+	sub := s.remoteWhisper.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+	s.Require().NoError(waitForArchival(events, 2*time.Second, hexes...))
+}
+
+func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...whisper.TopicType) string {
+	filterid, err := s.localWhisperAPI.NewMessageFilter(whisper.Criteria{
+		SymKeyID: s.envelopeSymkeyID,
+		Topics:   topics,
+		AllowP2P: true,
+	})
+	s.Require().NoError(err)
+	s.Require().NotNil(filterid)
+
+	messages, err := s.localWhisperAPI.GetFilterMessages(filterid)
+	s.Require().NoError(err)
+	s.Require().Empty(messages)
+	return filterid
+}
+
+func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []hexutil.Bytes {
+	requests, err := s.localAPI.InitiateHistoryRequests(InitiateHistoryRequest{
+		Peer:     s.remoteNode.String(),
+		SymKeyID: s.mailSymKey,
+		Timeout:  10 * time.Second,
+		Requests: topics,
+	})
+	s.Require().NoError(err)
+	return requests
+}
+
+func (s *RequestWithTrackingHistorySuite) waitMessagesDelivered(filterid string, hexes ...hexutil.Bytes) {
+	var received int
+	s.Require().NoError(utils.Eventually(func() error {
+		messages, err := s.localWhisperAPI.GetFilterMessages(filterid)
+		if err != nil {
+			return err
+		}
+		received += len(messages)
+		if received != len(hexes) {
+			return fmt.Errorf("expecting to receive %d messages, received %d", len(hexes), received)
+		}
+		return nil
+	}, 2*time.Second, 200*time.Millisecond))
+
+}
+
+func (s *RequestWithTrackingHistorySuite) waitLastEnvelopeUpdated(requests ...hexutil.Bytes) {
+	store := s.localService.historyUpdates.store
+	s.Require().NoError(utils.Eventually(func() error {
+		reqs, err := store.GetAllRequests()
+		if err != nil {
+			return err
+		}
+		if len(reqs) != len(requests) {
+			return errors.New("one request should be in database")
+		}
+		if (reqs[0].LastEnvelopeHash == common.Hash{}) {
+			return errors.New("last envelope hash is not set yet")
+		}
+		return nil
+	}, 2*time.Second, 200*time.Millisecond))
+}
+
+func (s *RequestWithTrackingHistorySuite) waitNoRequests() {
+	store := s.localService.historyUpdates.store
+	s.Require().NoError(utils.Eventually(func() error {
+		reqs, err := store.GetAllRequests()
+		if err != nil {
+			return err
+		}
+		if len(reqs) != 0 {
+			return fmt.Errorf("not all requests were removed. count %d", len(reqs))
+		}
+		return nil
+	}, 2*time.Second, 200*time.Millisecond))
+}
+
+func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
+	topic1 := whisper.TopicType{1, 1, 1, 1}
+	topic2 := whisper.TopicType{2, 2, 2, 2}
+	topic3 := whisper.TopicType{3, 3, 3, 3}
+	hexes := s.postEnvelopes(topic1, topic2, topic3)
+	s.waitForArchival(hexes)
+
+	filterid := s.createEmptyFilter(topic1, topic2, topic3)
+	requests := s.initiateHistoryRequest(
+		TopicRequest{Topic: topic1, Duration: time.Hour},
+		TopicRequest{Topic: topic2, Duration: time.Hour},
+		TopicRequest{Topic: topic3, Duration: 10 * time.Hour},
+	)
+	// since we are using differente duration for 3rd topic there will be 2 requests
+	s.Require().Len(requests, 2)
+	s.waitMessagesDelivered(filterid, hexes...)
+
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic1, time.Now(), common.BytesToHash(hexes[0])))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic2, time.Now(), common.BytesToHash(hexes[1])))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic3, time.Now(), common.BytesToHash(hexes[2])))
+	s.waitNoRequests()
+
+	requests = s.initiateHistoryRequest(
+		TopicRequest{Topic: topic1, Duration: time.Hour},
+		TopicRequest{Topic: topic2, Duration: time.Hour},
+		TopicRequest{Topic: topic3, Duration: 10 * time.Hour},
+	)
+	s.Len(requests, 1)
+}
+
+func (s *RequestWithTrackingHistorySuite) TestSingleRequest() {
+	topic1 := whisper.TopicType{1, 1, 1, 1}
+	topic2 := whisper.TopicType{255, 255, 255, 255}
+	hexes := s.postEnvelopes(topic1, topic2)
+	s.waitForArchival(hexes)
+
+	filterid := s.createEmptyFilter(topic1, topic2)
+	requests := s.initiateHistoryRequest(
+		TopicRequest{Topic: topic1, Duration: time.Hour},
+		TopicRequest{Topic: topic2, Duration: time.Hour},
+	)
+	s.Require().Len(requests, 1)
+	s.waitMessagesDelivered(filterid, hexes...)
+	s.waitLastEnvelopeUpdated(requests...)
+}
+
+func waitForArchival(events chan whisper.EnvelopeEvent, duration time.Duration, hashes ...hexutil.Bytes) error {
+	waiting := map[common.Hash]struct{}{}
+	for _, hash := range hashes {
+		waiting[common.BytesToHash(hash)] = struct{}{}
+	}
+	timeout := time.After(duration)
+	for {
+		select {
+		case <-timeout:
+			return errors.New("timed out while waiting for mailserver to archive envelopes")
+		case ev := <-events:
+			if ev.Event != whisper.EventMailServerEnvelopeArchived {
+				continue
+			}
+			if _, exist := waiting[ev.Hash]; exist {
+				delete(waiting, ev.Hash)
+				if len(waiting) == 0 {
+					return nil
+				}
+			}
+		}
+	}
+
 }

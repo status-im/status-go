@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
@@ -418,6 +419,12 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 // ConfirmMessagesProcessed is a method to confirm that messages was consumed by
 // the client side.
 func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) error {
+	for _, msg := range messages {
+		err := api.service.historyUpdates.UpdateTopicHistory(msg.Topic, time.Unix(int64(msg.Timestamp), 0), common.BytesToHash(msg.Hash))
+		if err != nil {
+			return err
+		}
+	}
 	return api.service.deduplicator.AddMessages(messages)
 }
 
@@ -491,6 +498,109 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)
+}
+
+// InitiateHistoryRequest type for initiating history requests from a peer.
+type InitiateHistoryRequest struct {
+	Peer     string
+	SymKeyID string
+	Requests []TopicRequest
+	Force    bool
+	Timeout  time.Duration
+}
+
+func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
+	shh := api.service.w
+	now := api.service.w.GetCurrentTime()
+
+	mailServerNode, err := api.getPeer(peer)
+	if err != nil {
+		return hash, fmt.Errorf("%v: %v", ErrInvalidMailServerPeer, err)
+	}
+
+	var (
+		symKey    []byte
+		publicKey *ecdsa.PublicKey
+	)
+
+	if symkeyID != "" {
+		symKey, err = shh.GetSymKey(symkeyID)
+		if err != nil {
+			return hash, fmt.Errorf("%v: %v", ErrInvalidSymKeyID, err)
+		}
+	} else {
+		publicKey = mailServerNode.Pubkey()
+	}
+
+	envelope, err := makeEnvelop(
+		payload,
+		symKey,
+		publicKey,
+		api.service.nodeID,
+		shh.MinPow(),
+		now,
+	)
+	if err != nil {
+		return hash, err
+	}
+	hash = envelope.Hash()
+
+	request.ID = hash
+	err = request.Save()
+	if err != nil {
+		return hash, err
+	}
+
+	if !force {
+		err = api.service.requestsRegistry.Register(hash, topics)
+		if err != nil {
+			return hash, err
+		}
+	}
+
+	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, timeout); err != nil {
+		err = request.Delete()
+		if err != nil {
+			return hash, err
+		}
+		if !force {
+			api.service.requestsRegistry.Unregister(hash)
+		}
+		return hash, err
+	}
+
+	return hash, nil
+
+}
+
+// InitiateHistoryRequests is a stateful API for initiating history request for each topic.
+// Caller of this method needs to define only two parameters per each TopicRequest:
+// - Topic
+// - Duration before Now
+// After that status-go will guarantee that request for this topic and date will be performed.
+func (api *PublicAPI) InitiateHistoryRequests(request InitiateHistoryRequest) ([]hexutil.Bytes, error) {
+	rst := []hexutil.Bytes{}
+	requests, err := api.service.historyUpdates.CreateRequests(request.Requests)
+	if err != nil {
+		return nil, err
+	}
+	for i := range requests {
+		req := requests[i]
+		options := CreateTopicOptionsFromRequest(req)
+		bloom := options.ToBloomFilterOption()
+		payload, err := bloom.ToMessagesRequestPayload()
+		if err != nil {
+			return rst, err
+		}
+		hash, err := api.requestMessagesUsingPayload(req, request.Peer, request.SymKeyID, payload, request.Force, request.Timeout, options.Topics())
+		if err != nil {
+			return rst, err
+		}
+		hex := hexutil.Bytes{}
+		copy(hex, hash[:])
+		rst = append(rst, hex)
+	}
+	return rst, nil
 }
 
 // DEPRECATED: use SendDirectMessage with DH flag

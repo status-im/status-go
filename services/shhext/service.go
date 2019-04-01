@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
@@ -41,18 +42,20 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w                *whisper.Whisper
-	config           params.ShhextConfig
-	envelopesMonitor *EnvelopesMonitor
-	mailMonitor      *MailRequestMonitor
-	requestsRegistry *RequestsRegistry
-	server           *p2p.Server
-	nodeID           *ecdsa.PrivateKey
-	deduplicator     *dedup.Deduplicator
-	protocol         *chat.ProtocolService
-	dataDir          string
-	installationID   string
-	pfsEnabled       bool
+	w                      *whisper.Whisper
+	config                 params.ShhextConfig
+	envelopesMonitor       *EnvelopesMonitor
+	mailMonitor            *MailRequestMonitor
+	requestsRegistry       *RequestsRegistry
+	historyUpdates         *HistoryUpdateReactor
+	historyUpdatesListener *HistoryEventListener
+	server                 *p2p.Server
+	nodeID                 *ecdsa.PrivateKey
+	deduplicator           *dedup.Deduplicator
+	protocol               *chat.ProtocolService
+	dataDir                string
+	installationID         string
+	pfsEnabled             bool
 
 	peerStore       *mailservers.PeerStore
 	cache           *mailservers.Cache
@@ -64,14 +67,16 @@ type Service struct {
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service. dataDir is a folder path to a network-independent location
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, config params.ShhextConfig) *Service {
-	cache := mailservers.NewCache(db)
+func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
+	cache := mailservers.NewCache(ldb)
 	ps := mailservers.NewPeerStore(cache)
 	delay := defaultRequestsDelay
 	if config.RequestsDelay != 0 {
 		delay = config.RequestsDelay
 	}
 	requestsRegistry := NewRequestsRegistry(delay)
+	historyUpdates := NewHistoryUpdateReactor(db.NewHistoryStore(ldb), requestsRegistry, w.GetCurrentTime)
+	historyUpdatesListener := NewHistoryListener(historyUpdates, w)
 	mailMonitor := &MailRequestMonitor{
 		w:                w,
 		handler:          handler,
@@ -80,17 +85,19 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, db *leveldb.DB, conf
 	}
 	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps, config.MaxMessageDeliveryAttempts)
 	return &Service{
-		w:                w,
-		config:           config,
-		envelopesMonitor: envelopesMonitor,
-		mailMonitor:      mailMonitor,
-		requestsRegistry: requestsRegistry,
-		deduplicator:     dedup.NewDeduplicator(w, db),
-		dataDir:          config.BackupDisabledDataDir,
-		installationID:   config.InstallationID,
-		pfsEnabled:       config.PFSEnabled,
-		peerStore:        ps,
-		cache:            cache,
+		w:                      w,
+		config:                 config,
+		envelopesMonitor:       envelopesMonitor,
+		mailMonitor:            mailMonitor,
+		requestsRegistry:       requestsRegistry,
+		historyUpdates:         historyUpdates,
+		historyUpdatesListener: historyUpdatesListener,
+		deduplicator:           dedup.NewDeduplicator(w, ldb),
+		dataDir:                config.BackupDisabledDataDir,
+		installationID:         config.InstallationID,
+		pfsEnabled:             config.PFSEnabled,
+		peerStore:              ps,
+		cache:                  cache,
 	}
 }
 
@@ -267,6 +274,9 @@ func (s *Service) Start(server *p2p.Server) error {
 		s.lastUsedMonitor = mailservers.NewLastUsedConnectionMonitor(s.peerStore, s.cache, s.w)
 		s.lastUsedMonitor.Start()
 	}
+	if err := s.historyUpdatesListener.Start(); err != nil {
+		return err
+	}
 	s.envelopesMonitor.Start()
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
@@ -283,6 +293,7 @@ func (s *Service) Stop() error {
 	if s.config.EnableLastUsedMonitor {
 		s.lastUsedMonitor.Stop()
 	}
+	s.historyUpdatesListener.Stop()
 	s.requestsRegistry.Clear()
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
