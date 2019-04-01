@@ -14,6 +14,8 @@ export API_MODULES    ?= eth,net,web3,admin
 export CONTAINER_NAME ?= status-go-mailserver
 export DATA_PATH      ?= /var/tmp/status-go-mail
 export FLEET_NAME     ?= eth.beta
+export REGISTER_TOPIC ?= whispermail
+export MAIL_PASSWORD  ?= status-offline-inbox
 # Necessary to make mailserver available publicly
 export PUBLIC_IP      ?= $(shell curl -s https://ipecho.net/plain)
 
@@ -65,6 +67,11 @@ config: ##@ Generate config for mailserver with current public IP.
 		| jq '.HTTPHost = "0.0.0.0"' \
 		| jq '.HTTPPort= $(RPC_PORT)' \
 		| jq '.APIModules = "$(API_MODULES)"' \
+		| jq '.RegisterTopics = ["$(REGISTER_TOPIC)"]' \
+		| jq '.WhisperConfig.Enabled = true' \
+		| jq '.WhisperConfig.EnableMailServer = true' \
+		| jq '.WhisperConfig.LightClient = false' \
+		| jq '.WhisperConfig.MailServerPassword = "$(MAIL_PASSWORD)"' \
 		> config.json
 
 clean:

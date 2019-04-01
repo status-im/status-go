@@ -8,7 +8,8 @@ services:
     command: -log=${LOG_LEVEL} -log-without-color -c=/config.json -dir=/data
     ports:
       - '127.0.0.1:${RPC_PORT}:${RPC_PORT}'
-      - '0.0.0.0:${LISTEN_PORT}:30303'
+      - '0.0.0.0:${LISTEN_PORT}:30303/tcp'
+      - '0.0.0.0:${LISTEN_PORT}:30303/udp'
     volumes:
       - '${PWD}/config.json:/config.json'
       - '${DATA_PATH}:/data'
