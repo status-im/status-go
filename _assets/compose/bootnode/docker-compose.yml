@@ -10,6 +10,6 @@ services:
       -nodekey=/keys/nodekey
       -addr=0.0.0.0:${LISTEN_PORT}
     ports:
-      - '0.0.0.0:${LISTEN_PORT}:${LISTEN_PORT}'
+      - '0.0.0.0:${LISTEN_PORT}:${LISTEN_PORT}/udp'
     volumes:
       - '${PWD}/keys:/keys'

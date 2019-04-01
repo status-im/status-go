@@ -52,7 +52,7 @@ enode:
 
 info:
 	@echo "$(GREEN)Your mailserver is listening on:$(RESET) $(BOLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RESET)"
-	@echo "$(YELLOW)Make sure that address and port are available from the internet!$(RESET)"
+	@echo "$(YELLOW)Make sure that address and TCP port are available from the internet!$(RESET)"
 	@echo "$(GREEN)Your enode address is:$(RESET)"
 
 show:
