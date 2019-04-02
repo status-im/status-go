@@ -35,10 +35,15 @@ const (
 	p2pRequestCompleteCode = 125
 )
 
+type failureMessage struct {
+	Hash  common.Hash
+	Error error
+}
+
 func newHandlerMock(buf int) handlerMock {
 	return handlerMock{
 		confirmations:     make(chan common.Hash, buf),
-		expirations:       make(chan common.Hash, buf),
+		expirations:       make(chan failureMessage, buf),
 		requestsCompleted: make(chan common.Hash, buf),
 		requestsExpired:   make(chan common.Hash, buf),
 		requestsFailed:    make(chan common.Hash, buf),
@@ -47,7 +52,7 @@ func newHandlerMock(buf int) handlerMock {
 
 type handlerMock struct {
 	confirmations     chan common.Hash
-	expirations       chan common.Hash
+	expirations       chan failureMessage
 	requestsCompleted chan common.Hash
 	requestsExpired   chan common.Hash
 	requestsFailed    chan common.Hash
@@ -57,8 +62,8 @@ func (t handlerMock) EnvelopeSent(hash common.Hash) {
 	t.confirmations <- hash
 }
 
-func (t handlerMock) EnvelopeExpired(hash common.Hash) {
-	t.expirations <- hash
+func (t handlerMock) EnvelopeExpired(hash common.Hash, err error) {
+	t.expirations <- failureMessage{Hash: hash, Error: err}
 }
 
 func (t handlerMock) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte, err error) {
@@ -168,7 +173,7 @@ func (s *ShhExtSuite) TestPostMessageWithConfirmation() {
 	}
 }
 
-func (s *ShhExtSuite) TestWaitMessageExpired() {
+func (s *ShhExtSuite) testWaitMessageExpired(expectedError string, ttl uint32) {
 	mock := newHandlerMock(1)
 	s.services[0].envelopesMonitor.handler = mock
 	symID, err := s.whisper[0].GenerateSymKey()
@@ -180,7 +185,7 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 		SymKeyID:  symID,
 		PowTarget: whisper.DefaultMinimumPoW,
 		PowTime:   200,
-		TTL:       1,
+		TTL:       ttl,
 		Topic:     whisper.TopicType{0x01, 0x01, 0x01, 0x01},
 		Payload:   []byte("hello"),
 	}
@@ -189,12 +194,27 @@ func (s *ShhExtSuite) TestWaitMessageExpired() {
 	s.NoError(err)
 	select {
 	case expired := <-mock.expirations:
-		s.Equal(mid, expired)
+		s.Equal(mid, expired.Hash)
+		s.EqualError(expired.Error, expectedError)
 	case confirmed := <-mock.confirmations:
 		s.Fail("unexpected confirmation for hash", confirmed)
 	case <-time.After(10 * time.Second):
 		s.Fail("timed out while waiting for confirmation")
 	}
+}
+
+func (s *ShhExtSuite) TestWaitMessageExpired() {
+	s.testWaitMessageExpired("envelope expired due to connectivity issues", 1)
+}
+
+func (s *ShhExtSuite) TestErrorOnEnvelopeDelivery() {
+	// in the test we are sending message from peer 0 to peer 1
+	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
+	s.Require().NoError(s.services[0].UpdateMailservers([]*enode.Node{s.nodes[1].Server().Self()}))
+	s.whisper[1].SetTimeSource(func() time.Time {
+		return time.Now().Add(time.Hour)
+	})
+	s.testWaitMessageExpired("envelope wasn't delivered due to time sync issues", 100)
 }
 
 func (s *ShhExtSuite) TestRequestMessagesErrors() {

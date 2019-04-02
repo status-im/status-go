@@ -36,6 +36,9 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // Whisper protocol parameters
@@ -50,6 +53,7 @@ const (
 	powRequirementCode     = 2   // PoW requirement
 	bloomFilterExCode      = 3   // bloom filter exchange
 	batchAcknowledgedCode  = 11  // confirmation that batch of envelopes was received
+	messageResponseCode    = 12  // includes confirmation for delivery and information about errors
 	p2pSyncRequestCode     = 123 // used to sync envelopes between two mail servers
 	p2pSyncResponseCode    = 124 // used to sync envelopes between two mail servers
 	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
@@ -84,6 +88,9 @@ const (
 	DefaultSyncAllowance = 10 // seconds
 
 	MaxLimitInSyncMailRequest = 1000
+
+	EnvelopeTimeNotSynced uint = iota + 1
+	EnvelopeOtherError
 )
 
 // MailServer represents a mail server, capable of
@@ -133,4 +140,61 @@ type SyncResponse struct {
 	Cursor    []byte
 	Final     bool // if true it means all envelopes were processed
 	Error     string
+}
+
+// MessagesResponse sent as a response after processing batch of envelopes.
+type MessagesResponse struct {
+	// Hash is a hash of all envelopes sent in the single batch.
+	Hash common.Hash
+	// Per envelope error.
+	Errors []EnvelopeError
+}
+
+// EnvelopeError code and optional description of the error.
+type EnvelopeError struct {
+	Hash        common.Hash
+	Code        uint
+	Description string
+}
+
+// MultiVersionResponse allows to decode response into chosen version.
+type MultiVersionResponse struct {
+	Version  uint
+	Response rlp.RawValue
+}
+
+// DecodeResponse1 decodes response into first version of the messages response.
+func (m MultiVersionResponse) DecodeResponse1() (resp MessagesResponse, err error) {
+	return resp, rlp.DecodeBytes(m.Response, &resp)
+}
+
+// Version1MessageResponse first version of the message response.
+type Version1MessageResponse struct {
+	Version  uint
+	Response MessagesResponse
+}
+
+// NewMessagesResponse returns instane of the version messages response.
+func NewMessagesResponse(batch common.Hash, errors []EnvelopeError) Version1MessageResponse {
+	return Version1MessageResponse{
+		Version: 1,
+		Response: MessagesResponse{
+			Hash:   batch,
+			Errors: errors,
+		},
+	}
+}
+
+// ErrorToEnvelopeError converts common golang error into EnvelopeError with a code.
+func ErrorToEnvelopeError(hash common.Hash, err error) EnvelopeError {
+	code := EnvelopeOtherError
+	switch err.(type) {
+	case TimeSyncError:
+		code = EnvelopeTimeNotSynced
+	}
+	return EnvelopeError{
+		Hash:        hash,
+		Code:        code,
+		Description: err.Error(),
+	}
 }

@@ -34,7 +34,7 @@ var errProtocolNotInitialized = errors.New("procotol is not initialized")
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
 	EnvelopeSent(common.Hash)
-	EnvelopeExpired(common.Hash)
+	EnvelopeExpired(common.Hash, error)
 	MailServerRequestCompleted(common.Hash, common.Hash, []byte, error)
 	MailServerRequestExpired(common.Hash)
 }

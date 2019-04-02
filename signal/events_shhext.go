@@ -32,7 +32,8 @@ const (
 
 // EnvelopeSignal includes hash of the envelope.
 type EnvelopeSignal struct {
-	Hash common.Hash `json:"hash"`
+	Hash    common.Hash `json:"hash"`
+	Message string      `json:"message"`
 }
 
 // MailServerResponseSignal holds the data received in the response from the mailserver.
@@ -56,12 +57,16 @@ type BundleAddedSignal struct {
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeSent(hash common.Hash) {
-	send(EventEnvelopeSent, EnvelopeSignal{hash})
+	send(EventEnvelopeSent, EnvelopeSignal{Hash: hash})
 }
 
 // SendEnvelopeExpired triggered when envelope delivered at least to 1 peer.
-func SendEnvelopeExpired(hash common.Hash) {
-	send(EventEnvelopeExpired, EnvelopeSignal{hash})
+func SendEnvelopeExpired(hash common.Hash, err error) {
+	var message string
+	if err != nil {
+		message = err.Error()
+	}
+	send(EventEnvelopeExpired, EnvelopeSignal{Hash: hash, Message: message})
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
@@ -81,7 +86,7 @@ func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash comm
 
 // SendMailServerRequestExpired triggered when mail server request expires
 func SendMailServerRequestExpired(hash common.Hash) {
-	send(EventMailServerRequestExpired, EnvelopeSignal{hash})
+	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 
 // EnodeDiscoveredSignal includes enode address and topic

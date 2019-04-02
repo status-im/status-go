@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,10 +38,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
 )
+
+// TimeSyncError error for clock skew errors.
+type TimeSyncError error
 
 // Statistics holds several message-related counter for analytics
 // purposes.
@@ -835,8 +838,13 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
-func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte) {
+func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
+	envelopeErrors []EnvelopeError) {
 	batchHash := crypto.Keccak256Hash(data)
+	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors)); err != nil {
+		log.Warn("failed to deliver messages response", "hash", batchHash, "envelopes errors", envelopeErrors,
+			"peer", peer, "error", err)
+	}
 	if err := p2p.Send(rw, batchAcknowledgedCode, batchHash); err != nil {
 		log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", peer, "error", err)
 	}
@@ -867,9 +875,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("failed to read envelopes data", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid enveloopes")
 			}
-			if !whisper.disableConfirmations {
-				go whisper.sendConfirmation(p.peer.ID(), rw, data)
-			}
 
 			var envelopes []*Envelope
 			if err := rlp.DecodeBytes(data, &envelopes); err != nil {
@@ -877,12 +882,18 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				return errors.New("invalid envelopes")
 			}
 			trouble := false
+			envelopeErrors := []EnvelopeError{}
 			for _, env := range envelopes {
 				cached, err := whisper.add(env, whisper.LightClientMode())
 				if err != nil {
-					trouble = true
-					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					_, isTimeSyncError := err.(TimeSyncError)
+					if !isTimeSyncError {
+						trouble = true
+						log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
+					}
+					envelopeErrors = append(envelopeErrors, ErrorToEnvelopeError(env.Hash(), err))
 				}
+
 				whisper.envelopeFeed.Send(EnvelopeEvent{
 					Event: EventEnvelopeReceived,
 					Hash:  env.Hash(),
@@ -892,14 +903,37 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					p.mark(env)
 				}
 			}
+			if !whisper.disableConfirmations {
+				go whisper.sendConfirmation(p.peer.ID(), rw, data, envelopeErrors)
+			}
 
 			if trouble {
 				return errors.New("invalid envelope")
 			}
+		case messageResponseCode:
+			var multiResponse MultiVersionResponse
+			if err := packet.Decode(&multiResponse); err != nil {
+				log.Error("failed to decode messages response", "peer", p.peer.ID(), "error", err)
+				return errors.New("invalid response message")
+			}
+			if multiResponse.Version == 1 {
+				response, err := multiResponse.DecodeResponse1()
+				if err != nil {
+					log.Error("failed to decode messages response into first version of response", "peer", p.peer.ID(), "error", err)
+				}
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Batch: response.Hash,
+					Event: EventBatchAcknowledged,
+					Peer:  p.peer.ID(),
+					Data:  response.Errors,
+				})
+			} else {
+				log.Warn("unknown version of the messages response was received. response is ignored", "peer", p.peer.ID(), "version", multiResponse.Version)
+			}
 		case batchAcknowledgedCode:
 			var batchHash common.Hash
 			if err := packet.Decode(&batchHash); err != nil {
-				log.Warn("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
+				log.Error("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
 				return errors.New("invalid confirmation message")
 			}
 			whisper.envelopeFeed.Send(EnvelopeEvent{
@@ -1076,11 +1110,11 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	sent := envelope.Expiry - envelope.TTL
 
 	envelopeAddedCounter.Inc(1)
-
 	if sent > now {
 		if sent-DefaultSyncAllowance > now {
 			envelopeErrFromFutureCounter.Inc(1)
-			return false, fmt.Errorf("envelope created in the future [%x]", envelope.Hash())
+			log.Warn("envelope created in the future", "hash", envelope.Hash())
+			return false, TimeSyncError(errors.New("envelope from future"))
 		}
 		// recalculate PoW, adjusted for the time difference, plus one second for latency
 		envelope.calculatePoW(sent - now + 1)
@@ -1089,7 +1123,8 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	if envelope.Expiry < now {
 		if envelope.Expiry+DefaultSyncAllowance*2 < now {
 			envelopeErrVeryOldCounter.Inc(1)
-			return false, fmt.Errorf("very old message")
+			log.Warn("very old envelope", "hash", envelope.Hash())
+			return false, TimeSyncError(errors.New("very old envelope"))
 		}
 		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
 		envelopeErrExpiredCounter.Inc(1)
