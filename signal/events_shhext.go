@@ -14,9 +14,6 @@ const (
 	// to any peer
 	EventEnvelopeExpired = "envelope.expired"
 
-	// EventEnvelopeDiscarded is triggerd when envelope was discarded by a peer for some reason.
-	EventEnvelopeDiscarded = "envelope.discarded"
-
 	// EventMailServerRequestCompleted is triggered when whisper receives a message ack from the mailserver
 	EventMailServerRequestCompleted = "mailserver.request.completed"
 
