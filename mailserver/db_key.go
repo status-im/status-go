@@ -53,13 +53,3 @@ func NewDBKeyFromBytes(b []byte) (*DBKey, error) {
 		hash:      common.BytesToHash(b[4:]),
 	}, nil
 }
-
-// mustNewDBKeyFromBytes panics if creating a key from a byte slice fails.
-// Check if a byte slice has DBKeyLength length before using it.
-func mustNewDBKeyFromBytes(b []byte) *DBKey {
-	k, err := NewDBKeyFromBytes(b)
-	if err != nil {
-		panic(err)
-	}
-	return k
-}

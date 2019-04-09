@@ -479,17 +479,14 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterato
 		ku, kl    *DBKey
 	)
 
+	ku = NewDBKey(upper+1, emptyHash)
 	kl = NewDBKey(lower, emptyHash)
-	if len(cursor) == DBKeyLength {
-		ku = mustNewDBKeyFromBytes(cursor)
-	} else {
-		ku = NewDBKey(upper+1, emptyHash)
-	}
 
 	i := s.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
 	// seek to the end as we want to return envelopes in a descending order
-	i.Seek(ku.Bytes())
-
+	if len(cursor) == DBKeyLength {
+		i.Seek(cursor)
+	}
 	return i
 }
 
@@ -524,7 +521,7 @@ func (s *WMailServer) processRequestInBundles(
 	// append and continue.
 	// Otherwise publish what you have so far, reset the bundle to the
 	// current envelope, and leave if we hit the limit
-	for iter.Prev() {
+	for iter.Next() {
 		var envelope whisper.Envelope
 
 		decodeErr := rlp.DecodeBytes(iter.Value(), &envelope)
