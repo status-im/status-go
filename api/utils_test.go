@@ -26,7 +26,7 @@ func TestHashMessage(t *testing.T) {
 	require.NoError(t, err)
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
-	originalMessage := []byte{0x01, 0x02, 0x03}
+	originalMessage := "hello world"
 	hash := HashMessage(originalMessage)
 
 	// simulate signature from external signer like a keycard

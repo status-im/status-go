@@ -1,7 +1,9 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -21,7 +23,14 @@ func RunAsync(f func() error) <-chan error {
 // The hash is calulcated as
 //   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
 // This gives context to the signed message and prevents signing of transactions.
-func HashMessage(data []byte) []byte {
+func HashMessage(message string) []byte {
+	data := []byte(message)
+	if strings.HasPrefix(message, "0x") {
+		if value, err := hex.DecodeString(message[2:]); err == nil {
+			data = value
+		}
+	}
+
 	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
 	return crypto.Keccak256([]byte(msg))
 }
