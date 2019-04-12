@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,10 +9,12 @@ import (
 	"path/filepath"
 	"time"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
@@ -21,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/incentivisation"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
@@ -40,6 +44,7 @@ var (
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
 	ErrStatusServiceRegistrationFailure           = errors.New("failed to register the Status service")
 	ErrPeerServiceRegistrationFailure             = errors.New("failed to register the Peer service")
+	ErrIncentivisationServiceRegistrationFailure  = errors.New("failed to register the Incentivisation service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -96,6 +101,11 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	// start Whisper service.
 	if err := activateShhService(stack, config, db); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
+	}
+
+	// start incentivisation service
+	if err := activateIncentivisationService(stack, config); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrIncentivisationServiceRegistrationFailure, err)
 	}
 
 	// start status service.
@@ -330,6 +340,49 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 			return nil, err
 		}
 		return shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+	})
+}
+
+// activateIncentivisationService configures Whisper and adds it to the given node.
+func activateIncentivisationService(stack *node.Node, config *params.NodeConfig) (err error) {
+	if !config.WhisperConfig.Enabled {
+		logger.Info("SHH protocol is disabled")
+		return nil
+	}
+
+	if !config.IncentivisationConfig.Enabled {
+		logger.Info("Incentivisation is disabled")
+		return nil
+	}
+
+	logger.Info("activating incentivisation")
+	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var w *whisper.Whisper
+		if err := ctx.Service(&w); err != nil {
+			return nil, err
+		}
+		incentivisationConfig := &incentivisation.ServiceConfig{
+			ContractAddress: config.IncentivisationConfig.ContractAddress,
+			RPCEndpoint:     config.IncentivisationConfig.RPCEndpoint,
+			IP:              config.IncentivisationConfig.IP,
+			Port:            config.IncentivisationConfig.Port,
+		}
+		privateKey, err := crypto.HexToECDSA(config.NodeKey)
+		if err != nil {
+			return nil, err
+		}
+		client, err := ethclient.DialContext(context.TODO(), incentivisationConfig.RPCEndpoint)
+		if err != nil {
+			return nil, err
+		}
+
+		contract, err := incentivisation.NewContract(gethcommon.HexToAddress(incentivisationConfig.ContractAddress), client, client)
+		if err != nil {
+			return nil, err
+		}
+
+		return incentivisation.New(privateKey, whisper.NewPublicWhisperAPI(w), incentivisationConfig, contract), nil
 	})
 }
 

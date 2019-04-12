@@ -45,6 +45,8 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	// assert peers limits
 	assert.Contains(t, c.RequireTopics, params.WhisperDiscv5Topic)
 	assert.Contains(t, c.RequireTopics, discv5.Topic(params.LesTopic(int(c.NetworkID))))
+	// assert incentivisation
+	assert.Equal(t, false, c.IncentivisationConfig.Enabled)
 	// assert other
 	assert.Equal(t, false, c.HTTPEnabled)
 	assert.Equal(t, false, c.IPCEnabled)
@@ -386,6 +388,103 @@ func TestNodeConfigValidate(t *testing.T) {
 			}`,
 			Error: "field BackupDisabledDataDir is required if PFSEnabled is true",
 		},
+		{
+			Name: "Valid JSON config with incentivisation",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data",
+				"BackupDisabledDataDir": "/tmp/data",
+				"KeyStoreDir": "/tmp/data",
+				"NoDiscovery": true,
+				"IncentivisationConfig": {
+				  "Enabled": true,
+				  "IP": "127.0.0.1",
+				  "Port": 300,
+				  "RPCEndpoint": "http://test.com",
+				  "ContractAddress": "0xfffff"
+				}
+			}`,
+		},
+		{
+			Name: "Missing RPCEndpoint",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data",
+				"BackupDisabledDataDir": "/tmp/data",
+				"KeyStoreDir": "/tmp/data",
+				"NoDiscovery": true,
+				"IncentivisationConfig": {
+				  "Enabled": true,
+				  "IP": "127.0.0.1",
+				  "Port": 300,
+				  "ContractAddress": "0xfffff"
+				}
+			}`,
+			FieldErrors: map[string]string{
+				"RPCEndpoint": "required",
+			},
+			Error: "RPCEndpoint is required if incentivisation is enabled",
+		},
+		{
+			Name: "Missing contract address",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data",
+				"BackupDisabledDataDir": "/tmp/data",
+				"KeyStoreDir": "/tmp/data",
+				"NoDiscovery": true,
+				"IncentivisationConfig": {
+				  "Enabled": true,
+				  "IP": "127.0.0.1",
+				  "Port": 300,
+				  "RPCEndpoint": "http://test.com"
+				}
+			}`,
+			FieldErrors: map[string]string{
+				"ContractAddress": "required",
+			},
+			Error: "field ContractAddress is required if incentivisation is enabled",
+		},
+		{
+			Name: "Missing ip address",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data",
+				"BackupDisabledDataDir": "/tmp/data",
+				"KeyStoreDir": "/tmp/data",
+				"NoDiscovery": true,
+				"IncentivisationConfig": {
+				  "Enabled": true,
+				  "Port": 300,
+				  "RPCEndpoint": "http://test.com",
+				  "ContractAddress": "0xfffff"
+				}
+			}`,
+			FieldErrors: map[string]string{
+				"IP": "required",
+			},
+			Error: "field IP is required if incentivisation is enabled",
+		},
+		{
+			Name: "Missing port",
+			Config: `{
+				"NetworkId": 1,
+				"DataDir": "/tmp/data",
+				"BackupDisabledDataDir": "/tmp/data",
+				"KeyStoreDir": "/tmp/data",
+				"NoDiscovery": true,
+				"IncentivisationConfig": {
+				  "Enabled": true,
+				  "IP": "127.0.0.1",
+				  "RPCEndpoint": "http://test.com",
+				  "ContractAddress": "0xfffff"
+				}
+			}`,
+			FieldErrors: map[string]string{
+				"Port": "required",
+			},
+			Error: "field Port is required if incentivisation is enabled",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -401,6 +500,7 @@ func TestNodeConfigValidate(t *testing.T) {
 				if tc.Error == "" {
 					require.NoError(t, err)
 				} else {
+					fmt.Println(tc.Error)
 					require.Contains(t, err.Error(), tc.Error)
 				}
 			case nil:
