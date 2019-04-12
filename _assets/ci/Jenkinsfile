@@ -31,7 +31,7 @@ pipeline {
     GOPATH      = "${env.WORKSPACE}"
     PATH        = "${env.PATH}:${env.GOPATH}/bin"
     /* This will override the var in Makefile */
-    RELEASE_DIRECTORY = "${env.WORKSPACE}/pkg"
+    RELEASE_DIR = "${env.WORKSPACE}/pkg"
   }
 
   stages {
@@ -64,16 +64,19 @@ pipeline {
         stage('Docker') { steps { script {
           dock = lib.buildBranch('status-go/platforms/docker')
         } } }
+        stage('XGO') { steps { script {
+          xgo = lib.buildBranch('status-go/platforms/xgo')
+        } } }
       } // parallel
     } // stage(Build)
 
     stage('Archive') {
       steps { script {
-        sh("rm -fr ${env.RELEASE_DIRECTORY}/*")
-        lib.copyArts('status-go/platforms/ios', ios.number)
-        lib.copyArts('status-go/platforms/android', android.number)
-        lib.copyArts('status-go/platforms/linux', linux.number)
-        dir(env.RELEASE_DIRECTORY) {
+        sh("rm -fr ${env.RELEASE_DIR}/*")
+        [ios, android, linux, xgo].each { platformBuild ->
+          lib.copyArts(platformBuild)
+        }
+        dir(env.RELEASE_DIR) {
           /* generate sha256 checksums for upload */
           sh 'sha256sum * | tee checksum.sha256'
           archiveArtifacts('*')
@@ -82,12 +85,13 @@ pipeline {
     } // stage(Archive)
 
     stage('Release') { when { expression { params.RELEASE == true } }
-      steps {
+      steps { script {
         /* rename build files to not include versions */
-        dir(env.RELEASE_DIRECTORY) {
-          sh 'mv status-go-ios-*.zip status-go-ios.zip'
-          sh 'mv status-go-android-*.aar status-go-android.aar'
-          sh 'mv status-go-desktop-*.zip status-go-desktop.zip'
+        dir(env.RELEASE_DIR) {
+          def pkgs = findFiles(glob: 'status-go-*')
+          pkgs.each { pkg ->
+            sh "mv ${pkg.path} ${pkg.path.replace("-"+lib.suffix(), "")}"
+          }
         }
         /* perform the release */
         dir(env.STATUS_PATH) {
@@ -97,14 +101,12 @@ pipeline {
             usernameVariable: 'GITHUB_USER',
             passwordVariable: 'GITHUB_TOKEN'
           ]]) {
-            sh """
-              yes | make release \
-                RELEASE_BRANCH=${lib.gitBranch()} \
-                RELEASE_DIRECTORY=${env.RELEASE_DIRECTORY}
-            """
+            env.RELEASE_BRANCH = lib.gitBranch()
+            env.RELEASE_DIR = env.RELEASE_DIR
+            sh 'yes | make release'
           }
         }
-      }
+      } }
     } // stage(Release)
     
     stage('Cleanup') { steps { dir(env.STATUS_PATH) {

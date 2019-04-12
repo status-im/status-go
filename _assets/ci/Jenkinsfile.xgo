@@ -1,0 +1,79 @@
+pipeline {
+  agent { label 'linux' }
+
+  parameters {
+    string(
+      name: 'BRANCH',
+      defaultValue: 'publis-status-go-bin',
+      description: 'Name of branch to build.'
+    )
+    booleanParam(
+      name: 'RELEASE',
+      defaultValue: false,
+      description: 'Enable to create build for release.',
+    )
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    /* Go requires a certain directory structure */
+    checkoutToSubdirectory('src/github.com/status-im/status-go')
+    /* manage how many builds we keep */
+    buildDiscarder(logRotator(
+      numToKeepStr: '30',
+      daysToKeepStr: '30',
+    ))
+  }
+
+
+  environment {
+    BUILD_PLATFORM = 'xgo'
+    STATUS_PATH    = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    CI_DIR         = "${env.STATUS_PATH}/_assets/ci"
+    GOPATH         = "${env.WORKSPACE}"
+    PATH           = "${env.PATH}:${env.GOPATH}/bin"
+    GOCACHE        = "off"
+  }
+
+  stages {
+    stage('Prep') {
+      steps { script { dir(env.STATUS_PATH) {
+        lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
+        /* clarify what we're building */
+        println("Version: ${lib.getVersion()}")
+        println("Git Branch: ${lib.gitBranch()}")
+        println("Git Commit: ${lib.gitCommit()}")
+        /* prepare dependencies */
+        sh 'make xgo-install'
+      } } }
+    }
+
+    stage('Build') {
+      steps { script { dir(env.STATUS_PATH) {
+        sh 'make statusgo-xgo'
+        /* append timestamp and commit to names */
+        def results = findFiles(glob: 'build/bin/status-go-*')
+        results.each { file ->
+          def newName = file.path.replace("amd64", "amd64-${lib.suffix()}")
+          sh "mv ${file.path} ${newName}"
+        }
+      } } }
+    }
+
+    stage('Archive') {
+      steps { dir(env.STATUS_PATH) {
+        archiveArtifacts('build/bin/status-go-*')
+      } }
+    }
+
+    stage('Upload') { steps { dir(env.STATUS_PATH) { script {
+      def binaries = findFiles(glob: 'build/bin/status-go-*')
+      binaries.each { binary -> lib.uploadArtifact(binary.path) }
+    } } } }
+  }
+  post {
+    success { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(true) } }
+    failure { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(false) } }
+  } // post
+}
