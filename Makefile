@@ -3,8 +3,9 @@
 
 RELEASE_TAG := $(shell cat VERSION)
 RELEASE_BRANCH := "develop"
-RELEASE_DIRECTORY := /tmp/release-$(RELEASE_TAG)
+RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
 PRE_RELEASE := "1"
+RELEASE_TYPE := $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi)
 
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
@@ -54,6 +55,9 @@ DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
+
+XGO_NAME ?= status-go
+XGO_TARGETS ?= linux/amd64,windows/amd64,darwin/amd64
 
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
@@ -122,10 +126,13 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@gomobile bind -target=ios -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
-statusgo-linux: xgo ##@cross-compile Build status-go for Linux
-	./_assets/patches/patcher -b . -p geth-xgo
-	$(GOPATH)/bin/xgo --image $(XGOIMAGE) --go=$(XGO_GO) -out statusgo --dest=$(GOBIN) --targets=linux/amd64 -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
-	./_assets/patches/patcher -b . -p geth-xgo -r
+statusgo-xgo: xgo-install ##@cross-compile Build status-go for xgo targets
+	$(GOPATH)/bin/xgo -v \
+		-out=$(XGO_NAME) \
+		-dest=$(GOBIN) \
+		-targets=$(XGO_TARGETS) \
+		-tags '$(BUILD_TAGS)' \
+		$(BUILD_FLAGS) ./cmd/statusd
 	@echo "Linux cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
@@ -201,27 +208,36 @@ generate: ##@other Regenerate assets and other auto-generated stuff
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
 prepare-release: clean-release
-	mkdir -p $(RELEASE_DIRECTORY)
-	mv build/bin/statusgo.aar $(RELEASE_DIRECTORY)/status-go-android.aar
+	mkdir -p $(RELEASE_DIR)
+	mv build/bin/statusgo.aar $(RELEASE_DIR)/status-go-android.aar
 	zip -r build/bin/Statusgo.framework.zip build/bin/Statusgo.framework
-	mv build/bin/Statusgo.framework.zip $(RELEASE_DIRECTORY)/status-go-ios.zip
-	zip -r $(RELEASE_DIRECTORY)/status-go-desktop.zip . -x *.git*
+	mv build/bin/Statusgo.framework.zip $(RELEASE_DIR)/status-go-ios.zip
+	zip -r $(RELEASE_DIR)/status-go-desktop.zip . -x *.git*
 	${MAKE} clean
 
 clean-release:
-	rm -rf $(RELEASE_DIRECTORY)
+	rm -rf $(RELEASE_DIR)
 
 release:
-	@read -p "Are you sure you want to create a new GitHub $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
+	@read -p "Are you sure you want to create a new GitHub $(RELEASE_TYPE} against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
 	if [ $$REPLY = "y" ]; then \
 		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
 		comparison="$$latest_tag..HEAD"; \
 		if [ -z "$$latest_tag" ]; then comparison=""; fi; \
 		changelog=$$(git log $$comparison --oneline --no-merges --format="* %h %s"); \
-	    github-release $(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) "status-im/status-go" "v$(RELEASE_TAG)" "$(RELEASE_BRANCH)" "$(changelog)" "$(RELEASE_DIRECTORY)/*" ; \
+		github-release \
+			$(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) \
+			"status-im/status-go" \
+			"v$(RELEASE_TAG)" \
+			"$(RELEASE_BRANCH)" \
+			"$(changelog)" \
+			"$(RELEASE_DIR)/*" ; \
 	else \
 	    echo "Aborting." && exit 1; \
 	fi
+
+xgo-install:
+	go get -u github.com/karalabe/xgo
 
 gomobile-install:
 	go get -u golang.org/x/mobile/cmd/gomobile

@@ -1,13 +1,19 @@
 def getVersion() {
-  return readFile("${env.WORKSPACE}/${env.STATUS_PATH}/VERSION").trim()
+  return readFile("${env.STATUS_PATH}/VERSION").trim()
 }
 
 def gitCommit() {
   return GIT_COMMIT.take(6)
 }
 
+def parentOrCurrentBuild() {
+  def c = currentBuild.rawBuild.getCause(hudson.model.Cause$UpstreamCause)
+  if (c == null) { return currentBuild }
+  return c.getUpstreamRun()
+}
+
 def timestamp() {
-  def now = new Date(currentBuild.timeInMillis)
+  def now = new Date(parentOrCurrentBuild().timeInMillis)
   return now.format('yyMMdd-HHmmss', TimeZone.getTimeZone('UTC'))
 }
 
@@ -74,14 +80,17 @@ def buildBranch(name = null, buildType = null) {
   return resp
 }
 
-def copyArts(projectName, buildNo) {
+def copyArts(build) {
+  /**
+   * The build argument is of class RunWrapper.
+   * https://javadoc.jenkins.io/plugin/workflow-support/org/jenkinsci/plugins/workflow/support/steps/build/RunWrapper.html
+   **/
   copyArtifacts(
-    projectName: projectName,
+    projectName: build.fullProjectName,
     target: 'pkg',
     flatten: true,
-    selector: specific("${buildNo}")
+    selector: specific("${build.number}")
   )
 }
 
 return this
-
