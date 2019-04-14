@@ -26,7 +26,7 @@ pipeline {
   }
 
   environment {
-    STATUS_PATH = 'src/github.com/status-im/status-go'
+    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
     CI_DIR      = "${env.STATUS_PATH}/_assets/ci"
     GOPATH      = "${env.WORKSPACE}"
     PATH        = "${env.PATH}:${env.GOPATH}/bin"
@@ -38,7 +38,7 @@ pipeline {
     stage('Prep') {
       steps { script {
         lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-        version = readFile("${STATUS_PATH}/VERSION").trim()
+        version = lib.getVersion()
         println("Version: ${version}")
         println("Git Branch: ${lib.gitBranch()}")
         println("Git Commit: ${lib.gitCommit()}")
@@ -86,11 +86,11 @@ pipeline {
 
     stage('Release') { when { expression { params.RELEASE == true } }
       steps { script {
+        def suffix = "-"+lib.suffix()
         /* rename build files to not include versions */
         dir(env.RELEASE_DIR) {
-          def pkgs = findFiles(glob: 'status-go-*')
-          pkgs.each { pkg ->
-            sh "mv ${pkg.path} ${pkg.path.replace("-"+lib.suffix(), "")}"
+          findFiles(glob: 'status-go-*').each { pkg ->
+            sh "mv ${pkg.path} ${pkg.path.replace(suffix, "")}"
           }
         }
         /* perform the release */

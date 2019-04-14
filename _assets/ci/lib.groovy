@@ -33,10 +33,6 @@ def getFilename(path) {
   return path.tokenize('/')[-1]
 }
 
-def getReleaseDir() {
-  return '/tmp/release-' + new File(env.WORKSPACE + '/VERSION').text.trim()
-}
-
 def uploadArtifact(path) {
   /* defaults for upload */
   def domain = 'ams3.digitaloceanspaces.com'
