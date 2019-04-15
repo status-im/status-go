@@ -45,7 +45,7 @@ type HistoryUpdateReactor struct {
 	timeSource TimeSource
 }
 
-// UpdateFinishedRequest removes succesfully finished request and updates every topic
+// UpdateFinishedRequest removes successfully finished request and updates every topic
 // attached to the request.
 func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(id common.Hash, hash common.Hash) error {
 	reactor.mu.Lock()
@@ -122,13 +122,13 @@ type TopicRequest struct {
 func (reactor *HistoryUpdateReactor) CreateRequests(topicRequests []TopicRequest) ([]db.HistoryRequest, error) {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
-	topics := map[whisper.TopicType]db.TopicHistory{}
+	histories := map[whisper.TopicType]db.TopicHistory{}
 	for i := range topicRequests {
-		topic, err := reactor.store.GetHistory(topicRequests[i].Topic, topicRequests[i].Duration)
+		history, err := reactor.store.GetHistory(topicRequests[i].Topic, topicRequests[i].Duration)
 		if err != nil {
 			return nil, err
 		}
-		topics[topicRequests[i].Topic] = topic
+		histories[topicRequests[i].Topic] = history
 	}
 	requests, err := reactor.store.GetAllRequests()
 	if err != nil {
@@ -137,16 +137,16 @@ func (reactor *HistoryUpdateReactor) CreateRequests(topicRequests []TopicRequest
 	filtered := []db.HistoryRequest{}
 	for i := range requests {
 		req := requests[i]
-		for _, t := range topics {
-			if req.Includes(t) {
-				delete(topics, t.Topic)
+		for _, th := range histories {
+			if req.Includes(th) {
+				delete(histories, th.Topic)
 			}
 		}
 		if !reactor.registry.Has(req.ID) {
 			filtered = append(filtered, req)
 		}
 	}
-	filtered = append(filtered, GroupHistoriesByRequestTimespan(reactor.store, mapToList(topics))...)
+	filtered = append(filtered, GroupHistoriesByRequestTimespan(reactor.store, mapToList(histories))...)
 	return RenewRequests(filtered, reactor.timeSource()), nil
 }
 

@@ -743,14 +743,21 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	localPeer := p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"shh", 6}})
 	// FIXME close this in tear down
 	rw1, rw2 := p2p.MsgPipe()
-	go local.HandlePeer(remotePeer, rw1)
-	go remote.HandlePeer(localPeer, rw2)
+	go func() {
+		err := local.HandlePeer(remotePeer, rw1)
+		s.Require().NoError(err)
+	}()
+	go func() {
+		err := remote.HandlePeer(localPeer, rw2)
+		s.Require().NoError(err)
+	}()
 
 	s.mailSymKey, err = s.localWhisperAPI.GenerateSymKeyFromPassword(context.Background(), password)
 	s.Require().NoError(err)
 
 	s.envelopeSymkey = "topics"
 	s.envelopeSymkeyID, err = s.localWhisperAPI.GenerateSymKeyFromPassword(context.Background(), s.envelopeSymkey)
+	s.Require().NoError(err)
 }
 
 func (s *RequestWithTrackingHistorySuite) postEnvelopes(topics ...whisper.TopicType) []hexutil.Bytes {
@@ -863,7 +870,7 @@ func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
 		TopicRequest{Topic: topic2, Duration: time.Hour},
 		TopicRequest{Topic: topic3, Duration: 10 * time.Hour},
 	)
-	// since we are using differente duration for 3rd topic there will be 2 requests
+	// since we are using different duration for 3rd topic there will be 2 requests
 	s.Require().Len(requests, 2)
 	s.waitMessagesDelivered(filterid, hexes...)
 
