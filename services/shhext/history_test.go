@@ -53,7 +53,7 @@ func TestCreateTopicOptionsFromRequest(t *testing.T) {
 	require.Equal(t, topic, options[0].Topic)
 	require.Equal(t, uint64(now.Add(-WhisperTimeAllowance).Unix()), options[0].Range.Start,
 		"start of the range must be adjusted by the whisper time allowance")
-	require.Equal(t, uint64(now.UnixNano()), options[0].Range.End)
+	require.Equal(t, uint64(now.Unix()), options[0].Range.End)
 }
 
 func TestTopicOptionsToBloom(t *testing.T) {
@@ -174,8 +174,13 @@ func TestRequestFinishedUpdate(t *testing.T) {
 }
 
 func TestTopicHistoryUpdate(t *testing.T) {
+	reqID := common.Hash{1}
 	store := createInMemStore(t)
+	request := store.NewRequest()
+	request.ID = reqID
+	require.NoError(t, request.Save())
 	th := store.NewHistory(whisper.TopicType{1}, time.Hour)
+	th.RequestID = request.ID
 	require.NoError(t, th.Save())
 	reactor := NewHistoryUpdateReactor(store, NewRequestsRegistry(0), time.Now)
 	now := time.Now()
