@@ -2,7 +2,7 @@
 .PHONY: statusgo-android statusgo-ios
 
 RELEASE_TAG := $(shell cat VERSION)
-RELEASE_BRANCH := "develop"
+RELEASE_BRANCH := develop
 RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
 PRE_RELEASE := "1"
 RELEASE_TYPE := $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi)
@@ -219,7 +219,7 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 release:
-	@read -p "Are you sure you want to create a new GitHub $(RELEASE_TYPE} against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
+	@read -p "Are you sure you want to create a new GitHub $(RELEASE_TYPE) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
 	if [ $$REPLY = "y" ]; then \
 		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
 		comparison="$$latest_tag..HEAD"; \
