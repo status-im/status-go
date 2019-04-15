@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -x "$(command -v apt)" ]; then
-  apt install -y protobuf-compiler jq
+  echo "apt install -y protobuf-compiler jq"
 fi
 
 if [ -x "$(command -v pacman)" ]; then
