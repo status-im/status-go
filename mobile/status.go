@@ -664,3 +664,13 @@ func ChaosModeUpdate(on bool) string {
 	err := node.ChaosModeCheckRPCClientsUpstreamURL(on)
 	return makeJSONResponse(err)
 }
+
+// SignHash exposes vanilla ECDSA signing required for Swarm messages
+func SignHash(hexEncodedHash string) string {
+	hexEncodedSignature, err := statusBackend.SignHash(hexEncodedHash)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return hexEncodedSignature
+}

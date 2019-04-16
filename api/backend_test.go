@@ -386,6 +386,29 @@ func TestStartStopMultipleTimes(t *testing.T) {
 	require.NoError(t, backend.StopNode())
 }
 
+func TestSignHash(t *testing.T) {
+	backend := NewStatusBackend()
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+
+	require.NoError(t, backend.StartNode(config))
+	defer func() {
+		require.NoError(t, backend.StopNode())
+	}()
+
+	info, _, _ := backend.AccountManager().CreateAccount("123")
+
+	backend.SelectAccount(info.WalletAddress, info.ChatAddress, "123")
+
+	signature, err := backend.SignHash("0xe8a7c03b58911e98bbd66accb2a55d57683f35b23bf9dfca89e5e244eb5cc3f2")
+
+	require.NoError(t, err)
+
+	require.NotEqual(t, signature, "")
+
+	// TODO: actually implement a test
+}
+
 func TestHashTypedData(t *testing.T) {
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
