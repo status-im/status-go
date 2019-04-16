@@ -7,11 +7,6 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 )
 
-// The default number of kdf iterations in sqlcipher (from version 3.0.0)
-// https://github.com/sqlcipher/sqlcipher/blob/fda4c68bb474da7e955be07a2b807bda1bb19bd2/CHANGELOG.md#300---2013-11-05
-// https://www.zetetic.net/sqlcipher/sqlcipher-api/#kdf_iter
-const defaultKdfIterationsNumber = 64000
-
 // The reduced number of kdf iterations (for performance reasons) which is
 // currently used for derivation of the database key
 // https://github.com/status-im/status-go/pull/1343
