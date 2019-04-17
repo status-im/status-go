@@ -396,17 +396,27 @@ func TestSignHash(t *testing.T) {
 		require.NoError(t, backend.StopNode())
 	}()
 
-	info, _, _ := backend.AccountManager().CreateAccount("123")
+	testSignature := func(chatPrivKeyHex, hashHex, expectedSignatureHex string) {
+		// encryption key doens't matter here
+		encryptionPrivKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
 
-	require.NoError(t, backend.SelectAccount(info.WalletAddress, info.ChatAddress, "123"))
+		require.NoError(t, backend.InjectChatAccount(chatPrivKeyHex, encryptionPrivKeyHex))
 
-	signature, err := backend.SignHash("0xe8a7c03b58911e98bbd66accb2a55d57683f35b23bf9dfca89e5e244eb5cc3f2")
+		signature, err := backend.SignHash(hashHex)
 
-	require.NoError(t, err)
+		require.NoError(t, err)
 
-	require.NotEqual(t, signature, "")
+		require.Equal(t, signature, expectedSignatureHex)
+	}
 
-	// TODO: actually implement a test
+	testSignature(
+		// note no 0x in chat key, that is intentional
+		"facadefacadefacadefacadefacadefacadefacadefacadefacadefacadefaca",
+		"0xa4735de5193362fe856416000105cdfa6ce56265607311cebae93b26e5adf438",
+		"0x176c971bae188c663614fc535ac9dbf62871dfeaadb38645809a510d28b3c4b0245415d5547c1b27f7cfea3341564f9c6981421144d3606b455346be69bd078c01",
+	)
 }
 
 func TestHashTypedData(t *testing.T) {
