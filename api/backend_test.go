@@ -398,7 +398,7 @@ func TestSignHash(t *testing.T) {
 
 	info, _, _ := backend.AccountManager().CreateAccount("123")
 
-	backend.SelectAccount(info.WalletAddress, info.ChatAddress, "123")
+	require.NoError(t, backend.SelectAccount(info.WalletAddress, info.ChatAddress, "123"))
 
 	signature, err := backend.SignHash("0xe8a7c03b58911e98bbd66accb2a55d57683f35b23bf9dfca89e5e244eb5cc3f2")
 
