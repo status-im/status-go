@@ -232,22 +232,17 @@ func (r *Rendezvous) Discover(
 
 func enrToNode(record enr.Record) (*discv5.Node, error) {
 	var (
-		key     enode.Secp256k1
-		ip      enr.IP
-		tport   enr.TCP
-		uport   enr.UDP
-		proxied Proxied
-		nodeID  discv5.NodeID
+		key    enode.Secp256k1
+		ip     enr.IP
+		tport  enr.TCP
+		uport  enr.UDP
+		nodeID discv5.NodeID
 	)
-	if err := record.Load(&proxied); err == nil {
-		nodeID = discv5.NodeID(proxied)
-	} else {
-		if err := record.Load(&key); err != nil {
-			return nil, err
-		}
-		ecdsaKey := ecdsa.PublicKey(key)
-		nodeID = discv5.PubkeyID(&ecdsaKey)
+	if err := record.Load(&key); err != nil {
+		return nil, err
 	}
+	ecdsaKey := ecdsa.PublicKey(key)
+	nodeID = discv5.PubkeyID(&ecdsaKey)
 	if err := record.Load(&ip); err != nil {
 		return nil, err
 	}
