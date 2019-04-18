@@ -48,6 +48,7 @@ func TestNewHistoryRequest(t *testing.T) {
 	require.Error(t, err)
 	req = store.NewRequest()
 	req.ID = id
+
 	th, err := store.GetHistory(whisper.TopicType{1}, time.Hour)
 	require.NoError(t, err)
 	req.AddHistory(th)

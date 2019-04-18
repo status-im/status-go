@@ -175,11 +175,7 @@ func (req *HistoryRequest) Load() error {
 	if err != nil {
 		return err
 	}
-	err = req.RawUnmarshall(val)
-	if err != nil {
-		return err
-	}
-	return req.loadHistories()
+	return req.RawUnmarshall(val)
 }
 
 func (req *HistoryRequest) loadHistories() error {
