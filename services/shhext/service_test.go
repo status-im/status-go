@@ -826,23 +826,6 @@ func (s *RequestWithTrackingHistorySuite) waitMessagesDelivered(filterid string,
 
 }
 
-func (s *RequestWithTrackingHistorySuite) waitLastEnvelopeUpdated(requests ...hexutil.Bytes) {
-	store := s.localService.historyUpdates.store
-	s.Require().NoError(utils.Eventually(func() error {
-		reqs, err := store.GetAllRequests()
-		if err != nil {
-			return err
-		}
-		if len(reqs) != len(requests) {
-			return errors.New("one request should be in database")
-		}
-		if (reqs[0].LastEnvelopeHash == common.Hash{}) {
-			return errors.New("last envelope hash is not set yet")
-		}
-		return nil
-	}, 2*time.Second, 200*time.Millisecond))
-}
-
 func (s *RequestWithTrackingHistorySuite) waitNoRequests() {
 	store := s.localService.historyUpdates.store
 	s.Require().NoError(utils.Eventually(func() error {
@@ -877,6 +860,9 @@ func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
 	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic1, time.Now(), common.BytesToHash(hexes[0])))
 	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic2, time.Now(), common.BytesToHash(hexes[1])))
 	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic3, time.Now(), common.BytesToHash(hexes[2])))
+	for _, r := range requests {
+		s.Require().NoError(s.localAPI.CompleteRequest(context.TODO(), r.String()))
+	}
 	s.waitNoRequests()
 
 	requests = s.initiateHistoryRequest(
@@ -900,7 +886,6 @@ func (s *RequestWithTrackingHistorySuite) TestSingleRequest() {
 	)
 	s.Require().Len(requests, 1)
 	s.waitMessagesDelivered(filterid, hexes...)
-	s.waitLastEnvelopeUpdated(requests...)
 }
 
 func waitForArchival(events chan whisper.EnvelopeEvent, duration time.Duration, hashes ...hexutil.Bytes) error {

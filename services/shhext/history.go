@@ -1,14 +1,11 @@
 package shhext
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
@@ -47,26 +44,14 @@ type HistoryUpdateReactor struct {
 
 // UpdateFinishedRequest removes successfully finished request and updates every topic
 // attached to the request.
-func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(id common.Hash, hash common.Hash) error {
+func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(id common.Hash) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
 	req, err := reactor.store.GetRequest(id)
 	if err != nil {
 		return err
 	}
-	// event was received once we processed all envelopes related to this event
-	histories := req.Histories()
-	for i := range histories {
-		th := &histories[i]
-		if th.LastEnvelopeHash == hash {
-			return req.Delete()
-		}
-	}
-	// if any of the topics already received LastEnvelopeHash we know that request is finished
-	// and we can safely remove request. If it is not finished then we need to wait for that LastTimestamp.
-	// and we do that in UpdateTopicHistory method
-	req.LastEnvelopeHash = hash
-	return req.Save()
+	return req.Delete()
 }
 
 // UpdateTopicHistory updates Current timestamp for the TopicHistory with a given timestamp.
@@ -92,23 +77,7 @@ func (reactor *HistoryUpdateReactor) UpdateTopicHistory(topic whisper.TopicType,
 		th.Current = timestamp
 		th.LastEnvelopeHash = envelopeHash
 	}
-	err = th.Save()
-	if err != nil {
-		return err
-	}
-	req, err := reactor.store.GetRequest(th.RequestID)
-	if err != nil {
-		return err
-	}
-	// we didn't receive event that request got finished yet
-	if (req.LastEnvelopeHash == common.Hash{}) {
-		return nil
-	}
-	// in this case we already processed event that request was finished
-	if req.LastEnvelopeHash == envelopeHash {
-		return req.Delete()
-	}
-	return nil
+	return th.Save()
 }
 
 // TopicRequest defines what user has to provide.
@@ -285,69 +254,4 @@ func (filter BloomFilterOption) ToMessagesRequestPayload() ([]byte, error) {
 		Limit: 10000,
 	}
 	return rlp.EncodeToBytes(payload)
-}
-
-// NewHistoryListener returns instance of the HistoryEventListener.
-func NewHistoryListener(reactor *HistoryUpdateReactor, requestsUpdates RequestEventsProducer) *HistoryEventListener {
-	return &HistoryEventListener{
-		reactor:        reactor,
-		requestUpdates: requestsUpdates,
-	}
-}
-
-// RequestEventsProducer produces events that track flow of history requests.
-type RequestEventsProducer interface {
-	SubscribeEnvelopeEvents(chan<- whisper.EnvelopeEvent) event.Subscription
-}
-
-// HistoryEventListener is an object that keeps open subscriptions for event producers and feeds necessary
-// information to HistoryUpdateReactor.
-type HistoryEventListener struct {
-	wg   sync.WaitGroup
-	quit chan struct{}
-
-	reactor *HistoryUpdateReactor
-
-	requestUpdates RequestEventsProducer
-}
-
-// Start creates subscriptions and spawns a goroutine to consume events from them.
-// Must be called in the same thread as Stop.
-func (listener *HistoryEventListener) Start() error {
-	if listener.quit != nil {
-		return errors.New("already running")
-	}
-	listener.wg.Add(1)
-	listener.quit = make(chan struct{})
-	requests := make(chan whisper.EnvelopeEvent, 10)
-	requestsSub := listener.requestUpdates.SubscribeEnvelopeEvents(requests)
-	go func() {
-		for {
-			select {
-			case <-listener.quit:
-				requestsSub.Unsubscribe()
-				listener.wg.Done()
-				return
-			case ev := <-requests:
-				if ev.Event != whisper.EventMailServerRequestCompleted {
-					continue
-				}
-				data := ev.Data.(*whisper.MailServerResponse)
-				err := listener.reactor.UpdateFinishedRequest(ev.Hash, data.LastEnvelopeHash)
-				if err != nil {
-					log.Error("failed to update request when it was finished", "id", ev.Hash, "error", err)
-				}
-			}
-		}
-	}()
-	return nil
-}
-
-// Stop consuming goroutine and wait until it exits.
-func (listener *HistoryEventListener) Stop() {
-	if listener.quit == nil {
-		return
-	}
-	close(listener.quit)
-	listener.wg.Wait()
 }

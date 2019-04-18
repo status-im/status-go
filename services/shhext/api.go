@@ -596,11 +596,14 @@ func (api *PublicAPI) InitiateHistoryRequests(request InitiateHistoryRequest) ([
 		if err != nil {
 			return rst, err
 		}
-		hex := hexutil.Bytes{}
-		copy(hex, hash[:])
-		rst = append(rst, hex)
+		rst = append(rst, hash[:])
 	}
 	return rst, nil
+}
+
+// CompleteRequest client must mark request completed when all envelopes were processed.
+func (api *PublicAPI) CompleteRequest(ctx context.Context, hex string) error {
+	return api.service.historyUpdates.UpdateFinishedRequest(common.HexToHash(hex))
 }
 
 // DEPRECATED: use SendDirectMessage with DH flag

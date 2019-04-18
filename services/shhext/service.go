@@ -42,20 +42,19 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	w                      *whisper.Whisper
-	config                 params.ShhextConfig
-	envelopesMonitor       *EnvelopesMonitor
-	mailMonitor            *MailRequestMonitor
-	requestsRegistry       *RequestsRegistry
-	historyUpdates         *HistoryUpdateReactor
-	historyUpdatesListener *HistoryEventListener
-	server                 *p2p.Server
-	nodeID                 *ecdsa.PrivateKey
-	deduplicator           *dedup.Deduplicator
-	protocol               *chat.ProtocolService
-	dataDir                string
-	installationID         string
-	pfsEnabled             bool
+	w                *whisper.Whisper
+	config           params.ShhextConfig
+	envelopesMonitor *EnvelopesMonitor
+	mailMonitor      *MailRequestMonitor
+	requestsRegistry *RequestsRegistry
+	historyUpdates   *HistoryUpdateReactor
+	server           *p2p.Server
+	nodeID           *ecdsa.PrivateKey
+	deduplicator     *dedup.Deduplicator
+	protocol         *chat.ProtocolService
+	dataDir          string
+	installationID   string
+	pfsEnabled       bool
 
 	peerStore       *mailservers.PeerStore
 	cache           *mailservers.Cache
@@ -76,7 +75,6 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 	}
 	requestsRegistry := NewRequestsRegistry(delay)
 	historyUpdates := NewHistoryUpdateReactor(db.NewHistoryStore(ldb), requestsRegistry, w.GetCurrentTime)
-	historyUpdatesListener := NewHistoryListener(historyUpdates, w)
 	mailMonitor := &MailRequestMonitor{
 		w:                w,
 		handler:          handler,
@@ -85,19 +83,18 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 	}
 	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps, config.MaxMessageDeliveryAttempts)
 	return &Service{
-		w:                      w,
-		config:                 config,
-		envelopesMonitor:       envelopesMonitor,
-		mailMonitor:            mailMonitor,
-		requestsRegistry:       requestsRegistry,
-		historyUpdates:         historyUpdates,
-		historyUpdatesListener: historyUpdatesListener,
-		deduplicator:           dedup.NewDeduplicator(w, ldb),
-		dataDir:                config.BackupDisabledDataDir,
-		installationID:         config.InstallationID,
-		pfsEnabled:             config.PFSEnabled,
-		peerStore:              ps,
-		cache:                  cache,
+		w:                w,
+		config:           config,
+		envelopesMonitor: envelopesMonitor,
+		mailMonitor:      mailMonitor,
+		requestsRegistry: requestsRegistry,
+		historyUpdates:   historyUpdates,
+		deduplicator:     dedup.NewDeduplicator(w, ldb),
+		dataDir:          config.BackupDisabledDataDir,
+		installationID:   config.InstallationID,
+		pfsEnabled:       config.PFSEnabled,
+		peerStore:        ps,
+		cache:            cache,
 	}
 }
 
@@ -274,9 +271,6 @@ func (s *Service) Start(server *p2p.Server) error {
 		s.lastUsedMonitor = mailservers.NewLastUsedConnectionMonitor(s.peerStore, s.cache, s.w)
 		s.lastUsedMonitor.Start()
 	}
-	if err := s.historyUpdatesListener.Start(); err != nil {
-		return err
-	}
 	s.envelopesMonitor.Start()
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
@@ -293,7 +287,6 @@ func (s *Service) Stop() error {
 	if s.config.EnableLastUsedMonitor {
 		s.lastUsedMonitor.Stop()
 	}
-	s.historyUpdatesListener.Stop()
 	s.requestsRegistry.Clear()
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
