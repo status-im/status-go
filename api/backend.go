@@ -762,24 +762,20 @@ func (b *StatusBackend) UpdateMailservers(enodes []string) error {
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm
 func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 	hash, err := hexutil.Decode(hexEncodedHash)
-
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not unmarshal the input: %v", err)
 	}
 
 	chatAccount, err := b.AccountManager().SelectedChatAccount()
-
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not select account: %v", err.Error())
 	}
 
 	signature, err := ethcrypto.Sign(hash, chatAccount.AccountKey.PrivateKey)
-
 	if err != nil {
 		return "", fmt.Errorf("SignHash: could not sign the hash: %v", err)
 	}
 
 	hexEncodedSignature := hexutil.Encode(signature)
-
 	return hexEncodedSignature, nil
 }

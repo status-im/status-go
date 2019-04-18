@@ -396,27 +396,31 @@ func TestSignHash(t *testing.T) {
 		require.NoError(t, backend.StopNode())
 	}()
 
-	testSignature := func(chatPrivKeyHex, hashHex, expectedSignatureHex string) {
-		// encryption key doens't matter here
-		encryptionPrivKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
-
-		require.NoError(t, backend.InjectChatAccount(chatPrivKeyHex, encryptionPrivKeyHex))
-
-		signature, err := backend.SignHash(hashHex)
-
-		require.NoError(t, err)
-
-		require.Equal(t, signature, expectedSignatureHex)
+	var testCases = []struct {
+		name                 string
+		chatPrivKeyHex       string
+		hashHex              string
+		expectedSignatureHex string
+	}{
+		{
+			name:                 "tc1",
+			chatPrivKeyHex:       "facadefacadefacadefacadefacadefacadefacadefacadefacadefacadefaca",
+			hashHex:              "0xa4735de5193362fe856416000105cdfa6ce56265607311cebae93b26e5adf438",
+			expectedSignatureHex: "0x176c971bae188c663614fc535ac9dbf62871dfeaadb38645809a510d28b3c4b0245415d5547c1b27f7cfea3341564f9c6981421144d3606b455346be69bd078c01",
+		},
 	}
 
-	testSignature(
-		// note no 0x in chat key, that is intentional
-		"facadefacadefacadefacadefacadefacadefacadefacadefacadefacadefaca",
-		"0xa4735de5193362fe856416000105cdfa6ce56265607311cebae93b26e5adf438",
-		"0x176c971bae188c663614fc535ac9dbf62871dfeaadb38645809a510d28b3c4b0245415d5547c1b27f7cfea3341564f9c6981421144d3606b455346be69bd078c01",
-	)
+	const dummyEncKey = "facadefacadefacadefacadefacadefacadefacadefacadefacadefacadefaca"
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, backend.InjectChatAccount(tc.chatPrivKeyHex, dummyEncKey))
+
+			signature, err := backend.SignHash(tc.hashHex)
+			require.NoError(t, err)
+			require.Equal(t, signature, tc.expectedSignatureHex)
+		})
+	}
 }
 
 func TestHashTypedData(t *testing.T) {
