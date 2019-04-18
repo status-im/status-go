@@ -50,8 +50,6 @@ type TopicHistory struct {
 	// whisper topic
 	Topic whisper.TopicType
 
-	LastEnvelopeHash common.Hash
-
 	Duration time.Duration
 	// Timestamp that was used for the first request with this topic.
 	// Used to identify overlapping ranges.
@@ -122,7 +120,6 @@ type HistoryRequest struct {
 	ID common.Hash
 	// List of the topics
 	TopicHistoryKeys []TopicHistoryKey
-	LastEnvelopeHash common.Hash
 }
 
 // AddHistory adds instance to internal list of instance and add instance key to the list

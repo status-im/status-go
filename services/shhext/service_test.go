@@ -857,9 +857,9 @@ func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
 	s.Require().Len(requests, 2)
 	s.waitMessagesDelivered(filterid, hexes...)
 
-	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic1, time.Now(), common.BytesToHash(hexes[0])))
-	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic2, time.Now(), common.BytesToHash(hexes[1])))
-	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic3, time.Now(), common.BytesToHash(hexes[2])))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic1, time.Now()))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic2, time.Now()))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic3, time.Now()))
 	for _, r := range requests {
 		s.Require().NoError(s.localAPI.CompleteRequest(context.TODO(), r.String()))
 	}

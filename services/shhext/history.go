@@ -55,7 +55,7 @@ func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(id common.Hash) error
 }
 
 // UpdateTopicHistory updates Current timestamp for the TopicHistory with a given timestamp.
-func (reactor *HistoryUpdateReactor) UpdateTopicHistory(topic whisper.TopicType, timestamp time.Time, envelopeHash common.Hash) error {
+func (reactor *HistoryUpdateReactor) UpdateTopicHistory(topic whisper.TopicType, timestamp time.Time) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
 	histories, err := reactor.store.GetHistoriesByTopic(topic)
@@ -75,7 +75,6 @@ func (reactor *HistoryUpdateReactor) UpdateTopicHistory(topic whisper.TopicType,
 	}
 	if timestamp.After(th.Current) {
 		th.Current = timestamp
-		th.LastEnvelopeHash = envelopeHash
 	}
 	return th.Save()
 }
