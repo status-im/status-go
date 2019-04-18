@@ -48,7 +48,6 @@ gotest_extraflags =
 
 DOCKER_IMAGE_NAME ?= statusteam/status-go
 BOOTNODE_IMAGE_NAME ?= statusteam/bootnode
-PROXY_IMAGE_NAME ?= statusteam/discovery-proxy
 STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 
 DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
@@ -100,10 +99,6 @@ statusd-prune-docker-image: ##@statusd-prune Build statusd-prune docker image
 
 bootnode: ##@build Build discovery v5 bootnode using status-go deps
 	go build -i -o $(GOBIN)/bootnode -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/bootnode/
-	@echo "Compilation done."
-
-proxy: ##@build Build proxy for rendezvous servers using status-go deps
-	go build -i -o $(GOBIN)/proxy -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/proxy/
 	@echo "Compilation done."
 
 node-canary: ##@build Build P2P node canary using status-go deps
@@ -160,14 +155,6 @@ bootnode-image:
 		--label "author=$(AUTHOR)" \
 		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
-
-proxy-image:
-	@echo "Building docker image for proxy..."
-	docker build --file _assets/build/Dockerfile-proxy . \
-		--build-arg "build_tags=$(BUILD_TAGS)" \
-		--build-arg "build_flags=$(BUILD_FLAGS)" \
-		-t $(PROXY_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
-		-t $(PROXY_IMAGE_NAME):latest
 
 push-docker-images: docker-image bootnode-image
 	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
