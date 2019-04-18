@@ -674,3 +674,17 @@ func GetNodesFromContract(rpcEndpoint *C.char, contractAddress *C.char) *C.char 
 
 	return C.CString(string(data))
 }
+
+// SignHash exposes vanilla ECDSA signing required for Swarm messages
+//export SignHash
+func SignHash(hexEncodedHash *C.char) *C.char {
+	hexEncodedSignature, err := statusBackend.SignHash(
+		C.GoString(hexEncodedHash),
+	)
+
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(hexEncodedSignature)
+}
