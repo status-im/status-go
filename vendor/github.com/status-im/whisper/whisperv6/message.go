@@ -75,6 +75,8 @@ type ReceivedMessage struct {
 
 	SymKeyHash   common.Hash // The Keccak256Hash of the key
 	EnvelopeHash common.Hash // Message envelope hash to act as a unique id
+
+	P2P bool // is set to true if this message was received from mail server.
 }
 
 func isMessageSigned(flags byte) bool {

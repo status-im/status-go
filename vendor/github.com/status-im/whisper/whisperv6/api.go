@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -364,7 +363,7 @@ func (api *PublicWhisperAPI) Messages(ctx context.Context, crit Criteria) (*rpc.
 
 	filter := Filter{
 		PoW:      crit.MinPow,
-		Messages: make(map[common.Hash]*ReceivedMessage),
+		Messages: api.w.NewMessageStore(),
 		AllowP2P: crit.AllowP2P,
 	}
 
@@ -453,6 +452,7 @@ type Message struct {
 	PoW       float64   `json:"pow"`
 	Hash      []byte    `json:"hash"`
 	Dst       []byte    `json:"recipientPublicKey,omitempty"`
+	P2P       bool      `json:"bool,omitempty"`
 }
 
 type messageOverride struct {
@@ -473,6 +473,7 @@ func ToWhisperMessage(message *ReceivedMessage) *Message {
 		PoW:       message.PoW,
 		Hash:      message.EnvelopeHash.Bytes(),
 		Topic:     message.Topic,
+		P2P:       message.P2P,
 	}
 
 	if message.Dst != nil {
@@ -587,7 +588,7 @@ func (api *PublicWhisperAPI) NewMessageFilter(req Criteria) (string, error) {
 		PoW:      req.MinPow,
 		AllowP2P: req.AllowP2P,
 		Topics:   topics,
-		Messages: make(map[common.Hash]*ReceivedMessage),
+		Messages: api.w.NewMessageStore(),
 	}
 
 	id, err := api.w.Subscribe(f)
