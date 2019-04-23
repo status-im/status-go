@@ -26,6 +26,47 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// MessageStore defines interface for temporary message store.
+type MessageStore interface {
+	Add(*ReceivedMessage) error
+	Pop() ([]*ReceivedMessage, error)
+}
+
+// NewMemoryMessageStore returns pointer to an instance of the MemoryMessageStore.
+func NewMemoryMessageStore() *MemoryMessageStore {
+	return &MemoryMessageStore{
+		messages: map[common.Hash]*ReceivedMessage{},
+	}
+}
+
+// MemoryMessageStore stores massages in memory hash table.
+type MemoryMessageStore struct {
+	mu       sync.Mutex
+	messages map[common.Hash]*ReceivedMessage
+}
+
+// Add adds message to store.
+func (store *MemoryMessageStore) Add(msg *ReceivedMessage) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, exist := store.messages[msg.EnvelopeHash]; !exist {
+		store.messages[msg.EnvelopeHash] = msg
+	}
+	return nil
+}
+
+// Pop returns all avaiable messages and cleans the store.
+func (store *MemoryMessageStore) Pop() ([]*ReceivedMessage, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	all := make([]*ReceivedMessage, 0, len(store.messages))
+	for hash, msg := range store.messages {
+		delete(store.messages, hash)
+		all = append(all, msg)
+	}
+	return all, nil
+}
+
 // Filter represents a Whisper message filter
 type Filter struct {
 	Src        *ecdsa.PublicKey  // Sender of the message
@@ -37,7 +78,7 @@ type Filter struct {
 	SymKeyHash common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
 	id         string            // unique identifier
 
-	Messages map[common.Hash]*ReceivedMessage
+	Messages MessageStore
 	mutex    sync.RWMutex
 }
 
@@ -66,10 +107,6 @@ func NewFilters(w *Whisper) *Filters {
 func (fs *Filters) Install(watcher *Filter) (string, error) {
 	if watcher.KeySym != nil && watcher.KeyAsym != nil {
 		return "", fmt.Errorf("filters must choose between symmetric and asymmetric keys")
-	}
-
-	if watcher.Messages == nil {
-		watcher.Messages = make(map[common.Hash]*ReceivedMessage)
 	}
 
 	id, err := GenerateRandomID()
@@ -183,6 +220,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 		}
 
 		if match && msg != nil {
+			msg.P2P = p2pMessage
 			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
 				watcher.Trigger(msg)
@@ -202,27 +240,21 @@ func (f *Filter) expectsSymmetricEncryption() bool {
 // Trigger adds a yet-unknown message to the filter's list of
 // received messages.
 func (f *Filter) Trigger(msg *ReceivedMessage) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	if _, exist := f.Messages[msg.EnvelopeHash]; !exist {
-		f.Messages[msg.EnvelopeHash] = msg
+	err := f.Messages.Add(msg)
+	if err != nil {
+		log.Error("failed to add msg into the filters store", "hash", msg.EnvelopeHash, "error", err)
 	}
 }
 
 // Retrieve will return the list of all received messages associated
 // to a filter.
-func (f *Filter) Retrieve() (all []*ReceivedMessage) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	all = make([]*ReceivedMessage, 0, len(f.Messages))
-	for _, msg := range f.Messages {
-		all = append(all, msg)
+func (f *Filter) Retrieve() []*ReceivedMessage {
+	msgs, err := f.Messages.Pop()
+	if err != nil {
+		log.Error("failed to retrieve messages from filter store", "error", err)
+		return nil
 	}
-
-	f.Messages = make(map[common.Hash]*ReceivedMessage) // delete old messages
-	return all
+	return msgs
 }
 
 // MatchMessage checks if the filter matches an already decrypted
