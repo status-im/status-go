@@ -299,10 +299,10 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	defer s.server.Close()
 
 	var (
-		sentEnvelopes     []*whisper.Envelope
-		reverseSentHashes []common.Hash
-		receivedHashes    []common.Hash
-		archiveKeys       []string
+		sentEnvelopes  []*whisper.Envelope
+		sentHashes     []common.Hash
+		receivedHashes []common.Hash
+		archiveKeys    []string
 	)
 
 	now := time.Now()
@@ -316,7 +316,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		key := NewDBKey(env.Expiry-env.TTL, env.Hash())
 		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Bytes()))
 		sentEnvelopes = append(sentEnvelopes, env)
-		reverseSentHashes = append([]common.Hash{env.Hash()}, reverseSentHashes...)
+		sentHashes = append(sentHashes, env.Hash())
 	}
 
 	reqLimit := uint32(6)
@@ -334,11 +334,11 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 	// 10 envelopes sent
 	s.Equal(count, uint32(len(sentEnvelopes)))
 	// 6 envelopes received
-	s.Equal(int(limit), len(receivedHashes))
-	// the 6 envelopes received should be in descending order
-	s.Equal(reverseSentHashes[:limit], receivedHashes)
+	s.Len(receivedHashes, int(limit))
+	// the 6 envelopes received should be in forward order
+	s.Equal(sentHashes[:limit], receivedHashes)
 	// cursor should be the key of the last envelope of the last page
-	s.Equal(archiveKeys[count-limit], fmt.Sprintf("%x", cursor))
+	s.Equal(archiveKeys[limit-1], fmt.Sprintf("%x", cursor))
 
 	// second page
 	receivedHashes, cursor, _ = processRequestAndCollectHashes(
