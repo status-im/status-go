@@ -63,7 +63,7 @@ type WhisperConfig struct {
 	// MinimumPoW minimum PoW for Whisper messages
 	MinimumPoW float64
 
-	// MailServerPassword for symmetric encryption with MailServer.
+	// MailServerPassword for symmetric encryption of whisper message history requests.
 	// (if no account file selected, then this password is used for symmetric encryption).
 	MailServerPassword string
 
@@ -271,7 +271,7 @@ type NodeConfig struct {
 	// LogMaxBackups defines number of rotated log files that will be stored.
 	LogMaxBackups int
 
-	// LogMaxSize after current size is reached log file will be rotated
+	// LogMaxSize in megabytes after current size is reached log file will be rotated.
 	LogMaxSize int
 
 	// LogCompressRotated if true all rotated files will be gzipped.

@@ -5,11 +5,12 @@
 
 # Docs
 
-- [How To Build](https://status.im/build_status/status_go.html)
-- [How To Contribute](CONTRIBUTING.md)
-- [How To Release](RELEASING.md)
-- [How To run a Bootnode](_assets/compose/bootnode)
-- [How To run a Mailserver](_assets/compose/mailserver)
+- [How to Build](https://status.im/build_status/status_go.html)
+- [How to Contribute](CONTRIBUTING.md)
+- [How to Release](RELEASING.md)
+- [How to run a Bootnode](_assets/compose/bootnode)
+- [How to run a Mailserver](_assets/compose/mailserver)
+- [How to configure status-go](/config)
 
 # License
 
