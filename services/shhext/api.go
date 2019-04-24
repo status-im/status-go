@@ -155,6 +155,15 @@ type SyncMessagesResponse struct {
 	Error string `json:"error"`
 }
 
+// InitiateHistoryRequestParams type for initiating history requests from a peer.
+type InitiateHistoryRequestParams struct {
+	Peer     string
+	SymKeyID string
+	Requests []TopicRequest
+	Force    bool
+	Timeout  time.Duration
+}
+
 // -----
 // PUBLIC API
 // -----
@@ -500,15 +509,6 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	return api.Post(ctx, whisperMessage)
 }
 
-// InitiateHistoryRequest type for initiating history requests from a peer.
-type InitiateHistoryRequest struct {
-	Peer     string
-	SymKeyID string
-	Requests []TopicRequest
-	Force    bool
-	Timeout  time.Duration
-}
-
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
 	shh := api.service.w
 	now := api.service.w.GetCurrentTime()
@@ -576,9 +576,9 @@ func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, pee
 // InitiateHistoryRequests is a stateful API for initiating history request for each topic.
 // Caller of this method needs to define only two parameters per each TopicRequest:
 // - Topic
-// - Duration before Now
+// - Duration in nanoseconds. Will be used to determine starting time for history request.
 // After that status-go will guarantee that request for this topic and date will be performed.
-func (api *PublicAPI) InitiateHistoryRequests(request InitiateHistoryRequest) ([]hexutil.Bytes, error) {
+func (api *PublicAPI) InitiateHistoryRequests(request InitiateHistoryRequestParams) ([]hexutil.Bytes, error) {
 	rst := []hexutil.Bytes{}
 	requests, err := api.service.historyUpdates.CreateRequests(request.Requests)
 	if err != nil {

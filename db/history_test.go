@@ -10,7 +10,7 @@ import (
 )
 
 func TestTopicHistoryStoreLoadFromKey(t *testing.T) {
-	db, err := NewIsolatedMemoryDB(TopicHistoryBucket)
+	db, err := NewMemoryDBNamespace(TopicHistoryBucket)
 	require.NoError(t, err)
 	th := TopicHistory{
 		db:       db,
@@ -74,9 +74,9 @@ func TestAddHistory(t *testing.T) {
 	topic := whisper.TopicType{1, 1, 1}
 	now := time.Now()
 
-	topicdb, err := NewIsolatedMemoryDB(TopicHistoryBucket)
+	topicdb, err := NewMemoryDBNamespace(TopicHistoryBucket)
 	require.NoError(t, err)
-	requestdb, err := NewIsolatedMemoryDB(HistoryRequestBucket)
+	requestdb, err := NewMemoryDBNamespace(HistoryRequestBucket)
 	require.NoError(t, err)
 
 	th := TopicHistory{db: topicdb, Topic: topic, Current: now}

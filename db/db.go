@@ -33,21 +33,22 @@ func NewMemoryDB() (*leveldb.DB, error) {
 	return leveldb.Open(storage.NewMemStorage(), nil)
 }
 
-// NewIsolatedDB returns instance that ensures isolated operations.
-func NewIsolatedDB(db *leveldb.DB, prefix storagePrefix) PrefixedLevelDB {
-	return PrefixedLevelDB{
+// NewDBNamespace returns instance that ensures isolated operations.
+func NewDBNamespace(db *leveldb.DB, prefix storagePrefix) LevelDBNamespace {
+	return LevelDBNamespace{
 		db:     db,
 		prefix: prefix,
 	}
 }
 
-// NewIsolatedMemoryDB wraps in memory leveldb with provided bucket.
-func NewIsolatedMemoryDB(prefix storagePrefix) (pdb PrefixedLevelDB, err error) {
+// NewMemoryDBNamespace wraps in memory leveldb with provided bucket.
+// Mostly used for tests. Including tests in other packages.
+func NewMemoryDBNamespace(prefix storagePrefix) (pdb LevelDBNamespace, err error) {
 	db, err := NewMemoryDB()
 	if err != nil {
 		return pdb, err
 	}
-	return NewIsolatedDB(db, prefix), nil
+	return NewDBNamespace(db, prefix), nil
 }
 
 // Key creates a DB key for a specified service with specified data
@@ -88,30 +89,30 @@ func Open(path string, opts *opt.Options) (db *leveldb.DB, err error) {
 	return
 }
 
-// PrefixedLevelDB database where all operations will be prefixed with a certain bucket.
-type PrefixedLevelDB struct {
+// LevelDBNamespace database where all operations will be prefixed with a certain bucket.
+type LevelDBNamespace struct {
 	db     *leveldb.DB
 	prefix storagePrefix
 }
 
-func (db PrefixedLevelDB) prefixedKey(key []byte) []byte {
+func (db LevelDBNamespace) prefixedKey(key []byte) []byte {
 	endkey := make([]byte, len(key)+1)
 	endkey[0] = byte(db.prefix)
 	copy(endkey[1:], key)
 	return endkey
 }
 
-func (db PrefixedLevelDB) Put(key, value []byte) error {
+func (db LevelDBNamespace) Put(key, value []byte) error {
 	return db.db.Put(db.prefixedKey(key), value, nil)
 }
 
-func (db PrefixedLevelDB) Get(key []byte) ([]byte, error) {
+func (db LevelDBNamespace) Get(key []byte) ([]byte, error) {
 	return db.db.Get(db.prefixedKey(key), nil)
 }
 
 // Range returns leveldb util.Range prefixed with a single byte.
 // If prefix is nil range will iterate over all records in a given bucket.
-func (db PrefixedLevelDB) Range(prefix, limit []byte) *util.Range {
+func (db LevelDBNamespace) Range(prefix, limit []byte) *util.Range {
 	if limit == nil {
 		return util.BytesPrefix(db.prefixedKey(prefix))
 	}
@@ -119,42 +120,42 @@ func (db PrefixedLevelDB) Range(prefix, limit []byte) *util.Range {
 }
 
 // Delete removes key from database.
-func (db PrefixedLevelDB) Delete(key []byte) error {
+func (db LevelDBNamespace) Delete(key []byte) error {
 	return db.db.Delete(db.prefixedKey(key), nil)
 }
 
 // NewIterator returns iterator for a given slice.
-func (db PrefixedLevelDB) NewIterator(slice *util.Range) PrefixedIterator {
-	return PrefixedIterator{db.db.NewIterator(slice, nil)}
+func (db LevelDBNamespace) NewIterator(slice *util.Range) NamespaceIterator {
+	return NamespaceIterator{db.db.NewIterator(slice, nil)}
 }
 
-// PrefixedIterator wraps leveldb iterator, works mostly the same way.
+// NamespaceIterator wraps leveldb iterator, works mostly the same way.
 // The only difference is that first byte of the key is dropped.
-type PrefixedIterator struct {
+type NamespaceIterator struct {
 	iter iterator.Iterator
 }
 
 // Key returns key of the current item.
-func (iter PrefixedIterator) Key() []byte {
+func (iter NamespaceIterator) Key() []byte {
 	return iter.iter.Key()[1:]
 }
 
 // Value returns actual value of the current item.
-func (iter PrefixedIterator) Value() []byte {
+func (iter NamespaceIterator) Value() []byte {
 	return iter.iter.Value()
 }
 
 // Error returns accumulated error.
-func (iter PrefixedIterator) Error() error {
+func (iter NamespaceIterator) Error() error {
 	return iter.iter.Error()
 }
 
 // Prev moves cursor backward.
-func (iter PrefixedIterator) Prev() bool {
+func (iter NamespaceIterator) Prev() bool {
 	return iter.iter.Prev()
 }
 
 // Next moves cursor forward.
-func (iter PrefixedIterator) Next() bool {
+func (iter NamespaceIterator) Next() bool {
 	return iter.iter.Next()
 }

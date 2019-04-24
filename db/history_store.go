@@ -12,15 +12,15 @@ import (
 // NewHistoryStore returns HistoryStore instance.
 func NewHistoryStore(db *leveldb.DB) HistoryStore {
 	return HistoryStore{
-		topicDB:   NewIsolatedDB(db, TopicHistoryBucket),
-		requestDB: NewIsolatedDB(db, HistoryRequestBucket),
+		topicDB:   NewDBNamespace(db, TopicHistoryBucket),
+		requestDB: NewDBNamespace(db, HistoryRequestBucket),
 	}
 }
 
 // HistoryStore provides utility methods for quering history and requests store.
 type HistoryStore struct {
-	topicDB   Interface
-	requestDB Interface
+	topicDB   DB
+	requestDB DB
 }
 
 // GetHistory creates history instance and loads history from database.
@@ -36,7 +36,7 @@ func (h HistoryStore) GetHistory(topic whisper.TopicType, duration time.Duration
 
 // NewRequest returns instance of the HistoryRequest.
 func (h HistoryStore) NewRequest() HistoryRequest {
-	return HistoryRequest{db: h.requestDB, topicDB: h.topicDB}
+	return HistoryRequest{requestDB: h.requestDB, topicDB: h.topicDB}
 }
 
 // NewHistory creates TopicHistory object with required values.
@@ -46,7 +46,7 @@ func (h HistoryStore) NewHistory(topic whisper.TopicType, duration time.Duration
 
 // GetRequest loads HistoryRequest from database.
 func (h HistoryStore) GetRequest(id common.Hash) (HistoryRequest, error) {
-	req := HistoryRequest{db: h.requestDB, topicDB: h.topicDB, ID: id}
+	req := HistoryRequest{requestDB: h.requestDB, topicDB: h.topicDB, ID: id}
 	err := req.Load()
 	if err != nil {
 		return HistoryRequest{}, err
@@ -60,8 +60,8 @@ func (h HistoryStore) GetAllRequests() ([]HistoryRequest, error) {
 	iter := h.requestDB.NewIterator(h.requestDB.Range(nil, nil))
 	for iter.Next() {
 		req := HistoryRequest{
-			db:      h.requestDB,
-			topicDB: h.topicDB,
+			requestDB: h.requestDB,
+			topicDB:   h.topicDB,
 		}
 		err := req.RawUnmarshall(iter.Value())
 		if err != nil {

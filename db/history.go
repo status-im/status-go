@@ -16,13 +16,13 @@ var (
 	ErrEmptyKey = errors.New("TopicHistoryKey is empty")
 )
 
-// Interface is a common interface for DB operations.
-type Interface interface {
+// DB is a common interface for DB operations.
+type DB interface {
 	Get([]byte) ([]byte, error)
 	Put([]byte, []byte) error
 	Delete([]byte) error
 	Range([]byte, []byte) *util.Range
-	NewIterator(*util.Range) PrefixedIterator
+	NewIterator(*util.Range) NamespaceIterator
 }
 
 // TopicHistoryKey defines bytes that are used as unique key for TopicHistory.
@@ -32,7 +32,7 @@ type TopicHistoryKey [12]byte
 
 // LoadTopicHistoryFromKey unmarshalls key into topic and duration and loads value of topic history
 // from given database.
-func LoadTopicHistoryFromKey(db Interface, key TopicHistoryKey) (th TopicHistory, err error) {
+func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err error) {
 	if (key == TopicHistoryKey{}) {
 		return th, ErrEmptyKey
 	}
@@ -45,7 +45,7 @@ func LoadTopicHistoryFromKey(db Interface, key TopicHistoryKey) (th TopicHistory
 
 // TopicHistory stores necessary information.
 type TopicHistory struct {
-	db Interface
+	db DB
 
 	// whisper topic
 	Topic whisper.TopicType
@@ -111,8 +111,8 @@ func (t TopicHistory) SameRange(other TopicHistory) bool {
 // HistoryRequest is kept in the database while request is in the progress.
 // Stores necessary information to identify topics with associated ranges included in the request.
 type HistoryRequest struct {
-	db      Interface
-	topicDB Interface
+	requestDB DB
+	topicDB   DB
 
 	histories []TopicHistory
 
@@ -153,7 +153,7 @@ func (req HistoryRequest) Save() error {
 	if err != nil {
 		return err
 	}
-	return req.db.Put(req.ID.Bytes(), val)
+	return req.requestDB.Put(req.ID.Bytes(), val)
 }
 
 // Delete HistoryRequest from store and update every topic.
@@ -166,12 +166,12 @@ func (req HistoryRequest) Delete() error {
 			return err
 		}
 	}
-	return req.db.Delete(req.ID.Bytes())
+	return req.requestDB.Delete(req.ID.Bytes())
 }
 
 // Load reads request and topic histories content from disk and unmarshalls them.
 func (req *HistoryRequest) Load() error {
-	val, err := req.db.Get(req.ID.Bytes())
+	val, err := req.requestDB.Get(req.ID.Bytes())
 	if err != nil {
 		return err
 	}

@@ -800,7 +800,7 @@ func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...whisper.To
 }
 
 func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []hexutil.Bytes {
-	requests, err := s.localAPI.InitiateHistoryRequests(InitiateHistoryRequest{
+	requests, err := s.localAPI.InitiateHistoryRequests(InitiateHistoryRequestParams{
 		Peer:     s.remoteNode.String(),
 		SymKeyID: s.mailSymKey,
 		Timeout:  10 * time.Second,
