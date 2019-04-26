@@ -1,8 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/hex"
-	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -23,14 +24,36 @@ func RunAsync(f func() error) <-chan error {
 // The hash is calulcated as
 //   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
 // This gives context to the signed message and prevents signing of transactions.
-func HashMessage(message string) []byte {
-	data := []byte(message)
-	if strings.HasPrefix(message, "0x") {
-		if value, err := hex.DecodeString(message[2:]); err == nil {
-			data = value
+func HashMessage(message string) ([]byte, error) {
+	buf := bytes.NewBufferString("\x19Ethereum Signed Message:\n")
+	if ok, value := decodeHexStrict(message); ok {
+		if _, err := buf.WriteString(strconv.Itoa(len(value))); err != nil {
+			return nil, err
+		}
+		if _, err := buf.Write(value); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := buf.WriteString(strconv.Itoa(len(message))); err != nil {
+			return nil, err
+		}
+		if _, err := buf.WriteString(message); err != nil {
+			return nil, err
 		}
 	}
 
-	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
-	return crypto.Keccak256([]byte(msg))
+	return crypto.Keccak256(buf.Bytes()), nil
+}
+
+func decodeHexStrict(s string) (bool, []byte) {
+	if !strings.HasPrefix(s, "0x") {
+		return false, nil
+	}
+
+	value, err := hex.DecodeString(s[2:])
+	if err != nil {
+		return false, nil
+	}
+
+	return true, value
 }

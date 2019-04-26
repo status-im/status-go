@@ -461,8 +461,12 @@ func HashTransaction(txArgsJSON string) string {
 //   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
 // This gives context to the signed message and prevents signing of transactions.
 func HashMessage(message string) string {
-	hash := api.HashMessage(message)
-	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), nil, codeUnknown)
+	hash, err := api.HashMessage(message)
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
+	}
+	return prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, code)
 }
 
 // StartCPUProfile runs pprof for CPU.
