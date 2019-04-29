@@ -459,14 +459,13 @@ func HashTransaction(txArgsJSON *C.char) *C.char {
 //   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
 // This gives context to the signed message and prevents signing of transactions.
 //export HashMessage
-func HashMessage(messageString *C.char) *C.char {
-	message, err := hex.DecodeString(C.GoString(messageString))
-	if err != nil {
-		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+func HashMessage(message *C.char) *C.char {
+	hash, err := api.HashMessage(C.GoString(message))
+	code := codeUnknown
+	if c, ok := errToCodeMap[err]; ok {
+		code = c
 	}
-
-	hash := api.HashMessage(message)
-	return C.CString(prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, codeUnknown))
+	return C.CString(prepareJSONResponseWithCode(fmt.Sprintf("0x%x", hash), err, code))
 }
 
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
