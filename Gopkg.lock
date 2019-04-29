@@ -767,11 +767,27 @@
   revision = "ed27b6fd65218132ee50cd95f38474a3d8a2cd12"
 
 [[projects]]
+  branch = "master"
+  digest = "1:df2ffac3fa01a4eff2983f6993e3e56db39101a2c030f6bbfc99209b8a15ca9b"
+  name = "github.com/russolsen/transit"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "0794b4c4505af6b9382d56e296a6796be0cf4d76"
+
+[[projects]]
   digest = "1:8737b20e873c7cad069dfafd6382659b4cdf9e80359cdc159b8ec464893c932e"
   name = "github.com/satori/go.uuid"
   packages = ["."]
   pruneopts = "NUT"
   revision = "36e9d2ebbde5e3f13ab2e25625fd453271d6522e"
+
+[[projects]]
+  digest = "1:11afe1ad32273aeda2ff5e80317638da5006aff881263b995038900a89494eff"
+  name = "github.com/shopspring/decimal"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "cd690d0c9e2447b1ef2a129a6b7b49077da89b8e"
+  version = "1.1.0"
 
 [[projects]]
   digest = "1:96ea40e8fab1400b769ff9669dd7f7de613c3a1943dd7f451c4ccbb05115bcaa"
@@ -1100,6 +1116,7 @@
     "github.com/multiformats/go-multiaddr",
     "github.com/mutecomm/go-sqlcipher",
     "github.com/pborman/uuid",
+    "github.com/russolsen/transit",
     "github.com/status-im/doubleratchet",
     "github.com/status-im/go-ethereum/common/hexutil",
     "github.com/status-im/migrate",

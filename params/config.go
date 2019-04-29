@@ -93,6 +93,34 @@ func (c *WhisperConfig) String() string {
 	return string(data)
 }
 
+// IncentivisationConfig holds incentivisation-related configuration
+type IncentivisationConfig struct {
+	// Enabled flag specifies whether protocol is enabled
+	Enabled bool `validate:"required"`
+	// Endpoint for the RPC calls
+	RPCEndpoint string `validate:"required"`
+	// Contract address
+	ContractAddress string `validate:"required"`
+	// IP address that is used
+	IP string `validate:"required"`
+	// Port
+	Port uint16 `validate:"required"`
+}
+
+// String dumps config object as nicely indented JSON
+func (c *IncentivisationConfig) String() string {
+	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
+	return string(data)
+}
+
+// Validate validates the IncentivisationConfig struct and returns an error if inconsistent values are found
+func (c *IncentivisationConfig) Validate(validate *validator.Validate) error {
+	if err := validate.Struct(c); err != nil {
+		return err
+	}
+	return nil
+}
+
 // ----------
 // SwarmConfig
 // ----------
@@ -294,6 +322,9 @@ type NodeConfig struct {
 
 	// WhisperConfig extra configuration for SHH
 	WhisperConfig WhisperConfig `json:"WhisperConfig," validate:"structonly"`
+
+	// IncentivisationConfig extra configuration for incentivisation service
+	IncentivisationConfig IncentivisationConfig `json:"IncentivisationConfig," validate:"structonly"`
 
 	// ShhextConfig keeps configuration for service running under shhext namespace.
 	ShhextConfig ShhextConfig `json:"ShhextConfig," validate:"structonly"`
@@ -630,6 +661,11 @@ func (c *NodeConfig) validateChildStructs(validate *validator.Validate) error {
 	}
 	if err := c.ShhextConfig.Validate(validate); err != nil {
 		return err
+	}
+	if c.IncentivisationConfig.Enabled {
+		if err := c.IncentivisationConfig.Validate(validate); err != nil {
+			return err
+		}
 	}
 	return nil
 }
