@@ -26,7 +26,7 @@ func RunAsync(f func() error) <-chan error {
 // This gives context to the signed message and prevents signing of transactions.
 func HashMessage(message string) ([]byte, error) {
 	buf := bytes.NewBufferString("\x19Ethereum Signed Message:\n")
-	if ok, value := decodeHexStrict(message); ok {
+	if value, ok := decodeHexStrict(message); ok {
 		if _, err := buf.WriteString(strconv.Itoa(len(value))); err != nil {
 			return nil, err
 		}
@@ -45,15 +45,15 @@ func HashMessage(message string) ([]byte, error) {
 	return crypto.Keccak256(buf.Bytes()), nil
 }
 
-func decodeHexStrict(s string) (bool, []byte) {
+func decodeHexStrict(s string) ([]byte, bool) {
 	if !strings.HasPrefix(s, "0x") {
-		return false, nil
+		return nil, false
 	}
 
 	value, err := hex.DecodeString(s[2:])
 	if err != nil {
-		return false, nil
+		return nil, false
 	}
 
-	return true, value
+	return value, true
 }
