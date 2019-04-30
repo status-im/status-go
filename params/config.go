@@ -367,6 +367,10 @@ type ShhextConfig struct {
 
 	// MaxMessageDeliveryAttempts defines how many times we will try to deliver not-acknowledged envelopes.
 	MaxMessageDeliveryAttempts int
+
+	// WhisperCacheDir is a folder where whisper filters may persist messages before delivering them
+	// to a client.
+	WhisperCacheDir string
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
