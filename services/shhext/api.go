@@ -547,8 +547,7 @@ func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, pee
 	}
 	hash = envelope.Hash()
 
-	request.ID = hash
-	err = request.Save()
+	err = request.Replace(hash)
 	if err != nil {
 		return hash, err
 	}
@@ -561,10 +560,6 @@ func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, pee
 	}
 
 	if err := shh.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, timeout); err != nil {
-		err = request.Delete()
-		if err != nil {
-			return hash, err
-		}
 		if !force {
 			api.service.requestsRegistry.Unregister(hash)
 		}

@@ -887,6 +887,24 @@ func (s *RequestWithTrackingHistorySuite) TestSingleRequest() {
 	s.waitMessagesDelivered(filterid, hexes...)
 }
 
+func (s *RequestWithTrackingHistorySuite) TestPreviousRequestReplaced() {
+	topic1 := whisper.TopicType{1, 1, 1, 1}
+	topic2 := whisper.TopicType{255, 255, 255, 255}
+
+	requests := s.initiateHistoryRequest(
+		TopicRequest{Topic: topic1, Duration: time.Hour},
+		TopicRequest{Topic: topic2, Duration: time.Hour},
+	)
+	s.Require().Len(requests, 1)
+	s.localService.requestsRegistry.Clear()
+	replaced := s.initiateHistoryRequest(
+		TopicRequest{Topic: topic1, Duration: time.Hour},
+		TopicRequest{Topic: topic2, Duration: time.Hour},
+	)
+	s.Require().Len(replaced, 1)
+	s.Require().NotEqual(requests[0], replaced[0])
+}
+
 func waitForArchival(events chan whisper.EnvelopeEvent, duration time.Duration, hashes ...hexutil.Bytes) error {
 	waiting := map[common.Hash]struct{}{}
 	for _, hash := range hashes {

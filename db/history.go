@@ -166,6 +166,17 @@ func (req HistoryRequest) Save() error {
 	return req.requestDB.Put(req.ID.Bytes(), val)
 }
 
+// Replace saves request with new ID and all data attached to the old one.
+func (req HistoryRequest) Replace(id common.Hash) error {
+	if (req.ID != common.Hash{}) {
+		if err := req.Delete(); err != nil {
+			return err
+		}
+	}
+	req.ID = id
+	return req.Save()
+}
+
 // Delete HistoryRequest from store and update every topic.
 func (req HistoryRequest) Delete() error {
 	return req.requestDB.Delete(req.ID.Bytes())
