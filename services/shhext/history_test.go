@@ -76,8 +76,7 @@ func TestBloomFilterToMessageRequestPayload(t *testing.T) {
 			Lower: start,
 			Upper: end,
 			Bloom: filter,
-			Batch: true,
-			Limit: 10000,
+			Limit: 100000,
 		}
 		bloomOption = BloomFilterOption{
 			Filter: filter,

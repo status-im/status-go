@@ -353,8 +353,8 @@ func (filter BloomFilterOption) ToMessagesRequestPayload() ([]byte, error) {
 		Bloom: filter.Filter,
 		// Client must tell the MailServer if it supports batch responses.
 		// This can be removed in the future.
-		Batch: true,
-		Limit: 10000,
+		//Batch: true,
+		Limit: 100000,
 	}
 	return rlp.EncodeToBytes(payload)
 }
