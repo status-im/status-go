@@ -5,15 +5,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	whisper "github.com/status-im/whisper/whisperv6"
-	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
 // NewHistoryStore returns HistoryStore instance.
-func NewHistoryStore(db *leveldb.DB) HistoryStore {
+func NewHistoryStore(storage Storage) HistoryStore {
 	return HistoryStore{
-		topicDB:   NewDBNamespace(db, TopicHistoryBucket),
-		requestDB: NewDBNamespace(db, HistoryRequestBucket),
+		topicDB:   NewDBNamespace(storage, TopicHistoryBucket),
+		requestDB: NewDBNamespace(storage, HistoryRequestBucket),
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 func createInMemStore(t *testing.T) HistoryStore {
 	db, err := NewMemoryDB()
 	require.NoError(t, err)
-	return NewHistoryStore(db)
+	return NewHistoryStore(LevelDBStorage{db: db})
 }
 
 func TestGetNewHistory(t *testing.T) {

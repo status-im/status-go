@@ -20,16 +20,9 @@ const (
 	WhisperTimeAllowance = 20 * time.Second
 )
 
-// TimeSource is a function that returns current time.
-type TimeSource func() time.Time
-
 // NewHistoryUpdateReactor creates HistoryUpdateReactor instance.
-func NewHistoryUpdateReactor(store db.HistoryStore, registry *RequestsRegistry, timeSource TimeSource) *HistoryUpdateReactor {
-	return &HistoryUpdateReactor{
-		store:      store,
-		registry:   registry,
-		timeSource: timeSource,
-	}
+func NewHistoryUpdateReactor() *HistoryUpdateReactor {
+	return &HistoryUpdateReactor{}
 }
 
 // HistoryUpdateReactor responsible for tracking progress for all history requests.
@@ -38,18 +31,15 @@ func NewHistoryUpdateReactor(store db.HistoryStore, registry *RequestsRegistry, 
 //    - when confirmation for request completion is received - we will set last envelope timestamp as the last timestamp
 //      for all TopicLists in current request.
 type HistoryUpdateReactor struct {
-	mu         sync.Mutex
-	store      db.HistoryStore
-	registry   *RequestsRegistry
-	timeSource TimeSource
+	mu sync.Mutex
 }
 
 // UpdateFinishedRequest removes successfully finished request and updates every topic
 // attached to the request.
-func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(id common.Hash) error {
+func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id common.Hash) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
-	req, err := reactor.store.GetRequest(id)
+	req, err := ctx.HistoryStore().GetRequest(id)
 	if err != nil {
 		return err
 	}
@@ -66,10 +56,10 @@ func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(id common.Hash) error
 }
 
 // UpdateTopicHistory updates Current timestamp for the TopicHistory with a given timestamp.
-func (reactor *HistoryUpdateReactor) UpdateTopicHistory(topic whisper.TopicType, timestamp time.Time) error {
+func (reactor *HistoryUpdateReactor) UpdateTopicHistory(ctx Context, topic whisper.TopicType, timestamp time.Time) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
-	histories, err := reactor.store.GetHistoriesByTopic(topic)
+	histories, err := ctx.HistoryStore().GetHistoriesByTopic(topic)
 	if err != nil {
 		return err
 	}
@@ -103,7 +93,7 @@ type TopicRequest struct {
 
 // CreateRequests receives list of topic with desired timestamps and initiates both pending requests and requests
 // that cover new topics.
-func (reactor *HistoryUpdateReactor) CreateRequests(topicRequests []TopicRequest) ([]db.HistoryRequest, error) {
+func (reactor *HistoryUpdateReactor) CreateRequests(ctx Context, topicRequests []TopicRequest) ([]db.HistoryRequest, error) {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
 	seen := map[whisper.TopicType]struct{}{}
@@ -115,13 +105,13 @@ func (reactor *HistoryUpdateReactor) CreateRequests(topicRequests []TopicRequest
 	}
 	histories := map[whisper.TopicType]db.TopicHistory{}
 	for i := range topicRequests {
-		th, err := reactor.store.GetHistory(topicRequests[i].Topic, topicRequests[i].Duration)
+		th, err := ctx.HistoryStore().GetHistory(topicRequests[i].Topic, topicRequests[i].Duration)
 		if err != nil {
 			return nil, err
 		}
 		histories[th.Topic] = th
 	}
-	requests, err := reactor.store.GetAllRequests()
+	requests, err := ctx.HistoryStore().GetAllRequests()
 	if err != nil {
 		return nil, err
 	}
@@ -133,17 +123,17 @@ func (reactor *HistoryUpdateReactor) CreateRequests(topicRequests []TopicRequest
 				delete(histories, th.Topic)
 			}
 		}
-		if !reactor.registry.Has(req.ID) {
+		if !ctx.RequestRegistry().Has(req.ID) {
 			filtered = append(filtered, req)
 		}
 	}
-	adjusted, err := adjustRequestedHistories(reactor.store, mapToList(histories))
+	adjusted, err := adjustRequestedHistories(ctx.HistoryStore(), mapToList(histories))
 	if err != nil {
 		return nil, err
 	}
 	filtered = append(filtered,
-		GroupHistoriesByRequestTimespan(reactor.store, adjusted)...)
-	return RenewRequests(filtered, reactor.timeSource()), nil
+		GroupHistoriesByRequestTimespan(ctx.HistoryStore(), adjusted)...)
+	return RenewRequests(filtered, ctx.Time()), nil
 }
 
 // for every history that is not included in any request check if there are other ranges with such topic in db
