@@ -24,12 +24,12 @@ func (tx LevelDBTx) Delete(key []byte) error {
 	return nil
 }
 
-// Get reads from currently commited state.
+// Get reads from currently committed state.
 func (tx LevelDBTx) Get(key []byte) ([]byte, error) {
 	return tx.db.Get(key)
 }
 
-// NewIterator returns iterator.Iterator that will read from currently commited state.
+// NewIterator returns iterator.Iterator that will read from currently committed state.
 func (tx LevelDBTx) NewIterator(slice *util.Range) iterator.Iterator {
 	return tx.db.NewIterator(slice)
 }
