@@ -595,15 +595,19 @@ func (api *PublicAPI) InitiateHistoryRequests(parent context.Context, request In
 	if err != nil {
 		return nil, err
 	}
+	var (
+		payload []byte
+		hash    common.Hash
+	)
 	for i := range requests {
 		req := requests[i]
 		options := CreateTopicOptionsFromRequest(req)
 		bloom := options.ToBloomFilterOption()
-		payload, err := bloom.ToMessagesRequestPayload()
+		payload, err = bloom.ToMessagesRequestPayload()
 		if err != nil {
 			return rst, err
 		}
-		hash, err := api.requestMessagesUsingPayload(req, request.Peer, request.SymKeyID, payload, request.Force, request.Timeout, options.Topics())
+		hash, err = api.requestMessagesUsingPayload(req, request.Peer, request.SymKeyID, payload, request.Force, request.Timeout, options.Topics())
 		if err != nil {
 			return rst, err
 		}
@@ -613,10 +617,10 @@ func (api *PublicAPI) InitiateHistoryRequests(parent context.Context, request In
 }
 
 // CompleteRequest client must mark request completed when all envelopes were processed.
-func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) error {
+func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err error) {
 	tx := api.service.storage.NewTx()
 	ctx := NewContextFromService(parent, api.service, tx)
-	err := api.service.historyUpdates.UpdateFinishedRequest(ctx, common.HexToHash(hex))
+	err = api.service.historyUpdates.UpdateFinishedRequest(ctx, common.HexToHash(hex))
 	if err == nil {
 		return tx.Commit()
 	}
