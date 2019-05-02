@@ -129,7 +129,7 @@ func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return subscriptions.NewAPI(b.statusNode.RPCPrivateClient()), nil
+		return subscriptions.New(b.statusNode.RPCPrivateClient()), nil
 	}
 }
 

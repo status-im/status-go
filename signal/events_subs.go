@@ -15,7 +15,6 @@ type SubscriptionDataEvent struct {
 type SubscriptionErrorEvent struct {
 	FilterID     string `json:"filter_id"`
 	ErrorMessage string `json:"error_message"`
-	ErrorCode    int    `json:"error_code,string"`
 }
 
 // SendSubscriptionDataEvent
@@ -27,9 +26,8 @@ func SendSubscriptionDataEvent(filterID string, data []interface{}) {
 }
 
 // SendSubscriptionErrorEvent
-func SendSubscriptionErrorEvent(filterID string, err error, errCode int) {
+func SendSubscriptionErrorEvent(filterID string, err error) {
 	send(EventSubscriptionsError, SubscriptionErrorEvent{
 		ErrorMessage: err.Error(),
-		ErrorCode:    errCode,
 	})
 }

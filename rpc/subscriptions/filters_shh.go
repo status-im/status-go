@@ -14,7 +14,7 @@ type whisperFilter struct {
 func InstallShhFilter(rpcClient *rpc.Client, method string, args []interface{}) (*whisperFilter, error) {
 
 	if err := validateShhMethod(method); err != nil {
-		return err
+		return nil, err
 	}
 
 	var result string

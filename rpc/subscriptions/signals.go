@@ -11,9 +11,9 @@ func newFilterSignal(filterID string) *filterSignal {
 }
 
 func (s *filterSignal) SendError(err error) {
-	signal.SendSubscriptionErrorEvent(s.filterID, 10, err.Error())
+	signal.SendSubscriptionErrorEvent(s.filterID, err)
 }
 
-func SendData(data []interface{}) {
+func (s *filterSignal) SendData(data []interface{}) {
 	signal.SendSubscriptionDataEvent(s.filterID, data)
 }

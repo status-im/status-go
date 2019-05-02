@@ -8,7 +8,7 @@ import (
 type SubscriptionID string
 
 type Subscription struct {
-	id     string
+	id     SubscriptionID
 	signal *filterSignal
 	quit   chan interface{}
 	filter filter
@@ -27,7 +27,7 @@ func NewSubscription(namespace string, filter filter) *Subscription {
 	return &Subscription{
 		id:     subscriptionID,
 		quit:   quit,
-		signal: newFilterSignal(subscriptionID),
+		signal: newFilterSignal(filter.getId()),
 		filter: filter,
 	}
 }

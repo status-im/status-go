@@ -6,16 +6,16 @@ import (
 	"github.com/status-im/status-go/rpc"
 )
 
-func NewAPI(rpcClient *rpc.Client) *API {
+type API struct {
+	rpcClient           *rpc.Client
+	activeSubscriptions *Subscriptions
+}
+
+func NewPublicAPI(rpcClient *rpc.Client) *API {
 	return &API{
 		rpcClient:           rpcClient,
 		activeSubscriptions: NewSubscriptions(),
 	}
-}
-
-type API struct {
-	rpcClient           *rpc.Client
-	activeSubscriptions Subscriptions
 }
 
 func (api *API) SubscribeSignal(method string, args ...interface{}) (SubscriptionID, error) {
@@ -25,24 +25,24 @@ func (api *API) SubscribeSignal(method string, args ...interface{}) (Subscriptio
 	var err error = nil
 
 	if namespace == "shh" {
-		filter, err := InstallShhFilter(rpcClient, method, args)
+		filter, err = InstallShhFilter(api.rpcClient, method, args)
 	} else if namespace == "eth" {
-		filter, err := InstallEthFilter(rpcClient, method, args)
+		filter, err = InstallEthFilter(api.rpcClient, method, args)
 	} else {
 		err = fmt.Errorf("unexpected namespace: %s", namespace)
 	}
 
 	if err != nil {
-		return -1, fmt.Errorf("[SubscribeSignal] could not subscribe, failed to call %s: %v", method, err)
+		return SubscriptionID(""), fmt.Errorf("[SubscribeSignal] could not subscribe, failed to call %s: %v", method, err)
 	}
 
 	return api.activeSubscriptions.Create(namespace, filter)
 }
 
-func (api *API) UnsubscribeSignal(id rpc.ID) error {
+func (api *API) UnsubscribeSignal(id string) error {
 	return api.activeSubscriptions.Remove(SubscriptionID(id))
 }
 
-func (api *API) ClearSignalSubscriptions() {
+func (api *API) ClearSignalSubscriptions() error {
 	return api.activeSubscriptions.RemoveAll()
 }
