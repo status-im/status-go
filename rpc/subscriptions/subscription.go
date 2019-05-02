@@ -7,34 +7,28 @@ import (
 
 type SubscriptionID string
 
-type cleanupFunc func() error
-type monitorFunc func() ([]string, error)
-
 type Subscription struct {
-	id          string
-	signal      *filterSignal
-	quit        chan interface{}
-	cleanupFunc cleanupFunc
-	monitorFunc monitorFunc
+	id     string
+	signal *filterSignal
+	quit   chan interface{}
+	filter filter
 }
 
 type SubscriptionParams struct {
-	namespace   string
-	filterID    string
-	cleanupFunc cleanupFunc
-	monitorFunc monitorFunc
+	namespace string
+	filter    filter
 }
 
-func NewSubscription(params SubscriptionParams) *Subscription {
-	subscriptionID := NewSubscriptionID(params.namespace, params.filterID)
+func NewSubscription(namespace string, filter filter) *Subscription {
+	subscriptionID := NewSubscriptionID(namespace, filter.getId())
+
 	quit := make(chan interface{})
 
 	return &Subscription{
-		id:          subscriptionID,
-		quit:        quit,
-		signal:      newFilterSignal(subscriptionID),
-		cleanupFunc: params.cleanupFunc,
-		monitorFunc: params.monitorFunc,
+		id:     subscriptionID,
+		quit:   quit,
+		signal: newFilterSignal(subscriptionID),
+		filter: filter,
 	}
 }
 
@@ -45,7 +39,7 @@ func (s *Subscription) Start() {
 	for {
 		select {
 		case <-ticker.C:
-			filterData, err := s.monitorFunc()
+			filterData, err := s.filter.getChanges()
 			if err != nil {
 				s.signal.SendError(err)
 			} else {
@@ -59,7 +53,7 @@ func (s *Subscription) Start() {
 
 func (s *Subscription) Stop() error {
 	close(s.quit)
-	return s.cleanupFunc()
+	return s.filter.uninstall()
 }
 
 func NewSubscriptionID(namespace, filterID string) SubscriptionID {

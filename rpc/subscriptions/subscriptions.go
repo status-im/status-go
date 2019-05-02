@@ -10,11 +10,11 @@ type Subscriptions struct {
 	subs map[SubscriptionID]*SubscriptionData
 }
 
-func (subs *Subscriptions) Create(params SubscriptionParams) (SubscriptionID, error) {
+func (subs *Subscriptions) Create(namespace string, filter filter) (SubscriptionID, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	newSub := NewSubscription(params)
+	newSub := NewSubscription(namespace, filter)
 
 	go newSub.Start()
 

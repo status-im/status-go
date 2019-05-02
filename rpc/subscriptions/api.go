@@ -2,8 +2,6 @@ package subscriptions
 
 import (
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/status-im/status-go/rpc"
 )
@@ -14,16 +12,24 @@ type API struct {
 }
 
 func (api *API) SubscribeSignal(method string, args ...interface{}) (SubscriptionID, error) {
-	namespace := "shh"
+	namespace := method[:3]
 
-	var filterID string
+	var filter filter = nil
+	var err error = nil
 
-	err := rpcClient.Call(&filterID, method, args)
+	if namespace == "shh" {
+		filter, err := InstallShhFilter(rpcClient, method, args)
+	} else if namespace == "eth" {
+		filter, err := InstallEthFilter(rpcClient, method, args)
+	} else {
+		err = fmt.Errorf("unexpected namespace: %s", namespace)
+	}
+
 	if err != nil {
 		return -1, fmt.Errorf("[SubscribeSignal] could not subscribe, failed to call %s: %v", method, err)
 	}
 
-	return api.activeSubscriptions.Add(namespace, filterID)
+	return api.activeSubscriptions.Create(namespace, filter)
 }
 
 func (api *API) UnsubscribeSignal(id rpc.ID) error {
