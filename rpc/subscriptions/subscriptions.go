@@ -7,7 +7,14 @@ import (
 
 type Subscriptions struct {
 	mu   sync.Mutex
-	subs map[SubscriptionID]*SubscriptionData
+	subs map[SubscriptionID]*Subscription
+}
+
+func NewSubscriptions() *Subscriptions {
+	return &Subscriptions{
+		mu:   sync.Mutex{},
+		subs: make(map[SubscriptionID]*Subscription),
+	}
 }
 
 func (subs *Subscriptions) Create(namespace string, filter filter) (SubscriptionID, error) {

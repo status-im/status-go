@@ -6,6 +6,13 @@ import (
 	"github.com/status-im/status-go/rpc"
 )
 
+func NewAPI(rpcClient *rpc.Client) *API {
+	return &API{
+		rpcClient:           rpcClient,
+		activeSubscriptions: NewSubscriptions(),
+	}
+}
+
 type API struct {
 	rpcClient           *rpc.Client
 	activeSubscriptions Subscriptions

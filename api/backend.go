@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/rpc/subscriptions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/shhext/chat"
@@ -126,6 +127,12 @@ func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 	}
 }
 
+func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return subscriptions.NewAPI(b.statusNode.RPCPrivateClient()), nil
+	}
+}
+
 func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -140,6 +147,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
+	services = append(services, b.subscriptionService())
 
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
 		Services: services,
