@@ -6,7 +6,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
-// LevelDBTx doesn't provide any read isolation. It allows to commit all writes atomically (put/delete).
+// LevelDBTx doesn't provide any read isolation. It allows committing all writes atomically (put/delete).
 type LevelDBTx struct {
 	batch *leveldb.Batch
 	db    LevelDBStorage
