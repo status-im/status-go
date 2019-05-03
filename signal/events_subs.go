@@ -8,12 +8,12 @@ const (
 )
 
 type SubscriptionDataEvent struct {
-	FilterID string        `json:"filter_id"`
+	FilterID string        `json:"subscription_id"`
 	Data     []interface{} `json:"data"`
 }
 
 type SubscriptionErrorEvent struct {
-	FilterID     string `json:"filter_id"`
+	FilterID     string `json:"subscription_id"`
 	ErrorMessage string `json:"error_message"`
 }
 

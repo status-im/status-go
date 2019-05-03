@@ -32,7 +32,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 func (s *Service) APIs() []gethrpc.API {
 	return []gethrpc.API{
 		{
-			Namespace: "status",
+			Namespace: "eth",
 			Version:   "1.0",
 			Service:   s.api,
 			Public:    true,
