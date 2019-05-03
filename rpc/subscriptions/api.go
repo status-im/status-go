@@ -2,6 +2,7 @@ package subscriptions
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/status-im/status-go/rpc"
 )
@@ -14,7 +15,7 @@ type API struct {
 func NewPublicAPI(rpcClient *rpc.Client) *API {
 	return &API{
 		rpcClient:           rpcClient,
-		activeSubscriptions: NewSubscriptions(),
+		activeSubscriptions: NewSubscriptions(100 * time.Millisecond),
 	}
 }
 

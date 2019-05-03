@@ -14,11 +14,6 @@ type Subscription struct {
 	filter filter
 }
 
-type SubscriptionParams struct {
-	namespace string
-	filter    filter
-}
-
 func NewSubscription(namespace string, filter filter) *Subscription {
 	subscriptionID := NewSubscriptionID(namespace, filter.getId())
 
@@ -27,13 +22,13 @@ func NewSubscription(namespace string, filter filter) *Subscription {
 	return &Subscription{
 		id:     subscriptionID,
 		quit:   quit,
-		signal: newFilterSignal(filter.getId()),
+		signal: newFilterSignal(string(subscriptionID)),
 		filter: filter,
 	}
 }
 
-func (s *Subscription) Start() {
-	ticker := time.NewTicker(time.Second)
+func (s *Subscription) Start(checkPeriod time.Duration) {
+	ticker := time.NewTicker(checkPeriod)
 	defer ticker.Stop()
 
 	for {
@@ -42,7 +37,7 @@ func (s *Subscription) Start() {
 			filterData, err := s.filter.getChanges()
 			if err != nil {
 				s.signal.SendError(err)
-			} else {
+			} else if filterData != nil {
 				s.signal.SendData(filterData)
 			}
 		case <-s.quit:

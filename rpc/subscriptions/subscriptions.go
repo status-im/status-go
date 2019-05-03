@@ -3,17 +3,20 @@ package subscriptions
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type Subscriptions struct {
-	mu   sync.Mutex
-	subs map[SubscriptionID]*Subscription
+	mu          sync.Mutex
+	subs        map[SubscriptionID]*Subscription
+	checkPeriod time.Duration
 }
 
-func NewSubscriptions() *Subscriptions {
+func NewSubscriptions(period time.Duration) *Subscriptions {
 	return &Subscriptions{
-		mu:   sync.Mutex{},
-		subs: make(map[SubscriptionID]*Subscription),
+		mu:          sync.Mutex{},
+		subs:        make(map[SubscriptionID]*Subscription),
+		checkPeriod: period,
 	}
 }
 
@@ -23,7 +26,7 @@ func (subs *Subscriptions) Create(namespace string, filter filter) (Subscription
 
 	newSub := NewSubscription(namespace, filter)
 
-	go newSub.Start()
+	go newSub.Start(subs.checkPeriod)
 
 	subs.subs[newSub.id] = newSub
 
