@@ -31,7 +31,7 @@ func newMockFilter(filterID string) *mockFilter {
 	}
 }
 
-func (mf *mockFilter) getId() string {
+func (mf *mockFilter) getID() string {
 	return mf.filterID
 }
 func (mf *mockFilter) getChanges() ([]interface{}, error) {
@@ -39,11 +39,11 @@ func (mf *mockFilter) getChanges() ([]interface{}, error) {
 		err := mf.filterError
 		mf.filterError = nil
 		return nil, err
-	} else {
-		data := mf.data
-		mf.data = nil
-		return data, nil
 	}
+
+	data := mf.data
+	mf.data = nil
+	return data, nil
 }
 
 func (mf *mockFilter) uninstall() error {
@@ -152,8 +152,10 @@ func TestSubscriptionRemoveAll(t *testing.T) {
 	filter1 := newMockFilter(filterID + "1")
 
 	subs := NewSubscriptions(time.Microsecond)
-	subs.Create(filterNS, filter0)
-	subs.Create(filterNS, filter1)
+	_, err := subs.Create(filterNS, filter0)
+	require.NoError(t, err)
+	_, err = subs.Create(filterNS, filter1)
+	require.NoError(t, err)
 
 	require.Equal(t, len(subs.subs), 2)
 
@@ -173,13 +175,16 @@ func TestSubscriptionRemoveAllError(t *testing.T) {
 	filter2 := newMockFilter(filterID + "2")
 
 	subs := NewSubscriptions(time.Microsecond)
-	subs.Create(filterNS, filter0)
-	subs.Create(filterNS, filter1)
-	subs.Create(filterNS, filter2)
+	_, err := subs.Create(filterNS, filter0)
+	require.NoError(t, err)
+	_, err = subs.Create(filterNS, filter1)
+	require.NoError(t, err)
+	_, err = subs.Create(filterNS, filter2)
+	require.NoError(t, err)
 
 	require.Equal(t, len(subs.subs), 3)
 
-	err := subs.RemoveAll()
+	err = subs.RemoveAll()
 
 	require.NotNil(t, err)
 

@@ -11,7 +11,7 @@ type whisperFilter struct {
 	rpcClient *rpc.Client
 }
 
-func InstallShhFilter(rpcClient *rpc.Client, method string, args []interface{}) (*whisperFilter, error) {
+func installShhFilter(rpcClient *rpc.Client, method string, args []interface{}) (*whisperFilter, error) {
 
 	if err := validateShhMethod(method); err != nil {
 		return nil, err
@@ -36,23 +36,22 @@ func InstallShhFilter(rpcClient *rpc.Client, method string, args []interface{}) 
 func (wf *whisperFilter) getChanges() ([]interface{}, error) {
 	var result []interface{}
 
-	err := wf.rpcClient.Call(&result, "shh_getFilterMessages", wf.getId())
+	err := wf.rpcClient.Call(&result, "shh_getFilterMessages", wf.getID())
 
 	return result, err
 }
 
-func (wf *whisperFilter) getId() string {
+func (wf *whisperFilter) getID() string {
 	return wf.id
 }
 
 func (wf *whisperFilter) uninstall() error {
-	return wf.rpcClient.Call(nil, "shh_deleteMessageFilter", wf.getId())
+	return wf.rpcClient.Call(nil, "shh_deleteMessageFilter", wf.getID())
 }
 
 func validateShhMethod(method string) error {
 	if method != "shh_newMessageFilter" {
 		return fmt.Errorf("unexpected filter method: %s", method)
-	} else {
-		return nil
 	}
+	return nil
 }

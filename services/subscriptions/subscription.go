@@ -15,7 +15,7 @@ type Subscription struct {
 }
 
 func NewSubscription(namespace string, filter filter) *Subscription {
-	subscriptionID := NewSubscriptionID(namespace, filter.getId())
+	subscriptionID := NewSubscriptionID(namespace, filter.getID())
 
 	quit := make(chan interface{})
 

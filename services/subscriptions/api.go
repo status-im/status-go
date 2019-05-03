@@ -22,13 +22,13 @@ func NewPublicAPI(rpcClient *rpc.Client) *API {
 func (api *API) SubscribeSignal(method string, args ...interface{}) (SubscriptionID, error) {
 	namespace := method[:3]
 
-	var filter filter = nil
-	var err error = nil
+	var filter filter
+	var err error
 
 	if namespace == "shh" {
-		filter, err = InstallShhFilter(api.rpcClient, method, args)
+		filter, err = installShhFilter(api.rpcClient, method, args)
 	} else if namespace == "eth" {
-		filter, err = InstallEthFilter(api.rpcClient, method, args)
+		filter, err = installEthFilter(api.rpcClient, method, args)
 	} else {
 		err = fmt.Errorf("unexpected namespace: %s", namespace)
 	}

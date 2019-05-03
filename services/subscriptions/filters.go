@@ -1,7 +1,7 @@
 package subscriptions
 
 type filter interface {
-	getId() string
+	getID() string
 	getChanges() ([]interface{}, error)
 	uninstall() error
 }

@@ -52,7 +52,7 @@ func (subs *Subscriptions) RemoveAll() error {
 
 	unsubscribeErrors := make(map[SubscriptionID]error)
 
-	for id, _ := range subs.subs {
+	for id := range subs.subs {
 		_, err := subs.stopSubscription(id)
 		if err != nil {
 			unsubscribeErrors[id] = err

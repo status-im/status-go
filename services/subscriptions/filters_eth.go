@@ -11,7 +11,7 @@ type ethFilter struct {
 	rpcClient *rpc.Client
 }
 
-func InstallEthFilter(rpcClient *rpc.Client, method string, args []interface{}) (*ethFilter, error) {
+func installEthFilter(rpcClient *rpc.Client, method string, args []interface{}) (*ethFilter, error) {
 
 	if err := validateEthMethod(method); err != nil {
 		return nil, err
@@ -34,20 +34,20 @@ func InstallEthFilter(rpcClient *rpc.Client, method string, args []interface{}) 
 
 }
 
-func (ef *ethFilter) getId() string {
+func (ef *ethFilter) getID() string {
 	return ef.id
 }
 
 func (ef *ethFilter) getChanges() ([]interface{}, error) {
 	var result []interface{}
 
-	err := ef.rpcClient.Call(&result, "eth_getFilterChanges", ef.getId())
+	err := ef.rpcClient.Call(&result, "eth_getFilterChanges", ef.getID())
 
 	return result, err
 }
 
 func (ef *ethFilter) uninstall() error {
-	return ef.rpcClient.Call(nil, "eth_uninstallFilter", ef.getId())
+	return ef.rpcClient.Call(nil, "eth_uninstallFilter", ef.getID())
 }
 
 func validateEthMethod(method string) error {
