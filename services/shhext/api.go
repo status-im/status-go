@@ -611,7 +611,7 @@ func (api *PublicAPI) InitiateHistoryRequests(parent context.Context, request In
 		if err != nil {
 			return rst, err
 		}
-		rst = append(rst, hash[:])
+		rst = append(rst, hash.Bytes())
 	}
 	return rst, err
 }
