@@ -61,6 +61,7 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 }
 
 func TestMakeMessagesRequestPayload(t *testing.T) {
+	var emptyTopic whisper.TopicType
 	testCases := []struct {
 		Name string
 		Req  MessagesRequest
@@ -74,12 +75,12 @@ func TestMakeMessagesRequestPayload(t *testing.T) {
 		{
 			Name: "invalid cursor size",
 			Req:  MessagesRequest{Cursor: hex.EncodeToString([]byte{0x01, 0x02, 0x03})},
-			Err:  fmt.Sprintf("invalid cursor size: expected %d but got 3", mailserver.DBKeyLength),
+			Err:  fmt.Sprintf("invalid cursor size: expected %d but got 3", mailserver.CursorLength),
 		},
 		{
 			Name: "valid cursor",
 			Req: MessagesRequest{
-				Cursor: hex.EncodeToString(mailserver.NewDBKey(123, common.Hash{}).Bytes()),
+				Cursor: hex.EncodeToString(mailserver.NewDBKey(123, emptyTopic, common.Hash{}).Cursor()),
 			},
 			Err: "",
 		},

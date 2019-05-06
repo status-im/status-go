@@ -115,13 +115,14 @@ func testMessagesCount(t *testing.T, expected int, s *WMailServer) {
 
 func countMessages(t *testing.T, db dbImpl) int {
 	var (
-		count int
-		zero  common.Hash
+		count      int
+		zero       common.Hash
+		emptyTopic whisper.TopicType
 	)
 
 	now := time.Now()
-	kl := NewDBKey(uint32(0), zero)
-	ku := NewDBKey(uint32(now.Unix()), zero)
+	kl := NewDBKey(uint32(0), emptyTopic, zero)
+	ku := NewDBKey(uint32(now.Unix()), emptyTopic, zero)
 	i := db.NewIterator(&util.Range{Start: kl.raw, Limit: ku.raw}, nil)
 	defer i.Release()
 

@@ -750,8 +750,9 @@ func makeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid cursor: %v", err)
 	}
-	if len(cursor) > 0 && len(cursor) != mailserver.DBKeyLength {
-		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.DBKeyLength, len(cursor))
+
+	if len(cursor) > 0 && len(cursor) != mailserver.CursorLength {
+		return nil, fmt.Errorf("invalid cursor size: expected %d but got %d", mailserver.CursorLength, len(cursor))
 	}
 
 	payload := mailserver.MessagesRequestPayload{

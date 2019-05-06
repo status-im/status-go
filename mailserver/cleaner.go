@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -86,8 +87,9 @@ func (c *dbCleaner) schedule(period time.Duration, cancel <-chan struct{}) {
 // and returns how many have been removed.
 func (c *dbCleaner) PruneEntriesOlderThan(t time.Time) (int, error) {
 	var zero common.Hash
-	kl := NewDBKey(0, zero)
-	ku := NewDBKey(uint32(t.Unix()), zero)
+	var emptyTopic whisper.TopicType
+	kl := NewDBKey(0, emptyTopic, zero)
+	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
 	i := c.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
 	defer i.Release()
 

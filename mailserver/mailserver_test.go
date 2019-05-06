@@ -266,7 +266,7 @@ func (s *MailserverSuite) TestArchive() {
 	s.NoError(err)
 
 	s.server.Archive(env)
-	key := NewDBKey(env.Expiry-env.TTL, env.Hash())
+	key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
 	archivedEnvelope, err := s.server.db.Get(key.Bytes(), nil)
 	s.NoError(err)
 
@@ -287,8 +287,9 @@ func (s *MailserverSuite) TestManageLimits() {
 
 func (s *MailserverSuite) TestDBKey() {
 	var h common.Hash
+	var emptyTopic whisper.TopicType
 	i := uint32(time.Now().Unix())
-	k := NewDBKey(i, h)
+	k := NewDBKey(i, emptyTopic, h)
 	s.Equal(len(k.Bytes()), DBKeyLength, "wrong DB key length")
 	s.Equal(byte(i%0x100), k.Bytes()[3], "raw representation should be big endian")
 	s.Equal(byte(i/0x1000000), k.Bytes()[0], "big endian expected")
@@ -313,8 +314,8 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
 		s.server.Archive(env)
-		key := NewDBKey(env.Expiry-env.TTL, env.Hash())
-		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Bytes()))
+		key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
+		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Cursor()))
 		sentEnvelopes = append(sentEnvelopes, env)
 		sentHashes = append(sentHashes, env.Hash())
 	}
@@ -523,7 +524,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 		Verify  func(
 			iterator.Iterator,
 			time.Duration, // processRequestInBundles timeout
-			chan []*whisper.Envelope,
+			chan []rlp.RawValue,
 		)
 	}{
 		{
@@ -532,7 +533,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 			Verify: func(
 				iter iterator.Iterator,
 				timeout time.Duration,
-				bundles chan []*whisper.Envelope,
+				bundles chan []rlp.RawValue,
 			) {
 				done := make(chan struct{})
 				processFinished := make(chan struct{})
@@ -556,7 +557,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 			Verify: func(
 				iter iterator.Iterator,
 				timeout time.Duration,
-				bundles chan []*whisper.Envelope,
+				bundles chan []rlp.RawValue,
 			) {
 				done := make(chan struct{}) // won't be closed because we test timeout of `processRequestInBundles()`
 				processFinished := make(chan struct{})
@@ -582,7 +583,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 
 			// Nothing reads from this unbuffered channel which simulates a situation
 			// when a connection between a peer and mail server was dropped.
-			bundles := make(chan []*whisper.Envelope)
+			bundles := make(chan []rlp.RawValue)
 
 			tc.Verify(iter, tc.Timeout, bundles)
 		})
@@ -778,13 +779,19 @@ func processRequestAndCollectHashes(
 ) ([]common.Hash, []byte, common.Hash) {
 	iter := server.createIterator(lower, upper, cursor)
 	defer iter.Release()
-	bundles := make(chan []*whisper.Envelope, 10)
+	bundles := make(chan []rlp.RawValue, 10)
 	done := make(chan struct{})
 
 	var hashes []common.Hash
 	go func() {
 		for bundle := range bundles {
-			for _, env := range bundle {
+			for _, rawEnvelope := range bundle {
+
+				var env *whisper.Envelope
+				if err := rlp.DecodeBytes(rawEnvelope, &env); err != nil {
+					panic(err)
+				}
+
 				hashes = append(hashes, env.Hash())
 			}
 		}
