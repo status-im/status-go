@@ -257,7 +257,8 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
-	grep -v /lib)
+	grep -v /lib | \
+	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
 	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 
