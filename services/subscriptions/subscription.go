@@ -1,6 +1,7 @@
 package subscriptions
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -8,10 +9,11 @@ import (
 type SubscriptionID string
 
 type Subscription struct {
-	id     SubscriptionID
-	signal *filterSignal
-	quit   chan struct{}
-	filter filter
+	id      SubscriptionID
+	signal  *filterSignal
+	quit    chan struct{}
+	filter  filter
+	stopped bool
 }
 
 func NewSubscription(namespace string, filter filter) *Subscription {
@@ -27,7 +29,10 @@ func NewSubscription(namespace string, filter filter) *Subscription {
 	}
 }
 
-func (s *Subscription) Start(checkPeriod time.Duration) {
+func (s *Subscription) Start(checkPeriod time.Duration) error {
+	if s.stopped {
+		return errors.New("it is impossible to start an already stopped subscription")
+	}
 	ticker := time.NewTicker(checkPeriod)
 	defer ticker.Stop()
 
@@ -41,16 +46,20 @@ func (s *Subscription) Start(checkPeriod time.Duration) {
 				s.signal.SendData(filterData)
 			}
 		case <-s.quit:
-			return
+			return nil
 		}
 	}
 }
 
 func (s *Subscription) Stop(uninstall bool) error {
+	if s.stopped {
+		return nil
+	}
 	close(s.quit)
 	if uninstall {
 		return s.filter.uninstall()
 	}
+	s.stopped = true
 	return nil
 }
 

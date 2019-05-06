@@ -130,7 +130,7 @@ func TestSubscriptionRemove(t *testing.T) {
 	require.NoError(t, subs.Remove(subID))
 
 	require.True(t, filter.uninstalled)
-	require.Equal(t, len(subs.subs), 0)
+	require.Empty(t, subs.subs)
 }
 
 func TestSubscriptionRemoveError(t *testing.T) {

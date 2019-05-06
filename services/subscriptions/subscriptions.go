@@ -4,61 +4,70 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type Subscriptions struct {
 	mu          sync.Mutex
 	subs        map[SubscriptionID]*Subscription
 	checkPeriod time.Duration
+	log         log.Logger
 }
 
 func NewSubscriptions(period time.Duration) *Subscriptions {
 	return &Subscriptions{
 		subs:        make(map[SubscriptionID]*Subscription),
 		checkPeriod: period,
+		log:         log.New("package", "status-go/services/subsriptions.Subscriptions"),
 	}
 }
 
-func (subs *Subscriptions) Create(namespace string, filter filter) (SubscriptionID, error) {
-	subs.mu.Lock()
-	defer subs.mu.Unlock()
+func (s *Subscriptions) Create(namespace string, filter filter) (SubscriptionID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	newSub := NewSubscription(namespace, filter)
 
-	go newSub.Start(subs.checkPeriod)
+	go func() {
+		err := newSub.Start(s.checkPeriod)
+		if err != nil {
+			s.log.Error("error while starting subscription", "err", err)
+		}
+	}()
 
-	subs.subs[newSub.id] = newSub
+	s.subs[newSub.id] = newSub
 
 	return newSub.id, nil
 }
 
-func (subs *Subscriptions) Remove(id SubscriptionID) error {
-	subs.mu.Lock()
-	defer subs.mu.Unlock()
+func (s *Subscriptions) Remove(id SubscriptionID) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	found, err := subs.stopSubscription(id)
+	found, err := s.stopSubscription(id)
 
 	if found {
-		delete(subs.subs, id)
+		delete(s.subs, id)
 	}
 
 	return err
 }
 
-func (subs *Subscriptions) removeAll() error {
-	subs.mu.Lock()
-	defer subs.mu.Unlock()
+func (s *Subscriptions) removeAll() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	unsubscribeErrors := make(map[SubscriptionID]error)
 
-	for id := range subs.subs {
-		_, err := subs.stopSubscription(id)
+	for id := range s.subs {
+		_, err := s.stopSubscription(id)
 		if err != nil {
 			unsubscribeErrors[id] = err
 		}
 	}
 
-	subs.subs = make(map[SubscriptionID]*Subscription)
+	s.subs = make(map[SubscriptionID]*Subscription)
 
 	if len(unsubscribeErrors) > 0 {
 		return fmt.Errorf("errors while cleaning up subscriptions: %+v", unsubscribeErrors)
@@ -68,8 +77,8 @@ func (subs *Subscriptions) removeAll() error {
 }
 
 // stopSubscription isn't thread safe!
-func (subs *Subscriptions) stopSubscription(id SubscriptionID) (bool, error) {
-	sub, found := subs.subs[id]
+func (s *Subscriptions) stopSubscription(id SubscriptionID) (bool, error) {
+	sub, found := s.subs[id]
 	if !found {
 		return false, nil
 	}
