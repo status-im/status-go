@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -163,39 +162,6 @@ func TestSubscriptionRemoveAll(t *testing.T) {
 
 	require.False(t, filter0.uninstalled)
 	require.False(t, filter1.uninstalled)
-
-	require.Equal(t, len(subs.subs), 0)
-}
-
-func TestSubscriptionRemoveAllError(t *testing.T) {
-	filter0 := newMockFilter(filterID)
-	filter0.uninstallError = errors.New("error-0")
-	filter1 := newMockFilter(filterID + "1")
-	filter1.uninstallError = errors.New("error-1")
-	filter2 := newMockFilter(filterID + "2")
-
-	subs := NewSubscriptions(time.Microsecond)
-	_, err := subs.Create(filterNS, filter0)
-	require.NoError(t, err)
-	_, err = subs.Create(filterNS, filter1)
-	require.NoError(t, err)
-	_, err = subs.Create(filterNS, filter2)
-	require.NoError(t, err)
-
-	require.Equal(t, len(subs.subs), 3)
-
-	err = subs.removeAll()
-
-	require.NotNil(t, err)
-
-	require.True(t, strings.Contains(err.Error(), "error-0"))
-	require.True(t, strings.Contains(err.Error(), "error-1"))
-
-	// removeAll DOES NOT uninstall filters, it is expected to be called
-	// on node shudown only and not exposed anywhere
-	require.False(t, filter0.uninstalled)
-	require.False(t, filter1.uninstalled)
-	require.False(t, filter2.uninstalled)
 
 	require.Equal(t, len(subs.subs), 0)
 }
