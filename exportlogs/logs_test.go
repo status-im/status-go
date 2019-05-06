@@ -21,7 +21,7 @@ func TestExportLogs(t *testing.T) {
 	log := response.Logs[0]
 	require.Equal(t, false, log.Compressed)
 	require.Equal(t, tempf.Name(), log.Filename)
-	require.Equal(t, logs, string(log.Content))
+	require.Equal(t, logs, log.Content)
 }
 
 func TestExportLogsNoFileError(t *testing.T) {

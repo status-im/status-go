@@ -3,14 +3,12 @@ package exportlogs
 import (
 	"fmt"
 	"io/ioutil"
-
-	"github.com/status-im/go-ethereum/common/hexutil"
 )
 
 // Log contains actual log content and filename. If content is gzipped Compressed will be set to true.
 type Log struct {
 	Filename   string
-	Content    []byte
+	Content    string
 	Compressed bool
 }
 
@@ -28,7 +26,7 @@ func ExportFromBaseFile(logFile string) ExportResponse {
 		return ExportResponse{Error: fmt.Errorf("error reading file %s: %v", logFile, err).Error()}
 	}
 	return ExportResponse{Logs: []Log{
-		{Filename: logFile, Compressed: false, Content: hexutil.Bytes(data)},
+		{Filename: logFile, Compressed: false, Content: string(data)},
 	}}
 
 }
