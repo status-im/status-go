@@ -20,6 +20,7 @@ const (
 
 func TestSubscriptionPendingTransaction(t *testing.T) {
 	backend := NewStatusBackend()
+	backend.allowAllRPC = true
 
 	account, _ := initNodeAndLogin(t, backend)
 

@@ -63,6 +63,7 @@ type StatusBackend struct {
 	connectionState connectionState
 	appState        appState
 	log             log.Logger
+	allowAllRPC     bool // used only for tests, disables api method restrictions
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -405,6 +406,10 @@ func (b *StatusBackend) registerHandlers() error {
 			},
 		)
 
+		if b.allowAllRPC {
+			// this should only happen in unit-tests, this variable is not available outside this package
+			continue
+		}
 		client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
 		client.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
 		client.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
