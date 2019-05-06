@@ -37,8 +37,6 @@ func TestSubscriptionPendingTransaction(t *testing.T) {
 
 	subID := createSubscription(t, backend, `"eth_newPendingTransactionFilter", []`)
 
-	fmt.Println(subID)
-
 	createTxFmt := `
     {
 		"jsonrpc":"2.0",

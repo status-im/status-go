@@ -13,7 +13,6 @@ type API struct {
 }
 
 func NewPublicAPI(node *node.StatusNode) *API {
-	fmt.Println("making newpublicAPI")
 	return &API{
 		node:                node,
 		activeSubscriptions: NewSubscriptions(100 * time.Millisecond),
@@ -21,12 +20,11 @@ func NewPublicAPI(node *node.StatusNode) *API {
 }
 
 func (api *API) SubscribeSignal(method string, args []interface{}) (SubscriptionID, error) {
-	namespace := method[:3]
-
-	var filter filter
-	var err error
-
-	fmt.Printf("args = %+v\n", args)
+	var (
+		filter    filter
+		err       error
+		namespace string = method[:3]
+	)
 
 	rpc := api.node.RPCPrivateClient()
 
