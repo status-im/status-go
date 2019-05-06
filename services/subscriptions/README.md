@@ -29,9 +29,7 @@ Example 2:
   "method": "eth_subscribeSignal", 
   "params": [
     "shh_newFilter",
-    {
-      "topics": ["0x12341234bf4b564f"]
-    }
+    [{ "topics": ["0x12341234bf4b564f"] }]
   ]
 }
 ```
