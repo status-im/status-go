@@ -42,6 +42,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
+	storage          db.TransactionalStorage
 	w                *whisper.Whisper
 	config           params.ShhextConfig
 	envelopesMonitor *EnvelopesMonitor
@@ -73,7 +74,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		delay = config.RequestsDelay
 	}
 	requestsRegistry := NewRequestsRegistry(delay)
-	historyUpdates := NewHistoryUpdateReactor(db.NewHistoryStore(ldb), requestsRegistry, w.GetCurrentTime)
+	historyUpdates := NewHistoryUpdateReactor()
 	mailMonitor := &MailRequestMonitor{
 		w:                w,
 		handler:          handler,
@@ -82,6 +83,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 	}
 	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps, config.MaxMessageDeliveryAttempts)
 	return &Service{
+		storage:          db.NewLevelDBStorage(ldb),
 		w:                w,
 		config:           config,
 		envelopesMonitor: envelopesMonitor,

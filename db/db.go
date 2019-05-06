@@ -34,7 +34,7 @@ func NewMemoryDB() (*leveldb.DB, error) {
 }
 
 // NewDBNamespace returns instance that ensures isolated operations.
-func NewDBNamespace(db *leveldb.DB, prefix storagePrefix) LevelDBNamespace {
+func NewDBNamespace(db Storage, prefix storagePrefix) LevelDBNamespace {
 	return LevelDBNamespace{
 		db:     db,
 		prefix: prefix,
@@ -48,7 +48,7 @@ func NewMemoryDBNamespace(prefix storagePrefix) (pdb LevelDBNamespace, err error
 	if err != nil {
 		return pdb, err
 	}
-	return NewDBNamespace(db, prefix), nil
+	return NewDBNamespace(LevelDBStorage{db: db}, prefix), nil
 }
 
 // Key creates a DB key for a specified service with specified data
@@ -91,7 +91,7 @@ func Open(path string, opts *opt.Options) (db *leveldb.DB, err error) {
 
 // LevelDBNamespace database where all operations will be prefixed with a certain bucket.
 type LevelDBNamespace struct {
-	db     *leveldb.DB
+	db     Storage
 	prefix storagePrefix
 }
 
@@ -103,11 +103,11 @@ func (db LevelDBNamespace) prefixedKey(key []byte) []byte {
 }
 
 func (db LevelDBNamespace) Put(key, value []byte) error {
-	return db.db.Put(db.prefixedKey(key), value, nil)
+	return db.db.Put(db.prefixedKey(key), value)
 }
 
 func (db LevelDBNamespace) Get(key []byte) ([]byte, error) {
-	return db.db.Get(db.prefixedKey(key), nil)
+	return db.db.Get(db.prefixedKey(key))
 }
 
 // Range returns leveldb util.Range prefixed with a single byte.
@@ -121,12 +121,12 @@ func (db LevelDBNamespace) Range(prefix, limit []byte) *util.Range {
 
 // Delete removes key from database.
 func (db LevelDBNamespace) Delete(key []byte) error {
-	return db.db.Delete(db.prefixedKey(key), nil)
+	return db.db.Delete(db.prefixedKey(key))
 }
 
 // NewIterator returns iterator for a given slice.
 func (db LevelDBNamespace) NewIterator(slice *util.Range) NamespaceIterator {
-	return NamespaceIterator{db.db.NewIterator(slice, nil)}
+	return NamespaceIterator{db.db.NewIterator(slice)}
 }
 
 // NamespaceIterator wraps leveldb iterator, works mostly the same way.

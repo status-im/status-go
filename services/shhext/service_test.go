@@ -698,6 +698,7 @@ type RequestWithTrackingHistorySuite struct {
 	localWhisperAPI *whisper.PublicWhisperAPI
 	localAPI        *PublicAPI
 	localService    *Service
+	localContext    Context
 	mailSymKey      string
 
 	remoteMailserver *mailserver.WMailServer
@@ -717,6 +718,7 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 
 	s.localWhisperAPI = whisper.NewPublicWhisperAPI(local)
 	s.localService = New(local, nil, db, params.ShhextConfig{})
+	s.localContext = NewContextFromService(context.Background(), s.localService, s.localService.storage)
 	localPkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.Require().NoError(s.localService.Start(&p2p.Server{Config: p2p.Config{PrivateKey: localPkey}}))
@@ -799,7 +801,7 @@ func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...whisper.To
 }
 
 func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []hexutil.Bytes {
-	requests, err := s.localAPI.InitiateHistoryRequests(InitiateHistoryRequestParams{
+	requests, err := s.localAPI.InitiateHistoryRequests(context.Background(), InitiateHistoryRequestParams{
 		Peer:     s.remoteNode.String(),
 		SymKeyID: s.mailSymKey,
 		Timeout:  10 * time.Second,
@@ -826,7 +828,7 @@ func (s *RequestWithTrackingHistorySuite) waitMessagesDelivered(filterid string,
 }
 
 func (s *RequestWithTrackingHistorySuite) waitNoRequests() {
-	store := s.localService.historyUpdates.store
+	store := s.localContext.HistoryStore()
 	s.Require().NoError(utils.Eventually(func() error {
 		reqs, err := store.GetAllRequests()
 		if err != nil {
@@ -856,9 +858,9 @@ func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
 	s.Require().Len(requests, 2)
 	s.waitMessagesDelivered(filterid, hexes...)
 
-	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic1, time.Now()))
-	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic2, time.Now()))
-	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(topic3, time.Now()))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(s.localContext, topic1, time.Now()))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(s.localContext, topic2, time.Now()))
+	s.Require().NoError(s.localService.historyUpdates.UpdateTopicHistory(s.localContext, topic3, time.Now()))
 	for _, r := range requests {
 		s.Require().NoError(s.localAPI.CompleteRequest(context.TODO(), r.String()))
 	}

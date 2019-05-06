@@ -427,16 +427,24 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 
 // ConfirmMessagesProcessed is a method to confirm that messages was consumed by
 // the client side.
-func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) error {
+func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) (err error) {
+	tx := api.service.storage.NewTx()
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		}
+	}()
+	ctx := NewContextFromService(context.Background(), api.service, tx)
 	for _, msg := range messages {
 		if msg.P2P {
-			err := api.service.historyUpdates.UpdateTopicHistory(msg.Topic, time.Unix(int64(msg.Timestamp), 0))
+			err = api.service.historyUpdates.UpdateTopicHistory(ctx, msg.Topic, time.Unix(int64(msg.Timestamp), 0))
 			if err != nil {
 				return err
 			}
 		}
 	}
-	return api.service.deduplicator.AddMessages(messages)
+	err = api.service.deduplicator.AddMessages(messages)
+	return err
 }
 
 // ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
@@ -575,32 +583,48 @@ func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, pee
 // - Topic
 // - Duration in nanoseconds. Will be used to determine starting time for history request.
 // After that status-go will guarantee that request for this topic and date will be performed.
-func (api *PublicAPI) InitiateHistoryRequests(request InitiateHistoryRequestParams) ([]hexutil.Bytes, error) {
-	rst := []hexutil.Bytes{}
-	requests, err := api.service.historyUpdates.CreateRequests(request.Requests)
+func (api *PublicAPI) InitiateHistoryRequests(parent context.Context, request InitiateHistoryRequestParams) (rst []hexutil.Bytes, err error) {
+	tx := api.service.storage.NewTx()
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		}
+	}()
+	ctx := NewContextFromService(parent, api.service, tx)
+	requests, err := api.service.historyUpdates.CreateRequests(ctx, request.Requests)
 	if err != nil {
 		return nil, err
 	}
+	var (
+		payload []byte
+		hash    common.Hash
+	)
 	for i := range requests {
 		req := requests[i]
 		options := CreateTopicOptionsFromRequest(req)
 		bloom := options.ToBloomFilterOption()
-		payload, err := bloom.ToMessagesRequestPayload()
+		payload, err = bloom.ToMessagesRequestPayload()
 		if err != nil {
 			return rst, err
 		}
-		hash, err := api.requestMessagesUsingPayload(req, request.Peer, request.SymKeyID, payload, request.Force, request.Timeout, options.Topics())
+		hash, err = api.requestMessagesUsingPayload(req, request.Peer, request.SymKeyID, payload, request.Force, request.Timeout, options.Topics())
 		if err != nil {
 			return rst, err
 		}
-		rst = append(rst, hash[:])
+		rst = append(rst, hash.Bytes())
 	}
-	return rst, nil
+	return rst, err
 }
 
 // CompleteRequest client must mark request completed when all envelopes were processed.
-func (api *PublicAPI) CompleteRequest(ctx context.Context, hex string) error {
-	return api.service.historyUpdates.UpdateFinishedRequest(common.HexToHash(hex))
+func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err error) {
+	tx := api.service.storage.NewTx()
+	ctx := NewContextFromService(parent, api.service, tx)
+	err = api.service.historyUpdates.UpdateFinishedRequest(ctx, common.HexToHash(hex))
+	if err == nil {
+		return tx.Commit()
+	}
+	return err
 }
 
 // DEPRECATED: use SendDirectMessage with DH flag

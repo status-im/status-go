@@ -1,6 +1,7 @@
 package shhext
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -13,10 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func newTestContext(t *testing.T) Context {
+	mdb, err := db.NewMemoryDB()
+	require.NoError(t, err)
+	return NewContext(context.Background(), time.Now, NewRequestsRegistry(0), db.NewLevelDBStorage(mdb))
+}
+
 func createInMemStore(t *testing.T) db.HistoryStore {
 	mdb, err := db.NewMemoryDB()
 	require.NoError(t, err)
-	return db.NewHistoryStore(mdb)
+	return db.NewHistoryStore(db.NewLevelDBStorage(mdb))
 }
 
 func TestRenewRequest(t *testing.T) {
@@ -95,11 +102,9 @@ func TestBloomFilterToMessageRequestPayload(t *testing.T) {
 }
 
 func TestCreateRequestsEmptyState(t *testing.T) {
-	now := time.Now()
-	reactor := NewHistoryUpdateReactor(
-		createInMemStore(t), NewRequestsRegistry(0),
-		func() time.Time { return now })
-	requests, err := reactor.CreateRequests([]TopicRequest{
+	ctx := newTestContext(t)
+	reactor := NewHistoryUpdateReactor()
+	requests, err := reactor.CreateRequests(ctx, []TopicRequest{
 		{Topic: whisper.TopicType{1}, Duration: time.Hour},
 		{Topic: whisper.TopicType{2}, Duration: time.Hour},
 		{Topic: whisper.TopicType{3}, Duration: 10 * time.Hour},
@@ -120,14 +125,15 @@ func TestCreateRequestsEmptyState(t *testing.T) {
 }
 
 func TestCreateRequestsWithExistingRequest(t *testing.T) {
-	store := createInMemStore(t)
+	ctx := newTestContext(t)
+	store := ctx.HistoryStore()
 	req := store.NewRequest()
 	req.ID = common.Hash{1}
 	th := store.NewHistory(whisper.TopicType{1}, time.Hour)
 	req.AddHistory(th)
 	require.NoError(t, req.Save())
-	reactor := NewHistoryUpdateReactor(store, NewRequestsRegistry(0), time.Now)
-	requests, err := reactor.CreateRequests([]TopicRequest{
+	reactor := NewHistoryUpdateReactor()
+	requests, err := reactor.CreateRequests(ctx, []TopicRequest{
 		{Topic: whisper.TopicType{1}, Duration: time.Hour},
 		{Topic: whisper.TopicType{2}, Duration: time.Hour},
 		{Topic: whisper.TopicType{3}, Duration: time.Hour},
@@ -148,12 +154,11 @@ func TestCreateRequestsWithExistingRequest(t *testing.T) {
 }
 
 func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
-	now := time.Now()
-	reactor := NewHistoryUpdateReactor(
-		createInMemStore(t), NewRequestsRegistry(0),
-		func() time.Time { return now })
+	ctx := newTestContext(t)
+	store := ctx.HistoryStore()
+	reactor := NewHistoryUpdateReactor()
 	topic := whisper.TopicType{1}
-	requests, err := reactor.CreateRequests([]TopicRequest{
+	requests, err := reactor.CreateRequests(ctx, []TopicRequest{
 		{Topic: topic, Duration: time.Hour},
 	})
 	require.NoError(t, err)
@@ -162,7 +167,7 @@ func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
 	require.NoError(t, requests[0].Save())
 
 	// duration changed. request wasn't finished
-	requests, err = reactor.CreateRequests([]TopicRequest{
+	requests, err = reactor.CreateRequests(ctx, []TopicRequest{
 		{Topic: topic, Duration: 10 * time.Hour},
 	})
 	require.NoError(t, err)
@@ -180,25 +185,26 @@ func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
 	require.Equal(t, requests[longest].Histories()[0].End, requests[longest^1].Histories()[0].First)
 
 	for _, r := range requests {
-		require.NoError(t, reactor.UpdateFinishedRequest(r.ID))
+		require.NoError(t, reactor.UpdateFinishedRequest(ctx, r.ID))
 	}
-	requests, err = reactor.CreateRequests([]TopicRequest{
+	requests, err = reactor.CreateRequests(ctx, []TopicRequest{
 		{Topic: topic, Duration: 10 * time.Hour},
 	})
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
 
-	topics, err := reactor.store.GetHistoriesByTopic(topic)
+	topics, err := store.GetHistoriesByTopic(topic)
 	require.NoError(t, err)
 	require.Len(t, topics, 1)
 	require.Equal(t, 10*time.Hour, topics[0].Duration)
 }
 
 func TestRequestFinishedUpdate(t *testing.T) {
-	store := createInMemStore(t)
+	ctx := newTestContext(t)
+	store := ctx.HistoryStore()
 	req := store.NewRequest()
 	req.ID = common.Hash{1}
-	now := time.Now()
+	now := ctx.Time()
 	thOne := store.NewHistory(whisper.TopicType{1}, time.Hour)
 	thOne.End = now
 	thTwo := store.NewHistory(whisper.TopicType{2}, time.Hour)
@@ -207,9 +213,9 @@ func TestRequestFinishedUpdate(t *testing.T) {
 	req.AddHistory(thTwo)
 	require.NoError(t, req.Save())
 
-	reactor := NewHistoryUpdateReactor(store, NewRequestsRegistry(0), time.Now)
-	require.NoError(t, reactor.UpdateTopicHistory(thOne.Topic, now.Add(-time.Minute)))
-	require.NoError(t, reactor.UpdateFinishedRequest(req.ID))
+	reactor := NewHistoryUpdateReactor()
+	require.NoError(t, reactor.UpdateTopicHistory(ctx, thOne.Topic, now.Add(-time.Minute)))
+	require.NoError(t, reactor.UpdateFinishedRequest(ctx, req.ID))
 	_, err := store.GetRequest(req.ID)
 	require.EqualError(t, err, "leveldb: not found")
 
@@ -220,8 +226,9 @@ func TestRequestFinishedUpdate(t *testing.T) {
 }
 
 func TestTopicHistoryUpdate(t *testing.T) {
+	ctx := newTestContext(t)
+	store := ctx.HistoryStore()
 	reqID := common.Hash{1}
-	store := createInMemStore(t)
 	request := store.NewRequest()
 	request.ID = reqID
 	now := time.Now()
@@ -230,14 +237,14 @@ func TestTopicHistoryUpdate(t *testing.T) {
 	th.RequestID = request.ID
 	th.End = now
 	require.NoError(t, th.Save())
-	reactor := NewHistoryUpdateReactor(store, NewRequestsRegistry(0), time.Now)
+	reactor := NewHistoryUpdateReactor()
 	timestamp := now.Add(-time.Minute)
 
-	require.NoError(t, reactor.UpdateTopicHistory(th.Topic, timestamp))
+	require.NoError(t, reactor.UpdateTopicHistory(ctx, th.Topic, timestamp))
 	require.NoError(t, th.Load())
 	require.Equal(t, timestamp.Unix(), th.Current.Unix())
 
-	require.NoError(t, reactor.UpdateTopicHistory(th.Topic, now))
+	require.NoError(t, reactor.UpdateTopicHistory(ctx, th.Topic, now))
 	require.NoError(t, th.Load())
 	require.Equal(t, timestamp.Unix(), th.Current.Unix())
 }
