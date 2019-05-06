@@ -1,15 +1,15 @@
 package subscriptions
 
 import (
-	"github.com/ethereum/go-ethereum/node"
+	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	gethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/node"
 )
 
 // Make sure that Service implements node.Service interface.
-var _ node.Service = (*Service)(nil)
+var _ gethnode.Service = (*Service)(nil)
 
 // Service represents out own implementation of personal sign operations.
 type Service struct {
@@ -17,9 +17,9 @@ type Service struct {
 }
 
 // New returns a new Service.
-func New(rpc *rpc.Client) *Service {
+func New(node *node.StatusNode) *Service {
 	return &Service{
-		api: NewPublicAPI(rpc),
+		api: NewPublicAPI(node),
 	}
 }
 
@@ -29,8 +29,8 @@ func (s *Service) Protocols() []p2p.Protocol {
 }
 
 // APIs returns a list of new APIs.
-func (s *Service) APIs() []gethrpc.API {
-	return []gethrpc.API{
+func (s *Service) APIs() []rpc.API {
+	return []rpc.API{
 		{
 			Namespace: "eth",
 			Version:   "1.0",

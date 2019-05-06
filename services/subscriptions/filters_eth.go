@@ -47,6 +47,7 @@ func (ef *ethFilter) getChanges() ([]interface{}, error) {
 }
 
 func (ef *ethFilter) uninstall() error {
+	fmt.Printf("uninstallFilter id=%s", ef.getID())
 	return ef.rpcClient.Call(nil, "eth_uninstallFilter", ef.getID())
 }
 

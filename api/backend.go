@@ -129,7 +129,7 @@ func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return subscriptions.New(b.statusNode.RPCPrivateClient()), nil
+		return subscriptions.New(b.statusNode), nil
 	}
 }
 
@@ -405,7 +405,7 @@ func (b *StatusBackend) registerHandlers() error {
 			},
 		)
 
-		client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
+		//client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
 		client.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
 		client.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
 	}

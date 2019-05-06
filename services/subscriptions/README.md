@@ -17,7 +17,7 @@ Example 1:
   "jsonrpc": "2.0", 
   "id": 1,
   "method": "eth_subscribeSignal", 
-  "params": ["eth_newPendingTransactionsFilter"]
+  "params": ["eth_newPendingTransactionFilter", []]
 }
 ```
 
