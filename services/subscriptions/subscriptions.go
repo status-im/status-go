@@ -46,7 +46,7 @@ func (subs *Subscriptions) Remove(id SubscriptionID) error {
 	return err
 }
 
-func (subs *Subscriptions) RemoveAll() error {
+func (subs *Subscriptions) removeAll() error {
 	subs.mu.Lock()
 	defer subs.mu.Unlock()
 
@@ -75,6 +75,6 @@ func (subs *Subscriptions) stopSubscription(id SubscriptionID) (bool, error) {
 		return false, nil
 	}
 
-	return true, sub.Stop()
+	return true, sub.Stop(false)
 
 }

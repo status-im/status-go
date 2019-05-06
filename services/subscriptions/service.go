@@ -47,5 +47,5 @@ func (s *Service) Start(server *p2p.Server) error {
 
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
-	return s.api.ClearSignalSubscriptions()
+	return s.api.shutdown()
 }

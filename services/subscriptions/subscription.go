@@ -47,9 +47,12 @@ func (s *Subscription) Start(checkPeriod time.Duration) {
 	}
 }
 
-func (s *Subscription) Stop() error {
+func (s *Subscription) Stop(uninstall bool) error {
 	close(s.quit)
-	return s.filter.uninstall()
+	if uninstall {
+		return s.filter.uninstall()
+	}
+	return nil
 }
 
 func NewSubscriptionID(namespace, filterID string) SubscriptionID {

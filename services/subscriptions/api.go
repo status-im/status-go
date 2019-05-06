@@ -49,6 +49,6 @@ func (api *API) UnsubscribeSignal(id string) error {
 	return api.activeSubscriptions.Remove(SubscriptionID(id))
 }
 
-func (api *API) ClearSignalSubscriptions() error {
-	return api.activeSubscriptions.RemoveAll()
+func (api *API) shutdown() error {
+	return api.activeSubscriptions.removeAll()
 }
