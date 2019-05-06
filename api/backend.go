@@ -405,7 +405,7 @@ func (b *StatusBackend) registerHandlers() error {
 			},
 		)
 
-		//client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
+		client.RegisterHandler(params.SendTransactionMethodName, unsupportedMethodHandler)
 		client.RegisterHandler(params.PersonalSignMethodName, unsupportedMethodHandler)
 		client.RegisterHandler(params.PersonalRecoverMethodName, unsupportedMethodHandler)
 	}
