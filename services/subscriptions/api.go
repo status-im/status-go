@@ -28,11 +28,12 @@ func (api *API) SubscribeSignal(method string, args []interface{}) (Subscription
 
 	rpc := api.node.RPCPrivateClient()
 
-	if namespace == "shh" {
+	switch namespace {
+	case "shh":
 		filter, err = installShhFilter(rpc, method, args)
-	} else if namespace == "eth" {
+	case "eth":
 		filter, err = installEthFilter(rpc, method, args)
-	} else {
+	default:
 		err = fmt.Errorf("unexpected namespace: %s", namespace)
 	}
 

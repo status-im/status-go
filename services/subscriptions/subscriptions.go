@@ -14,7 +14,6 @@ type Subscriptions struct {
 
 func NewSubscriptions(period time.Duration) *Subscriptions {
 	return &Subscriptions{
-		mu:          sync.Mutex{},
 		subs:        make(map[SubscriptionID]*Subscription),
 		checkPeriod: period,
 	}

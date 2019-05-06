@@ -10,14 +10,14 @@ type SubscriptionID string
 type Subscription struct {
 	id     SubscriptionID
 	signal *filterSignal
-	quit   chan interface{}
+	quit   chan struct{}
 	filter filter
 }
 
 func NewSubscription(namespace string, filter filter) *Subscription {
 	subscriptionID := NewSubscriptionID(namespace, filter.getID())
 
-	quit := make(chan interface{})
+	quit := make(chan struct{})
 
 	return &Subscription{
 		id:     subscriptionID,
