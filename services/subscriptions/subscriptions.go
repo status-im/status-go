@@ -45,7 +45,7 @@ func (s *Subscriptions) Remove(id SubscriptionID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	found, err := s.stopSubscription(id)
+	found, err := s.stopSubscription(id, true)
 
 	if found {
 		delete(s.subs, id)
@@ -61,7 +61,7 @@ func (s *Subscriptions) removeAll() error {
 	unsubscribeErrors := make(map[SubscriptionID]error)
 
 	for id := range s.subs {
-		_, err := s.stopSubscription(id)
+		_, err := s.stopSubscription(id, false)
 		if err != nil {
 			unsubscribeErrors[id] = err
 		}
@@ -77,12 +77,12 @@ func (s *Subscriptions) removeAll() error {
 }
 
 // stopSubscription isn't thread safe!
-func (s *Subscriptions) stopSubscription(id SubscriptionID) (bool, error) {
+func (s *Subscriptions) stopSubscription(id SubscriptionID, uninstall bool) (bool, error) {
 	sub, found := s.subs[id]
 	if !found {
 		return false, nil
 	}
 
-	return true, sub.Stop(false)
+	return true, sub.Stop(uninstall)
 
 }
