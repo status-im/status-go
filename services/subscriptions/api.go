@@ -23,7 +23,7 @@ func (api *API) SubscribeSignal(method string, args []interface{}) (Subscription
 	var (
 		filter    filter
 		err       error
-		namespace string = method[:3]
+		namespace = method[:3]
 	)
 
 	rpc := api.node.RPCPrivateClient()

@@ -53,10 +53,10 @@ func TestSubscriptionPendingTransaction(t *testing.T) {
 		"id":99
 	}`
 
-	txJsonResponse, err := backend.CallPrivateRPC(fmt.Sprintf(createTxFmt, account))
+	txJSONResponse, err := backend.CallPrivateRPC(fmt.Sprintf(createTxFmt, account))
 	require.NoError(t, err)
 
-	createdTxID := extractResult(t, txJsonResponse)
+	createdTxID := extractResult(t, txJSONResponse)
 
 	select {
 	case event := <-signals:
@@ -86,9 +86,9 @@ func TestSubscriptionWhisperEnvelopes(t *testing.T) {
 	topic := "0x12341234"
 	payload := "0x12312312"
 
-	shhGenSymKeyJsonResponse, err := backend.CallPrivateRPC(`{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test"],"id":119}`)
+	shhGenSymKeyJSONResponse, err := backend.CallPrivateRPC(`{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test"],"id":119}`)
 	require.NoError(t, err)
-	symKeyID := extractResult(t, shhGenSymKeyJsonResponse)
+	symKeyID := extractResult(t, shhGenSymKeyJSONResponse)
 
 	subID := createSubscription(t, backend, fmt.Sprintf(`"shh_newMessageFilter", [{ "symKeyID": "%s", "topics": ["%s"] }]`, symKeyID, topic))
 
@@ -109,7 +109,7 @@ func TestSubscriptionWhisperEnvelopes(t *testing.T) {
 
 	numberOfEnvelopes := 5
 
-	for i := 0; i < numberOfEnvelopes; i += 1 {
+	for i := 0; i < numberOfEnvelopes; i++ {
 		_, err = backend.CallPrivateRPC(fmt.Sprintf(sendMessageFmt, symKeyID, topic, payload))
 		require.NoError(t, err)
 	}
@@ -198,7 +198,7 @@ func initNodeAndLogin(t *testing.T, backend *StatusBackend) (string, string) {
 	info, _, err := backend.AccountManager().CreateAccount(password)
 	require.NoError(t, err)
 
-	backend.AccountManager().SelectAccount(info.WalletAddress, info.ChatAddress, password)
+	require.NoError(t, backend.AccountManager().SelectAccount(info.WalletAddress, info.ChatAddress, password))
 
 	unlockFmt := `
 	{

@@ -85,7 +85,7 @@ func TestSubscriptionGetData(t *testing.T) {
 		require.NoError(t, errors.New("timeout while waiting for filter results"))
 	}
 
-	require.NoError(t, subs.RemoveAll())
+	require.NoError(t, subs.removeAll())
 	signal.ResetDefaultNodeNotificationHandler()
 }
 
@@ -116,7 +116,7 @@ func TestSubscriptionGetError(t *testing.T) {
 		require.NoError(t, errors.New("timeout while waiting for filter results"))
 	}
 
-	require.NoError(t, subs.RemoveAll())
+	require.NoError(t, subs.removeAll())
 	signal.ResetDefaultNodeNotificationHandler()
 }
 
@@ -159,10 +159,10 @@ func TestSubscriptionRemoveAll(t *testing.T) {
 
 	require.Equal(t, len(subs.subs), 2)
 
-	require.NoError(t, subs.RemoveAll())
+	require.NoError(t, subs.removeAll())
 
-	require.True(t, filter0.uninstalled)
-	require.True(t, filter1.uninstalled)
+	require.False(t, filter0.uninstalled)
+	require.False(t, filter1.uninstalled)
 
 	require.Equal(t, len(subs.subs), 0)
 }
@@ -184,16 +184,18 @@ func TestSubscriptionRemoveAllError(t *testing.T) {
 
 	require.Equal(t, len(subs.subs), 3)
 
-	err = subs.RemoveAll()
+	err = subs.removeAll()
 
 	require.NotNil(t, err)
 
 	require.True(t, strings.Contains(err.Error(), "error-0"))
 	require.True(t, strings.Contains(err.Error(), "error-1"))
 
-	require.True(t, filter0.uninstalled)
-	require.True(t, filter1.uninstalled)
-	require.True(t, filter2.uninstalled)
+	// removeAll DOES NOT uninstall filters, it is expected to be called
+	// on node shudown only and not exposed anywhere
+	require.False(t, filter0.uninstalled)
+	require.False(t, filter1.uninstalled)
+	require.False(t, filter2.uninstalled)
 
 	require.Equal(t, len(subs.subs), 0)
 }

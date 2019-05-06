@@ -37,7 +37,7 @@ func (s *Subscription) Start(checkPeriod time.Duration) {
 			filterData, err := s.filter.getChanges()
 			if err != nil {
 				s.signal.SendError(err)
-			} else if filterData != nil && len(filterData) > 0 {
+			} else if len(filterData) > 0 {
 				s.signal.SendData(filterData)
 			}
 		case <-s.quit:
