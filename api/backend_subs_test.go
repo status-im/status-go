@@ -21,7 +21,7 @@ const (
 func TestSubscriptionPendingTransaction(t *testing.T) {
 	backend := NewStatusBackend()
 
-	account := initNodeAndLogin(t, backend)
+	account, _ := initNodeAndLogin(t, backend)
 
 	defer func() { require.NoError(t, backend.StopNode()) }()
 
@@ -63,6 +63,84 @@ func TestSubscriptionPendingTransaction(t *testing.T) {
 		validateTxEvent(t, subID, event, createdTxID)
 	case <-time.After(2 * time.Second):
 		require.Fail(t, "timeout waiting for subscription")
+	}
+}
+
+func TestSubscriptionWhisperEnvelopes(t *testing.T) {
+	backend := NewStatusBackend()
+
+	initNodeAndLogin(t, backend)
+
+	defer func() { require.NoError(t, backend.StopNode()) }()
+
+	signals := make(chan string)
+	defer func() {
+		signal.ResetDefaultNodeNotificationHandler()
+		close(signals)
+	}()
+
+	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+		signals <- jsonEvent
+	})
+
+	topic := "0x12341234"
+	payload := "0x12312312"
+
+	shhGenSymKeyJsonResponse, err := backend.CallPrivateRPC(`{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test"],"id":119}`)
+	require.NoError(t, err)
+	symKeyID := extractResult(t, shhGenSymKeyJsonResponse)
+
+	subID := createSubscription(t, backend, fmt.Sprintf(`"shh_newMessageFilter", [{ "symKeyID": "%s", "topics": ["%s"] }]`, symKeyID, topic))
+
+	sendMessageFmt := `
+	{
+		"jsonrpc": "2.0",
+		"method": "shh_post",
+		"params": [{
+			"ttl": 7,
+			"symKeyID": "%s",
+			"topic": "%s",
+			"powTarget": 2.01,
+			"powTime": 2,
+			"payload": "%s"
+		}],
+		"id":11
+	}`
+
+	numberOfEnvelopes := 5
+
+	for i := 0; i < numberOfEnvelopes; i += 1 {
+		_, err = backend.CallPrivateRPC(fmt.Sprintf(sendMessageFmt, symKeyID, topic, payload))
+		require.NoError(t, err)
+	}
+
+	select {
+	case event := <-signals:
+		validateShhEvent(t, event, subID, numberOfEnvelopes, topic, payload)
+	case <-time.After(2 * time.Second):
+		require.Fail(t, "timeout waiting for subscription")
+	}
+}
+
+// * * * * * * * * * * utility methods below * * * * * * * * * * *
+
+func validateShhEvent(t *testing.T, jsonEvent string, expectedSubID string, numberOfEnvelopes int, topic string, payload string) {
+	result := struct {
+		Event signal.SubscriptionDataEvent `json:"event"`
+		Type  string                       `json:"type"`
+	}{}
+
+	require.NoError(t, json.Unmarshal([]byte(jsonEvent), &result))
+
+	require.Equal(t, signal.EventSubscriptionsData, result.Type)
+	require.Equal(t, expectedSubID, result.Event.FilterID)
+
+	require.Equal(t, numberOfEnvelopes, len(result.Event.Data))
+
+	for _, item := range result.Event.Data {
+		dict := item.(map[string]interface{})
+		require.Equal(t, dict["topic"], topic)
+		require.Equal(t, dict["payload"], payload)
 	}
 }
 
@@ -110,7 +188,7 @@ func createSubscription(t *testing.T, backend *StatusBackend, params string) str
 	return extractResult(t, jsonResponse)
 }
 
-func initNodeAndLogin(t *testing.T, backend *StatusBackend) string {
+func initNodeAndLogin(t *testing.T, backend *StatusBackend) (string, string) {
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 
@@ -135,5 +213,5 @@ func initNodeAndLogin(t *testing.T, backend *StatusBackend) string {
 
 	require.NotContains(t, unlockResult, "err")
 
-	return info.WalletAddress
+	return info.WalletAddress, info.ChatPubKey
 }
