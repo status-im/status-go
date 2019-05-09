@@ -142,6 +142,15 @@ type SyncResponse struct {
 	Error     string
 }
 
+// RawSyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type RawSyncResponse struct {
+	Envelopes []rlp.RawValue
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
+}
+
 // MessagesResponse sent as a response after processing batch of envelopes.
 type MessagesResponse struct {
 	// Hash is a hash of all envelopes sent in the single batch.

@@ -493,6 +493,11 @@ func (whisper *Whisper) SendSyncResponse(p *Peer, data SyncResponse) error {
 	return p2p.Send(p.ws, p2pSyncResponseCode, data)
 }
 
+// SendRawSyncResponse sends a response to a Mail Server with a slice of envelopes.
+func (whisper *Whisper) SendRawSyncResponse(p *Peer, data RawSyncResponse) error {
+	return p2p.Send(p.ws, p2pSyncResponseCode, data)
+}
+
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
 func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
 	p, err := whisper.getPeer(peerID)
@@ -507,6 +512,17 @@ func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) er
 // rather than a slice. This is important to keep this method backward compatible
 // as it used to send only single envelopes.
 func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+	if len(envelopes) == 1 {
+		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
+	}
+	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
+}
+
+// SendRawP2PDirect sends a peer-to-peer message to a specific peer.
+// If only a single envelope is given, data is sent as a single object
+// rather than a slice. This is important to keep this method backward compatible
+// as it used to send only single envelopes.
+func (whisper *Whisper) SendRawP2PDirect(peer *Peer, envelopes ...rlp.RawValue) error {
 	if len(envelopes) == 1 {
 		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
 	}

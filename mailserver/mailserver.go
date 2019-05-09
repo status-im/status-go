@@ -198,7 +198,7 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 	log.Debug("Archiving envelope", "hash", env.Hash().Hex())
 
-	key := NewDBKey(env.Expiry-env.TTL, env.Hash())
+	key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
@@ -299,14 +299,14 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	iter := s.createIterator(lower, upper, cursor)
 	defer iter.Release()
 
-	bundles := make(chan []*whisper.Envelope, 5)
+	bundles := make(chan []rlp.RawValue, 5)
 	errCh := make(chan error)
 	cancelProcessing := make(chan struct{})
 
 	go func() {
 		counter := 0
 		for bundle := range bundles {
-			if err := s.sendEnvelopes(peer, bundle, batch); err != nil {
+			if err := s.sendRawEnvelopes(peer, bundle, batch); err != nil {
 				close(cancelProcessing)
 				errCh <- err
 				break
@@ -395,14 +395,14 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 	iter := s.createIterator(request.Lower, request.Upper, request.Cursor)
 	defer iter.Release()
 
-	bundles := make(chan []*whisper.Envelope, 5)
+	bundles := make(chan []rlp.RawValue, 5)
 	errCh := make(chan error)
 	cancelProcessing := make(chan struct{})
 
 	go func() {
 		for bundle := range bundles {
-			resp := whisper.SyncResponse{Envelopes: bundle}
-			if err := s.w.SendSyncResponse(peer, resp); err != nil {
+			resp := whisper.RawSyncResponse{Envelopes: bundle}
+			if err := s.w.SendRawSyncResponse(peer, resp); err != nil {
 				close(cancelProcessing)
 				errCh <- fmt.Errorf("failed to send sync response: %v", err)
 				break
@@ -475,16 +475,17 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 
 func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
 	var (
-		emptyHash common.Hash
-		ku, kl    *DBKey
+		emptyHash  common.Hash
+		emptyTopic whisper.TopicType
+		ku, kl     *DBKey
 	)
 
-	ku = NewDBKey(upper+1, emptyHash)
-	kl = NewDBKey(lower, emptyHash)
+	ku = NewDBKey(upper+1, emptyTopic, emptyHash)
+	kl = NewDBKey(lower, emptyTopic, emptyHash)
 
 	i := s.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
 	// seek to the end as we want to return envelopes in a descending order
-	if len(cursor) == DBKeyLength {
+	if len(cursor) == CursorLength {
 		i.Seek(cursor)
 	}
 	return i
@@ -498,13 +499,13 @@ func (s *WMailServer) processRequestInBundles(
 	limit int,
 	timeout time.Duration,
 	requestID string,
-	output chan<- []*whisper.Envelope,
+	output chan<- []rlp.RawValue,
 	cancel <-chan struct{},
 ) ([]byte, common.Hash) {
 	var (
-		bundle                 []*whisper.Envelope
+		bundle                 []rlp.RawValue
 		bundleSize             uint32
-		batches                [][]*whisper.Envelope
+		batches                [][]rlp.RawValue
 		processedEnvelopes     int
 		processedEnvelopesSize int64
 		nextCursor             []byte
@@ -522,29 +523,41 @@ func (s *WMailServer) processRequestInBundles(
 	// Otherwise publish what you have so far, reset the bundle to the
 	// current envelope, and leave if we hit the limit
 	for iter.Next() {
-		var envelope whisper.Envelope
 
-		decodeErr := rlp.DecodeBytes(iter.Value(), &envelope)
-		if decodeErr != nil {
-			log.Error("[mailserver:processRequestInBundles] failed to decode RLP",
-				"err", decodeErr,
-				"requestID", requestID)
+		rawValue := make([]byte, len(iter.Value()))
+		copy(rawValue, iter.Value())
+
+		key := &DBKey{
+			raw: iter.Key(),
+		}
+
+		var envelopeBloom []byte
+		// Old key, we extract the topic from the envelope
+		if len(key.Bytes()) != DBKeyLength {
+			var err error
+			envelopeBloom, err = extractBloomFromEncodedEnvelope(rawValue)
+			if err != nil {
+				log.Error("[mailserver:processRequestInBundles] failed to decode RLP",
+					"err", err,
+					"requestID", requestID)
+				continue
+			}
+		} else {
+			envelopeBloom = whisper.TopicToBloom(key.Topic())
+		}
+		if !whisper.BloomFilterMatch(bloom, envelopeBloom) {
 			continue
 		}
 
-		if !whisper.BloomFilterMatch(bloom, envelope.Bloom()) {
-			continue
-		}
-
-		lastEnvelopeHash = envelope.Hash()
+		lastEnvelopeHash = key.EnvelopeHash()
 		processedEnvelopes++
-		envelopeSize := whisper.EnvelopeHeaderLength + uint32(len(envelope.Data))
+		envelopeSize := uint32(len(rawValue))
 		limitReached := processedEnvelopes == limit
 		newSize := bundleSize + envelopeSize
 
 		// If we still have some room for messages, add and continue
 		if !limitReached && newSize < s.w.MaxMessageSize() {
-			bundle = append(bundle, &envelope)
+			bundle = append(bundle, rawValue)
 			bundleSize = newSize
 			continue
 		}
@@ -557,12 +570,12 @@ func (s *WMailServer) processRequestInBundles(
 		}
 
 		// Reset the bundle with the current envelope
-		bundle = []*whisper.Envelope{&envelope}
+		bundle = []rlp.RawValue{rawValue}
 		bundleSize = envelopeSize
 
 		// Leave if we reached the limit
 		if limitReached {
-			nextCursor = iter.Key()
+			nextCursor = key.Cursor()
 			break
 		}
 	}
@@ -608,16 +621,16 @@ func (s *WMailServer) processRequestInBundles(
 	return nextCursor, lastEnvelopeHash
 }
 
-func (s *WMailServer) sendEnvelopes(peer *whisper.Peer, envelopes []*whisper.Envelope, batch bool) error {
+func (s *WMailServer) sendRawEnvelopes(peer *whisper.Peer, envelopes []rlp.RawValue, batch bool) error {
 	start := time.Now()
 	defer requestProcessNetTimer.UpdateSince(start)
 
 	if batch {
-		return s.w.SendP2PDirect(peer, envelopes...)
+		return s.w.SendRawP2PDirect(peer, envelopes...)
 	}
 
 	for _, env := range envelopes {
-		if err := s.w.SendP2PDirect(peer, env); err != nil {
+		if err := s.w.SendRawP2PDirect(peer, env); err != nil {
 			return err
 		}
 	}
@@ -791,4 +804,13 @@ func peerIDString(peer peerWithID) string {
 
 func peerIDBytesString(id []byte) string {
 	return fmt.Sprintf("%x", id)
+}
+
+func extractBloomFromEncodedEnvelope(rawValue rlp.RawValue) ([]byte, error) {
+	var envelope whisper.Envelope
+	decodeErr := rlp.DecodeBytes(rawValue, &envelope)
+	if decodeErr != nil {
+		return nil, decodeErr
+	}
+	return envelope.Bloom(), nil
 }
