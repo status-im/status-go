@@ -19,7 +19,7 @@ func installEthFilter(rpcClient *rpc.Client, method string, args []interface{}) 
 
 	var result string
 
-	err := rpcClient.Call(&result, method, args)
+	err := rpcClient.Call(&result, method, args...)
 
 	if err != nil {
 		return nil, err
