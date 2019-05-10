@@ -18,6 +18,23 @@ const (
 
 // since `backend_test` grew too big, subscription tests are moved to its own part
 
+func TestSubscriptionEthWithParamsDict(t *testing.T) {
+	// a simple test to check the parameter parsing for eth_* filter subscriptions
+	backend := NewStatusBackend()
+
+	initNodeAndLogin(t, backend)
+
+	defer func() { require.NoError(t, backend.StopNode()) }()
+
+	createSubscription(t, backend, fmt.Sprintf(`"eth_newFilter", [
+	{
+	 "fromBlock":"earliest",
+	 "address":["0xc55cf4b03948d7ebc8b9e8bad92643703811d162","0xdee43a267e8726efd60c2e7d5b81552dcd4fa35c","0x703d7dc0bc8e314d65436adf985dda51e09ad43b","0xe639e24346d646e927f323558e6e0031bfc93581","0x2e7cd05f437eb256f363417fd8f920e2efa77540","0x57cc9b83730e6d22b224e9dc3e370967b44a2de0"],
+	 "topics":["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef","0x0000000000000000000000005dc6108dc6296b052bbd33000553afe0ea576b5e",null]
+    }
+	]`))
+}
+
 func TestSubscriptionPendingTransaction(t *testing.T) {
 	backend := NewStatusBackend()
 	backend.allowAllRPC = true
@@ -168,7 +185,7 @@ func extractResult(t *testing.T, jsonString string) string {
 	require.NoError(t, err)
 
 	value, ok := resultMap["result"]
-	require.True(t, ok)
+	require.True(t, ok, fmt.Sprintf("unexpected response: %s", jsonString))
 
 	return value.(string)
 }
