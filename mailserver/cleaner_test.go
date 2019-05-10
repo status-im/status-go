@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 func TestCleaner(t *testing.T) {
@@ -89,7 +88,9 @@ func BenchmarkCleanerPruneM100_000_B100(b *testing.B) {
 
 func setupTestServer(t *testing.T) *WMailServer {
 	var s WMailServer
-	s.db, _ = leveldb.Open(storage.NewMemStorage(), nil)
+	db, _ := leveldb.Open(storage.NewMemStorage(), nil)
+
+	s.db = &LevelDBImpl{ldb: db}
 	s.pow = powRequirement
 	return &s
 }
@@ -123,7 +124,13 @@ func countMessages(t *testing.T, db dbImpl) int {
 	now := time.Now()
 	kl := NewDBKey(uint32(0), emptyTopic, zero)
 	ku := NewDBKey(uint32(now.Unix()), emptyTopic, zero)
-	i := db.NewIterator(&util.Range{Start: kl.raw, Limit: ku.raw}, nil)
+
+	query := CursorQuery{
+		start: kl.raw,
+		end:   ku.raw,
+	}
+
+	i := db.BuildIterator(query)
 	defer i.Release()
 
 	for i.Next() {

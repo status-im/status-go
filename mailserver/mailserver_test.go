@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -267,7 +266,7 @@ func (s *MailserverSuite) TestArchive() {
 
 	s.server.Archive(env)
 	key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
-	archivedEnvelope, err := s.server.db.Get(key.Bytes(), nil)
+	archivedEnvelope, err := s.server.db.GetEnvelope(key)
 	s.NoError(err)
 
 	s.Equal(rawEnvelope, archivedEnvelope)
@@ -522,7 +521,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 		Name    string
 		Timeout time.Duration
 		Verify  func(
-			iterator.Iterator,
+			Iterator,
 			time.Duration, // processRequestInBundles timeout
 			chan []rlp.RawValue,
 		)
@@ -531,7 +530,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 			Name:    "finish processing using `done` channel",
 			Timeout: time.Second * 5,
 			Verify: func(
-				iter iterator.Iterator,
+				iter Iterator,
 				timeout time.Duration,
 				bundles chan []rlp.RawValue,
 			) {
@@ -555,7 +554,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 			Name:    "finish processing due to timeout",
 			Timeout: time.Second,
 			Verify: func(
-				iter iterator.Iterator,
+				iter Iterator,
 				timeout time.Duration,
 				bundles chan []rlp.RawValue,
 			) {
@@ -578,7 +577,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 
 	for _, tc := range testCases {
 		s.T().Run(tc.Name, func(t *testing.T) {
-			iter := s.server.createIterator(lower, upper, cursor)
+			iter := s.server.createIterator(lower, upper, cursor, nil, 0)
 			defer iter.Release()
 
 			// Nothing reads from this unbuffered channel which simulates a situation
@@ -777,7 +776,7 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 func processRequestAndCollectHashes(
 	server *WMailServer, lower, upper uint32, cursor []byte, bloom []byte, limit int,
 ) ([]common.Hash, []byte, common.Hash) {
-	iter := server.createIterator(lower, upper, cursor)
+	iter := server.createIterator(lower, upper, cursor, nil, 0)
 	defer iter.Release()
 	bundles := make(chan []rlp.RawValue, 10)
 	done := make(chan struct{})

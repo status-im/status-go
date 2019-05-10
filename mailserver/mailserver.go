@@ -29,13 +29,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
 	whisper "github.com/status-im/whisper/whisperv6"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 const (
@@ -57,20 +52,6 @@ const (
 	requestTimeRangeLength = timestampLength * 2
 	processRequestTimeout  = time.Minute
 )
-
-// dbImpl is an interface introduced to be able to test some unexpected
-// panics from leveldb that are difficult to reproduce.
-// normally the db implementation is leveldb.DB, but in TestMailServerDBPanicSuite
-// we use panicDB to test panics from the db.
-// more info about the panic errors:
-// https://github.com/syndtr/goleveldb/issues/224
-type dbImpl interface {
-	Close() error
-	Write(*leveldb.Batch, *opt.WriteOptions) error
-	Put([]byte, []byte, *opt.WriteOptions) error
-	Get([]byte, *opt.ReadOptions) ([]byte, error)
-	NewIterator(*util.Range, *opt.ReadOptions) iterator.Iterator
-}
 
 // WMailServer whisper mailserver.
 type WMailServer struct {
@@ -111,7 +92,7 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 
 	// Open database in the last step in order not to init with error
 	// and leave the database open by accident.
-	database, err := db.Open(config.DataDir, nil)
+	database, err := NewLevelDBImpl(config)
 	if err != nil {
 		return fmt.Errorf("open DB: %s", err)
 	}
@@ -183,39 +164,15 @@ func (s *WMailServer) Close() {
 	}
 }
 
-func recoverLevelDBPanics(calleMethodName string) {
-	// Recover from possible goleveldb panics
-	if r := recover(); r != nil {
-		if errString, ok := r.(string); ok {
-			log.Error(fmt.Sprintf("recovered from panic in %s: %s", calleMethodName, errString))
-		}
-	}
-}
-
 // Archive a whisper envelope.
 func (s *WMailServer) Archive(env *whisper.Envelope) {
-	defer recoverLevelDBPanics("Archive")
-
-	log.Debug("Archiving envelope", "hash", env.Hash().Hex())
-
-	key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
-	rawEnvelope, err := rlp.EncodeToBytes(env)
-	if err != nil {
-		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
-		archivedErrorsCounter.Inc(1)
-	} else {
-		if err = s.db.Put(key.Bytes(), rawEnvelope, nil); err != nil {
-			log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
-			archivedErrorsCounter.Inc(1)
-		}
-		archivedMeter.Mark(1)
-		archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
+	if err := s.db.SaveEnvelope(env); err != nil {
+		log.Error("Could not save envelope", "hash", env.Hash())
 	}
 }
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
-	defer recoverLevelDBPanics("DeliverMail")
 
 	startMethod := time.Now()
 	defer deliverMailTimer.UpdateSince(startMethod)
@@ -296,7 +253,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		requestsBatchedCounter.Inc(1)
 	}
 
-	iter := s.createIterator(lower, upper, cursor)
+	iter := s.createIterator(lower, upper, cursor, bloom, limit)
 	defer iter.Release()
 
 	bundles := make(chan []rlp.RawValue, 5)
@@ -375,8 +332,6 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailRequest) error {
 	log.Info("Started syncing envelopes", "peer", peerIDString(peer), "req", request)
 
-	defer recoverLevelDBPanics("SyncMail")
-
 	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000))
 
 	syncRequestsMeter.Mark(1)
@@ -392,7 +347,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		return fmt.Errorf("request is invalid: %v", err)
 	}
 
-	iter := s.createIterator(request.Lower, request.Upper, request.Cursor)
+	iter := s.createIterator(request.Lower, request.Upper, request.Cursor, nil, 0)
 	defer iter.Release()
 
 	bundles := make(chan []rlp.RawValue, 5)
@@ -473,7 +428,7 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	return true
 }
 
-func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterator.Iterator {
+func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte, bloom []byte, limit uint32) Iterator {
 	var (
 		emptyHash  common.Hash
 		emptyTopic whisper.TopicType
@@ -483,18 +438,20 @@ func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte) iterato
 	ku = NewDBKey(upper+1, emptyTopic, emptyHash)
 	kl = NewDBKey(lower, emptyTopic, emptyHash)
 
-	i := s.db.NewIterator(&util.Range{Start: kl.Bytes(), Limit: ku.Bytes()}, nil)
-	// seek to the end as we want to return envelopes in a descending order
-	if len(cursor) == CursorLength {
-		i.Seek(cursor)
+	query := CursorQuery{
+		start:  kl.Bytes(),
+		end:    ku.Bytes(),
+		cursor: cursor,
+		bloom:  bloom,
+		limit:  limit,
 	}
-	return i
+	return s.db.BuildIterator(query)
 }
 
 // processRequestInBundles processes envelopes using an iterator and passes them
 // to the output channel in bundles.
 func (s *WMailServer) processRequestInBundles(
-	iter iterator.Iterator,
+	iter Iterator,
 	bloom []byte,
 	limit int,
 	timeout time.Duration,
@@ -524,30 +481,21 @@ func (s *WMailServer) processRequestInBundles(
 	// current envelope, and leave if we hit the limit
 	for iter.Next() {
 
-		rawValue := make([]byte, len(iter.Value()))
-		copy(rawValue, iter.Value())
+		rawValue, err := iter.GetEnvelope(bloom)
 
-		key := &DBKey{
-			raw: iter.Key(),
+		if err != nil {
+			log.Error("Failed to get envelope from iterator",
+				"err", err,
+				"requestID", requestID)
+			continue
+
 		}
 
-		var envelopeBloom []byte
-		// Old key, we extract the topic from the envelope
-		if len(key.Bytes()) != DBKeyLength {
-			var err error
-			envelopeBloom, err = extractBloomFromEncodedEnvelope(rawValue)
-			if err != nil {
-				log.Error("[mailserver:processRequestInBundles] failed to decode RLP",
-					"err", err,
-					"requestID", requestID)
-				continue
-			}
-		} else {
-			envelopeBloom = whisper.TopicToBloom(key.Topic())
-		}
-		if !whisper.BloomFilterMatch(bloom, envelopeBloom) {
+		if rawValue == nil {
 			continue
 		}
+
+		key := iter.DBKey()
 
 		lastEnvelopeHash = key.EnvelopeHash()
 		processedEnvelopes++
