@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// dbImpl is an interface to abstract interactions with the db so that the mailserver
+// DB is an interface to abstract interactions with the db so that the mailserver
 // is agnostic to the underlaying technology used
-type dbImpl interface {
+type DB interface {
 	Close() error
 	// SaveEnvelope stores an envelope
 	SaveEnvelope(*whisper.Envelope) error
@@ -16,14 +16,12 @@ type dbImpl interface {
 	// Prune removes envelopes older than time
 	Prune(time.Time, int) (int, error)
 	// BuildIterator returns an iterator over envelopes
-	BuildIterator(query CursorQuery) Iterator
+	BuildIterator(query CursorQuery) (Iterator, error)
 }
 
 type Iterator interface {
 	Next() bool
-	Prev() bool
-	DBKey() *DBKey
-	Value() []byte
+	DBKey() (*DBKey, error)
 	Release()
 	Error() error
 	GetEnvelope(bloom []byte) ([]byte, error)

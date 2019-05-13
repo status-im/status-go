@@ -90,7 +90,7 @@ func setupTestServer(t *testing.T) *WMailServer {
 	var s WMailServer
 	db, _ := leveldb.Open(storage.NewMemStorage(), nil)
 
-	s.db = &LevelDBImpl{ldb: db}
+	s.db = &LevelDB{ldb: db}
 	s.pow = powRequirement
 	return &s
 }
@@ -114,7 +114,7 @@ func testMessagesCount(t *testing.T, expected int, s *WMailServer) {
 	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
 }
 
-func countMessages(t *testing.T, db dbImpl) int {
+func countMessages(t *testing.T, db DB) int {
 	var (
 		count      int
 		zero       common.Hash
@@ -130,12 +130,17 @@ func countMessages(t *testing.T, db dbImpl) int {
 		end:   ku.raw,
 	}
 
-	i := db.BuildIterator(query)
+	i, _ := db.BuildIterator(query)
 	defer i.Release()
 
 	for i.Next() {
 		var env whisper.Envelope
-		err := rlp.DecodeBytes(i.Value(), &env)
+		value, err := i.GetEnvelope(query.bloom)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = rlp.DecodeBytes(value, &env)
 		if err != nil {
 			t.Fatal(err)
 		}

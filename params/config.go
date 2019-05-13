@@ -85,6 +85,20 @@ type WhisperConfig struct {
 	// MaxMessageSize is a maximum size of a devp2p packet handled by the Whisper protocol,
 	// not only the size of envelopes sent in that packet.
 	MaxMessageSize uint32
+
+	// DatabaseConfig is configuration for which datastore we use
+	DatabaseConfig DatabaseConfig
+}
+
+type DatabaseConfig struct {
+	PGConfig PGConfig
+}
+
+type PGConfig struct {
+	// Enabled whether we should use a posgres instance
+	Enabled bool
+	// The URI of the server
+	URI string
 }
 
 // String dumps config object as nicely indented JSON

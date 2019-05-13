@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-type LevelDBImpl struct {
+type LevelDB struct {
 	// We can't embed as there are some state problems with go-routines
 	ldb *leveldb.DB
 }
@@ -23,10 +23,10 @@ type LevelDBIterator struct {
 	iterator.Iterator
 }
 
-func (i *LevelDBIterator) DBKey() *DBKey {
+func (i *LevelDBIterator) DBKey() (*DBKey, error) {
 	return &DBKey{
 		raw: i.Key(),
-	}
+	}, nil
 }
 
 func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
@@ -34,7 +34,11 @@ func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 	rawValue := make([]byte, len(i.Value()))
 	copy(rawValue, i.Value())
 
-	key := i.DBKey()
+	key, err := i.DBKey()
+	if err != nil {
+		return nil, err
+	}
+
 	if len(key.Bytes()) != DBKeyLength {
 		var err error
 		envelopeBloom, err = extractBloomFromEncodedEnvelope(rawValue)
@@ -51,18 +55,18 @@ func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 
 }
 
-func NewLevelDBImpl(config *params.WhisperConfig) (*LevelDBImpl, error) {
+func NewLevelDB(config *params.WhisperConfig) (*LevelDB, error) {
 	// Open opens an existing leveldb database
 	db, err := leveldb.OpenFile(config.DataDir, nil)
 	if _, iscorrupted := err.(*errors.ErrCorrupted); iscorrupted {
 		log.Info("database is corrupted trying to recover", "path", config.DataDir)
 		db, err = leveldb.RecoverFile(config.DataDir, nil)
 	}
-	return &LevelDBImpl{ldb: db}, err
+	return &LevelDB{ldb: db}, err
 }
 
 // Build iterator returns an iterator given a start/end and a cursor
-func (db *LevelDBImpl) BuildIterator(query CursorQuery) Iterator {
+func (db *LevelDB) BuildIterator(query CursorQuery) (Iterator, error) {
 	defer recoverLevelDBPanics("BuildIterator")
 
 	i := db.ldb.NewIterator(&util.Range{Start: query.start, Limit: query.end}, nil)
@@ -70,18 +74,18 @@ func (db *LevelDBImpl) BuildIterator(query CursorQuery) Iterator {
 	if len(query.cursor) == CursorLength {
 		i.Seek(query.cursor)
 	}
-	return &LevelDBIterator{i}
+	return &LevelDBIterator{i}, nil
 }
 
 // GetEnvelope get an envelope by its key
-func (db *LevelDBImpl) GetEnvelope(key *DBKey) ([]byte, error) {
+func (db *LevelDB) GetEnvelope(key *DBKey) ([]byte, error) {
 	defer recoverLevelDBPanics("GetEnvelope")
 
 	return db.ldb.Get(key.Bytes(), nil)
 }
 
 // Prune removes envelopes older than time
-func (db *LevelDBImpl) Prune(t time.Time, batchSize int) (int, error) {
+func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	defer recoverLevelDBPanics("Prune")
 
 	var zero common.Hash
@@ -92,14 +96,22 @@ func (db *LevelDBImpl) Prune(t time.Time, batchSize int) (int, error) {
 		start: kl.Bytes(),
 		end:   ku.Bytes(),
 	}
-	i := db.BuildIterator(query)
+	i, err := db.BuildIterator(query)
+	if err != nil {
+		return 0, err
+	}
 	defer i.Release()
 
 	batch := leveldb.Batch{}
 	removed := 0
 
 	for i.Next() {
-		batch.Delete(i.DBKey().Bytes())
+		dbKey, err := i.DBKey()
+		if err != nil {
+			return 0, err
+		}
+
+		batch.Delete(dbKey.Bytes())
 
 		if batch.Len() == batchSize {
 			if err := db.ldb.Write(&batch, nil); err != nil {
@@ -123,7 +135,7 @@ func (db *LevelDBImpl) Prune(t time.Time, batchSize int) (int, error) {
 }
 
 // SaveEnvelope stores an envelope in leveldb and increments the metrics
-func (db *LevelDBImpl) SaveEnvelope(env *whisper.Envelope) error {
+func (db *LevelDB) SaveEnvelope(env *whisper.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
 	key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
@@ -143,7 +155,7 @@ func (db *LevelDBImpl) SaveEnvelope(env *whisper.Envelope) error {
 	return err
 }
 
-func (db *LevelDBImpl) Close() error {
+func (db *LevelDB) Close() error {
 	return db.ldb.Close()
 }
 

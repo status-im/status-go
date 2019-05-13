@@ -41,4 +41,5 @@ exclude_patterns:
   - vendor/
   - static/
   - t/
-  
+  - mailserver/migrations
+  - services/shhext/chat/migrations
