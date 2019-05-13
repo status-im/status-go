@@ -16,7 +16,7 @@ const (
 type dbCleaner struct {
 	sync.RWMutex
 
-	db        dbImpl
+	db        DB
 	batchSize int
 	retention time.Duration
 
@@ -25,7 +25,7 @@ type dbCleaner struct {
 }
 
 // newDBCleaner returns a new cleaner for db.
-func newDBCleaner(db dbImpl, retention time.Duration) *dbCleaner {
+func newDBCleaner(db DB, retention time.Duration) *dbCleaner {
 	return &dbCleaner{
 		db:        db,
 		retention: retention,

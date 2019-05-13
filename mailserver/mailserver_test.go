@@ -577,7 +577,9 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 
 	for _, tc := range testCases {
 		s.T().Run(tc.Name, func(t *testing.T) {
-			iter := s.server.createIterator(lower, upper, cursor, nil, 0)
+			iter, err := s.server.createIterator(lower, upper, cursor, nil, 0)
+			s.Require().NoError(err)
+
 			defer iter.Release()
 
 			// Nothing reads from this unbuffered channel which simulates a situation
@@ -776,7 +778,7 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 func processRequestAndCollectHashes(
 	server *WMailServer, lower, upper uint32, cursor []byte, bloom []byte, limit int,
 ) ([]common.Hash, []byte, common.Hash) {
-	iter := server.createIterator(lower, upper, cursor, nil, 0)
+	iter, _ := server.createIterator(lower, upper, cursor, nil, 0)
 	defer iter.Release()
 	bundles := make(chan []rlp.RawValue, 10)
 	done := make(chan struct{})

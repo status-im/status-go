@@ -55,7 +55,7 @@ const (
 
 // WMailServer whisper mailserver.
 type WMailServer struct {
-	db         dbImpl
+	db         DB
 	w          *whisper.Whisper
 	pow        float64
 	symFilter  *whisper.Filter
@@ -69,8 +69,6 @@ type WMailServer struct {
 
 // Init initializes mailServer.
 func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) error {
-	var err error
-
 	if len(config.DataDir) == 0 {
 		return errDirectoryNotProvided
 	}
@@ -92,11 +90,22 @@ func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) e
 
 	// Open database in the last step in order not to init with error
 	// and leave the database open by accident.
-	database, err := NewLevelDBImpl(config)
-	if err != nil {
-		return fmt.Errorf("open DB: %s", err)
+	if config.DatabaseConfig.PGConfig.Enabled {
+		log.Info("Connecting to postgres database")
+		database, err := NewPostgresDB(config)
+		if err != nil {
+			return fmt.Errorf("open DB: %s", err)
+		}
+		s.db = database
+		log.Info("Connected to postgres database")
+	} else {
+		// Defaults to LevelDB
+		database, err := NewLevelDB(config)
+		if err != nil {
+			return fmt.Errorf("open DB: %s", err)
+		}
+		s.db = database
 	}
-	s.db = database
 
 	if config.MailServerDataRetention > 0 {
 		// MailServerDataRetention is a number of days.
@@ -253,7 +262,15 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		requestsBatchedCounter.Inc(1)
 	}
 
-	iter := s.createIterator(lower, upper, cursor, bloom, limit)
+	iter, err := s.createIterator(lower, upper, cursor, bloom, limit)
+	if err != nil {
+		log.Error("[mailserver:DeliverMail] request failed",
+			"peerID", peerID,
+			"requestID", requestID)
+
+		return
+	}
+
 	defer iter.Release()
 
 	bundles := make(chan []rlp.RawValue, 5)
@@ -347,7 +364,10 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		return fmt.Errorf("request is invalid: %v", err)
 	}
 
-	iter := s.createIterator(request.Lower, request.Upper, request.Cursor, nil, 0)
+	iter, err := s.createIterator(request.Lower, request.Upper, request.Cursor, nil, 0)
+	if err != nil {
+		return err
+	}
 	defer iter.Release()
 
 	bundles := make(chan []rlp.RawValue, 5)
@@ -393,7 +413,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 			peer,
 			whisper.SyncResponse{Error: "failed to process all envelopes"},
 		)
-		return fmt.Errorf("levelDB iterator failed: %v", err)
+		return fmt.Errorf("LevelDB iterator failed: %v", err)
 	}
 
 	log.Info("Finished syncing envelopes", "peer", peerIDString(peer))
@@ -428,7 +448,7 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 	return true
 }
 
-func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte, bloom []byte, limit uint32) Iterator {
+func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte, bloom []byte, limit uint32) (Iterator, error) {
 	var (
 		emptyHash  common.Hash
 		emptyTopic whisper.TopicType
@@ -495,7 +515,13 @@ func (s *WMailServer) processRequestInBundles(
 			continue
 		}
 
-		key := iter.DBKey()
+		key, err := iter.DBKey()
+		if err != nil {
+			log.Error("[mailserver:processRequestInBundles] failed getting key",
+				"requestID", requestID)
+			break
+
+		}
 
 		lastEnvelopeHash = key.EnvelopeHash()
 		processedEnvelopes++

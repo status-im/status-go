@@ -374,6 +374,18 @@
   revision = "f00545f9f3748e591590be3732d913c77525b10f"
 
 [[projects]]
+  branch = "master"
+  digest = "1:f8a9f7e4b9da760c589c6b4ce06a4b7b88085850605f8a9b88cd0d8dd523f614"
+  name = "github.com/lib/pq"
+  packages = [
+    ".",
+    "oid",
+    "scram",
+  ]
+  pruneopts = "NUT"
+  revision = "2ff3cb3adc01768e0a552b3a02575a6df38a9bea"
+
+[[projects]]
   digest = "1:7f9d01bc5289296160042e42e146052ae9fb8fdb92be6dd11b0e5d4916784f6d"
   name = "github.com/libp2p/go-addr-util"
   packages = ["."]
@@ -822,10 +834,11 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:7607ae0e3b67bdf37a65dc42f866a90bcbe543308e92184c51e33a4cca842ecb"
+  digest = "1:e93ff99796affffb8cfd16ff6fb8b54b089c3edac11b82d3ee2f17ffb2a0f7a2"
   name = "github.com/status-im/migrate"
   packages = [
     ".",
+    "database/postgres",
     "database/sqlcipher",
     "source/go_bindata",
   ]
@@ -1112,6 +1125,7 @@
     "github.com/ethereum/go-ethereum/rpc",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
+    "github.com/lib/pq",
     "github.com/libp2p/go-libp2p-crypto",
     "github.com/multiformats/go-multiaddr",
     "github.com/mutecomm/go-sqlcipher",
@@ -1120,6 +1134,7 @@
     "github.com/status-im/doubleratchet",
     "github.com/status-im/go-ethereum/common/hexutil",
     "github.com/status-im/migrate",
+    "github.com/status-im/migrate/database/postgres",
     "github.com/status-im/migrate/database/sqlcipher",
     "github.com/status-im/migrate/source/go_bindata",
     "github.com/status-im/rendezvous",

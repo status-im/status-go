@@ -67,6 +67,26 @@ If you want your node to relay Whisper(SHH) protocol messages you'll want to inc
 ```
 The `MailServerPassword` is used for symmetric encryption of history requests.
 
+By default it will use `leveldb` embedded database. To use postgres instead you need to 
+pass a config of this kind:
+
+```json
+{
+    "WhisperConfig": {
+        "Enabled": true,
+        "EnableMailServer": true,
+        "LightClient": false,
+        "MailServerPassword": "status-offline-inbox"
+        "DatabaseConfig": {
+          "PGConfig": {
+            "Enabled": true,
+            "URI": "postgres://user:password@host:port?options"
+          }
+        }
+    }
+}
+```
+
 __NOTE:__ The default password used by Status App and [our mailservers](https://fleets.status.im/) is `status-offline-inbox`.
 
 ## `ClusterConfig`
