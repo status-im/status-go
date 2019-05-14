@@ -54,7 +54,7 @@ func (o *Onboarding) Accounts() []*OnboardingAccount {
 func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
 	account, ok := o.accounts[id]
 	if !ok {
-		return nil, errors.New("id not found")
+		return nil, ErrOnboardingAccountNotFound
 	}
 
 	return account, nil

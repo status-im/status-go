@@ -26,6 +26,8 @@ var (
 	ErrAccountToKeyMappingFailure     = errors.New("cannot retrieve a valid key for a given account")
 	ErrNoAccountSelected              = errors.New("no account has been selected, please login")
 	ErrInvalidMasterKeyCreated        = errors.New("can not create master extended key")
+	ErrOnboardingNotStarted           = errors.New("onboarding must be started before choosing an account")
+	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 )
 
 // GethServiceProvider provides required geth services.
@@ -382,9 +384,20 @@ func (m *Manager) NewOnboarding(accountsCount, mnemonicPhraseLength int) ([]*Onb
 	return m.onboarding.Accounts(), nil
 }
 
+func (m *Manager) ResetOnboarding() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.onboarding = nil
+}
+
 func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.onboarding == nil {
+		return Info{}, "", ErrOnboardingNotStarted
+	}
 
 	acc, err := m.onboarding.Account(id)
 	if err != nil {
@@ -395,6 +408,8 @@ func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, str
 	if err != nil {
 		return Info{}, "", err
 	}
+
+	m.onboarding = nil
 
 	return info, acc.mnemonic, nil
 }
