@@ -224,6 +224,29 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 	s.Equal(errKeyStore, err)
 }
 
+func (s *ManagerTestSuite) TestOnboarding() {
+	// generates 5 random accounts
+	count := 5
+	accounts, err := s.accManager.NewOnboarding(count, 24)
+	s.Require().NoError(err)
+	s.Equal(count, len(accounts))
+
+	// choose one account and encrypt it with password
+	password := "test-onboarding-account"
+	account := accounts[0]
+	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	info, mnemonic, err := s.accManager.ImportOnboardingAccount(account.ID, password)
+	s.Require().NoError(err)
+	s.Equal(account.Info, info)
+	s.Equal(account.mnemonic, mnemonic)
+
+	// try to decrypt it with password
+	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
+	decAccount, _, err := s.accManager.AddressToDecryptedAccount(info.WalletAddress, password)
+	s.Require().NoError(err)
+	s.Equal(info.WalletAddress, decAccount.Address.Hex())
+}
+
 func (s *ManagerTestSuite) TestSelectAccount() {
 	testCases := []struct {
 		name                  string

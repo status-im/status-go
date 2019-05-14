@@ -14,51 +14,53 @@ type address string
 
 var errInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length")
 
-type keyPair struct {
-	purpose   extkeys.KeyPurpose
-	address   string
-	publicKey string
-}
-
-type userAccount struct {
-	mnemonic          string
-	masterExtendedKey *extkeys.ExtendedKey
-	keyPairs          []*keyPair
+type OnboardingAccount struct {
+	ID       string `json:"id"`
+	mnemonic string
+	Info     Info `json:"info"`
 }
 
 type Onboarding struct {
-	userAccounts map[string]*userAccount
+	accounts map[string]*OnboardingAccount
 }
 
-func New(accountsCount int, mnemonicPhraseLength int) (*Onboarding, error) {
+func NewOnboarding(accountsCount, mnemonicPhraseLength int) (*Onboarding, error) {
 	onboarding := &Onboarding{
-		userAccounts: make(map[string]*userAccount),
+		accounts: make(map[string]*OnboardingAccount),
 	}
 
 	for i := 0; i < accountsCount; i++ {
-		userAccount, err := onboarding.generateUserAccount(mnemonicPhraseLength)
+		account, err := onboarding.generateAccount(mnemonicPhraseLength)
 		if err != nil {
 			return nil, err
 		}
-		uuid := uuid.NewRandom()
-		onboarding.userAccounts[uuid.String()] = userAccount
+		uuid := uuid.NewRandom().String()
+		account.ID = uuid
+		onboarding.accounts[uuid] = account
 	}
 
 	return onboarding, nil
 }
 
-func (o *Onboarding) Choose(id, password string) error {
-	if _, ok := o.userAccounts[id]; !ok {
-		return errors.New("id not found")
+func (o *Onboarding) Accounts() []*OnboardingAccount {
+	accounts := make([]*OnboardingAccount, 0)
+	for _, a := range o.accounts {
+		accounts = append(accounts, a)
 	}
 
-	// return address, pubKey too?
-	_, _, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
-
-	return err
+	return accounts
 }
 
-func (o *Onboarding) generateUserAccount(mnemonicPhraseLength int) (*userAccount, error) {
+func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
+	account, ok := o.accounts[id]
+	if !ok {
+		return nil, errors.New("id not found")
+	}
+
+	return account, nil
+}
+
+func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccount, error) {
 	entropyStrength, err := mnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
@@ -75,39 +77,37 @@ func (o *Onboarding) generateUserAccount(mnemonicPhraseLength int) (*userAccount
 		return nil, fmt.Errorf("can not create master extended key: %v", err)
 	}
 
-	walletKeyPair, err := o.deriveKeyPair(masterExtendedKey, extkeys.KeyPurposeWallet, 0)
+	walletAddress, walletPubKey, err := o.deriveAccount(masterExtendedKey, extkeys.KeyPurposeWallet, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	chatKeyPair := walletKeyPair
-
-	kps := []*keyPair{walletKeyPair, chatKeyPair}
-
-	userAccount := &userAccount{
-		mnemonic:          mnemonicPhrase,
-		masterExtendedKey: masterExtendedKey,
-		keyPairs:          kps,
+	info := Info{
+		WalletAddress: walletAddress,
+		WalletPubKey:  walletPubKey,
+		ChatAddress:   walletAddress,
+		ChatPubKey:    walletPubKey,
 	}
 
-	return userAccount, nil
+	account := &OnboardingAccount{
+		mnemonic: mnemonicPhrase,
+		Info:     info,
+	}
+
+	return account, nil
 }
 
-func (o *Onboarding) deriveKeyPair(masterExtendedKey *extkeys.ExtendedKey, purpose extkeys.KeyPurpose, index uint32) (*keyPair, error) {
+func (o *Onboarding) deriveAccount(masterExtendedKey *extkeys.ExtendedKey, purpose extkeys.KeyPurpose, index uint32) (string, string, error) {
 	extendedKey, err := masterExtendedKey.ChildForPurpose(purpose, index)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
 	privateKeyECDSA := extendedKey.ToECDSA()
 	address := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey)
 	publicKeyHex := hexutil.Encode(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
 
-	return &keyPair{
-		purpose:   purpose,
-		address:   address.Hex(),
-		publicKey: publicKeyHex,
-	}, nil
+	return address.Hex(), publicKeyHex, nil
 }
 
 func mnemonicPhraseLengthToEntropyStrenght(length int) (extkeys.EntropyStrength, error) {
