@@ -38,7 +38,10 @@ type GethServiceProvider interface {
 type Manager struct {
 	geth GethServiceProvider
 
-	mu                    sync.RWMutex
+	mu sync.RWMutex
+
+	onboarding *Onboarding
+
 	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
 	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectAccount()
 }
@@ -363,6 +366,37 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	}
 
 	return filtered, nil
+}
+
+func (m *Manager) NewOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	onboarding, err := NewOnboarding(accountsCount, mnemonicPhraseLength)
+	if err != nil {
+		return nil, err
+	}
+
+	m.onboarding = onboarding
+
+	return m.onboarding.Accounts(), nil
+}
+
+func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	acc, err := m.onboarding.Account(id)
+	if err != nil {
+		return Info{}, "", err
+	}
+
+	info, err := m.RecoverAccount(password, acc.mnemonic)
+	if err != nil {
+		return Info{}, "", err
+	}
+
+	return info, acc.mnemonic, nil
 }
 
 // refreshSelectedWalletAccount re-populates list of sub-accounts of the currently selected account (if any)

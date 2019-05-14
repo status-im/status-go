@@ -1,11 +1,12 @@
 package account
 
 import (
-	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/status-im/status-go/extkeys"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMnemonicPhraseLengthToEntropyStrenght(t *testing.T) {
@@ -32,9 +33,23 @@ func TestMnemonicPhraseLengthToEntropyStrenght(t *testing.T) {
 	}
 }
 
-func TestNew(t *testing.T) {
-	o, _ := New(2, 12)
-	for _, a := range o.userAccounts {
-		fmt.Printf("--- %+v\n", a)
+func TestOnboarding(t *testing.T) {
+	count := 2
+	wordsCount := 24
+	o, _ := NewOnboarding(count, wordsCount)
+	assert.Equal(t, count, len(o.accounts))
+
+	for id, a := range o.accounts {
+		words := strings.Split(a.mnemonic, " ")
+
+		assert.Equal(t, wordsCount, len(words))
+		assert.NotEmpty(t, a.Info.WalletAddress)
+		assert.NotEmpty(t, a.Info.WalletPubKey)
+		assert.NotEmpty(t, a.Info.ChatAddress)
+		assert.NotEmpty(t, a.Info.ChatPubKey)
+
+		retrieved, err := o.Account(id)
+		require.NoError(t, err)
+		assert.Equal(t, a, retrieved)
 	}
 }
