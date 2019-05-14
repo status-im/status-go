@@ -225,11 +225,19 @@ func (s *ManagerTestSuite) TestRecoverAccount() {
 }
 
 func (s *ManagerTestSuite) TestOnboarding() {
+	// try to choose an account before starting onboarding
+	_, _, err := s.accManager.ImportOnboardingAccount("test-id", "test-password")
+	s.Equal(ErrOnboardingNotStarted, err)
+
 	// generates 5 random accounts
 	count := 5
 	accounts, err := s.accManager.NewOnboarding(count, 24)
 	s.Require().NoError(err)
 	s.Equal(count, len(accounts))
+
+	// try to choose an account with an undefined id
+	_, _, err = s.accManager.ImportOnboardingAccount("test-id", "test-password")
+	s.Equal(ErrOnboardingAccountNotFound, err)
 
 	// choose one account and encrypt it with password
 	password := "test-onboarding-account"
@@ -239,12 +247,21 @@ func (s *ManagerTestSuite) TestOnboarding() {
 	s.Require().NoError(err)
 	s.Equal(account.Info, info)
 	s.Equal(account.mnemonic, mnemonic)
+	s.Nil(s.accManager.onboarding)
 
-	// try to decrypt it with password
+	// try to decrypt it with password to check if it's been imported correctly
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil)
 	decAccount, _, err := s.accManager.AddressToDecryptedAccount(info.WalletAddress, password)
 	s.Require().NoError(err)
 	s.Equal(info.WalletAddress, decAccount.Address.Hex())
+
+	// try resetting onboarding
+	_, err = s.accManager.NewOnboarding(count, 24)
+	s.Require().NoError(err)
+	s.NotNil(s.accManager.onboarding)
+
+	s.accManager.ResetOnboarding()
+	s.Nil(s.accManager.onboarding)
 }
 
 func (s *ManagerTestSuite) TestSelectAccount() {
