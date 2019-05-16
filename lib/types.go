@@ -74,6 +74,17 @@ type AccountInfo struct {
 	Error         string `json:"error"`
 }
 
+// OnboardingAccount represents accounts info generated for the onboarding.
+type OnboardingAccount struct {
+	ID            string `json:"id"`
+	Address       string `json:"address"` // DEPRECATED
+	PubKey        string `json:"pubkey"`  // DEPRECATED
+	WalletAddress string `json:"walletAddress"`
+	WalletPubKey  string `json:"walletPubKey"`
+	ChatAddress   string `json:"chatAddress"`
+	ChatPubKey    string `json:"chatPubKey"`
+}
+
 // SendDataNotificationResult is a JSON returned from notify message.
 type SendDataNotificationResult struct {
 	Status bool   `json:"status"`
