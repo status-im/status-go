@@ -10,8 +10,6 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
-type address string
-
 var errInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length")
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
@@ -72,7 +70,7 @@ func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccou
 	}
 
 	mnemonic := extkeys.NewMnemonic()
-	mnemonicPhrase, err := mnemonic.MnemonicPhrase(extkeys.EntropyStrength(entropyStrength), extkeys.EnglishLanguage)
+	mnemonicPhrase, err := mnemonic.MnemonicPhrase(entropyStrength, extkeys.EnglishLanguage)
 	if err != nil {
 		return nil, fmt.Errorf("can not create mnemonic seed: %v", err)
 	}
