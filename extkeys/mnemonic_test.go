@@ -45,7 +45,7 @@ func TestMnemonicPhrase(t *testing.T) {
 	mnemonic := NewMnemonic()
 
 	// test strength validation
-	strengths := []entropyStrength{127, 129, 257}
+	strengths := []EntropyStrength{127, 129, 257}
 	for _, s := range strengths {
 		_, err := mnemonic.MnemonicPhrase(s, EnglishLanguage)
 		if err != ErrInvalidEntropyStrength {
