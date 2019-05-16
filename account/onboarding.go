@@ -14,22 +14,25 @@ type address string
 
 var errInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length")
 
+// OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
 type OnboardingAccount struct {
 	ID       string `json:"id"`
 	mnemonic string
 	Info     Info `json:"info"`
 }
 
+// Onboarding is a struct contains a slice of OnboardingAccount.
 type Onboarding struct {
 	accounts map[string]*OnboardingAccount
 }
 
-func NewOnboarding(accountsCount, mnemonicPhraseLength int) (*Onboarding, error) {
+// NewOnboarding returns a new onboarding struct generating n accounts.
+func NewOnboarding(n, mnemonicPhraseLength int) (*Onboarding, error) {
 	onboarding := &Onboarding{
 		accounts: make(map[string]*OnboardingAccount),
 	}
 
-	for i := 0; i < accountsCount; i++ {
+	for i := 0; i < n; i++ {
 		account, err := onboarding.generateAccount(mnemonicPhraseLength)
 		if err != nil {
 			return nil, err
@@ -42,6 +45,7 @@ func NewOnboarding(accountsCount, mnemonicPhraseLength int) (*Onboarding, error)
 	return onboarding, nil
 }
 
+// Accounts return the list of OnboardingAccount generated.
 func (o *Onboarding) Accounts() []*OnboardingAccount {
 	accounts := make([]*OnboardingAccount, 0)
 	for _, a := range o.accounts {
@@ -51,6 +55,7 @@ func (o *Onboarding) Accounts() []*OnboardingAccount {
 	return accounts
 }
 
+// Account returns an OnboardingAccount by id.
 func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
 	account, ok := o.accounts[id]
 	if !ok {

@@ -370,6 +370,7 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	return filtered, nil
 }
 
+// NewOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
 func (m *Manager) NewOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -384,6 +385,7 @@ func (m *Manager) NewOnboarding(accountsCount, mnemonicPhraseLength int) ([]*Onb
 	return m.onboarding.Accounts(), nil
 }
 
+// ResetOnboarding reset the current onboarding struct setting it to nil and deleting the accounts from memory.
 func (m *Manager) ResetOnboarding() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -391,6 +393,7 @@ func (m *Manager) ResetOnboarding() {
 	m.onboarding = nil
 }
 
+// ImportOnboardingAccount imports the account specified by id and encrypts it with password.
 func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
