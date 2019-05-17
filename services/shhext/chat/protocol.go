@@ -16,14 +16,14 @@ type ProtocolService struct {
 	encryption          *EncryptionService
 	topic               *topic.Service
 	addedBundlesHandler func([]IdentityAndIDPair)
-	onNewTopicHandler   func([]byte)
+	onNewTopicHandler   func([][]byte)
 	Enabled             bool
 }
 
 var ErrNotProtocolMessage = errors.New("Not a protocol message")
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService, topic *topic.Service, addedBundlesHandler func([]IdentityAndIDPair), onNewTopicHandler func([]byte)) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, topic *topic.Service, addedBundlesHandler func([]IdentityAndIDPair), onNewTopicHandler func([][]byte)) *ProtocolService {
 	return &ProtocolService{
 		log:                 log.New("package", "status-go/services/sshext.chat"),
 		encryption:          encryption,
@@ -88,19 +88,22 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 	// Check who we are sending the message to, and see if we have a shared secret
 	// across devices
 	var installationIDs []string
-	for installationID, _ := range protocolMessage.GetDirectMessage() {
+	var sharedSecret []byte
+	for installationID := range protocolMessage.GetDirectMessage() {
 		if installationID != noInstallationID {
 			installationIDs = append(installationIDs, installationID)
 		}
 	}
-	sharedSecret, err := p.topic.Send(publicKey, installationIDs)
-	if err != nil {
-		return nil, nil, err
+	if len(installationIDs) != 0 {
+		sharedSecret, err = p.topic.Send(publicKey, installationIDs)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Call handler
 	if sharedSecret != nil {
-		p.onNewTopicHandler(sharedSecret)
+		p.onNewTopicHandler([][]byte{sharedSecret})
 	}
 
 	return msg, sharedSecret, nil
@@ -208,7 +211,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 				return nil, err
 			}
 
-			p.onNewTopicHandler(topic)
+			p.onNewTopicHandler([][]byte{topic})
 
 		}
 		return message, nil

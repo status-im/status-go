@@ -6,11 +6,12 @@ import (
 )
 
 type PersistenceService interface {
-	AddTopic(identity []byte, secret []byte, installationID string) error
-	GetTopic(identity []byte, installationIDs []string) (*TopicResponse, error)
+	Add(identity []byte, secret []byte, installationID string) error
+	Get(identity []byte, installationIDs []string) (*Response, error)
+	All() ([][]byte, error)
 }
 
-type TopicResponse struct {
+type Response struct {
 	secret          []byte
 	installationIDs map[string]bool
 }
@@ -23,7 +24,7 @@ func NewSQLLitePersistence(db *sql.DB) *SQLLitePersistence {
 	return &SQLLitePersistence{db: db}
 }
 
-func (s *SQLLitePersistence) AddTopic(identity []byte, secret []byte, installationID string) error {
+func (s *SQLLitePersistence) Add(identity []byte, secret []byte, installationID string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -57,8 +58,8 @@ func (s *SQLLitePersistence) AddTopic(identity []byte, secret []byte, installati
 	return tx.Commit()
 }
 
-func (s *SQLLitePersistence) GetTopic(identity []byte, installationIDs []string) (*TopicResponse, error) {
-	response := &TopicResponse{
+func (s *SQLLitePersistence) Get(identity []byte, installationIDs []string) (*Response, error) {
+	response := &Response{
 		installationIDs: make(map[string]bool),
 	}
 	args := make([]interface{}, len(installationIDs)+1)
@@ -96,4 +97,28 @@ func (s *SQLLitePersistence) GetTopic(identity []byte, installationIDs []string)
 	}
 
 	return response, nil
+}
+
+func (s *SQLLitePersistence) All() ([][]byte, error) {
+	query := `SELECT secret
+	          FROM topics`
+
+	var secrets [][]byte
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var secret []byte
+		err = rows.Scan(&secret)
+		if err != nil {
+			return nil, err
+		}
+
+		secrets = append(secrets, secret)
+	}
+
+	return secrets, nil
 }

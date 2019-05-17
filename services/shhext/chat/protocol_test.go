@@ -39,17 +39,22 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	}
 
 	addedBundlesHandler := func(addedBundles []IdentityAndIDPair) {}
-	onNewTopicHandler := func(topic []byte) {}
+	onNewTopicHandler := func(topic [][]byte) {}
 
 	s.alice = NewProtocolService(
 		NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")),
 		topic.NewService(alicePersistence.GetTopicStorage()),
-		addedBundlesHandler)
+		addedBundlesHandler,
+		onNewTopicHandler,
+	)
 
 	s.bob = NewProtocolService(
 		NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")),
 		topic.NewService(bobPersistence.GetTopicStorage()),
-		addedBundlesHandler)
+		addedBundlesHandler,
+		onNewTopicHandler,
+	)
+
 }
 
 func (s *ProtocolServiceTestSuite) TestBuildPublicMessage() {

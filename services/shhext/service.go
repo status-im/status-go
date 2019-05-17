@@ -1,6 +1,7 @@
 package shhext
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -62,6 +64,7 @@ type Service struct {
 	cache            *mailservers.Cache
 	connManager      *mailservers.ConnectionManager
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
+	filtersAdded     map[string]string
 }
 
 // Make sure that Service implements node.Service interface.
@@ -98,6 +101,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		pfsEnabled:       config.PFSEnabled,
 		peerStore:        ps,
 		cache:            cache,
+		filtersAdded:     make(map[string]string),
 	}
 }
 
@@ -191,17 +195,22 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	onNewTopicHandler := func(topic []byte) {
-
+	// Initialize topics
+	topicService := topic.NewService(persistence.GetTopicStorage())
+	sharedSecrets, err := topicService.All()
+	if err != nil {
+		return err
 	}
+
+	s.onNewTopicHandler(sharedSecrets)
 
 	s.protocol = chat.NewProtocolService(
 		chat.NewEncryptionService(
 			persistence,
 			chat.DefaultEncryptionServiceConfig(s.installationID)),
-		topic.NewService(persistence.GetTopicStorage()),
+		topicService,
 		addedBundlesHandler,
-		onNewTopicHandler)
+		s.onNewTopicHandler)
 
 	return nil
 }
@@ -304,4 +313,48 @@ func (s *Service) Stop() error {
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
 	return nil
+}
+
+func (s *Service) GetSymKeyID(sharedSecret []byte) string {
+	secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
+	return s.filtersAdded[secretID]
+}
+
+func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
+	var filterIDs []string
+	for _, sharedSecret := range sharedSecrets {
+		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
+		if _, ok := s.filtersAdded[secretID]; ok {
+			return
+		}
+
+		api := whisper.NewPublicWhisperAPI(s.w)
+
+		whisperTopics := []whisper.TopicType{
+			chat.SharedSecretToTopic(sharedSecret),
+		}
+		symKeyID, err := api.AddSymKey(context.TODO(), sharedSecret)
+		if err != nil {
+			return
+		}
+
+		criteria := whisper.Criteria{
+			SymKeyID: symKeyID,
+			MinPow:   0.0002,
+			Topics:   whisperTopics,
+		}
+		filterID, err := api.NewMessageFilter(criteria)
+		if err != nil {
+			return
+		}
+
+		filterIDs = append(filterIDs, filterID)
+		s.filtersAdded[secretID] = symKeyID
+
+	}
+	if len(filterIDs) != 0 {
+		handler := EnvelopeSignalHandler{}
+		handler.WhisperFilterAdded(filterIDs)
+	}
+
 }
