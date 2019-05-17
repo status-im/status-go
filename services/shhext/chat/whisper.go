@@ -8,8 +8,14 @@ import (
 var discoveryTopic = "contact-discovery"
 var discoveryTopicBytes = toTopic(discoveryTopic)
 
+var topicSalt = []byte{0x01, 0x02, 0x03, 0x04}
+
 func toTopic(s string) whisper.TopicType {
 	return whisper.BytesToTopic(crypto.Keccak256([]byte(s)))
+}
+
+func SharedSecretToTopic(secret []byte) whisper.TopicType {
+	return whisper.BytesToTopic(crypto.Keccak256(append(secret, topicSalt...)))
 }
 
 func defaultWhisperMessage() whisper.NewMessage {
@@ -33,22 +39,26 @@ func PublicMessageToWhisper(rpcMsg SendPublicMessageRPC, payload []byte) whisper
 	return msg
 }
 
-func DirectMessageToWhisper(rpcMsg SendDirectMessageRPC, payload []byte) whisper.NewMessage {
+func DirectMessageToWhisper(rpcMsg SendDirectMessageRPC, payload []byte, sharedSecret []byte) whisper.NewMessage {
 	var topicBytes whisper.TopicType
+	msg := defaultWhisperMessage()
 
 	if rpcMsg.Chat == "" {
-		topicBytes = discoveryTopicBytes
+		if sharedSecret != nil {
+			topicBytes = SharedSecretToTopic(sharedSecret)
+		} else {
+			topicBytes = discoveryTopicBytes
+			msg.PublicKey = rpcMsg.PubKey
+		}
 	} else {
 		topicBytes = toTopic(rpcMsg.Chat)
+		msg.PublicKey = rpcMsg.PubKey
 	}
-
-	msg := defaultWhisperMessage()
 
 	msg.Topic = topicBytes
 
 	msg.Payload = payload
 	msg.Sig = rpcMsg.Sig
-	msg.PublicKey = rpcMsg.PubKey
 
 	return msg
 }

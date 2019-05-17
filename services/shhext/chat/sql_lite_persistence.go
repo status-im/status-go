@@ -3,42 +3,28 @@ package chat
 import (
 	"crypto/ecdsa"
 	"database/sql"
-	"fmt"
-	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 
-	sqlite "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 	dr "github.com/status-im/doubleratchet"
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	"github.com/status-im/migrate/v4/source/go_bindata"
 	ecrypto "github.com/status-im/status-go/services/shhext/chat/crypto"
-	"github.com/status-im/status-go/services/shhext/chat/migrations"
+	appDB "github.com/status-im/status-go/services/shhext/chat/db"
+	"github.com/status-im/status-go/services/shhext/chat/topic"
 )
 
 // A safe max number of rows
 const maxNumberOfRows = 100000000
-
-// The default number of kdf iterations in sqlcipher (from version 3.0.0)
-// https://github.com/sqlcipher/sqlcipher/blob/fda4c68bb474da7e955be07a2b807bda1bb19bd2/CHANGELOG.md#300---2013-11-05
-// https://www.zetetic.net/sqlcipher/sqlcipher-api/#kdf_iter
-const defaultKdfIterationsNumber = 64000
-
-// The reduced number of kdf iterations (for performance reasons) which is
-// currently used for derivation of the database key
-// https://github.com/status-im/status-go/pull/1343
-// https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
-const kdfIterationsNumber = 3200
-
-const exportDB = "SELECT sqlcipher_export('newdb')"
 
 // SQLLitePersistence represents a persistence service tied to an SQLite database
 type SQLLitePersistence struct {
 	db             *sql.DB
 	keysStorage    dr.KeysStorage
 	sessionStorage dr.SessionStorage
+	topicStorage   topic.PersistenceService
 }
 
 // SQLLiteKeysStorage represents a keys persistence service tied to an SQLite database
@@ -63,185 +49,9 @@ func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error)
 
 	s.sessionStorage = NewSQLLiteSessionStorage(s.db)
 
+	s.topicStorage = topic.NewSQLLitePersistence(s.db)
+
 	return s, nil
-}
-
-func MigrateDBFile(oldPath string, newPath string, oldKey string, newKey string) error {
-	_, err := os.Stat(oldPath)
-
-	// No files, nothing to do
-	if os.IsNotExist(err) {
-		return nil
-	}
-
-	// Any other error, throws
-	if err != nil {
-		return err
-	}
-
-	if err := os.Rename(oldPath, newPath); err != nil {
-		return err
-	}
-
-	db, err := openDB(newPath, oldKey, defaultKdfIterationsNumber)
-	if err != nil {
-		return err
-	}
-
-	keyString := fmt.Sprintf("PRAGMA rekey = '%s'", newKey)
-
-	if _, err = db.Exec(keyString); err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
-// MigrateDBKeyKdfIterations changes the number of kdf iterations executed
-// during the database key derivation. This change is necessary because
-// of performance reasons.
-// https://github.com/status-im/status-go/pull/1343
-// `sqlcipher_export` is used for migration, check out this link for details:
-// https://www.zetetic.net/sqlcipher/sqlcipher-api/#sqlcipher_export
-func MigrateDBKeyKdfIterations(oldPath string, newPath string, key string) error {
-	_, err := os.Stat(oldPath)
-
-	// No files, nothing to do
-	if os.IsNotExist(err) {
-		return nil
-	}
-
-	// Any other error, throws
-	if err != nil {
-		return err
-	}
-
-	isEncrypted, err := sqlite.IsEncrypted(oldPath)
-	if err != nil {
-		return err
-	}
-
-	// Nothing to do, move db to the next migration
-	if !isEncrypted {
-		return os.Rename(oldPath, newPath)
-	}
-
-	db, err := openDB(oldPath, key, defaultKdfIterationsNumber)
-	if err != nil {
-		return err
-	}
-
-	attach := fmt.Sprintf(
-		"ATTACH DATABASE '%s' AS newdb KEY '%s'",
-		newPath,
-		key)
-
-	if _, err = db.Exec(attach); err != nil {
-		return err
-	}
-
-	changeKdfIter := fmt.Sprintf(
-		"PRAGMA newdb.kdf_iter = %d",
-		kdfIterationsNumber)
-
-	if _, err = db.Exec(changeKdfIter); err != nil {
-		return err
-	}
-
-	if _, err = db.Exec(exportDB); err != nil {
-		return err
-	}
-
-	if err = db.Close(); err != nil {
-		return err
-	}
-
-	return os.Remove(oldPath)
-}
-
-// EncryptDatabase encrypts an unencrypted database with key
-func EncryptDatabase(oldPath string, newPath string, key string) error {
-	_, err := os.Stat(oldPath)
-
-	// No files, nothing to do
-	if os.IsNotExist(err) {
-		return nil
-	}
-
-	// Any other error, throws
-	if err != nil {
-		return err
-	}
-
-	isEncrypted, err := sqlite.IsEncrypted(oldPath)
-	if err != nil {
-		return err
-	}
-
-	// Nothing to do, already encrypted
-	if isEncrypted {
-		return os.Rename(oldPath, newPath)
-	}
-
-	db, err := openDB(oldPath, "", defaultKdfIterationsNumber)
-	if err != nil {
-		return err
-	}
-
-	attach := fmt.Sprintf(
-		"ATTACH DATABASE '%s' AS newdb KEY '%s'",
-		newPath,
-		key)
-
-	if _, err = db.Exec(attach); err != nil {
-		return err
-	}
-
-	changeKdfIter := fmt.Sprintf(
-		"PRAGMA newdb.kdf_iter = %d",
-		kdfIterationsNumber)
-
-	if _, err = db.Exec(changeKdfIter); err != nil {
-		return err
-	}
-
-	if _, err = db.Exec(exportDB); err != nil {
-		return err
-	}
-
-	if err = db.Close(); err != nil {
-		return err
-	}
-
-	return os.Remove(oldPath)
-}
-
-func openDB(path string, key string, kdfIter int) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", path)
-	if err != nil {
-		return nil, err
-	}
-
-	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
-
-	// Disable concurrent access as not supported by the driver
-	db.SetMaxOpenConns(1)
-
-	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
-		return nil, err
-	}
-
-	if _, err = db.Exec(keyString); err != nil {
-		return nil, err
-	}
-
-	kdfString := fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIter)
-
-	if _, err = db.Exec(kdfString); err != nil {
-		return nil, err
-	}
-	return db, nil
 }
 
 // NewSQLLiteKeysStorage creates a new SQLLiteKeysStorage instance associated with the specified database
@@ -268,16 +78,21 @@ func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
 	return s.sessionStorage
 }
 
+// GetTopicStorage returns the associated topicStorageObject
+func (s *SQLLitePersistence) GetTopicStorage() topic.PersistenceService {
+	return s.topicStorage
+}
+
 // Open opens a file at the specified path
 func (s *SQLLitePersistence) Open(path string, key string) error {
-	db, err := openDB(path, key, kdfIterationsNumber)
+	db, err := appDB.Open(path, key, appDB.KdfIterationsNumber)
 	if err != nil {
 		return err
 	}
 
 	s.db = db
 
-	return s.setup()
+	return nil
 }
 
 // AddPrivateBundle adds the specified BundleContainer to the database
@@ -1068,38 +883,4 @@ func toKey(a []byte) dr.Key {
 	var k [32]byte
 	copy(k[:], a)
 	return k
-}
-
-func (s *SQLLitePersistence) setup() error {
-	resources := bindata.Resource(
-		migrations.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		},
-	)
-
-	source, err := bindata.WithInstance(resources)
-	if err != nil {
-		return err
-	}
-
-	driver, err := sqlcipher.WithInstance(s.db, &sqlcipher.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithInstance(
-		"go-bindata",
-		source,
-		"sqlcipher",
-		driver)
-	if err != nil {
-		return err
-	}
-
-	if err = m.Up(); err != migrate.ErrNoChange {
-		return err
-	}
-
-	return nil
 }

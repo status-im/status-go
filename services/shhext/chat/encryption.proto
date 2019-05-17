@@ -78,4 +78,6 @@ message ProtocolMessage {
   // Public chats, not encrypted
   bytes public_message = 102;
 
+  // Version of the protocol
+  uint32 version = 103;
 }
