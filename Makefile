@@ -191,7 +191,7 @@ setup-build: dep-install lint-install release-install gomobile-install ##@other 
 setup: setup-build setup-dev ##@other Prepare project for development and building
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/encryption_migrations ./static/mailserver_db_migrations
+	go generate ./static ./static/chat_db_migrations ./static/mailserver_db_migrations
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
 prepare-release: clean-release
