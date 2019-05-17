@@ -14,7 +14,7 @@ func toTopic(s string) whisper.TopicType {
 	return whisper.BytesToTopic(crypto.Keccak256([]byte(s)))
 }
 
-func sharedSecretToTopic(secret []byte) whisper.TopicType {
+func SharedSecretToTopic(secret []byte) whisper.TopicType {
 	return whisper.BytesToTopic(crypto.Keccak256(append(secret, topicSalt...)))
 }
 
@@ -41,24 +41,24 @@ func PublicMessageToWhisper(rpcMsg SendPublicMessageRPC, payload []byte) whisper
 
 func DirectMessageToWhisper(rpcMsg SendDirectMessageRPC, payload []byte, sharedSecret []byte) whisper.NewMessage {
 	var topicBytes whisper.TopicType
+	msg := defaultWhisperMessage()
 
 	if rpcMsg.Chat == "" {
 		if sharedSecret != nil {
-			topicBytes = sharedSecretToTopic(sharedSecret)
+			topicBytes = SharedSecretToTopic(sharedSecret)
 		} else {
 			topicBytes = discoveryTopicBytes
+			msg.PublicKey = rpcMsg.PubKey
 		}
 	} else {
 		topicBytes = toTopic(rpcMsg.Chat)
+		msg.PublicKey = rpcMsg.PubKey
 	}
-
-	msg := defaultWhisperMessage()
 
 	msg.Topic = topicBytes
 
 	msg.Payload = payload
 	msg.Sig = rpcMsg.Sig
-	msg.PublicKey = rpcMsg.PubKey
 
 	return msg
 }
