@@ -14,8 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/golang/protobuf/proto"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
@@ -485,8 +487,15 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 		return nil, err
 	}
 
+	// marshal for sending to wire
+	marshaledMessage, err := proto.Marshal(protocolMessage)
+	if err != nil {
+		api.log.Error("encryption-service", "error marshaling message", err)
+		return nil, err
+	}
+
 	// Enrich with transport layer info
-	whisperMessage := chat.PublicMessageToWhisper(msg, protocolMessage)
+	whisperMessage := chat.PublicMessageToWhisper(msg, marshaledMessage)
 	whisperMessage.SymKeyID = symKeyID
 
 	// And dispatch
@@ -510,20 +519,46 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	}
 
 	// This is transport layer-agnostic
-	var protocolMessage []byte
+	var protocolMessage *chat.ProtocolMessage
+	// The negotiated secret
+	var topic []byte
 
+	api.log.Info("BUILDING MESSAGE")
 	if msg.DH {
-		protocolMessage, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
+		protocolMessage, topic, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
 	} else {
-		protocolMessage, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
+		protocolMessage, topic, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
 	}
+
+	api.log.Info("BUILT MESSAGE", "topic", topic)
 
 	if err != nil {
 		return nil, err
 	}
 
+	// marshal for sending to wire
+	marshaledMessage, err := proto.Marshal(protocolMessage)
+	if err != nil {
+		api.log.Error("encryption-service", "error marshaling message", err)
+		return nil, err
+	}
+
+	// TODO: Refactor this as it's not quite the right abstraction anymore
+	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
 	// Enrich with transport layer info
-	whisperMessage := chat.DirectMessageToWhisper(msg, protocolMessage)
+	if topic != nil {
+		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetNegotiatedChat(publicKey))
+
+		chat := api.service.GetNegotiatedChat(publicKey)
+
+		if chat != nil {
+			whisperMessage.SymKeyID = chat.SymKeyID
+			whisperMessage.Topic = whisper.BytesToTopic(chat.Topic)
+			whisperMessage.PublicKey = nil
+		}
+	}
+
+	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)
@@ -637,43 +672,6 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-// DEPRECATED: use SendDirectMessage with DH flag
-// SendPairingMessage sends a 1:1 chat message to our own devices to initiate a pairing session
-func (api *PublicAPI) SendPairingMessage(ctx context.Context, msg chat.SendDirectMessageRPC) ([]hexutil.Bytes, error) {
-	if !api.service.pfsEnabled {
-		return nil, ErrPFSNotEnabled
-	}
-	// To be completely agnostic from whisper we should not be using whisper to store the key
-	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
-	if err != nil {
-		return nil, err
-	}
-
-	msg.PubKey = crypto.FromECDSAPub(&privateKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	protocolMessage, err := api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
-	if err != nil {
-		return nil, err
-	}
-
-	var response []hexutil.Bytes
-
-	// Enrich with transport layer info
-	whisperMessage := chat.DirectMessageToWhisper(msg, protocolMessage)
-
-	// And dispatch
-	hash, err := api.Post(ctx, whisperMessage)
-	if err != nil {
-		return nil, err
-	}
-	response = append(response, hash)
-
-	return response, nil
-}
-
 func (api *PublicAPI) processPFSMessage(dedupMessage dedup.DeduplicateMessage) error {
 	msg := dedupMessage.Message
 
@@ -692,7 +690,15 @@ func (api *PublicAPI) processPFSMessage(dedupMessage dedup.DeduplicateMessage) e
 		return err
 	}
 
-	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, msg.Payload, dedupMessage.DedupID)
+	// Unmarshal message
+	protocolMessage := &chat.ProtocolMessage{}
+
+	if err := proto.Unmarshal(msg.Payload, protocolMessage); err != nil {
+		api.log.Debug("Not a protocol message", "err", err)
+		return nil
+	}
+
+	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, protocolMessage, dedupMessage.DedupID)
 
 	switch err {
 	case nil:
@@ -706,13 +712,9 @@ func (api *PublicAPI) processPFSMessage(dedupMessage dedup.DeduplicateMessage) e
 			handler := EnvelopeSignalHandler{}
 			handler.DecryptMessageFailed(keyString)
 		}
-	case chat.ErrNotProtocolMessage:
-		// Not using encryption, pass directly to the layer below
-		api.log.Debug("Not a protocol message", "err", err)
 	default:
 		// Log and pass to the client, even if failed to decrypt
 		api.log.Error("Failed handling message with error", "err", err)
-
 	}
 
 	return nil

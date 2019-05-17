@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/golang/protobuf/proto"
+	"github.com/status-im/status-go/services/shhext/chat/topic"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -39,31 +39,36 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	}
 
 	addedBundlesHandler := func(addedBundles []IdentityAndIDPair) {}
+	onNewTopicHandler := func(topic [][]byte) {}
 
-	s.alice = NewProtocolService(NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")), addedBundlesHandler)
-	s.bob = NewProtocolService(NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")), addedBundlesHandler)
+	s.alice = NewProtocolService(
+		NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")),
+		topic.NewService(alicePersistence.GetTopicStorage()),
+		addedBundlesHandler,
+		onNewTopicHandler,
+	)
+
+	s.bob = NewProtocolService(
+		NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")),
+		topic.NewService(bobPersistence.GetTopicStorage()),
+		addedBundlesHandler,
+		onNewTopicHandler,
+	)
+
 }
 
 func (s *ProtocolServiceTestSuite) TestBuildPublicMessage() {
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
-	payload, err := proto.Marshal(&ChatMessagePayload{
-		Content:     "Test content",
-		ClockValue:  1,
-		ContentType: "a",
-		MessageType: "some type",
-	})
+	payload := []byte("test")
 	s.NoError(err)
 
-	marshaledMsg, err := s.alice.BuildPublicMessage(aliceKey, payload)
+	msg, err := s.alice.BuildPublicMessage(aliceKey, payload)
 	s.NoError(err)
-	s.NotNil(marshaledMsg, "It creates a message")
+	s.NotNil(msg, "It creates a message")
 
-	unmarshaledMsg := &ProtocolMessage{}
-	err = proto.Unmarshal(marshaledMsg, unmarshaledMsg)
-	s.NoError(err)
-	s.NotNilf(unmarshaledMsg.GetBundles(), "It adds a bundle to the message")
+	s.NotNilf(msg.GetBundles(), "It adds a bundle to the message")
 }
 
 func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
@@ -72,24 +77,15 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
-	payload, err := proto.Marshal(&ChatMessagePayload{
-		Content:     "Test content",
-		ClockValue:  1,
-		ContentType: "a",
-		MessageType: "some type",
-	})
-	s.NoError(err)
+	payload := []byte("test")
 
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msg, _, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
-	s.NotNil(marshaledMsg, "It creates a message")
+	s.NotNil(msg, "It creates a message")
 
-	unmarshaledMsg := &ProtocolMessage{}
-	err = proto.Unmarshal(marshaledMsg, unmarshaledMsg)
-	s.NoError(err)
-	s.NotNilf(unmarshaledMsg.GetBundle(), "It adds a bundle to the message")
+	s.NotNilf(msg.GetBundle(), "It adds a bundle to the message")
 
-	directMessage := unmarshaledMsg.GetDirectMessage()
+	directMessage := msg.GetDirectMessage()
 	s.NotNilf(directMessage, "It sets the direct message")
 
 	encryptedPayload := directMessage["none"].GetPayload()
@@ -104,18 +100,10 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
-	payload := ChatMessagePayload{
-		Content:     "Test content",
-		ClockValue:  1,
-		ContentType: "a",
-		MessageType: "some type",
-	}
-
-	marshaledPayload, err := proto.Marshal(&payload)
-	s.NoError(err)
+	payload := []byte("test")
 
 	// Message is sent with DH
-	marshaledMsg, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, marshaledPayload)
+	marshaledMsg, _, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 
 	s.NoError(err)
 
@@ -125,9 +113,6 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 
 	s.NotNil(unmarshaledMsg)
 
-	recoveredPayload := ChatMessagePayload{}
-	err = proto.Unmarshal(unmarshaledMsg, &recoveredPayload)
-
-	s.NoError(err)
-	s.Equalf(proto.Equal(&payload, &recoveredPayload), true, "It successfully unmarshal the decrypted message")
+	recoveredPayload := []byte("test")
+	s.Equalf(payload, recoveredPayload, "It successfully unmarshal the decrypted message")
 }

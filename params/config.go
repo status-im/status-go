@@ -360,6 +360,8 @@ type NodeConfig struct {
 
 // ShhextConfig defines options used by shhext service.
 type ShhextConfig struct {
+	// AsymKeyID the key id of the selected account
+	AsymKeyID  string
 	PFSEnabled bool
 	// BackupDisabledDataDir is the file system folder the node should use for any data storage needs that it doesn't want backed up.
 	BackupDisabledDataDir string
