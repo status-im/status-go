@@ -35,3 +35,7 @@ func (h EnvelopeSignalHandler) DecryptMessageFailed(pubKey string) {
 func (h EnvelopeSignalHandler) BundleAdded(identity string, installationID string) {
 	signal.SendBundleAdded(identity, installationID)
 }
+
+func (h EnvelopeSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
+	signal.SendWhisperFilterAdded(filters)
+}

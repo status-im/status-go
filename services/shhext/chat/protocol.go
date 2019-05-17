@@ -5,28 +5,35 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/golang/protobuf/proto"
+	"github.com/status-im/status-go/services/shhext/chat/topic"
 )
+
+const protocolCurrentVersion = 1
+const topicNegotiationVersion = 1
 
 type ProtocolService struct {
 	log                 log.Logger
 	encryption          *EncryptionService
+	topic               *topic.Service
 	addedBundlesHandler func([]IdentityAndIDPair)
+	onNewTopicHandler   func([]*topic.Secret)
 	Enabled             bool
 }
 
 var ErrNotProtocolMessage = errors.New("Not a protocol message")
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService, addedBundlesHandler func([]IdentityAndIDPair)) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, topic *topic.Service, addedBundlesHandler func([]IdentityAndIDPair), onNewTopicHandler func([]*topic.Secret)) *ProtocolService {
 	return &ProtocolService{
 		log:                 log.New("package", "status-go/services/sshext.chat"),
 		encryption:          encryption,
+		topic:               topic,
 		addedBundlesHandler: addedBundlesHandler,
+		onNewTopicHandler:   onNewTopicHandler,
 	}
 }
 
-func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage, sendSingle bool) ([]byte, error) {
+func (p *ProtocolService) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage, sendSingle bool) (*ProtocolMessage, error) {
 	// Get a bundle
 	bundle, err := p.encryption.CreateBundle(myIdentityKey)
 	if err != nil {
@@ -42,61 +49,93 @@ func (p *ProtocolService) addBundleAndMarshal(myIdentityKey *ecdsa.PrivateKey, m
 		msg.Bundles = []*Bundle{bundle}
 	}
 
-	// marshal for sending to wire
-	marshaledMessage, err := proto.Marshal(msg)
-	if err != nil {
-		p.log.Error("encryption-service", "error marshaling message", err)
-		return nil, err
-	}
-
-	return marshaledMessage, nil
+	return msg, nil
 }
 
 // BuildPublicMessage marshals a public chat message given the user identity private key and a payload
-func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) ([]byte, error) {
+func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload []byte) (*ProtocolMessage, error) {
 	// Build message not encrypted
 	protocolMessage := &ProtocolMessage{
 		InstallationId: p.encryption.config.InstallationID,
 		PublicMessage:  payload,
+		Version:        protocolCurrentVersion,
 	}
 
-	return p.addBundleAndMarshal(myIdentityKey, protocolMessage, false)
+	return p.addBundle(myIdentityKey, protocolMessage, false)
 }
 
-// BuildDirectMessage marshals a 1:1 chat message given the user identity private key, the recipient's public key, and a payload
-func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+// BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
+func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) (*ProtocolMessage, []byte, error) {
 	// Encrypt payload
 	encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
 	if err != nil {
 		p.log.Error("encryption-service", "error encrypting payload", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Build message
 	protocolMessage := &ProtocolMessage{
 		InstallationId: p.encryption.config.InstallationID,
 		DirectMessage:  encryptionResponse,
+		Version:        protocolCurrentVersion,
 	}
 
-	return p.addBundleAndMarshal(myIdentityKey, protocolMessage, true)
+	msg, err := p.addBundle(myIdentityKey, protocolMessage, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Check who we are sending the message to, and see if we have a shared secret
+	// across devices
+	var installationIDs []string
+	var sharedSecret *topic.Secret
+	var agreed bool
+	for installationID := range protocolMessage.GetDirectMessage() {
+		if installationID != noInstallationID {
+			installationIDs = append(installationIDs, installationID)
+		}
+	}
+	if len(installationIDs) != 0 {
+		sharedSecret, agreed, err = p.topic.Send(myIdentityKey, p.encryption.config.InstallationID, publicKey, installationIDs)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// Call handler
+	if sharedSecret != nil {
+		p.onNewTopicHandler([]*topic.Secret{sharedSecret})
+	}
+
+	if agreed {
+		return msg, sharedSecret.Key, nil
+	} else {
+		return msg, nil, nil
+	}
 }
 
 // BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.
-func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *ecdsa.PublicKey, payload []byte) (*ProtocolMessage, []byte, error) {
 	// Encrypt payload
 	encryptionResponse, err := p.encryption.EncryptPayloadWithDH(destination, payload)
 	if err != nil {
 		p.log.Error("encryption-service", "error encrypting payload", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Build message
 	protocolMessage := &ProtocolMessage{
 		InstallationId: p.encryption.config.InstallationID,
 		DirectMessage:  encryptionResponse,
+		Version:        protocolCurrentVersion,
 	}
 
-	return p.addBundleAndMarshal(myIdentityKey, protocolMessage, true)
+	msg, err := p.addBundle(myIdentityKey, protocolMessage, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return msg, nil, nil
 }
 
 // ProcessPublicBundle processes a received X3DH bundle.
@@ -130,16 +169,9 @@ func (p *ProtocolService) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 }
 
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
-func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, payload []byte, messageID []byte) ([]byte, error) {
+func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, protocolMessage *ProtocolMessage, messageID []byte) ([]byte, error) {
 	if p.encryption == nil {
 		return nil, errors.New("encryption service not initialized")
-	}
-
-	// Unmarshal message
-	protocolMessage := &ProtocolMessage{}
-
-	if err := proto.Unmarshal(payload, protocolMessage); err != nil {
-		return nil, ErrNotProtocolMessage
 	}
 
 	// Process bundle, deprecated, here for backward compatibility
@@ -177,6 +209,18 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 			return nil, err
 		}
 
+		p.log.Info("Checking version")
+		// Handle protocol negotiation for compatible clients
+		if protocolMessage.Version >= topicNegotiationVersion {
+			p.log.Info("Version greater than 1 negotianting")
+			sharedSecret, err := p.topic.Receive(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
+			if err != nil {
+				return nil, err
+			}
+
+			p.onNewTopicHandler([]*topic.Secret{sharedSecret})
+
+		}
 		return message, nil
 	}
 
