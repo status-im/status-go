@@ -85,7 +85,7 @@ func _1557732988_initialize_dbDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1557732988_initialize_db.down.sql", size: 72, mode: os.FileMode(420), modTime: time.Unix(1557741108, 0)}
+	info := bindataFileInfo{name: "1557732988_initialize_db.down.sql", size: 72, mode: os.FileMode(420), modTime: time.Unix(1557996559, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -105,7 +105,7 @@ func _1557732988_initialize_dbUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1557732988_initialize_db.up.sql", size: 234, mode: os.FileMode(420), modTime: time.Unix(1557742866, 0)}
+	info := bindataFileInfo{name: "1557732988_initialize_db.up.sql", size: 234, mode: os.FileMode(420), modTime: time.Unix(1557996559, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -125,7 +125,7 @@ func staticGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "static.go", size: 178, mode: os.FileMode(420), modTime: time.Unix(1557739557, 0)}
+	info := bindataFileInfo{name: "static.go", size: 178, mode: os.FileMode(420), modTime: time.Unix(1557996559, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

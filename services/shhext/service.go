@@ -16,6 +16,8 @@ import (
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/chat"
+	appDB "github.com/status-im/status-go/services/shhext/chat/db"
+	"github.com/status-im/status-go/services/shhext/chat/topic"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -142,11 +144,11 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	v4Path := filepath.Join(s.dataDir, fmt.Sprintf("%s.v4.db", s.installationID))
 
 	if password != "" {
-		if err := chat.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
+		if err := appDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 			return err
 		}
 
-		if err := chat.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
+		if err := appDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
 			// Remove db file as created with a blank password and never used,
 			// and there's no need to rekey in this case
 			os.Remove(v1Path)
@@ -154,13 +156,13 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	if err := chat.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
+	if err := appDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
 		os.Remove(v2Path)
 		os.Remove(v3Path)
 	}
 
 	// Fix IOS not encrypting database
-	if err := chat.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
+	if err := appDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
@@ -189,7 +191,17 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	s.protocol = chat.NewProtocolService(chat.NewEncryptionService(persistence, chat.DefaultEncryptionServiceConfig(s.installationID)), addedBundlesHandler)
+	onNewTopicHandler := func(topic []byte) {
+
+	}
+
+	s.protocol = chat.NewProtocolService(
+		chat.NewEncryptionService(
+			persistence,
+			chat.DefaultEncryptionServiceConfig(s.installationID)),
+		topic.NewService(persistence.GetTopicStorage()),
+		addedBundlesHandler,
+		onNewTopicHandler)
 
 	return nil
 }
