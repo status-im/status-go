@@ -23,9 +23,12 @@ func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.
 		sskLen,
 		sskLen,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	theirIdentity := crypto.CompressPubkey(theirPublicKey)
-	if err = s.persistence.AddTopic(theirIdentity, sharedKey, installationID); err != nil {
+	if err = s.persistence.Add(theirIdentity, sharedKey, installationID); err != nil {
 		return nil, err
 	}
 
@@ -36,7 +39,7 @@ func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.
 func (s *Service) Send(theirPublicKey *ecdsa.PublicKey, installationIDs []string) ([]byte, error) {
 	theirIdentity := crypto.CompressPubkey(theirPublicKey)
 
-	response, err := s.persistence.GetTopic(theirIdentity, installationIDs)
+	response, err := s.persistence.Get(theirIdentity, installationIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -48,4 +51,8 @@ func (s *Service) Send(theirPublicKey *ecdsa.PublicKey, installationIDs []string
 	}
 
 	return response.secret, nil
+}
+
+func (s *Service) All() ([][]byte, error) {
+	return s.persistence.All()
 }

@@ -530,8 +530,12 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		return nil, err
 	}
 
-	// Enrich with transport layer info
+	// TODO: Refactor this as it's not quite the right abstraction anymore
 	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
+	// Enrich with transport layer info
+	if topic != nil {
+		whisperMessage.SymKeyID = api.service.GetSymKeyID(topic)
+	}
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)

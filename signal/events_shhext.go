@@ -31,6 +31,9 @@ const (
 
 	// EventBundleAdded is triggered when we receive a bundle
 	EventBundleAdded = "bundles.added"
+
+	// EventWhisperFilterAdded is triggered when we setup a new filter or restore existing ones
+	EventWhisperFilterAdded = "whisper.filter.added"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -56,6 +59,10 @@ type DecryptMessageFailedSignal struct {
 type BundleAddedSignal struct {
 	Identity       string `json:"identity"`
 	InstallationID string `json:"installationID"`
+}
+
+type WhisperFilterAddedSignal struct {
+	FilterIDs []string `json:"filterIds"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -113,4 +120,8 @@ func SendDecryptMessageFailed(sender string) {
 
 func SendBundleAdded(identity string, installationID string) {
 	send(EventBundleAdded, BundleAddedSignal{Identity: identity, InstallationID: installationID})
+}
+
+func SendWhisperFilterAdded(filterIDs []string) {
+	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{FilterIDs: filterIDs})
 }
