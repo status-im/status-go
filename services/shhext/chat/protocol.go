@@ -89,13 +89,14 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 	// across devices
 	var installationIDs []string
 	var sharedSecret []byte
+	var agreed bool
 	for installationID := range protocolMessage.GetDirectMessage() {
 		if installationID != noInstallationID {
 			installationIDs = append(installationIDs, installationID)
 		}
 	}
 	if len(installationIDs) != 0 {
-		sharedSecret, err = p.topic.Send(publicKey, installationIDs)
+		sharedSecret, agreed, err = p.topic.Send(myIdentityKey, p.encryption.config.InstallationID, publicKey, installationIDs)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -106,7 +107,11 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 		p.onNewTopicHandler([][]byte{sharedSecret})
 	}
 
-	return msg, sharedSecret, nil
+	if agreed {
+		return msg, sharedSecret, nil
+	} else {
+		return msg, nil, nil
+	}
 }
 
 // BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.
