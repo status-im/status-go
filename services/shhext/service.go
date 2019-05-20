@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/shhext/chat/topic"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
+	"github.com/status-im/status-go/signal"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"golang.org/x/crypto/sha3"
@@ -65,7 +66,7 @@ type Service struct {
 	cache            *mailservers.Cache
 	connManager      *mailservers.ConnectionManager
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
-	filtersAdded     map[string]string
+	filtersAdded     map[string]*signal.Filter
 }
 
 // Make sure that Service implements node.Service interface.
@@ -102,7 +103,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		pfsEnabled:       config.PFSEnabled,
 		peerStore:        ps,
 		cache:            cache,
-		filtersAdded:     make(map[string]string),
+		filtersAdded:     make(map[string]*signal.Filter),
 	}
 }
 
@@ -316,14 +317,14 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func (s *Service) GetSymKeyID(sharedSecret []byte) string {
+func (s *Service) GetFilter(sharedSecret []byte) *signal.Filter {
 	log.Info("TOPICS", "t", s.filtersAdded)
 	secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
 	return s.filtersAdded[secretID]
 }
 
 func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
-	var filterIDs []string
+	var filters []*signal.Filter
 	log.Info("NEW TOPIC HANDLER", "secrets", sharedSecrets)
 	for _, sharedSecret := range sharedSecrets {
 		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
@@ -332,10 +333,9 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 		}
 
 		api := whisper.NewPublicWhisperAPI(s.w)
+		topic := chat.SharedSecretToTopic(sharedSecret)
 
-		whisperTopics := []whisper.TopicType{
-			chat.SharedSecretToTopic(sharedSecret),
-		}
+		whisperTopics := []whisper.TopicType{topic}
 		symKeyID, err := api.AddSymKey(context.TODO(), sharedSecret)
 		if err != nil {
 			log.Error("SYM KEYN FAILED", "err", err)
@@ -353,14 +353,19 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 			return
 		}
 
-		filterIDs = append(filterIDs, filterID)
-		s.filtersAdded[secretID] = symKeyID
+		filter := &signal.Filter{
+			FilterID: filterID,
+			SymKeyID: symKeyID,
+			Topic:    topic}
+
+		filters = append(filters, filter)
+		s.filtersAdded[secretID] = filter
 
 	}
-	log.Info("FILTER IDS", "filter", filterIDs)
-	if len(filterIDs) != 0 {
+	log.Info("FILTER IDS", "filter", filters)
+	if len(filters) != 0 {
 		handler := EnvelopeSignalHandler{}
-		handler.WhisperFilterAdded(filterIDs)
+		handler.WhisperFilterAdded(filters)
 	}
 
 }

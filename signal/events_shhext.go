@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
+	whisper "github.com/status-im/whisper/whisperv6"
 )
 
 const (
@@ -61,8 +62,14 @@ type BundleAddedSignal struct {
 	InstallationID string `json:"installationID"`
 }
 
+type Filter struct {
+	FilterID string            `json:"filterId"`
+	SymKeyID string            `json:"symKeyId"`
+	Topic    whisper.TopicType `json:"topic"`
+}
+
 type WhisperFilterAddedSignal struct {
-	FilterIDs []string `json:"filterIds"`
+	Filters []*Filter `json:"filters"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -122,6 +129,6 @@ func SendBundleAdded(identity string, installationID string) {
 	send(EventBundleAdded, BundleAddedSignal{Identity: identity, InstallationID: installationID})
 }
 
-func SendWhisperFilterAdded(filterIDs []string) {
-	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{FilterIDs: filterIDs})
+func SendWhisperFilterAdded(filters []*Filter) {
+	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
 }
