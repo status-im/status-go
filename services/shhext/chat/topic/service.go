@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 const sskLen = 16
@@ -18,6 +19,7 @@ func NewService(persistence PersistenceService) *Service {
 
 // Receive will generate a shared secret for a given identity, and return it
 func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) ([]byte, error) {
+	log.Info("Receive called for", "installationID", installationID)
 	sharedKey, err := ecies.ImportECDSA(myPrivateKey).GenerateShared(
 		ecies.ImportECDSAPublic(theirPublicKey),
 		sskLen,

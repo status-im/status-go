@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -322,6 +323,7 @@ func (s *Service) GetSymKeyID(sharedSecret []byte) string {
 
 func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 	var filterIDs []string
+	log.Info("NEW TOPIC HANDLER", "secrets", sharedSecrets)
 	for _, sharedSecret := range sharedSecrets {
 		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
 		if _, ok := s.filtersAdded[secretID]; ok {
@@ -335,6 +337,7 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 		}
 		symKeyID, err := api.AddSymKey(context.TODO(), sharedSecret)
 		if err != nil {
+			log.Error("SYM KEYN FAILED", "err", err)
 			return
 		}
 
@@ -345,6 +348,7 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 		}
 		filterID, err := api.NewMessageFilter(criteria)
 		if err != nil {
+			log.Error("FILTER FAILED", "err", err)
 			return
 		}
 
@@ -352,6 +356,7 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 		s.filtersAdded[secretID] = symKeyID
 
 	}
+	log.Info("FILTER IDS", "filter", filterIDs)
 	if len(filterIDs) != 0 {
 		handler := EnvelopeSignalHandler{}
 		handler.WhisperFilterAdded(filterIDs)

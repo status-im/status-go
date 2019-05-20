@@ -204,8 +204,10 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 			return nil, err
 		}
 
+		p.log.Info("Checking version")
 		// Handle protocol negotiation for compatible clients
 		if protocolMessage.Version >= topicNegotiationVersion {
+			p.log.Info("Version greater than 1 negotianting")
 			topic, err := p.topic.Receive(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
 			if err != nil {
 				return nil, err
