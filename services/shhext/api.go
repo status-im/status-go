@@ -540,6 +540,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetSymKeyID(topic))
 
 		whisperMessage.SymKeyID = api.service.GetSymKeyID(topic)
+		whisperMessage.PublicKey = nil
 	}
 
 	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
