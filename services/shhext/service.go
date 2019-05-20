@@ -364,6 +364,7 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 	}
 	log.Info("FILTER IDS", "filter", filters)
 	if len(filters) != 0 {
+		log.Info("SENDING FILTERS")
 		handler := EnvelopeSignalHandler{}
 		handler.WhisperFilterAdded(filters)
 	}
