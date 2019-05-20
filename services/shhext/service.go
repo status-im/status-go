@@ -329,7 +329,7 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 	for _, sharedSecret := range sharedSecrets {
 		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
 		if _, ok := s.filtersAdded[secretID]; ok {
-			return
+			continue
 		}
 
 		api := whisper.NewPublicWhisperAPI(s.w)
