@@ -513,11 +513,14 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	// The negotiated secret
 	var topic []byte
 
+	api.log.Info("BUILDING MESSAGE")
 	if msg.DH {
 		protocolMessage, topic, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
 	} else {
 		protocolMessage, topic, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
 	}
+
+	api.log.Info("BUILT MESSAGE", "topic", topic)
 
 	if err != nil {
 		return nil, err
@@ -534,8 +537,12 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
 	// Enrich with transport layer info
 	if topic != nil {
+		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetSymKeyID(topic))
+
 		whisperMessage.SymKeyID = api.service.GetSymKeyID(topic)
 	}
+
+	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)
