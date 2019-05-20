@@ -317,6 +317,7 @@ func (s *Service) Stop() error {
 }
 
 func (s *Service) GetSymKeyID(sharedSecret []byte) string {
+	log.Info("TOPICS", "t", s.filtersAdded)
 	secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
 	return s.filtersAdded[secretID]
 }
