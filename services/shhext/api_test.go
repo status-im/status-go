@@ -220,3 +220,20 @@ func TestSyncMessagesErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestExpiredOrCompleted(t *testing.T) {
+	timeout := time.Millisecond
+	events := make(chan whisper.EnvelopeEvent)
+	errors := make(chan error, 1)
+	hash := common.Hash{1}
+	go func() {
+		_, err := waitForExpiredOrCompleted(hash, events, timeout)
+		errors <- err
+	}()
+	select {
+	case <-time.After(time.Second):
+		require.FailNow(t, "timed out waiting for waitForExpiredOrCompleted to complete")
+	case err := <-errors:
+		require.EqualError(t, err, fmt.Sprintf("request %x expired", hash))
+	}
+}
