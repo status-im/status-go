@@ -36,6 +36,6 @@ func (h EnvelopeSignalHandler) BundleAdded(identity string, installationID strin
 	signal.SendBundleAdded(identity, installationID)
 }
 
-func (h EnvelopeSignalHandler) WhisperFilterAdded(filterIDs []string) {
-	signal.SendWhisperFilterAdded(filterIDs)
+func (h EnvelopeSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
+	signal.SendWhisperFilterAdded(filters)
 }

@@ -537,10 +537,15 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
 	// Enrich with transport layer info
 	if topic != nil {
-		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetSymKeyID(topic))
+		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetFilter(topic))
 
-		whisperMessage.SymKeyID = api.service.GetSymKeyID(topic)
-		whisperMessage.PublicKey = nil
+		filter := api.service.GetFilter(topic)
+
+		if filter != nil {
+			whisperMessage.SymKeyID = filter.SymKeyID
+			whisperMessage.PublicKey = nil
+
+		}
 	}
 
 	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
