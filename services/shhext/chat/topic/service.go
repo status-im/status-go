@@ -17,7 +17,7 @@ func NewService(persistence PersistenceService) *Service {
 	return &Service{persistence: persistence}
 }
 
-func (s *Service) setupTopic(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) ([]byte, error) {
+func (s *Service) setupTopic(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) (*Secret, error) {
 	log.Info("Setup topic called for", "installationID", installationID)
 	sharedKey, err := ecies.ImportECDSA(myPrivateKey).GenerateShared(
 		ecies.ImportECDSAPublic(theirPublicKey),
@@ -33,16 +33,16 @@ func (s *Service) setupTopic(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecd
 		return nil, err
 	}
 
-	return sharedKey, err
+	return &Secret{Key: sharedKey, Identity: theirPublicKey}, err
 }
 
 // Receive will generate a shared secret for a given identity, and return it
-func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) ([]byte, error) {
+func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) (*Secret, error) {
 	return s.setupTopic(myPrivateKey, theirPublicKey, installationID)
 }
 
 // Send returns a shared key and whether it has been acknowledged from all the installationIDs
-func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, theirPublicKey *ecdsa.PublicKey, theirInstallationIDs []string) ([]byte, bool, error) {
+func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, theirPublicKey *ecdsa.PublicKey, theirInstallationIDs []string) (*Secret, bool, error) {
 	sharedKey, err := s.setupTopic(myPrivateKey, theirPublicKey, myInstallationID)
 	if err != nil {
 		return nil, false, err
@@ -60,9 +60,34 @@ func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, 
 		}
 	}
 
-	return response.secret, true, nil
+	return &Secret{
+		Key:      response.secret,
+		Identity: theirPublicKey,
+	}, true, nil
 }
 
-func (s *Service) All() ([][]byte, error) {
-	return s.persistence.All()
+type Secret struct {
+	Identity *ecdsa.PublicKey
+	Key      []byte
+}
+
+func (s *Service) All() ([]*Secret, error) {
+	var secrets []*Secret
+	tuples, err := s.persistence.All()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, tuple := range tuples {
+		key, err := crypto.DecompressPubkey(tuple[0])
+		if err != nil {
+			return nil, err
+		}
+
+		secrets = append(secrets, &Secret{Identity: key, Key: tuple[1]})
+
+	}
+
+	return secrets, nil
+
 }
