@@ -541,6 +541,12 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 
 		filter := api.service.GetFilter(topic)
 
+		msgs, err := api.publicAPI.GetFilterMessages(filter.FilterID)
+		if err != nil {
+			return nil, err
+		}
+		api.log.Info("COUNTING MESSAGES", "count", len(msgs))
+
 		if filter != nil {
 			whisperMessage.SymKeyID = filter.SymKeyID
 			whisperMessage.Topic = chat.SharedSecretToTopic(topic)
