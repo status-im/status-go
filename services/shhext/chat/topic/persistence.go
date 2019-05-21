@@ -8,7 +8,7 @@ import (
 type PersistenceService interface {
 	Add(identity []byte, secret []byte, installationID string) error
 	Get(identity []byte, installationIDs []string) (*Response, error)
-	All() ([][]byte, error)
+	All() ([][][]byte, error)
 }
 
 type Response struct {
@@ -99,11 +99,11 @@ func (s *SQLLitePersistence) Get(identity []byte, installationIDs []string) (*Re
 	return response, nil
 }
 
-func (s *SQLLitePersistence) All() ([][]byte, error) {
-	query := `SELECT secret
+func (s *SQLLitePersistence) All() ([][][]byte, error) {
+	query := `SELECT identity, secret
 	          FROM topics`
 
-	var secrets [][]byte
+	var secrets [][][]byte
 
 	rows, err := s.db.Query(query)
 	if err != nil {
@@ -112,12 +112,13 @@ func (s *SQLLitePersistence) All() ([][]byte, error) {
 
 	for rows.Next() {
 		var secret []byte
-		err = rows.Scan(&secret)
+		var identity []byte
+		err = rows.Scan(&identity, &secret)
 		if err != nil {
 			return nil, err
 		}
 
-		secrets = append(secrets, secret)
+		secrets = append(secrets, [][]byte{identity, secret})
 	}
 
 	return secrets, nil

@@ -16,14 +16,14 @@ type ProtocolService struct {
 	encryption          *EncryptionService
 	topic               *topic.Service
 	addedBundlesHandler func([]IdentityAndIDPair)
-	onNewTopicHandler   func([][]byte)
+	onNewTopicHandler   func([]*topic.Secret)
 	Enabled             bool
 }
 
 var ErrNotProtocolMessage = errors.New("Not a protocol message")
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService, topic *topic.Service, addedBundlesHandler func([]IdentityAndIDPair), onNewTopicHandler func([][]byte)) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, topic *topic.Service, addedBundlesHandler func([]IdentityAndIDPair), onNewTopicHandler func([]*topic.Secret)) *ProtocolService {
 	return &ProtocolService{
 		log:                 log.New("package", "status-go/services/sshext.chat"),
 		encryption:          encryption,
@@ -88,7 +88,7 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 	// Check who we are sending the message to, and see if we have a shared secret
 	// across devices
 	var installationIDs []string
-	var sharedSecret []byte
+	var sharedSecret *topic.Secret
 	var agreed bool
 	for installationID := range protocolMessage.GetDirectMessage() {
 		if installationID != noInstallationID {
@@ -104,11 +104,11 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 
 	// Call handler
 	if sharedSecret != nil {
-		p.onNewTopicHandler([][]byte{sharedSecret})
+		p.onNewTopicHandler([]*topic.Secret{sharedSecret})
 	}
 
 	if agreed {
-		return msg, sharedSecret, nil
+		return msg, sharedSecret.Key, nil
 	} else {
 		return msg, nil, nil
 	}
@@ -213,12 +213,12 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 		// Handle protocol negotiation for compatible clients
 		if protocolMessage.Version >= topicNegotiationVersion {
 			p.log.Info("Version greater than 1 negotianting")
-			topic, err := p.topic.Receive(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
+			sharedSecret, err := p.topic.Receive(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
 			if err != nil {
 				return nil, err
 			}
 
-			p.onNewTopicHandler([][]byte{topic})
+			p.onNewTopicHandler([]*topic.Secret{sharedSecret})
 
 		}
 		return message, nil
