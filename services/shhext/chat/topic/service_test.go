@@ -106,5 +106,9 @@ func (s *ServiceTestSuite) TestAll() {
 	// All the topics are there
 	topics, err := s.service.All()
 	s.Require().NoError(err)
-	s.Require().Equal([][]byte{sharedKey1, sharedKey2}, topics)
+	expected := []*Secret{
+		sharedKey1,
+		sharedKey2,
+	}
+	s.Require().Equal(expected, topics)
 }

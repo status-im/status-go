@@ -323,20 +323,20 @@ func (s *Service) GetFilter(sharedSecret []byte) *signal.Filter {
 	return s.filtersAdded[secretID]
 }
 
-func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
+func (s *Service) onNewTopicHandler(sharedSecrets []*topic.Secret) {
 	var filters []*signal.Filter
 	log.Info("NEW TOPIC HANDLER", "secrets", sharedSecrets)
 	for _, sharedSecret := range sharedSecrets {
-		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
+		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret.Key))
 		if _, ok := s.filtersAdded[secretID]; ok {
 			continue
 		}
 
 		api := whisper.NewPublicWhisperAPI(s.w)
-		topic := chat.SharedSecretToTopic(sharedSecret)
+		topic := chat.SharedSecretToTopic(sharedSecret.Key)
 
 		whisperTopics := []whisper.TopicType{topic}
-		symKeyID, err := api.AddSymKey(context.TODO(), sharedSecret)
+		symKeyID, err := api.AddSymKey(context.TODO(), sharedSecret.Key)
 		if err != nil {
 			log.Error("SYM KEYN FAILED", "err", err)
 			return
@@ -353,7 +353,9 @@ func (s *Service) onNewTopicHandler(sharedSecrets [][]byte) {
 			return
 		}
 
+		identityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(sharedSecret.Identity))
 		filter := &signal.Filter{
+			Identity: identityStr,
 			FilterID: filterID,
 			SymKeyID: symKeyID,
 			Topic:    topic}

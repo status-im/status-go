@@ -63,6 +63,7 @@ type BundleAddedSignal struct {
 }
 
 type Filter struct {
+	Identity string            `json:"identity"`
 	FilterID string            `json:"filterId"`
 	SymKeyID string            `json:"symKeyId"`
 	Topic    whisper.TopicType `json:"topic"`
