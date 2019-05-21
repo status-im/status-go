@@ -543,6 +543,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 
 		if filter != nil {
 			whisperMessage.SymKeyID = filter.SymKeyID
+			whisperMessage.Topic = chat.SharedSecretToTopic(topic)
 			whisperMessage.PublicKey = nil
 
 		}
