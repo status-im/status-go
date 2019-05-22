@@ -21,9 +21,11 @@ type ChatView struct {
 	ID                     string            `json:"id"`
 	Type                   Type              `json:"type"`
 	Name                   string            `json:"name"`
-	LastMessageContent     map[string]string `json:"last_message_content"`
-	LastMessageContentType string            `json:"last_message_content_type"`
-	UnreadMessagesCount    int               `json:"unviewed_messages_count"`
+	ColorHex               string            `json:"color"`
+	LastMessageContent     map[string]string `json:"last-message-content"`
+	LastMessageContentType string            `json:"last-message-content-type"`
+	UnreadMessagesCount    int               `json:"unviewed-messages-count"`
+	IsActive               bool              `json:"is-active"`
 }
 
 type API struct {
@@ -41,6 +43,8 @@ func (api *API) Chats() (ChatsResponse, error) {
 				ID:                     "status-fake",
 				Type:                   TypePublic,
 				Name:                   "#status-fake",
+				ColorHex:               "#51d0f0",
+				IsActive:               true,
 				LastMessageContentType: "text/plain",
 				LastMessageContent:     map[string]string{"text": "well, hello there!"},
 				UnreadMessagesCount:    20,
@@ -49,6 +53,8 @@ func (api *API) Chats() (ChatsResponse, error) {
 				ID:                     "status-fake-group",
 				Type:                   TypePrivateGroup,
 				Name:                   "#status-fake-group",
+				ColorHex:               "#51d0f0",
+				IsActive:               true,
 				LastMessageContentType: "text/plain",
 				LastMessageContent:     map[string]string{"text": "private-group-chat!"},
 				UnreadMessagesCount:    9,
@@ -57,6 +63,8 @@ func (api *API) Chats() (ChatsResponse, error) {
 				ID:                     "blah-one-on-one",
 				Type:                   TypeOneOnOne,
 				Name:                   "One Single Imitation",
+				ColorHex:               "#51d0f0",
+				IsActive:               true,
 				LastMessageContentType: "text/plain",
 				LastMessageContent:     map[string]string{"text": "one-on-one!"},
 				UnreadMessagesCount:    1,
