@@ -18,12 +18,12 @@ type ChatsResponse struct {
 }
 
 type ChatView struct {
-	ID                  string `json:"id"`
-	Type                Type   `json:"type"`
-	Name                string `json:"name"`
-	LastMessageContent  string `json:"last_message"`
-	LastMessageSender   string `json:"last_message_sender"`
-	UnreadMessagesCount int    `json:"unread_messages"`
+	ID                     string            `json:"id"`
+	Type                   Type              `json:"type"`
+	Name                   string            `json:"name"`
+	LastMessageContent     map[string]string `json:"last_message_content"`
+	LastMessageContentType string            `json:"last_message_content_type"`
+	UnreadMessagesCount    int               `json:"unviewed_messages_count"`
 }
 
 type API struct {
@@ -38,28 +38,28 @@ func (api *API) Chats() (ChatsResponse, error) {
 		UnreadMessagesCount: 30,
 		Chats: map[string]ChatView{
 			"status-fake": {
-				ID:                  "status-fake",
-				Type:                TypePublic,
-				Name:                "#status-fake",
-				LastMessageContent:  "well, hello there!",
-				LastMessageSender:   "Unreal Fake Imitation",
-				UnreadMessagesCount: 20,
+				ID:                     "status-fake",
+				Type:                   TypePublic,
+				Name:                   "#status-fake",
+				LastMessageContentType: "text/plain",
+				LastMessageContent:     map[string]string{"text": "well, hello there!"},
+				UnreadMessagesCount:    20,
 			},
 			"status-fake-group": {
-				ID:                  "status-fake-group",
-				Type:                TypePrivateGroup,
-				Name:                "#status-fake-group",
-				LastMessageContent:  "group, hello there!",
-				LastMessageSender:   "Unreal Private Group",
-				UnreadMessagesCount: 9,
+				ID:                     "status-fake-group",
+				Type:                   TypePrivateGroup,
+				Name:                   "#status-fake-group",
+				LastMessageContentType: "text/plain",
+				LastMessageContent:     map[string]string{"text": "private-group-chat!"},
+				UnreadMessagesCount:    9,
 			},
 			"blah-one-on-one": {
-				ID:                  "blah-one-on-one",
-				Type:                TypeOneOnOne,
-				Name:                "One Single Imitation",
-				LastMessageContent:  "Hi there!",
-				LastMessageSender:   "One Single Imitation",
-				UnreadMessagesCount: 1,
+				ID:                     "blah-one-on-one",
+				Type:                   TypeOneOnOne,
+				Name:                   "One Single Imitation",
+				LastMessageContentType: "text/plain",
+				LastMessageContent:     map[string]string{"text": "one-on-one!"},
+				UnreadMessagesCount:    1,
 			},
 		},
 	}, nil
