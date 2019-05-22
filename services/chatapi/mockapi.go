@@ -32,9 +32,20 @@ func (api *API) Chats() (ChatsResponse, error) {
 	return ChatsResponse{
 		UnreadMessagesCount: 30,
 		Chats: map[string]ChatView{
+			"status": {
+				ID:                     "status",
+				Name:                   "status",
+				ColorHex:               "#000000",
+				IsActive:               true,
+				LastMessageContentType: "text/plain",
+				LastMessageContent:     map[string]string{"text": "still fake but real ID"},
+				UnreadMessagesCount:    1,
+				IsGroupChat:            true,
+				IsPublic:               true,
+			},
 			"status-fake": {
 				ID:                     "status-fake",
-				Name:                   "#status-fake",
+				Name:                   "status-fake",
 				ColorHex:               "#51d0f0",
 				IsActive:               true,
 				LastMessageContentType: "text/plain",
@@ -45,7 +56,7 @@ func (api *API) Chats() (ChatsResponse, error) {
 			},
 			"status-fake-group": {
 				ID:                     "status-fake-group",
-				Name:                   "#status-fake-group",
+				Name:                   "status-fake-group",
 				ColorHex:               "#51d0f0",
 				IsActive:               true,
 				LastMessageContentType: "text/plain",
