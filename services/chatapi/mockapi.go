@@ -13,12 +13,12 @@ const (
 )
 
 type ChatsResponse struct {
-	UnreadMessagesCount int                 `json:"unread_messages"`
+	UnreadMessagesCount int                 `json:"unviewed-messages-count"`
 	Chats               map[string]ChatView `json:"chats"`
 }
 
 type ChatView struct {
-	ID                     string            `json:"id"`
+	ID                     string            `json:"chat-id"`
 	Type                   Type              `json:"type"`
 	Name                   string            `json:"name"`
 	ColorHex               string            `json:"color"`
