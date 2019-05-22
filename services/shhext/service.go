@@ -1,7 +1,6 @@
 package shhext
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -22,6 +20,7 @@ import (
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
 	"github.com/status-im/status-go/services/shhext/chat/topic"
 	"github.com/status-im/status-go/services/shhext/dedup"
+	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -66,7 +65,7 @@ type Service struct {
 	cache            *mailservers.Cache
 	connManager      *mailservers.ConnectionManager
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
-	filtersAdded     map[string]*signal.Filter
+	filter           *filter.Service
 }
 
 // Make sure that Service implements node.Service interface.
@@ -103,7 +102,6 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		pfsEnabled:       config.PFSEnabled,
 		peerStore:        ps,
 		cache:            cache,
-		filtersAdded:     make(map[string]*signal.Filter),
 	}
 }
 
@@ -199,12 +197,8 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 
 	// Initialize topics
 	topicService := topic.NewService(persistence.GetTopicStorage())
-	sharedSecrets, err := topicService.All()
-	if err != nil {
-		return err
-	}
-
-	s.onNewTopicHandler(sharedSecrets)
+	filterService := filter.New(s.config.AsymKeyID, s.w, topicService)
+	s.filter = filterService
 
 	s.protocol = chat.NewProtocolService(
 		chat.NewEncryptionService(
@@ -314,56 +308,34 @@ func (s *Service) Stop() error {
 	s.requestsRegistry.Clear()
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
+	s.filter.Stop()
 	return nil
 }
 
-func (s *Service) GetFilter(sharedSecret []byte) *signal.Filter {
-	log.Info("TOPICS", "t", s.filtersAdded)
-	secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret))
-	return s.filtersAdded[secretID]
+func (s *Service) GetNegotiatedChat(identity *ecdsa.PublicKey) *filter.Chat {
+	return s.filter.Get(identity)
+}
+
+func (s *Service) LoadFilters(chats []*filter.Chat) error {
+	return s.filter.Init(chats)
+}
+
+func (s *Service) RemoveFilter(chat *filter.Chat) {
+	// remove filter
 }
 
 func (s *Service) onNewTopicHandler(sharedSecrets []*topic.Secret) {
 	var filters []*signal.Filter
 	log.Info("NEW TOPIC HANDLER", "secrets", sharedSecrets)
 	for _, sharedSecret := range sharedSecrets {
-		secretID := fmt.Sprintf("%x", crypto.Keccak256(sharedSecret.Key))
-		if _, ok := s.filtersAdded[secretID]; ok {
-			continue
-		}
-
-		api := whisper.NewPublicWhisperAPI(s.w)
-		topic := chat.SharedSecretToTopic(sharedSecret.Key)
-
-		whisperTopics := []whisper.TopicType{topic}
-		symKeyID, err := api.AddSymKey(context.TODO(), sharedSecret.Key)
+		err := s.filter.ProcessNegotiatedSecret(sharedSecret)
 		if err != nil {
-			log.Error("SYM KEYN FAILED", "err", err)
+			log.Error("Failed to process negotiated secret", "err", err)
 			return
 		}
-
-		criteria := whisper.Criteria{
-			SymKeyID: symKeyID,
-			MinPow:   0.0002,
-			Topics:   whisperTopics,
-		}
-		filterID, err := api.NewMessageFilter(criteria)
-		if err != nil {
-			log.Error("FILTER FAILED", "err", err)
-			return
-		}
-
-		identityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(sharedSecret.Identity))
-		filter := &signal.Filter{
-			Identity: identityStr,
-			FilterID: filterID,
-			SymKeyID: symKeyID,
-			Topic:    topic}
-
-		filters = append(filters, filter)
-		s.filtersAdded[secretID] = filter
 
 	}
+	// TODO: send back chat filter
 	log.Info("FILTER IDS", "filter", filters)
 	if len(filters) != 0 {
 		log.Info("SENDING FILTERS")

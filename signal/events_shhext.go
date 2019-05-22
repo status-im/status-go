@@ -66,6 +66,7 @@ type Filter struct {
 	Identity string            `json:"identity"`
 	FilterID string            `json:"filterId"`
 	SymKeyID string            `json:"symKeyId"`
+	ChatID   string            `json:"chatId"`
 	Topic    whisper.TopicType `json:"topic"`
 }
 
