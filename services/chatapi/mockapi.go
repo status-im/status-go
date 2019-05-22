@@ -13,8 +13,8 @@ const (
 )
 
 type ChatsResponse struct {
-	UnreadMessagesCount int        `json:"unread_messages"`
-	Chats               []ChatView `json:"chats"`
+	UnreadMessagesCount int                 `json:"unread_messages"`
+	Chats               map[string]ChatView `json:"chats"`
 }
 
 type ChatView struct {
@@ -36,24 +36,24 @@ func NewMockAPI(node *node.StatusNode) *API {
 func (api *API) Chats() (ChatsResponse, error) {
 	return ChatsResponse{
 		UnreadMessagesCount: 30,
-		Chats: []ChatView{
-			{
-				ID:                  "blah1",
+		Chats: map[string]ChatView{
+			"status-fake": {
+				ID:                  "status-fake",
 				Type:                TypePublic,
 				Name:                "#status-fake",
 				LastMessageContent:  "well, hello there!",
 				LastMessageSender:   "Unreal Fake Imitation",
 				UnreadMessagesCount: 20,
 			},
-			{
-				ID:                  "blah-private-group1",
+			"status-fake-group": {
+				ID:                  "status-fake-group",
 				Type:                TypePrivateGroup,
 				Name:                "#status-fake-group",
 				LastMessageContent:  "group, hello there!",
 				LastMessageSender:   "Unreal Private Group",
 				UnreadMessagesCount: 9,
 			},
-			{
+			"blah-one-on-one": {
 				ID:                  "blah-one-on-one",
 				Type:                TypeOneOnOne,
 				Name:                "One Single Imitation",
@@ -64,3 +64,9 @@ func (api *API) Chats() (ChatsResponse, error) {
 		},
 	}, nil
 }
+
+/*
+
+{"status" {:updated-at nil, :tags #{}, :referenced-messages {}, :color "#51d0f0", :contacts #{}, :last-clock-value 156035060894207, :admins #{}, :members-joined #{}, :name "status", :removed-from-at nil, :membership-updates (), :unviewed-messages-count 1, :last-message-content-type "text/plain", :is-active true, :last-message-content {:chat-id "status", :text "Please take a look at this Youtube playlist to learn how to use Status\n\nhttps://www.youtube.com/watch?v=fnuqRV37JmE&list=PLbrz7IuP1hrinFXb47zmukKPbsB-1_Uhx", :response-to "0xe72e84ddb55d4c499f1412aa997b865a0bd6303610ee7dd00254181f0e14f06e", :response-to-v2 "0xb0366c4ef191e12be89030b299694ec5c89c77efa2ef93de13c40c356a7b2a74", :metadata {:link ([72 155])}, :render-recipe [["Please take a look at this Youtube playlist to learn how to use Status\n\n" :text] ["https://www.youtube.com/watch?v=fnuqRV37JmE&list=PLbrz7IuP1hrinFXb47zmukKPbsB-1_Uhx" :link]]}, :messages #status-im.utils.prio<…>
+
+*/
