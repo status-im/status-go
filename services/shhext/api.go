@@ -547,21 +547,14 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
 	// Enrich with transport layer info
 	if topic != nil {
-		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetFilter(topic))
+		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetNegotiatedChat(publicKey))
 
-		filter := api.service.GetFilter(topic)
+		chat := api.service.GetNegotiatedChat(publicKey)
 
-		msgs, err := api.publicAPI.GetFilterMessages(filter.FilterID)
-		if err != nil {
-			return nil, err
-		}
-		api.log.Info("COUNTING MESSAGES", "count", len(msgs))
-
-		if filter != nil {
-			whisperMessage.SymKeyID = filter.SymKeyID
-			whisperMessage.Topic = chat.SharedSecretToTopic(topic)
+		if chat != nil {
+			whisperMessage.SymKeyID = chat.SymKeyID
+			whisperMessage.Topic = whisper.BytesToTopic(chat.Topic)
 			whisperMessage.PublicKey = nil
-
 		}
 	}
 
