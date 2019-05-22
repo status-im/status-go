@@ -33,7 +33,7 @@ func NewMockAPI(node *node.StatusNode) *API {
 	return &API{}
 }
 
-func (api *API) Chats(method string, args []interface{}) (ChatsResponse, error) {
+func (api *API) Chats() (ChatsResponse, error) {
 	return ChatsResponse{
 		UnreadMessagesCount: 30,
 		Chats: []ChatView{
