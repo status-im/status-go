@@ -4,14 +4,6 @@ import (
 	"github.com/status-im/status-go/node"
 )
 
-type Type string
-
-const (
-	TypePublic       = Type("public")
-	TypePrivateGroup = Type("private_group")
-	TypeOneOnOne     = Type("one_on_one")
-)
-
 type ChatsResponse struct {
 	UnreadMessagesCount int                 `json:"unviewed-messages-count"`
 	Chats               map[string]ChatView `json:"chats"`
@@ -19,13 +11,14 @@ type ChatsResponse struct {
 
 type ChatView struct {
 	ID                     string            `json:"chat-id"`
-	Type                   Type              `json:"type"`
 	Name                   string            `json:"name"`
 	ColorHex               string            `json:"color"`
 	LastMessageContent     map[string]string `json:"last-message-content"`
 	LastMessageContentType string            `json:"last-message-content-type"`
 	UnreadMessagesCount    int               `json:"unviewed-messages-count"`
 	IsActive               bool              `json:"is-active"`
+	IsGroupChat            bool              `json:"group-chat"`
+	IsPublic               bool              `json:"public?"`
 }
 
 type API struct {
@@ -41,33 +34,36 @@ func (api *API) Chats() (ChatsResponse, error) {
 		Chats: map[string]ChatView{
 			"status-fake": {
 				ID:                     "status-fake",
-				Type:                   TypePublic,
 				Name:                   "#status-fake",
 				ColorHex:               "#51d0f0",
 				IsActive:               true,
 				LastMessageContentType: "text/plain",
 				LastMessageContent:     map[string]string{"text": "well, hello there!"},
 				UnreadMessagesCount:    20,
+				IsGroupChat:            true,
+				IsPublic:               true,
 			},
 			"status-fake-group": {
 				ID:                     "status-fake-group",
-				Type:                   TypePrivateGroup,
 				Name:                   "#status-fake-group",
 				ColorHex:               "#51d0f0",
 				IsActive:               true,
 				LastMessageContentType: "text/plain",
 				LastMessageContent:     map[string]string{"text": "private-group-chat!"},
 				UnreadMessagesCount:    9,
+				IsGroupChat:            true,
+				IsPublic:               false,
 			},
 			"blah-one-on-one": {
 				ID:                     "blah-one-on-one",
-				Type:                   TypeOneOnOne,
 				Name:                   "One Single Imitation",
 				ColorHex:               "#51d0f0",
 				IsActive:               true,
 				LastMessageContentType: "text/plain",
 				LastMessageContent:     map[string]string{"text": "one-on-one!"},
 				UnreadMessagesCount:    1,
+				IsGroupChat:            false,
+				IsPublic:               false,
 			},
 		},
 	}, nil
