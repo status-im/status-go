@@ -105,7 +105,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	aliceKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
+	encryptionResponse1, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
 	installationResponse1 := encryptionResponse1["none"]
@@ -124,7 +124,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	s.Equal(cleartext, decryptedPayload1, "It correctly decrypts the payload using DH")
 
 	// The next message will not be re-using the same key
-	encryptionResponse2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
+	encryptionResponse2, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
 	installationResponse2 := encryptionResponse2[aliceInstallationID]
@@ -158,7 +158,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	s.Require().NoError(err)
 
 	// We send a message using the bundle
-	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
+	encryptionResponse1, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext)
 	s.Require().NoError(err)
 
 	installationResponse1 := encryptionResponse1[bobInstallationID]
@@ -217,11 +217,11 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	s.Require().NoError(err)
 
 	// We send a message using the bundle
-	_, err = s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext1)
+	_, _, err = s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext1)
 	s.Require().NoError(err)
 
 	// We send another message using the bundle
-	encryptionResponse, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
+	encryptionResponse, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
 	s.Require().NoError(err)
 
 	installationResponse := encryptionResponse[bobInstallationID]
@@ -290,7 +290,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	encryptionResponse, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext1)
+	encryptionResponse, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext1)
 	s.Require().NoError(err)
 
 	// Bob receives the message
@@ -298,7 +298,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// Bob replies to the message
-	encryptionResponse, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, cleartext1)
+	encryptionResponse, _, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, cleartext1)
 	s.Require().NoError(err)
 
 	// Alice receives the message
@@ -306,7 +306,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	s.Require().NoError(err)
 
 	// We send another message using the bundle
-	encryptionResponse, err = s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
+	encryptionResponse, _, err = s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, cleartext2)
 	s.Require().NoError(err)
 
 	installationResponse := encryptionResponse[bobInstallationID]
@@ -372,12 +372,12 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
 	// Bob sends a message
 
 	for i := 0; i < s.alice.config.MaxSkip; i++ {
-		_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		_, _, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		s.Require().NoError(err)
 	}
 
 	// Bob sends a message
-	bobMessage1, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	bobMessage1, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 	s.Require().NoError(err)
 
 	// Alice receives the message
@@ -385,11 +385,11 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeys() {
 	s.Require().NoError(err)
 
 	// Bob sends a message
-	_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	_, _, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 	s.Require().NoError(err)
 
 	// Bob sends a message
-	bobMessage2, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	bobMessage2, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 	s.Require().NoError(err)
 
 	// Alice receives the message, we should have maxSkip + 1 keys in the db, but
@@ -427,12 +427,12 @@ func (s *EncryptionServiceTestSuite) TestMaxSkipKeysError() {
 	// Bob sends a message
 
 	for i := 0; i < s.alice.config.MaxSkip+1; i++ {
-		_, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		_, _, err = s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		s.Require().NoError(err)
 	}
 
 	// Bob sends a message
-	bobMessage1, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	bobMessage1, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 	s.Require().NoError(err)
 
 	// Alice receives the message
@@ -477,14 +477,14 @@ func (s *EncryptionServiceTestSuite) TestMaxMessageKeysPerSession() {
 	nMessages := s.alice.config.MaxMessageKeysPerSession
 	messages := make([]map[string]*DirectMessageProtocol, nMessages)
 	for i := 0; i < nMessages; i++ {
-		m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		m, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		s.Require().NoError(err)
 
 		messages[i] = m
 	}
 
 	// Another message to trigger the deletion
-	m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+	m, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 	s.Require().NoError(err)
 	_, err = s.alice.DecryptPayload(aliceKey, &bobKey.PublicKey, bobInstallationID, m, defaultMessageID)
 	s.Require().NoError(err)
@@ -532,7 +532,7 @@ func (s *EncryptionServiceTestSuite) TestMaxKeep() {
 	// We decrypt all messages but 1 & 2
 	messages := make([]map[string]*DirectMessageProtocol, s.alice.config.MaxKeep)
 	for i := 0; i < s.alice.config.MaxKeep; i++ {
-		m, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
+		m, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText)
 		messages[i] = m
 		s.Require().NoError(err)
 
@@ -592,11 +592,11 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	aliceMessage1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, aliceText1)
+	aliceMessage1, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, aliceText1)
 	s.Require().NoError(err)
 
 	// Bob sends a message
-	bobMessage1, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
+	bobMessage1, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
 	s.Require().NoError(err)
 
 	// Bob receives the message
@@ -608,11 +608,11 @@ func (s *EncryptionServiceTestSuite) TestConcurrentBundles() {
 	s.Require().NoError(err)
 
 	// Bob replies to the message
-	bobMessage2, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText2)
+	bobMessage2, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText2)
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	aliceMessage2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, aliceText2)
+	aliceMessage2, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, aliceText2)
 	s.Require().NoError(err)
 
 	// Alice receives the message
@@ -642,7 +642,7 @@ func publisher(
 			go func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
-				response, err := e.EncryptPayload(publicKey, privateKey, cleartext)
+				response, _, err := e.EncryptPayload(publicKey, privateKey, cleartext)
 				if err != nil {
 					errChan <- err
 					return
@@ -771,7 +771,7 @@ func (s *EncryptionServiceTestSuite) TestBundleNotExisting() {
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	aliceMessage, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, aliceText)
+	aliceMessage, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, aliceText)
 	s.Require().NoError(err)
 
 	// Bob receives the message, and returns a bundlenotfound error
@@ -804,7 +804,7 @@ func (s *EncryptionServiceTestSuite) TestDeviceNotIncluded() {
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	aliceMessage, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("does not matter"))
+	aliceMessage, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("does not matter"))
 	s.Require().NoError(err)
 
 	// Bob receives the message, and returns a bundlenotfound error
@@ -846,7 +846,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	encryptionResponse1, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
+	encryptionResponse1, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
 	s.Require().NoError(err)
 
 	installationResponse1 := encryptionResponse1[bobInstallationID]
@@ -867,7 +867,7 @@ func (s *EncryptionServiceTestSuite) TestRefreshedBundle() {
 	s.Require().NoError(err)
 
 	// Alice sends a message
-	encryptionResponse2, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
+	encryptionResponse2, _, err := s.alice.EncryptPayload(&bobKey.PublicKey, aliceKey, []byte("anything"))
 	s.Require().NoError(err)
 
 	installationResponse2 := encryptionResponse2[bobInstallationID]
@@ -910,7 +910,7 @@ func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
 	s.Require().NoError(err)
 
 	// Bob sends a message
-	bobMessage1, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
+	bobMessage1, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
 	s.Require().NoError(err)
 	bobMessage1ID := []byte("bob-message-1-id")
 
@@ -931,12 +931,12 @@ func (s *EncryptionServiceTestSuite) TestMessageConfirmation() {
 	s.Require().Equal(errors.New("can't skip current chain message keys: bad until: probably an out-of-order message that was deleted"), err)
 
 	// Bob sends a message
-	bobMessage2, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
+	bobMessage2, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
 	s.Require().NoError(err)
 	bobMessage2ID := []byte("bob-message-2-id")
 
 	// Bob sends a message
-	bobMessage3, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
+	bobMessage3, _, err := s.bob.EncryptPayload(&aliceKey.PublicKey, bobKey, bobText1)
 	s.Require().NoError(err)
 	bobMessage3ID := []byte("bob-message-3-id")
 

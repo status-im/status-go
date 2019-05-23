@@ -218,7 +218,7 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevices() {
 	s.Require().NoError(err)
 
 	// Bob sends a message to alice
-	payload, err := bob1.EncryptPayload(&aliceKey.PublicKey, bobKey, []byte("test"))
+	payload, _, err := bob1.EncryptPayload(&aliceKey.PublicKey, bobKey, []byte("test"))
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(payload))
 	s.Require().NotNil(payload["alice1"])
@@ -247,7 +247,7 @@ func (s *EncryptionServiceMultiDeviceSuite) TestMaxDevices() {
 	s.Require().NoError(err)
 
 	// Bob sends a message to alice
-	payload, err = bob1.EncryptPayload(&aliceKey.PublicKey, bobKey, []byte("test"))
+	payload, _, err = bob1.EncryptPayload(&aliceKey.PublicKey, bobKey, []byte("test"))
 	s.Require().NoError(err)
 	s.Require().Equal(3, len(payload))
 	s.Require().NotNil(payload["alice1"])

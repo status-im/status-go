@@ -10,6 +10,7 @@ import (
 
 const protocolCurrentVersion = 1
 const topicNegotiationVersion = 1
+const partitionedTopicMinVersion = 1
 
 type ProtocolService struct {
 	log                 log.Logger
@@ -63,13 +64,40 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 	return p.addBundle(myIdentityKey, protocolMessage, false)
 }
 
+type ProtocolMessageSpec struct {
+	Message *ProtocolMessage
+	// Installations is the targeted devices
+	Installations []*Installation
+	// SharedSecret is a shared secret established among the installations
+	SharedSecret []byte
+}
+
+func (p *ProtocolMessageSpec) MinVersion() uint32 {
+
+	var version uint32
+
+	for _, installation := range p.Installations {
+		if installation.Version < version {
+			version = installation.Version
+		}
+	}
+	return version
+
+}
+
+func (p *ProtocolMessageSpec) PartitionedTopic() bool {
+
+	return p.MinVersion() >= partitionedTopicMinVersion
+
+}
+
 // BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
-func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) (*ProtocolMessage, []byte, error) {
+func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) (*ProtocolMessageSpec, error) {
 	// Encrypt payload
-	encryptionResponse, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
+	encryptionResponse, installations, err := p.encryption.EncryptPayload(publicKey, myIdentityKey, payload)
 	if err != nil {
 		p.log.Error("encryption-service", "error encrypting payload", err)
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Build message
@@ -80,7 +108,7 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 
 	msg, err := p.addBundle(myIdentityKey, protocolMessage, true)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Check who we are sending the message to, and see if we have a shared secret
@@ -96,7 +124,7 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 	if len(installationIDs) != 0 {
 		sharedSecret, agreed, err = p.topic.Send(myIdentityKey, p.encryption.config.InstallationID, publicKey, installationIDs)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -104,20 +132,24 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 	if sharedSecret != nil {
 		p.onNewTopicHandler([]*topic.Secret{sharedSecret})
 	}
+	response := &ProtocolMessageSpec{
+		Message:       msg,
+		Installations: installations,
+	}
 
 	if agreed {
-		return msg, sharedSecret.Key, nil
+		response.SharedSecret = sharedSecret.Key
 	}
-	return msg, nil, nil
+	return response, nil
 }
 
 // BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.
-func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *ecdsa.PublicKey, payload []byte) (*ProtocolMessage, []byte, error) {
+func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *ecdsa.PublicKey, payload []byte) (*ProtocolMessage, error) {
 	// Encrypt payload
 	encryptionResponse, err := p.encryption.EncryptPayloadWithDH(destination, payload)
 	if err != nil {
 		p.log.Error("encryption-service", "error encrypting payload", err)
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Build message
@@ -128,10 +160,10 @@ func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destin
 
 	msg, err := p.addBundle(myIdentityKey, protocolMessage, true)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return msg, nil, nil
+	return msg, nil
 }
 
 // ProcessPublicBundle processes a received X3DH bundle.
