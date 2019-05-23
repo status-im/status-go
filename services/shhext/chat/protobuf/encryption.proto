@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package chat;
+package protobuf;
 
 message SignedPreKey {
   bytes signed_pre_key = 1;

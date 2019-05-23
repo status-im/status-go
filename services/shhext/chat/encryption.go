@@ -1,11 +1,9 @@
 package chat
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -15,6 +13,8 @@ import (
 	dr "github.com/status-im/doubleratchet"
 
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
+	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 )
 
 var ErrSessionNotFound = errors.New("session not found")
@@ -50,8 +50,6 @@ type EncryptionServiceConfig struct {
 	// How long before we refresh the interval in milliseconds
 	BundleRefreshInterval int64
 }
-
-type IdentityAndIDPair [2]string
 
 // DefaultEncryptionServiceConfig returns the default values used by the encryption service
 func DefaultEncryptionServiceConfig(installationID string) EncryptionServiceConfig {
@@ -132,18 +130,8 @@ func (s *EncryptionService) ConfirmMessagesProcessed(messageIDs [][]byte) error 
 }
 
 // CreateBundle retrieves or creates an X3DH bundle given a private key
-func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle, error) {
+func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey, installations []*multidevice.Installation) (*protobuf.Bundle, error) {
 	ourIdentityKeyC := ecrypto.CompressPubkey(&privateKey.PublicKey)
-
-	installations, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations-1, ourIdentityKeyC)
-	if err != nil {
-		return nil, err
-	}
-
-	installations = append(installations, &Installation{
-		ID:      s.config.InstallationID,
-		Version: protocolCurrentVersion,
-	})
 
 	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installations)
 	if err != nil {
@@ -176,7 +164,7 @@ func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle,
 		return nil, err
 	}
 
-	return s.CreateBundle(privateKey)
+	return s.CreateBundle(privateKey, installations)
 }
 
 // DecryptWithDH decrypts message sent with a DH key exchange, and throws away the key after decryption
@@ -224,55 +212,13 @@ func (s *EncryptionService) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, 
 	return key, nil
 }
 
-func (s *EncryptionService) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
-	myIdentityKeyC := ecrypto.CompressPubkey(myIdentityKey)
-	return s.persistence.EnableInstallation(myIdentityKeyC, installationID)
-}
-
-func (s *EncryptionService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
-	myIdentityKeyC := ecrypto.CompressPubkey(myIdentityKey)
-	return s.persistence.DisableInstallation(myIdentityKeyC, installationID)
-}
-
-// ProcessPublicBundle persists a bundle and returns a list of tuples identity/installationID
-func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *Bundle) ([]IdentityAndIDPair, error) {
-	// Make sure the bundle belongs to who signed it
-	identity, err := ExtractIdentity(b)
-	if err != nil {
-		return nil, err
-	}
-	signedPreKeys := b.GetSignedPreKeys()
-	var response []IdentityAndIDPair
-	var installations []*Installation
-	myIdentityStr := fmt.Sprintf("0x%x", ecrypto.FromECDSAPub(&myIdentityKey.PublicKey))
-
-	// Any device from other peers will be considered enabled, ours needs to
-	// be explicitly enabled
-	fromOurIdentity := identity != myIdentityStr
-
-	for installationID, signedPreKey := range signedPreKeys {
-		if installationID != s.config.InstallationID {
-			installations = append(installations, &Installation{
-				ID:      installationID,
-				Version: signedPreKey.GetProtocolVersion(),
-			})
-			response = append(response, IdentityAndIDPair{identity, installationID})
-		}
-	}
-
-	if err = s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installations, fromOurIdentity); err != nil {
-		return nil, err
-	}
-
-	if err = s.persistence.AddPublicBundle(b); err != nil {
-		return nil, err
-	}
-
-	return response, nil
+// ProcessPublicBundle persists a bundle
+func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b *protobuf.Bundle) error {
+	return s.persistence.AddPublicBundle(b)
 }
 
 // DecryptPayload decrypts the payload of a DirectMessageProtocol, given an identity private key and the sender's public key
-func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*DirectMessageProtocol, messageID []byte) ([]byte, error) {
+func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirInstallationID string, msgs map[string]*protobuf.DirectMessageProtocol, messageID []byte) ([]byte, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -325,11 +271,6 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC, theirInstallationID)
 		if err != nil {
 			s.log.Error("Could not get ratchet info", "err", err)
-			return nil, err
-		}
-
-		// Add installations with a timestamp of 0, as we don't have bundle informations
-		if err = s.persistence.AddInstallations(theirIdentityKeyC, 0, []*Installation{{ID: theirInstallationID, Version: 0}}, true); err != nil {
 			return nil, err
 		}
 
@@ -396,7 +337,7 @@ func (s *EncryptionService) createNewSession(drInfo *RatchetInfo, sk [32]byte, k
 	return session, err
 }
 
-func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *RatchetInfo, payload []byte) ([]byte, *DRHeader, error) {
+func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *RatchetInfo, payload []byte) ([]byte, *protobuf.DRHeader, error) {
 	var err error
 
 	var session dr.Session
@@ -430,7 +371,7 @@ func (s *EncryptionService) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 		return nil, nil, err
 	}
 
-	header := &DRHeader{
+	header := &protobuf.DRHeader{
 		Id:  drInfo.BundleID,
 		Key: response.Header.DH[:],
 		N:   response.Header.N,
@@ -474,7 +415,7 @@ func (s *EncryptionService) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, dr
 	return plaintext, nil
 }
 
-func (s *EncryptionService) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (*DirectMessageProtocol, error) {
+func (s *EncryptionService) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (*protobuf.DirectMessageProtocol, error) {
 	symmetricKey, ourEphemeralKey, err := PerformActiveDH(theirIdentityKey)
 	if err != nil {
 		return nil, err
@@ -485,16 +426,16 @@ func (s *EncryptionService) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, pay
 		return nil, err
 	}
 
-	return &DirectMessageProtocol{
-		DHHeader: &DHHeader{
+	return &protobuf.DirectMessageProtocol{
+		DHHeader: &protobuf.DHHeader{
 			Key: ecrypto.CompressPubkey(ourEphemeralKey),
 		},
 		Payload: encryptedPayload,
 	}, nil
 }
 
-func (s *EncryptionService) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (map[string]*DirectMessageProtocol, error) {
-	response := make(map[string]*DirectMessageProtocol)
+func (s *EncryptionService) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicKey, payload []byte) (map[string]*protobuf.DirectMessageProtocol, error) {
+	response := make(map[string]*protobuf.DirectMessageProtocol)
 	dmp, err := s.encryptWithDH(theirIdentityKey, payload)
 	if err != nil {
 		return nil, err
@@ -505,21 +446,15 @@ func (s *EncryptionService) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicK
 }
 
 // GetPublicBundle returns the active installations bundles for a given user
-func (s *EncryptionService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, error) {
-	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
-
-	installations, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *EncryptionService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, installations []*multidevice.Installation) (*protobuf.Bundle, error) {
 	return s.persistence.GetPublicBundle(theirIdentityKey, installations)
 }
 
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
-// TODO: refactor this
-// nolint: gocyclo
-func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, payload []byte) (map[string]*DirectMessageProtocol, error) {
+func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*protobuf.DirectMessageProtocol, []*multidevice.Installation, error) {
+	// Which installations we are sending the message to
+	var targetedInstallations []*multidevice.Installation
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -527,18 +462,13 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
-	// Get their installationIds
-	installations, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
-	if err != nil {
-		return nil, err
-	}
-
 	// We don't have any, send a message with DH
-	if installations == nil && !bytes.Equal(theirIdentityKeyC, ecrypto.CompressPubkey(&myIdentityKey.PublicKey)) {
-		return s.EncryptPayloadWithDH(theirIdentityKey, payload)
+	if len(installations) == 0 {
+		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
+		return encryptedPayload, targetedInstallations, err
 	}
 
-	response := make(map[string]*DirectMessageProtocol)
+	response := make(map[string]*protobuf.DirectMessageProtocol)
 
 	for _, installation := range installations {
 		installationID := installation.ID
@@ -546,31 +476,33 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 		if s.config.InstallationID == installationID {
 			continue
 		}
-		bundle, err := s.persistence.GetPublicBundle(theirIdentityKey, []*Installation{installation})
+		bundle, err := s.persistence.GetPublicBundle(theirIdentityKey, []*multidevice.Installation{installation})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// See if a session is there already
 		drInfo, err := s.persistence.GetAnyRatchetInfo(theirIdentityKeyC, installationID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+
+		targetedInstallations = append(targetedInstallations, installation)
 
 		if drInfo != nil {
 			s.log.Debug("Found DR info", "installationID", installationID)
 			encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
-			dmp := DirectMessageProtocol{
+			dmp := protobuf.DirectMessageProtocol{
 				Payload:  encryptedPayload,
 				DRHeader: drHeader,
 			}
 
 			if drInfo.EphemeralKey != nil {
-				dmp.X3DHHeader = &X3DHHeader{
+				dmp.X3DHHeader = &protobuf.X3DHHeader{
 					Key: drInfo.EphemeralKey,
 					Id:  drInfo.BundleID,
 				}
@@ -594,33 +526,33 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 		sharedKey, ourEphemeralKey, err := s.keyFromActiveX3DH(theirIdentityKeyC, theirSignedPreKey, myIdentityKey)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 		ourEphemeralKeyC := ecrypto.CompressPubkey(ourEphemeralKey)
 
 		err = s.persistence.AddRatchetInfo(sharedKey, theirIdentityKeyC, theirSignedPreKey, ourEphemeralKeyC, installationID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		x3dhHeader := &X3DHHeader{
+		x3dhHeader := &protobuf.X3DHHeader{
 			Key: ourEphemeralKeyC,
 			Id:  theirSignedPreKey,
 		}
 
 		drInfo, err = s.persistence.GetRatchetInfo(theirSignedPreKey, theirIdentityKeyC, installationID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if drInfo != nil {
 			encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
-			dmp := &DirectMessageProtocol{
+			dmp := &protobuf.DirectMessageProtocol{
 				Payload:    encryptedPayload,
 				X3DHHeader: x3dhHeader,
 				DRHeader:   drHeader,
@@ -632,5 +564,5 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	s.log.Debug("Built message", "theirKey", theirIdentityKey)
 
-	return response, nil
+	return response, targetedInstallations, nil
 }

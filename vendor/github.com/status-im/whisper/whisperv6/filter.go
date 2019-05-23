@@ -197,6 +197,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
+	log.Info("Got envelope for topic", "topic", env.Topic)
 	candidates := fs.getWatchersByTopic(env.Topic)
 	for _, watcher := range candidates {
 		if p2pMessage && !watcher.AllowP2P {
@@ -279,6 +280,7 @@ func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
 // the message and subsequently call MatchMessage.
 // Topics are not checked here, since this is done by topic matchers.
 func (f *Filter) MatchEnvelope(envelope *Envelope) bool {
+	log.Trace("checking pow", "filter", f.PoW, "envelope", envelope.pow)
 	return f.PoW <= 0 || envelope.pow >= f.PoW
 }
 

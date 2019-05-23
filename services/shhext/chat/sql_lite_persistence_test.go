@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -53,7 +54,7 @@ func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualKey)
 
-	anyPrivateBundle, err := s.service.GetAnyPrivateBundle([]byte("non-existing-id"), []*Installation{{ID: installationID, Version: 1}})
+	anyPrivateBundle, err := s.service.GetAnyPrivateBundle([]byte("non-existing-id"), []*multidevice.Installation{{ID: installationID, Version: 1}})
 	s.Require().NoError(err)
 	s.Nil(anyPrivateBundle)
 
@@ -70,7 +71,7 @@ func (s *SQLLitePersistenceTestSuite) TestPrivateBundle() {
 	s.Equal(bundle.GetPrivateSignedPreKey(), actualKey, "It returns the same key")
 
 	identity := crypto.CompressPubkey(&key.PublicKey)
-	anyPrivateBundle, err = s.service.GetAnyPrivateBundle(identity, []*Installation{{ID: installationID, Version: 1}})
+	anyPrivateBundle, err = s.service.GetAnyPrivateBundle(identity, []*multidevice.Installation{{ID: installationID, Version: 1}})
 	s.Require().NoError(err)
 	s.NotNil(anyPrivateBundle)
 	s.Equal(bundle.GetBundle().GetSignedPreKeys()[installationID].SignedPreKey, anyPrivateBundle.GetBundle().GetSignedPreKeys()[installationID].SignedPreKey, "It returns the same bundle")
@@ -80,7 +81,7 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -91,7 +92,7 @@ func (s *SQLLitePersistenceTestSuite) TestPublicBundle() {
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err)
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
@@ -101,7 +102,7 @@ func (s *SQLLitePersistenceTestSuite) TestUpdatedBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -123,7 +124,7 @@ func (s *SQLLitePersistenceTestSuite) TestUpdatedBundle() {
 	err = s.service.AddPublicBundle(bundle)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err)
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle.GetSignedPreKeys(), actualBundle.GetSignedPreKeys(), "It sets the right prekeys")
@@ -133,7 +134,7 @@ func (s *SQLLitePersistenceTestSuite) TestOutOfOrderBundles() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -160,7 +161,7 @@ func (s *SQLLitePersistenceTestSuite) TestOutOfOrderBundles() {
 	err = s.service.AddPublicBundle(bundle1)
 	s.Require().NoError(err)
 
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err)
 	s.Equal(bundle2.GetIdentity(), actualBundle.GetIdentity(), "It sets the right identity")
 	s.Equal(bundle2.GetSignedPreKeys()["1"].GetVersion(), uint32(1))
@@ -171,7 +172,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -197,7 +198,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiplePublicBundle() {
 	s.Require().NoError(err)
 
 	// Returns the most recent bundle
-	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err)
 
 	s.Equal(bundle.GetIdentity(), actualBundle.GetIdentity(), "It sets the identity")
@@ -209,7 +210,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiDevicePublicBundle() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*Installation{{ID: "1", Version: 1}})
+	actualBundle, err := s.service.GetPublicBundle(&key.PublicKey, []*multidevice.Installation{{ID: "1", Version: 1}})
 	s.Require().NoError(err, "Error was not returned even though bundle is not there")
 	s.Nil(actualBundle)
 
@@ -234,7 +235,7 @@ func (s *SQLLitePersistenceTestSuite) TestMultiDevicePublicBundle() {
 
 	// Returns the most recent bundle
 	actualBundle, err = s.service.GetPublicBundle(&key.PublicKey,
-		[]*Installation{
+		[]*multidevice.Installation{
 			{ID: "1", Version: 1},
 			{ID: "2", Version: 1},
 		})
@@ -345,213 +346,6 @@ func (s *SQLLitePersistenceTestSuite) TestRatchetInfoNoBundle() {
 	ratchetInfo, err := s.service.GetAnyRatchetInfo([]byte("their-public-key"), "4")
 	s.Require().NoError(err)
 	s.Nil(ratchetInfo, "It returns nil when no bundle is there")
-}
-
-func (s *SQLLitePersistenceTestSuite) TestAddInstallations() {
-	identity := []byte("alice")
-	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-	err := s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		true,
-	)
-
-	s.Require().NoError(err)
-
-	enabledInstallations, err := s.service.GetActiveInstallations(5, identity)
-	s.Require().NoError(err)
-
-	s.Require().Equal(installations, enabledInstallations)
-}
-
-func (s *SQLLitePersistenceTestSuite) TestAddInstallationVersions() {
-	identity := []byte("alice")
-	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-	}
-	err := s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		true,
-	)
-
-	s.Require().NoError(err)
-
-	enabledInstallations, err := s.service.GetActiveInstallations(5, identity)
-	s.Require().NoError(err)
-
-	s.Require().Equal(installations, enabledInstallations)
-
-	installationsWithDowngradedVersion := []*Installation{
-		{ID: "alice-1", Version: 0},
-	}
-
-	err = s.service.AddInstallations(
-		identity,
-		3,
-		installationsWithDowngradedVersion,
-		true,
-	)
-	s.Require().NoError(err)
-
-	enabledInstallations, err = s.service.GetActiveInstallations(5, identity)
-	s.Require().NoError(err)
-	s.Require().Equal(installations, enabledInstallations)
-}
-
-func (s *SQLLitePersistenceTestSuite) TestAddInstallationsLimit() {
-	identity := []byte("alice")
-
-	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-
-	err := s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		true,
-	)
-	s.Require().NoError(err)
-
-	installations = []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-3", Version: 3},
-	}
-
-	err = s.service.AddInstallations(
-		identity,
-		2,
-		installations,
-		true,
-	)
-	s.Require().NoError(err)
-
-	installations = []*Installation{
-		{ID: "alice-2", Version: 2},
-		{ID: "alice-3", Version: 3},
-		{ID: "alice-4", Version: 4},
-	}
-
-	err = s.service.AddInstallations(
-		identity,
-		3,
-		installations,
-		true,
-	)
-	s.Require().NoError(err)
-
-	enabledInstallations, err := s.service.GetActiveInstallations(3, identity)
-	s.Require().NoError(err)
-
-	s.Require().Equal(installations, enabledInstallations)
-}
-
-func (s *SQLLitePersistenceTestSuite) TestAddInstallationsDisabled() {
-	identity := []byte("alice")
-
-	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-
-	err := s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		false,
-	)
-	s.Require().NoError(err)
-
-	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
-	s.Require().NoError(err)
-
-	s.Require().Nil(actualInstallations)
-}
-
-func (s *SQLLitePersistenceTestSuite) TestDisableInstallation() {
-	identity := []byte("alice")
-
-	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-
-	err := s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		true,
-	)
-	s.Require().NoError(err)
-
-	err = s.service.DisableInstallation(identity, "alice-1")
-	s.Require().NoError(err)
-
-	// We add the installations again
-	installations = []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-
-	err = s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		true,
-	)
-	s.Require().NoError(err)
-
-	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
-	s.Require().NoError(err)
-
-	expected := []*Installation{{ID: "alice-2", Version: 2}}
-	s.Require().Equal(expected, actualInstallations)
-}
-
-func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
-	identity := []byte("alice")
-
-	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-
-	err := s.service.AddInstallations(
-		identity,
-		1,
-		installations,
-		true,
-	)
-	s.Require().NoError(err)
-
-	err = s.service.DisableInstallation(identity, "alice-1")
-	s.Require().NoError(err)
-
-	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
-	s.Require().NoError(err)
-
-	expected := []*Installation{{ID: "alice-2", Version: 2}}
-	s.Require().Equal(expected, actualInstallations)
-
-	err = s.service.EnableInstallation(identity, "alice-1")
-	s.Require().NoError(err)
-
-	actualInstallations, err = s.service.GetActiveInstallations(3, identity)
-	s.Require().NoError(err)
-
-	expected = []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
-	}
-	s.Require().Equal(expected, actualInstallations)
-
 }
 
 // TODO: Add test for MarkBundleExpired
