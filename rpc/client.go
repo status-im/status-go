@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/params"
@@ -72,6 +73,14 @@ func NewClient(client *gethrpc.Client, upstream params.UpstreamRPCConfig) (*Clie
 	c.router = newRouter(c.upstreamEnabled)
 
 	return &c, nil
+}
+
+// Ethclient returns ethclient.Client with upstream or local client.
+func (c *Client) Ethclient() *ethclient.Client {
+	if c.upstreamEnabled {
+		return ethclient.NewClient(c.upstream)
+	}
+	return ethclient.NewClient(c.local)
 }
 
 // UpdateUpstreamURL changes the upstream RPC client URL, if the upstream is enabled.
