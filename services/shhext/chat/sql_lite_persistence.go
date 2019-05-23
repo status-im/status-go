@@ -13,7 +13,9 @@ import (
 	"github.com/status-im/migrate/v4/source/go_bindata"
 	ecrypto "github.com/status-im/status-go/services/shhext/chat/crypto"
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
+	"github.com/status-im/status-go/services/shhext/chat/protobuf"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 )
 
 // A safe max number of rows
@@ -21,10 +23,11 @@ const maxNumberOfRows = 100000000
 
 // SQLLitePersistence represents a persistence service tied to an SQLite database
 type SQLLitePersistence struct {
-	db             *sql.DB
-	keysStorage    dr.KeysStorage
-	sessionStorage dr.SessionStorage
-	topicStorage   topic.PersistenceService
+	db                 *sql.DB
+	keysStorage        dr.KeysStorage
+	sessionStorage     dr.SessionStorage
+	secretStorage      sharedsecret.PersistenceService
+	multideviceStorage multidevice.Persistence
 }
 
 // SQLLiteKeysStorage represents a keys persistence service tied to an SQLite database
@@ -49,7 +52,9 @@ func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error)
 
 	s.sessionStorage = NewSQLLiteSessionStorage(s.db)
 
-	s.topicStorage = topic.NewSQLLitePersistence(s.db)
+	s.secretStorage = sharedsecret.NewSQLLitePersistence(s.db)
+
+	s.multideviceStorage = multidevice.NewSQLLitePersistence(s.db)
 
 	return s, nil
 }
@@ -78,9 +83,14 @@ func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
 	return s.sessionStorage
 }
 
-// GetTopicStorage returns the associated topicStorageObject
-func (s *SQLLitePersistence) GetTopicStorage() topic.PersistenceService {
-	return s.topicStorage
+// GetSharedSecretStorage returns the associated secretStorageObject
+func (s *SQLLitePersistence) GetSharedSecretStorage() sharedsecret.PersistenceService {
+	return s.secretStorage
+}
+
+// GetMultideviceStorage returns the associated multideviceStorage
+func (s *SQLLitePersistence) GetMultideviceStorage() multidevice.Persistence {
+	return s.multideviceStorage
 }
 
 // Open opens a file at the specified path
@@ -96,7 +106,7 @@ func (s *SQLLitePersistence) Open(path string, key string) error {
 }
 
 // AddPrivateBundle adds the specified BundleContainer to the database
-func (s *SQLLitePersistence) AddPrivateBundle(bc *BundleContainer) error {
+func (s *SQLLitePersistence) AddPrivateBundle(bc *protobuf.BundleContainer) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -150,7 +160,7 @@ func (s *SQLLitePersistence) AddPrivateBundle(bc *BundleContainer) error {
 }
 
 // AddPublicBundle adds the specified Bundle to the database
-func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
+func (s *SQLLitePersistence) AddPublicBundle(b *protobuf.Bundle) error {
 	tx, err := s.db.Begin()
 
 	if err != nil {
@@ -203,7 +213,7 @@ func (s *SQLLitePersistence) AddPublicBundle(b *Bundle) error {
 }
 
 // GetAnyPrivateBundle retrieves any bundle from the database containing a private key
-func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installations []*Installation) (*BundleContainer, error) {
+func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installations []*multidevice.Installation) (*protobuf.BundleContainer, error) {
 
 	versions := make(map[string]uint32)
 	/* #nosec */
@@ -239,11 +249,11 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installat
 
 	defer rows.Close()
 
-	bundle := &Bundle{
-		SignedPreKeys: make(map[string]*SignedPreKey),
+	bundle := &protobuf.Bundle{
+		SignedPreKeys: make(map[string]*protobuf.SignedPreKey),
 	}
 
-	bundleContainer := &BundleContainer{
+	bundleContainer := &protobuf.BundleContainer{
 		Bundle: bundle,
 	}
 
@@ -267,7 +277,7 @@ func (s *SQLLitePersistence) GetAnyPrivateBundle(myIdentityKey []byte, installat
 			bundle.Timestamp = timestamp
 		}
 
-		bundle.SignedPreKeys[installationID] = &SignedPreKey{
+		bundle.SignedPreKeys[installationID] = &protobuf.SignedPreKey{
 			SignedPreKey:    signedPreKey,
 			Version:         version,
 			ProtocolVersion: versions[installationID],
@@ -323,7 +333,7 @@ func (s *SQLLitePersistence) MarkBundleExpired(identity []byte) error {
 }
 
 // GetPublicBundle retrieves an existing Bundle for the specified public key from the database
-func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installations []*Installation) (*Bundle, error) {
+func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, installations []*multidevice.Installation) (*protobuf.Bundle, error) {
 
 	if len(installations) == 0 {
 		return nil, nil
@@ -360,9 +370,9 @@ func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, install
 
 	defer rows.Close()
 
-	bundle := &Bundle{
+	bundle := &protobuf.Bundle{
 		Identity:      identity,
-		SignedPreKeys: make(map[string]*SignedPreKey),
+		SignedPreKeys: make(map[string]*protobuf.SignedPreKey),
 	}
 
 	for rows.Next() {
@@ -379,7 +389,7 @@ func (s *SQLLitePersistence) GetPublicBundle(publicKey *ecdsa.PublicKey, install
 			return nil, err
 		}
 
-		bundle.SignedPreKeys[installationID] = &SignedPreKey{
+		bundle.SignedPreKeys[installationID] = &protobuf.SignedPreKey{
 			SignedPreKey:    signedPreKey,
 			Version:         version,
 			ProtocolVersion: versions[installationID],
@@ -752,159 +762,6 @@ func (s *SQLLiteSessionStorage) Load(id []byte) (*dr.State, error) {
 	default:
 		return nil, err
 	}
-}
-
-// GetActiveInstallations returns the active installations for a given identity
-func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations int, identity []byte) ([]*Installation, error) {
-	stmt, err := s.db.Prepare(`SELECT installation_id, version
-				   FROM installations
-				   WHERE enabled = 1 AND identity = ?
-				   ORDER BY timestamp DESC
-				   LIMIT ?`)
-	if err != nil {
-		return nil, err
-	}
-
-	var installations []*Installation
-	rows, err := stmt.Query(identity, maxInstallations)
-	if err != nil {
-		return nil, err
-	}
-
-	for rows.Next() {
-		var installationID string
-		var version uint32
-		err = rows.Scan(
-			&installationID,
-			&version,
-		)
-		if err != nil {
-			return nil, err
-		}
-		installations = append(installations, &Installation{
-			ID:      installationID,
-			Version: version,
-		})
-
-	}
-
-	return installations, nil
-
-}
-
-// AddInstallations adds the installations for a given identity, maintaining the enabled flag
-func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, installations []*Installation, defaultEnabled bool) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return nil
-	}
-
-	for _, installation := range installations {
-		stmt, err := tx.Prepare(`SELECT enabled, version
-					 FROM installations
-					 WHERE identity = ? AND installation_id = ?
-					 LIMIT 1`)
-		if err != nil {
-			return err
-		}
-		defer stmt.Close()
-
-		var oldEnabled bool
-		// We don't override version once we saw one
-		var oldVersion uint32
-		latestVersion := installation.Version
-
-		err = stmt.QueryRow(identity, installation.ID).Scan(&oldEnabled, &oldVersion)
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-
-		// We update timestamp if present without changing enabled, only if this is a new bundle
-		// and we set the version to the latest we ever saw
-		if err != sql.ErrNoRows {
-			if oldVersion > installation.Version {
-				latestVersion = oldVersion
-			}
-
-			stmt, err = tx.Prepare(`UPDATE installations
-					        SET timestamp = ?,  enabled = ?, version = ?
-						WHERE identity = ?
-						AND installation_id = ?
-						AND timestamp < ?`)
-			if err != nil {
-				return err
-			}
-
-			_, err = stmt.Exec(
-				timestamp,
-				oldEnabled,
-				latestVersion,
-				identity,
-				installation.ID,
-				timestamp,
-			)
-			if err != nil {
-				return err
-			}
-			defer stmt.Close()
-
-		} else {
-			stmt, err = tx.Prepare(`INSERT INTO installations(identity, installation_id, timestamp, enabled, version)
-						VALUES (?, ?, ?, ?, ?)`)
-			if err != nil {
-				return err
-			}
-
-			_, err = stmt.Exec(
-				identity,
-				installation.ID,
-				timestamp,
-				defaultEnabled,
-				latestVersion,
-			)
-			if err != nil {
-				return err
-			}
-			defer stmt.Close()
-		}
-
-	}
-
-	if err := tx.Commit(); err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
-	return nil
-
-}
-
-// EnableInstallation enables the installation
-func (s *SQLLitePersistence) EnableInstallation(identity []byte, installationID string) error {
-	stmt, err := s.db.Prepare(`UPDATE installations
-				   SET enabled = 1
-				   WHERE identity = ? AND installation_id = ?`)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(identity, installationID)
-	return err
-
-}
-
-// DisableInstallation disable the installation
-func (s *SQLLitePersistence) DisableInstallation(identity []byte, installationID string) error {
-
-	stmt, err := s.db.Prepare(`UPDATE installations
-				   SET enabled = 0
-				   WHERE identity = ? AND installation_id = ?`)
-	if err != nil {
-		return err
-	}
-
-	_, err = stmt.Exec(identity, installationID)
-	return err
 }
 
 func toKey(a []byte) dr.Key {
