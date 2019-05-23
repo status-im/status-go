@@ -137,6 +137,11 @@ func (api *API) StartOneOnOneChat(recipient string) error {
 	return nil
 }
 
+func (api *API) RemoveChat(id string) error {
+	delete(api.cs, id)
+	return nil
+}
+
 func (api *API) sendChatsUpdatedSignal(name string) {
 	signal.SendChatsDidChangeEvent(name)
 }
