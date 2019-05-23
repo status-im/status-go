@@ -4,12 +4,9 @@ import (
 	"crypto/ecdsa"
 
 	dr "github.com/status-im/doubleratchet"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
+	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 )
-
-type Installation struct {
-	ID      string
-	Version uint32
-}
 
 // RatchetInfo holds the current ratchet state
 type RatchetInfo struct {
@@ -30,17 +27,17 @@ type PersistenceService interface {
 	// GetSessionStorage returns the associated double ratchet SessionStorage object.
 	GetSessionStorage() dr.SessionStorage
 
-	// GetPublicBundle retrieves an existing Bundle for the specified public key & installationIDs.
-	GetPublicBundle(*ecdsa.PublicKey, []*Installation) (*Bundle, error)
+	// GetPublicBundle retrieves an existing Bundle for the specified public key & installations
+	GetPublicBundle(*ecdsa.PublicKey, []*multidevice.Installation) (*protobuf.Bundle, error)
 	// AddPublicBundle persists a specified Bundle
-	AddPublicBundle(*Bundle) error
+	AddPublicBundle(*protobuf.Bundle) error
 
-	// GetAnyPrivateBundle retrieves any bundle for our identity & installationIDs
-	GetAnyPrivateBundle([]byte, []*Installation) (*BundleContainer, error)
+	// GetAnyPrivateBundle retrieves any bundle for our identity & installations
+	GetAnyPrivateBundle([]byte, []*multidevice.Installation) (*protobuf.BundleContainer, error)
 	// GetPrivateKeyBundle retrieves a BundleContainer with the specified signed prekey.
 	GetPrivateKeyBundle([]byte) ([]byte, error)
 	// AddPrivateBundle persists a BundleContainer.
-	AddPrivateBundle(*BundleContainer) error
+	AddPrivateBundle(*protobuf.BundleContainer) error
 	// MarkBundleExpired marks a private bundle as expired, not to be used for encryption anymore.
 	MarkBundleExpired([]byte) error
 
@@ -53,13 +50,4 @@ type PersistenceService interface {
 	// RatchetInfoConfirmed clears the ephemeral key in the RatchetInfo
 	// associated with the specified bundle ID and interlocutor identity public key.
 	RatchetInfoConfirmed([]byte, []byte, string) error
-
-	// GetActiveInstallations returns the active installations for a given identity.
-	GetActiveInstallations(maxInstallations int, identity []byte) ([]*Installation, error)
-	// AddInstallations adds the installations for a given identity.
-	AddInstallations(identity []byte, timestamp int64, installations []*Installation, enabled bool) error
-	// EnableInstallation enables the installation.
-	EnableInstallation(identity []byte, installationID string) error
-	// DisableInstallation disable the installation.
-	DisableInstallation(identity []byte, installationID string) error
 }

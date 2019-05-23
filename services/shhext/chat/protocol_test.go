@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -38,21 +39,35 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	addedBundlesHandler := func(addedBundles []IdentityAndIDPair) {}
-	onNewTopicHandler := func(topic []*topic.Secret) {}
+	addedBundlesHandler := func(addedBundles []multidevice.IdentityAndIDPair) {}
+	onNewSharedSecretHandler := func(secret []*sharedsecret.Secret) {}
+
+	aliceMultideviceConfig := &multidevice.Config{
+		MaxInstallations: 3,
+		InstallationID:   "1",
+		ProtocolVersion:  ProtocolVersion,
+	}
 
 	s.alice = NewProtocolService(
 		NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")),
-		topic.NewService(alicePersistence.GetTopicStorage()),
+		sharedsecret.NewService(alicePersistence.GetSharedSecretStorage()),
+		multidevice.New(aliceMultideviceConfig, alicePersistence.GetMultideviceStorage()),
 		addedBundlesHandler,
-		onNewTopicHandler,
+		onNewSharedSecretHandler,
 	)
+
+	bobMultideviceConfig := &multidevice.Config{
+		MaxInstallations: 3,
+		InstallationID:   "2",
+		ProtocolVersion:  ProtocolVersion,
+	}
 
 	s.bob = NewProtocolService(
 		NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")),
-		topic.NewService(bobPersistence.GetTopicStorage()),
+		sharedsecret.NewService(bobPersistence.GetSharedSecretStorage()),
+		multidevice.New(bobMultideviceConfig, bobPersistence.GetMultideviceStorage()),
 		addedBundlesHandler,
-		onNewTopicHandler,
+		onNewSharedSecretHandler,
 	)
 
 }
@@ -79,9 +94,12 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	payload := []byte("test")
 
-	msg, _, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
-	s.NotNil(msg, "It creates a message")
+	s.NotNil(msgSpec, "It creates a message spec")
+
+	msg := msgSpec.Message
+	s.NotNil(msg, "It creates a messages")
 
 	s.NotNilf(msg.GetBundle(), "It adds a bundle to the message")
 
@@ -96,23 +114,58 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	bobKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	aliceKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	payload := []byte("test")
+
+	// Message is sent with DH
+	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	s.Require().NoError(err)
+	s.Require().NotNil(msgSpec)
+
+	msg := msgSpec.Message
+	s.Require().NotNil(msg)
+
+	// Bob is able to decrypt the message
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msg, []byte("message-id"))
+	s.NoError(err)
+	s.NotNil(unmarshaledMsg)
+
+	recoveredPayload := []byte("test")
+	s.Equalf(payload, recoveredPayload, "It successfully unmarshal the decrypted message")
+}
+
+func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
+	var secretResponse []*sharedsecret.Secret
+	bobKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
 	payload := []byte("test")
 
-	// Message is sent with DH
-	marshaledMsg, _, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	s.bob.onNewSharedSecretHandler = func(secret []*sharedsecret.Secret) {
+		secretResponse = secret
+	}
+	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	s.NoError(err)
+	s.NotNil(msgSpec, "It creates a message spec")
 
+	bundle := msgSpec.Message.GetBundle()
+	s.Require().NotNil(bundle)
+
+	signedPreKeys := bundle.GetSignedPreKeys()
+	s.Require().NotNil(signedPreKeys)
+
+	signedPreKey := signedPreKeys["1"]
+	s.Require().NotNil(signedPreKey)
+
+	s.Require().Equal(uint32(1), signedPreKey.GetProtocolVersion())
+
+	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msgSpec.Message, []byte("message-id"))
 	s.NoError(err)
 
-	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg, []byte("message-id"))
-	s.NoError(err)
-
-	s.NotNil(unmarshaledMsg)
-
-	recoveredPayload := []byte("test")
-	s.Equalf(payload, recoveredPayload, "It successfully unmarshal the decrypted message")
+	s.Require().NotNil(secretResponse)
 }

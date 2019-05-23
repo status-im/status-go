@@ -1,4 +1,4 @@
-package topic
+package sharedsecret
 
 import (
 	"io/ioutil"
@@ -21,7 +21,7 @@ type ServiceTestSuite struct {
 }
 
 func (s *ServiceTestSuite) SetupTest() {
-	dbFile, err := ioutil.TempFile(os.TempDir(), "topic")
+	dbFile, err := ioutil.TempFile(os.TempDir(), "sharedsecret")
 	s.Require().NoError(err)
 	s.path = dbFile.Name()
 
@@ -103,12 +103,12 @@ func (s *ServiceTestSuite) TestAll() {
 	s.Require().NoError(err)
 	s.Require().NotNil(sharedKey2, "it generates a shared key")
 
-	// All the topics are there
-	topics, err := s.service.All()
+	// All the secrets are there
+	secrets, err := s.service.All()
 	s.Require().NoError(err)
 	expected := []*Secret{
 		sharedKey1,
 		sharedKey2,
 	}
-	s.Require().Equal(expected, topics)
+	s.Require().Equal(expected, secrets)
 }

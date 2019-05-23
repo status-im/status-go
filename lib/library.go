@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -51,40 +52,23 @@ func StopNode() *C.char {
 	return makeJSONResponse(nil)
 }
 
-// Create an X3DH bundle
-//export CreateContactCode
-func CreateContactCode() *C.char {
-	bundle, err := statusBackend.CreateContactCode()
-	if err != nil {
+// LoadFilters load all whisper filters
+//export LoadFilters
+func LoadFilters(chatsStr *C.char) *C.char {
+	var chats []*filter.Chat
+
+	if err := json.Unmarshal([]byte(C.GoString(chatsStr)), &chats); err != nil {
 		return makeJSONResponse(err)
 	}
 
-	cstr := C.CString(bundle)
-
-	return cstr
-}
-
-//export ProcessContactCode
-func ProcessContactCode(bundleString *C.char) *C.char {
-	err := statusBackend.ProcessContactCode(C.GoString(bundleString))
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return nil
-}
-
-// Get an X3DH bundle
-//export GetContactCode
-func GetContactCode(identityString *C.char) *C.char {
-	bundle, err := statusBackend.GetContactCode(C.GoString(identityString))
+	response, err := statusBackend.LoadFilters(chats)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
 	data, err := json.Marshal(struct {
-		ContactCode string `json:"code"`
-	}{ContactCode: bundle})
+		Chats []*filter.Chat `json:"result"`
+	}{Chats: response})
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -92,22 +76,48 @@ func GetContactCode(identityString *C.char) *C.char {
 	return C.CString(string(data))
 }
 
-//export ExtractIdentityFromContactCode
-func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
-	bundle := C.GoString(bundleString)
+// LoadFilter load a whisper filter
+//export LoadFilter
+func LoadFilter(chatStr *C.char) *C.char {
+	var chat *filter.Chat
 
-	identity, err := statusBackend.ExtractIdentityFromContactCode(bundle)
+	if err := json.Unmarshal([]byte(C.GoString(chatStr)), &chat); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	response, err := statusBackend.LoadFilter(chat)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-	if err := statusBackend.ProcessContactCode(bundle); err != nil {
+	data, err := json.Marshal(struct {
+		Chats []*filter.Chat `json:"result"`
+	}{Chats: response})
+
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// RemoveFilter load a whisper filter
+//export RemoveFilter
+func RemoveFilter(chatStr *C.char) *C.char {
+	var chat *filter.Chat
+
+	if err := json.Unmarshal([]byte(C.GoString(chatStr)), &chat); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err := statusBackend.RemoveFilter(chat)
+	if err != nil {
 		return makeJSONResponse(err)
 	}
 
 	data, err := json.Marshal(struct {
-		Identity string `json:"identity"`
-	}{Identity: identity})
+		Response string `json:"response"`
+	}{Response: "ok"})
 	if err != nil {
 		return makeJSONResponse(err)
 	}

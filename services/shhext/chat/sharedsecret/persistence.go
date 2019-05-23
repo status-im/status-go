@@ -1,4 +1,4 @@
-package topic
+package sharedsecret
 
 import (
 	"database/sql"
@@ -30,20 +30,20 @@ func (s *SQLLitePersistence) Add(identity []byte, secret []byte, installationID 
 		return err
 	}
 
-	insertTopicStmt, err := tx.Prepare("INSERT INTO topics(identity, secret) VALUES (?, ?)")
+	insertSecretStmt, err := tx.Prepare("INSERT INTO secrets(identity, secret) VALUES (?, ?)")
 	if err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-	defer insertTopicStmt.Close()
+	defer insertSecretStmt.Close()
 
-	_, err = insertTopicStmt.Exec(identity, secret)
+	_, err = insertSecretStmt.Exec(identity, secret)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
 	}
 
-	insertInstallationIDStmt, err := tx.Prepare("INSERT INTO topic_installation_ids(id, identity_id) VALUES (?, ?)")
+	insertInstallationIDStmt, err := tx.Prepare("INSERT INTO secret_installation_ids(id, identity_id) VALUES (?, ?)")
 	if err != nil {
 		_ = tx.Rollback()
 		return err
@@ -70,9 +70,9 @@ func (s *SQLLitePersistence) Get(identity []byte, installationIDs []string) (*Re
 
 	/* #nosec */
 	query := `SELECT secret, id
-	          FROM topics t
+	          FROM secrets t
 		  JOIN
-		  topic_installation_ids tid
+		  secret_installation_ids tid
 		  ON t.identity = tid.identity_id
 		  WHERE
 		  t.identity = ?
@@ -101,7 +101,7 @@ func (s *SQLLitePersistence) Get(identity []byte, installationIDs []string) (*Re
 
 func (s *SQLLitePersistence) All() ([][][]byte, error) {
 	query := `SELECT identity, secret
-	          FROM topics`
+	          FROM secrets`
 
 	var secrets [][][]byte
 
