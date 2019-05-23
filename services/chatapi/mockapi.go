@@ -103,9 +103,9 @@ func (api *API) JoinPublicChat(name string) error {
 	return nil
 }
 
-func (api *API) JoinPrivateGroupChat(name string, participants []string) error {
+func (api *API) JoinPrivateGroupChat(id string, name string, admin string participants []string) error {
 	api.cs[name] = ChatView{
-		ID:                     name,
+		ID:                     id,
 		Name:                   name,
 		ColorHex:               "#abcabc",
 		IsActive:               true,
