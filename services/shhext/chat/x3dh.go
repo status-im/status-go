@@ -96,7 +96,10 @@ func NewBundleContainer(identity *ecdsa.PrivateKey, installationID string) (*Bun
 
 	encodedPreKey := crypto.FromECDSA(preKey)
 	signedPreKeys := make(map[string]*SignedPreKey)
-	signedPreKeys[installationID] = &SignedPreKey{SignedPreKey: compressedPreKey}
+	signedPreKeys[installationID] = &SignedPreKey{
+		ProtocolVersion: protocolCurrentVersion,
+		SignedPreKey:    compressedPreKey,
+	}
 
 	bundle := Bundle{
 		Timestamp:     time.Now().UnixNano(),

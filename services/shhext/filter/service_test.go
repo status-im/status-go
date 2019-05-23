@@ -101,10 +101,10 @@ func (s *ServiceTestSuite) TestDiscoveryAndPartitionedTopic() {
 
 func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 	chats := []*Chat{
-		&Chat{
+		{
 			ChatID: "status",
 		},
-		&Chat{
+		{
 			ChatID:   s.keys[1].PublicKeyString(),
 			Identity: s.keys[1].PublicKeyString(),
 			OneToOne: true,
