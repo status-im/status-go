@@ -84,7 +84,7 @@ func (s *ServiceTestSuite) TestDiscoveryAndPartitionedTopic() {
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.keys[0].partitionedTopic)
 	contactCodeTopic := s.keys[0].PublicKeyString() + "-contact-code"
 
-	err := s.service.Init(chats)
+	_, err := s.service.Init(chats)
 	s.Require().NoError(err)
 
 	s.Require().Equal(3, len(s.service.chats), "It creates two filters")
@@ -113,7 +113,7 @@ func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.keys[1].partitionedTopic)
 	contactCodeTopic := s.keys[1].PublicKeyString() + "-contact-code"
 
-	err := s.service.Init(chats)
+	_, err := s.service.Init(chats)
 	s.Require().NoError(err)
 
 	s.Require().Equal(6, len(s.service.chats), "It creates two additional filters for the one to one and one for the public chat")
@@ -143,7 +143,7 @@ func (s *ServiceTestSuite) TestNegotiatedTopic() {
 	_, _, err = s.service.topic.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{"0-2"})
 	s.Require().NoError(err)
 
-	err = s.service.Init(chats)
+	_, err = s.service.Init(chats)
 	s.Require().NoError(err)
 
 	s.Require().Equal(5, len(s.service.chats), "It creates two additional filters for the negotiated topics")
