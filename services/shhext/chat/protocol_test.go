@@ -79,9 +79,12 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 	payload := []byte("test")
 
-	msg, _, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
-	s.NotNil(msg, "It creates a message")
+	s.NotNil(msgSpec, "It creates a message spec")
+
+	msg := msgSpec.Message
+	s.NotNil(msg, "It creates a messages")
 
 	s.NotNilf(msg.GetBundle(), "It adds a bundle to the message")
 
@@ -96,21 +99,23 @@ func (s *ProtocolServiceTestSuite) TestBuildDirectMessage() {
 
 func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 	bobKey, err := crypto.GenerateKey()
-	s.NoError(err)
+	s.Require().NoError(err)
 	aliceKey, err := crypto.GenerateKey()
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	payload := []byte("test")
 
 	// Message is sent with DH
-	marshaledMsg, _, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
+	s.Require().NoError(err)
+	s.Require().NotNil(msgSpec)
 
-	s.NoError(err)
+	msg := msgSpec.Message
+	s.Require().NotNil(msg)
 
 	// Bob is able to decrypt the message
-	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, marshaledMsg, []byte("message-id"))
+	unmarshaledMsg, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msg, []byte("message-id"))
 	s.NoError(err)
-
 	s.NotNil(unmarshaledMsg)
 
 	recoveredPayload := []byte("test")

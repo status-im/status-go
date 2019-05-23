@@ -19,12 +19,21 @@ const (
 // The number of partitions
 var nPartitions = big.NewInt(5000)
 
-func toTopic(s string) []byte {
+func ToTopic(s string) []byte {
 	return crypto.Keccak256([]byte(s))[:whisper.TopicLength]
 }
 
-func chatIDToPartitionedTopic(identity string) (string, error) {
+func PublicKeyToPartitionedTopic(publicKey *ecdsa.PublicKey) string {
 	partition := big.NewInt(0)
+	partition.Mod(publicKey.X, nPartitions)
+	return fmt.Sprintf("contact-discovery-%d", partition.Int64())
+}
+
+func PublicKeyToPartitionedTopicBytes(publicKey *ecdsa.PublicKey) []byte {
+	return ToTopic(PublicKeyToPartitionedTopic(publicKey))
+}
+
+func chatIDToPartitionedTopic(identity string) (string, error) {
 	publicKeyBytes, err := hex.DecodeString(identity)
 	if err != nil {
 		return "", err
@@ -35,9 +44,7 @@ func chatIDToPartitionedTopic(identity string) (string, error) {
 		return "", err
 	}
 
-	partition.Mod(publicKey.X, nPartitions)
-
-	return fmt.Sprintf("contact-discovery-%d", partition.Int64()), nil
+	return PublicKeyToPartitionedTopic(publicKey), nil
 }
 
 type Filter struct {
@@ -220,7 +227,7 @@ func (s *Service) LoadOneToOne(myKey *ecdsa.PrivateKey, identity string, listen 
 func (s *Service) AddSymmetric(chatID string) (*Filter, error) {
 	var symKey []byte
 
-	topic := toTopic(chatID)
+	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
 	symKeyID, err := s.whisper.AddSymKeyFromPassword(chatID)
@@ -264,7 +271,7 @@ func (s *Service) AddAsymmetricFilter(keyAsym *ecdsa.PrivateKey, chatID string, 
 		pow = 1
 	}
 
-	topic := toTopic(chatID)
+	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
 	f := &whisper.Filter{

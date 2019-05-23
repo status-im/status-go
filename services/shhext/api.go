@@ -22,6 +22,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
+	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
@@ -521,16 +522,22 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	// This is transport layer-agnostic
 	var protocolMessage *chat.ProtocolMessage
 	// The negotiated secret
+	var msgSpec *chat.ProtocolMessageSpec
+	var partitionedTopicSupported bool
 	var topic []byte
 
 	api.log.Info("BUILDING MESSAGE")
 	if msg.DH {
-		protocolMessage, topic, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
+		protocolMessage, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
 	} else {
-		protocolMessage, topic, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
+		msgSpec, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
+		if err != nil {
+			return nil, err
+		}
+		protocolMessage = msgSpec.Message
+		partitionedTopicSupported = msgSpec.PartitionedTopic()
+		topic = msgSpec.SharedSecret
 	}
-
-	api.log.Info("BUILT MESSAGE", "topic", topic)
 
 	if err != nil {
 		return nil, err
@@ -556,6 +563,10 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 			whisperMessage.Topic = whisper.BytesToTopic(chat.Topic)
 			whisperMessage.PublicKey = nil
 		}
+	} else if partitionedTopicSupported {
+		t := filter.PublicKeyToPartitionedTopicBytes(publicKey)
+		whisperMessage.Topic = whisper.BytesToTopic(t)
+
 	}
 
 	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
