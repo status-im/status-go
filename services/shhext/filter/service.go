@@ -3,6 +3,7 @@ package filter
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -109,11 +110,15 @@ func (s *Service) LoadDiscovery(myKey *ecdsa.PrivateKey) error {
 	return nil
 }
 
-func (s *Service) Init(chats []*Chat) error {
+func (s *Service) Init(chats []*Chat) (map[string]*Chat, error) {
 	log.Debug("Initializing filter service")
+	keyID := s.whisper.SelectedKeyPairID()
+	if keyID == "" {
+		return nil, errors.New("no key selected")
+	}
 	myKey, err := s.whisper.GetPrivateKey(s.keyID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add our own topic
@@ -123,22 +128,22 @@ func (s *Service) Init(chats []*Chat) error {
 	if err != nil {
 		log.Error("Error loading one to one chats", "err", err)
 
-		return err
+		return nil, err
 	}
 
 	// Add discovery topic
 	log.Debug("Loading discovery topics")
 	err = s.LoadDiscovery(myKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Add the various one to one and public chats
 	log.Debug("Loading chats")
 	for _, chat := range chats {
-		err = s.Load(myKey, chat)
+		err = s.load(myKey, chat)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -146,16 +151,16 @@ func (s *Service) Init(chats []*Chat) error {
 	log.Debug("Loading negotiated topics")
 	secrets, err := s.topic.All()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, secret := range secrets {
-		if err := s.ProcessNegotiatedSecret(secret); err != nil {
-			return err
+		if _, err := s.ProcessNegotiatedSecret(secret); err != nil {
+			return nil, err
 		}
 	}
 
-	return nil
+	return s.chats, nil
 }
 
 func (s *Service) Stop() error {
@@ -306,8 +311,15 @@ func (s *Service) LoadPublic(chat *Chat) error {
 	s.chats[chat.ChatID] = chat
 	return nil
 }
+func (s *Service) Load(chat *Chat) (*Chat, error) {
+	myKey, err := s.whisper.GetPrivateKey(s.keyID)
+	if err != nil {
+		return nil, err
+	}
+	return chat, s.load(myKey, chat)
+}
 
-func (s *Service) Load(myKey *ecdsa.PrivateKey, chat *Chat) error {
+func (s *Service) load(myKey *ecdsa.PrivateKey, chat *Chat) error {
 	var err error
 	log.Debug("Loading chat", "chatID", chat.ChatID)
 
@@ -335,14 +347,14 @@ func (s *Service) Get(identity *ecdsa.PublicKey) *Chat {
 	return s.chats[negotiatedID(identity)]
 }
 
-func (s *Service) ProcessNegotiatedSecret(secret *topic.Secret) error {
+func (s *Service) ProcessNegotiatedSecret(secret *topic.Secret) (*Chat, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	keyString := fmt.Sprintf("%x", secret.Key)
 	filter, err := s.AddSymmetric(keyString)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	identityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(secret.Identity))
@@ -355,5 +367,5 @@ func (s *Service) ProcessNegotiatedSecret(secret *topic.Secret) error {
 	}
 
 	s.chats[chat.ChatID] = chat
-	return nil
+	return chat, nil
 }
