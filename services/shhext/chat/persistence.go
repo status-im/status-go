@@ -6,6 +6,11 @@ import (
 	dr "github.com/status-im/doubleratchet"
 )
 
+type Installation struct {
+	ID      string
+	Version uint32
+}
+
 // RatchetInfo holds the current ratchet state
 type RatchetInfo struct {
 	ID             []byte
@@ -26,12 +31,12 @@ type PersistenceService interface {
 	GetSessionStorage() dr.SessionStorage
 
 	// GetPublicBundle retrieves an existing Bundle for the specified public key & installationIDs.
-	GetPublicBundle(*ecdsa.PublicKey, []string) (*Bundle, error)
+	GetPublicBundle(*ecdsa.PublicKey, []*Installation) (*Bundle, error)
 	// AddPublicBundle persists a specified Bundle
 	AddPublicBundle(*Bundle) error
 
 	// GetAnyPrivateBundle retrieves any bundle for our identity & installationIDs
-	GetAnyPrivateBundle([]byte, []string) (*BundleContainer, error)
+	GetAnyPrivateBundle([]byte, []*Installation) (*BundleContainer, error)
 	// GetPrivateKeyBundle retrieves a BundleContainer with the specified signed prekey.
 	GetPrivateKeyBundle([]byte) ([]byte, error)
 	// AddPrivateBundle persists a BundleContainer.
@@ -50,9 +55,9 @@ type PersistenceService interface {
 	RatchetInfoConfirmed([]byte, []byte, string) error
 
 	// GetActiveInstallations returns the active installations for a given identity.
-	GetActiveInstallations(maxInstallations int, identity []byte) ([]string, error)
+	GetActiveInstallations(maxInstallations int, identity []byte) ([]*Installation, error)
 	// AddInstallations adds the installations for a given identity.
-	AddInstallations(identity []byte, timestamp int64, installationIDs []string, enabled bool) error
+	AddInstallations(identity []byte, timestamp int64, installations []*Installation, enabled bool) error
 	// EnableInstallation enables the installation.
 	EnableInstallation(identity []byte, installationID string) error
 	// DisableInstallation disable the installation.

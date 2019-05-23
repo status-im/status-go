@@ -135,14 +135,17 @@ func (s *EncryptionService) ConfirmMessagesProcessed(messageIDs [][]byte) error 
 func (s *EncryptionService) CreateBundle(privateKey *ecdsa.PrivateKey) (*Bundle, error) {
 	ourIdentityKeyC := ecrypto.CompressPubkey(&privateKey.PublicKey)
 
-	installationIDs, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations-1, ourIdentityKeyC)
+	installations, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations-1, ourIdentityKeyC)
 	if err != nil {
 		return nil, err
 	}
 
-	installationIDs = append(installationIDs, s.config.InstallationID)
+	installations = append(installations, &Installation{
+		ID:      s.config.InstallationID,
+		Version: protocolCurrentVersion,
+	})
 
-	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installationIDs)
+	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installations)
 	if err != nil {
 		return nil, err
 	}
@@ -240,21 +243,24 @@ func (s *EncryptionService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey,
 	}
 	signedPreKeys := b.GetSignedPreKeys()
 	var response []IdentityAndIDPair
-	var installationIDs []string
+	var installations []*Installation
 	myIdentityStr := fmt.Sprintf("0x%x", ecrypto.FromECDSAPub(&myIdentityKey.PublicKey))
 
 	// Any device from other peers will be considered enabled, ours needs to
 	// be explicitly enabled
 	fromOurIdentity := identity != myIdentityStr
 
-	for installationID := range signedPreKeys {
+	for installationID, signedPreKey := range signedPreKeys {
 		if installationID != s.config.InstallationID {
-			installationIDs = append(installationIDs, installationID)
+			installations = append(installations, &Installation{
+				ID:      installationID,
+				Version: signedPreKey.GetProtocolVersion(),
+			})
 			response = append(response, IdentityAndIDPair{identity, installationID})
 		}
 	}
 
-	if err = s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installationIDs, fromOurIdentity); err != nil {
+	if err = s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installations, fromOurIdentity); err != nil {
 		return nil, err
 	}
 
@@ -323,7 +329,7 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 		}
 
 		// Add installations with a timestamp of 0, as we don't have bundle informations
-		if err = s.persistence.AddInstallations(theirIdentityKeyC, 0, []string{theirInstallationID}, true); err != nil {
+		if err = s.persistence.AddInstallations(theirIdentityKeyC, 0, []*Installation{{ID: theirInstallationID, Version: 0}}, true); err != nil {
 			return nil, err
 		}
 
@@ -502,12 +508,12 @@ func (s *EncryptionService) EncryptPayloadWithDH(theirIdentityKey *ecdsa.PublicK
 func (s *EncryptionService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, error) {
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
-	installationIDs, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
+	installations, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.persistence.GetPublicBundle(theirIdentityKey, installationIDs)
+	return s.persistence.GetPublicBundle(theirIdentityKey, installations)
 }
 
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
@@ -522,24 +528,25 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
 	// Get their installationIds
-	installationIds, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
+	installations, err := s.persistence.GetActiveInstallations(s.config.MaxInstallations, theirIdentityKeyC)
 	if err != nil {
 		return nil, err
 	}
 
 	// We don't have any, send a message with DH
-	if installationIds == nil && !bytes.Equal(theirIdentityKeyC, ecrypto.CompressPubkey(&myIdentityKey.PublicKey)) {
+	if installations == nil && !bytes.Equal(theirIdentityKeyC, ecrypto.CompressPubkey(&myIdentityKey.PublicKey)) {
 		return s.EncryptPayloadWithDH(theirIdentityKey, payload)
 	}
 
 	response := make(map[string]*DirectMessageProtocol)
 
-	for _, installationID := range installationIds {
+	for _, installation := range installations {
+		installationID := installation.ID
 		s.log.Debug("Processing installation", "installationID", installationID)
 		if s.config.InstallationID == installationID {
 			continue
 		}
-		bundle, err := s.persistence.GetPublicBundle(theirIdentityKey, []string{installationID})
+		bundle, err := s.persistence.GetPublicBundle(theirIdentityKey, []*Installation{installation})
 		if err != nil {
 			return nil, err
 		}

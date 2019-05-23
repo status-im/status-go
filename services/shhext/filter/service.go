@@ -37,10 +37,10 @@ func chatIDToPartitionedTopic(identity string) (string, error) {
 
 	partition.Mod(publicKey.X, nPartitions)
 
-	return fmt.Sprintf("contact-discovery-%d", partition), nil
+	return fmt.Sprintf("contact-discovery-%d", partition.Int64()), nil
 }
 
-type FilterAndTopic struct {
+type Filter struct {
 	FilterID string
 	Topic    []byte
 	SymKeyID string
@@ -143,7 +143,9 @@ func (s *Service) Init(chats []*Chat) error {
 	}
 
 	for _, secret := range secrets {
-		s.ProcessNegotiatedSecret(secret)
+		if err := s.ProcessNegotiatedSecret(secret); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -215,7 +217,7 @@ func (s *Service) LoadOneToOne(myKey *ecdsa.PrivateKey, identity string, listen 
 	return nil
 }
 
-func (s *Service) AddSymmetric(chatID string) (*FilterAndTopic, error) {
+func (s *Service) AddSymmetric(chatID string) (*Filter, error) {
 	var symKey []byte
 
 	topic := toTopic(chatID)
@@ -244,14 +246,14 @@ func (s *Service) AddSymmetric(chatID string) (*FilterAndTopic, error) {
 		return nil, err
 	}
 
-	return &FilterAndTopic{
+	return &Filter{
 		FilterID: id,
 		SymKeyID: symKeyID,
 		Topic:    topic,
 	}, nil
 }
 
-func (s *Service) AddAsymmetricFilter(keyAsym *ecdsa.PrivateKey, chatID string, listen bool) (*FilterAndTopic, error) {
+func (s *Service) AddAsymmetricFilter(keyAsym *ecdsa.PrivateKey, chatID string, listen bool) (*Filter, error) {
 	var err error
 	var pow float64
 
@@ -278,7 +280,7 @@ func (s *Service) AddAsymmetricFilter(keyAsym *ecdsa.PrivateKey, chatID string, 
 		return nil, err
 	}
 
-	return &FilterAndTopic{FilterID: id, Topic: topic}, nil
+	return &Filter{FilterID: id, Topic: topic}, nil
 }
 
 func (s *Service) LoadPublic(chat *Chat) error {
