@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/signal"
 )
 
 type ChatsResponse struct {
@@ -97,7 +98,7 @@ func (api *API) JoinPublicChat(name string) error {
 		IsGroupChat:            true,
 		IsPublic:               true,
 	}
-	api.sendChatsUpdatedSignal()
+	api.sendChatsUpdatedSignal(name)
 
 	return nil
 }
@@ -114,7 +115,7 @@ func (api *API) JoinPrivateGroupChat(name string, participants []string) error {
 		IsGroupChat:            true,
 		IsPublic:               false,
 	}
-	api.sendChatsUpdatedSignal()
+	api.sendChatsUpdatedSignal(name)
 
 	return nil
 }
@@ -131,13 +132,13 @@ func (api *API) StartOneOnOneChat(recipient string) error {
 		IsGroupChat:            false,
 		IsPublic:               false,
 	}
-	api.sendChatsUpdatedSignal()
+	api.sendChatsUpdatedSignal(recipient)
 
 	return nil
 }
 
-func (api *API) sendChatsUpdatedSignal() {
-	// TODO: implement me!
+func (api *API) sendChatsUpdatedSignal(name string) {
+	signal.SendChatsDidChangeEvent(name)
 }
 
 // TODO: a signal
