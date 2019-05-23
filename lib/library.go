@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
+	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -108,6 +109,79 @@ func ExtractIdentityFromContactCode(bundleString *C.char) *C.char {
 	data, err := json.Marshal(struct {
 		Identity string `json:"identity"`
 	}{Identity: identity})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// LoadFilters load all whisper filters
+//export LoadFilters
+func LoadFilters(chatsStr *C.char) *C.char {
+	var chats []*filter.Chat
+
+	if err := json.Unmarshal([]byte(C.GoString(chatsStr)), &chats); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	response, err := statusBackend.LoadFilters(chats)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Chats []*filter.Chat `json:"result"`
+	}{Chats: response})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// LoadFilter load a whisper filter
+//export LoadFilter
+func LoadFilter(chatStr *C.char) *C.char {
+	var chat *filter.Chat
+
+	if err := json.Unmarshal([]byte(C.GoString(chatStr)), &chat); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	response, err := statusBackend.LoadFilter(chat)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Chats []*filter.Chat `json:"result"`
+	}{Chats: response})
+
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}
+
+// RemoveFilter load a whisper filter
+//export RemoveFilter
+func RemoveFilter(chatStr *C.char) *C.char {
+	var chat *filter.Chat
+
+	if err := json.Unmarshal([]byte(C.GoString(chatStr)), &chat); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err := statusBackend.RemoveFilter(chat)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
 	if err != nil {
 		return makeJSONResponse(err)
 	}

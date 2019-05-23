@@ -472,32 +472,14 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
-	if err != nil {
-		return nil, err
-	}
-
-	// This is transport layer agnostic
-	protocolMessage, err := api.service.protocol.BuildPublicMessage(privateKey, msg.Payload)
-	if err != nil {
-		return nil, err
-	}
-
-	symKeyID, err := api.service.w.AddSymKeyFromPassword(msg.Chat)
-	if err != nil {
-		return nil, err
-	}
-
-	// marshal for sending to wire
-	marshaledMessage, err := proto.Marshal(protocolMessage)
-	if err != nil {
-		api.log.Error("encryption-service", "error marshaling message", err)
-		return nil, err
+	filter := api.service.filter.GetByID(msg.Chat)
+	if filter == nil {
+		return nil, errors.New("not subscribed to chat")
 	}
 
 	// Enrich with transport layer info
-	whisperMessage := chat.PublicMessageToWhisper(msg, marshaledMessage)
-	whisperMessage.SymKeyID = symKeyID
+	whisperMessage := chat.PublicMessageToWhisper(msg, msg.Payload)
+	whisperMessage.SymKeyID = filter.SymKeyID
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)
@@ -560,10 +542,14 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 
 		if chat != nil {
 			whisperMessage.SymKeyID = chat.SymKeyID
-			whisperMessage.Topic = whisper.BytesToTopic(chat.Topic)
+			whisperMessage.Topic = chat.Topic
 			whisperMessage.PublicKey = nil
 		}
 	} else if partitionedTopicSupported {
+		// Create filter on demand
+		if _, err := api.service.filter.LoadPartitioned(privateKey, publicKey, false); err != nil {
+			return nil, err
+		}
 		t := filter.PublicKeyToPartitionedTopicBytes(publicKey)
 		whisperMessage.Topic = whisper.BytesToTopic(t)
 
