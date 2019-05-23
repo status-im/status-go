@@ -5,6 +5,7 @@ package chat;
 message SignedPreKey {
   bytes signed_pre_key = 1;
   uint32 version = 2;
+  uint32 protocol_version = 3;
 }
 
 // X3DH prekey bundle
@@ -77,7 +78,4 @@ message ProtocolMessage {
 
   // Public chats, not encrypted
   bytes public_message = 102;
-
-  // Version of the protocol
-  uint32 version = 103;
 }
