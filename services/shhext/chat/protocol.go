@@ -58,7 +58,6 @@ func (p *ProtocolService) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, pa
 	protocolMessage := &ProtocolMessage{
 		InstallationId: p.encryption.config.InstallationID,
 		PublicMessage:  payload,
-		Version:        protocolCurrentVersion,
 	}
 
 	return p.addBundle(myIdentityKey, protocolMessage, false)
@@ -77,7 +76,6 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 	protocolMessage := &ProtocolMessage{
 		InstallationId: p.encryption.config.InstallationID,
 		DirectMessage:  encryptionResponse,
-		Version:        protocolCurrentVersion,
 	}
 
 	msg, err := p.addBundle(myIdentityKey, protocolMessage, true)
@@ -109,9 +107,8 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 
 	if agreed {
 		return msg, sharedSecret.Key, nil
-	} else {
-		return msg, nil, nil
 	}
+	return msg, nil, nil
 }
 
 // BuildDHMessage builds a message with DH encryption so that it can be decrypted by any other device.
@@ -127,7 +124,6 @@ func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destin
 	protocolMessage := &ProtocolMessage{
 		InstallationId: p.encryption.config.InstallationID,
 		DirectMessage:  encryptionResponse,
-		Version:        protocolCurrentVersion,
 	}
 
 	msg, err := p.addBundle(myIdentityKey, protocolMessage, true)
@@ -211,7 +207,8 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 		p.log.Info("Checking version")
 		// Handle protocol negotiation for compatible clients
-		if protocolMessage.Version >= topicNegotiationVersion {
+		version := getProtocolVersion(protocolMessage.GetBundles(), protocolMessage.GetInstallationId())
+		if version >= topicNegotiationVersion {
 			p.log.Info("Version greater than 1 negotianting")
 			sharedSecret, err := p.topic.Receive(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
 			if err != nil {
@@ -226,4 +223,26 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 	// Return error
 	return nil, errors.New("no payload")
+}
+
+func getProtocolVersion(bundles []*Bundle, installationID string) uint32 {
+	if installationID == "" {
+		return 0
+	}
+
+	for _, bundle := range bundles {
+		signedPreKeys := bundle.GetSignedPreKeys()
+		if signedPreKeys == nil {
+			continue
+		}
+
+		signedPreKey := signedPreKeys[installationID]
+		if signedPreKey == nil {
+			return 0
+		}
+
+		return signedPreKey.GetProtocolVersion()
+	}
+
+	return 0
 }
