@@ -39,7 +39,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	}
 
 	addedBundlesHandler := func(addedBundles []IdentityAndIDPair) {}
-	onNewTopicHandler := func(topic [][]byte) {}
+	onNewTopicHandler := func(topic []*topic.Secret) {}
 
 	s.alice = NewProtocolService(
 		NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")),

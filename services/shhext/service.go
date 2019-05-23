@@ -308,7 +308,12 @@ func (s *Service) Stop() error {
 	s.requestsRegistry.Clear()
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
-	s.filter.Stop()
+	if s.filter != nil {
+		if err := s.filter.Stop(); err != nil {
+			log.Error("Failed to stop filter service with error", "err", err)
+		}
+	}
+
 	return nil
 }
 
