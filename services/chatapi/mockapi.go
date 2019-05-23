@@ -1,6 +1,8 @@
 package chatapi
 
 import (
+	"fmt"
+
 	"github.com/status-im/status-go/node"
 )
 
@@ -22,16 +24,12 @@ type ChatView struct {
 }
 
 type API struct {
+	cs map[string]ChatView
 }
 
 func NewMockAPI(node *node.StatusNode) *API {
-	return &API{}
-}
-
-func (api *API) Chats() (ChatsResponse, error) {
-	return ChatsResponse{
-		UnreadMessagesCount: 30,
-		Chats: map[string]ChatView{
+	return &API{
+		cs: map[string]ChatView{
 			"status": {
 				ID:                     "status",
 				Name:                   "status",
@@ -77,8 +75,72 @@ func (api *API) Chats() (ChatsResponse, error) {
 				IsPublic:               false,
 			},
 		},
+	}
+}
+
+func (api *API) Chats() (ChatsResponse, error) {
+	return ChatsResponse{
+		UnreadMessagesCount: 30,
+		Chats:               api.cs,
 	}, nil
 }
+
+func (api *API) JoinPublicChat(name string) error {
+	api.cs[name] = ChatView{
+		ID:                     name,
+		Name:                   name,
+		ColorHex:               "#abcabc",
+		IsActive:               true,
+		LastMessageContentType: "text/plain",
+		LastMessageContent:     map[string]string{"text": fmt.Sprintf("you created %s!", name)},
+		UnreadMessagesCount:    1,
+		IsGroupChat:            true,
+		IsPublic:               true,
+	}
+	api.sendChatsUpdatedSignal()
+
+	return nil
+}
+
+func (api *API) JoinPrivateGroupChat(name string, participants []string) error {
+	api.cs[name] = ChatView{
+		ID:                     name,
+		Name:                   name,
+		ColorHex:               "#abcabc",
+		IsActive:               true,
+		LastMessageContentType: "text/plain",
+		LastMessageContent:     map[string]string{"text": fmt.Sprintf("%s -> %d participants!", name, len(participants))},
+		UnreadMessagesCount:    1,
+		IsGroupChat:            true,
+		IsPublic:               false,
+	}
+	api.sendChatsUpdatedSignal()
+
+	return nil
+}
+
+func (api *API) StartOneOnOneChat(recipient string) error {
+	api.cs[recipient] = ChatView{
+		ID:                     recipient,
+		Name:                   recipient,
+		ColorHex:               "#abcabc",
+		IsActive:               true,
+		LastMessageContentType: "text/plain",
+		LastMessageContent:     map[string]string{"text": fmt.Sprintf("you created %s!", recipient)},
+		UnreadMessagesCount:    1,
+		IsGroupChat:            false,
+		IsPublic:               false,
+	}
+	api.sendChatsUpdatedSignal()
+
+	return nil
+}
+
+func (api *API) sendChatsUpdatedSignal() {
+	// TODO: implement me!
+}
+
+// TODO: a signal
 
 /*
 
