@@ -84,19 +84,22 @@ func (s *ServiceTestSuite) TestDiscoveryAndPartitionedTopic() {
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.keys[0].partitionedTopic)
 	contactCodeTopic := s.keys[0].PublicKeyString() + "-contact-code"
 
-	err := s.service.Init(chats)
+	_, err := s.service.Init(chats)
 	s.Require().NoError(err)
 
 	s.Require().Equal(3, len(s.service.chats), "It creates two filters")
 
 	discoveryFilter := s.service.chats[discoveryTopic]
 	s.Require().NotNil(discoveryFilter, "It adds the discovery filter")
+	s.Require().True(discoveryFilter.Listen)
 
 	contactCodeFilter := s.service.chats[contactCodeTopic]
 	s.Require().NotNil(contactCodeFilter, "It adds the contact code filter")
+	s.Require().True(contactCodeFilter.Listen)
 
 	partitionedFilter := s.service.chats[partitionedTopic]
 	s.Require().NotNil(partitionedFilter, "It adds the partitioned filter")
+	s.Require().True(partitionedFilter.Listen)
 }
 
 func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
@@ -110,23 +113,21 @@ func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 			OneToOne: true,
 		},
 	}
-	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.keys[1].partitionedTopic)
 	contactCodeTopic := s.keys[1].PublicKeyString() + "-contact-code"
 
-	err := s.service.Init(chats)
+	_, err := s.service.Init(chats)
 	s.Require().NoError(err)
 
-	s.Require().Equal(6, len(s.service.chats), "It creates two additional filters for the one to one and one for the public chat")
+	s.Require().Equal(5, len(s.service.chats), "It creates two additional filters for the one to one and one for the public chat")
 
 	statusFilter := s.service.chats["status"]
 	s.Require().NotNil(statusFilter, "It creates a filter for the public chat")
 	s.Require().NotNil(statusFilter.SymKeyID, "It returns a sym key id")
+	s.Require().True(statusFilter.Listen)
 
 	contactCodeFilter := s.service.chats[contactCodeTopic]
 	s.Require().NotNil(contactCodeFilter, "It adds the contact code filter")
-
-	partitionedFilter := s.service.chats[partitionedTopic]
-	s.Require().NotNil(partitionedFilter, "It adds the partitioned filter")
+	s.Require().True(contactCodeFilter.Listen)
 }
 
 func (s *ServiceTestSuite) TestNegotiatedTopic() {
@@ -143,7 +144,7 @@ func (s *ServiceTestSuite) TestNegotiatedTopic() {
 	_, _, err = s.service.topic.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{"0-2"})
 	s.Require().NoError(err)
 
-	err = s.service.Init(chats)
+	_, err = s.service.Init(chats)
 	s.Require().NoError(err)
 
 	s.Require().Equal(5, len(s.service.chats), "It creates two additional filters for the negotiated topics")

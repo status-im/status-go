@@ -321,26 +321,40 @@ func (s *Service) GetNegotiatedChat(identity *ecdsa.PublicKey) *filter.Chat {
 	return s.filter.Get(identity)
 }
 
-func (s *Service) LoadFilters(chats []*filter.Chat) error {
+func (s *Service) LoadFilters(chats []*filter.Chat) ([]*filter.Chat, error) {
 	return s.filter.Init(chats)
 }
 
-func (s *Service) RemoveFilter(chat *filter.Chat) {
-	// remove filter
+func (s *Service) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
+	return s.filter.Load(chat)
+}
+
+func (s *Service) RemoveFilter(chat *filter.Chat) error {
+	return s.filter.Remove(chat)
 }
 
 func (s *Service) onNewTopicHandler(sharedSecrets []*topic.Secret) {
 	var filters []*signal.Filter
 	log.Info("NEW TOPIC HANDLER", "secrets", sharedSecrets)
 	for _, sharedSecret := range sharedSecrets {
-		err := s.filter.ProcessNegotiatedSecret(sharedSecret)
+		chat, err := s.filter.ProcessNegotiatedSecret(sharedSecret)
 		if err != nil {
 			log.Error("Failed to process negotiated secret", "err", err)
 			return
 		}
 
+		filter := &signal.Filter{
+			ChatID:   chat.ChatID,
+			SymKeyID: chat.SymKeyID,
+			Listen:   chat.Listen,
+			FilterID: chat.FilterID,
+			Identity: chat.Identity,
+			Topic:    chat.Topic,
+		}
+
+		filters = append(filters, filter)
+
 	}
-	// TODO: send back chat filter
 	log.Info("FILTER IDS", "filter", filters)
 	if len(filters) != 0 {
 		log.Info("SENDING FILTERS")

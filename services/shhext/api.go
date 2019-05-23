@@ -560,10 +560,14 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 
 		if chat != nil {
 			whisperMessage.SymKeyID = chat.SymKeyID
-			whisperMessage.Topic = whisper.BytesToTopic(chat.Topic)
+			whisperMessage.Topic = chat.Topic
 			whisperMessage.PublicKey = nil
 		}
 	} else if partitionedTopicSupported {
+		// Create filter on demand
+		if _, err := api.service.filter.LoadPartitioned(privateKey, publicKey, false); err != nil {
+			return nil, err
+		}
 		t := filter.PublicKeyToPartitionedTopicBytes(publicKey)
 		whisperMessage.Topic = whisper.BytesToTopic(t)
 
