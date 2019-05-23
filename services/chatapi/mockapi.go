@@ -103,7 +103,7 @@ func (api *API) JoinPublicChat(name string) error {
 	return nil
 }
 
-func (api *API) JoinPrivateGroupChat(id string, name string, admin string participants []string) error {
+func (api *API) JoinPrivateGroupChat(id string, name string, admin string, participants []string) error {
 	api.cs[name] = ChatView{
 		ID:                     id,
 		Name:                   name,
