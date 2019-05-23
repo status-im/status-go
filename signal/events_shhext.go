@@ -63,11 +63,18 @@ type BundleAddedSignal struct {
 }
 
 type Filter struct {
-	Identity string            `json:"identity"`
-	FilterID string            `json:"filterId"`
-	SymKeyID string            `json:"symKeyId"`
-	ChatID   string            `json:"chatId"`
-	Topic    whisper.TopicType `json:"topic"`
+	// ChatID is the identifier of the chat
+	ChatID string `json:"chatId"`
+	// SymKeyID is the symmetric key id used for symmetric chats
+	SymKeyID string `json:"symKeyId"`
+	// OneToOne tells us if we need to use asymmetric encryption for this chat
+	Listen bool `json:"listen"`
+	// FilterID the whisper filter id generated
+	FilterID string `json:"filterId"`
+	// Identity is the public key of the other recipient for non-public chats
+	Identity string `json:"identity"`
+	// Topic is the whisper topic
+	Topic whisper.TopicType `json:"topic"`
 }
 
 type WhisperFilterAddedSignal struct {
