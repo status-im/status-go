@@ -2,6 +2,7 @@ package typeddata
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -268,6 +269,42 @@ func TestEncodeDataErrors(t *testing.T) {
 			encoded, err := hashStruct(tc.target, tc.message, tc.types)
 			require.Error(t, err)
 			require.Equal(t, common.Hash{}, encoded)
+		})
+	}
+}
+
+func TestEncodeInt(t *testing.T) {
+	example := new(big.Int).Exp(big.NewInt(2), big.NewInt(255), nil)
+	for _, tc := range []struct {
+		description string
+		data        []byte
+		expected    *big.Int
+		err         error
+	}{
+		{
+			description: "AsString",
+			data:        []byte(example.String()),
+			expected:    example,
+		},
+		{
+			description: "WrappedIntoString",
+			data:        []byte(fmt.Sprintf("\"%s\"", example.String())),
+			expected:    example,
+		},
+		{
+			description: "NotAnInteger",
+			data:        []byte("\"xzy\""),
+			err:         errNotInteger,
+		},
+	} {
+		t.Run(tc.description, func(t *testing.T) {
+			rst, _, err := toInt(Field{}, tc.data)
+			if tc.err == nil {
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, rst)
+			} else {
+				require.EqualError(t, err, tc.err.Error())
+			}
 		})
 	}
 }
