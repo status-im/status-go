@@ -92,7 +92,31 @@ func (s *ETHTransferSuite) TestBalanceUpdatedOnInbound() {
 }
 
 func (s *ETHTransferSuite) TestBalanceUpdatedOnOutbound() {
-	s.Require().FailNow("not implemented")
+	ctx := context.TODO()
+	tx := types.NewTransaction(0, crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
+	tx, err := types.SignTx(tx, s.signer, s.faucet)
+	s.Require().NoError(err)
+	s.Require().NoError(s.ethclient.SendTransaction(ctx, tx))
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, err = bind.WaitMined(timeout, s.ethclient, tx)
+	cancel()
+	s.Require().NoError(err)
+
+	tx = types.NewTransaction(0, common.Address{1}, big.NewInt(5e17), 1e6, big.NewInt(10), nil)
+	tx, err = types.SignTx(tx, s.signer, s.identity)
+	s.Require().NoError(err)
+	s.Require().NoError(s.ethclient.SendTransaction(ctx, tx))
+	timeout, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	_, err = bind.WaitMined(timeout, s.ethclient, tx)
+	cancel()
+	s.Require().NoError(err)
+
+	header, err := s.ethclient.HeaderByNumber(ctx, nil)
+	s.Require().NoError(err)
+	s.Require().Equal(big.NewInt(2), header.Number)
+	transfers, err := s.downloader.GetTransfers(ctx, header)
+	s.Require().NoError(err)
+	s.Require().Len(transfers, 1)
 }
 
 func TestERC20Transfers(t *testing.T) {
@@ -105,6 +129,7 @@ type ERC20TransferSuite struct {
 	ethclient *ethclient.Client
 	identity  *ecdsa.PrivateKey
 	faucet    *ecdsa.PrivateKey
+	signer    types.Signer
 
 	downloader *ERC20TransfersDownloader
 
@@ -133,6 +158,7 @@ func (s *ERC20TransferSuite) SetupTest() {
 	_, err = bind.WaitMined(timeout, s.ethclient, tx)
 	s.Require().NoError(err)
 	s.contract = contract
+	s.signer = types.NewEIP155Signer(big.NewInt(1337))
 }
 
 func (s *ERC20TransferSuite) TestNoEvents() {
@@ -150,7 +176,7 @@ func (s *ERC20TransferSuite) TestInboundEvent() {
 	s.Require().NoError(err)
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	receipt, err := bind.WaitMined(timeout, s.ethclient, tx)
+	_, err = bind.WaitMined(timeout, s.ethclient, tx)
 	s.Require().NoError(err)
 
 	header, err := s.ethclient.HeaderByNumber(context.TODO(), nil)
@@ -162,5 +188,30 @@ func (s *ERC20TransferSuite) TestInboundEvent() {
 }
 
 func (s *ERC20TransferSuite) TestOutboundEvent() {
-	s.Require().FailNow("not implemented")
+	// give some eth to pay for gas
+	ctx := context.TODO()
+	// nonce is 1 - contact with nonce 0 was deployed in setup
+	// FIXME request nonce
+	tx := types.NewTransaction(1, crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
+	tx, err := types.SignTx(tx, s.signer, s.faucet)
+	s.Require().NoError(err)
+	s.Require().NoError(s.ethclient.SendTransaction(ctx, tx))
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, err = bind.WaitMined(timeout, s.ethclient, tx)
+	cancel()
+	s.Require().NoError(err)
+
+	tx, err = s.contract.Transfer(bind.NewKeyedTransactor(s.identity), common.Address{1}, big.NewInt(100))
+	s.Require().NoError(err)
+	timeout, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	_, err = bind.WaitMined(timeout, s.ethclient, tx)
+	cancel()
+	s.Require().NoError(err)
+
+	header, err := s.ethclient.HeaderByNumber(context.TODO(), nil)
+	s.Require().NoError(err)
+
+	transfers, err := s.downloader.GetTransfers(context.TODO(), header)
+	s.Require().NoError(err)
+	s.Require().Len(transfers, 1)
 }

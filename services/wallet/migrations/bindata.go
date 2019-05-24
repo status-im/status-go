@@ -43,6 +43,15 @@ func _0001_transfers_up_db_sql() ([]byte, error) {
 	)
 }
 
+var _doc_go = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
+
+func doc_go() ([]byte, error) {
+	return bindata_read(
+		_doc_go,
+		"doc.go",
+	)
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -67,6 +76,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() ([]byte, error){
 	"0001_transfers.down.db.sql": _0001_transfers_down_db_sql,
 	"0001_transfers.up.db.sql": _0001_transfers_up_db_sql,
+	"doc.go": doc_go,
 }
 // AssetDir returns the file names below a certain
 // directory embedded in the file by go-bindata.
@@ -111,5 +121,7 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"0001_transfers.down.db.sql": &_bintree_t{_0001_transfers_down_db_sql, map[string]*_bintree_t{
 	}},
 	"0001_transfers.up.db.sql": &_bintree_t{_0001_transfers_up_db_sql, map[string]*_bintree_t{
+	}},
+	"doc.go": &_bintree_t{doc_go, map[string]*_bintree_t{
 	}},
 }}

@@ -99,7 +99,7 @@ type ERC20TransfersDownloader struct {
 
 	// hash of the Transfer event signature
 	signature common.Hash
-	// hash of the address
+	// padded address
 	target common.Hash
 }
 
