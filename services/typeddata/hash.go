@@ -17,6 +17,8 @@ import (
 var (
 	bytes32Type, _ = abi.NewType("bytes32", nil)
 	int256Type, _  = abi.NewType("int256", nil)
+
+	errNotInteger = errors.New("not an integer")
 )
 
 // ValidateAndHash generates a hash of TypedData and verifies that chainId in the typed data matches currently selected chain.
@@ -171,11 +173,21 @@ func toFixedBytes(f Field, data json.RawMessage) (rst [32]byte, typ abi.Type, er
 }
 
 func toInt(f Field, data json.RawMessage) (val *big.Int, typ abi.Type, err error) {
-	var rst big.Int
-	if err = json.Unmarshal(data, &rst); err != nil {
-		return
+	val = new(big.Int)
+	if err = json.Unmarshal(data, &val); err != nil {
+		var buf string
+		err = json.Unmarshal(data, &buf)
+		if err != nil {
+			return
+		}
+		var ok bool
+		val, ok = val.SetString(buf, 0)
+		if !ok {
+			err = errNotInteger
+			return
+		}
 	}
-	return &rst, int256Type, nil
+	return val, int256Type, nil
 }
 
 func toAddress(f Field, data json.RawMessage) (rst common.Address, err error) {
