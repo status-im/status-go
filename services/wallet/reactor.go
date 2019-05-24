@@ -3,12 +3,15 @@ package wallet
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -17,10 +20,26 @@ type HeaderReader interface {
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 }
 
+func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address) *Reactor {
+	reactor := &Reactor{
+		db:     db,
+		client: client,
+		feed:   feed,
+	}
+	reactor.erc20 = NewERC20TransfersDownloader(client, address)
+	// TODO(dshulyak) pass chain id or signer
+	reactor.eth = &ETHTransferDownloader{
+		client:  client,
+		address: address,
+	}
+	return reactor
+}
+
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
 	client HeaderReader
 	db     *Database
+	feed   *event.Feed
 
 	eth   *ETHTransferDownloader
 	erc20 *ERC20TransfersDownloader
@@ -137,17 +156,28 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header
 		return nil, nil, err
 	}
 	// reorg
-	for previous.Hash() != latest.ParentHash {
+	for previous.Hash() != latest.ParentHash || previous == nil {
 		removed = append(removed, previous)
 		added = append(added, latest)
 		latest, err = r.client.HeaderByHash(context.TODO(), latest.ParentHash)
 		if err != nil {
 			return nil, nil, err
 		}
-		previous, err = r.db.GetHeaderByNumber(new(big.Int).Add(latest.Number, one.Neg(one)))
+		previous, err = r.db.GetHeaderByNumber(new(big.Int).Sub(latest.Number, one))
 		if err != nil {
 			return nil, nil, err
 		}
 	}
+	added = append(added, latest)
 	return added, removed, nil
+}
+
+func printHeaders(headers ...*types.Header) {
+	for _, h := range headers {
+		printHeader(h)
+	}
+}
+
+func printHeader(h *types.Header) {
+	fmt.Printf("%s - %s - %x - %x\n", h.Number, h.Difficulty, h.Hash(), h.ParentHash)
 }

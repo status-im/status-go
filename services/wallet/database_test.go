@@ -104,5 +104,35 @@ func TestReorgTransfers(t *testing.T) {
 }
 
 func TestGetTransfersFromBlock(t *testing.T) {
-	require.FailNow(t, "not implemented")
+	db, stop := setupTestDB(t)
+	defer stop()
+	headers := []*types.Header{}
+	transfers := []Transfer{}
+	for i := 1; i < 10; i++ {
+		header := &types.Header{
+			Number:     big.NewInt(int64(i)),
+			Difficulty: big.NewInt(1),
+			Time:       big.NewInt(1),
+		}
+		headers = append(headers, header)
+		tx := types.NewTransaction(uint64(i), common.Address{1}, nil, 10, big.NewInt(10), nil)
+		receipt := types.NewReceipt(nil, false, 100)
+		receipt.Logs = []*types.Log{}
+		transfer := Transfer{
+			Type:        ethTransfer,
+			Header:      header,
+			Transaction: tx,
+			Receipt:     receipt,
+		}
+		transfers = append(transfers, transfer)
+	}
+	require.NoError(t, db.ProcessTranfers(transfers, headers, nil))
+	rst, err := db.GetTransfers(big.NewInt(7), nil)
+	require.NoError(t, err)
+	require.Len(t, rst, 3)
+
+	rst, err = db.GetTransfers(big.NewInt(2), big.NewInt(5))
+	require.NoError(t, err)
+	require.Len(t, rst, 4)
+
 }

@@ -3,6 +3,7 @@ package wallet
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"math/big"
 
@@ -105,6 +106,26 @@ func (i *SQLBigInt) Value() (driver.Value, error) {
 	return (*big.Int)(i).Int64(), nil
 }
 
+type JSONBlob struct {
+	Interface interface{}
+}
+
+func (blob *JSONBlob) Scan(value interface{}) error {
+	bytes, ok := value.([]byte)
+	if !ok {
+		return errors.New("not a byte slice")
+	}
+	if len(bytes) == 0 {
+		return nil
+	}
+	err := json.Unmarshal(bytes, blob.Interface)
+	return err
+}
+
+func (blob *JSONBlob) Value() (driver.Value, error) {
+	return json.Marshal(blob.Interface)
+}
+
 type Database struct {
 	db *sql.DB
 }
@@ -151,22 +172,50 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types
 		}
 	}
 	for _, header := range added {
-		headerJSON, _ := header.MarshalJSON()
-		_, err = blocks.Exec(header.Hash(), (*SQLBigInt)(header.Number), headerJSON)
+		_, err = blocks.Exec(header.Hash(), (*SQLBigInt)(header.Number), &JSONBlob{header})
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, t := range transfers {
-		txJSON, _ := t.Transaction.MarshalJSON()
-		receiptJSON, _ := t.Receipt.MarshalJSON()
-		_, err = insert.Exec(t.Transaction.Hash(), t.Header.Hash(), txJSON, receiptJSON, t.Type)
+		_, err = insert.Exec(t.Transaction.Hash(), t.Header.Hash(), &JSONBlob{t.Transaction}, &JSONBlob{t.Receipt}, t.Type)
 		if err != nil {
 			return err
 		}
 	}
 	return err
+}
+
+func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error) {
+	query := "SELECT type, blocks.header, tx, receipt FROM transfers JOIN blocks ON blk_hash = blocks.hash WHERE blocks.number >= ?"
+	var (
+		rows *sql.Rows
+	)
+	if end != nil {
+		query += " AND blocks.number <= ?"
+		rows, err = db.db.Query(query, (*SQLBigInt)(start), (*SQLBigInt)(end))
+	} else {
+		rows, err = db.db.Query(query, (*SQLBigInt)(start))
+	}
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		transfer := Transfer{
+			Header:      &types.Header{},
+			Transaction: &types.Transaction{},
+			Receipt:     &types.Receipt{},
+		}
+		err = rows.Scan(
+			&transfer.Type, &JSONBlob{transfer.Header},
+			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, transfer)
+	}
+	return
 }
 
 func (db *Database) SaveHeader(header *types.Header) error {
@@ -176,6 +225,41 @@ func (db *Database) SaveHeader(header *types.Header) error {
 	}
 	_, err = db.db.Exec("INSERT INTO blocks(number, hash, header) VALUES (?, ?, ?)", (*SQLBigInt)(header.Number), header.Hash(), headerJSON)
 	return err
+}
+
+func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
+	var (
+		tx     *sql.Tx
+		insert *sql.Stmt
+		buf    []byte
+	)
+	tx, err = db.db.Begin()
+	if err != nil {
+		return
+	}
+	insert, err = tx.Prepare("INSERT INTO blocks(number,hash,header) VALUES (?,?,?)")
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+		} else {
+			_ = tx.Rollback()
+		}
+	}()
+
+	for _, h := range headers {
+		buf, err = h.MarshalJSON()
+		if err != nil {
+			return
+		}
+		_, err = insert.Exec((*SQLBigInt)(h.Number), h.Hash(), buf)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (db *Database) LastHeader() (*types.Header, error) {
