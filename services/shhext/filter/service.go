@@ -19,7 +19,7 @@ const (
 
 // The number of partitions
 var nPartitions = big.NewInt(5000)
-var minPow = 0.0001
+var minPow = 0
 
 type Filter struct {
 	FilterID string
