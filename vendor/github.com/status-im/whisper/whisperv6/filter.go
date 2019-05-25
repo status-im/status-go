@@ -279,6 +279,7 @@ func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
 // the message and subsequently call MatchMessage.
 // Topics are not checked here, since this is done by topic matchers.
 func (f *Filter) MatchEnvelope(envelope *Envelope) bool {
+	log.Trace("checking pow", "filter", f.PoW, "envelope", envelope.pow)
 	return f.PoW <= 0 || envelope.pow >= f.PoW
 }
 
