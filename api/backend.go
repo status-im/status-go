@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"path"
 	"sync"
 	"time"
 
@@ -474,7 +475,19 @@ func (b *StatusBackend) Logout() error {
 	default:
 		return err
 	}
-
+	if b.statusNode.Config().WalletConfig.Enabled {
+		wallet, err := b.statusNode.WalletService()
+		switch err {
+		case node.ErrServiceUnknown:
+		case nil:
+			err = wallet.StopReactor()
+			if err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
 	b.AccountManager().Logout()
 
 	return nil
@@ -497,7 +510,10 @@ func (b *StatusBackend) reSelectAccount() error {
 	default:
 		return err
 	}
-
+	err = b.startWallet()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -539,20 +555,45 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 			return err
 		}
 	}
+	err = b.startWallet()
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
+func (b *StatusBackend) startWallet() error {
+	if b.statusNode.Config().WalletConfig.Enabled {
+		wallet, err := b.statusNode.WalletService()
+		if err != nil {
+			return err
+		}
+		account, err := b.accountManager.SelectedWalletAccount()
+		if err != nil {
+			return err
+		}
+		path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", account.Address))
+		err = wallet.StartReactor(path,
+			b.statusNode.RPCClient().Ethclient(),
+			account.Address,
+			new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 // SendDataNotification sends data push notifications to users.
 // dataPayloadJSON is a JSON string that looks like this:
 // {
-// 	"data": {
-// 		"msg-v2": {
-// 			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
-// 			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
-// 			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
-// 		}
-// 	}
+//	"data": {
+//		"msg-v2": {
+//			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
+//			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
+//			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
+//		}
+//	}
 // }
 func (b *StatusBackend) SendDataNotification(dataPayloadJSON string, tokens ...string) error {
 	log.Debug("sending data push notification")

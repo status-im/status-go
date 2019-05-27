@@ -10,45 +10,60 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-// NewService initializes database and creates new service instance.
-func NewService(dbpath string, client *ethclient.Client, address common.Address, chain *big.Int) (*Service, error) {
-	db, err := InitializeDB(dbpath)
-	if err != nil {
-		return nil, err
-	}
+// NewService initializes service instance.
+func NewService() *Service {
 	feed := &event.Feed{}
 	return &Service{
-		db:      db,
-		reactor: NewReactor(db, feed, client, address, chain),
+		feed:    feed,
 		signals: &SignalsTransmitter{publisher: feed},
-	}, nil
+	}
 }
 
 // Service is a wallet service.
 type Service struct {
+	feed    *event.Feed
 	db      *Database
 	reactor *Reactor
 	signals *SignalsTransmitter
 }
 
-// Start reactor and signals transmitter.
+// Start signals transmitter.
 func (s *Service) Start(*p2p.Server) error {
-	err := s.signals.Start()
+	return s.signals.Start()
+}
+
+// StartReactor separately cause it requires known ethereum address.
+func (s *Service) StartReactor(dbpath string, client *ethclient.Client, address common.Address, chain *big.Int) error {
+	db, err := InitializeDB(dbpath)
 	if err != nil {
 		return err
 	}
-	err = s.reactor.Start()
+	reactor := NewReactor(db, s.feed, client, address, chain)
+	err = reactor.Start()
 	if err != nil {
 		return err
 	}
+	s.db = db
+	s.reactor = reactor
 	return nil
+}
+
+// StopReactor stops reactor and closes database.
+func (s *Service) StopReactor() error {
+	if s.reactor == nil {
+		return nil
+	}
+	s.reactor.Stop()
+	if s.db == nil {
+		return nil
+	}
+	return s.db.Close()
 }
 
 // Stop reactor, signals  transmitter and close db.
 func (s *Service) Stop() error {
-	s.reactor.Stop()
 	s.signals.Stop()
-	return s.db.Close()
+	return s.StopReactor()
 }
 
 // APIs returns list of available RPC APIs.
@@ -57,7 +72,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "wallet",
 			Version:   "0.1.0",
-			Service:   API{s.db},
+			Service:   API{s},
 			Public:    true,
 		},
 	}

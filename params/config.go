@@ -340,8 +340,11 @@ type NodeConfig struct {
 	// IncentivisationConfig extra configuration for incentivisation service
 	IncentivisationConfig IncentivisationConfig `json:"IncentivisationConfig," validate:"structonly"`
 
-	// ShhextConfig keeps configuration for service running under shhext namespace.
+	// ShhextConfig extra configuration for service running under shhext namespace.
 	ShhextConfig ShhextConfig `json:"ShhextConfig," validate:"structonly"`
+
+	// WalletConfig extra configuration for wallet.Service.
+	WalletConfig WalletConfig
 
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
@@ -356,6 +359,11 @@ type NodeConfig struct {
 
 	// MailServerRegistryAddress is the MailServerRegistry contract address
 	MailServerRegistryAddress string
+}
+
+// WalletConfig extra configuratin for wallet.Service.
+type WalletConfig struct {
+	Enabled bool
 }
 
 // ShhextConfig defines options used by shhext service.
