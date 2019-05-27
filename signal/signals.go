@@ -49,7 +49,6 @@ func send(typ string, event interface{}) {
 		logger.Error("Marshalling signal envelope", "error", err)
 		return
 	}
-
 	// If a Go implementation of signal handler is set, let's use it.
 	if mobileSignalHandler != nil {
 		mobileSignalHandler(data)

@@ -245,21 +245,30 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 }
 
 // LastHeader selects last header by block number.
-func (db *Database) LastHeader() (*types.Header, error) {
+func (db *Database) LastHeader() (header *types.Header, err error) {
 	var buf NullBytes
-	err := db.db.QueryRow("SELECT header FROM blocks WHERE number = (SELECT MAX(number) FROM blocks)").Scan(&buf)
+	rows, err := db.db.Query("SELECT header FROM blocks WHERE number = (SELECT MAX(number) FROM blocks)")
 	if err != nil {
 		return nil, err
 	}
-	if !buf.Valid {
-		return nil, errors.New("not found")
+	for rows.Next() {
+		err = rows.Scan(&buf)
+		if err != nil {
+			return nil, err
+		}
+		if !buf.Valid {
+			return nil, errors.New("not found")
+		}
+		header = &types.Header{}
+		err = header.UnmarshalJSON(buf.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		if header != nil {
+			return header, nil
+		}
 	}
-	header := &types.Header{}
-	err = header.UnmarshalJSON(buf.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	return header, nil
+	return nil, nil
 }
 
 // HeaderExists checks if header with hash exists in db.

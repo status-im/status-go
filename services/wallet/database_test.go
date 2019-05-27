@@ -79,6 +79,14 @@ func TestLastHeader(t *testing.T) {
 	require.Equal(t, second.Hash(), rst.Hash())
 }
 
+func TestNoLastHeader(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	header, err := db.LastHeader()
+	require.NoError(t, err)
+	require.Nil(t, header)
+}
+
 func TestProcessTransfer(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()

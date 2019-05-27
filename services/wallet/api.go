@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // API is class with methods available over RPC.
@@ -15,8 +17,14 @@ type API struct {
 // TODO(dshulyak) benchmark loading many transfers from database. We can avoid json unmarshal/marshal json if we will
 // return header, tx and receipt as a raw json.
 func (api *API) GetTransfers(ctx context.Context, start, end *big.Int) ([]Transfer, error) {
+	log.Info("call to get transfers", "start", start, "end", end)
 	if api.s.db == nil {
 		return nil, errors.New("wallet service is not initialized")
 	}
-	return api.s.db.GetTransfers(start, end)
+	rst, err := api.s.db.GetTransfers(start, end)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("result from database for transfers", "start", start, "end", end, "len", len(rst))
+	return rst, nil
 }

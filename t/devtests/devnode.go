@@ -52,10 +52,10 @@ func (s *DevNodeSuite) SetupTest() {
 	config.WhisperConfig.Enabled = false
 	config.LightEthConfig.Enabled = false
 	config.UpstreamConfig.Enabled = true
+	config.WalletConfig.Enabled = true
 	config.UpstreamConfig.URL = s.miner.IPCEndpoint()
 	s.backend = api.NewStatusBackend()
 	s.Require().NoError(s.backend.StartNode(config))
-
 	s.Remote, err = s.miner.Attach()
 	s.Require().NoError(err)
 	s.Eth = ethclient.NewClient(s.Remote)
