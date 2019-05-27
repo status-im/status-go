@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -45,6 +46,7 @@ var (
 	ErrStatusServiceRegistrationFailure           = errors.New("failed to register the Status service")
 	ErrPeerServiceRegistrationFailure             = errors.New("failed to register the Peer service")
 	ErrIncentivisationServiceRegistrationFailure  = errors.New("failed to register the Incentivisation service")
+	ErrWalletServiceRegistrationFailure           = errors.New("failed to register the Wallet service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -116,6 +118,10 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 	// start peer service
 	if err := activatePeerService(stack); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
+	}
+
+	if err := activateWalletService(stack, config.WalletConfig); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrWalletServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -266,6 +272,16 @@ func activatePeerService(stack *node.Node) error {
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		svc := peer.New()
 		return svc, nil
+	})
+}
+
+func activateWalletService(stack *node.Node, config params.WalletConfig) error {
+	if !config.Enabled {
+		logger.Info("service.Wallet is disabled")
+		return nil
+	}
+	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		return wallet.NewService(), nil
 	})
 }
 

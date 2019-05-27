@@ -2,17 +2,21 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"math/big"
 )
 
 // API is class with methods available over RPC.
 type API struct {
-	db *Database
+	s *Service
 }
 
 // GetTransfers returns transfers in range of blocks. If `end` is nil all transfers from `start` will be returned.
 // TODO(dshulyak) benchmark loading many transfers from database. We can avoid json unmarshal/marshal json if we will
 // return header, tx and receipt as a raw json.
 func (api *API) GetTransfers(ctx context.Context, start, end *big.Int) ([]Transfer, error) {
-	return api.db.GetTransfers(start, end)
+	if api.s.db == nil {
+		return nil, errors.New("wallet service is not initialized")
+	}
+	return api.s.db.GetTransfers(start, end)
 }

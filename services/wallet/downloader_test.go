@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/status-im/status-go/services/wallet/erc20"
-	"github.com/status-im/status-go/t/devtests"
+	"github.com/status-im/status-go/t/devtests/miner"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -39,11 +39,11 @@ func (s *ETHTransferSuite) SetupTest() {
 	s.faucet, err = crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	miner, err := devtests.NewDevNode(crypto.PubkeyToAddress(s.faucet.PublicKey))
+	node, err := miner.NewDevNode(crypto.PubkeyToAddress(s.faucet.PublicKey))
 	s.Require().NoError(err)
-	s.Require().NoError(devtests.StartWithMiner(miner))
+	s.Require().NoError(miner.StartWithMiner(node))
 
-	client, err := miner.Attach()
+	client, err := node.Attach()
 	s.Require().NoError(err)
 	s.ethclient = ethclient.NewClient(client)
 	s.signer = types.NewEIP155Signer(big.NewInt(1337))
@@ -143,11 +143,11 @@ func (s *ERC20TransferSuite) SetupTest() {
 	s.faucet, err = crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	miner, err := devtests.NewDevNode(crypto.PubkeyToAddress(s.faucet.PublicKey))
+	node, err := miner.NewDevNode(crypto.PubkeyToAddress(s.faucet.PublicKey))
 	s.Require().NoError(err)
-	s.Require().NoError(devtests.StartWithMiner(miner))
+	s.Require().NoError(miner.StartWithMiner(node))
 
-	client, err := miner.Attach()
+	client, err := node.Attach()
 	s.Require().NoError(err)
 	s.ethclient = ethclient.NewClient(client)
 	s.downloader = NewERC20TransfersDownloader(s.ethclient, crypto.PubkeyToAddress(s.identity.PublicKey))
