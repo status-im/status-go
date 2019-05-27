@@ -13,6 +13,7 @@ type publisher interface {
 	Subscribe(interface{}) event.Subscription
 }
 
+// SignalsTransmitter transmits received events as a wallet signals.
 type SignalsTransmitter struct {
 	publisher
 
@@ -20,6 +21,7 @@ type SignalsTransmitter struct {
 	quit chan struct{}
 }
 
+// Start runs loop in background.
 func (tmr *SignalsTransmitter) Start() error {
 	if tmr.quit != nil {
 		return errors.New("already running")
@@ -51,6 +53,7 @@ func (tmr *SignalsTransmitter) Start() error {
 	return nil
 }
 
+// Stop stops the loop and waits till it exits.
 func (tmr *SignalsTransmitter) Stop() {
 	if tmr.quit == nil {
 		return

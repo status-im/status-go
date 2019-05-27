@@ -2,6 +2,7 @@ package wallet
 
 import "math/big"
 
+// EventType type for event types.
 type EventType string
 
 const (
@@ -11,6 +12,7 @@ const (
 	EventReorg = "reorg"
 )
 
+// Event is a type for wallet events.
 type Event struct {
 	Type        EventType
 	BlockNumber *big.Int

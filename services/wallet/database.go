@@ -9,64 +9,31 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/migrate"
-	"github.com/status-im/migrate/database/sqlcipher"
-	bindata "github.com/status-im/migrate/source/go_bindata"
 	"github.com/status-im/status-go/services/wallet/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
 
-// Migrate applies migrations.
-func Migrate(db *sql.DB) error {
-	resources := bindata.Resource(
-		migrations.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		},
-	)
-
-	source, err := bindata.WithInstance(resources)
-	if err != nil {
-		return err
-	}
-
-	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{})
-	if err != nil {
-		return err
-	}
-
-	m, err := migrate.NewWithInstance(
-		"go-bindata",
-		source,
-		"sqlcipher",
-		driver)
-	if err != nil {
-		return err
-	}
-
-	if err = m.Up(); err != migrate.ErrNoChange {
-		return err
-	}
-	return nil
-}
-
+// InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path string) (*Database, error) {
 	db, err := sqlite.OpenDB(path)
 	if err != nil {
 		return nil, err
 	}
-	err = Migrate(db)
+	err = migrations.Migrate(db)
 	if err != nil {
 		return nil, err
 	}
 	return &Database{db: db}, nil
 }
 
+// NullBytes type for downloading potentially null bytes,
+// FIXME(dshulyak) replace with JSONBlob for all cases.
 type NullBytes struct {
 	Bytes []byte
 	Valid bool
 }
 
+// Scan implements interface.
 func (b *NullBytes) Scan(value interface{}) error {
 	if value == nil {
 		return nil
@@ -81,6 +48,7 @@ func (b *NullBytes) Scan(value interface{}) error {
 	return nil
 }
 
+// Value implement interface.
 func (b *NullBytes) Value() (driver.Value, error) {
 	if !b.Valid {
 		return nil, nil
@@ -88,8 +56,12 @@ func (b *NullBytes) Value() (driver.Value, error) {
 	return b.Bytes, nil
 }
 
+// SQLBigInt type for storing uin256 in the databse.
+// FIXME(dshulyak) SQL bit int is max 64 bits. Maybe store as bytes in big endian and hope
+// that lexographical sorting will work.
 type SQLBigInt big.Int
 
+// Scan implements interface.
 func (i *SQLBigInt) Scan(value interface{}) error {
 	val, ok := value.(int64)
 	if !ok {
@@ -99,6 +71,7 @@ func (i *SQLBigInt) Scan(value interface{}) error {
 	return nil
 }
 
+// Value implements interface.
 func (i *SQLBigInt) Value() (driver.Value, error) {
 	if !(*big.Int)(i).IsInt64() {
 		return nil, errors.New("not at int64")
@@ -106,10 +79,12 @@ func (i *SQLBigInt) Value() (driver.Value, error) {
 	return (*big.Int)(i).Int64(), nil
 }
 
+// JSONBlob type for marshaling/unmarshaling inner type to json.
 type JSONBlob struct {
 	Interface interface{}
 }
 
+// Scan implements interface.
 func (blob *JSONBlob) Scan(value interface{}) error {
 	bytes, ok := value.([]byte)
 	if !ok {
@@ -122,18 +97,22 @@ func (blob *JSONBlob) Scan(value interface{}) error {
 	return err
 }
 
+// Value implements interface.
 func (blob *JSONBlob) Value() (driver.Value, error) {
 	return json.Marshal(blob.Interface)
 }
 
+// Database sql wrapper for operations with wallet objects.
 type Database struct {
 	db *sql.DB
 }
 
+// Close closes database.
 func (db Database) Close() error {
 	return db.db.Close()
 }
 
+// ProcessTranfers atomically adds/removes blocks and adds new tranfers.
 func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types.Header) (err error) {
 	var (
 		tx     *sql.Tx
@@ -187,6 +166,7 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types
 	return err
 }
 
+// GetTransfers load transfers transfer betweeen two blocks.
 func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error) {
 	query := "SELECT type, blocks.header, tx, receipt FROM transfers JOIN blocks ON blk_hash = blocks.hash WHERE blocks.number >= ?"
 	var (
@@ -218,6 +198,7 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 	return
 }
 
+// SaveHeader stores single header.
 func (db *Database) SaveHeader(header *types.Header) error {
 	headerJSON, err := header.MarshalJSON()
 	if err != nil {
@@ -227,6 +208,7 @@ func (db *Database) SaveHeader(header *types.Header) error {
 	return err
 }
 
+// SaveHeaders atomically stores list of headers.
 func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	var (
 		tx     *sql.Tx
@@ -262,6 +244,7 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	return
 }
 
+// LastHeader selects last header by block number.
 func (db *Database) LastHeader() (*types.Header, error) {
 	var buf NullBytes
 	err := db.db.QueryRow("SELECT header FROM blocks WHERE number = (SELECT MAX(number) FROM blocks)").Scan(&buf)
@@ -279,6 +262,7 @@ func (db *Database) LastHeader() (*types.Header, error) {
 	return header, nil
 }
 
+// HeaderExists checks if header with hash exists in db.
 func (db *Database) HeaderExists(hash common.Hash) (bool, error) {
 	var val sql.NullBool
 	err := db.db.QueryRow("SELECT EXISTS (SELECT hash FROM blocks WHERE hash = ?)", hash).Scan(&val)
@@ -288,6 +272,7 @@ func (db *Database) HeaderExists(hash common.Hash) (bool, error) {
 	return val.Bool, nil
 }
 
+// GetHeaderByNumber selects header using block number.
 func (db *Database) GetHeaderByNumber(number *big.Int) (*types.Header, error) {
 	var buf NullBytes
 	err := db.db.QueryRow("SELECT header FROM blocks WHERE number = ?", (*SQLBigInt)(number)).Scan(&buf)

@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// TransferType type of the asset that was transfered.
 type TransferType string
 
 const (
@@ -24,6 +26,7 @@ var (
 	one = big.NewInt(1)
 )
 
+// Transfer stores information about transfer.
 type Transfer struct {
 	Type        TransferType
 	Header      *types.Header
@@ -31,14 +34,17 @@ type Transfer struct {
 	Receipt     *types.Receipt
 }
 
+// ETHTransferDownloader downloads regular eth transfers.
 type ETHTransferDownloader struct {
 	client  *ethclient.Client
 	address common.Address
 	signer  types.Signer
 }
 
+// GetTransfers checks is balance was changed between two blocks. And if so it downloads transfers
+// for that block.
 func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *types.Header) (rst []Transfer, err error) {
-	// TODO consider caching balance and reset it on reorg
+	// TODO(dshulyak) consider caching balance and reset it on reorg
 	num := new(big.Int).Sub(header.Number, one)
 	balance, err := d.client.BalanceAt(ctx, d.address, num)
 	if err != nil {
@@ -78,9 +84,13 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *types.
 			continue
 		}
 	}
+	if len(rst) == 0 {
+		return nil, errors.New("balance changed but no new transactions were found")
+	}
 	return rst, nil
 }
 
+// NewERC20TransfersDownloader returns new instance.
 func NewERC20TransfersDownloader(client *ethclient.Client, address common.Address) *ERC20TransfersDownloader {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
 	target := common.Hash{}
@@ -93,6 +103,7 @@ func NewERC20TransfersDownloader(client *ethclient.Client, address common.Addres
 	}
 }
 
+// ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
 type ERC20TransfersDownloader struct {
 	client  *ethclient.Client
 	address common.Address
@@ -103,6 +114,7 @@ type ERC20TransfersDownloader struct {
 	target common.Hash
 }
 
+// GetTransfers for erc20 uses getLogs rpc with Transfer event signature and our address acount.
 func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *types.Header) ([]Transfer, error) {
 	hash := header.Hash()
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
