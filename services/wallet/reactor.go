@@ -3,7 +3,6 @@ package wallet
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -15,22 +14,24 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+// HeaderReader interface for reading headers using block number or hash.
 type HeaderReader interface {
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 }
 
-func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address) *Reactor {
+// NewReactor creates instance of the Reactor.
+func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address, chain *big.Int) *Reactor {
 	reactor := &Reactor{
 		db:     db,
 		client: client,
 		feed:   feed,
 	}
 	reactor.erc20 = NewERC20TransfersDownloader(client, address)
-	// TODO(dshulyak) pass chain id or signer
 	reactor.eth = &ETHTransferDownloader{
 		client:  client,
 		address: address,
+		signer:  types.NewEIP155Signer(chain),
 	}
 	return reactor
 }
@@ -48,6 +49,7 @@ type Reactor struct {
 	quit chan struct{}
 }
 
+// Start runs reactor loop in background.
 func (r *Reactor) Start() error {
 	if r.quit != nil {
 		return errors.New("already running")
@@ -61,6 +63,7 @@ func (r *Reactor) Start() error {
 	return nil
 }
 
+// Stop stops reactor loop and waits till it exits.
 func (r *Reactor) Stop() {
 	if r.quit == nil {
 		return
@@ -71,11 +74,13 @@ func (r *Reactor) Stop() {
 }
 
 func (r *Reactor) loop() {
-	ticker := time.NewTicker(5 * time.Second)
 	var (
+		// block is mined once per ~14 seconds
+		ticker = time.NewTicker(10 * time.Second)
 		latest *types.Header
 		err    error
 	)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-r.quit:
@@ -91,16 +96,14 @@ func (r *Reactor) loop() {
 			if latest != nil {
 				num = new(big.Int).Add(latest.Number, one)
 			}
-			ctx := context.Background()
-			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			header, err := r.client.HeaderByNumber(ctx, num)
 			cancel()
 			if err != nil {
 				log.Error("failed to get latest block", "number", latest, "error", err)
 				continue
 			}
-			ctx = context.Background()
-			ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 			added, removed, err := r.onNewBlock(ctx, latest, header)
 			cancel()
 			if err != nil {
@@ -128,11 +131,15 @@ func (r *Reactor) loop() {
 }
 
 func (r *Reactor) getTransfers(header *types.Header) ([]Transfer, error) {
-	ethT, err := r.eth.GetTransfers(context.TODO(), header)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ethT, err := r.eth.GetTransfers(ctx, header)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
-	erc20T, err := r.erc20.GetTransfers(context.TODO(), header)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	erc20T, err := r.erc20.GetTransfers(ctx, header)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +166,7 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header
 	for previous.Hash() != latest.ParentHash || previous == nil {
 		removed = append(removed, previous)
 		added = append(added, latest)
-		latest, err = r.client.HeaderByHash(context.TODO(), latest.ParentHash)
+		latest, err = r.client.HeaderByHash(ctx, latest.ParentHash)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -170,14 +177,4 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header
 	}
 	added = append(added, latest)
 	return added, removed, nil
-}
-
-func printHeaders(headers ...*types.Header) {
-	for _, h := range headers {
-		printHeader(h)
-	}
-}
-
-func printHeader(h *types.Header) {
-	fmt.Printf("%s - %s - %x - %x\n", h.Number, h.Difficulty, h.Hash(), h.ParentHash)
 }
