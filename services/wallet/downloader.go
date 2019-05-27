@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// TransferType type of the asset that was transfered.
+// TransferType type of the asset that was transferred.
 type TransferType string
 
 const (

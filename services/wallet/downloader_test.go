@@ -153,6 +153,7 @@ func (s *ERC20TransferSuite) SetupTest() {
 	s.downloader = NewERC20TransfersDownloader(s.ethclient, crypto.PubkeyToAddress(s.identity.PublicKey))
 
 	_, tx, contract, err := erc20.DeployERC20Transfer(bind.NewKeyedTransactor(s.faucet), s.ethclient)
+	s.Require().NoError(err)
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err = bind.WaitMined(timeout, s.ethclient, tx)

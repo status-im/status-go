@@ -23,9 +23,10 @@ type HeaderReader interface {
 // NewReactor creates instance of the Reactor.
 func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address, chain *big.Int) *Reactor {
 	reactor := &Reactor{
-		db:     db,
-		client: client,
-		feed:   feed,
+		db:      db,
+		client:  client,
+		feed:    feed,
+		address: address,
 	}
 	reactor.erc20 = NewERC20TransfersDownloader(client, address)
 	reactor.eth = &ETHTransferDownloader{
@@ -38,9 +39,10 @@ func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, addres
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	client HeaderReader
-	db     *Database
-	feed   *event.Feed
+	client  HeaderReader
+	db      *Database
+	feed    *event.Feed
+	address common.Address
 
 	eth   *ETHTransferDownloader
 	erc20 *ERC20TransfersDownloader
@@ -57,6 +59,7 @@ func (r *Reactor) Start() error {
 	r.quit = make(chan struct{})
 	r.wg.Add(1)
 	go func() {
+		log.Info("wallet reactor started", "address", r.address.String())
 		r.loop()
 		r.wg.Done()
 	}()
@@ -75,8 +78,10 @@ func (r *Reactor) Stop() {
 
 func (r *Reactor) loop() {
 	var (
-		// block is mined once per ~14 seconds
-		ticker = time.NewTicker(10 * time.Second)
+		// TODO(dshulyak) parametrize
+		// pow block on main chain is mined once per ~14 seconds
+		// but we for tests we are using clique chain with immediate block signer
+		ticker = time.NewTicker(1 * time.Second)
 		latest *types.Header
 		err    error
 	)
@@ -90,6 +95,7 @@ func (r *Reactor) loop() {
 			if latest == nil {
 				latest, err = r.db.LastHeader()
 				if err != nil {
+					log.Error("failed to read last header from database", "error", err)
 					continue
 				}
 			}
@@ -103,6 +109,7 @@ func (r *Reactor) loop() {
 				log.Error("failed to get latest block", "number", latest, "error", err)
 				continue
 			}
+			log.Info("reactor received new block", "header", header.Hash())
 			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 			added, removed, err := r.onNewBlock(ctx, latest, header)
 			cancel()
@@ -113,11 +120,13 @@ func (r *Reactor) loop() {
 			// for each added block get tranfers from downloaders
 			all := []Transfer{}
 			for i := range added {
+				log.Info("reactor get transfers", "block", added[i].Hash(), "number", added[i].Number)
 				transfers, err := r.getTransfers(added[i])
 				if err != nil {
 					log.Error("failed to get transfers", "header", header, "error", err)
 					continue
 				}
+				log.Info("reactor adding transfers", "block", added[i].Hash(), "number", added[i].Number, "len", len(transfers))
 				all = append(all, transfers...)
 			}
 			err = r.db.ProcessTranfers(all, added, removed)
@@ -126,6 +135,20 @@ func (r *Reactor) loop() {
 				continue
 			}
 			latest = header
+
+			if len(added) == 1 && len(removed) == 0 {
+				r.feed.Send(Event{
+					Type:        EventNewBlock,
+					BlockNumber: added[0].Number,
+				})
+			}
+			if len(removed) != 0 {
+				lth := len(removed)
+				r.feed.Send(Event{
+					Type:        EventReorg,
+					BlockNumber: removed[lth-1].Number,
+				})
+			}
 		}
 	}
 }

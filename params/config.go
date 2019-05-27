@@ -361,7 +361,7 @@ type NodeConfig struct {
 	MailServerRegistryAddress string
 }
 
-// WalletConfig extra configuratin for wallet.Service.
+// WalletConfig extra configuration for wallet.Service.
 type WalletConfig struct {
 	Enabled bool
 }
@@ -531,7 +531,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		HTTPPort:         8545,
 		HTTPVirtualHosts: []string{"localhost"},
 		ListenAddr:       ":0",
-		APIModules:       "eth,net,web3,peer",
+		APIModules:       "eth,net,web3,peer,wallet",
 		MaxPeers:         25,
 		MaxPendingPeers:  0,
 		IPCFile:          "geth.ipc",
