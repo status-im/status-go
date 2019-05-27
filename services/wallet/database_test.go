@@ -100,7 +100,33 @@ func TestProcessTransfer(t *testing.T) {
 }
 
 func TestReorgTransfers(t *testing.T) {
-	require.FailNow(t, "not implemented")
+	db, stop := setupTestDB(t)
+	defer stop()
+	rcpt := types.NewReceipt(nil, false, 100)
+	rcpt.Logs = []*types.Log{}
+	original := &types.Header{
+		Number:     big.NewInt(1),
+		Difficulty: big.NewInt(1),
+		Time:       big.NewInt(1),
+	}
+	replaced := &types.Header{
+		Number:     big.NewInt(1),
+		Difficulty: big.NewInt(2),
+		Time:       big.NewInt(2),
+	}
+	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
+	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
+	require.NoError(t, db.ProcessTranfers([]Transfer{
+		{ethTransfer, original, originalTX, rcpt},
+	}, []*types.Header{original}, nil))
+	require.NoError(t, db.ProcessTranfers([]Transfer{
+		{ethTransfer, replaced, replacedTX, rcpt},
+	}, []*types.Header{replaced}, []*types.Header{original}))
+
+	all, err := db.GetTransfers(big.NewInt(0), nil)
+	require.NoError(t, err)
+	require.Len(t, all, 1)
+	require.Equal(t, replacedTX.Hash(), all[0].Transaction.Hash())
 }
 
 func TestGetTransfersFromBlock(t *testing.T) {
