@@ -66,7 +66,7 @@ func (s *TransfersSuite) TestEventuallySynced() {
 	}, 10*time.Second, 1*time.Second))
 
 	go func() {
-		for i := 1; i <= 10; i++ {
+		for i := 1; i < 10; i++ {
 			s.sendTx(uint64(i), s.Address)
 		}
 	}()
