@@ -7,21 +7,53 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
+/*
+* This API part consists of a few API methods and one signal
+* signal is called every time when a list of chat is updated, no matter
+* if a chat is removed or added or changed.
+ */
+
 type ChatsResponse struct {
-	UnreadMessagesCount int                 `json:"unviewed-messages-count"`
-	Chats               map[string]ChatView `json:"chats"`
+	// TOTAL unviewed message count (for "home" tab)
+	UnreadMessagesCount int `json:"unviewed-messages-count"`
+	// Dict of chats for now (in the future maybe it should be replaces with something like ordered dict)
+	Chats map[string]ChatView `json:"chats"`
 }
 
+// A single chat representation as status-react expects
 type ChatView struct {
-	ID                     string            `json:"chat-id"`
-	Name                   string            `json:"name"`
-	ColorHex               string            `json:"color"`
-	LastMessageContent     map[string]string `json:"last-message-content"`
-	LastMessageContentType string            `json:"last-message-content-type"`
-	UnreadMessagesCount    int               `json:"unviewed-messages-count"`
-	IsActive               bool              `json:"is-active"`
-	IsGroupChat            bool              `json:"group-chat"`
-	IsPublic               bool              `json:"public?"`
+	// chat ID is the chat topic in case of public chats or
+	// the recipient key if that is 1-1 chat. no group chats are supported now.
+	ID string `json:"chat-id"`
+	// something like "status" for #status and empty for 1-1 chat (clojure generates 3-word name)
+	Name string `json:"name"` // empty for 1-1 chats
+	// chat color (generated based on ID)
+	ColorHex string `json:"color"`
+	// properties of the last received message in the chatroom
+
+	// content is a dict, because extensions and emoji are treated separately
+	LastMessageContent map[string]string `json:"last-message-content"`
+
+	// text or emoji or sticker or etc
+	LastMessageContentType string `json:"last-message-content-type"`
+
+	// just a clock value
+	LastMessageClock int `json:"last-clock-value"` // 0 if no messages for this chat
+
+	// number of unread messages in this chat
+	UnreadMessagesCount int `json:"unviewed-messages-count"`
+
+	// can always be "true" for go-based chat
+	IsActive bool `json:"is-active"`
+
+	// "true" for public and group chats
+	IsGroupChat bool `json:"group-chat"`
+
+	// "true" for public chats
+	IsPublic bool `json:"public?"`
+
+	// when the chat was last updated (new message came) (or created), local time!
+	Timestamp int `json:"timestamp"`
 }
 
 type API struct {
@@ -66,7 +98,7 @@ func NewMockAPI(node *node.StatusNode) *API {
 			},
 			"blah-one-on-one": {
 				ID:                     "blah-one-on-one",
-				Name:                   "One Single Imitation",
+				Name:                   "",
 				ColorHex:               "#51d0f0",
 				IsActive:               true,
 				LastMessageContentType: "text/plain",
@@ -123,7 +155,7 @@ func (api *API) JoinPrivateGroupChat(id string, name string, admin string, parti
 func (api *API) StartOneOnOneChat(recipient string) error {
 	api.cs[recipient] = ChatView{
 		ID:                     recipient,
-		Name:                   recipient,
+		Name:                   "",
 		ColorHex:               "#abcabc",
 		IsActive:               true,
 		LastMessageContentType: "text/plain",
@@ -146,11 +178,3 @@ func (api *API) RemoveChat(id string) error {
 func (api *API) sendChatsUpdatedSignal(name string) {
 	signal.SendChatsDidChangeEvent(name)
 }
-
-// TODO: a signal
-
-/*
-
-{"status" {:updated-at nil, :tags #{}, :referenced-messages {}, :color "#51d0f0", :contacts #{}, :last-clock-value 156035060894207, :admins #{}, :members-joined #{}, :name "status", :removed-from-at nil, :membership-updates (), :unviewed-messages-count 1, :last-message-content-type "text/plain", :is-active true, :last-message-content {:chat-id "status", :text "Please take a look at this Youtube playlist to learn how to use Status\n\nhttps://www.youtube.com/watch?v=fnuqRV37JmE&list=PLbrz7IuP1hrinFXb47zmukKPbsB-1_Uhx", :response-to "0xe72e84ddb55d4c499f1412aa997b865a0bd6303610ee7dd00254181f0e14f06e", :response-to-v2 "0xb0366c4ef191e12be89030b299694ec5c89c77efa2ef93de13c40c356a7b2a74", :metadata {:link ([72 155])}, :render-recipe [["Please take a look at this Youtube playlist to learn how to use Status\n\n" :text] ["https://www.youtube.com/watch?v=fnuqRV37JmE&list=PLbrz7IuP1hrinFXb47zmukKPbsB-1_Uhx" :link]]}, :messages #status-im.utils.prio<…>
-
-*/
