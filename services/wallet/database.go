@@ -26,36 +26,6 @@ func InitializeDB(path string) (*Database, error) {
 	return &Database{db: db}, nil
 }
 
-// NullBytes type for downloading potentially null bytes,
-// FIXME(dshulyak) replace with JSONBlob for all cases.
-type NullBytes struct {
-	Bytes []byte
-	Valid bool
-}
-
-// Scan implements interface.
-func (b *NullBytes) Scan(value interface{}) error {
-	if value == nil {
-		return nil
-	}
-	buf, ok := value.([]byte)
-	if !ok {
-		return errors.New("value not bytes")
-	}
-	b.Bytes = make([]byte, len(buf))
-	copy(b.Bytes, buf)
-	b.Valid = true
-	return nil
-}
-
-// Value implement interface.
-func (b *NullBytes) Value() (driver.Value, error) {
-	if !b.Valid {
-		return nil, nil
-	}
-	return b.Bytes, nil
-}
-
 // SQLBigInt type for storing uin256 in the databse.
 // FIXME(dshulyak) SQL bit int is max 64 bits. Maybe store as bytes in big endian and hope
 // that lexographical sorting will work.
@@ -200,11 +170,7 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 
 // SaveHeader stores single header.
 func (db *Database) SaveHeader(header *types.Header) error {
-	headerJSON, err := header.MarshalJSON()
-	if err != nil {
-		return err
-	}
-	_, err = db.db.Exec("INSERT INTO blocks(number, hash, header) VALUES (?, ?, ?)", (*SQLBigInt)(header.Number), header.Hash(), headerJSON)
+	_, err := db.db.Exec("INSERT INTO blocks(number, hash, header) VALUES (?, ?, ?)", (*SQLBigInt)(header.Number), header.Hash(), &JSONBlob{header})
 	return err
 }
 
@@ -213,7 +179,6 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
-		buf    []byte
 	)
 	tx, err = db.db.Begin()
 	if err != nil {
@@ -232,11 +197,7 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	}()
 
 	for _, h := range headers {
-		buf, err = h.MarshalJSON()
-		if err != nil {
-			return
-		}
-		_, err = insert.Exec((*SQLBigInt)(h.Number), h.Hash(), buf)
+		_, err = insert.Exec((*SQLBigInt)(h.Number), h.Hash(), &JSONBlob{h})
 		if err != nil {
 			return
 		}
@@ -246,21 +207,13 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 
 // LastHeader selects last header by block number.
 func (db *Database) LastHeader() (header *types.Header, err error) {
-	var buf NullBytes
 	rows, err := db.db.Query("SELECT header FROM blocks WHERE number = (SELECT MAX(number) FROM blocks)")
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		err = rows.Scan(&buf)
-		if err != nil {
-			return nil, err
-		}
-		if !buf.Valid {
-			return nil, errors.New("not found")
-		}
 		header = &types.Header{}
-		err = header.UnmarshalJSON(buf.Bytes)
+		err = rows.Scan(&JSONBlob{header})
 		if err != nil {
 			return nil, err
 		}
@@ -283,16 +236,8 @@ func (db *Database) HeaderExists(hash common.Hash) (bool, error) {
 
 // GetHeaderByNumber selects header using block number.
 func (db *Database) GetHeaderByNumber(number *big.Int) (*types.Header, error) {
-	var buf NullBytes
-	err := db.db.QueryRow("SELECT header FROM blocks WHERE number = ?", (*SQLBigInt)(number)).Scan(&buf)
-	if err != nil {
-		return nil, err
-	}
-	if !buf.Valid {
-		return nil, errors.New("not found")
-	}
 	header := &types.Header{}
-	err = header.UnmarshalJSON(buf.Bytes)
+	err := db.db.QueryRow("SELECT header FROM blocks WHERE number = ?", (*SQLBigInt)(number)).Scan(&JSONBlob{header})
 	if err != nil {
 		return nil, err
 	}

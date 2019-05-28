@@ -32,7 +32,7 @@ func (s *Service) Start(*p2p.Server) error {
 	return s.signals.Start()
 }
 
-// StartReactor separately cause it requires known ethereum address.
+// StartReactor separately cause it requires known ethereum address, that will become available only after login.
 func (s *Service) StartReactor(dbpath string, client *ethclient.Client, address common.Address, chain *big.Int) error {
 	db, err := InitializeDB(dbpath)
 	if err != nil {
