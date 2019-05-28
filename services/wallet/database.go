@@ -13,6 +13,10 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+const (
+	errNoRows = "sql: no rows in result set"
+)
+
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path string) (*Database, error) {
 	db, err := sqlite.OpenDB(path)
@@ -26,8 +30,8 @@ func InitializeDB(path string) (*Database, error) {
 	return &Database{db: db}, nil
 }
 
-// SQLBigInt type for storing uin256 in the databse.
-// FIXME(dshulyak) SQL bit int is max 64 bits. Maybe store as bytes in big endian and hope
+// SQLBigInt type for storing uint256 in the databse.
+// FIXME(dshulyak) SQL big int is max 64 bits. Maybe store as bytes in big endian and hope
 // that lexographical sorting will work.
 type SQLBigInt big.Int
 
@@ -151,6 +155,7 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 	if err != nil {
 		return
 	}
+	defer rows.Close()
 	for rows.Next() {
 		transfer := Transfer{
 			Header:      &types.Header{},
@@ -211,6 +216,7 @@ func (db *Database) LastHeader() (header *types.Header, err error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		header = &types.Header{}
 		err = rows.Scan(&JSONBlob{header})
@@ -238,8 +244,11 @@ func (db *Database) HeaderExists(hash common.Hash) (bool, error) {
 func (db *Database) GetHeaderByNumber(number *big.Int) (*types.Header, error) {
 	header := &types.Header{}
 	err := db.db.QueryRow("SELECT header FROM blocks WHERE number = ?", (*SQLBigInt)(number)).Scan(&JSONBlob{header})
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return header, nil
 	}
-	return header, nil
+	if err.Error() == errNoRows {
+		return nil, nil
+	}
+	return nil, err
 }

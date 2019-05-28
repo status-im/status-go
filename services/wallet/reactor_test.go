@@ -35,17 +35,7 @@ func (h headers) HeaderByNumber(ctx context.Context, number *big.Int) (*types.He
 func TestReactorReorgOnNewBlock(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	original := make([]*types.Header, 5)
-	for i := range original {
-		original[i] = &types.Header{
-			Number:     big.NewInt(int64(i)),
-			Difficulty: big.NewInt(1),
-			Time:       big.NewInt(1),
-		}
-		if i != 0 {
-			original[i].ParentHash = original[i-1].Hash()
-		}
-	}
+	original := genHeadersChain(5, 1)
 	require.NoError(t, db.SaveHeaders(original))
 	// rewrite parents ater 2nd block
 	reorg := make(headers, 5)
@@ -62,13 +52,13 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 		client: reorg,
 		db:     db,
 	}
-	previous := original[len(original)-1]
 	latest := &types.Header{
 		Number:     big.NewInt(5),
 		Difficulty: big.NewInt(2),
 		Time:       big.NewInt(1),
 		ParentHash: reorg[len(reorg)-1].Hash(),
 	}
+	previous := original[len(original)-1]
 	added, removed, err := reactor.onNewBlock(context.TODO(), previous, latest)
 	require.NoError(t, err)
 	require.Len(t, added, 4)
@@ -90,4 +80,42 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 	for i, h := range expected {
 		require.Equal(t, h.Hash(), added[i].Hash())
 	}
+}
+
+func TestReactorReorgAllKnownHeaders(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	original := genHeadersChain(2, 1)
+	reorg := make(headers, 2)
+	copy(reorg, genHeadersChain(2, 2))
+	latest := &types.Header{
+		Number:     big.NewInt(2),
+		Difficulty: big.NewInt(2),
+		Time:       big.NewInt(1),
+		ParentHash: reorg[len(reorg)-1].Hash(),
+	}
+	require.NoError(t, db.SaveHeaders(original))
+	reactor := Reactor{
+		client: reorg,
+		db:     db,
+	}
+	added, removed, err := reactor.onNewBlock(context.TODO(), original[len(original)-1], latest)
+	require.NoError(t, err)
+	require.Len(t, added, 3)
+	require.Len(t, removed, 2)
+}
+
+func genHeadersChain(size, difficulty int) []*types.Header {
+	rst := make([]*types.Header, size)
+	for i := 0; i < size; i++ {
+		rst[i] = &types.Header{
+			Number:     big.NewInt(int64(i)),
+			Difficulty: big.NewInt(int64(difficulty)),
+			Time:       big.NewInt(1),
+		}
+		if i != 0 {
+			rst[i].ParentHash = rst[i-1].Hash()
+		}
+	}
+	return rst
 }
