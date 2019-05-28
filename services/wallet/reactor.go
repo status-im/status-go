@@ -109,7 +109,7 @@ func (r *Reactor) loop() {
 				log.Error("failed to get latest block", "number", latest, "error", err)
 				continue
 			}
-			log.Info("reactor received new block", "header", header.Hash())
+			log.Debug("reactor received new block", "header", header.Hash())
 			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 			added, removed, err := r.onNewBlock(ctx, latest, header)
 			cancel()
@@ -120,13 +120,13 @@ func (r *Reactor) loop() {
 			// for each added block get tranfers from downloaders
 			all := []Transfer{}
 			for i := range added {
-				log.Info("reactor get transfers", "block", added[i].Hash(), "number", added[i].Number)
+				log.Debug("reactor get transfers", "block", added[i].Hash(), "number", added[i].Number)
 				transfers, err := r.getTransfers(added[i])
 				if err != nil {
 					log.Error("failed to get transfers", "header", header, "error", err)
 					continue
 				}
-				log.Info("reactor adding transfers", "block", added[i].Hash(), "number", added[i].Number, "len", len(transfers))
+				log.Debug("reactor adding transfers", "block", added[i].Hash(), "number", added[i].Number, "len", len(transfers))
 				all = append(all, transfers...)
 			}
 			err = r.db.ProcessTranfers(all, added, removed)
@@ -183,10 +183,11 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header
 		return nil, nil, err
 	}
 	if exists {
-		return nil, nil, err
+		return nil, nil, nil
 	}
 	// reorg
-	for previous.Hash() != latest.ParentHash || previous == nil {
+	log.Debug("wallet reactor spotted reorg", "last header in db", previous.Hash(), "new parent", latest.ParentHash)
+	for previous != nil && previous.Hash() != latest.ParentHash {
 		removed = append(removed, previous)
 		added = append(added, latest)
 		latest, err = r.client.HeaderByHash(ctx, latest.ParentHash)
