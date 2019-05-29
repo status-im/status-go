@@ -13,8 +13,15 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+// SyncOption is used to specify that application processed transfers for that block.
+type SyncOption uint
+
 const (
 	errNoRows = "sql: no rows in result set"
+
+	// sync options
+	ethSync   SyncOption = 1
+	erc20Sync SyncOption = 2
 )
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -87,12 +94,15 @@ func (db Database) Close() error {
 }
 
 // ProcessTranfers atomically adds/removes blocks and adds new tranfers.
-func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types.Header) (err error) {
+func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types.Header, option SyncOption) (err error) {
 	var (
-		tx     *sql.Tx
-		insert *sql.Stmt
-		blocks *sql.Stmt
-		delete *sql.Stmt
+		tx       *sql.Tx
+		insert   *sql.Stmt
+		blocks   *sql.Stmt
+		update   *sql.Stmt
+		delete   *sql.Stmt
+		rst      sql.Result
+		affected int64
 	)
 	tx, err = db.db.Begin()
 	if err != nil {
@@ -114,7 +124,11 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types
 	if err != nil {
 		return err
 	}
-	blocks, err = tx.Prepare("INSERT INTO blocks(hash, number, header) VALUES (?, ?, ?)")
+	update, err = tx.Prepare("UPDATE blocks SET sync=sync|? WHERE hash = ?")
+	if err != nil {
+		return err
+	}
+	blocks, err = tx.Prepare("INSERT INTO blocks(hash, number, header, sync) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
@@ -125,7 +139,18 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types
 		}
 	}
 	for _, header := range added {
-		_, err = blocks.Exec(header.Hash(), (*SQLBigInt)(header.Number), &JSONBlob{header})
+		rst, err = update.Exec(option, header.Hash())
+		if err != nil {
+			return err
+		}
+		affected, err = rst.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected != 0 {
+			continue
+		}
+		_, err = blocks.Exec(header.Hash(), (*SQLBigInt)(header.Number), &JSONBlob{header}, option)
 		if err != nil {
 			return err
 		}
@@ -174,13 +199,13 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 }
 
 // SaveHeader stores a single header.
-func (db *Database) SaveHeader(header *types.Header) error {
-	_, err := db.db.Exec("INSERT INTO blocks(number, hash, header) VALUES (?, ?, ?)", (*SQLBigInt)(header.Number), header.Hash(), &JSONBlob{header})
+func (db *Database) SaveHeader(header *types.Header, sync SyncOption) error {
+	_, err := db.db.Exec("INSERT INTO blocks(number, hash, header, sync) VALUES (?, ?, ?, ?)", (*SQLBigInt)(header.Number), header.Hash(), &JSONBlob{header}, sync)
 	return err
 }
 
 // SaveHeaders stores a list of headers atomically.
-func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
+func (db *Database) SaveHeaders(headers []*types.Header, sync SyncOption) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
@@ -189,7 +214,7 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	if err != nil {
 		return
 	}
-	insert, err = tx.Prepare("INSERT INTO blocks(number, hash, header) VALUES (?,?,?)")
+	insert, err = tx.Prepare("INSERT INTO blocks(number, hash, header, sync) VALUES (?,?,?,?)")
 	if err != nil {
 		return
 	}
@@ -251,4 +276,23 @@ func (db *Database) GetHeaderByNumber(number *big.Int) (*types.Header, error) {
 		return nil, nil
 	}
 	return nil, err
+}
+
+func (db *Database) GetEarliestSynced(option SyncOption) (header *types.Header, err error) {
+	rows, err := db.db.Query("SELECT header FROM blocks WHERE number = (SELECT MIN(number) FROM blocks WHERE sync & $1 = $1)", option)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		header = &types.Header{}
+		err = rows.Scan(&JSONBlob{header})
+		if err != nil {
+			return nil, err
+		}
+		if header != nil {
+			return header, nil
+		}
+	}
+	return nil, nil
 }

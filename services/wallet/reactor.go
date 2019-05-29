@@ -27,6 +27,12 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 	}
 }
 
+var (
+	reorgSafetyDepth = big.NewInt(15)
+	erc20BatchSize   = big.NewInt(100000)
+	ethBatchSize     = big.NewInt(100)
+)
+
 // HeaderReader interface for reading headers using block number or hash.
 type HeaderReader interface {
 	HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error)
@@ -72,10 +78,44 @@ func (r *Reactor) Start() error {
 		return errors.New("already running")
 	}
 	r.quit = make(chan struct{})
+
+	latest, err := r.db.LastHeader()
+	if err != nil {
+		return err
+	}
+	if latest == nil {
+		// TODO(dshulyak) this must be done inside of a loop
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		latest, err = r.client.HeaderByNumber(ctx, nil)
+		cancel()
+		if err != nil {
+			return err
+		}
+		if latest.Number.Cmp(reorgSafetyDepth) >= 0 {
+			num := new(big.Int).Sub(latest.Number, reorgSafetyDepth)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			latest, err = r.client.HeaderByNumber(ctx, num)
+			cancel()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	r.wg.Add(1)
 	go func() {
-		log.Info("wallet reactor started", "address", r.address.String())
-		r.loop()
+		log.Info("wallet loop for new transfers started", "address", r.address.String())
+		r.newTransfersLoop(latest)
+		r.wg.Done()
+	}()
+	r.wg.Add(1)
+	go func() {
+		r.erc20HistoricalLoop(latest)
+		r.wg.Done()
+	}()
+	r.wg.Add(1)
+	go func() {
+		r.ethHistoricalLoop(latest)
 		r.wg.Done()
 	}()
 	return nil
@@ -91,11 +131,10 @@ func (r *Reactor) Stop() {
 	r.quit = nil
 }
 
-func (r *Reactor) loop() {
+func (r *Reactor) erc20HistoricalLoop(latest *types.Header) {
+	// TODO(dshulyak) waiting makes sense only in case of error. otherwise proceed in batches without waiting.
 	var (
-		ticker = time.NewTicker(pollingPeriodByChain(r.chain))
-		latest *types.Header
-		err    error
+		ticker = time.NewTicker(1 * time.Second)
 	)
 	defer ticker.Stop()
 	for {
@@ -103,17 +142,97 @@ func (r *Reactor) loop() {
 		case <-r.quit:
 			return
 		case <-ticker.C:
-			var num *big.Int
-			if latest == nil {
-				latest, err = r.db.LastHeader()
-				if err != nil {
-					log.Error("failed to read last header from database", "error", err)
-					continue
-				}
+			earliest, err := r.db.GetEarliestSynced(erc20Sync)
+			if err != nil {
+				log.Error("failed to get earliest synced block for erc20", "error", err)
+				continue
 			}
-			if latest != nil {
-				num = new(big.Int).Add(latest.Number, one)
+			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
+				log.Info("finished downloading historical transfers")
+				return
 			}
+			if earliest == nil {
+				earliest = latest
+			}
+			start := new(big.Int).Sub(earliest.Number, erc20BatchSize)
+			// if start < 0; start = 0
+			from, err := r.client.HeaderByNumber(context.Background(), start)
+			if err != nil {
+				log.Error("failed to get header by number", "number", start, "error", err)
+				continue
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			transfers, err := r.erc20.GetTransfersInRange(ctx, from, earliest)
+			cancel()
+			if err != nil {
+				log.Error("failed to get erc20 transfer inbetween two bloks", "from", from, "to", earliest, "error", err)
+				continue
+			}
+			err = r.db.ProcessTranfers(transfers, []*types.Header{from}, nil, erc20Sync)
+			if err != nil {
+				log.Error("failed to save downloaded erc20 transfers", "error", err)
+			}
+		}
+	}
+}
+
+func (r *Reactor) ethHistoricalLoop(latest *types.Header) {
+	var (
+		ticker = time.NewTicker(1 * time.Second)
+	)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-r.quit:
+			return
+		case <-ticker.C:
+			earliest, err := r.db.GetEarliestSynced(ethSync)
+			if err != nil {
+				log.Error("failed to get earliest synced block for eth transfers", "error", err)
+				continue
+			}
+			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
+				log.Info("finished downloading historical transfers")
+				return
+			}
+			if earliest == nil {
+				earliest = latest
+			}
+			start := new(big.Int).Sub(earliest.Number, ethBatchSize)
+			// if start < 0; start = 0
+			from, err := r.client.HeaderByNumber(context.Background(), start)
+			if err != nil {
+				log.Error("failed to get header by number", "number", start, "error", err)
+				continue
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			transfers, err := r.eth.GetTransfersInRange(ctx, from, earliest)
+			cancel()
+			if err != nil {
+				log.Error("failed to get eth transfer inbetween two bloks", "from", from, "to", earliest, "error", err)
+				continue
+			}
+			err = r.db.ProcessTranfers(transfers, []*types.Header{from}, nil, ethSync)
+			if err != nil {
+				log.Error("failed to save downloaded erc20 transfers", "error", err)
+			}
+		}
+	}
+}
+
+// newTransfersLoop looks for new transfers block by block
+func (r *Reactor) newTransfersLoop(latest *types.Header) {
+	var (
+		ticker = time.NewTicker(pollingPeriodByChain(r.chain))
+		num    = new(big.Int)
+	)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-r.quit:
+			return
+		case <-ticker.C:
+			num = num.Add(latest.Number, one)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			header, err := r.client.HeaderByNumber(ctx, num)
 			cancel()
@@ -141,13 +260,12 @@ func (r *Reactor) loop() {
 				log.Debug("reactor adding transfers", "block", added[i].Hash(), "number", added[i].Number, "len", len(transfers))
 				all = append(all, transfers...)
 			}
-			err = r.db.ProcessTranfers(all, added, removed)
+			err = r.db.ProcessTranfers(all, added, removed, erc20Sync|ethSync)
 			if err != nil {
 				log.Error("failed to persist transfers", "error", err)
 				continue
 			}
 			latest = header
-
 			if len(added) == 1 && len(removed) == 0 {
 				r.feed.Send(Event{
 					Type:        EventNewBlock,
