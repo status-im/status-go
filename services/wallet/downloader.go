@@ -29,7 +29,8 @@ var (
 // Transfer stores information about transfer.
 type Transfer struct {
 	Type        TransferType
-	Header      *types.Header
+	BlockNumber *big.Int
+	BlockHash   common.Hash
 	Transaction *types.Transaction
 	Receipt     *types.Receipt
 }
@@ -43,7 +44,7 @@ type ETHTransferDownloader struct {
 
 // GetTransfers checks if the balance was changed between two blocks.
 // If so it downloads transaction that transfer ethereum from that block.
-func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *types.Header) (rst []Transfer, err error) {
+func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHeader) (rst []Transfer, err error) {
 	// TODO(dshulyak) consider caching balance and reset it on reorg
 	num := new(big.Int).Sub(header.Number, one)
 	balance, err := d.client.BalanceAt(ctx, d.address, num)
@@ -57,7 +58,7 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *types.
 	if current.Cmp(balance) == 0 {
 		return nil, nil
 	}
-	blk, err := d.client.BlockByHash(ctx, header.Hash())
+	blk, err := d.client.BlockByHash(ctx, header.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +79,10 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 			if err != nil {
 				return nil, err
 			}
-			rst = append(rst, Transfer{Type: ethTransfer, Header: blk.Header(), Transaction: tx, Receipt: receipt})
+			rst = append(rst, Transfer{Type: ethTransfer,
+				BlockNumber: blk.Number(),
+				BlockHash:   blk.Hash(),
+				Transaction: tx, Receipt: receipt})
 			continue
 		}
 		from, err := types.Sender(d.signer, tx)
@@ -91,7 +95,10 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 			if err != nil {
 				return nil, err
 			}
-			rst = append(rst, Transfer{Type: ethTransfer, Header: blk.Header(), Transaction: tx, Receipt: receipt})
+			rst = append(rst, Transfer{Type: ethTransfer,
+				BlockNumber: blk.Number(),
+				BlockHash:   blk.Hash(),
+				Transaction: tx, Receipt: receipt})
 			continue
 		}
 	}
@@ -99,21 +106,21 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 	return rst, nil
 }
 
-func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, to *types.Header) (rst []Transfer, err error) {
-	older, err := d.client.BalanceAt(ctx, d.address, from.Number)
+func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) (rst []Transfer, err error) {
+	older, err := d.client.BalanceAt(ctx, d.address, from)
 	if err != nil {
 		return nil, err
 	}
-	newer, err := d.client.BalanceAt(ctx, d.address, to.Number)
+	newer, err := d.client.BalanceAt(ctx, d.address, to)
 	if err != nil {
 		return nil, err
 	}
 	// need better name
-	num := new(big.Int).Set(to.Number)
-	// on every iteration newer will get one step closer to odler.
+	num := new(big.Int).Set(to)
+	// on every iteration newer will get one step closer to older.
 	// once balance is the same we consider that all possible transfers were found
 	for older.Cmp(newer) != 0 {
-		num = num.Sub(to.Number, one)
+		num = num.Sub(num, one)
 		update, err := d.client.BalanceAt(ctx, d.address, num)
 		if err != nil {
 			return nil, err
@@ -170,10 +177,6 @@ func (d *ERC20TransfersDownloader) outboundTopics() [][]common.Hash {
 func (d *ERC20TransfersDownloader) transfersFromLogs(ctx context.Context, logs []types.Log) ([]Transfer, error) {
 	rst := make([]Transfer, len(logs))
 	for i, l := range logs {
-		header, err := d.client.HeaderByHash(ctx, l.BlockHash)
-		if err != nil {
-			return nil, err
-		}
 		tx, err := d.client.TransactionInBlock(ctx, l.BlockHash, l.TxIndex)
 		if err != nil {
 			return nil, err
@@ -184,7 +187,8 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(ctx context.Context, logs [
 		}
 		rst[i] = Transfer{
 			Type:        erc20Transfer,
-			Header:      header,
+			BlockNumber: new(big.Int).SetUint64(l.BlockNumber),
+			BlockHash:   l.BlockHash,
 			Transaction: tx,
 			Receipt:     receipt,
 		}
@@ -193,8 +197,8 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(ctx context.Context, logs [
 }
 
 // GetTransfers for erc20 uses eth_getLogs rpc with Transfer event signature and our address acount.
-func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *types.Header) ([]Transfer, error) {
-	hash := header.Hash()
+func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBHeader) ([]Transfer, error) {
+	hash := header.Hash
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 		BlockHash: &hash,
 		Topics:    d.outboundTopics(),
@@ -216,40 +220,23 @@ func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *typ
 	all := make([]types.Log, lth)
 	copy(all, outbound)
 	copy(all[len(outbound):], inbound)
-	rst := make([]Transfer, lth)
-	for i, l := range all {
-		tx, err := d.client.TransactionInBlock(ctx, hash, l.TxIndex)
-		if err != nil {
-			return nil, err
-		}
-		receipt, err := d.client.TransactionReceipt(ctx, l.TxHash)
-		if err != nil {
-			return nil, err
-		}
-		rst[i] = Transfer{
-			Type:        erc20Transfer,
-			Header:      header,
-			Transaction: tx,
-			Receipt:     receipt,
-		}
-	}
-	return rst, nil
+	return d.transfersFromLogs(ctx, all)
 }
 
 // GetTransfersInRange returns transfers between two blocks.
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
-func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from, to *types.Header) ([]Transfer, error) {
+func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error) {
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-		FromBlock: from.Number,
-		ToBlock:   to.Number,
+		FromBlock: from,
+		ToBlock:   to,
 		Topics:    d.outboundTopics(),
 	})
 	if err != nil {
 		return nil, err
 	}
 	inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-		FromBlock: from.Number,
-		ToBlock:   to.Number,
+		FromBlock: from,
+		ToBlock:   to,
 		Topics:    d.inboundTopics(),
 	})
 	if err != nil {

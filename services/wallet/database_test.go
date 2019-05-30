@@ -33,7 +33,7 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 	require.NoError(t, db.SaveHeader(header, 0))
 	rst, err := db.GetHeaderByNumber(header.Number)
 	require.NoError(t, err)
-	require.Equal(t, header.Hash(), rst.Hash())
+	require.Equal(t, header.Hash(), rst.Hash)
 }
 
 func TestDBGetHeaderByNumberNoRows(t *testing.T) {
@@ -84,7 +84,7 @@ func TestDBLastHeader(t *testing.T) {
 
 	rst, err := db.LastHeader()
 	require.NoError(t, err)
-	require.Equal(t, second.Hash(), rst.Hash())
+	require.Equal(t, second.Hash(), rst.Hash)
 }
 
 func TestDBNoLastHeader(t *testing.T) {
@@ -98,21 +98,21 @@ func TestDBNoLastHeader(t *testing.T) {
 func TestDBProcessTransfer(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	header := &types.Header{
-		Number:     big.NewInt(1),
-		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+	header := &DBHeader{
+		Number: big.NewInt(1),
+		Hash:   common.Hash{1},
 	}
 	tx := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	transfers := []Transfer{
 		{
 			Type:        ethTransfer,
-			Header:      header,
+			BlockHash:   header.Hash,
+			BlockNumber: header.Number,
 			Transaction: tx,
 			Receipt:     types.NewReceipt(nil, false, 100),
 		},
 	}
-	require.NoError(t, db.ProcessTranfers(transfers, []*types.Header{header}, nil, 0))
+	require.NoError(t, db.ProcessTranfers(transfers, []*DBHeader{header}, nil, 0))
 }
 
 func TestDBReorgTransfers(t *testing.T) {
@@ -120,24 +120,22 @@ func TestDBReorgTransfers(t *testing.T) {
 	defer stop()
 	rcpt := types.NewReceipt(nil, false, 100)
 	rcpt.Logs = []*types.Log{}
-	original := &types.Header{
-		Number:     big.NewInt(1),
-		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+	original := &DBHeader{
+		Number: big.NewInt(1),
+		Hash:   common.Hash{1},
 	}
-	replaced := &types.Header{
-		Number:     big.NewInt(1),
-		Difficulty: big.NewInt(2),
-		Time:       big.NewInt(2),
+	replaced := &DBHeader{
+		Number: big.NewInt(1),
+		Hash:   common.Hash{2},
 	}
 	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, original, originalTX, rcpt},
-	}, []*types.Header{original}, nil, 0))
+		{ethTransfer, original.Number, original.Hash, originalTX, rcpt},
+	}, []*DBHeader{original}, nil, 0))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, replaced, replacedTX, rcpt},
-	}, []*types.Header{replaced}, []*types.Header{original}, 0))
+		{ethTransfer, replaced.Number, replaced.Hash, replacedTX, rcpt},
+	}, []*DBHeader{replaced}, []*DBHeader{original}, 0))
 
 	all, err := db.GetTransfers(big.NewInt(0), nil)
 	require.NoError(t, err)
@@ -148,13 +146,12 @@ func TestDBReorgTransfers(t *testing.T) {
 func TestDBGetTransfersFromBlock(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	headers := []*types.Header{}
+	headers := []*DBHeader{}
 	transfers := []Transfer{}
 	for i := 1; i < 10; i++ {
-		header := &types.Header{
-			Number:     big.NewInt(int64(i)),
-			Difficulty: big.NewInt(1),
-			Time:       big.NewInt(1),
+		header := &DBHeader{
+			Number: big.NewInt(int64(i)),
+			Hash:   common.Hash{byte(i)},
 		}
 		headers = append(headers, header)
 		tx := types.NewTransaction(uint64(i), common.Address{1}, nil, 10, big.NewInt(10), nil)
@@ -162,7 +159,8 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		receipt.Logs = []*types.Log{}
 		transfer := Transfer{
 			Type:        ethTransfer,
-			Header:      header,
+			BlockNumber: header.Number,
+			BlockHash:   header.Hash,
 			Transaction: tx,
 			Receipt:     receipt,
 		}
@@ -198,7 +196,7 @@ func TestDBEarliestSynced(t *testing.T) {
 
 	earliest, err := db.GetEarliestSynced(ethSync)
 	require.NoError(t, err)
-	require.Equal(t, h2.Hash(), earliest.Hash())
+	require.Equal(t, h2.Hash(), earliest.Hash)
 }
 
 func TestDBEarliestSyncedDoesntExist(t *testing.T) {
@@ -214,15 +212,14 @@ func TestDBProcessTransfersUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	header := &types.Header{
-		Number:     big.NewInt(10),
-		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+	header := &DBHeader{
+		Number: big.NewInt(10),
+		Hash:   common.Hash{1},
 	}
-	require.NoError(t, db.ProcessTranfers(nil, []*types.Header{header}, nil, ethSync))
-	require.NoError(t, db.ProcessTranfers(nil, []*types.Header{header}, nil, erc20Sync))
+	require.NoError(t, db.ProcessTranfers(nil, []*DBHeader{header}, nil, ethSync))
+	require.NoError(t, db.ProcessTranfers(nil, []*DBHeader{header}, nil, erc20Sync))
 
 	earliest, err := db.GetEarliestSynced(ethSync | erc20Sync)
 	require.NoError(t, err)
-	require.Equal(t, header.Hash(), earliest.Hash())
+	require.Equal(t, header.Hash, earliest.Hash)
 }

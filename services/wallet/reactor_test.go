@@ -59,7 +59,7 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 		ParentHash: reorg[len(reorg)-1].Hash(),
 	}
 	previous := original[len(original)-1]
-	added, removed, err := reactor.onNewBlock(context.TODO(), previous, latest)
+	added, removed, err := reactor.onNewBlock(context.TODO(), toDBHeader(previous), latest)
 	require.NoError(t, err)
 	require.Len(t, added, 4)
 	require.Len(t, removed, 3)
@@ -68,7 +68,7 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 		return removed[i].Number.Cmp(removed[j].Number) < 1
 	})
 	for i, h := range original[2:] {
-		require.Equal(t, h.Hash(), removed[i].Hash())
+		require.Equal(t, h.Hash(), removed[i].Hash)
 	}
 
 	expected := make([]*types.Header, 4)
@@ -78,7 +78,7 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 		return added[i].Number.Cmp(added[j].Number) < 1
 	})
 	for i, h := range expected {
-		require.Equal(t, h.Hash(), added[i].Hash())
+		require.Equal(t, h.Hash(), added[i].Hash)
 	}
 }
 
@@ -99,7 +99,7 @@ func TestReactorReorgAllKnownHeaders(t *testing.T) {
 		client: reorg,
 		db:     db,
 	}
-	added, removed, err := reactor.onNewBlock(context.TODO(), original[len(original)-1], latest)
+	added, removed, err := reactor.onNewBlock(context.TODO(), toDBHeader(original[len(original)-1]), latest)
 	require.NoError(t, err)
 	require.Len(t, added, 3)
 	require.Len(t, removed, 2)
