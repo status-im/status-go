@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -22,18 +23,24 @@ func TestTransfersSuite(t *testing.T) {
 type TransfersSuite struct {
 	DevNodeSuite
 
-	Address common.Address
+	Password string
+	Info     account.Info
+	Address  common.Address
+}
+
+func (s *TransfersSuite) SelectAccount() {
+	s.Require().NoError(s.backend.SelectAccount(s.Info.WalletAddress, s.Info.ChatAddress, s.Password))
+	_, err := s.backend.AccountManager().SelectedWalletAccount()
+	s.Require().NoError(err)
 }
 
 func (s *TransfersSuite) SetupTest() {
 	s.DevNodeSuite.SetupTest()
-	password := "test"
-	info, _, err := s.backend.AccountManager().CreateAccount(password)
+	s.Password = "test"
+	info, _, err := s.backend.AccountManager().CreateAccount(s.Password)
 	s.Require().NoError(err)
-	s.Require().NoError(s.backend.SelectAccount(info.WalletAddress, info.ChatAddress, password))
-	account, err := s.backend.AccountManager().SelectedWalletAccount()
-	s.Require().NoError(err)
-	s.Address = account.Address
+	s.Info = info
+	s.Address = common.HexToAddress(info.WalletAddress)
 }
 
 func (s *TransfersSuite) getAllTranfers() (rst []wallet.Transfer, err error) {
@@ -52,7 +59,8 @@ func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
 	s.Require().NoError(err)
 }
 
-func (s *TransfersSuite) TestEventuallySynced() {
+func (s *TransfersSuite) TestNewTransfers() {
+	s.SelectAccount()
 	s.sendTx(0, s.Address)
 	s.Require().NoError(utils.Eventually(func() error {
 		all, err := s.getAllTranfers()
@@ -76,7 +84,24 @@ func (s *TransfersSuite) TestEventuallySynced() {
 			return err
 		}
 		if len(all) != 10 {
-			return fmt.Errorf("waiting for ten transfers")
+			return fmt.Errorf("waiting for 10 transfers")
+		}
+		return nil
+	}, 30*time.Second, 1*time.Second))
+}
+
+func (s *TransfersSuite) TestHistoricalTransfers() {
+	for i := 0; i < 30; i++ {
+		s.sendTx(uint64(i), s.Address)
+	}
+	s.SelectAccount()
+	s.Require().NoError(utils.Eventually(func() error {
+		all, err := s.getAllTranfers()
+		if err != nil {
+			return err
+		}
+		if len(all) != 30 {
+			return fmt.Errorf("waiting for 30 transfers")
 		}
 		return nil
 	}, 30*time.Second, 1*time.Second))
