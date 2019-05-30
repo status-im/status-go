@@ -145,6 +145,10 @@ func (r *Reactor) erc20HistoricalLoop() {
 					log.Error("failed to save downloaded erc20 transfers", "error", err)
 					break
 				}
+				r.feed.Send(Event{
+					Type:        EventNewHistory,
+					BlockNumber: iterator.Header().Number,
+				})
 			}
 			if iterator.Finished() {
 				return
@@ -186,6 +190,10 @@ func (r *Reactor) ethHistoricalLoop() {
 					log.Error("failed to save downloaded eth transfers", "error", err)
 					break
 				}
+				r.feed.Send(Event{
+					Type:        EventNewHistory,
+					BlockNumber: iterator.Header().Number,
+				})
 			}
 			if iterator.Finished() {
 				return

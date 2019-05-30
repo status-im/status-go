@@ -10,6 +10,8 @@ const (
 	EventNewBlock = "newblock"
 	// EventReorg emitted when canonical chain was changed. In this case, BlockNumber will be an earliest added block.
 	EventReorg = "reorg"
+	// EventNewHistory emitted if transfer from older block was added.
+	EventNewHistory = "history"
 )
 
 // Event is a type for wallet events.
