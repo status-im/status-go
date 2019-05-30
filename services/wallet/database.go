@@ -141,7 +141,7 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*DBHea
 	if err != nil {
 		return err
 	}
-	blocks, err = tx.Prepare("INSERT INTO blocks(hash, number, sync) VALUES (?, ?, ?)")
+	blocks, err = tx.Prepare("INSERT OR IGNORE INTO blocks(hash, number, sync) VALUES (?, ?, ?)")
 	if err != nil {
 		return err
 	}

@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	one = big.NewInt(1)
+	one  = big.NewInt(1)
+	zero = big.NewInt(0)
 )
 
 // Transfer stores information about transfer.
@@ -107,6 +108,12 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 }
 
 func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) (rst []Transfer, err error) {
+	if to == nil {
+		return nil, errors.New("to shouldn't be nil")
+	}
+	if from.Cmp(zero) == 1 {
+		from = new(big.Int).Sub(from, one)
+	}
 	older, err := d.client.BalanceAt(ctx, d.address, from)
 	if err != nil {
 		return nil, err
@@ -126,7 +133,7 @@ func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, t
 			return nil, err
 		}
 		if update.Cmp(newer) != 0 {
-			// FIXME store both
+			// FIXME store both previous and current to avoid allocation
 			blk, err := d.client.BlockByNumber(ctx, new(big.Int).Add(num, one))
 			if err != nil {
 				return nil, err

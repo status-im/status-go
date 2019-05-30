@@ -79,46 +79,22 @@ func (r *Reactor) Start() error {
 	}
 	r.quit = make(chan struct{})
 
-	known, err := r.db.LastHeader()
-	if err != nil {
-		return err
-	}
-	if known == nil {
-		// TODO(dshulyak) this must be done inside of a loop
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		latest, err := r.client.HeaderByNumber(ctx, nil)
-		cancel()
-		if err != nil {
-			return err
-		}
-		if latest.Number.Cmp(reorgSafetyDepth) >= 0 {
-			num := new(big.Int).Sub(latest.Number, reorgSafetyDepth)
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			latest, err = r.client.HeaderByNumber(ctx, num)
-			cancel()
-			if err != nil {
-				return err
-			}
-		}
-		known = toDBHeader(latest)
-	}
-
 	r.wg.Add(1)
 	go func() {
 		log.Info("wallet loop for new transfers started", "address", r.address)
-		r.newTransfersLoop(known)
+		r.newTransfersLoop()
 		r.wg.Done()
 	}()
 	r.wg.Add(1)
 	go func() {
 		log.Info("wallet loop for erc20 historical transfers started", "address", r.address)
-		r.erc20HistoricalLoop(known)
+		r.erc20HistoricalLoop()
 		r.wg.Done()
 	}()
 	r.wg.Add(1)
 	go func() {
 		log.Info("wallet loop for eth historical transfers started", "address", r.address)
-		r.ethHistoricalLoop(known)
+		r.ethHistoricalLoop()
 		r.wg.Done()
 	}()
 	return nil
@@ -134,10 +110,13 @@ func (r *Reactor) Stop() {
 	r.quit = nil
 }
 
-func (r *Reactor) erc20HistoricalLoop(previous *DBHeader) {
-	// TODO(dshulyak) waiting makes sense only in case of error. otherwise proceed in batches without waiting.
+func (r *Reactor) erc20HistoricalLoop() {
+	// TODO(dshulyak) waiting makes sense only in case of error
+	// otherwise contiue processing in batches without waiting.
 	var (
-		ticker = time.NewTicker(1 * time.Second)
+		ticker   = time.NewTicker(1 * time.Second)
+		iterator *IterativeDownloader
+		err      error
 	)
 	defer ticker.Stop()
 	for {
@@ -145,43 +124,40 @@ func (r *Reactor) erc20HistoricalLoop(previous *DBHeader) {
 		case <-r.quit:
 			return
 		case <-ticker.C:
-			earliest, err := r.db.GetEarliestSynced(erc20Sync)
-			if err != nil {
-				log.Error("failed to get earliest synced block for erc20", "error", err)
-				continue
+			if iterator == nil {
+				iterator, err = SetupIterativeDownloader(r.db, r.client, erc20Sync, r.erc20, erc20BatchSize)
+				if err != nil {
+					log.Error("failed to setup historical downloader for erc20")
+					continue
+				}
 			}
-			if earliest == nil {
-				earliest = previous
+			for !iterator.Finished() {
+				transfers, err := iterator.Next()
+				if err != nil {
+					log.Error("failed to get next batch", "error", err)
+					break
+				}
+				headers := headersFromTransfers(transfers)
+				headers = append(headers, iterator.Header())
+				err = r.db.ProcessTranfers(transfers, headers, nil, erc20Sync)
+				if err != nil {
+					iterator.Revert()
+					log.Error("failed to save downloaded erc20 transfers", "error", err)
+					break
+				}
 			}
-			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
-				log.Info("finished downloading erc20 historical transfers")
+			if iterator.Finished() {
 				return
-			}
-			start := new(big.Int).Sub(earliest.Number, erc20BatchSize)
-			// if start < 0; start = 0
-			from, err := r.client.HeaderByNumber(context.Background(), start)
-			if err != nil {
-				log.Error("failed to get header by number", "number", start, "error", err)
-				continue
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			transfers, err := r.erc20.GetTransfersInRange(ctx, from.Number, earliest.Number)
-			cancel()
-			if err != nil {
-				log.Error("failed to get erc20 transfer inbetween two bloks", "from", from, "to", earliest, "error", err)
-				continue
-			}
-			err = r.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, erc20Sync)
-			if err != nil {
-				log.Error("failed to save downloaded erc20 transfers", "error", err)
 			}
 		}
 	}
 }
 
-func (r *Reactor) ethHistoricalLoop(previous *DBHeader) {
+func (r *Reactor) ethHistoricalLoop() {
 	var (
-		ticker = time.NewTicker(1 * time.Second)
+		ticker   = time.NewTicker(1 * time.Second)
+		iterator *IterativeDownloader
+		err      error
 	)
 	defer ticker.Stop()
 	for {
@@ -189,45 +165,42 @@ func (r *Reactor) ethHistoricalLoop(previous *DBHeader) {
 		case <-r.quit:
 			return
 		case <-ticker.C:
-			earliest, err := r.db.GetEarliestSynced(ethSync)
-			if err != nil {
-				log.Error("failed to get earliest synced block for eth transfers", "error", err)
-				continue
+			if iterator == nil {
+				iterator, err = SetupIterativeDownloader(r.db, r.client, ethSync, r.eth, ethBatchSize)
+				if err != nil {
+					log.Error("failed to setup historical downloader for eth")
+					continue
+				}
 			}
-			if earliest == nil {
-				earliest = previous
+			for !iterator.Finished() {
+				transfers, err := iterator.Next()
+				if err != nil {
+					log.Error("failed to get next batch", "error", err)
+					break
+				}
+				headers := headersFromTransfers(transfers)
+				headers = append(headers, iterator.Header())
+				err = r.db.ProcessTranfers(transfers, headers, nil, ethSync)
+				if err != nil {
+					iterator.Revert()
+					log.Error("failed to save downloaded eth transfers", "error", err)
+					break
+				}
 			}
-			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
-				log.Info("finished downloading eth historical transfers")
+			if iterator.Finished() {
 				return
-			}
-			start := new(big.Int).Sub(earliest.Number, ethBatchSize)
-			// if start < 0; start = 0
-			from, err := r.client.HeaderByNumber(context.Background(), start)
-			if err != nil {
-				log.Error("failed to get header by number", "number", start, "error", err)
-				continue
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			transfers, err := r.eth.GetTransfersInRange(ctx, from.Number, earliest.Number)
-			cancel()
-			if err != nil {
-				log.Error("failed to get eth transfer inbetween two bloks", "from", from, "to", earliest, "error", err)
-				continue
-			}
-			err = r.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, ethSync)
-			if err != nil {
-				log.Error("failed to save downloaded erc20 transfers", "error", err)
 			}
 		}
 	}
 }
 
 // newTransfersLoop looks for new transfers block by block
-func (r *Reactor) newTransfersLoop(previous *DBHeader) {
+func (r *Reactor) newTransfersLoop() {
 	var (
-		ticker = time.NewTicker(pollingPeriodByChain(r.chain))
-		num    = new(big.Int)
+		ticker   = time.NewTicker(pollingPeriodByChain(r.chain))
+		num      = new(big.Int)
+		previous *DBHeader
+		err      error
 	)
 	defer ticker.Stop()
 	for {
@@ -235,6 +208,13 @@ func (r *Reactor) newTransfersLoop(previous *DBHeader) {
 		case <-r.quit:
 			return
 		case <-ticker.C:
+			if previous == nil {
+				previous, err = lastKnownHeader(r.db, r.client)
+				if err != nil {
+					log.Error("failed to get last known header", "error", err)
+					continue
+				}
+			}
 			num = num.Add(previous.Number, one)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			latest, err := r.client.HeaderByNumber(ctx, num)
@@ -321,7 +301,6 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous *DBHeader, latest *ty
 	if exists {
 		return nil, nil, nil
 	}
-	// reorg
 	log.Debug("wallet reactor spotted reorg", "last header in db", previous.Hash, "new parent", latest.ParentHash)
 	for previous != nil && previous.Hash != latest.ParentHash {
 		removed = append(removed, previous)
@@ -353,4 +332,30 @@ func headersFromTransfers(transfers []Transfer) []*DBHeader {
 		})
 	}
 	return rst
+}
+
+func lastKnownHeader(db *Database, client HeaderReader) (*DBHeader, error) {
+	known, err := db.LastHeader()
+	if err != nil {
+		return nil, err
+	}
+	if known == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		latest, err := client.HeaderByNumber(ctx, nil)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		if latest.Number.Cmp(reorgSafetyDepth) >= 0 {
+			num := new(big.Int).Sub(latest.Number, reorgSafetyDepth)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			latest, err = client.HeaderByNumber(ctx, num)
+			cancel()
+			if err != nil {
+				return nil, err
+			}
+		}
+		known = toDBHeader(latest)
+	}
+	return known, nil
 }
