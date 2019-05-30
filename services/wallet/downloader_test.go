@@ -67,7 +67,7 @@ func (s *ETHTransferSuite) TestNoBalance() {
 
 	header, err := s.ethclient.HeaderByNumber(ctx, nil)
 	s.Require().NoError(err)
-	transfers, err := s.downloader.GetTransfers(ctx, header)
+	transfers, err := s.downloader.GetTransfers(ctx, toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Empty(transfers)
 }
@@ -86,7 +86,7 @@ func (s *ETHTransferSuite) TestBalanceUpdatedOnInbound() {
 	header, err := s.ethclient.HeaderByNumber(ctx, nil)
 	s.Require().NoError(err)
 	s.Require().Equal(big.NewInt(1), header.Number)
-	transfers, err := s.downloader.GetTransfers(ctx, header)
+	transfers, err := s.downloader.GetTransfers(ctx, toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 1)
 }
@@ -114,7 +114,7 @@ func (s *ETHTransferSuite) TestBalanceUpdatedOnOutbound() {
 	header, err := s.ethclient.HeaderByNumber(ctx, nil)
 	s.Require().NoError(err)
 	s.Require().Equal(big.NewInt(2), header.Number)
-	transfers, err := s.downloader.GetTransfers(ctx, header)
+	transfers, err := s.downloader.GetTransfers(ctx, toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 1)
 }
@@ -166,7 +166,7 @@ func (s *ERC20TransferSuite) TestNoEvents() {
 	header, err := s.ethclient.HeaderByNumber(context.TODO(), nil)
 	s.Require().NoError(err)
 
-	transfers, err := s.downloader.GetTransfers(context.TODO(), header)
+	transfers, err := s.downloader.GetTransfers(context.TODO(), toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Empty(transfers)
 }
@@ -183,7 +183,7 @@ func (s *ERC20TransferSuite) TestInboundEvent() {
 	header, err := s.ethclient.HeaderByNumber(context.TODO(), nil)
 	s.Require().NoError(err)
 
-	transfers, err := s.downloader.GetTransfers(context.TODO(), header)
+	transfers, err := s.downloader.GetTransfers(context.TODO(), toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 1)
 }
@@ -212,7 +212,7 @@ func (s *ERC20TransferSuite) TestOutboundEvent() {
 	header, err := s.ethclient.HeaderByNumber(context.TODO(), nil)
 	s.Require().NoError(err)
 
-	transfers, err := s.downloader.GetTransfers(context.TODO(), header)
+	transfers, err := s.downloader.GetTransfers(context.TODO(), toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 1)
 }

@@ -79,14 +79,14 @@ func (r *Reactor) Start() error {
 	}
 	r.quit = make(chan struct{})
 
-	latest, err := r.db.LastHeader()
+	known, err := r.db.LastHeader()
 	if err != nil {
 		return err
 	}
-	if latest == nil {
+	if known == nil {
 		// TODO(dshulyak) this must be done inside of a loop
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		latest, err = r.client.HeaderByNumber(ctx, nil)
+		latest, err := r.client.HeaderByNumber(ctx, nil)
 		cancel()
 		if err != nil {
 			return err
@@ -100,22 +100,25 @@ func (r *Reactor) Start() error {
 				return err
 			}
 		}
+		known = toDBHeader(latest)
 	}
 
 	r.wg.Add(1)
 	go func() {
-		log.Info("wallet loop for new transfers started", "address", r.address.String())
-		r.newTransfersLoop(latest)
+		log.Info("wallet loop for new transfers started", "address", r.address)
+		r.newTransfersLoop(known)
 		r.wg.Done()
 	}()
 	r.wg.Add(1)
 	go func() {
-		r.erc20HistoricalLoop(latest)
+		log.Info("wallet loop for erc20 historical transfers started", "address", r.address)
+		r.erc20HistoricalLoop(known)
 		r.wg.Done()
 	}()
 	r.wg.Add(1)
 	go func() {
-		r.ethHistoricalLoop(latest)
+		log.Info("wallet loop for eth historical transfers started", "address", r.address)
+		r.ethHistoricalLoop(known)
 		r.wg.Done()
 	}()
 	return nil
@@ -131,7 +134,7 @@ func (r *Reactor) Stop() {
 	r.quit = nil
 }
 
-func (r *Reactor) erc20HistoricalLoop(latest *types.Header) {
+func (r *Reactor) erc20HistoricalLoop(previous *DBHeader) {
 	// TODO(dshulyak) waiting makes sense only in case of error. otherwise proceed in batches without waiting.
 	var (
 		ticker = time.NewTicker(1 * time.Second)
@@ -147,12 +150,12 @@ func (r *Reactor) erc20HistoricalLoop(latest *types.Header) {
 				log.Error("failed to get earliest synced block for erc20", "error", err)
 				continue
 			}
-			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
-				log.Info("finished downloading historical transfers")
-				return
-			}
 			if earliest == nil {
-				earliest = latest
+				earliest = previous
+			}
+			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
+				log.Info("finished downloading erc20 historical transfers")
+				return
 			}
 			start := new(big.Int).Sub(earliest.Number, erc20BatchSize)
 			// if start < 0; start = 0
@@ -162,13 +165,13 @@ func (r *Reactor) erc20HistoricalLoop(latest *types.Header) {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			transfers, err := r.erc20.GetTransfersInRange(ctx, from, earliest)
+			transfers, err := r.erc20.GetTransfersInRange(ctx, from.Number, earliest.Number)
 			cancel()
 			if err != nil {
 				log.Error("failed to get erc20 transfer inbetween two bloks", "from", from, "to", earliest, "error", err)
 				continue
 			}
-			err = r.db.ProcessTranfers(transfers, []*types.Header{from}, nil, erc20Sync)
+			err = r.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, erc20Sync)
 			if err != nil {
 				log.Error("failed to save downloaded erc20 transfers", "error", err)
 			}
@@ -176,7 +179,7 @@ func (r *Reactor) erc20HistoricalLoop(latest *types.Header) {
 	}
 }
 
-func (r *Reactor) ethHistoricalLoop(latest *types.Header) {
+func (r *Reactor) ethHistoricalLoop(previous *DBHeader) {
 	var (
 		ticker = time.NewTicker(1 * time.Second)
 	)
@@ -191,12 +194,12 @@ func (r *Reactor) ethHistoricalLoop(latest *types.Header) {
 				log.Error("failed to get earliest synced block for eth transfers", "error", err)
 				continue
 			}
-			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
-				log.Info("finished downloading historical transfers")
-				return
-			}
 			if earliest == nil {
-				earliest = latest
+				earliest = previous
+			}
+			if earliest.Number.Cmp(big.NewInt(0)) == 0 {
+				log.Info("finished downloading eth historical transfers")
+				return
 			}
 			start := new(big.Int).Sub(earliest.Number, ethBatchSize)
 			// if start < 0; start = 0
@@ -206,13 +209,13 @@ func (r *Reactor) ethHistoricalLoop(latest *types.Header) {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			transfers, err := r.eth.GetTransfersInRange(ctx, from, earliest)
+			transfers, err := r.eth.GetTransfersInRange(ctx, from.Number, earliest.Number)
 			cancel()
 			if err != nil {
 				log.Error("failed to get eth transfer inbetween two bloks", "from", from, "to", earliest, "error", err)
 				continue
 			}
-			err = r.db.ProcessTranfers(transfers, []*types.Header{from}, nil, ethSync)
+			err = r.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, ethSync)
 			if err != nil {
 				log.Error("failed to save downloaded erc20 transfers", "error", err)
 			}
@@ -221,7 +224,7 @@ func (r *Reactor) ethHistoricalLoop(latest *types.Header) {
 }
 
 // newTransfersLoop looks for new transfers block by block
-func (r *Reactor) newTransfersLoop(latest *types.Header) {
+func (r *Reactor) newTransfersLoop(previous *DBHeader) {
 	var (
 		ticker = time.NewTicker(pollingPeriodByChain(r.chain))
 		num    = new(big.Int)
@@ -232,32 +235,32 @@ func (r *Reactor) newTransfersLoop(latest *types.Header) {
 		case <-r.quit:
 			return
 		case <-ticker.C:
-			num = num.Add(latest.Number, one)
+			num = num.Add(previous.Number, one)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			header, err := r.client.HeaderByNumber(ctx, num)
+			latest, err := r.client.HeaderByNumber(ctx, num)
 			cancel()
 			if err != nil {
-				log.Error("failed to get latest block", "number", latest, "error", err)
+				log.Error("failed to get latest block", "number", num, "error", err)
 				continue
 			}
-			log.Debug("reactor received new block", "header", header.Hash())
+			log.Debug("reactor received new block", "header", latest.Hash())
 			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-			added, removed, err := r.onNewBlock(ctx, latest, header)
+			added, removed, err := r.onNewBlock(ctx, previous, latest)
 			cancel()
 			if err != nil {
-				log.Error("failed to process new header", "header", header, "error", err)
+				log.Error("failed to process new header", "header", latest, "error", err)
 				continue
 			}
 			// for each added block get tranfers from downloaders
 			all := []Transfer{}
 			for i := range added {
-				log.Debug("reactor get transfers", "block", added[i].Hash(), "number", added[i].Number)
+				log.Debug("reactor get transfers", "block", added[i].Hash, "number", added[i].Number)
 				transfers, err := r.getTransfers(added[i])
 				if err != nil {
-					log.Error("failed to get transfers", "header", header, "error", err)
+					log.Error("failed to get transfers", "header", added[i].Hash, "error", err)
 					continue
 				}
-				log.Debug("reactor adding transfers", "block", added[i].Hash(), "number", added[i].Number, "len", len(transfers))
+				log.Debug("reactor adding transfers", "block", added[i].Hash, "number", added[i].Number, "len", len(transfers))
 				all = append(all, transfers...)
 			}
 			err = r.db.ProcessTranfers(all, added, removed, erc20Sync|ethSync)
@@ -265,7 +268,7 @@ func (r *Reactor) newTransfersLoop(latest *types.Header) {
 				log.Error("failed to persist transfers", "error", err)
 				continue
 			}
-			latest = header
+			previous = toDBHeader(latest)
 			if len(added) == 1 && len(removed) == 0 {
 				r.feed.Send(Event{
 					Type:        EventNewBlock,
@@ -284,7 +287,7 @@ func (r *Reactor) newTransfersLoop(latest *types.Header) {
 }
 
 // getTransfers fetches erc20 and eth transfers and returns single slice with them.
-func (r *Reactor) getTransfers(header *types.Header) ([]Transfer, error) {
+func (r *Reactor) getTransfers(header *DBHeader) ([]Transfer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	ethT, err := r.eth.GetTransfers(ctx, header)
 	cancel()
@@ -302,14 +305,14 @@ func (r *Reactor) getTransfers(header *types.Header) ([]Transfer, error) {
 
 // onNewBlock verifies if latest block extends current canonical chain view. In case if it doesn't it will find common
 // parrent and replace all blocks after that parent.
-func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header) (added, removed []*types.Header, err error) {
+func (r *Reactor) onNewBlock(ctx context.Context, previous *DBHeader, latest *types.Header) (added, removed []*DBHeader, err error) {
 	if previous == nil {
 		// first node in the cache
-		return []*types.Header{latest}, nil, nil
+		return []*DBHeader{toDBHeader(latest)}, nil, nil
 	}
-	if previous.Hash() == latest.ParentHash {
+	if previous.Hash == latest.ParentHash {
 		// parent matching previous node in the cache. on the same chain.
-		return []*types.Header{latest}, nil, nil
+		return []*DBHeader{toDBHeader(latest)}, nil, nil
 	}
 	exists, err := r.db.HeaderExists(latest.Hash())
 	if err != nil {
@@ -319,10 +322,10 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header
 		return nil, nil, nil
 	}
 	// reorg
-	log.Debug("wallet reactor spotted reorg", "last header in db", previous.Hash(), "new parent", latest.ParentHash)
-	for previous != nil && previous.Hash() != latest.ParentHash {
+	log.Debug("wallet reactor spotted reorg", "last header in db", previous.Hash, "new parent", latest.ParentHash)
+	for previous != nil && previous.Hash != latest.ParentHash {
 		removed = append(removed, previous)
-		added = append(added, latest)
+		added = append(added, toDBHeader(latest))
 		latest, err = r.client.HeaderByHash(ctx, latest.ParentHash)
 		if err != nil {
 			return nil, nil, err
@@ -332,6 +335,22 @@ func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header
 			return nil, nil, err
 		}
 	}
-	added = append(added, latest)
+	added = append(added, toDBHeader(latest))
 	return added, removed, nil
+}
+
+func headersFromTransfers(transfers []Transfer) []*DBHeader {
+	byHash := map[common.Hash]struct{}{}
+	rst := []*DBHeader{}
+	for i := range transfers {
+		_, exists := byHash[transfers[i].BlockHash]
+		if exists {
+			continue
+		}
+		rst = append(rst, &DBHeader{
+			Hash:   transfers[i].BlockHash,
+			Number: transfers[i].BlockNumber,
+		})
+	}
+	return rst
 }
