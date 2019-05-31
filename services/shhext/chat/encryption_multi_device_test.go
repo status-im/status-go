@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 )
 
 const (
@@ -53,24 +53,24 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 		if err != nil {
 			return err
 		}
-		// Initialize topics
+		// Initialize sharedsecret
 		multideviceConfig := &multidevice.Config{
 			MaxInstallations: n - 1,
 			InstallationID:   installationID,
 			ProtocolVersion:  1,
 		}
 
-		topicService := topic.NewService(persistence.GetTopicStorage())
+		sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 		multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
 
 		protocol := NewProtocolService(
 			NewEncryptionService(
 				persistence,
 				DefaultEncryptionServiceConfig(installationID)),
-			topicService,
+			sharedSecretService,
 			multideviceService,
 			func(s []multidevice.IdentityAndIDPair) {},
-			func(s []*topic.Secret) {},
+			func(s []*sharedsecret.Secret) {},
 		)
 
 		s.services[user].services[i] = protocol

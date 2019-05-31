@@ -239,5 +239,3 @@ func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
 	s.Require().Equal(expected, actualInstallations)
 
 }
-
-// TODO: Add test for MarkBundleExpired

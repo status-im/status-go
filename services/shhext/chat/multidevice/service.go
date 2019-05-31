@@ -50,7 +50,6 @@ func (s *Service) GetOurActiveInstallations(identity *ecdsa.PublicKey) ([]*Insta
 	})
 
 	return installations, nil
-
 }
 
 func (s *Service) EnableInstallation(identity *ecdsa.PublicKey, installationID string) error {

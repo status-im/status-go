@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
@@ -275,11 +274,6 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 			return nil, err
 		}
 
-		// Add installations with a timestamp of 0, as we don't have bundle informations
-		//if err = s.persistence.AddInstallations(theirIdentityKeyC, 0, []*Installation{{ID: theirInstallationID, Version: 0}}, true); err != nil {
-		//		return nil, err
-		//	}
-
 		// We mark the exchange as successful so we stop sending x3dh header
 		if err = s.persistence.RatchetInfoConfirmed(drHeader.GetId(), theirIdentityKeyC, theirInstallationID); err != nil {
 			s.log.Error("Could not confirm ratchet info", "err", err)
@@ -457,8 +451,6 @@ func (s *EncryptionService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, i
 }
 
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
-// TODO: refactor this
-// nolint: gocyclo
 func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*protobuf.DirectMessageProtocol, []*multidevice.Installation, error) {
 	// Which installations we are sending the message to
 	var targetedInstallations []*multidevice.Installation
@@ -471,7 +463,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
 	// We don't have any, send a message with DH
-	if installations == nil && !bytes.Equal(theirIdentityKeyC, ecrypto.CompressPubkey(&myIdentityKey.PublicKey)) {
+	if len(installations) == 0 {
 		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
 		return encryptedPayload, targetedInstallations, err
 	}

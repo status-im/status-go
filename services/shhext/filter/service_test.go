@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -51,7 +51,7 @@ func (s *ServiceTestSuite) SetupTest() {
 	keyStrs := []string{"c6cbd7d76bc5baca530c875663711b947efa6a86a900a9e8645ce32e5821484e", "d51dd64ad19ea84968a308dca246012c00d2b2101d41bce740acd1c650acc509"}
 	keyTopics := []int{4490, 3991}
 
-	dbFile, err := ioutil.TempFile(os.TempDir(), "topic")
+	dbFile, err := ioutil.TempFile(os.TempDir(), "filter")
 
 	s.Require().NoError(err)
 	s.path = dbFile.Name()
@@ -67,12 +67,12 @@ func (s *ServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Build services
-	topicService := topic.NewService(topic.NewSQLLitePersistence(db))
+	sharedSecretService := sharedsecret.NewService(sharedsecret.NewSQLLitePersistence(db))
 	whisper := whisper.New(nil)
 	_, err = whisper.AddKeyPair(s.keys[0].privateKey)
 	s.Require().NoError(err)
 
-	s.service = New(whisper, topicService)
+	s.service = New(whisper, sharedSecretService)
 }
 
 func (s *ServiceTestSuite) TearDownTest() {
@@ -82,7 +82,7 @@ func (s *ServiceTestSuite) TearDownTest() {
 func (s *ServiceTestSuite) TestDiscoveryAndPartitionedTopic() {
 	chats := []*Chat{}
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.keys[0].partitionedTopic)
-	contactCodeTopic := s.keys[0].PublicKeyString() + "-contact-code"
+	contactCodeTopic := "0x" + s.keys[0].PublicKeyString() + "-contact-code"
 
 	_, err := s.service.Init(chats)
 	s.Require().NoError(err)
@@ -113,7 +113,7 @@ func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 			OneToOne: true,
 		},
 	}
-	contactCodeTopic := s.keys[1].PublicKeyString() + "-contact-code"
+	contactCodeTopic := "0x" + s.keys[1].PublicKeyString() + "-contact-code"
 
 	response, err := s.service.Init(chats)
 	s.Require().NoError(err)
@@ -139,15 +139,15 @@ func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 func (s *ServiceTestSuite) TestNegotiatedTopic() {
 	chats := []*Chat{}
 
-	negotiatedTopic1 := s.keys[0].PublicKeyString() + "-negotiated"
-	negotiatedTopic2 := s.keys[1].PublicKeyString() + "-negotiated"
+	negotiatedTopic1 := "0x" + s.keys[0].PublicKeyString() + "-negotiated"
+	negotiatedTopic2 := "0x" + s.keys[1].PublicKeyString() + "-negotiated"
 
 	// We send a message to ourselves
-	_, _, err := s.service.topic.Send(s.keys[0].privateKey, "0-1", &s.keys[0].privateKey.PublicKey, []string{"0-2"})
+	_, _, err := s.service.secret.Send(s.keys[0].privateKey, "0-1", &s.keys[0].privateKey.PublicKey, []string{"0-2"})
 	s.Require().NoError(err)
 
 	// We send a message to someone else
-	_, _, err = s.service.topic.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{"0-2"})
+	_, _, err = s.service.secret.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{"0-2"})
 	s.Require().NoError(err)
 
 	response, err := s.service.Init(chats)
@@ -174,14 +174,10 @@ func (s *ServiceTestSuite) TestLoadChat() {
 	s.Require().NoError(err)
 
 	// We add a public chat
-
 	response1, err := s.service.Load(&Chat{ChatID: "status"})
 
 	s.Require().NoError(err)
 	s.Require().Equal(1, len(response1))
 	s.Require().Equal("status", response1[0].ChatID)
 	s.Require().True(response1[0].Listen)
-
-	// we load a public chat
-
 }

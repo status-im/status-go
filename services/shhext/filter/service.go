@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"math/big"
 	"sync"
@@ -46,24 +46,21 @@ type Chat struct {
 
 type Service struct {
 	whisper *whisper.Whisper
-	topic   *topic.Service
+	secret  *sharedsecret.Service
 	chats   map[string]*Chat
 	mutex   sync.Mutex
 }
 
 // New returns a new filter service
-func New(w *whisper.Whisper, t *topic.Service) *Service {
+func New(w *whisper.Whisper, s *sharedsecret.Service) *Service {
 	return &Service{
 		whisper: w,
-		topic:   t,
+		secret:  s,
 		mutex:   sync.Mutex{},
 		chats:   make(map[string]*Chat),
 	}
 }
 
-// TODO: Dont add duplicated filters
-// TODO: Create partitioned topic only when actually sending to a user
-// TODO: format response so that it can be parsed by the user
 // LoadChat should return a list of newly chats loaded
 func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 	log.Debug("Initializing filter service", "chats", chats)
@@ -102,9 +99,9 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 		}
 	}
 
-	// Add the negotiated topics
+	// Add the negotiated secrets
 	log.Debug("Loading negotiated topics")
-	secrets, err := s.topic.All()
+	secrets, err := s.secret.All()
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +137,7 @@ func (s *Service) Remove(chat *Chat) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if err := s.whisper.Unsubscribe(chat.ChatID); err != nil {
+	if err := s.whisper.Unsubscribe(chat.FilterID); err != nil {
 		return err
 	}
 	if chat.SymKeyID != "" {
@@ -211,7 +208,7 @@ func (s *Service) GetByID(chatID string) *Chat {
 }
 
 // ProcessNegotiatedSecret adds a filter based on the agreed secret
-func (s *Service) ProcessNegotiatedSecret(secret *topic.Secret) (*Chat, error) {
+func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -347,7 +344,7 @@ func (s *Service) loadContactCode(identity string) (*Chat, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	chatID := identity + "-contact-code"
+	chatID := "0x" + identity + "-contact-code"
 	if _, ok := s.chats[chatID]; ok {
 		return s.chats[chatID], nil
 	}
@@ -438,7 +435,7 @@ func (s *Service) addAsymmetricFilter(keyAsym *ecdsa.PrivateKey, chatID string, 
 }
 
 func negotiatedID(identity *ecdsa.PublicKey) string {
-	return fmt.Sprintf("%x-negotiated", crypto.FromECDSAPub(identity))
+	return fmt.Sprintf("0x%x-negotiated", crypto.FromECDSAPub(identity))
 }
 
 func (s *Service) load(myKey *ecdsa.PrivateKey, chat *Chat) ([]*Chat, error) {

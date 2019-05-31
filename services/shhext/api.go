@@ -9,15 +9,15 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/golang/protobuf/proto"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/golang/protobuf/proto"
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
+	"github.com/status-im/status-go/services/shhext/whisperutils"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -479,11 +480,54 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 	}
 
 	// Enrich with transport layer info
-	whisperMessage := chat.PublicMessageToWhisper(msg, msg.Payload)
+	whisperMessage := whisperutils.DefaultWhisperMessage()
+	whisperMessage.Payload = msg.Payload
+	whisperMessage.Sig = msg.Sig
+	whisperMessage.Topic = whisperutils.ToTopic(msg.Chat)
 	whisperMessage.SymKeyID = filter.SymKeyID
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)
+}
+
+func (api *PublicAPI) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
+	// marshal for sending to wire
+	marshaledMessage, err := proto.Marshal(spec.Message)
+	if err != nil {
+		api.log.Error("encryption-service", "error marshaling message", err)
+		return nil, err
+	}
+
+	whisperMessage := whisperutils.DefaultWhisperMessage()
+	whisperMessage.Payload = marshaledMessage
+	whisperMessage.Sig = signature
+
+	if spec.SharedSecret != nil {
+		chat := api.service.GetNegotiatedChat(theirPublicKey)
+		if chat != nil {
+			api.log.Debug("Sending on negotiated topic")
+			whisperMessage.SymKeyID = chat.SymKeyID
+			whisperMessage.Topic = chat.Topic
+			whisperMessage.PublicKey = nil
+			return &whisperMessage, nil
+		}
+	} else if spec.PartitionedTopic() {
+		api.log.Debug("Sending on partitioned topic")
+		// Create filter on demand
+		if _, err := api.service.filter.LoadPartitioned(myPrivateKey, theirPublicKey, false); err != nil {
+			return nil, err
+		}
+		t := filter.PublicKeyToPartitionedTopicBytes(theirPublicKey)
+		whisperMessage.Topic = whisper.BytesToTopic(t)
+		whisperMessage.PublicKey = destination
+		return &whisperMessage, nil
+	}
+
+	api.log.Debug("Sending on old discovery topic")
+	whisperMessage.Topic = whisperutils.DiscoveryTopicBytes
+	whisperMessage.PublicKey = destination
+
+	return &whisperMessage, nil
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
@@ -491,7 +535,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	if !api.service.pfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
-	// To be completely agnostic from whisper we should not be using whisper to store the key
+
 	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
 	if err != nil {
 		return nil, err
@@ -502,64 +546,27 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		return nil, err
 	}
 
-	// This is transport layer-agnostic
-	var protocolMessage *protobuf.ProtocolMessage
-	// The negotiated secret
 	var msgSpec *chat.ProtocolMessageSpec
-	var partitionedTopicSupported bool
-	var topic []byte
 
-	api.log.Info("BUILDING MESSAGE")
 	if msg.DH {
-		protocolMessage, err = api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
+		api.log.Debug("Building dh message")
+		msgSpec, err = api.service.protocol.BuildDHMessage(privateKey, publicKey, msg.Payload)
 	} else {
+		api.log.Debug("Building direct message")
 		msgSpec, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
-		if err != nil {
-			return nil, err
-		}
-		protocolMessage = msgSpec.Message
-		partitionedTopicSupported = msgSpec.PartitionedTopic()
-		topic = msgSpec.SharedSecret
 	}
-
 	if err != nil {
 		return nil, err
 	}
 
-	// marshal for sending to wire
-	marshaledMessage, err := proto.Marshal(protocolMessage)
+	whisperMessage, err := api.directMessageToWhisper(privateKey, publicKey, msg.PubKey, msg.Sig, msgSpec)
 	if err != nil {
-		api.log.Error("encryption-service", "error marshaling message", err)
+		api.log.Error("sshext-service", "error building whisper message", err)
 		return nil, err
 	}
-
-	// TODO: Refactor this as it's not quite the right abstraction anymore
-	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
-	// Enrich with transport layer info
-	if topic != nil {
-		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetNegotiatedChat(publicKey))
-
-		chat := api.service.GetNegotiatedChat(publicKey)
-
-		if chat != nil {
-			whisperMessage.SymKeyID = chat.SymKeyID
-			whisperMessage.Topic = chat.Topic
-			whisperMessage.PublicKey = nil
-		}
-	} else if partitionedTopicSupported {
-		// Create filter on demand
-		if _, err := api.service.filter.LoadPartitioned(privateKey, publicKey, false); err != nil {
-			return nil, err
-		}
-		t := filter.PublicKeyToPartitionedTopicBytes(publicKey)
-		whisperMessage.Topic = whisper.BytesToTopic(t)
-
-	}
-
-	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
 
 	// And dispatch
-	return api.Post(ctx, whisperMessage)
+	return api.Post(ctx, *whisperMessage)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
