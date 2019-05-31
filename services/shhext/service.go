@@ -18,6 +18,8 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/chat"
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
+	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 	"github.com/status-im/status-go/services/shhext/chat/topic"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/filter"
@@ -33,6 +35,7 @@ const (
 	defaultConnectionsTarget = 1
 	// defaultTimeoutWaitAdded is a timeout to use to establish initial connections.
 	defaultTimeoutWaitAdded = 5 * time.Second
+	maxInstallations        = 3
 )
 
 var errProtocolNotInitialized = errors.New("procotol is not initialized")
@@ -188,7 +191,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	addedBundlesHandler := func(addedBundles []chat.IdentityAndIDPair) {
+	addedBundlesHandler := func(addedBundles []multidevice.IdentityAndIDPair) {
 		handler := EnvelopeSignalHandler{}
 		for _, bundle := range addedBundles {
 			handler.BundleAdded(bundle[0], bundle[1])
@@ -197,21 +200,31 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 
 	// Initialize topics
 	topicService := topic.NewService(persistence.GetTopicStorage())
-	filterService := filter.New(s.config.AsymKeyID, s.w, topicService)
+	// Initialize filter
+	filterService := filter.New(s.w, topicService)
 	s.filter = filterService
+
+	// Initialize multidevice
+	multideviceConfig := &multidevice.Config{
+		InstallationID:   s.installationID,
+		ProtocolVersion:  chat.ProtocolVersion,
+		MaxInstallations: maxInstallations,
+	}
+	multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
 
 	s.protocol = chat.NewProtocolService(
 		chat.NewEncryptionService(
 			persistence,
 			chat.DefaultEncryptionServiceConfig(s.installationID)),
 		topicService,
+		multideviceService,
 		addedBundlesHandler,
 		s.onNewTopicHandler)
 
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *chat.Bundle) ([]chat.IdentityAndIDPair, error) {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]multidevice.IdentityAndIDPair, error) {
 	if s.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
@@ -219,7 +232,7 @@ func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *c
 	return s.protocol.ProcessPublicBundle(myIdentityKey, bundle)
 }
 
-func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*chat.Bundle, error) {
+func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*protobuf.Bundle, error) {
 	if s.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
@@ -236,7 +249,7 @@ func (s *Service) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installatio
 	return s.protocol.EnableInstallation(myIdentityKey, installationID)
 }
 
-func (s *Service) GetPublicBundle(identityKey *ecdsa.PublicKey) (*chat.Bundle, error) {
+func (s *Service) GetPublicBundle(identityKey *ecdsa.PublicKey) (*protobuf.Bundle, error) {
 	if s.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}

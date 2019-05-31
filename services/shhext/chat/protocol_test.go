@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/topic"
 	"github.com/stretchr/testify/suite"
 )
@@ -38,19 +39,31 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	addedBundlesHandler := func(addedBundles []IdentityAndIDPair) {}
+	addedBundlesHandler := func(addedBundles []multidevice.IdentityAndIDPair) {}
 	onNewTopicHandler := func(topic []*topic.Secret) {}
+
+	aliceMultideviceConfig := &multidevice.Config{
+		MaxInstallations: 3,
+		InstallationID:   "1",
+	}
 
 	s.alice = NewProtocolService(
 		NewEncryptionService(alicePersistence, DefaultEncryptionServiceConfig("1")),
 		topic.NewService(alicePersistence.GetTopicStorage()),
+		multidevice.New(aliceMultideviceConfig, alicePersistence.GetMultideviceStorage()),
 		addedBundlesHandler,
 		onNewTopicHandler,
 	)
 
+	bobMultideviceConfig := &multidevice.Config{
+		MaxInstallations: 3,
+		InstallationID:   "2",
+	}
+
 	s.bob = NewProtocolService(
 		NewEncryptionService(bobPersistence, DefaultEncryptionServiceConfig("2")),
 		topic.NewService(bobPersistence.GetTopicStorage()),
+		multidevice.New(bobMultideviceConfig, bobPersistence.GetMultideviceStorage()),
 		addedBundlesHandler,
 		onNewTopicHandler,
 	)

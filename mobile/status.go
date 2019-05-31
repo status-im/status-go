@@ -65,48 +65,6 @@ func StopNode() string {
 	return makeJSONResponse(nil)
 }
 
-// CreateContactCode creates an X3DH bundle.
-func CreateContactCode() string {
-	bundle, err := statusBackend.CreateContactCode()
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return bundle
-}
-
-// ProcessContactCode processes an X3DH bundle.
-// TODO(adam): it looks like the return should be error.
-func ProcessContactCode(bundle string) string {
-	err := statusBackend.ProcessContactCode(bundle)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return ""
-}
-
-// ExtractIdentityFromContactCode extracts an identity from an X3DH bundle.
-func ExtractIdentityFromContactCode(bundle string) string {
-	identity, err := statusBackend.ExtractIdentityFromContactCode(bundle)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	if err := statusBackend.ProcessContactCode(bundle); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Identity string `json:"identity"`
-	}{Identity: identity})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
-}
-
 // ExtractGroupMembershipSignatures extract public keys from tuples of content/signature.
 func ExtractGroupMembershipSignatures(signaturePairsStr string) string {
 	var signaturePairs [][2]string
@@ -616,24 +574,6 @@ func SetMobileSignalHandler(handler SignalHandler) {
 // SetSignalEventCallback setup geth callback to notify about new signal
 func SetSignalEventCallback(cb unsafe.Pointer) {
 	signal.SetSignalEventCallback(cb)
-}
-
-// Get an X3DH bundle
-//export GetContactCode
-func GetContactCode(identity string) string {
-	bundle, err := statusBackend.GetContactCode(identity)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		ContactCode string `json:"code"`
-	}{ContactCode: bundle})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
 }
 
 // ExportNodeLogs reads current node log and returns content to a caller.

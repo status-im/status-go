@@ -45,7 +45,6 @@ type Chat struct {
 }
 
 type Service struct {
-	keyID   string
 	whisper *whisper.Whisper
 	topic   *topic.Service
 	chats   map[string]*Chat
@@ -53,9 +52,8 @@ type Service struct {
 }
 
 // New returns a new filter service
-func New(k string, w *whisper.Whisper, t *topic.Service) *Service {
+func New(w *whisper.Whisper, t *topic.Service) *Service {
 	return &Service{
-		keyID:   k,
 		whisper: w,
 		topic:   t,
 		mutex:   sync.Mutex{},
@@ -184,7 +182,12 @@ func (s *Service) LoadPartitioned(myKey *ecdsa.PrivateKey, theirPublicKey *ecdsa
 
 // Load creates filters for a given chat, and returns all the created filters
 func (s *Service) Load(chat *Chat) ([]*Chat, error) {
-	myKey, err := s.whisper.GetPrivateKey(s.keyID)
+	keyID := s.whisper.SelectedKeyPairID()
+	if keyID == "" {
+		return nil, errors.New("no key selected")
+	}
+	myKey, err := s.whisper.GetPrivateKey(keyID)
+
 	if err != nil {
 		return nil, err
 	}

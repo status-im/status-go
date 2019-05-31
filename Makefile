@@ -192,7 +192,7 @@ setup: setup-build setup-dev ##@other Prepare project for development and buildi
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/chat_db_migrations ./static/mailserver_db_migrations
-	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
+	$(shell cd ./services/shhext/chat/protobuf && exec protoc --go_out=. ./*.proto)
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

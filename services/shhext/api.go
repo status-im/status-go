@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
@@ -502,7 +503,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	}
 
 	// This is transport layer-agnostic
-	var protocolMessage *chat.ProtocolMessage
+	var protocolMessage *protobuf.ProtocolMessage
 	// The negotiated secret
 	var msgSpec *chat.ProtocolMessageSpec
 	var partitionedTopicSupported bool
@@ -688,7 +689,7 @@ func (api *PublicAPI) processPFSMessage(dedupMessage dedup.DeduplicateMessage) e
 	}
 
 	// Unmarshal message
-	protocolMessage := &chat.ProtocolMessage{}
+	protocolMessage := &protobuf.ProtocolMessage{}
 
 	if err := proto.Unmarshal(msg.Payload, protocolMessage); err != nil {
 		api.log.Debug("Not a protocol message", "err", err)

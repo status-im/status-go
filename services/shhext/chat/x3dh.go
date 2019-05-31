@@ -2,16 +2,14 @@ package chat
 
 import (
 	"crypto/ecdsa"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"sort"
 	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/golang/protobuf/proto"
+	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 )
 
 const (
@@ -19,33 +17,7 @@ const (
 	sskLen = 16
 )
 
-// ToBase64 returns a Base64 encoding representation of the protobuf Bundle message
-func (bundle *Bundle) ToBase64() (string, error) {
-	marshaledMessage, err := proto.Marshal(bundle)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.StdEncoding.EncodeToString(marshaledMessage), nil
-}
-
-// FromBase64 unmarshals a Bundle from a Base64 encoding representation of the protobuf Bundle message
-func FromBase64(str string) (*Bundle, error) {
-	bundle := &Bundle{}
-
-	decodedBundle, err := base64.StdEncoding.DecodeString(str)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := proto.Unmarshal(decodedBundle, bundle); err != nil {
-		return nil, err
-	}
-
-	return bundle, nil
-}
-
-func buildSignatureMaterial(bundle *Bundle) []byte {
+func buildSignatureMaterial(bundle *protobuf.Bundle) []byte {
 	signedPreKeys := bundle.GetSignedPreKeys()
 	timestamp := bundle.GetTimestamp()
 	var keys []string
@@ -73,7 +45,7 @@ func buildSignatureMaterial(bundle *Bundle) []byte {
 
 }
 
-func SignBundle(identity *ecdsa.PrivateKey, bundleContainer *BundleContainer) error {
+func SignBundle(identity *ecdsa.PrivateKey, bundleContainer *protobuf.BundleContainer) error {
 	signatureMaterial := buildSignatureMaterial(bundleContainer.GetBundle())
 
 	signature, err := crypto.Sign(crypto.Keccak256(signatureMaterial), identity)
@@ -85,7 +57,7 @@ func SignBundle(identity *ecdsa.PrivateKey, bundleContainer *BundleContainer) er
 }
 
 // NewBundleContainer creates a new BundleContainer from an identity private key
-func NewBundleContainer(identity *ecdsa.PrivateKey, installationID string) (*BundleContainer, error) {
+func NewBundleContainer(identity *ecdsa.PrivateKey, installationID string) (*protobuf.BundleContainer, error) {
 	preKey, err := crypto.GenerateKey()
 	if err != nil {
 		return nil, err
@@ -95,35 +67,35 @@ func NewBundleContainer(identity *ecdsa.PrivateKey, installationID string) (*Bun
 	compressedIdentityKey := crypto.CompressPubkey(&identity.PublicKey)
 
 	encodedPreKey := crypto.FromECDSA(preKey)
-	signedPreKeys := make(map[string]*SignedPreKey)
-	signedPreKeys[installationID] = &SignedPreKey{
-		ProtocolVersion: protocolCurrentVersion,
+	signedPreKeys := make(map[string]*protobuf.SignedPreKey)
+	signedPreKeys[installationID] = &protobuf.SignedPreKey{
+		ProtocolVersion: ProtocolVersion,
 		SignedPreKey:    compressedPreKey,
 	}
 
-	bundle := Bundle{
+	bundle := protobuf.Bundle{
 		Timestamp:     time.Now().UnixNano(),
 		Identity:      compressedIdentityKey,
 		SignedPreKeys: signedPreKeys,
 	}
 
-	return &BundleContainer{
+	return &protobuf.BundleContainer{
 		Bundle:              &bundle,
 		PrivateSignedPreKey: encodedPreKey,
 	}, nil
 }
 
 // VerifyBundle checks that a bundle is valid
-func VerifyBundle(bundle *Bundle) error {
+func VerifyBundle(bundle *protobuf.Bundle) error {
 	_, err := ExtractIdentity(bundle)
 	return err
 }
 
 // ExtractIdentity extracts the identity key from a given bundle
-func ExtractIdentity(bundle *Bundle) (string, error) {
+func ExtractIdentity(bundle *protobuf.Bundle) (*ecdsa.PublicKey, error) {
 	bundleIdentityKey, err := crypto.DecompressPubkey(bundle.GetIdentity())
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	signatureMaterial := buildSignatureMaterial(bundle)
@@ -133,14 +105,14 @@ func ExtractIdentity(bundle *Bundle) (string, error) {
 		bundle.GetSignature(),
 	)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if crypto.PubkeyToAddress(*recoveredKey) != crypto.PubkeyToAddress(*bundleIdentityKey) {
-		return "", errors.New("identity key and signature mismatch")
+		return nil, errors.New("identity key and signature mismatch")
 	}
 
-	return fmt.Sprintf("0x%x", crypto.FromECDSAPub(recoveredKey)), nil
+	return recoveredKey, nil
 }
 
 // PerformDH generates a shared key given a private and a public key

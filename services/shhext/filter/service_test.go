@@ -69,10 +69,10 @@ func (s *ServiceTestSuite) SetupTest() {
 	// Build services
 	topicService := topic.NewService(topic.NewSQLLitePersistence(db))
 	whisper := whisper.New(nil)
-	keyID, err := whisper.AddKeyPair(s.keys[0].privateKey)
+	_, err = whisper.AddKeyPair(s.keys[0].privateKey)
 	s.Require().NoError(err)
 
-	s.service = New(keyID, whisper, topicService)
+	s.service = New(whisper, topicService)
 }
 
 func (s *ServiceTestSuite) TearDownTest() {
@@ -177,6 +177,7 @@ func (s *ServiceTestSuite) TestLoadChat() {
 
 	response1, err := s.service.Load(&Chat{ChatID: "status"})
 
+	s.Require().NoError(err)
 	s.Require().Equal(1, len(response1))
 	s.Require().Equal("status", response1[0].ChatID)
 	s.Require().True(response1[0].Listen)

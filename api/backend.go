@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -25,7 +24,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
-	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
 	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/subscriptions"
@@ -614,91 +612,6 @@ func appendIf(condition bool, services []gethnode.ServiceConstructor, service ge
 		return services
 	}
 	return append(services, service)
-}
-
-// CreateContactCode create or return the latest contact code
-func (b *StatusBackend) CreateContactCode() (string, error) {
-	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
-	if err != nil {
-		return "", err
-	}
-
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return "", err
-	}
-
-	bundle, err := st.GetBundle(selectedChatAccount.AccountKey.PrivateKey)
-	if err != nil {
-		return "", err
-	}
-
-	return bundle.ToBase64()
-}
-
-// GetContactCode return the latest contact code
-func (b *StatusBackend) GetContactCode(identity string) (string, error) {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return "", err
-	}
-
-	publicKeyBytes, err := hex.DecodeString(identity)
-	if err != nil {
-		return "", err
-	}
-
-	publicKey, err := ethcrypto.UnmarshalPubkey(publicKeyBytes)
-	if err != nil {
-		return "", err
-	}
-
-	bundle, err := st.GetPublicBundle(publicKey)
-	if err != nil {
-		return "", err
-	}
-
-	if bundle == nil {
-		return "", nil
-	}
-
-	return bundle.ToBase64()
-}
-
-// ProcessContactCode process and adds the someone else's bundle
-func (b *StatusBackend) ProcessContactCode(contactCode string) error {
-	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	bundle, err := chat.FromBase64(contactCode)
-	if err != nil {
-		b.log.Error("error decoding base64", "err", err)
-		return err
-	}
-
-	if _, err := st.ProcessPublicBundle(selectedChatAccount.AccountKey.PrivateKey, bundle); err != nil {
-		b.log.Error("error adding bundle", "err", err)
-		return err
-	}
-
-	return nil
-}
-
-// ExtractIdentityFromContactCode extract the identity of the user generating the contact code
-func (b *StatusBackend) ExtractIdentityFromContactCode(contactCode string) (string, error) {
-	bundle, err := chat.FromBase64(contactCode)
-	if err != nil {
-		return "", err
-	}
-
-	return chat.ExtractIdentity(bundle)
 }
 
 // ExtractGroupMembershipSignatures extract signatures from tuples of content/signature
