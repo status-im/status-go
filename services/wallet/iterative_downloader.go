@@ -3,7 +3,6 @@ package wallet
 import (
 	"context"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -73,9 +72,7 @@ func (d *IterativeDownloader) Next() ([]Transfer, error) {
 		log.Error("failed to get header by number", "number", start, "error", err)
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	transfers, err := d.downloader.GetTransfersInRange(ctx, start, d.known.Number)
-	cancel()
+	transfers, err := d.downloader.GetTransfersInRange(context.Background(), start, d.known.Number)
 	if err != nil {
 		log.Error("failed to get transfer inbetween two bloks", "from", start, "to", d.known.Number, "error", err)
 		return nil, err
