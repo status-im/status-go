@@ -55,7 +55,7 @@ func (i *SQLBigInt) Value() (driver.Value, error) {
 
 // JSONBlob type for marshaling/unmarshaling inner type to json.
 type JSONBlob struct {
-	Interface interface{}
+	data interface{}
 }
 
 // Scan implements interface.
@@ -67,13 +67,13 @@ func (blob *JSONBlob) Scan(value interface{}) error {
 	if len(bytes) == 0 {
 		return nil
 	}
-	err := json.Unmarshal(bytes, blob.Interface)
+	err := json.Unmarshal(bytes, blob.data)
 	return err
 }
 
 // Value implements interface.
 func (blob *JSONBlob) Value() (driver.Value, error) {
-	return json.Marshal(blob.Interface)
+	return json.Marshal(blob.data)
 }
 
 // Database sql wrapper for operations with wallet objects.
@@ -114,7 +114,7 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*types
 	if err != nil {
 		return err
 	}
-	blocks, err = tx.Prepare("INSERT INTO blocks(hash,number,header) VALUES (?, ?, ?)")
+	blocks, err = tx.Prepare("INSERT INTO blocks(hash, number, header) VALUES (?, ?, ?)")
 	if err != nil {
 		return err
 	}
@@ -173,13 +173,13 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 	return
 }
 
-// SaveHeader stores single header.
+// SaveHeader stores a single header.
 func (db *Database) SaveHeader(header *types.Header) error {
 	_, err := db.db.Exec("INSERT INTO blocks(number, hash, header) VALUES (?, ?, ?)", (*SQLBigInt)(header.Number), header.Hash(), &JSONBlob{header})
 	return err
 }
 
-// SaveHeaders atomically stores list of headers.
+// SaveHeaders stores a list of headers atomically.
 func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	var (
 		tx     *sql.Tx
@@ -189,7 +189,7 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	if err != nil {
 		return
 	}
-	insert, err = tx.Prepare("INSERT INTO blocks(number,hash,header) VALUES (?,?,?)")
+	insert, err = tx.Prepare("INSERT INTO blocks(number, hash, header) VALUES (?,?,?)")
 	if err != nil {
 		return
 	}

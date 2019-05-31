@@ -31,7 +31,7 @@ var (
 const ERC20TransferABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"to\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"}]"
 
 // ERC20TransferBin is the compiled bytecode used for deploying new contracts.
-const ERC20TransferBin = `0x6080604052348015600f57600080fd5b5060c88061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063a9059cbb14602d575b600080fd5b605660048036036040811015604157600080fd5b506001600160a01b0381351690602001356058565b005b6040805182815290516001600160a01b0384169133917fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9181900360200190a3505056fea165627a7a723058205a3b651d160745f3384583bfcd779db1e53bc7e335198ba8a8503fc353ab2a630029`
+const ERC20TransferBin = `0x6080604052348015600f57600080fd5b5060c88061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063a9059cbb14602d575b600080fd5b605660048036036040811015604157600080fd5b506001600160a01b0381351690602001356058565b005b6040805182815290516001600160a01b0384169133917fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9181900360200190a3505056fea165627a7a72305820821ecaa5ed56957610817ecaabbb288ac338db81a0f09fc3ce5c7ddfa17351b60029`
 
 // DeployERC20Transfer deploys a new Ethereum contract, binding an instance of ERC20Transfer to it.
 func DeployERC20Transfer(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ERC20Transfer, error) {
@@ -350,4 +350,3 @@ func (_ERC20Transfer *ERC20TransferFilterer) WatchTransfer(opts *bind.WatchOpts,
 		}
 	}), nil
 }
-

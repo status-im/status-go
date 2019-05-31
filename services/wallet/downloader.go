@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
@@ -41,8 +40,8 @@ type ETHTransferDownloader struct {
 	signer  types.Signer
 }
 
-// GetTransfers checks is balance was changed between two blocks. And if so it downloads transfers
-// for that block.
+// GetTransfers checks if the balance was changed between two blocks.
+// If so it downloads transaction that transfer ethereum from that block.
 func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *types.Header) (rst []Transfer, err error) {
 	// TODO(dshulyak) consider caching balance and reset it on reorg
 	num := new(big.Int).Sub(header.Number, one)
@@ -84,9 +83,7 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *types.
 			continue
 		}
 	}
-	if len(rst) == 0 {
-		return nil, errors.New("balance changed but no new transactions were found")
-	}
+	// TODO(dshulyak) test that balance difference was covered by transactions
 	return rst, nil
 }
 
@@ -114,7 +111,7 @@ type ERC20TransfersDownloader struct {
 	target common.Hash
 }
 
-// GetTransfers for erc20 uses getLogs rpc with Transfer event signature and our address acount.
+// GetTransfers for erc20 uses eth_getLogs rpc with Transfer event signature and our address acount.
 func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *types.Header) ([]Transfer, error) {
 	hash := header.Hash()
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{

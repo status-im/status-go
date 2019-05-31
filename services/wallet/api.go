@@ -14,8 +14,8 @@ type API struct {
 }
 
 // GetTransfers returns transfers in range of blocks. If `end` is nil all transfers from `start` will be returned.
-// TODO(dshulyak) benchmark loading many transfers from database. We can avoid json unmarshal/marshal json if we will
-// return header, tx and receipt as a raw json.
+// TODO(dshulyak) benchmark loading many transfers from database. We can avoid json unmarshal/marshal if we will
+// read header, tx and receipt as a raw json.
 func (api *API) GetTransfers(ctx context.Context, start, end *big.Int) ([]Transfer, error) {
 	log.Debug("call to get transfers", "start", start, "end", end)
 	if api.s.db == nil {
