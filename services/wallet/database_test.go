@@ -36,6 +36,14 @@ func TestGetHeaderByNumber(t *testing.T) {
 	require.Equal(t, header.Hash(), rst.Hash())
 }
 
+func TestGetHeaderByNumberNoRows(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	rst, err := db.GetHeaderByNumber(big.NewInt(1))
+	require.NoError(t, err)
+	require.Nil(t, rst)
+}
+
 func TestHeaderExists(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()

@@ -12,7 +12,20 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/params"
 )
+
+// pow block on main chain is mined once per ~14 seconds
+// but for tests we are using clique chain with immediate block signer
+// hence we can use different polling periods for methods that depend on mining time.
+func pollingPeriodByChain(chain *big.Int) time.Duration {
+	switch chain.Int64() {
+	case int64(params.MainNetworkID):
+		return 10 * time.Second
+	default:
+		return 500 * time.Millisecond
+	}
+}
 
 // HeaderReader interface for reading headers using block number or hash.
 type HeaderReader interface {
@@ -27,6 +40,7 @@ func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, addres
 		client:  client,
 		feed:    feed,
 		address: address,
+		chain:   chain,
 	}
 	reactor.erc20 = NewERC20TransfersDownloader(client, address)
 	reactor.eth = &ETHTransferDownloader{
@@ -43,6 +57,7 @@ type Reactor struct {
 	db      *Database
 	feed    *event.Feed
 	address common.Address
+	chain   *big.Int
 
 	eth   *ETHTransferDownloader
 	erc20 *ERC20TransfersDownloader
@@ -78,10 +93,7 @@ func (r *Reactor) Stop() {
 
 func (r *Reactor) loop() {
 	var (
-		// TODO(dshulyak) parametrize
-		// pow block on main chain is mined once per ~14 seconds
-		// but we for tests we are using clique chain with immediate block signer
-		ticker = time.NewTicker(1 * time.Second)
+		ticker = time.NewTicker(pollingPeriodByChain(r.chain))
 		latest *types.Header
 		err    error
 	)
@@ -153,6 +165,7 @@ func (r *Reactor) loop() {
 	}
 }
 
+// getTransfers fetches erc20 and eth transfers and returns single slice with them.
 func (r *Reactor) getTransfers(header *types.Header) ([]Transfer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	ethT, err := r.eth.GetTransfers(ctx, header)
@@ -169,6 +182,8 @@ func (r *Reactor) getTransfers(header *types.Header) ([]Transfer, error) {
 	return append(ethT, erc20T...), nil
 }
 
+// onNewBlock verifies if latest block extends current canonical chain view. In case if it doesn't it will find common
+// parrent and replace all blocks after that parent.
 func (r *Reactor) onNewBlock(ctx context.Context, previous, latest *types.Header) (added, removed []*types.Header, err error) {
 	if previous == nil {
 		// first node in the cache

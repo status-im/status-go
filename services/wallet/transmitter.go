@@ -13,7 +13,7 @@ type publisher interface {
 	Subscribe(interface{}) event.Subscription
 }
 
-// SignalsTransmitter transmits received events as a wallet signals.
+// SignalsTransmitter transmits received events as wallet signals.
 type SignalsTransmitter struct {
 	publisher
 

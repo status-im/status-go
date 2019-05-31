@@ -510,11 +510,7 @@ func (b *StatusBackend) reSelectAccount() error {
 	default:
 		return err
 	}
-	err = b.startWallet()
-	if err != nil {
-		return err
-	}
-	return nil
+	return b.startWallet()
 }
 
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
@@ -555,33 +551,26 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 			return err
 		}
 	}
-	err = b.startWallet()
-	if err != nil {
-		return err
-	}
-	return nil
+	return b.startWallet()
 }
 
 func (b *StatusBackend) startWallet() error {
-	if b.statusNode.Config().WalletConfig.Enabled {
-		wallet, err := b.statusNode.WalletService()
-		if err != nil {
-			return err
-		}
-		account, err := b.accountManager.SelectedWalletAccount()
-		if err != nil {
-			return err
-		}
-		path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", account.Address))
-		err = wallet.StartReactor(path,
-			b.statusNode.RPCClient().Ethclient(),
-			account.Address,
-			new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
-		if err != nil {
-			return err
-		}
+	if !b.statusNode.Config().WalletConfig.Enabled {
+		return nil
 	}
-	return nil
+	wallet, err := b.statusNode.WalletService()
+	if err != nil {
+		return err
+	}
+	account, err := b.accountManager.SelectedWalletAccount()
+	if err != nil {
+		return err
+	}
+	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", account.Address))
+	return wallet.StartReactor(path,
+		b.statusNode.RPCClient().Ethclient(),
+		account.Address,
+		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
 }
 
 // SendDataNotification sends data push notifications to users.

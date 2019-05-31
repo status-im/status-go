@@ -1,8 +1,8 @@
-Wallet API
+Wallet
 ==========
 
 Wallet service starts a loop that watches for new transfers (eth and erc20).
-To correctly start a service two values need to be changed in the config:
+To correctly start the service two values need to be changed in the config:
 
 1. Set Enable to true in WalletConfig
 
@@ -22,7 +22,7 @@ To correctly start a service two values need to be changed in the config:
 }
 ```
 
-Wallet API
+API
 ----------
 
 #### wallet_getTransfers
@@ -90,11 +90,12 @@ List of objects like:
 Signals
 -------
 
-Two signals will are emmited:
+Two signals will are emitted:
 
-1. Signal `newblock`
+1. `newblock` signal
 
-Emmited when transfers from new block were added to the database. In this case block number if the number of this new block.
+Emitted when transfers from new block were added to the database. In this case block number if the number of this new block.
+Client expected to request transfers starting from received block.
 
 ```json
 {
@@ -106,9 +107,10 @@ Emmited when transfers from new block were added to the database. In this case b
 }
 ```
 
-2. Signal `reorg`.
+2. `reorg` signal.
 
-Emmited when part of blocks were removed. Starting from a given block number all transfers were removed.
+Emitted when part of blocks were removed. Starting from a given block number all transfers were removed.
+Client expected to request new transfers from received block and replace transfers that were received previously.
 
 ```json
 {
