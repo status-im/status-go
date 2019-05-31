@@ -30,7 +30,7 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 var (
 	reorgSafetyDepth = big.NewInt(15)
 	erc20BatchSize   = big.NewInt(100000)
-	ethBatchSize     = big.NewInt(100)
+	ethBatchSize     = big.NewInt(1000)
 )
 
 // HeaderReader interface for reading headers using block number or hash.
@@ -151,6 +151,7 @@ func (r *Reactor) erc20HistoricalLoop() {
 				})
 			}
 			if iterator.Finished() {
+				log.Info("wallet historical downloader for erc20 transfers finished")
 				return
 			}
 		}
@@ -158,6 +159,10 @@ func (r *Reactor) erc20HistoricalLoop() {
 }
 
 func (r *Reactor) ethHistoricalLoop() {
+	// TODO(dshulyak) implement custom iterative downloader for eth transfers
+	// instead of moving from latest to 0 step by step in size of batch
+	// we can check balances at latest and 0 and then do binary search to find block where
+	// balance changed
 	var (
 		ticker   = time.NewTicker(1 * time.Second)
 		iterator *IterativeDownloader
@@ -196,6 +201,7 @@ func (r *Reactor) ethHistoricalLoop() {
 				})
 			}
 			if iterator.Finished() {
+				log.Info("wallet historical downloader for eth transfers finished")
 				return
 			}
 		}
@@ -342,6 +348,15 @@ func headersFromTransfers(transfers []Transfer) []*DBHeader {
 	return rst
 }
 
+// lastKnownHeader selects last stored header in database.
+// If not found it will get head of the chain and in this case last known header will be atleast
+// `reorgSafetyDepth` blocks away from chain head.
+// `reorgSafetyDepth` is used for two purposes:
+// 1. to minimize chances that historical downloader and new blocks downloader will find different transfers
+// due to hitting different replicas (infura load balancer). new blocks downloader will eventually resolve conflicts
+// by going back parent by parent but it will require more time.
+// 2. as we don't store whole chain of blocks, but only blocks with transfers we won't be always able to find parent
+// when reorg occurs if we won't start syncing headers atleast 15 blocks away from canonical chain head
 func lastKnownHeader(db *Database, client HeaderReader) (*DBHeader, error) {
 	known, err := db.LastHeader()
 	if err != nil {

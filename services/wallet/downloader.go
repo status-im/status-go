@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // TransferType type of the asset that was transferred.
@@ -107,18 +109,24 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 	return rst, nil
 }
 
-func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) (rst []Transfer, err error) {
+func (d *ETHTransferDownloader) GetTransfersInRange(parent context.Context, from, to *big.Int) (rst []Transfer, err error) {
+	start := time.Now()
+	log.Debug("get eth transfers in range", "from", from, "to", to)
 	if to == nil {
 		return nil, errors.New("to shouldn't be nil")
 	}
 	if from.Cmp(zero) == 1 {
 		from = new(big.Int).Sub(from, one)
 	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
 	older, err := d.client.BalanceAt(ctx, d.address, from)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel = context.WithTimeout(parent, 2*time.Second)
 	newer, err := d.client.BalanceAt(ctx, d.address, to)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +136,16 @@ func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, t
 	// once balance is the same we consider that all possible transfers were found
 	for older.Cmp(newer) != 0 {
 		num = num.Sub(num, one)
+		ctx, cancel = context.WithTimeout(parent, 2*time.Second)
 		update, err := d.client.BalanceAt(ctx, d.address, num)
+		cancel()
 		if err != nil {
 			return nil, err
 		}
 		if update.Cmp(newer) != 0 {
 			// FIXME store both previous and current to avoid allocation
+			ctx, cancel = context.WithTimeout(parent, 5*time.Second)
+			defer cancel()
 			blk, err := d.client.BlockByNumber(ctx, new(big.Int).Add(num, one))
 			if err != nil {
 				return nil, err
@@ -146,6 +158,7 @@ func (d *ETHTransferDownloader) GetTransfersInRange(ctx context.Context, from, t
 		}
 		newer = update
 	}
+	log.Debug("found eth transfers in range", "from", from, "to", to, "lth", len(rst), "took", time.Since(start))
 	return rst, nil
 }
 
@@ -233,6 +246,9 @@ func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBH
 // GetTransfersInRange returns transfers between two blocks.
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
 func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error) {
+	start := time.Now()
+	log.Debug("get erc20 transfers in range", "from", from, "to", to)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: from,
 		ToBlock:   to,
@@ -253,8 +269,11 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from
 	if lth == 0 {
 		return nil, nil
 	}
+	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", lth, "took", time.Since(start))
 	all := make([]types.Log, lth)
 	copy(all, outbound)
 	copy(all[len(outbound):], inbound)
-	return d.transfersFromLogs(ctx, all)
+	rst, err := d.transfersFromLogs(ctx, all)
+	cancel()
+	return rst, err
 }
