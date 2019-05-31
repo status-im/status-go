@@ -20,7 +20,7 @@ import (
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
@@ -198,10 +198,10 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	// Initialize topics
-	topicService := topic.NewService(persistence.GetTopicStorage())
+	// Initialize sharedsecret
+	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 	// Initialize filter
-	filterService := filter.New(s.w, topicService)
+	filterService := filter.New(s.w, sharedSecretService)
 	s.filter = filterService
 
 	// Initialize multidevice
@@ -216,10 +216,10 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		chat.NewEncryptionService(
 			persistence,
 			chat.DefaultEncryptionServiceConfig(s.installationID)),
-		topicService,
+		sharedSecretService,
 		multideviceService,
 		addedBundlesHandler,
-		s.onNewTopicHandler)
+		s.onNewSharedSecretHandler)
 
 	return nil
 }
@@ -346,9 +346,9 @@ func (s *Service) RemoveFilter(chat *filter.Chat) error {
 	return s.filter.Remove(chat)
 }
 
-func (s *Service) onNewTopicHandler(sharedSecrets []*topic.Secret) {
+func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
 	var filters []*signal.Filter
-	log.Info("NEW TOPIC HANDLER", "secrets", sharedSecrets)
+	log.Info("NEW SHAREDSECRET HANDLER", "secrets", sharedSecrets)
 	for _, sharedSecret := range sharedSecrets {
 		chat, err := s.filter.ProcessNegotiatedSecret(sharedSecret)
 		if err != nil {

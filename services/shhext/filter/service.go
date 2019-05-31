@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"math/big"
 	"sync"
@@ -46,16 +46,16 @@ type Chat struct {
 
 type Service struct {
 	whisper *whisper.Whisper
-	topic   *topic.Service
+	secret  *sharedsecret.Service
 	chats   map[string]*Chat
 	mutex   sync.Mutex
 }
 
 // New returns a new filter service
-func New(w *whisper.Whisper, t *topic.Service) *Service {
+func New(w *whisper.Whisper, s *sharedsecret.Service) *Service {
 	return &Service{
 		whisper: w,
-		topic:   t,
+		secret:  s,
 		mutex:   sync.Mutex{},
 		chats:   make(map[string]*Chat),
 	}
@@ -102,9 +102,9 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 		}
 	}
 
-	// Add the negotiated topics
+	// Add the negotiated secrets
 	log.Debug("Loading negotiated topics")
-	secrets, err := s.topic.All()
+	secrets, err := s.secret.All()
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (s *Service) GetByID(chatID string) *Chat {
 }
 
 // ProcessNegotiatedSecret adds a filter based on the agreed secret
-func (s *Service) ProcessNegotiatedSecret(secret *topic.Secret) (*Chat, error) {
+func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 

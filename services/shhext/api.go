@@ -9,15 +9,15 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/golang/protobuf/proto"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/golang/protobuf/proto"
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
@@ -504,7 +504,6 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 
 	// This is transport layer-agnostic
 	var protocolMessage *protobuf.ProtocolMessage
-	// The negotiated secret
 	var msgSpec *chat.ProtocolMessageSpec
 	var partitionedTopicSupported bool
 	var topic []byte
@@ -537,16 +536,17 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 	whisperMessage := chat.DirectMessageToWhisper(msg, marshaledMessage, topic)
 	// Enrich with transport layer info
 	if topic != nil {
-		api.log.Info("GETTING SYM KEY", "symkey", api.service.GetNegotiatedChat(publicKey))
 
 		chat := api.service.GetNegotiatedChat(publicKey)
 
 		if chat != nil {
+			api.log.Info("Sending on negotiated topic")
 			whisperMessage.SymKeyID = chat.SymKeyID
 			whisperMessage.Topic = chat.Topic
 			whisperMessage.PublicKey = nil
 		}
 	} else if partitionedTopicSupported {
+		api.log.Info("Sending on partitioned topic")
 		// Create filter on demand
 		if _, err := api.service.filter.LoadPartitioned(privateKey, publicKey, false); err != nil {
 			return nil, err
@@ -554,9 +554,9 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirect
 		t := filter.PublicKeyToPartitionedTopicBytes(publicKey)
 		whisperMessage.Topic = whisper.BytesToTopic(t)
 
+	} else {
+		api.log.Info("Sending on old discovery topic")
 	}
-
-	api.log.Info("WHISPER MESSAGE", "message", whisperMessage)
 
 	// And dispatch
 	return api.Post(ctx, whisperMessage)
