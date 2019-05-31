@@ -44,11 +44,12 @@ type HeaderReader interface {
 // NewReactor creates instance of the Reactor.
 func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address, chain *big.Int) *Reactor {
 	reactor := &Reactor{
-		db:      db,
-		client:  client,
-		feed:    feed,
-		address: address,
-		chain:   chain,
+		db:        db,
+		client:    client,
+		ethclient: client,
+		feed:      feed,
+		address:   address,
+		chain:     chain,
 	}
 	reactor.erc20 = NewERC20TransfersDownloader(client, address)
 	reactor.eth = &ETHTransferDownloader{
@@ -61,11 +62,13 @@ func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, addres
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	client  HeaderReader
-	db      *Database
-	feed    *event.Feed
-	address common.Address
-	chain   *big.Int
+	// FIXME(dshulyak) references same object. rework this part
+	client    HeaderReader
+	ethclient *ethclient.Client
+	db        *Database
+	feed      *event.Feed
+	address   common.Address
+	chain     *big.Int
 
 	eth   *ETHTransferDownloader
 	erc20 *ERC20TransfersDownloader
@@ -171,7 +174,8 @@ func (r *Reactor) ethHistoricalLoop() {
 	// balance changed
 	var (
 		ticker   = time.NewTicker(5 * time.Second)
-		iterator *IterativeDownloader
+		ticker   = time.NewTicker(1 * time.Second)
+		iterator *BinaryIterativeDownloader
 		err      error
 	)
 	defer ticker.Stop()
@@ -181,7 +185,7 @@ func (r *Reactor) ethHistoricalLoop() {
 			return
 		case <-ticker.C:
 			if iterator == nil {
-				iterator, err = SetupIterativeDownloader(r.db, r.client, ethSync, r.eth, ethBatchSize)
+				iterator, err = SetupBinaryIterativeDownloader(r.db, r.ethclient, r.address, ethSync, r.eth)
 				if err != nil {
 					log.Error("failed to setup historical downloader for eth")
 					continue
@@ -201,7 +205,7 @@ func (r *Reactor) ethHistoricalLoop() {
 					log.Error("failed to save downloaded eth transfers", "error", err)
 					break
 				}
-				if len(transfers) > 0 {
+				if len(transfers) != 0 {
 					r.feed.Send(Event{
 						Type:        EventNewHistory,
 						BlockNumber: iterator.Header().Number,
