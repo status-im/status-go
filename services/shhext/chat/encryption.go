@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
@@ -457,8 +456,6 @@ func (s *EncryptionService) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, i
 }
 
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
-// TODO: refactor this
-// nolint: gocyclo
 func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*protobuf.DirectMessageProtocol, []*multidevice.Installation, error) {
 	// Which installations we are sending the message to
 	var targetedInstallations []*multidevice.Installation
@@ -471,7 +468,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
 
 	// We don't have any, send a message with DH
-	if installations == nil && !bytes.Equal(theirIdentityKeyC, ecrypto.CompressPubkey(&myIdentityKey.PublicKey)) {
+	if len(installations) == 0 {
 		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
 		return encryptedPayload, targetedInstallations, err
 	}

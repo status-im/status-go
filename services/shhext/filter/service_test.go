@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -51,7 +51,7 @@ func (s *ServiceTestSuite) SetupTest() {
 	keyStrs := []string{"c6cbd7d76bc5baca530c875663711b947efa6a86a900a9e8645ce32e5821484e", "d51dd64ad19ea84968a308dca246012c00d2b2101d41bce740acd1c650acc509"}
 	keyTopics := []int{4490, 3991}
 
-	dbFile, err := ioutil.TempFile(os.TempDir(), "topic")
+	dbFile, err := ioutil.TempFile(os.TempDir(), "filter")
 
 	s.Require().NoError(err)
 	s.path = dbFile.Name()
@@ -67,12 +67,12 @@ func (s *ServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 
 	// Build services
-	topicService := topic.NewService(topic.NewSQLLitePersistence(db))
+	sharedSecretService := sharedsecret.NewService(sharedsecret.NewSQLLitePersistence(db))
 	whisper := whisper.New(nil)
 	_, err = whisper.AddKeyPair(s.keys[0].privateKey)
 	s.Require().NoError(err)
 
-	s.service = New(whisper, topicService)
+	s.service = New(whisper, sharedSecretService)
 }
 
 func (s *ServiceTestSuite) TearDownTest() {
@@ -143,11 +143,11 @@ func (s *ServiceTestSuite) TestNegotiatedTopic() {
 	negotiatedTopic2 := s.keys[1].PublicKeyString() + "-negotiated"
 
 	// We send a message to ourselves
-	_, _, err := s.service.topic.Send(s.keys[0].privateKey, "0-1", &s.keys[0].privateKey.PublicKey, []string{"0-2"})
+	_, _, err := s.service.secret.Send(s.keys[0].privateKey, "0-1", &s.keys[0].privateKey.PublicKey, []string{"0-2"})
 	s.Require().NoError(err)
 
 	// We send a message to someone else
-	_, _, err = s.service.topic.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{"0-2"})
+	_, _, err = s.service.secret.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{"0-2"})
 	s.Require().NoError(err)
 
 	response, err := s.service.Init(chats)

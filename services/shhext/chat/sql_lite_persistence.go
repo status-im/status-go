@@ -12,7 +12,7 @@ import (
 	appDB "github.com/status-im/status-go/services/shhext/chat/db"
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 )
 
 // A safe max number of rows
@@ -23,7 +23,7 @@ type SQLLitePersistence struct {
 	db                 *sql.DB
 	keysStorage        dr.KeysStorage
 	sessionStorage     dr.SessionStorage
-	topicStorage       topic.PersistenceService
+	secretStorage      sharedsecret.PersistenceService
 	multideviceStorage multidevice.Persistence
 }
 
@@ -49,7 +49,7 @@ func NewSQLLitePersistence(path string, key string) (*SQLLitePersistence, error)
 
 	s.sessionStorage = NewSQLLiteSessionStorage(s.db)
 
-	s.topicStorage = topic.NewSQLLitePersistence(s.db)
+	s.secretStorage = sharedsecret.NewSQLLitePersistence(s.db)
 
 	s.multideviceStorage = multidevice.NewSQLLitePersistence(s.db)
 
@@ -80,9 +80,9 @@ func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
 	return s.sessionStorage
 }
 
-// GetTopicStorage returns the associated topicStorageObject
-func (s *SQLLitePersistence) GetTopicStorage() topic.PersistenceService {
-	return s.topicStorage
+// GetSharedSecretStorage returns the associated secretStorageObject
+func (s *SQLLitePersistence) GetSharedSecretStorage() sharedsecret.PersistenceService {
+	return s.secretStorage
 }
 
 // GetMultideviceStorage returns the associated multideviceStorage

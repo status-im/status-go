@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
-	"github.com/status-im/status-go/services/shhext/chat/topic"
+	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -73,15 +73,15 @@ func (s *EncryptionServiceTestSuite) initDatabases(baseConfig *EncryptionService
 	baseConfig.InstallationID = aliceInstallationID
 	aliceEncryptionService := NewEncryptionService(alicePersistence, *baseConfig)
 
-	aliceTopicService := topic.NewService(alicePersistence.GetTopicStorage())
+	aliceSharedSecretService := sharedsecret.NewService(alicePersistence.GetSharedSecretStorage())
 	aliceMultideviceService := multidevice.New(aliceMultideviceConfig, alicePersistence.GetMultideviceStorage())
 
 	s.alice = NewProtocolService(
 		aliceEncryptionService,
-		aliceTopicService,
+		aliceSharedSecretService,
 		aliceMultideviceService,
 		func(s []multidevice.IdentityAndIDPair) {},
-		func(s []*topic.Secret) {},
+		func(s []*sharedsecret.Secret) {},
 	)
 
 	bobPersistence, err := NewSQLLitePersistence(bobDBPath, bobDBKey)
@@ -97,17 +97,17 @@ func (s *EncryptionServiceTestSuite) initDatabases(baseConfig *EncryptionService
 
 	bobMultideviceService := multidevice.New(bobMultideviceConfig, bobPersistence.GetMultideviceStorage())
 
-	bobTopicService := topic.NewService(bobPersistence.GetTopicStorage())
+	bobSharedSecretService := sharedsecret.NewService(bobPersistence.GetSharedSecretStorage())
 
 	baseConfig.InstallationID = bobInstallationID
 	bobEncryptionService := NewEncryptionService(bobPersistence, *baseConfig)
 
 	s.bob = NewProtocolService(
 		bobEncryptionService,
-		bobTopicService,
+		bobSharedSecretService,
 		bobMultideviceService,
 		func(s []multidevice.IdentityAndIDPair) {},
-		func(s []*topic.Secret) {},
+		func(s []*sharedsecret.Secret) {},
 	)
 
 }
