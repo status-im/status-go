@@ -100,8 +100,8 @@ func (s *TransfersSuite) TestHistoricalTransfers() {
 		if err != nil {
 			return err
 		}
-		if len(all) != 30 {
-			return fmt.Errorf("waiting for 30 transfers")
+		if len(all) >= 30 {
+			return fmt.Errorf("waiting for atleast 30 transfers")
 		}
 		return nil
 	}, 30*time.Second, 1*time.Second))
