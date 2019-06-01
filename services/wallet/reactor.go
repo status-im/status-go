@@ -22,6 +22,8 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 	switch chain.Int64() {
 	case int64(params.MainNetworkID):
 		return 10 * time.Second
+	case int64(params.RopstenNetworkID):
+		return 2 * time.Second
 	default:
 		return 500 * time.Millisecond
 	}
@@ -29,7 +31,7 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 
 var (
 	reorgSafetyDepth = big.NewInt(15)
-	erc20BatchSize   = big.NewInt(100000)
+	erc20BatchSize   = big.NewInt(50000)
 	ethBatchSize     = big.NewInt(1000)
 )
 
