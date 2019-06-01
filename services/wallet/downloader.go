@@ -77,10 +77,12 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHead
 
 func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block) (rst []Transfer, err error) {
 	for _, tx := range blk.Transactions() {
-		if tx.To() == nil {
-			continue
+		from, err := types.Sender(d.signer, tx)
+		if err != nil {
+			return nil, err
 		}
-		if *tx.To() == d.address {
+		// payload is empty for eth transfers
+		if from == d.address && len(tx.Data()) == 0 {
 			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
 			if err != nil {
 				return nil, err
@@ -91,12 +93,10 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 				Transaction: tx, Receipt: receipt})
 			continue
 		}
-		from, err := types.Sender(d.signer, tx)
-		if err != nil {
-			return nil, err
+		if tx.To() == nil {
+			continue
 		}
-		// payload is empty for eth transfers
-		if from == d.address && len(tx.Data()) == 0 {
+		if *tx.To() == d.address {
 			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
 			if err != nil {
 				return nil, err
