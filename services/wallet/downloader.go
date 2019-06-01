@@ -77,6 +77,9 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHead
 
 func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block) (rst []Transfer, err error) {
 	for _, tx := range blk.Transactions() {
+		if tx.To() == nil {
+			continue
+		}
 		if *tx.To() == d.address {
 			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
 			if err != nil {
