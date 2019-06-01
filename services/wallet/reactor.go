@@ -236,7 +236,7 @@ func (r *Reactor) newTransfersLoop() {
 			latest, err := r.client.HeaderByNumber(ctx, num)
 			cancel()
 			if err != nil {
-				log.Error("failed to get latest block", "number", num, "error", err)
+				log.Warn("failed to get latest block", "number", num, "error", err)
 				continue
 			}
 			log.Debug("reactor received new block", "header", latest.Hash())
