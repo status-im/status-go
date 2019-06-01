@@ -116,7 +116,7 @@ func (r *Reactor) erc20HistoricalLoop() {
 	// TODO(dshulyak) waiting makes sense only in case of error
 	// otherwise contiue processing in batches without waiting.
 	var (
-		ticker   = time.NewTicker(1 * time.Second)
+		ticker   = time.NewTicker(5 * time.Second)
 		iterator *IterativeDownloader
 		err      error
 	)
@@ -166,7 +166,7 @@ func (r *Reactor) ethHistoricalLoop() {
 	// we can check balances at latest and 0 and then do binary search to find block where
 	// balance changed
 	var (
-		ticker   = time.NewTicker(1 * time.Second)
+		ticker   = time.NewTicker(5 * time.Second)
 		iterator *IterativeDownloader
 		err      error
 	)
