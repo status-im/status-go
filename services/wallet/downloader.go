@@ -197,7 +197,8 @@ func (d *ERC20TransfersDownloader) outboundTopics() [][]common.Hash {
 func (d *ERC20TransfersDownloader) transfersFromLogs(ctx context.Context, logs []types.Log) ([]Transfer, error) {
 	rst := make([]Transfer, len(logs))
 	for i, l := range logs {
-		tx, err := d.client.TransactionInBlock(ctx, l.BlockHash, l.TxIndex)
+		// TODO(dshulyak) use TransactionInBlock after it is fixed
+		tx, _, err := d.client.TransactionByHash(ctx, l.TxHash)
 		if err != nil {
 			return nil, err
 		}
@@ -248,7 +249,9 @@ func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBH
 func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error) {
 	start := time.Now()
 	log.Debug("get erc20 transfers in range", "from", from, "to", to)
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// TODO(dshulyak) timeout for every separate rpc call
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: from,
 		ToBlock:   to,
@@ -274,6 +277,5 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from
 	copy(all, outbound)
 	copy(all[len(outbound):], inbound)
 	rst, err := d.transfersFromLogs(ctx, all)
-	cancel()
 	return rst, err
 }
