@@ -194,15 +194,19 @@ func (d *ERC20TransfersDownloader) outboundTopics() [][]common.Hash {
 	return [][]common.Hash{{d.signature}, {d.target}, {}}
 }
 
-func (d *ERC20TransfersDownloader) transfersFromLogs(ctx context.Context, logs []types.Log) ([]Transfer, error) {
+func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, logs []types.Log) ([]Transfer, error) {
 	rst := make([]Transfer, len(logs))
 	for i, l := range logs {
 		// TODO(dshulyak) use TransactionInBlock after it is fixed
+		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
 		tx, _, err := d.client.TransactionByHash(ctx, l.TxHash)
+		cancel()
 		if err != nil {
 			return nil, err
 		}
+		ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 		receipt, err := d.client.TransactionReceipt(ctx, l.TxHash)
+		cancel()
 		if err != nil {
 			return nil, err
 		}
@@ -246,25 +250,27 @@ func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBH
 
 // GetTransfersInRange returns transfers between two blocks.
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
-func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error) {
+func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, from, to *big.Int) ([]Transfer, error) {
 	start := time.Now()
 	log.Debug("get erc20 transfers in range", "from", from, "to", to)
 	// TODO(dshulyak) timeout for every separate rpc call
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: from,
 		ToBlock:   to,
 		Topics:    d.outboundTopics(),
 	})
+	cancel()
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel = context.WithTimeout(parent, 5*time.Second)
 	inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
 		FromBlock: from,
 		ToBlock:   to,
 		Topics:    d.inboundTopics(),
 	})
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -272,10 +278,10 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(ctx context.Context, from
 	if lth == 0 {
 		return nil, nil
 	}
-	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", lth, "took", time.Since(start))
 	all := make([]types.Log, lth)
 	copy(all, outbound)
 	copy(all[len(outbound):], inbound)
-	rst, err := d.transfersFromLogs(ctx, all)
+	rst, err := d.transfersFromLogs(parent, all)
+	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", lth, "took", time.Since(start))
 	return rst, err
 }
