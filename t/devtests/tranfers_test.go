@@ -9,8 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -44,7 +46,7 @@ func (s *TransfersSuite) SetupTest() {
 }
 
 func (s *TransfersSuite) getAllTranfers() (rst []wallet.Transfer, err error) {
-	return rst, s.Local.Call(&rst, "wallet_getTransfers", big.NewInt(0))
+	return rst, s.Local.Call(&rst, "wallet_getTransfers", (*hexutil.Big)(big.NewInt(0)))
 }
 
 func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
@@ -60,6 +62,7 @@ func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
 }
 
 func (s *TransfersSuite) TestNewTransfers() {
+	logutils.OverrideRootLog(true, "debug", logutils.FileOptions{}, true)
 	s.SelectAccount()
 	s.sendTx(0, s.Address)
 	s.Require().NoError(utils.Eventually(func() error {
