@@ -152,7 +152,11 @@ func (s *Service) Start(server *p2p.Server) error {
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
-	return s.Service.Start()
+	return s.Service.Start(s.online, true)
+}
+
+func (s *Service) online() bool {
+	return s.server.PeerCount() != 0
 }
 
 // Stop is run when a service is stopped.

@@ -191,6 +191,10 @@ func (s *Service) Load(chat *Chat) ([]*Chat, error) {
 	return s.load(myKey, chat)
 }
 
+func ContactCodeTopic(identity string) string {
+	return "0x" + identity + "-contact-code"
+}
+
 // Get returns a negotiated filter given an identity
 func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	s.mutex.Lock()
@@ -346,7 +350,7 @@ func (s *Service) loadContactCode(identity string) (*Chat, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	chatID := "0x" + identity + "-contact-code"
+	chatID := ContactCodeTopic(identity)
 	if _, ok := s.chats[chatID]; ok {
 		return s.chats[chatID], nil
 	}

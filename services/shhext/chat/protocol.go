@@ -84,19 +84,21 @@ type ProtocolMessageSpec struct {
 
 func (p *ProtocolMessageSpec) MinVersion() uint32 {
 
-	var version uint32
+	if len(p.Installations) == 0 {
+		return 0
+	}
 
-	for _, installation := range p.Installations {
+	version := p.Installations[0].Version
+
+	for _, installation := range p.Installations[1:] {
 		if installation.Version < version {
 			version = installation.Version
 		}
 	}
 	return version
-
 }
 
 func (p *ProtocolMessageSpec) PartitionedTopic() bool {
-
 	return p.MinVersion() >= partitionedTopicMinVersion
 
 }
