@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -62,8 +63,12 @@ func (s *Service) StopReactor() error {
 
 // Stop reactor, signals transmitter and close db.
 func (s *Service) Stop() error {
+	log.Info("wallet stopping reactor")
+	err := s.StopReactor()
+	log.Info("wallet stopping signals")
 	s.signals.Stop()
-	return s.StopReactor()
+	log.Info("wallet stopped")
+	return err
 }
 
 // APIs returns list of available RPC APIs.

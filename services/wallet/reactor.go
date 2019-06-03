@@ -70,16 +70,17 @@ type Reactor struct {
 	eth   *ETHTransferDownloader
 	erc20 *ERC20TransfersDownloader
 
-	wg   sync.WaitGroup
-	quit chan struct{}
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel func()
 }
 
 // Start runs reactor loop in background.
 func (r *Reactor) Start() error {
-	if r.quit != nil {
+	if r.ctx != nil {
 		return errors.New("already running")
 	}
-	r.quit = make(chan struct{})
+	r.ctx, r.cancel = context.WithCancel(context.Background())
 
 	r.wg.Add(1)
 	go func() {
@@ -104,12 +105,13 @@ func (r *Reactor) Start() error {
 
 // Stop stops reactor loop and waits till it exits.
 func (r *Reactor) Stop() {
-	if r.quit == nil {
+	if r.ctx == nil {
 		return
 	}
-	close(r.quit)
+	r.cancel()
 	r.wg.Wait()
-	r.quit = nil
+	r.cancel = nil
+	r.ctx = nil
 }
 
 func (r *Reactor) erc20HistoricalLoop() {
@@ -123,7 +125,7 @@ func (r *Reactor) erc20HistoricalLoop() {
 	defer ticker.Stop()
 	for {
 		select {
-		case <-r.quit:
+		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
 			if iterator == nil {
@@ -147,10 +149,12 @@ func (r *Reactor) erc20HistoricalLoop() {
 					log.Error("failed to save downloaded erc20 transfers", "error", err)
 					break
 				}
-				r.feed.Send(Event{
-					Type:        EventNewHistory,
-					BlockNumber: iterator.Header().Number,
-				})
+				if len(transfers) > 0 {
+					r.feed.Send(Event{
+						Type:        EventNewHistory,
+						BlockNumber: iterator.Header().Number,
+					})
+				}
 			}
 			if iterator.Finished() {
 				log.Info("wallet historical downloader for erc20 transfers finished")
@@ -173,7 +177,7 @@ func (r *Reactor) ethHistoricalLoop() {
 	defer ticker.Stop()
 	for {
 		select {
-		case <-r.quit:
+		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
 			if iterator == nil {
@@ -197,10 +201,12 @@ func (r *Reactor) ethHistoricalLoop() {
 					log.Error("failed to save downloaded eth transfers", "error", err)
 					break
 				}
-				r.feed.Send(Event{
-					Type:        EventNewHistory,
-					BlockNumber: iterator.Header().Number,
-				})
+				if len(transfers) > 0 {
+					r.feed.Send(Event{
+						Type:        EventNewHistory,
+						BlockNumber: iterator.Header().Number,
+					})
+				}
 			}
 			if iterator.Finished() {
 				log.Info("wallet historical downloader for eth transfers finished")
@@ -221,7 +227,7 @@ func (r *Reactor) newTransfersLoop() {
 	defer ticker.Stop()
 	for {
 		select {
-		case <-r.quit:
+		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
 			if previous == nil {
@@ -232,7 +238,7 @@ func (r *Reactor) newTransfersLoop() {
 				}
 			}
 			num = num.Add(previous.Number, one)
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(r.ctx, 5*time.Second)
 			latest, err := r.client.HeaderByNumber(ctx, num)
 			cancel()
 			if err != nil {
@@ -240,7 +246,7 @@ func (r *Reactor) newTransfersLoop() {
 				continue
 			}
 			log.Debug("reactor received new block", "header", latest.Hash())
-			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel = context.WithTimeout(r.ctx, 10*time.Second)
 			added, removed, err := r.onNewBlock(ctx, previous, latest)
 			cancel()
 			if err != nil {
@@ -284,13 +290,13 @@ func (r *Reactor) newTransfersLoop() {
 
 // getTransfers fetches erc20 and eth transfers and returns single slice with them.
 func (r *Reactor) getTransfers(header *DBHeader) ([]Transfer, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.ctx, 5*time.Second)
 	ethT, err := r.eth.GetTransfers(ctx, header)
 	cancel()
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel = context.WithTimeout(r.ctx, 5*time.Second)
 	erc20T, err := r.erc20.GetTransfers(ctx, header)
 	cancel()
 	if err != nil {

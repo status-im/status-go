@@ -85,8 +85,8 @@ Client expected to request transfers starting from received block.
 {
   "type": "wallet",
   "event": {
-    "Type": "newblock",
-    "BlockNumber": 10
+    "type": "newblock",
+    "blockNumber": 10
   }
 }
 ```
@@ -100,8 +100,8 @@ Client expected to request new transfers from received block and replace transfe
 {
   "type": "wallet",
   "event": {
-    "Type": "reorg",
-    "BlockNumber": 10
+    "type": "reorg",
+    "blockNumber": 10
   }
 }
 ```
@@ -115,8 +115,8 @@ Client expected to request transfers starting from this new block till the earli
 {
   "type": "wallet",
   "event": {
-    "Type": "history",
-    "BlockNumber": 10
+    "type": "history",
+    "blockNumber": 10
   }
 }
 ```

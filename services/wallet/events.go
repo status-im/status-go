@@ -16,6 +16,6 @@ const (
 
 // Event is a type for wallet events.
 type Event struct {
-	Type        EventType
-	BlockNumber *big.Int
+	Type        EventType `json:"type"`
+	BlockNumber *big.Int  `json:"blockNumber"`
 }
