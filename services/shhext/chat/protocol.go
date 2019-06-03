@@ -136,11 +136,10 @@ func (p *ProtocolService) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, pu
 			installationIDs = append(installationIDs, installationID)
 		}
 	}
-	if len(installationIDs) != 0 {
-		sharedSecret, agreed, err = p.secret.Send(myIdentityKey, p.encryption.config.InstallationID, publicKey, installationIDs)
-		if err != nil {
-			return nil, err
-		}
+
+	sharedSecret, agreed, err = p.secret.Send(myIdentityKey, p.encryption.config.InstallationID, publicKey, installationIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	// Call handler

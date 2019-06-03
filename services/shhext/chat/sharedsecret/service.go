@@ -53,6 +53,14 @@ func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, 
 	if err != nil {
 		return nil, false, err
 	}
+	secret := &Secret{
+		Key:      response.secret,
+		Identity: theirPublicKey,
+	}
+
+	if len(theirInstallationIDs) == 0 {
+		return secret, false, nil
+	}
 
 	for _, installationID := range theirInstallationIDs {
 		if !response.installationIDs[installationID] {
@@ -60,10 +68,7 @@ func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, 
 		}
 	}
 
-	return &Secret{
-		Key:      response.secret,
-		Identity: theirPublicKey,
-	}, true, nil
+	return secret, true, nil
 }
 
 type Secret struct {
