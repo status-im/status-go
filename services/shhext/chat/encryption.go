@@ -464,6 +464,7 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 
 	// We don't have any, send a message with DH
 	if len(installations) == 0 {
+		s.log.Debug("no installations, sending to all devices")
 		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
 		return encryptedPayload, targetedInstallations, err
 	}
