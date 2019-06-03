@@ -13,13 +13,21 @@ import (
 const ProtocolVersion = 1
 const sharedSecretNegotiationVersion = 1
 const partitionedTopicMinVersion = 1
+const defaultMinVersion = 0
+
+type PartitionTopic int
+
+const (
+	PartitionTopicNoSupport PartitionTopic = iota
+	PartitionTopicV1
+)
 
 type ProtocolService struct {
 	log                      log.Logger
 	encryption               *EncryptionService
 	secret                   *sharedsecret.Service
 	multidevice              *multidevice.Service
-	addedBundlesHandler      func([]multidevice.IdentityAndIDPair)
+	addedBundlesHandler      func([]*multidevice.IdentityAndID)
 	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	Enabled                  bool
 }
@@ -27,7 +35,7 @@ type ProtocolService struct {
 var ErrNotProtocolMessage = errors.New("Not a protocol message")
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]multidevice.IdentityAndIDPair), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]*multidevice.IdentityAndID), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
 	return &ProtocolService{
 		log:                      log.New("package", "status-go/services/sshext.chat"),
 		encryption:               encryption,
@@ -84,21 +92,25 @@ type ProtocolMessageSpec struct {
 
 func (p *ProtocolMessageSpec) MinVersion() uint32 {
 
-	var version uint32
+	if len(p.Installations) == 0 {
+		return defaultMinVersion
+	}
 
-	for _, installation := range p.Installations {
+	version := p.Installations[0].Version
+
+	for _, installation := range p.Installations[1:] {
 		if installation.Version < version {
 			version = installation.Version
 		}
 	}
 	return version
-
 }
 
-func (p *ProtocolMessageSpec) PartitionedTopic() bool {
-
-	return p.MinVersion() >= partitionedTopicMinVersion
-
+func (p *ProtocolMessageSpec) PartitionedTopic() PartitionTopic {
+	if p.MinVersion() >= partitionedTopicMinVersion {
+		return PartitionTopicV1
+	}
+	return PartitionTopicNoSupport
 }
 
 // BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
@@ -181,12 +193,13 @@ func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destin
 }
 
 // ProcessPublicBundle processes a received X3DH bundle.
-func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]multidevice.IdentityAndIDPair, error) {
+func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.IdentityAndID, error) {
 	if err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle); err != nil {
 		return nil, err
 	}
 
 	theirIdentityKey, err := ExtractIdentity(bundle)
+	p.log.Debug("Processing bundle", "bundle", bundle)
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +243,7 @@ func (p *ProtocolService) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, protocolMessage *protobuf.ProtocolMessage, messageID []byte) ([]byte, error) {
+	p.log.Debug("Received message from", "public-key", theirPublicKey)
 	if p.encryption == nil {
 		return nil, errors.New("encryption service not initialized")
 	}
@@ -258,25 +272,26 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 	// Check if it's a public message
 	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
+		p.log.Debug("Public message, nothing to do")
 		// Nothing to do, as already in cleartext
 		return publicMessage, nil
 	}
 
 	// Decrypt message
 	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
+		p.log.Debug("Processing direct message")
 		message, err := p.encryption.DecryptPayload(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId(), directMessage, messageID)
 		if err != nil {
 			return nil, err
 		}
 
 		var bundles []*protobuf.Bundle
-		p.log.Info("Checking version")
 		// Handle protocol negotiation for compatible clients
-		p.log.Info("bundle", "bundles", protocolMessage)
 		bundles = append(protocolMessage.GetBundles(), protocolMessage.GetBundle())
 		version := getProtocolVersion(bundles, protocolMessage.GetInstallationId())
+		p.log.Debug("Message version is", "version", version)
 		if version >= sharedSecretNegotiationVersion {
-			p.log.Info("Version greater than 1 negotianting")
+			p.log.Debug("Negotiating shared secret")
 			sharedSecret, err := p.secret.Receive(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
 			if err != nil {
 				return nil, err
@@ -294,7 +309,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 func getProtocolVersion(bundles []*protobuf.Bundle, installationID string) uint32 {
 	if installationID == "" {
-		return 0
+		return defaultMinVersion
 	}
 
 	for _, bundle := range bundles {
@@ -306,12 +321,12 @@ func getProtocolVersion(bundles []*protobuf.Bundle, installationID string) uint3
 
 			signedPreKey := signedPreKeys[installationID]
 			if signedPreKey == nil {
-				return 0
+				return defaultMinVersion
 			}
 
 			return signedPreKey.GetProtocolVersion()
 		}
 	}
 
-	return 0
+	return defaultMinVersion
 }

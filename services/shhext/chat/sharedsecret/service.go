@@ -10,15 +10,19 @@ import (
 const sskLen = 16
 
 type Service struct {
+	log         log.Logger
 	persistence PersistenceService
 }
 
 func NewService(persistence PersistenceService) *Service {
-	return &Service{persistence: persistence}
+	return &Service{
+		log:         log.New("package", "status-go/services/sshext/chat.sharedsecret"),
+		persistence: persistence,
+	}
 }
 
 func (s *Service) setup(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) (*Secret, error) {
-	log.Info("Setup called for", "installationID", installationID)
+	s.log.Debug("Setup called for", "installationID", installationID)
 	sharedKey, err := ecies.ImportECDSA(myPrivateKey).GenerateShared(
 		ecies.ImportECDSAPublic(theirPublicKey),
 		sskLen,
@@ -38,11 +42,13 @@ func (s *Service) setup(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.Pu
 
 // Receive will generate a shared secret for a given identity, and return it
 func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, installationID string) (*Secret, error) {
+	s.log.Debug("Received message, setting up topic", "public-key", theirPublicKey, "installation-id", installationID)
 	return s.setup(myPrivateKey, theirPublicKey, installationID)
 }
 
 // Send returns a shared key and whether it has been acknowledged from all the installationIDs
 func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, theirPublicKey *ecdsa.PublicKey, theirInstallationIDs []string) (*Secret, bool, error) {
+	s.log.Debug("Checking againts:", "installation-ids", theirInstallationIDs)
 	secret, err := s.setup(myPrivateKey, theirPublicKey, myInstallationID)
 	if err != nil {
 		return nil, false, err
@@ -60,9 +66,12 @@ func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, 
 
 	for _, installationID := range theirInstallationIDs {
 		if !response.installationIDs[installationID] {
+			s.log.Debug("no shared secret with:", "installation-id", installationID)
 			return secret, false, nil
 		}
 	}
+
+	s.log.Debug("shared secret found")
 
 	return secret, true, nil
 }

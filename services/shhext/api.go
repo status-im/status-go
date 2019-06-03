@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
+	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
@@ -466,12 +467,22 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	return api.service.SendPublicMessage(ctx, msg)
+	message, err := api.service.CreatePublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Post(ctx, *message)
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
-	return api.service.SendDirectMessage(ctx, msg)
+	message, err := api.service.CreateDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Post(ctx, *message)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
@@ -580,6 +591,21 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 		return tx.Commit()
 	}
 	return err
+}
+
+// LoadFilters load all the necessary filters
+func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
+	return api.service.LoadFilters(chats)
+}
+
+// LoadFilter load a single filter
+func (api *PublicAPI) LoadFilter(parent context.Context, chat *filter.Chat) ([]*filter.Chat, error) {
+	return api.service.LoadFilter(chat)
+}
+
+// RemoveFilter remove a single filter
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
+	return api.service.RemoveFilters(chats)
 }
 
 // -----

@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"github.com/status-im/status-go/services/shhext/chat"
-	appDB "github.com/status-im/status-go/services/shhext/chat/db"
+	chatDB "github.com/status-im/status-go/services/shhext/chat/db"
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
@@ -26,7 +26,9 @@ import (
 )
 
 const (
-	tickerInterval   = 120
+	tickerInterval = 120
+	// How often we should publish a contact code in seconds
+	publishInterval  = 21600
 	maxInstallations = 3
 )
 
@@ -37,19 +39,17 @@ var (
 	ErrPFSNotEnabled = errors.New("pfs not enabled")
 )
 
-//type Persistence interface {
-//}
-
 type Service struct {
-	whisper    *whisper.Whisper
-	whisperAPI *whisper.PublicWhisperAPI
-	protocol   *chat.ProtocolService
-	//	persistence Persistence
-	log    log.Logger
-	filter *filter.Service
-	config *Config
-	quit   chan struct{}
-	ticker *time.Ticker
+	whisper     *whisper.Whisper
+	online      func() bool
+	whisperAPI  *whisper.PublicWhisperAPI
+	protocol    *chat.ProtocolService
+	persistence Persistence
+	log         log.Logger
+	filter      *filter.Service
+	config      *Config
+	quit        chan struct{}
+	ticker      *time.Ticker
 }
 
 type Config struct {
@@ -94,11 +94,11 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	v4Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%s.v4.db", s.config.InstallationID))
 
 	if password != "" {
-		if err := appDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
+		if err := chatDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 			return err
 		}
 
-		if err := appDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
+		if err := chatDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
 			// Remove db file as created with a blank password and never used,
 			// and there's no need to rekey in this case
 			os.Remove(v1Path)
@@ -106,13 +106,13 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	if err := appDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
+	if err := chatDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
 		os.Remove(v2Path)
 		os.Remove(v3Path)
 	}
 
 	// Fix IOS not encrypting database
-	if err := appDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
+	if err := chatDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
@@ -134,12 +134,16 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	addedBundlesHandler := func(addedBundles []multidevice.IdentityAndIDPair) {
+	addedBundlesHandler := func(addedBundles []*multidevice.IdentityAndID) {
 		handler := SignalHandler{}
 		for _, bundle := range addedBundles {
-			handler.BundleAdded(bundle[0], bundle[1])
+			handler.BundleAdded(bundle.Identity, bundle.ID)
 		}
 	}
+
+	// Initialize persistence
+
+	s.persistence = NewSQLLitePersistence(persistence.DB)
 
 	// Initialize sharedsecret
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
@@ -167,7 +171,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]multidevice.IdentityAndIDPair, error) {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.IdentityAndID, error) {
 	if s.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
@@ -209,10 +213,14 @@ func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installati
 	return s.protocol.DisableInstallation(myIdentityKey, installationID)
 }
 
-func (s *Service) Start() error {
-	s.startTicker()
+func (s *Service) Start(online func() bool, startTicker bool) error {
+	s.online = online
+	if startTicker {
+		s.startTicker()
+	}
 	return nil
 }
+
 func (s *Service) Stop() error {
 	if s.filter != nil {
 		if err := s.filter.Stop(); err != nil {
@@ -223,7 +231,7 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func (s *Service) GetNegotiatedChat(identity *ecdsa.PublicKey) *filter.Chat {
+func (s *Service) getNegotiatedChat(identity *ecdsa.PublicKey) *filter.Chat {
 	return s.filter.GetNegotiated(identity)
 }
 
@@ -235,8 +243,8 @@ func (s *Service) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
 	return s.filter.Load(chat)
 }
 
-func (s *Service) RemoveFilter(chat *filter.Chat) error {
-	return s.filter.Remove(chat)
+func (s *Service) RemoveFilters(chats []*filter.Chat) error {
+	return s.filter.Remove(chats)
 }
 
 func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
@@ -318,42 +326,42 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 	return nil
 }
 
-// SendDirectMessage sends a 1:1 chat message to the underlying transport
-func (s *Service) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
+// CreateDirectMessage creates a 1:1 chat message
+func (s *Service) CreateDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(msg.Sig)
+	privateKey, err := s.whisper.GetPrivateKey(signature)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKey, err := crypto.UnmarshalPubkey(msg.PubKey)
+	publicKey, err := crypto.UnmarshalPubkey(destination)
 	if err != nil {
 		return nil, err
 	}
 
 	var msgSpec *chat.ProtocolMessageSpec
 
-	if msg.DH {
+	if DH {
 		s.log.Debug("Building dh message")
-		msgSpec, err = s.protocol.BuildDHMessage(privateKey, publicKey, msg.Payload)
+		msgSpec, err = s.protocol.BuildDHMessage(privateKey, publicKey, payload)
 	} else {
 		s.log.Debug("Building direct message")
-		msgSpec, err = s.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
+		msgSpec, err = s.protocol.BuildDirectMessage(privateKey, publicKey, payload)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	whisperMessage, err := s.directMessageToWhisper(privateKey, publicKey, msg.PubKey, msg.Sig, msgSpec)
+	whisperMessage, err := s.directMessageToWhisper(privateKey, publicKey, destination, signature, msgSpec)
 	if err != nil {
 		s.log.Error("sshext-service", "error building whisper message", err)
 		return nil, err
 	}
 
-	return s.whisperAPI.Post(ctx, *whisperMessage)
+	return whisperMessage, nil
 }
 
 func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
@@ -369,16 +377,16 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 	whisperMessage.Sig = signature
 
 	if spec.SharedSecret != nil {
-		chat := s.GetNegotiatedChat(theirPublicKey)
+		chat := s.getNegotiatedChat(theirPublicKey)
 		if chat != nil {
-			s.log.Debug("Sending on negotiated topic")
+			s.log.Debug("Sending on negotiated topic", "public-key", destination)
 			whisperMessage.SymKeyID = chat.SymKeyID
 			whisperMessage.Topic = chat.Topic
 			whisperMessage.PublicKey = nil
 			return &whisperMessage, nil
 		}
-	} else if spec.PartitionedTopic() {
-		s.log.Debug("Sending on partitioned topic")
+	} else if spec.PartitionedTopic() == chat.PartitionTopicV1 {
+		s.log.Debug("Sending on partitioned topic", "public-key", destination)
 		// Create filter on demand
 		if _, err := s.filter.LoadPartitioned(myPrivateKey, theirPublicKey, false); err != nil {
 			return nil, err
@@ -389,33 +397,58 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 		return &whisperMessage, nil
 	}
 
-	s.log.Debug("Sending on old discovery topic")
+	s.log.Debug("Sending on old discovery topic", "public-key", destination)
 	whisperMessage.Topic = whisperutils.DiscoveryTopicBytes
 	whisperMessage.PublicKey = destination
 
 	return &whisperMessage, nil
 }
 
-// SendPublicMessage sends a public chat message to the underlying transport
-func (s *Service) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
+// CreatePublicMessage sends a public chat message to the underlying transport
+func (s *Service) CreatePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
-	filter := s.filter.GetByID(msg.Chat)
+	filter := s.filter.GetByID(chatID)
 	if filter == nil {
 		return nil, errors.New("not subscribed to chat")
 	}
+	s.log.Info("SIG", signature)
 
 	// Enrich with transport layer info
 	whisperMessage := whisperutils.DefaultWhisperMessage()
-	whisperMessage.Payload = msg.Payload
-	whisperMessage.Sig = msg.Sig
-	whisperMessage.Topic = whisperutils.ToTopic(msg.Chat)
+	whisperMessage.Sig = signature
+	whisperMessage.Topic = whisperutils.ToTopic(chatID)
 	whisperMessage.SymKeyID = filter.SymKeyID
 
-	// And dispatch
-	return s.whisperAPI.Post(ctx, whisperMessage)
+	if wrap {
+		privateKeyID := s.whisper.SelectedKeyPairID()
+		if privateKeyID == "" {
+			return nil, errors.New("no key selected")
+		}
+
+		privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+		if err != nil {
+			return nil, err
+		}
+
+		message, err := s.protocol.BuildPublicMessage(privateKey, payload)
+		if err != nil {
+			return nil, err
+		}
+		marshaledMessage, err := proto.Marshal(message)
+		if err != nil {
+			s.log.Error("encryption-service", "error marshaling message", err)
+			return nil, err
+		}
+		whisperMessage.Payload = marshaledMessage
+
+	} else {
+		whisperMessage.Payload = payload
+	}
+
+	return &whisperMessage, nil
 }
 
 func (s *Service) ConfirmMessagesProcessed(ids [][]byte) error {
@@ -429,7 +462,7 @@ func (s *Service) startTicker() {
 		for {
 			select {
 			case <-s.ticker.C:
-				err := s.perform()
+				_, err := s.sendContactCode()
 				if err != nil {
 					s.log.Error("could not execute tick", "err", err)
 				}
@@ -441,6 +474,60 @@ func (s *Service) startTicker() {
 	}()
 }
 
-func (s *Service) perform() error {
-	return nil
+func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
+	s.log.Info("publishing bundle")
+	if !s.config.PfsEnabled {
+		return nil, nil
+	}
+
+	lastPublished, err := s.persistence.Get()
+	if err != nil {
+		s.log.Error("could not fetch config from db", "err", err)
+		return nil, err
+	}
+
+	now := time.Now().Unix()
+
+	if now-lastPublished < publishInterval {
+		fmt.Println("NOTHING")
+		s.log.Debug("nothing to do")
+		return nil, nil
+	}
+
+	if !s.online() {
+		s.log.Debug("not connected")
+		return nil, nil
+	}
+
+	privateKeyID := s.whisper.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return nil, errors.New("no key selected")
+	}
+
+	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return nil, err
+	}
+
+	identity := fmt.Sprintf("%x", crypto.FromECDSAPub(&privateKey.PublicKey))
+
+	message, err := s.CreatePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
+	if err != nil {
+		s.log.Error("could not build contact code", "identity", identity, "err", err)
+		return nil, err
+	}
+
+	_, err = s.whisperAPI.Post(context.TODO(), *message)
+	if err != nil {
+		s.log.Error("could not publish contact code on whisper", "identity", identity, "err", err)
+		return nil, err
+	}
+
+	err = s.persistence.Set(now)
+	if err != nil {
+		s.log.Error("could not set last published", "err", err)
+		return nil, err
+	}
+
+	return message, nil
 }

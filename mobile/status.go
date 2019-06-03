@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
-	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -613,74 +612,4 @@ func SignHash(hexEncodedHash string) string {
 	}
 
 	return hexEncodedSignature
-}
-
-// LoadFilters load all whisper filters
-func LoadFilters(chatsStr string) string {
-	var chats []*filter.Chat
-
-	if err := json.Unmarshal([]byte(chatsStr), &chats); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	response, err := statusBackend.LoadFilters(chats)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Chats []*filter.Chat `json:"result"`
-	}{Chats: response})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
-}
-
-// LoadFilter load a whisper filter
-func LoadFilter(chatStr string) string {
-	var chat *filter.Chat
-
-	if err := json.Unmarshal([]byte(chatStr), &chat); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	response, err := statusBackend.LoadFilter(chat)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Chats []*filter.Chat `json:"result"`
-	}{Chats: response})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
-}
-
-// RemoveFilter load a whisper filter
-//export RemoveFilter
-func RemoveFilter(chatStr string) string {
-	var chat *filter.Chat
-
-	if err := json.Unmarshal([]byte(chatStr), &chat); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	err := statusBackend.RemoveFilter(chat)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Response string `json:"response"`
-	}{Response: "ok"})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
 }
