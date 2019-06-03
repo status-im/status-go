@@ -32,6 +32,10 @@ func (h headers) HeaderByNumber(ctx context.Context, number *big.Int) (*types.He
 	return nil, errors.New("not found")
 }
 
+func (h headers) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	return nil, errors.New("not implemented")
+}
+
 func TestReactorReorgOnNewBlock(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
