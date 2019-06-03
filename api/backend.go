@@ -25,7 +25,6 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/shhext/chat/crypto"
-	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -627,36 +626,6 @@ func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
 	}
 
 	return crypto.Sign(content, selectedChatAccount.AccountKey.PrivateKey)
-}
-
-// LoadFilters loads filter on sshext
-func (b *StatusBackend) LoadFilters(chats []*filter.Chat) ([]*filter.Chat, error) {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return nil, err
-	}
-
-	return st.LoadFilters(chats)
-}
-
-// LoadFilter loads filter on sshext
-func (b *StatusBackend) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return nil, err
-	}
-
-	return st.LoadFilter(chat)
-}
-
-// RemoveFilter remove a filter
-func (b *StatusBackend) RemoveFilter(chat *filter.Chat) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	return st.RemoveFilter(chat)
 }
 
 // EnableInstallation enables an installation for multi-device sync.

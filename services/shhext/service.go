@@ -152,12 +152,16 @@ func (s *Service) Start(server *p2p.Server) error {
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
-	return s.Service.Start()
+	return s.Service.Start(s.online, true)
+}
+
+func (s *Service) online() bool {
+	return s.server.PeerCount() != 0
 }
 
 // Stop is run when a service is stopped.
-// It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Stop() error {
+	log.Info("Stopping shhext service")
 	if s.config.EnableConnectionManager {
 		s.connManager.Stop()
 	}

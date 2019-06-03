@@ -6,9 +6,9 @@ import (
 	"os"
 
 	sqlite "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
-	"github.com/status-im/migrate"
-	"github.com/status-im/migrate/database/sqlcipher"
-	"github.com/status-im/migrate/source/go_bindata"
+	"github.com/status-im/migrate/v4"
+	"github.com/status-im/migrate/v4/database/sqlcipher"
+	"github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/status-im/status-go/services/shhext/chat/db/migrations"
 )
 
