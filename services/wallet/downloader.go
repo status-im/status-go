@@ -79,7 +79,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 			return nil, err
 		}
 		// payload is empty for eth transfers
-		if from == d.address && len(tx.Data()) == 0 {
+		if from == d.address {
 			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
 			if err != nil {
 				return nil, err
