@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -93,7 +92,10 @@ func (d *IterativeDownloader) Revert() {
 	}
 }
 
-func SetupBinaryIterativeDownloader(db *Database, client *ethclient.Client, address common.Address,
+// SetupBinaryIterativeDownloader reads earliest synced block (with a given option) from database
+// or fetches last known block if there is no synced block.
+// Returns instance of the iterative downloader.
+func SetupBinaryIterativeDownloader(db *Database, client reactorClient, address common.Address,
 	option SyncOption, downloader BatchDownloader) (*BinaryIterativeDownloader, error) {
 	d := &BinaryIterativeDownloader{
 		client:     client,
@@ -120,8 +122,9 @@ func SetupBinaryIterativeDownloader(db *Database, client *ethclient.Client, addr
 }
 
 // BinaryIterativeDownloader uses approach similar to binary search to find differences balance differences between several blocks.
+// TODO(dshulyak) better name
 type BinaryIterativeDownloader struct {
-	client                       *ethclient.Client
+	client                       reactorClient
 	address                      common.Address
 	downloader                   BatchDownloader
 	high, low, prevHigh, prevLow *big.Int
@@ -139,6 +142,9 @@ func (d *BinaryIterativeDownloader) updateLastDownloaded() error {
 	return nil
 }
 
+// Next compares balances between current low and high blocks based on that moves cursor in either direction.
+// NOTE(dshulyak) technically we can miss transfers if account received assets and then trasfered all assets.
+// practically it shouldn't happen cause some assets will be on account as a leftover from paying gas
 func (d *BinaryIterativeDownloader) Next() ([]Transfer, error) {
 	log.Debug("comparing balances between", "low", d.low, "high", d.high)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -159,7 +165,7 @@ func (d *BinaryIterativeDownloader) Next() ([]Transfer, error) {
 			"diff", new(big.Int).Sub(hbalance, lbalance))
 		if new(big.Int).Sub(d.high, d.low).Cmp(one) == 0 {
 			log.Debug("higher block is a direct child. downloading transfers")
-			// TODO(dshulyak) maybe use downloader for single block
+			// TODO(dshulyak) consider iterating one by one if blocks are closer that some N (5-10)
 			ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 			transfers, err := d.downloader.GetTransfersInRange(ctx, d.low, d.high)
 			cancel()
@@ -177,44 +183,43 @@ func (d *BinaryIterativeDownloader) Next() ([]Transfer, error) {
 			d.low = new(big.Int).Div(d.high, big.NewInt(2))
 			return transfers, nil
 		}
-		d.prevHigh, d.prevLow = d.high, d.low
-		mid := new(big.Int).Add(d.high, d.low)
 		err = d.updateLastDownloaded()
 		if err != nil {
 			return nil, err
 		}
-		d.high = d.low
-		d.low = mid.Div(mid, big.NewInt(2))
-		if d.low.Cmp(one) >= 0 {
-			d.low = d.low.Sub(d.low, one)
-		}
+		// move one step closer to upper bound
+		d.prevHigh, d.prevLow = d.high, d.low
+		mid := new(big.Int).Add(d.high, d.low)
+		d.low = new(big.Int).Div(mid, big.NewInt(2))
 		return nil, nil
 	}
-	log.Debug("balances between are equal",
-		"low", d.low, "high", d.high)
-	// TODO(dshulyak) DRY
-	d.prevHigh, d.prevLow = d.high, d.low
-	mid := new(big.Int).Add(d.high, d.low)
+	log.Debug("balances between are equal", "low", d.low, "high", d.high)
 	err = d.updateLastDownloaded()
 	if err != nil {
 		return nil, err
 	}
+	// move one step closer to lower bound
+	d.prevHigh, d.prevLow = d.high, d.low
 	d.high = d.low
-	d.low = mid.Div(mid, big.NewInt(2))
+	d.low = new(big.Int).Div(d.low, big.NewInt(2))
 	if d.low.Cmp(one) >= 0 {
 		d.low = d.low.Sub(d.low, one)
 	}
 	return nil, nil
 }
 
+// Finished when upper bound is equal to zero.
 func (d *BinaryIterativeDownloader) Finished() bool {
 	return d.high.Cmp(zero) == 0
 }
 
+// Header stores last downloader header.
 func (d *BinaryIterativeDownloader) Header() *DBHeader {
 	return d.lastDownloaded
 }
 
+// Revert resets lower and upper bound so that last operation can be repeated.
+// Should be used if app failed to process Transfers returned by Next.
 func (d *BinaryIterativeDownloader) Revert() {
 	if d.prevHigh != nil {
 		d.high, d.low = d.prevHigh, d.prevLow

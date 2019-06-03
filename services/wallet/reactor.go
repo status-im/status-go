@@ -41,15 +41,24 @@ type HeaderReader interface {
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 }
 
+// BalanceReader interface for reading balance at a specifeid address.
+type BalanceReader interface {
+	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+}
+
+type reactorClient interface {
+	HeaderReader
+	BalanceReader
+}
+
 // NewReactor creates instance of the Reactor.
 func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address, chain *big.Int) *Reactor {
 	reactor := &Reactor{
-		db:        db,
-		client:    client,
-		ethclient: client,
-		feed:      feed,
-		address:   address,
-		chain:     chain,
+		db:      db,
+		client:  client,
+		feed:    feed,
+		address: address,
+		chain:   chain,
 	}
 	reactor.erc20 = NewERC20TransfersDownloader(client, address)
 	reactor.eth = &ETHTransferDownloader{
@@ -63,12 +72,11 @@ func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, addres
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
 	// FIXME(dshulyak) references same object. rework this part
-	client    HeaderReader
-	ethclient *ethclient.Client
-	db        *Database
-	feed      *event.Feed
-	address   common.Address
-	chain     *big.Int
+	client  reactorClient
+	db      *Database
+	feed    *event.Feed
+	address common.Address
+	chain   *big.Int
 
 	eth   *ETHTransferDownloader
 	erc20 *ERC20TransfersDownloader
@@ -174,7 +182,6 @@ func (r *Reactor) ethHistoricalLoop() {
 	// balance changed
 	var (
 		ticker   = time.NewTicker(5 * time.Second)
-		ticker   = time.NewTicker(1 * time.Second)
 		iterator *BinaryIterativeDownloader
 		err      error
 	)
@@ -185,7 +192,7 @@ func (r *Reactor) ethHistoricalLoop() {
 			return
 		case <-ticker.C:
 			if iterator == nil {
-				iterator, err = SetupBinaryIterativeDownloader(r.db, r.ethclient, r.address, ethSync, r.eth)
+				iterator, err = SetupBinaryIterativeDownloader(r.db, r.client, r.address, ethSync, r.eth)
 				if err != nil {
 					log.Error("failed to setup historical downloader for eth")
 					continue
