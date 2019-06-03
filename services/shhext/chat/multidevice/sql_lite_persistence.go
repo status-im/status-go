@@ -79,9 +79,27 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 			return err
 		}
 
-		// We update timestamp if present without changing enabled, only if this is a new bundle
-		// and we set the version to the latest we ever saw
-		if err != sql.ErrNoRows {
+		if err == sql.ErrNoRows {
+			stmt, err = tx.Prepare(`INSERT INTO installations(identity, installation_id, timestamp, enabled, version)
+						VALUES (?, ?, ?, ?, ?)`)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+
+			_, err = stmt.Exec(
+				identity,
+				installation.ID,
+				timestamp,
+				defaultEnabled,
+				latestVersion,
+			)
+			if err != nil {
+				return err
+			}
+		} else {
+			// We update timestamp if present without changing enabled, only if this is a new bundle
+			// and we set the version to the latest we ever saw
 			if oldVersion > installation.Version {
 				latestVersion = oldVersion
 			}
@@ -94,6 +112,7 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 			if err != nil {
 				return err
 			}
+			defer stmt.Close()
 
 			_, err = stmt.Exec(
 				timestamp,
@@ -106,26 +125,6 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 			if err != nil {
 				return err
 			}
-			defer stmt.Close()
-
-		} else {
-			stmt, err = tx.Prepare(`INSERT INTO installations(identity, installation_id, timestamp, enabled, version)
-						VALUES (?, ?, ?, ?, ?)`)
-			if err != nil {
-				return err
-			}
-
-			_, err = stmt.Exec(
-				identity,
-				installation.ID,
-				timestamp,
-				defaultEnabled,
-				latestVersion,
-			)
-			if err != nil {
-				return err
-			}
-			defer stmt.Close()
 		}
 
 	}

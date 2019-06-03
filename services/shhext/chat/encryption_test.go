@@ -80,7 +80,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(baseConfig *EncryptionService
 		aliceEncryptionService,
 		aliceSharedSecretService,
 		aliceMultideviceService,
-		func(s []multidevice.IdentityAndIDPair) {},
+		func(s []*multidevice.IdentityAndID) {},
 		func(s []*sharedsecret.Secret) {},
 	)
 
@@ -106,7 +106,7 @@ func (s *EncryptionServiceTestSuite) initDatabases(baseConfig *EncryptionService
 		bobEncryptionService,
 		bobSharedSecretService,
 		bobMultideviceService,
-		func(s []multidevice.IdentityAndIDPair) {},
+		func(s []*multidevice.IdentityAndID) {},
 		func(s []*sharedsecret.Secret) {},
 	)
 

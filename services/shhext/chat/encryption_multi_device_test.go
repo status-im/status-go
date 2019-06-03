@@ -69,7 +69,7 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 				DefaultEncryptionServiceConfig(installationID)),
 			sharedSecretService,
 			multideviceService,
-			func(s []multidevice.IdentityAndIDPair) {},
+			func(s []*multidevice.IdentityAndID) {},
 			func(s []*sharedsecret.Secret) {},
 		)
 
@@ -111,12 +111,12 @@ func (s *EncryptionServiceMultiDeviceSuite) TestProcessPublicBundle() {
 	// Add alice2 bundle
 	response, err := s.services[aliceUser].services[0].ProcessPublicBundle(aliceKey, alice2Bundle)
 	s.Require().NoError(err)
-	s.Require().Equal(multidevice.IdentityAndIDPair{alice2Identity, "alice2"}, response[0])
+	s.Require().Equal(multidevice.IdentityAndID{alice2Identity, "alice2"}, *response[0])
 
 	// Add alice3 bundle
 	response, err = s.services[aliceUser].services[0].ProcessPublicBundle(aliceKey, alice3Bundle)
 	s.Require().NoError(err)
-	s.Require().Equal(multidevice.IdentityAndIDPair{alice3Identity, "alice3"}, response[0])
+	s.Require().Equal(multidevice.IdentityAndID{alice3Identity, "alice3"}, *response[0])
 
 	// No installation is enabled
 	alice1MergedBundle1, err := s.services[aliceUser].services[0].GetBundle(aliceKey)
@@ -144,12 +144,12 @@ func (s *EncryptionServiceMultiDeviceSuite) TestProcessPublicBundle() {
 	response, err = s.services[aliceUser].services[0].ProcessPublicBundle(aliceKey, alice1MergedBundle2)
 	s.Require().NoError(err)
 	sort.Slice(response, func(i, j int) bool {
-		return response[i][1] < response[j][1]
+		return response[i].ID < response[j].ID
 	})
 	// We only get back installationIDs not equal to us
 	s.Require().Equal(2, len(response))
-	s.Require().Equal(multidevice.IdentityAndIDPair{alice2Identity, "alice2"}, response[0])
-	s.Require().Equal(multidevice.IdentityAndIDPair{alice2Identity, "alice3"}, response[1])
+	s.Require().Equal(multidevice.IdentityAndID{alice2Identity, "alice2"}, *response[0])
+	s.Require().Equal(multidevice.IdentityAndID{alice2Identity, "alice3"}, *response[1])
 
 	// We disable the installations
 	err = s.services[aliceUser].services[0].DisableInstallation(&aliceKey.PublicKey, "alice2")
