@@ -69,9 +69,6 @@ func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHead
 	if err != nil {
 		return nil, err
 	}
-	if len(rst) == 0 {
-		return nil, errors.New("balance changed but no new transactions were found")
-	}
 	return rst, nil
 }
 
