@@ -466,12 +466,22 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	return api.service.SendPublicMessage(ctx, msg)
+	message, err := api.service.SendPublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Post(ctx, *message)
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
-	return api.service.SendDirectMessage(ctx, msg)
+	message, err := api.service.SendDirectMessage(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.Post(ctx, *message)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {

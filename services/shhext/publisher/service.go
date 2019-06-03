@@ -319,7 +319,7 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
-func (s *Service) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
+func (s *Service) SendDirectMessage(msg chat.SendDirectMessageRPC) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -353,7 +353,7 @@ func (s *Service) SendDirectMessage(ctx context.Context, msg chat.SendDirectMess
 		return nil, err
 	}
 
-	return s.whisperAPI.Post(ctx, *whisperMessage)
+	return whisperMessage, nil
 }
 
 func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
@@ -397,25 +397,50 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 }
 
 // SendPublicMessage sends a public chat message to the underlying transport
-func (s *Service) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
+func (s *Service) SendPublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
-	filter := s.filter.GetByID(msg.Chat)
+	filter := s.filter.GetByID(chatID)
 	if filter == nil {
 		return nil, errors.New("not subscribed to chat")
 	}
+	s.log.Info("SIG", signature)
 
 	// Enrich with transport layer info
 	whisperMessage := whisperutils.DefaultWhisperMessage()
-	whisperMessage.Payload = msg.Payload
-	whisperMessage.Sig = msg.Sig
-	whisperMessage.Topic = whisperutils.ToTopic(msg.Chat)
+	whisperMessage.Sig = signature
+	whisperMessage.Topic = whisperutils.ToTopic(chatID)
 	whisperMessage.SymKeyID = filter.SymKeyID
 
-	// And dispatch
-	return s.whisperAPI.Post(ctx, whisperMessage)
+	if wrap {
+		privateKeyID := s.whisper.SelectedKeyPairID()
+		if privateKeyID == "" {
+			return nil, errors.New("no key selected")
+		}
+
+		privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+		if err != nil {
+			return nil, err
+		}
+
+		message, err := s.protocol.BuildPublicMessage(privateKey, payload)
+		if err != nil {
+			return nil, err
+		}
+		marshaledMessage, err := proto.Marshal(message)
+		if err != nil {
+			s.log.Error("encryption-service", "error marshaling message", err)
+			return nil, err
+		}
+		whisperMessage.Payload = marshaledMessage
+
+	} else {
+		whisperMessage.Payload = payload
+	}
+
+	return &whisperMessage, nil
 }
 
 func (s *Service) ConfirmMessagesProcessed(ids [][]byte) error {
@@ -442,5 +467,30 @@ func (s *Service) startTicker() {
 }
 
 func (s *Service) perform() error {
+	s.log.Info("publishing bundle")
+	privateKeyID := s.whisper.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return errors.New("no key selected")
+	}
+
+	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return err
+	}
+
+	identity := fmt.Sprintf("%x", crypto.FromECDSAPub(&privateKey.PublicKey))
+
+	message, err := s.SendPublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
+	if err != nil {
+		s.log.Error("could not build contact code", "identity", identity, "err", err)
+		return err
+	}
+
+	_, err = s.whisperAPI.Post(context.TODO(), *message)
+	if err != nil {
+		s.log.Error("could not publish contact code on whisper", "identity", identity, "err", err)
+		return err
+	}
+
 	return nil
 }
