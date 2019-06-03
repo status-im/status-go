@@ -146,7 +146,7 @@ func (r *Reactor) erc20HistoricalLoop() {
 				}
 			}
 			for !iterator.Finished() {
-				transfers, err := iterator.Next()
+				transfers, err := iterator.Next(r.ctx)
 				if err != nil {
 					log.Error("failed to get next batch", "error", err)
 					break
@@ -198,7 +198,7 @@ func (r *Reactor) ethHistoricalLoop() {
 				}
 			}
 			for !iterator.Finished() {
-				transfers, err := iterator.Next()
+				transfers, err := iterator.Next(r.ctx)
 				if err != nil {
 					log.Error("failed to get next batch", "error", err)
 					break

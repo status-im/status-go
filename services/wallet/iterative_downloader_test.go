@@ -61,10 +61,10 @@ func TestIterProgress(t *testing.T) {
 		batchSize:  big.NewInt(5),
 		known:      &DBHeader{Number: big.NewInt(9)},
 	}
-	batch, err := iter.Next()
+	batch, err := iter.Next(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, batch, 6)
-	batch, err = iter.Next()
+	batch, err = iter.Next(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, batch, 5)
 	require.True(t, iter.Finished())
@@ -206,7 +206,7 @@ func TestBinaryIterativeDownloader(t *testing.T) {
 				if len(rst) > len(tc.expected) {
 					require.FailNowf(t, "more comparisons then expected", "expected: %s\ngot: %s\n", tc.expected, rst)
 				}
-				_, err := downloader.Next()
+				_, err := downloader.Next(context.TODO())
 				require.NoError(t, err)
 			}
 			require.Equal(t, len(tc.expected), len(rst))

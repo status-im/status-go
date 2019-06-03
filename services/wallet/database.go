@@ -129,7 +129,7 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*DBHea
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare("INSERT INTO transfers(hash, blk_hash, tx, receipt, type) VALUES (?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, tx, receipt, type) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
