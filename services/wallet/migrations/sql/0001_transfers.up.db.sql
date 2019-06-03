@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS transfers (
-hash VARCHAR NOT NULL,
+hash VARCHAR UNIQUE NOT NULL,
 blk_hash VARCHAR NOT NULL,
 tx BLOB,
 receipt BLOB,

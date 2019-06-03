@@ -63,18 +63,20 @@ func (d *IterativeDownloader) Header() *DBHeader {
 }
 
 // Next moves closer to the end on every new iteration.
-func (d *IterativeDownloader) Next() ([]Transfer, error) {
+func (d *IterativeDownloader) Next(parent context.Context) ([]Transfer, error) {
 	start := new(big.Int).Sub(d.known.Number, d.batchSize)
 	// if start < 0; start = 0
 	if start.Cmp(big.NewInt(0)) <= 0 {
 		start = big.NewInt(0)
 	}
-	from, err := d.client.HeaderByNumber(context.Background(), start)
+	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+	from, err := d.client.HeaderByNumber(ctx, start)
+	cancel()
 	if err != nil {
 		log.Error("failed to get header by number", "number", start, "error", err)
 		return nil, err
 	}
-	transfers, err := d.downloader.GetTransfersInRange(context.Background(), start, d.known.Number)
+	transfers, err := d.downloader.GetTransfersInRange(parent, start, d.known.Number)
 	if err != nil {
 		log.Error("failed to get transfer inbetween two bloks", "from", start, "to", d.known.Number, "error", err)
 		return nil, err
@@ -145,15 +147,15 @@ func (d *BinaryIterativeDownloader) updateLastDownloaded() error {
 // Next compares balances between current low and high blocks based on that moves cursor in either direction.
 // NOTE(dshulyak) technically we can miss transfers if account received assets and then trasfered all assets.
 // practically it shouldn't happen cause some assets will be on account as a leftover from paying gas
-func (d *BinaryIterativeDownloader) Next() ([]Transfer, error) {
+func (d *BinaryIterativeDownloader) Next(parent context.Context) ([]Transfer, error) {
 	log.Debug("comparing balances between", "low", d.low, "high", d.high)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
 	hbalance, err := d.client.BalanceAt(ctx, d.address, d.high)
 	cancel()
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel = context.WithTimeout(parent, 2*time.Second)
 	lbalance, err := d.client.BalanceAt(ctx, d.address, d.low)
 	cancel()
 	if err != nil {
@@ -164,9 +166,9 @@ func (d *BinaryIterativeDownloader) Next() ([]Transfer, error) {
 			"low", d.low, "high", d.high,
 			"diff", new(big.Int).Sub(hbalance, lbalance))
 		if new(big.Int).Sub(d.high, d.low).Cmp(one) == 0 {
-			log.Debug("higher block is a direct child. downloading transfers")
+			log.Debug("higher block is a direct child. downloading transfers...")
 			// TODO(dshulyak) consider iterating one by one if blocks are closer that some N (5-10)
-			ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel = context.WithTimeout(parent, 5*time.Second)
 			transfers, err := d.downloader.GetTransfersInRange(ctx, d.low, d.high)
 			cancel()
 			if err != nil {
