@@ -197,6 +197,7 @@ func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
+	log.Info("Got envelope for topic", "topic", env.Topic)
 	candidates := fs.getWatchersByTopic(env.Topic)
 	for _, watcher := range candidates {
 		if p2pMessage && !watcher.AllowP2P {

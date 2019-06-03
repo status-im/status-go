@@ -235,6 +235,8 @@ func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, e
 		Listen:   true,
 	}
 
+	log.Info("PROCESSING SECRET", "chat-id", chatID, "topic", filter.Topic, "symKey", keyString)
+
 	s.chats[chat.ChatID] = chat
 	return chat, nil
 }
