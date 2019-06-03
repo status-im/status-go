@@ -9,11 +9,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -21,11 +18,8 @@ import (
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
-	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 	"github.com/status-im/status-go/services/shhext/dedup"
-	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
-	"github.com/status-im/status-go/services/shhext/whisperutils"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -427,13 +421,11 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 
 	dedupMessages := api.service.deduplicator.Deduplicate(msgs)
 
-	if api.service.pfsEnabled {
-		// Attempt to decrypt message, otherwise leave unchanged
-		for _, dedupMessage := range dedupMessages {
+	// Attempt to decrypt message, otherwise leave unchanged
+	for _, dedupMessage := range dedupMessages {
 
-			if err := api.processPFSMessage(dedupMessage); err != nil {
-				return nil, err
-			}
+		if err := api.service.ProcessMessage(dedupMessage); err != nil {
+			return nil, err
 		}
 	}
 
@@ -465,7 +457,7 @@ func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) (err
 // ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
 // the client side.
 func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
-	if err := api.service.protocol.ConfirmMessagesProcessed(messageIDs); err != nil {
+	if err := api.service.ConfirmMessagesProcessed(messageIDs); err != nil {
 		return err
 	}
 
@@ -474,99 +466,12 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	filter := api.service.filter.GetByID(msg.Chat)
-	if filter == nil {
-		return nil, errors.New("not subscribed to chat")
-	}
-
-	// Enrich with transport layer info
-	whisperMessage := whisperutils.DefaultWhisperMessage()
-	whisperMessage.Payload = msg.Payload
-	whisperMessage.Sig = msg.Sig
-	whisperMessage.Topic = whisperutils.ToTopic(msg.Chat)
-	whisperMessage.SymKeyID = filter.SymKeyID
-
-	// And dispatch
-	return api.Post(ctx, whisperMessage)
-}
-
-func (api *PublicAPI) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
-	// marshal for sending to wire
-	marshaledMessage, err := proto.Marshal(spec.Message)
-	if err != nil {
-		api.log.Error("encryption-service", "error marshaling message", err)
-		return nil, err
-	}
-
-	whisperMessage := whisperutils.DefaultWhisperMessage()
-	whisperMessage.Payload = marshaledMessage
-	whisperMessage.Sig = signature
-
-	if spec.SharedSecret != nil {
-		chat := api.service.GetNegotiatedChat(theirPublicKey)
-		if chat != nil {
-			api.log.Debug("Sending on negotiated topic")
-			whisperMessage.SymKeyID = chat.SymKeyID
-			whisperMessage.Topic = chat.Topic
-			whisperMessage.PublicKey = nil
-			return &whisperMessage, nil
-		}
-	} else if spec.PartitionedTopic() {
-		api.log.Debug("Sending on partitioned topic")
-		// Create filter on demand
-		if _, err := api.service.filter.LoadPartitioned(myPrivateKey, theirPublicKey, false); err != nil {
-			return nil, err
-		}
-		t := filter.PublicKeyToPartitionedTopicBytes(theirPublicKey)
-		whisperMessage.Topic = whisper.BytesToTopic(t)
-		whisperMessage.PublicKey = destination
-		return &whisperMessage, nil
-	}
-
-	api.log.Debug("Sending on old discovery topic")
-	whisperMessage.Topic = whisperutils.DiscoveryTopicBytes
-	whisperMessage.PublicKey = destination
-
-	return &whisperMessage, nil
+	return api.service.SendPublicMessage(ctx, msg)
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
-	if !api.service.pfsEnabled {
-		return nil, ErrPFSNotEnabled
-	}
-
-	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
-	if err != nil {
-		return nil, err
-	}
-
-	publicKey, err := crypto.UnmarshalPubkey(msg.PubKey)
-	if err != nil {
-		return nil, err
-	}
-
-	var msgSpec *chat.ProtocolMessageSpec
-
-	if msg.DH {
-		api.log.Debug("Building dh message")
-		msgSpec, err = api.service.protocol.BuildDHMessage(privateKey, publicKey, msg.Payload)
-	} else {
-		api.log.Debug("Building direct message")
-		msgSpec, err = api.service.protocol.BuildDirectMessage(privateKey, publicKey, msg.Payload)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	whisperMessage, err := api.directMessageToWhisper(privateKey, publicKey, msg.PubKey, msg.Sig, msgSpec)
-	if err != nil {
-		api.log.Error("sshext-service", "error building whisper message", err)
-		return nil, err
-	}
-
-	// And dispatch
-	return api.Post(ctx, *whisperMessage)
+	return api.service.SendDirectMessage(ctx, msg)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
@@ -675,54 +580,6 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 		return tx.Commit()
 	}
 	return err
-}
-
-func (api *PublicAPI) processPFSMessage(dedupMessage dedup.DeduplicateMessage) error {
-	msg := dedupMessage.Message
-
-	privateKeyID := api.service.w.SelectedKeyPairID()
-	if privateKeyID == "" {
-		return errors.New("no key selected")
-	}
-
-	privateKey, err := api.service.w.GetPrivateKey(privateKeyID)
-	if err != nil {
-		return err
-	}
-
-	publicKey, err := crypto.UnmarshalPubkey(msg.Sig)
-	if err != nil {
-		return err
-	}
-
-	// Unmarshal message
-	protocolMessage := &protobuf.ProtocolMessage{}
-
-	if err := proto.Unmarshal(msg.Payload, protocolMessage); err != nil {
-		api.log.Debug("Not a protocol message", "err", err)
-		return nil
-	}
-
-	response, err := api.service.protocol.HandleMessage(privateKey, publicKey, protocolMessage, dedupMessage.DedupID)
-
-	switch err {
-	case nil:
-		// Set the decrypted payload
-		msg.Payload = response
-	case chat.ErrDeviceNotFound:
-		// Notify that someone tried to contact us using an invalid bundle
-		if privateKey.PublicKey != *publicKey {
-			api.log.Warn("Device not found, sending signal", "err", err)
-			keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
-			handler := EnvelopeSignalHandler{}
-			handler.DecryptMessageFailed(keyString)
-		}
-	default:
-		// Log and pass to the client, even if failed to decrypt
-		api.log.Error("Failed handling message with error", "err", err)
-	}
-
-	return nil
 }
 
 // -----
