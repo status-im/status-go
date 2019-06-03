@@ -43,9 +43,13 @@ func (s *Service) Receive(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.
 
 // Send returns a shared key and whether it has been acknowledged from all the installationIDs
 func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, theirPublicKey *ecdsa.PublicKey, theirInstallationIDs []string) (*Secret, bool, error) {
-	sharedKey, err := s.setup(myPrivateKey, theirPublicKey, myInstallationID)
+	secret, err := s.setup(myPrivateKey, theirPublicKey, myInstallationID)
 	if err != nil {
 		return nil, false, err
+	}
+
+	if len(theirInstallationIDs) == 0 {
+		return secret, false, nil
 	}
 
 	theirIdentity := crypto.CompressPubkey(theirPublicKey)
@@ -56,14 +60,11 @@ func (s *Service) Send(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, 
 
 	for _, installationID := range theirInstallationIDs {
 		if !response.installationIDs[installationID] {
-			return sharedKey, false, nil
+			return secret, false, nil
 		}
 	}
 
-	return &Secret{
-		Key:      response.secret,
-		Identity: theirPublicKey,
-	}, true, nil
+	return secret, true, nil
 }
 
 type Secret struct {
