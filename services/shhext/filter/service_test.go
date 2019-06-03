@@ -181,3 +181,27 @@ func (s *ServiceTestSuite) TestLoadChat() {
 	s.Require().Equal("status", response1[0].ChatID)
 	s.Require().True(response1[0].Listen)
 }
+
+func (s *ServiceTestSuite) TestNoInstallationIDs() {
+	chats := []*Chat{}
+
+	negotiatedTopic1 := "0x" + s.keys[1].PublicKeyString() + "-negotiated"
+
+	// We send a message to someone else, but without any installation ID
+	_, _, err := s.service.secret.Send(s.keys[0].privateKey, "0-1", &s.keys[1].privateKey.PublicKey, []string{})
+	s.Require().NoError(err)
+
+	response, err := s.service.Init(chats)
+	s.Require().NoError(err)
+
+	actualChats := make(map[string]*Chat)
+
+	for _, chat := range response {
+		actualChats[chat.ChatID] = chat
+	}
+
+	s.Require().Equal(4, len(actualChats), "It creates two additional filters for the negotiated topics")
+
+	negotiatedFilter1 := actualChats[negotiatedTopic1]
+	s.Require().NotNil(negotiatedFilter1, "It adds the negotiated filter")
+}
