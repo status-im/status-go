@@ -32,7 +32,6 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 var (
 	reorgSafetyDepth = big.NewInt(15)
 	erc20BatchSize   = big.NewInt(50000)
-	ethBatchSize     = big.NewInt(1000)
 )
 
 // HeaderReader interface for reading headers using block number or hash.
