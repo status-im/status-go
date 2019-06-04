@@ -36,7 +36,7 @@ func (h headers) BalanceAt(ctx context.Context, account common.Address, blockNum
 	return nil, errors.New("not implemented")
 }
 
-func TestReactorReorgOnNewBlock(t *testing.T) {
+func TestReorgOnNewBlock(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	original := genHeadersChain(5, 1)
@@ -52,7 +52,7 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 			ParentHash: reorg[i-1].Hash(),
 		}
 	}
-	reactor := Reactor{
+	cmd := &newBlocksTransfersCommand{
 		client: reorg,
 		db:     db,
 	}
@@ -63,7 +63,7 @@ func TestReactorReorgOnNewBlock(t *testing.T) {
 		ParentHash: reorg[len(reorg)-1].Hash(),
 	}
 	previous := original[len(original)-1]
-	added, removed, err := reactor.onNewBlock(context.TODO(), toDBHeader(previous), latest)
+	added, removed, err := cmd.onNewBlock(context.TODO(), toDBHeader(previous), latest)
 	require.NoError(t, err)
 	require.Len(t, added, 4)
 	require.Len(t, removed, 3)
@@ -99,11 +99,11 @@ func TestReactorReorgAllKnownHeaders(t *testing.T) {
 		ParentHash: reorg[len(reorg)-1].Hash(),
 	}
 	require.NoError(t, db.SaveHeaders(original, 0))
-	reactor := Reactor{
+	cmd := &newBlocksTransfersCommand{
 		client: reorg,
 		db:     db,
 	}
-	added, removed, err := reactor.onNewBlock(context.TODO(), toDBHeader(original[len(original)-1]), latest)
+	added, removed, err := cmd.onNewBlock(context.TODO(), toDBHeader(original[len(original)-1]), latest)
 	require.NoError(t, err)
 	require.Len(t, added, 3)
 	require.Len(t, removed, 2)
