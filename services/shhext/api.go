@@ -467,7 +467,7 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	message, err := api.service.InitializePublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
+	message, err := api.service.CreatePublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
 	if err != nil {
 		return nil, err
 	}
