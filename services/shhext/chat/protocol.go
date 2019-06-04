@@ -13,12 +13,13 @@ import (
 const ProtocolVersion = 1
 const sharedSecretNegotiationVersion = 1
 const partitionedTopicMinVersion = 1
+const defaultMinVersion = 0
 
 type PartitionTopic int
 
 const (
 	PartitionTopicNoSupport PartitionTopic = iota
-	PartitionTopicV1        PartitionTopic = iota
+	PartitionTopicV1
 )
 
 type ProtocolService struct {
@@ -92,7 +93,7 @@ type ProtocolMessageSpec struct {
 func (p *ProtocolMessageSpec) MinVersion() uint32 {
 
 	if len(p.Installations) == 0 {
-		return 0
+		return defaultMinVersion
 	}
 
 	version := p.Installations[0].Version
@@ -197,6 +198,7 @@ func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, b
 		return nil, err
 	}
 
+	p.log.Info("Processing bundle", "bundle", bundle)
 	theirIdentityKey, err := ExtractIdentity(bundle)
 	if err != nil {
 		return nil, err
@@ -305,7 +307,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 
 func getProtocolVersion(bundles []*protobuf.Bundle, installationID string) uint32 {
 	if installationID == "" {
-		return 0
+		return defaultMinVersion
 	}
 
 	for _, bundle := range bundles {
@@ -317,12 +319,12 @@ func getProtocolVersion(bundles []*protobuf.Bundle, installationID string) uint3
 
 			signedPreKey := signedPreKeys[installationID]
 			if signedPreKey == nil {
-				return 0
+				return defaultMinVersion
 			}
 
 			return signedPreKey.GetProtocolVersion()
 		}
 	}
 
-	return 0
+	return defaultMinVersion
 }

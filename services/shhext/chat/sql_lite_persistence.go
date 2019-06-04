@@ -9,7 +9,7 @@ import (
 
 	dr "github.com/status-im/doubleratchet"
 	ecrypto "github.com/status-im/status-go/services/shhext/chat/crypto"
-	appDB "github.com/status-im/status-go/services/shhext/chat/db"
+	chatDB "github.com/status-im/status-go/services/shhext/chat/db"
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
@@ -92,7 +92,7 @@ func (s *SQLLitePersistence) GetMultideviceStorage() multidevice.Persistence {
 
 // Open opens a file at the specified path
 func (s *SQLLitePersistence) Open(path string, key string) error {
-	db, err := appDB.Open(path, key, appDB.KdfIterationsNumber)
+	db, err := chatDB.Open(path, key, chatDB.KdfIterationsNumber)
 	if err != nil {
 		return err
 	}
