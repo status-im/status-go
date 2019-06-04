@@ -42,6 +42,8 @@ type Chat struct {
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
 	Topic whisper.TopicType `json:"topic"`
+	// Discovery is whether this is a discovery topic
+	Discovery bool `json:"discovery"`
 }
 
 type Service struct {
@@ -165,11 +167,15 @@ func (s *Service) LoadPartitioned(myKey *ecdsa.PrivateKey, theirPublicKey *ecdsa
 		return nil, err
 	}
 
+	identityStr := fmt.Sprintf("%x", crypto.FromECDSAPub(theirPublicKey))
+
 	chat := &Chat{
-		ChatID:   chatID,
-		FilterID: filter.FilterID,
-		Topic:    filter.Topic,
-		Listen:   listen,
+		ChatID:    chatID,
+		FilterID:  filter.FilterID,
+		Topic:     filter.Topic,
+		Listen:    listen,
+		Identity:  identityStr,
+		Discovery: true,
 	}
 
 	s.chats[chatID] = chat
@@ -195,7 +201,7 @@ func ContactCodeTopic(identity string) string {
 	return "0x" + identity + "-contact-code"
 }
 
-// Get returns a negotiated filter given an identity
+// Get returns a negotiated chat given an identity
 func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -203,7 +209,7 @@ func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	return s.chats[negotiatedID(identity)]
 }
 
-// GetByID returns a filter by chatID
+// GetByID returns a chat by chatID
 func (s *Service) GetByID(chatID string) *Chat {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -217,7 +223,7 @@ func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, e
 	defer s.mutex.Unlock()
 
 	chatID := negotiatedID(secret.Identity)
-	// If we already have a filter do nothing
+	// If we already have a chat do nothing
 	if _, ok := s.chats[chatID]; ok {
 		return s.chats[chatID], nil
 	}
@@ -273,9 +279,13 @@ func (s *Service) loadDiscovery(myKey *ecdsa.PrivateKey) error {
 		return nil
 	}
 
+	identityStr := fmt.Sprintf("%x", crypto.FromECDSAPub(&myKey.PublicKey))
+
 	discoveryChat := &Chat{
-		ChatID: discoveryTopic,
-		Listen: true,
+		ChatID:    discoveryTopic,
+		Listen:    true,
+		Identity:  identityStr,
+		Discovery: true,
 	}
 
 	discoveryResponse, err := s.addAsymmetricFilter(myKey, discoveryChat.ChatID, true)
