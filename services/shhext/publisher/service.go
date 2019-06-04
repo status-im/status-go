@@ -243,8 +243,8 @@ func (s *Service) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
 	return s.filter.Load(chat)
 }
 
-func (s *Service) RemoveFilter(chat *filter.Chat) error {
-	return s.filter.Remove(chat)
+func (s *Service) RemoveFilters(chats []*filter.Chat) error {
+	return s.filter.Remove(chats)
 }
 
 func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
