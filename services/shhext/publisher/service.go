@@ -134,10 +134,10 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	addedBundlesHandler := func(addedBundles []multidevice.IdentityAndIDPair) {
+	addedBundlesHandler := func(addedBundles []*multidevice.IdentityAndID) {
 		handler := SignalHandler{}
 		for _, bundle := range addedBundles {
-			handler.BundleAdded(bundle[0], bundle[1])
+			handler.BundleAdded(bundle.Identity, bundle.ID)
 		}
 	}
 
@@ -171,7 +171,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]multidevice.IdentityAndIDPair, error) {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.IdentityAndID, error) {
 	if s.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
@@ -326,8 +326,8 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 	return nil
 }
 
-// SendDirectMessage sends a 1:1 chat message to the underlying transport
-func (s *Service) SendDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
+// InitializeDirectMessage sends a 1:1 chat message to the underlying transport
+func (s *Service) InitializeDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -385,7 +385,7 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 			whisperMessage.PublicKey = nil
 			return &whisperMessage, nil
 		}
-	} else if spec.PartitionedTopic() {
+	} else if spec.PartitionedTopic() == chat.PartitionTopicV1 {
 		s.log.Debug("Sending on partitioned topic")
 		// Create filter on demand
 		if _, err := s.filter.LoadPartitioned(myPrivateKey, theirPublicKey, false); err != nil {
@@ -404,8 +404,8 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 	return &whisperMessage, nil
 }
 
-// SendPublicMessage sends a public chat message to the underlying transport
-func (s *Service) SendPublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
+// InitializePublicMessage sends a public chat message to the underlying transport
+func (s *Service) InitializePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -476,6 +476,10 @@ func (s *Service) startTicker() {
 
 func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
 	s.log.Info("publishing bundle")
+	if !s.config.PfsEnabled {
+		return nil, nil
+	}
+
 	lastPublished, err := s.persistence.Get()
 	if err != nil {
 		s.log.Error("could not fetch config from db", "err", err)
@@ -507,7 +511,7 @@ func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
 
 	identity := fmt.Sprintf("%x", crypto.FromECDSAPub(&privateKey.PublicKey))
 
-	message, err := s.SendPublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
+	message, err := s.InitializePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
 	if err != nil {
 		s.log.Error("could not build contact code", "identity", identity, "err", err)
 		return nil, err
