@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"time"
 
@@ -41,9 +40,9 @@ type Transfer struct {
 
 // ETHTransferDownloader downloads regular eth transfers.
 type ETHTransferDownloader struct {
-	client  *ethclient.Client
-	address common.Address
-	signer  types.Signer
+	client   *ethclient.Client
+	accounts []common.Address
+	signer   types.Signer
 }
 
 // GetTransfers checks if the balance was changed between two blocks.
@@ -51,36 +50,42 @@ type ETHTransferDownloader struct {
 func (d *ETHTransferDownloader) GetTransfers(ctx context.Context, header *DBHeader) (rst []Transfer, err error) {
 	// TODO(dshulyak) consider caching balance and reset it on reorg
 	num := new(big.Int).Sub(header.Number, one)
-	balance, err := d.client.BalanceAt(ctx, d.address, num)
-	if err != nil {
-		return nil, err
+	changed := []common.Address{}
+	for _, address := range d.accounts {
+		balance, err := d.client.BalanceAt(ctx, d.address, num)
+		if err != nil {
+			return nil, err
+		}
+		current, err := d.client.BalanceAt(ctx, d.address, header.Number)
+		if err != nil {
+			return nil, err
+		}
+		if current.Cmp(balance) != 0 {
+			changed = append(changed, address)
+		}
 	}
-	current, err := d.client.BalanceAt(ctx, d.address, header.Number)
-	if err != nil {
-		return nil, err
-	}
-	if current.Cmp(balance) == 0 {
+	if len(changed) == 0 {
 		return nil, nil
 	}
 	blk, err := d.client.BlockByHash(ctx, header.Hash)
 	if err != nil {
 		return nil, err
 	}
-	rst, err = d.getTransfersInBlock(ctx, blk)
+	rst, err = d.getTransfersInBlock(ctx, blk, changed)
 	if err != nil {
 		return nil, err
 	}
 	return rst, nil
 }
 
-func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block) (rst []Transfer, err error) {
+func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
 	for _, tx := range blk.Transactions() {
 		from, err := types.Sender(d.signer, tx)
 		if err != nil {
 			return nil, err
 		}
 		// payload is empty for eth transfers
-		if from == d.address {
+		if any(from, accounts) {
 			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
 			if err != nil {
 				return nil, err
@@ -94,7 +99,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 		if tx.To() == nil {
 			continue
 		}
-		if *tx.To() == d.address {
+		if any(*tx.To, accounts) {
 			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
 			if err != nil {
 				return nil, err
@@ -110,89 +115,37 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 	return rst, nil
 }
 
-func (d *ETHTransferDownloader) GetTransfersInRange(parent context.Context, from, to *big.Int) (rst []Transfer, err error) {
-	start := time.Now()
-	log.Debug("get eth transfers in range", "from", from, "to", to)
-	if to == nil {
-		return nil, errors.New("to shouldn't be nil")
-	}
-	if from.Cmp(zero) == 1 {
-		from = new(big.Int).Sub(from, one)
-	}
-	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
-	older, err := d.client.BalanceAt(ctx, d.address, from)
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-	ctx, cancel = context.WithTimeout(parent, 2*time.Second)
-	newer, err := d.client.BalanceAt(ctx, d.address, to)
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-	// need better name
-	num := new(big.Int).Set(to)
-	// on every iteration newer will get one step closer to older.
-	// once balance is the same we consider that all possible transfers were found
-	for older.Cmp(newer) != 0 {
-		num = num.Sub(num, one)
-		ctx, cancel = context.WithTimeout(parent, 2*time.Second)
-		update, err := d.client.BalanceAt(ctx, d.address, num)
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		if update.Cmp(newer) != 0 {
-			// FIXME store both previous and current to avoid allocation
-			ctx, cancel = context.WithTimeout(parent, 5*time.Second)
-			defer cancel()
-			blk, err := d.client.BlockByNumber(ctx, new(big.Int).Add(num, one))
-			if err != nil {
-				return nil, err
-			}
-			transfers, err := d.getTransfersInBlock(ctx, blk)
-			if err != nil {
-				return nil, err
-			}
-			rst = append(rst, transfers...)
-		}
-		newer = update
-	}
-	log.Debug("found eth transfers in range", "from", from, "to", to, "lth", len(rst), "took", time.Since(start))
-	return rst, nil
-}
-
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client *ethclient.Client, address common.Address) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client *ethclient.Client, accoutns []common.Address) *ERC20TransfersDownloader {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
-	target := common.Hash{}
-	copy(target[12:], address[:])
 	return &ERC20TransfersDownloader{
 		client:    client,
-		address:   address,
+		accounts:  accounts,
 		signature: signature,
-		target:    target,
 	}
 }
 
 // ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
 type ERC20TransfersDownloader struct {
-	client  *ethclient.Client
-	address common.Address
+	client   *ethclient.Client
+	accounts []common.Address
 
 	// hash of the Transfer event signature
 	signature common.Hash
-	// padded address
-	target common.Hash
 }
 
-func (d *ERC20TransfersDownloader) inboundTopics() [][]common.Hash {
-	return [][]common.Hash{{d.signature}, {}, {d.target}}
+func (d *ERC20TransfersDownloader) paddedAddress(address common.Address) common.Hash {
+	rst := common.Hash{}
+	copy(rst[12:], address[:])
+	return target
+}
+
+func (d *ERC20TransfersDownloader) inboundTopics(address common.Address) [][]common.Hash {
+	return [][]common.Hash{{d.signature}, {}, {d.paddedAddress(address)}}
 }
 
 func (d *ERC20TransfersDownloader) outboundTopics() [][]common.Hash {
-	return [][]common.Hash{{d.signature}, {d.target}, {}}
+	return [][]common.Hash{{d.signature}, {d.paddedAddress(address)}, {}}
 }
 
 func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, logs []types.Log) ([]Transfer, error) {
@@ -222,31 +175,41 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	return rst, nil
 }
 
+func any(address common.Address, compare []common.Address) bool {
+	for _, c := range compare {
+		if c == address {
+			return true
+		}
+	}
+	return false
+}
+
 // GetTransfers for erc20 uses eth_getLogs rpc with Transfer event signature and our address acount.
 func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBHeader) ([]Transfer, error) {
 	hash := header.Hash
-	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-		BlockHash: &hash,
-		Topics:    d.outboundTopics(),
-	})
-	if err != nil {
-		return nil, err
+	rst := []Transfer{}
+	for _, address := range d.accounts {
+		outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+			BlockHash: &hash,
+			Topics:    d.outboundTopics(address),
+		})
+		if err != nil {
+			return nil, err
+		}
+		inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+			BlockHash: &hash,
+			Topics:    d.inboundTopics(address),
+		})
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, outbound...)
+		rst = append(rst, inbound...)
 	}
-	inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-		BlockHash: &hash,
-		Topics:    d.inboundTopics(),
-	})
-	if err != nil {
-		return nil, err
-	}
-	lth := len(outbound) + len(inbound)
-	if lth == 0 {
+	if len(rst) == 0 {
 		return nil, nil
 	}
-	all := make([]types.Log, lth)
-	copy(all, outbound)
-	copy(all[len(outbound):], inbound)
-	return d.transfersFromLogs(ctx, all)
+	return d.transfersFromLogs(ctx, rst)
 }
 
 // GetTransfersInRange returns transfers between two blocks.
@@ -255,34 +218,34 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, f
 	start := time.Now()
 	log.Debug("get erc20 transfers in range", "from", from, "to", to)
 	// TODO(dshulyak) timeout for every separate rpc call
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-		FromBlock: from,
-		ToBlock:   to,
-		Topics:    d.outboundTopics(),
-	})
-	cancel()
-	if err != nil {
-		return nil, err
+	for _, address := range d.accounts {
+		ctx, cancel := context.WithTimeout(parent, 5*time.Second)
+		outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+			FromBlock: from,
+			ToBlock:   to,
+			Topics:    d.outboundTopics(address),
+		})
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		ctx, cancel = context.WithTimeout(parent, 5*time.Second)
+		inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
+			FromBlock: from,
+			ToBlock:   to,
+			Topics:    d.inboundTopics(address),
+		})
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, outbound...)
+		rst = append(rst, inbound...)
 	}
-	ctx, cancel = context.WithTimeout(parent, 5*time.Second)
-	inbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
-		FromBlock: from,
-		ToBlock:   to,
-		Topics:    d.inboundTopics(),
-	})
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-	lth := len(outbound) + len(inbound)
-	if lth == 0 {
+	if len(rst) == 0 {
 		return nil, nil
 	}
-	all := make([]types.Log, lth)
-	copy(all, outbound)
-	copy(all[len(outbound):], inbound)
-	rst, err := d.transfersFromLogs(parent, all)
-	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", lth, "took", time.Since(start))
-	return rst, err
+	transfers, err := d.transfersFromLogs(parent, rst)
+	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", len(transfers), "took", time.Since(start))
+	return transfers, err
 }

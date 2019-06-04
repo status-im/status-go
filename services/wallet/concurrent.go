@@ -74,7 +74,12 @@ func (d *ConcurrentDownloader) Error() error {
 	return d.error
 }
 
-func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, batch BatchDownloader, account common.Address, low, high *big.Int) {
+// TransferDownloader downloads transfers from single block.
+type TransferDownloader interface {
+	GetTransfers(ctx context.Context, header *DBHeader) (rst []Transfer, err error)
+}
+
+func downloadEthConcurrently(c *ConcurrentDownloader, client TransferDownloader, batch BatchDownloader, account common.Address, low, high *big.Int) {
 	c.Go(func(ctx context.Context) ([]Transfer, error) {
 		log.Debug("eth transfers comparing blocks", "low", low, "high", high)
 		lb, err := client.BalanceAt(ctx, account, low)
@@ -91,7 +96,7 @@ func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, batc
 		}
 		if new(big.Int).Sub(high, low).Cmp(one) == 0 {
 			log.Debug("higher block is a parent", "low", low, "high", high)
-			return batch.GetTransfersInRange(ctx, high, high)
+			return batch.GetTransfers(ctx, high)
 		}
 		mid := new(big.Int).Add(low, high)
 		mid = mid.Div(mid, two)
