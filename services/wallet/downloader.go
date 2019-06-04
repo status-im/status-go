@@ -27,6 +27,7 @@ const (
 var (
 	one  = big.NewInt(1)
 	zero = big.NewInt(0)
+	two  = big.NewInt(2)
 )
 
 // Transfer stores information about transfer.

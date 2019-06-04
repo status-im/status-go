@@ -175,13 +175,9 @@ func (r *Reactor) erc20HistoricalLoop() {
 }
 
 func (r *Reactor) ethHistoricalLoop() {
-	// TODO(dshulyak) implement custom iterative downloader for eth transfers
-	// instead of moving from latest to 0 step by step in size of batch
-	// we can check balances at latest and 0 and then do binary search to find block where
-	// balance changed
 	var (
 		ticker   = time.NewTicker(5 * time.Second)
-		iterator *BinaryIterativeDownloader
+		previous *DBHeader
 		err      error
 	)
 	defer ticker.Stop()
@@ -190,38 +186,45 @@ func (r *Reactor) ethHistoricalLoop() {
 		case <-r.ctx.Done():
 			return
 		case <-ticker.C:
-			if iterator == nil {
-				iterator, err = SetupBinaryIterativeDownloader(r.db, r.client, r.address, ethSync, r.eth)
+			if previous == nil {
+				previous, err = r.db.GetEarliestSynced(ethSync)
 				if err != nil {
-					log.Error("failed to setup historical downloader for eth")
 					continue
 				}
-			}
-			for !iterator.Finished() {
-				transfers, err := iterator.Next(r.ctx)
-				if err != nil {
-					log.Error("failed to get next batch", "error", err)
-					break
-				}
-				headers := headersFromTransfers(transfers)
-				headers = append(headers, iterator.Header())
-				err = r.db.ProcessTranfers(transfers, headers, nil, ethSync)
-				if err != nil {
-					iterator.Revert()
-					log.Error("failed to save downloaded eth transfers", "error", err)
-					break
-				}
-				if len(transfers) != 0 {
-					r.feed.Send(Event{
-						Type:        EventNewHistory,
-						BlockNumber: iterator.Header().Number,
-					})
+				if previous == nil {
+					previous, err = lastKnownHeader(r.db, r.client)
+					if err != nil {
+						continue
+					}
 				}
 			}
-			if iterator.Finished() {
-				log.Info("wallet historical downloader for eth transfers finished")
-				return
+			ctx, cancel := context.WithTimeout(r.ctx, 10*time.Minute)
+			defer cancel()
+			concurrent := NewConcurrentDownloader(ctx)
+			start := time.Now()
+			downloadEthConcurrently(concurrent, r.client, r.eth, r.address, zero, previous.Number)
+			concurrent.Wait()
+			if concurrent.Error() != nil {
+				log.Error("failed to dowloader transfers using concurrent downloader", "error", err)
+				break
 			}
+			transfers := concurrent.Transfers()
+			log.Info("eth historical downloader finished succesfully", "total transfers", len(transfers), "time", time.Since(start))
+			// TODO(dshulyak) insert 0 block number with transfers
+			err = r.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, ethSync)
+			if err != nil {
+				log.Error("failed to save downloaded erc20 transfers", "error", err)
+				break
+			}
+			if len(transfers) > 0 {
+				// we download all or nothing
+				r.feed.Send(Event{
+					Type:        EventNewHistory,
+					BlockNumber: zero,
+				})
+			}
+			log.Debug("eth transfer persisted. loop is closed")
+			return
 		}
 	}
 }
