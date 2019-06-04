@@ -604,8 +604,13 @@ func (api *PublicAPI) LoadFilter(parent context.Context, chat *filter.Chat) ([]*
 }
 
 // RemoveFilter remove a single filter
-func (api *PublicAPI) RemoveFilter(parent context.Context, chat *filter.Chat) error {
-	return api.service.RemoveFilter(chat)
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
+	return api.service.RemoveFilters(chats)
+}
+
+// Stop stops the underlaying service
+func (api *PublicAPI) Stop(parent context.Context) error {
+	return api.service.Stop()
 }
 
 // -----

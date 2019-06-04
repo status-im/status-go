@@ -160,8 +160,8 @@ func (s *Service) online() bool {
 }
 
 // Stop is run when a service is stopped.
-// It does nothing in this case but is required by `node.Service` interface.
 func (s *Service) Stop() error {
+	log.Info("Stopping shhext service")
 	if s.config.EnableConnectionManager {
 		s.connManager.Stop()
 	}

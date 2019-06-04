@@ -44,6 +44,8 @@ type Chat struct {
 	Topic whisper.TopicType `json:"topic"`
 	// Discovery is whether this is a discovery topic
 	Discovery bool `json:"discovery"`
+	// Negotiated tells us whether is a negotiated topic
+	Negotiated bool `json:"negotiated"`
 }
 
 type Service struct {
@@ -126,26 +128,27 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 
 // Stop removes all the filters
 func (s *Service) Stop() error {
+	var chats []*Chat
 	for _, chat := range s.chats {
-		if err := s.Remove(chat); err != nil {
-			return err
-		}
+		chats = append(chats, chat)
 	}
-	return nil
+	return s.Remove(chats)
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (s *Service) Remove(chat *Chat) error {
+func (s *Service) Remove(chats []*Chat) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if err := s.whisper.Unsubscribe(chat.FilterID); err != nil {
-		return err
+	for _, chat := range chats {
+		if err := s.whisper.Unsubscribe(chat.FilterID); err != nil {
+			return err
+		}
+		if chat.SymKeyID != "" {
+			s.whisper.DeleteSymKey(chat.SymKeyID)
+		}
+		delete(s.chats, chat.ChatID)
 	}
-	if chat.SymKeyID != "" {
-		s.whisper.DeleteSymKey(chat.SymKeyID)
-	}
-	delete(s.chats, chat.ChatID)
 
 	return nil
 }
@@ -237,12 +240,13 @@ func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, e
 	identityStr := fmt.Sprintf("%x", crypto.FromECDSAPub(secret.Identity))
 
 	chat := &Chat{
-		ChatID:   chatID,
-		Topic:    filter.Topic,
-		SymKeyID: filter.SymKeyID,
-		FilterID: filter.FilterID,
-		Identity: identityStr,
-		Listen:   true,
+		ChatID:     chatID,
+		Topic:      filter.Topic,
+		SymKeyID:   filter.SymKeyID,
+		FilterID:   filter.FilterID,
+		Identity:   identityStr,
+		Listen:     true,
+		Negotiated: true,
 	}
 
 	log.Info("PROCESSING SECRET", "chat-id", chatID, "topic", filter.Topic, "symKey", keyString)

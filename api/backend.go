@@ -649,16 +649,6 @@ func (b *StatusBackend) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
 	return st.LoadFilter(chat)
 }
 
-// RemoveFilter remove a filter
-func (b *StatusBackend) RemoveFilter(chat *filter.Chat) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	return st.RemoveFilter(chat)
-}
-
 // EnableInstallation enables an installation for multi-device sync.
 func (b *StatusBackend) EnableInstallation(installationID string) error {
 	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
