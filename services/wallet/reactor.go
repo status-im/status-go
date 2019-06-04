@@ -59,25 +59,17 @@ func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, addres
 		chain:   chain,
 	}
 	reactor.erc20 = NewERC20TransfersDownloader(client, address)
-	reactor.eth = &ETHTransferDownloader{
-		client:  client,
-		address: address,
-		signer:  types.NewEIP155Signer(chain),
-	}
 	return reactor
 }
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
 	// FIXME(dshulyak) references same object. rework this part
-	client  reactorClient
-	db      *Database
-	feed    *event.Feed
-	address common.Address
-	chain   *big.Int
-
-	eth   *ETHTransferDownloader
-	erc20 *ERC20TransfersDownloader
+	client   *ethclient.Client
+	db       *Database
+	feed     *event.Feed
+	accounts []common.Address
+	chain    *big.Int
 
 	mu    sync.Mutex
 	group *Group
@@ -90,29 +82,39 @@ func (r *Reactor) Start() error {
 	if r.group != nil {
 		return errors.New("already running")
 	}
-	r.group = NewGroup()
-	erc20 := &erc20HistoricalCommand{
-		db:     r.db,
-		erc20:  r.erc20,
-		client: r.client,
-		feed:   r.feed,
+	for _, address := range r.acconts {
+		r.group = NewGroup()
+		erc20 := &erc20HistoricalCommand{
+			db:     r.db,
+			erc20:  NewERC20TransfersDownloader(r.client, []common.Address{address}),
+			client: r.client,
+			feed:   r.feed,
+		}
+		r.group.Add(erc20.Command())
+		eth := &ethHistoricalCommand{
+			db:      r.db,
+			client:  r.client,
+			address: address,
+			eth: &ETHTransferDownloader{
+				client:  r.client,
+				address: address,
+				signer:  types.NewEIP155Signer(r.chain),
+			},
+			feed: r.feed,
+		}
+		r.group.Add(eth.Command())
 	}
-	r.group.Add(erc20.Command())
-	eth := &ethHistoricalCommand{
-		db:      r.db,
-		client:  r.client,
-		address: r.address,
-		eth:     r.eth,
-		feed:    r.feed,
-	}
-	r.group.Add(eth.Command())
 	newBlocks := &newBlocksTransfersCommand{
 		db:     r.db,
 		chain:  r.chain,
 		client: r.client,
-		erc20:  r.erc20,
-		eth:    r.eth,
-		feed:   r.feed,
+		eth: &ETHTransferDownloader{
+			client:  r.client,
+			address: r.accounts,
+			signer:  types.NewEIP155Signer(r.chain),
+		},
+		erc20: NewERC20TransfersDownloader(r.client, r.accounts),
+		feed:  r.feed,
 	}
 	r.group.Add(newBlocks.Command())
 	return nil
