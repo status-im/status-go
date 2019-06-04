@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
 	"github.com/status-im/status-go/services/shhext/dedup"
+	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
@@ -466,7 +467,7 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
-	message, err := api.service.SendPublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
+	message, err := api.service.InitializePublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +477,7 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
-	message, err := api.service.SendDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
+	message, err := api.service.InitializeDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -590,6 +591,21 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 		return tx.Commit()
 	}
 	return err
+}
+
+// LoadFilters load all the necessary filters
+func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
+	return api.service.LoadFilters(chats)
+}
+
+// LoadFilter load a single filter
+func (api *PublicAPI) LoadFilter(parent context.Context, chat *filter.Chat) ([]*filter.Chat, error) {
+	return api.service.LoadFilter(chat)
+}
+
+// RemoveFilter remove a single filter
+func (api *PublicAPI) RemoveFilter(parent context.Context, chat *filter.Chat) error {
+	return api.service.RemoveFilter(chat)
 }
 
 // -----

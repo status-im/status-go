@@ -14,12 +14,19 @@ const ProtocolVersion = 1
 const sharedSecretNegotiationVersion = 1
 const partitionedTopicMinVersion = 1
 
+type PartitionTopic int
+
+const (
+	PARTITION_TOPIC_NO_SUPPORT PartitionTopic = iota
+	PARTITION_TOPIC_V1         PartitionTopic = iota
+)
+
 type ProtocolService struct {
 	log                      log.Logger
 	encryption               *EncryptionService
 	secret                   *sharedsecret.Service
 	multidevice              *multidevice.Service
-	addedBundlesHandler      func([]multidevice.IdentityAndIDPair)
+	addedBundlesHandler      func([]*multidevice.IdentityAndID)
 	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	Enabled                  bool
 }
@@ -27,7 +34,7 @@ type ProtocolService struct {
 var ErrNotProtocolMessage = errors.New("Not a protocol message")
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]multidevice.IdentityAndIDPair), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]*multidevice.IdentityAndID), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
 	return &ProtocolService{
 		log:                      log.New("package", "status-go/services/sshext.chat"),
 		encryption:               encryption,
@@ -98,9 +105,11 @@ func (p *ProtocolMessageSpec) MinVersion() uint32 {
 	return version
 }
 
-func (p *ProtocolMessageSpec) PartitionedTopic() bool {
-	return p.MinVersion() >= partitionedTopicMinVersion
-
+func (p *ProtocolMessageSpec) PartitionedTopic() PartitionTopic {
+	if p.MinVersion() >= partitionedTopicMinVersion {
+		return PARTITION_TOPIC_V1
+	}
+	return PARTITION_TOPIC_NO_SUPPORT
 }
 
 // BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
@@ -183,7 +192,7 @@ func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destin
 }
 
 // ProcessPublicBundle processes a received X3DH bundle.
-func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]multidevice.IdentityAndIDPair, error) {
+func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.IdentityAndID, error) {
 	if err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle); err != nil {
 		return nil, err
 	}

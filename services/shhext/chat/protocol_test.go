@@ -39,7 +39,7 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 		panic(err)
 	}
 
-	addedBundlesHandler := func(addedBundles []multidevice.IdentityAndIDPair) {}
+	addedBundlesHandler := func(addedBundles []*multidevice.IdentityAndID) {}
 	onNewSharedSecretHandler := func(secret []*sharedsecret.Secret) {}
 
 	aliceMultideviceConfig := &multidevice.Config{

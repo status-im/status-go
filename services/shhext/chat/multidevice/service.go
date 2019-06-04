@@ -30,7 +30,10 @@ type Service struct {
 	config      *Config
 }
 
-type IdentityAndIDPair [2]string
+type IdentityAndID struct {
+	Identity string
+	ID       string
+}
 
 func (s *Service) GetActiveInstallations(identity *ecdsa.PublicKey) ([]*Installation, error) {
 	identityC := crypto.CompressPubkey(identity)
@@ -63,9 +66,9 @@ func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installati
 }
 
 // ProcessPublicBundle persists a bundle and returns a list of tuples identity/installationID
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIdentity *ecdsa.PublicKey, b *protobuf.Bundle) ([]IdentityAndIDPair, error) {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIdentity *ecdsa.PublicKey, b *protobuf.Bundle) ([]*IdentityAndID, error) {
 	signedPreKeys := b.GetSignedPreKeys()
-	var response []IdentityAndIDPair
+	var response []*IdentityAndID
 	var installations []*Installation
 
 	myIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(&myIdentityKey.PublicKey))
@@ -81,7 +84,7 @@ func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIden
 				ID:      installationID,
 				Version: signedPreKey.GetProtocolVersion(),
 			})
-			response = append(response, IdentityAndIDPair{theirIdentityStr, installationID})
+			response = append(response, &IdentityAndID{theirIdentityStr, installationID})
 		}
 	}
 
