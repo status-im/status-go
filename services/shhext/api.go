@@ -477,7 +477,7 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
-	message, err := api.service.InitializeDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
+	message, err := api.service.CreateDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
