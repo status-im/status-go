@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/golang/protobuf/proto"
 	"github.com/status-im/status-go/services/shhext/chat"
-	appDB "github.com/status-im/status-go/services/shhext/chat/db"
+	chatDB "github.com/status-im/status-go/services/shhext/chat/db"
 	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
@@ -94,11 +94,11 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	v4Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%s.v4.db", s.config.InstallationID))
 
 	if password != "" {
-		if err := appDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
+		if err := chatDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 			return err
 		}
 
-		if err := appDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
+		if err := chatDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
 			// Remove db file as created with a blank password and never used,
 			// and there's no need to rekey in this case
 			os.Remove(v1Path)
@@ -106,13 +106,13 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	if err := appDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
+	if err := chatDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
 		os.Remove(v2Path)
 		os.Remove(v3Path)
 	}
 
 	// Fix IOS not encrypting database
-	if err := appDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
+	if err := chatDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
@@ -243,8 +243,8 @@ func (s *Service) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
 	return s.filter.Load(chat)
 }
 
-func (s *Service) RemoveFilter(chat *filter.Chat) error {
-	return s.filter.Remove(chat)
+func (s *Service) RemoveFilters(chats []*filter.Chat) error {
+	return s.filter.Remove(chats)
 }
 
 func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
@@ -326,8 +326,8 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 	return nil
 }
 
-// InitializeDirectMessage sends a 1:1 chat message to the underlying transport
-func (s *Service) InitializeDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
+// CreateDirectMessage creates a 1:1 chat message
+func (s *Service) CreateDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -404,8 +404,8 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 	return &whisperMessage, nil
 }
 
-// InitializePublicMessage sends a public chat message to the underlying transport
-func (s *Service) InitializePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
+// CreatePublicMessage sends a public chat message to the underlying transport
+func (s *Service) CreatePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
 	if !s.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -511,7 +511,7 @@ func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
 
 	identity := fmt.Sprintf("%x", crypto.FromECDSAPub(&privateKey.PublicKey))
 
-	message, err := s.InitializePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
+	message, err := s.CreatePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
 	if err != nil {
 		s.log.Error("could not build contact code", "identity", identity, "err", err)
 		return nil, err

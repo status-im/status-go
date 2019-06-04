@@ -42,6 +42,10 @@ type Chat struct {
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
 	Topic whisper.TopicType `json:"topic"`
+	// Discovery is whether this is a discovery topic
+	Discovery bool `json:"discovery"`
+	// Negotiated tells us whether is a negotiated topic
+	Negotiated bool `json:"negotiated"`
 }
 
 type Service struct {
@@ -124,26 +128,27 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 
 // Stop removes all the filters
 func (s *Service) Stop() error {
+	var chats []*Chat
 	for _, chat := range s.chats {
-		if err := s.Remove(chat); err != nil {
-			return err
-		}
+		chats = append(chats, chat)
 	}
-	return nil
+	return s.Remove(chats)
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (s *Service) Remove(chat *Chat) error {
+func (s *Service) Remove(chats []*Chat) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if err := s.whisper.Unsubscribe(chat.FilterID); err != nil {
-		return err
+	for _, chat := range chats {
+		if err := s.whisper.Unsubscribe(chat.FilterID); err != nil {
+			return err
+		}
+		if chat.SymKeyID != "" {
+			s.whisper.DeleteSymKey(chat.SymKeyID)
+		}
+		delete(s.chats, chat.ChatID)
 	}
-	if chat.SymKeyID != "" {
-		s.whisper.DeleteSymKey(chat.SymKeyID)
-	}
-	delete(s.chats, chat.ChatID)
 
 	return nil
 }
@@ -165,11 +170,15 @@ func (s *Service) LoadPartitioned(myKey *ecdsa.PrivateKey, theirPublicKey *ecdsa
 		return nil, err
 	}
 
+	identityStr := fmt.Sprintf("%x", crypto.FromECDSAPub(theirPublicKey))
+
 	chat := &Chat{
-		ChatID:   chatID,
-		FilterID: filter.FilterID,
-		Topic:    filter.Topic,
-		Listen:   listen,
+		ChatID:    chatID,
+		FilterID:  filter.FilterID,
+		Topic:     filter.Topic,
+		Listen:    listen,
+		Identity:  identityStr,
+		Discovery: true,
 	}
 
 	s.chats[chatID] = chat
@@ -195,7 +204,7 @@ func ContactCodeTopic(identity string) string {
 	return "0x" + identity + "-contact-code"
 }
 
-// Get returns a negotiated filter given an identity
+// Get returns a negotiated chat given an identity
 func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -203,7 +212,7 @@ func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	return s.chats[negotiatedID(identity)]
 }
 
-// GetByID returns a filter by chatID
+// GetByID returns a chat by chatID
 func (s *Service) GetByID(chatID string) *Chat {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -217,7 +226,7 @@ func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, e
 	defer s.mutex.Unlock()
 
 	chatID := negotiatedID(secret.Identity)
-	// If we already have a filter do nothing
+	// If we already have a chat do nothing
 	if _, ok := s.chats[chatID]; ok {
 		return s.chats[chatID], nil
 	}
@@ -231,12 +240,13 @@ func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, e
 	identityStr := fmt.Sprintf("%x", crypto.FromECDSAPub(secret.Identity))
 
 	chat := &Chat{
-		ChatID:   chatID,
-		Topic:    filter.Topic,
-		SymKeyID: filter.SymKeyID,
-		FilterID: filter.FilterID,
-		Identity: identityStr,
-		Listen:   true,
+		ChatID:     chatID,
+		Topic:      filter.Topic,
+		SymKeyID:   filter.SymKeyID,
+		FilterID:   filter.FilterID,
+		Identity:   identityStr,
+		Listen:     true,
+		Negotiated: true,
 	}
 
 	log.Info("PROCESSING SECRET", "chat-id", chatID, "topic", filter.Topic, "symKey", keyString)
@@ -273,9 +283,13 @@ func (s *Service) loadDiscovery(myKey *ecdsa.PrivateKey) error {
 		return nil
 	}
 
+	identityStr := fmt.Sprintf("%x", crypto.FromECDSAPub(&myKey.PublicKey))
+
 	discoveryChat := &Chat{
-		ChatID: discoveryTopic,
-		Listen: true,
+		ChatID:    discoveryTopic,
+		Listen:    true,
+		Identity:  identityStr,
+		Discovery: true,
 	}
 
 	discoveryResponse, err := s.addAsymmetricFilter(myKey, discoveryChat.ChatID, true)
