@@ -195,7 +195,7 @@ func ContactCodeTopic(identity string) string {
 	return "0x" + identity + "-contact-code"
 }
 
-// Get returns a negotiated filter given an identity
+// Get returns a negotiated chat given an identity
 func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -203,7 +203,7 @@ func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
 	return s.chats[negotiatedID(identity)]
 }
 
-// GetByID returns a filter by chatID
+// GetByID returns a chat by chatID
 func (s *Service) GetByID(chatID string) *Chat {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -217,7 +217,7 @@ func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, e
 	defer s.mutex.Unlock()
 
 	chatID := negotiatedID(secret.Identity)
-	// If we already have a filter do nothing
+	// If we already have a chat do nothing
 	if _, ok := s.chats[chatID]; ok {
 		return s.chats[chatID], nil
 	}

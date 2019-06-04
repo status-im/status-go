@@ -8,7 +8,9 @@ import (
 )
 
 type Installation struct {
-	ID      string
+	// The installation-id of the device
+	ID string
+	// The last known protocol version of the device
 	Version uint32
 }
 
@@ -46,7 +48,7 @@ func (s *Service) GetOurActiveInstallations(identity *ecdsa.PublicKey) ([]*Insta
 	if err != nil {
 		return nil, err
 	}
-	// Move to layer above
+
 	installations = append(installations, &Installation{
 		ID:      s.config.InstallationID,
 		Version: s.config.ProtocolVersion,
