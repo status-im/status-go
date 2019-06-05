@@ -222,7 +222,7 @@ func (db *Database) GetTransfersByAddress(address common.Address, start, end *bi
 			Receipt:     &types.Receipt{},
 		}
 		err = rows.Scan(
-			&transfer.Type, &transfer.BlockHash, &transfer.Address, (*SQLBigInt)(transfer.BlockNumber),
+			&transfer.Type, &transfer.BlockHash, (*SQLBigInt)(transfer.BlockNumber), &transfer.Address,
 			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
 		if err != nil {
 			return nil, err

@@ -50,7 +50,7 @@ func (s *TransfersSuite) TearDownTest() {
 }
 
 func (s *TransfersSuite) getAllTranfers() (rst []wallet.Transfer, err error) {
-	return rst, s.Local.Call(&rst, "wallet_getTransfers", (*hexutil.Big)(big.NewInt(0)))
+	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.Address, (*hexutil.Big)(big.NewInt(0)))
 }
 
 func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
