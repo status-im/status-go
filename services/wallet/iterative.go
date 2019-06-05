@@ -5,19 +5,20 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 )
 
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
 func SetupIterativeDownloader(
-	db *Database, client HeaderReader, option SyncOption,
+	db *Database, client HeaderReader, address common.Address, option SyncOption,
 	downloader BatchDownloader, size *big.Int) (*IterativeDownloader, error) {
 	d := &IterativeDownloader{
 		client:     client,
 		batchSize:  size,
 		downloader: downloader,
 	}
-	earliest, err := db.GetEarliestSynced(option)
+	earliest, err := db.GetEarliestSynced(address, option)
 	if err != nil {
 		log.Error("failed to get earliest synced block", "error", err)
 		return nil, err

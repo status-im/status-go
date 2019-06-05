@@ -569,7 +569,7 @@ func (b *StatusBackend) startWallet() error {
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", account.Address))
 	return wallet.StartReactor(path,
 		b.statusNode.RPCClient().Ethclient(),
-		account.Address,
+		[]common.Address{account.Address},
 		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
 }
 
