@@ -31,12 +31,12 @@ var (
 
 // Transfer stores information about transfer.
 type Transfer struct {
-	Type        TransferType
-	Address     common.Address
-	BlockNumber *big.Int
-	BlockHash   common.Hash
-	Transaction *types.Transaction
-	Receipt     *types.Receipt
+	Type        TransferType       `json:"type"`
+	Address     common.Address     `json:"address"`
+	BlockNumber *big.Int           `json:"blockNumber"`
+	BlockHash   common.Hash        `json:"blockhash"`
+	Transaction *types.Transaction `json:"transaction"`
+	Receipt     *types.Receipt     `json:"receipt"`
 }
 
 // ETHTransferDownloader downloads regular eth transfers.
