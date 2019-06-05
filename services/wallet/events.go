@@ -1,6 +1,10 @@
 package wallet
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 // EventType type for event types.
 type EventType string
@@ -16,6 +20,7 @@ const (
 
 // Event is a type for wallet events.
 type Event struct {
-	Type        EventType `json:"type"`
-	BlockNumber *big.Int  `json:"blockNumber"`
+	Type        EventType        `json:"type"`
+	BlockNumber *big.Int         `json:"blockNumber"`
+	Accounts    []common.Address `json:"accounts"`
 }

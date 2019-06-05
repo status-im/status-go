@@ -50,21 +50,18 @@ type reactorClient interface {
 }
 
 // NewReactor creates instance of the Reactor.
-func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, address common.Address, chain *big.Int) *Reactor {
-	reactor := &Reactor{
-		db:      db,
-		client:  client,
-		feed:    feed,
-		address: address,
-		chain:   chain,
+func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, accounts []common.Address, chain *big.Int) *Reactor {
+	return &Reactor{
+		db:       db,
+		client:   client,
+		feed:     feed,
+		accounts: accounts,
+		chain:    chain,
 	}
-	reactor.erc20 = NewERC20TransfersDownloader(client, address)
-	return reactor
 }
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	// FIXME(dshulyak) references same object. rework this part
 	client   *ethclient.Client
 	db       *Database
 	feed     *event.Feed
@@ -82,7 +79,10 @@ func (r *Reactor) Start() error {
 	if r.group != nil {
 		return errors.New("already running")
 	}
-	for _, address := range r.acconts {
+	// TODO(dshulyak) to support adding accounts in runtime implement keyed group
+	// and export private api to start downloaders from accounts
+	// private api should have access only to reactor
+	for _, address := range r.accounts {
 		r.group = NewGroup()
 		erc20 := &erc20HistoricalCommand{
 			db:     r.db,
@@ -96,9 +96,9 @@ func (r *Reactor) Start() error {
 			client:  r.client,
 			address: address,
 			eth: &ETHTransferDownloader{
-				client:  r.client,
-				address: address,
-				signer:  types.NewEIP155Signer(r.chain),
+				client:   r.client,
+				accounts: []common.Address{address},
+				signer:   types.NewEIP155Signer(r.chain),
 			},
 			feed: r.feed,
 		}
@@ -109,9 +109,9 @@ func (r *Reactor) Start() error {
 		chain:  r.chain,
 		client: r.client,
 		eth: &ETHTransferDownloader{
-			client:  r.client,
-			address: r.accounts,
-			signer:  types.NewEIP155Signer(r.chain),
+			client:   r.client,
+			accounts: r.accounts,
+			signer:   types.NewEIP155Signer(r.chain),
 		},
 		erc20: NewERC20TransfersDownloader(r.client, r.accounts),
 		feed:  r.feed,

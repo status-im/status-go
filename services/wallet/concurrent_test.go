@@ -56,13 +56,12 @@ func (f balancesFixture) BalanceAt(ctx context.Context, account common.Address, 
 
 type batchesFixture [][]Transfer
 
-func (f batchesFixture) GetTransfersInRange(ctx context.Context, from, to *big.Int) (rst []Transfer, err error) {
-	start := int(from.Int64())
-	end := int(from.Int64())
-	for i := start; i <= end; i++ {
-		rst = append(rst, f[i]...)
+func (f batchesFixture) GetTransfersByNumber(ctx context.Context, number *big.Int) (rst []Transfer, err error) {
+	index := int(number.Int64())
+	if index > len(f)-1 {
+		return nil, errors.New("unknown block")
 	}
-	return rst, err
+	return f[index], nil
 }
 
 func TestConcurrentEthDownloader(t *testing.T) {

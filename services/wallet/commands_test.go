@@ -40,7 +40,7 @@ func TestReorgOnNewBlock(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	original := genHeadersChain(5, 1)
-	require.NoError(t, db.SaveHeaders(original, 0))
+	require.NoError(t, db.SaveHeaders(original))
 	// rewrite parents ater 2nd block
 	reorg := make(headers, 5)
 	copy(reorg, original[:2])
@@ -98,7 +98,7 @@ func TestReactorReorgAllKnownHeaders(t *testing.T) {
 		Time:       big.NewInt(1),
 		ParentHash: reorg[len(reorg)-1].Hash(),
 	}
-	require.NoError(t, db.SaveHeaders(original, 0))
+	require.NoError(t, db.SaveHeaders(original))
 	cmd := &newBlocksTransfersCommand{
 		client: reorg,
 		db:     db,

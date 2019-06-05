@@ -82,7 +82,7 @@ func (g *Group) Stop() {
 
 type ethHistoricalCommand struct {
 	db      *Database
-	eth     BatchDownloader
+	eth     TransferDownloader
 	address common.Address
 	client  reactorClient
 	feed    *event.Feed
@@ -99,7 +99,7 @@ func (c *ethHistoricalCommand) Command() FiniteCommand {
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.previous == nil {
-		c.previous, err = c.db.GetEarliestSynced(ethSync)
+		c.previous, err = c.db.GetEarliestSynced(c.address, ethSync)
 		if err != nil {
 			return err
 		}
@@ -133,6 +133,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 		c.feed.Send(Event{
 			Type:        EventNewHistory,
 			BlockNumber: zero,
+			Accounts:    []common.Address{c.address},
 		})
 	}
 	log.Debug("eth transfers were persisted. command is closed")
@@ -140,10 +141,11 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 }
 
 type erc20HistoricalCommand struct {
-	db     *Database
-	erc20  BatchDownloader
-	client reactorClient
-	feed   *event.Feed
+	db      *Database
+	erc20   BatchDownloader
+	address common.Address
+	client  reactorClient
+	feed    *event.Feed
 
 	iterator *IterativeDownloader
 }
@@ -157,7 +159,7 @@ func (c *erc20HistoricalCommand) Command() FiniteCommand {
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.iterator == nil {
-		c.iterator, err = SetupIterativeDownloader(c.db, c.client, erc20Sync, c.erc20, erc20BatchSize)
+		c.iterator, err = SetupIterativeDownloader(c.db, c.client, c.address, erc20Sync, c.erc20, erc20BatchSize)
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
 			return err
@@ -181,6 +183,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 			c.feed.Send(Event{
 				Type:        EventNewHistory,
 				BlockNumber: c.iterator.Header().Number,
+				Accounts:    []common.Address{c.address},
 			})
 		}
 	}
@@ -252,6 +255,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 		c.feed.Send(Event{
 			Type:        EventNewBlock,
 			BlockNumber: added[0].Number,
+			Accounts:    uniqueAccountsFromTransfers(all),
 		})
 	}
 	if len(removed) != 0 {
@@ -259,6 +263,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 		c.feed.Send(Event{
 			Type:        EventReorg,
 			BlockNumber: removed[lth-1].Number,
+			Accounts:    uniqueAccountsFromTransfers(all),
 		})
 	}
 	return nil
@@ -311,4 +316,18 @@ func (c *newBlocksTransfersCommand) getTransfers(parent context.Context, header 
 		return nil, err
 	}
 	return append(ethT, erc20T...), nil
+}
+
+func uniqueAccountsFromTransfers(transfers []Transfer) []common.Address {
+	accounts := []common.Address{}
+	unique := map[common.Address]struct{}{}
+	for i := range transfers {
+		_, exist := unique[transfers[i].Address]
+		if exist {
+			continue
+		}
+		unique[transfers[i].Address] = struct{}{}
+		accounts = append(accounts, transfers[i].Address)
+	}
+	return accounts
 }
