@@ -48,9 +48,9 @@ func (s *ETHTransferSuite) SetupTest() {
 	s.ethclient = ethclient.NewClient(client)
 	s.signer = types.NewEIP155Signer(big.NewInt(1337))
 	s.downloader = &ETHTransferDownloader{
-		signer:  s.signer,
-		client:  s.ethclient,
-		address: crypto.PubkeyToAddress(s.identity.PublicKey),
+		signer:   s.signer,
+		client:   s.ethclient,
+		accounts: []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)},
 	}
 }
 
@@ -119,27 +119,6 @@ func (s *ETHTransferSuite) TestBalanceUpdatedOnOutbound() {
 	s.Require().Len(transfers, 1)
 }
 
-func (s *ETHTransferSuite) TestInRange() {
-	ctx := context.TODO()
-	for i := 0; i < 5; i++ {
-		tx := types.NewTransaction(uint64(i), crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
-		tx, err := types.SignTx(tx, s.signer, s.faucet)
-		s.Require().NoError(err)
-		s.Require().NoError(s.ethclient.SendTransaction(ctx, tx))
-		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_, err = bind.WaitMined(timeout, s.ethclient, tx)
-		s.Require().NoError(err)
-	}
-
-	head, err := s.ethclient.HeaderByNumber(ctx, nil)
-	s.Require().NoError(err)
-
-	transfers, err := s.downloader.GetTransfersInRange(ctx, big.NewInt(1), head.Number)
-	s.Require().NoError(err)
-	s.Require().Len(transfers, 5)
-}
-
 func TestERC20Transfers(t *testing.T) {
 	suite.Run(t, new(ERC20TransferSuite))
 }
@@ -171,7 +150,7 @@ func (s *ERC20TransferSuite) SetupTest() {
 	client, err := node.Attach()
 	s.Require().NoError(err)
 	s.ethclient = ethclient.NewClient(client)
-	s.downloader = NewERC20TransfersDownloader(s.ethclient, crypto.PubkeyToAddress(s.identity.PublicKey))
+	s.downloader = NewERC20TransfersDownloader(s.ethclient, []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)})
 
 	_, tx, contract, err := erc20.DeployERC20Transfer(bind.NewKeyedTransactor(s.faucet), s.ethclient)
 	s.Require().NoError(err)
