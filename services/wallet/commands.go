@@ -2,8 +2,8 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,74 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 )
-
-type Command interface {
-	Run(context.Context)
-}
-
-type FiniteCommand struct {
-	Interval time.Duration
-	Runable  func(context.Context) error
-}
-
-func (c FiniteCommand) Run(ctx context.Context) {
-	ticker := time.NewTicker(c.Interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			err := c.Runable(ctx)
-			if err == nil {
-				return
-			}
-		}
-	}
-}
-
-type InfiniteCommand struct {
-	Interval time.Duration
-	Runable  func(context.Context) error
-}
-
-func (c InfiniteCommand) Run(ctx context.Context) {
-	ticker := time.NewTicker(c.Interval)
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			_ = c.Runable(ctx)
-		}
-	}
-}
-
-func NewGroup() *Group {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &Group{
-		ctx:    ctx,
-		cancel: cancel,
-	}
-}
-
-type Group struct {
-	ctx    context.Context
-	cancel func()
-	wg     sync.WaitGroup
-}
-
-func (g *Group) Add(cmd Command) {
-	g.wg.Add(1)
-	go func() {
-		cmd.Run(g.ctx)
-		g.wg.Done()
-	}()
-}
-
-func (g *Group) Stop() {
-	g.cancel()
-	g.wg.Wait()
-}
 
 type ethHistoricalCommand struct {
 	db      *Database
@@ -115,12 +47,17 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	concurrent := NewConcurrentDownloader(ctx)
 	start := time.Now()
 	downloadEthConcurrently(concurrent, c.client, c.eth, c.address, zero, c.previous.Number)
-	concurrent.Wait()
+	select {
+	case <-concurrent.WaitAsync():
+	case <-ctx.Done():
+		log.Error("eth downloader is stuck")
+		return errors.New("eth downloader is stuck")
+	}
 	if concurrent.Error() != nil {
 		log.Error("failed to dowloader transfers using concurrent downloader", "error", err)
 		return concurrent.Error()
 	}
-	transfers := concurrent.Transfers()
+	transfers := concurrent.Get()
 	log.Info("eth historical downloader finished succesfully", "total transfers", len(transfers), "time", time.Since(start))
 	// TODO(dshulyak) insert 0 block number with transfers
 	err = c.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, ethSync)

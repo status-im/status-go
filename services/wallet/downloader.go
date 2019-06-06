@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"time"
 
@@ -163,32 +164,48 @@ func (d *ERC20TransfersDownloader) outboundTopics(address common.Address) [][]co
 	return [][]common.Hash{{d.signature}, {d.paddedAddress(address)}, {}}
 }
 
-func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, logs []types.Log, address common.Address) ([]Transfer, error) {
-	rst := make([]Transfer, len(logs))
-	for i, l := range logs {
-		// TODO(dshulyak) use TransactionInBlock after it is fixed
-		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-		tx, _, err := d.client.TransactionByHash(ctx, l.TxHash)
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-		receipt, err := d.client.TransactionReceipt(ctx, l.TxHash)
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		rst[i] = Transfer{
-			Address:     address,
-			Type:        erc20Transfer,
-			BlockNumber: new(big.Int).SetUint64(l.BlockNumber),
-			BlockHash:   l.BlockHash,
-			Transaction: tx,
-			Receipt:     receipt,
-		}
+func (d *ERC20TransfersDownloader) tranasferFromLogs(parent context.Context, log types.Log, address common.Address) (Transfer, error) {
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	tx, _, err := d.client.TransactionByHash(ctx, log.TxHash)
+	cancel()
+	if err != nil {
+		return Transfer{}, err
 	}
-	return rst, nil
+	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
+	receipt, err := d.client.TransactionReceipt(ctx, log.TxHash)
+	cancel()
+	if err != nil {
+		return Transfer{}, err
+	}
+	return Transfer{
+		Address:     address,
+		Type:        erc20Transfer,
+		BlockNumber: new(big.Int).SetUint64(log.BlockNumber),
+		BlockHash:   log.BlockHash,
+		Transaction: tx,
+		Receipt:     receipt,
+	}, nil
+}
+
+func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, logs []types.Log, address common.Address) ([]Transfer, error) {
+	concurrent := NewConcurrentDownloader(parent)
+	for i := range logs {
+		l := logs[i]
+		concurrent.Go(func(ctx context.Context) error {
+			transfer, err := d.tranasferFromLogs(ctx, l, address)
+			if err != nil {
+				return err
+			}
+			concurrent.Add(transfer)
+			return nil
+		})
+	}
+	select {
+	case <-concurrent.WaitAsync():
+	case <-parent.Done():
+		return nil, errors.New("logs downloader stuck")
+	}
+	return concurrent.Get(), nil
 }
 
 func any(address common.Address, compare []common.Address) bool {
