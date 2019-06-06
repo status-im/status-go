@@ -41,6 +41,7 @@ func (r *Result) Get() []Transfer {
 }
 
 func NewConcurrentRunner(ctx context.Context) *ConcurrentRunner {
+	// TODO(dshulyak) rename to atomic group and keep interface consistent with regular Group.
 	ctx, cancel := context.WithCancel(ctx)
 	return &ConcurrentRunner{
 		ctx:    ctx,
