@@ -30,8 +30,6 @@ func toDBHeader(header *types.Header) *DBHeader {
 type SyncOption uint
 
 const (
-	errNoRows = "sql: no rows in result set"
-
 	// sync options
 	ethSync   SyncOption = 1
 	erc20Sync SyncOption = 2
@@ -108,16 +106,8 @@ func (db Database) Close() error {
 
 // ProcessTranfers atomically adds/removes blocks and adds new tranfers.
 func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*DBHeader, option SyncOption) (err error) {
-	// TODO(dshulyak) split this method
 	var (
-		tx             *sql.Tx
-		insert         *sql.Stmt
-		blocks         *sql.Stmt
-		delete         *sql.Stmt
-		accountsUpdate *sql.Stmt
-		accountsInsert *sql.Stmt
-		rst            sql.Result
-		affected       int64
+		tx *sql.Tx
 	)
 	tx, err = db.db.Begin()
 	if err != nil {
@@ -130,139 +120,45 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*DBHea
 		}
 		_ = tx.Rollback()
 	}()
-
-	insert, err = tx.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, address, tx, receipt, type) VALUES (?, ?, ?, ?, ?, ?)")
+	err = deleteHeaders(tx, removed)
 	if err != nil {
-		return err
+		return
 	}
-	delete, err = tx.Prepare("DELETE FROM blocks WHERE hash = ?")
+	err = insertHeaders(tx, added)
 	if err != nil {
-		return err
+		return
 	}
-	blocks, err = tx.Prepare("INSERT OR IGNORE INTO blocks(hash, number) VALUES (?, ?)")
+	err = insertTransfers(tx, transfers)
 	if err != nil {
-		return err
+		return
 	}
-	accountsUpdate, err = tx.Prepare("UPDATE accounts_to_blocks SET sync=sync|? WHERE address=? AND blk_number=?")
-	if err != nil {
-		return err
-	}
-	accountsInsert, err = tx.Prepare("INSERT OR IGNORE INTO accounts_to_blocks(address,blk_number,sync) VALUES(?,?,?)")
-	if err != nil {
-		return err
-	}
-	for _, header := range removed {
-		_, err = delete.Exec(header.Hash)
-		if err != nil {
-			return err
-		}
-	}
-	for _, header := range added {
-		_, err = blocks.Exec(header.Hash, (*SQLBigInt)(header.Number))
-		if err != nil {
-			return err
-		}
-	}
-
-	accountsChanges := map[common.Address]map[string]*big.Int{}
-	for _, t := range transfers {
-		_, err = insert.Exec(t.Transaction.Hash(), t.BlockHash, t.Address, &JSONBlob{t.Transaction}, &JSONBlob{t.Receipt}, t.Type)
-		if err != nil {
-			return err
-		}
-		_, exist := accountsChanges[t.Address]
-		if !exist {
-			accountsChanges[t.Address] = map[string]*big.Int{}
-		}
-		accountsChanges[t.Address][t.BlockNumber.String()] = t.BlockNumber
-	}
-	for address, changedBlocks := range accountsChanges {
-		for _, blkNumber := range changedBlocks {
-			rst, err = accountsUpdate.Exec(option, address, (*SQLBigInt)(blkNumber))
-			if err != nil {
-				return err
-			}
-			affected, err = rst.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if affected > 0 {
-				continue
-			}
-			_, err = accountsInsert.Exec(address, (*SQLBigInt)(blkNumber), option)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return err
+	err = updateAccounts(tx, transfers, option)
+	return
 }
 
 // GetTransfersByAddress loads transfers for a given address between two blocks.
 func (db *Database) GetTransfersByAddress(address common.Address, start, end *big.Int) (rst []Transfer, err error) {
-	// TODO(dshulyak) DRY
-	query := "SELECT type, blocks.hash, blocks.number, address, tx, receipt FROM transfers JOIN blocks ON blk_hash = blocks.hash WHERE address == ? AND blocks.number >= ?"
-	var (
-		rows *sql.Rows
-	)
-	if end != nil {
-		query += " AND blocks.number <= ?"
-		rows, err = db.db.Query(query, address, (*SQLBigInt)(start), (*SQLBigInt)(end))
-	} else {
-		rows, err = db.db.Query(query, address, (*SQLBigInt)(start))
-	}
+	query := newTransfersQuery().FilterAddress(address).FilterStart(start).FilterEnd(end)
+	rows, err := db.db.Query(query.String(), query.Args()...)
 	if err != nil {
 		return
 	}
 	defer rows.Close()
-	for rows.Next() {
-		transfer := Transfer{
-			BlockNumber: &big.Int{},
-			Transaction: &types.Transaction{},
-			Receipt:     &types.Receipt{},
-		}
-		err = rows.Scan(
-			&transfer.Type, &transfer.BlockHash, (*SQLBigInt)(transfer.BlockNumber), &transfer.Address,
-			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
-		if err != nil {
-			return nil, err
-		}
-		rst = append(rst, transfer)
-	}
-	return
+	return scanTransfers(rows)
 }
 
 // GetTransfers load transfers transfer betweeen two blocks.
 func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error) {
-	query := "SELECT type, blocks.hash, blocks.number, address, tx, receipt FROM transfers JOIN blocks ON blk_hash = blocks.hash WHERE blocks.number >= ?"
-	var (
-		rows *sql.Rows
-	)
-	if end != nil {
-		query += " AND blocks.number <= ?"
-		rows, err = db.db.Query(query, (*SQLBigInt)(start), (*SQLBigInt)(end))
-	} else {
-		rows, err = db.db.Query(query, (*SQLBigInt)(start))
+	query := newTransfersQuery().FilterStart(start).FilterEnd(end)
+	rows, err := db.db.Query(query.String(), query.Args()...)
+	if err != nil {
+		return
 	}
 	if err != nil {
 		return
 	}
 	defer rows.Close()
-	for rows.Next() {
-		transfer := Transfer{
-			BlockNumber: &big.Int{},
-			Transaction: &types.Transaction{},
-			Receipt:     &types.Receipt{},
-		}
-		err = rows.Scan(
-			&transfer.Type, &transfer.BlockHash, (*SQLBigInt)(transfer.BlockNumber), &transfer.Address,
-			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
-		if err != nil {
-			return nil, err
-		}
-		rst = append(rst, transfer)
-	}
-	return
+	return scanTransfers(rows)
 }
 
 // SaveHeader stores a single header.
@@ -366,7 +262,7 @@ func (db *Database) GetHeaderByNumber(number *big.Int) (header *DBHeader, err er
 	if err == nil {
 		return header, nil
 	}
-	if err.Error() == errNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return nil, err
@@ -391,4 +287,98 @@ SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number
 		}
 	}
 	return nil, nil
+}
+
+func scanTransfers(rows *sql.Rows) (rst []Transfer, err error) {
+	for rows.Next() {
+		transfer := Transfer{
+			BlockNumber: &big.Int{},
+			Transaction: &types.Transaction{},
+			Receipt:     &types.Receipt{},
+		}
+		err = rows.Scan(
+			&transfer.Type, &transfer.BlockHash, (*SQLBigInt)(transfer.BlockNumber), &transfer.Address,
+			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, transfer)
+	}
+	return rst, nil
+}
+
+// statementCreator allows to pass transaction or database to use in consumer.
+type statementCreator interface {
+	Prepare(query string) (*sql.Stmt, error)
+}
+
+func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
+	delete, err := creator.Prepare("DELETE FROM blocks WHERE hash = ?")
+	if err != nil {
+		return err
+	}
+	for _, h := range headers {
+		_, err = delete.Exec(h.Hash)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertHeaders(creator statementCreator, headers []*DBHeader) error {
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(hash, number) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	for _, h := range headers {
+		_, err = insert.Exec(h.Hash, (*SQLBigInt)(h.Number))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertTransfers(creator statementCreator, transfers []Transfer) error {
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, address, tx, receipt, type) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	for _, t := range transfers {
+		_, err = insert.Exec(t.Transaction.Hash(), t.BlockHash, t.Address, &JSONBlob{t.Transaction}, &JSONBlob{t.Receipt}, t.Type)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func updateAccounts(creator statementCreator, transfers []Transfer, option SyncOption) error {
+	update, err := creator.Prepare("UPDATE accounts_to_blocks SET sync=sync|? WHERE address=? AND blk_number=?")
+	if err != nil {
+		return err
+	}
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO accounts_to_blocks(address,blk_number,sync) VALUES(?,?,?)")
+	if err != nil {
+		return err
+	}
+	for _, t := range transfers {
+		rst, err := update.Exec(option, t.Address, (*SQLBigInt)(t.BlockNumber))
+		if err != nil {
+			return err
+		}
+		affected, err := rst.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected > 0 {
+			continue
+		}
+		_, err = insert.Exec(t.Address, (*SQLBigInt)(t.BlockNumber), option)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
