@@ -11,30 +11,59 @@ import (
 
 // NewConcurrentDownloader creates ConcurrentDownloader instance.
 func NewConcurrentDownloader(ctx context.Context) *ConcurrentDownloader {
+	runner := NewConcurrentRunner(ctx)
+	result := &Result{}
+	return &ConcurrentDownloader{runner, result}
+}
+
+type ConcurrentDownloader struct {
+	*ConcurrentRunner
+	*Result
+}
+
+type Result struct {
+	mu        sync.Mutex
+	transfers []Transfer
+}
+
+func (r *Result) Add(transfers ...Transfer) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.transfers = append(r.transfers, transfers...)
+}
+
+func (r *Result) Get() []Transfer {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rst := make([]Transfer, len(r.transfers))
+	copy(rst, r.transfers)
+	return rst
+}
+
+func NewConcurrentRunner(ctx context.Context) *ConcurrentRunner {
 	ctx, cancel := context.WithCancel(ctx)
-	return &ConcurrentDownloader{
+	return &ConcurrentRunner{
 		ctx:    ctx,
 		cancel: cancel,
 	}
 }
 
-// ConcurrentDownloader manages downloaders life cycle.
-type ConcurrentDownloader struct {
+// ConcurrentRunner runs group atomically.
+type ConcurrentRunner struct {
 	ctx    context.Context
 	cancel func()
 	wg     sync.WaitGroup
 
-	mu      sync.Mutex
-	results []Transfer
-	error   error
+	mu    sync.Mutex
+	error error
 }
 
 // Go spawns function in a goroutine and stores results or errors.
-func (d *ConcurrentDownloader) Go(f func(context.Context) ([]Transfer, error)) {
+func (d *ConcurrentRunner) Go(f func(context.Context) error) {
 	d.wg.Add(1)
 	go func() {
 		defer d.wg.Done()
-		transfers, err := f(d.ctx)
+		err := f(d.ctx)
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		if err != nil {
@@ -46,29 +75,30 @@ func (d *ConcurrentDownloader) Go(f func(context.Context) ([]Transfer, error)) {
 			d.cancel()
 			return
 		}
-		d.results = append(d.results, transfers...)
 	}()
 }
 
-// Transfers returns collected transfers. To get all results should be called after Wait.
-func (d *ConcurrentDownloader) Transfers() []Transfer {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	rst := make([]Transfer, len(d.results))
-	copy(rst, d.results)
-	return rst
-}
-
 // Wait for all downloaders to finish.
-func (d *ConcurrentDownloader) Wait() {
+func (d *ConcurrentRunner) Wait() {
 	d.wg.Wait()
 	if d.Error() == nil {
+		d.mu.Lock()
+		defer d.mu.Unlock()
 		d.cancel()
 	}
 }
 
+func (d *ConcurrentRunner) WaitAsync() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		d.Wait()
+		close(ch)
+	}()
+	return ch
+}
+
 // Error stores an error that was reported by any of the downloader. Should be called after Wait.
-func (d *ConcurrentDownloader) Error() error {
+func (d *ConcurrentRunner) Error() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.error
@@ -80,29 +110,34 @@ type TransferDownloader interface {
 }
 
 func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, downloader TransferDownloader, account common.Address, low, high *big.Int) {
-	c.Go(func(ctx context.Context) ([]Transfer, error) {
+	c.Go(func(ctx context.Context) error {
 		log.Debug("eth transfers comparing blocks", "low", low, "high", high)
 		lb, err := client.BalanceAt(ctx, account, low)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		hb, err := client.BalanceAt(ctx, account, high)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if lb.Cmp(hb) == 0 {
 			log.Debug("balances are equal", "low", low, "high", high)
-			return nil, nil
+			return nil
 		}
 		if new(big.Int).Sub(high, low).Cmp(one) == 0 {
 			log.Debug("higher block is a parent", "low", low, "high", high)
-			return downloader.GetTransfersByNumber(ctx, high)
+			transfers, err := downloader.GetTransfersByNumber(ctx, high)
+			if err != nil {
+				return err
+			}
+			c.Add(transfers...)
+			return nil
 		}
 		mid := new(big.Int).Add(low, high)
 		mid = mid.Div(mid, two)
 		log.Debug("balances are not equal spawn two concurrent downloaders", "low", low, "mid", mid, "high", high)
 		downloadEthConcurrently(c, client, downloader, account, low, mid)
 		downloadEthConcurrently(c, client, downloader, account, mid, high)
-		return nil, nil
+		return nil
 	})
 }
