@@ -15,17 +15,17 @@ import (
 func TestConcurrentErrorInterrupts(t *testing.T) {
 	concurrent := NewConcurrentDownloader(context.Background())
 	var interrupted bool
-	concurrent.Go(func(ctx context.Context) ([]Transfer, error) {
+	concurrent.Go(func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			interrupted = true
 		case <-time.After(10 * time.Second):
 		}
-		return nil, nil
+		return nil
 	})
 	err := errors.New("interrupt")
-	concurrent.Go(func(ctx context.Context) ([]Transfer, error) {
-		return nil, err
+	concurrent.Go(func(ctx context.Context) error {
+		return err
 	})
 	concurrent.Wait()
 	require.True(t, interrupted)
@@ -34,14 +34,16 @@ func TestConcurrentErrorInterrupts(t *testing.T) {
 
 func TestConcurrentCollectsTransfers(t *testing.T) {
 	concurrent := NewConcurrentDownloader(context.Background())
-	concurrent.Go(func(context.Context) ([]Transfer, error) {
-		return []Transfer{{}}, nil
+	concurrent.Go(func(context.Context) error {
+		concurrent.Add(Transfer{})
+		return nil
 	})
-	concurrent.Go(func(context.Context) ([]Transfer, error) {
-		return []Transfer{{}}, nil
+	concurrent.Go(func(context.Context) error {
+		concurrent.Add(Transfer{})
+		return nil
 	})
 	concurrent.Wait()
-	require.Len(t, concurrent.Transfers(), 2)
+	require.Len(t, concurrent.Get(), 2)
 }
 
 type balancesFixture []*big.Int
@@ -111,7 +113,7 @@ func TestConcurrentEthDownloader(t *testing.T) {
 				common.Address{}, zero, tc.options.last)
 			concurrent.Wait()
 			require.NoError(t, concurrent.Error())
-			rst := concurrent.Transfers()
+			rst := concurrent.Get()
 			require.Len(t, rst, len(tc.options.result))
 			sort.Slice(rst, func(i, j int) bool {
 				return rst[i].BlockNumber.Cmp(rst[j].BlockNumber) < 0
