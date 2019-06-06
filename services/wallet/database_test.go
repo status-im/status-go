@@ -105,6 +105,7 @@ func TestDBProcessTransfer(t *testing.T) {
 	tx := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	transfers := []Transfer{
 		{
+			ID:          common.Hash{1},
 			Type:        ethTransfer,
 			BlockHash:   header.Hash,
 			BlockNumber: header.Number,
@@ -131,10 +132,10 @@ func TestDBReorgTransfers(t *testing.T) {
 	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, *originalTX.To(), original.Number, original.Hash, originalTX, rcpt},
+		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, originalTX, rcpt},
 	}, []*DBHeader{original}, nil, 0))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, *replacedTX.To(), replaced.Number, replaced.Hash, replacedTX, rcpt},
+		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, replacedTX, rcpt},
 	}, []*DBHeader{replaced}, []*DBHeader{original}, 0))
 
 	all, err := db.GetTransfers(big.NewInt(0), nil)
@@ -158,6 +159,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		receipt := types.NewReceipt(nil, false, 100)
 		receipt.Logs = []*types.Log{}
 		transfer := Transfer{
+			ID:          tx.Hash(),
 			Type:        ethTransfer,
 			BlockNumber: header.Number,
 			BlockHash:   header.Hash,
@@ -223,6 +225,7 @@ func TestDBProcessTransfersUpdate(t *testing.T) {
 		Hash:   common.Hash{1},
 	}
 	transfer := Transfer{
+		ID:          common.Hash{1},
 		BlockNumber: header.Number,
 		BlockHash:   header.Hash,
 		Transaction: types.NewTransaction(0, common.Address{}, nil, 0, nil, nil),

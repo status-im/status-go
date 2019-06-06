@@ -144,7 +144,7 @@ func (db *Database) GetTransfersByAddress(address common.Address, start, end *bi
 		return
 	}
 	defer rows.Close()
-	return scanTransfers(rows)
+	return query.Scan(rows)
 }
 
 // GetTransfers load transfers transfer betweeen two blocks.
@@ -154,11 +154,8 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 	if err != nil {
 		return
 	}
-	if err != nil {
-		return
-	}
 	defer rows.Close()
-	return scanTransfers(rows)
+	return query.Scan(rows)
 }
 
 // SaveHeader stores a single header.
@@ -289,24 +286,6 @@ SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number
 	return nil, nil
 }
 
-func scanTransfers(rows *sql.Rows) (rst []Transfer, err error) {
-	for rows.Next() {
-		transfer := Transfer{
-			BlockNumber: &big.Int{},
-			Transaction: &types.Transaction{},
-			Receipt:     &types.Receipt{},
-		}
-		err = rows.Scan(
-			&transfer.Type, &transfer.BlockHash, (*SQLBigInt)(transfer.BlockNumber), &transfer.Address,
-			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
-		if err != nil {
-			return nil, err
-		}
-		rst = append(rst, transfer)
-	}
-	return rst, nil
-}
-
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
@@ -346,7 +325,7 @@ func insertTransfers(creator statementCreator, transfers []Transfer) error {
 		return err
 	}
 	for _, t := range transfers {
-		_, err = insert.Exec(t.Transaction.Hash(), t.BlockHash, t.Address, &JSONBlob{t.Transaction}, &JSONBlob{t.Receipt}, t.Type)
+		_, err = insert.Exec(t.ID, t.BlockHash, t.Address, &JSONBlob{t.Transaction}, &JSONBlob{t.Receipt}, t.Type)
 		if err != nil {
 			return err
 		}

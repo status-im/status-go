@@ -2,12 +2,14 @@ package wallet
 
 import (
 	"bytes"
+	"database/sql"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const baseTransfersQuery = "SELECT type, blocks.hash, blocks.number, address, tx, receipt FROM transfers JOIN blocks ON blk_hash = blocks.hash"
+const baseTransfersQuery = "SELECT transfers.hash, type, blocks.hash, blocks.number, address, tx, receipt FROM transfers JOIN blocks ON blk_hash = blocks.hash"
 
 func newTransfersQuery() *transfersQuery {
 	buf := bytes.NewBuffer(nil)
@@ -63,4 +65,22 @@ func (q *transfersQuery) String() string {
 
 func (q *transfersQuery) Args() []interface{} {
 	return q.args
+}
+
+func (q *transfersQuery) Scan(rows *sql.Rows) (rst []Transfer, err error) {
+	for rows.Next() {
+		transfer := Transfer{
+			BlockNumber: &big.Int{},
+			Transaction: &types.Transaction{},
+			Receipt:     &types.Receipt{},
+		}
+		err = rows.Scan(
+			&transfer.ID, &transfer.Type, &transfer.BlockHash, (*SQLBigInt)(transfer.BlockNumber), &transfer.Address,
+			&JSONBlob{transfer.Transaction}, &JSONBlob{transfer.Receipt})
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, transfer)
+	}
+	return rst, nil
 }
