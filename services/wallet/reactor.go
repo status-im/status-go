@@ -90,6 +90,7 @@ func (r *Reactor) Start() error {
 			client:      r.client,
 			feed:        r.feed,
 			safetyDepth: reorgSafetyDepth,
+			address:     address,
 		}
 		r.group.Add(erc20.Command())
 		eth := &ethHistoricalCommand{

@@ -42,6 +42,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 				return err
 			}
 		}
+		log.Info("initialized downloader for eth historical transfers", "address", c.address, "starting at", c.previous.Number)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -105,6 +106,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 			log.Error("failed to setup historical downloader for erc20")
 			return err
 		}
+		log.Info("initialized downloader for erc20 historical transfers", "address", c.address, "starting at", c.iterator.Header().Number)
 	}
 	for !c.iterator.Finished() {
 		transfers, err := c.iterator.Next(ctx)
@@ -158,6 +160,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 			log.Error("failed to get last known header", "error", err)
 			return err
 		}
+		log.Info("initialized downloader for new blocks transfers", "starting at", c.previous.Number)
 	}
 	num := new(big.Int).Add(c.previous.Number, one)
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
@@ -290,24 +293,20 @@ func lastKnownHeader(parent context.Context, db *Database, client HeaderReader, 
 	if int64(len(headers)) > safetyLimit.Int64() && isSequence(headers) {
 		return headers[0], nil
 	}
-	var latest *DBHeader
-	if len(headers) == 0 {
-		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-		header, err := client.HeaderByNumber(ctx, nil)
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		latest = toDBHeader(header)
-	} else {
-		latest = headers[0]
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	header, err := client.HeaderByNumber(ctx, nil)
+	cancel()
+	if err != nil {
+		return nil, err
 	}
+	log.Info("head of the chain", "number", header.Number)
+	latest := toDBHeader(header)
 	diff := new(big.Int).Sub(latest.Number, safetyLimit)
 	if diff.Cmp(zero) <= 0 {
 		diff = zero
 	}
-	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-	header, err := client.HeaderByNumber(ctx, safetyLimit)
+	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
+	header, err = client.HeaderByNumber(ctx, diff)
 	cancel()
 	if err != nil {
 		return nil, err
