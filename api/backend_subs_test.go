@@ -132,17 +132,28 @@ func TestSubscriptionWhisperEnvelopes(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	select {
-	case event := <-signals:
-		validateShhEvent(t, event, subID, numberOfEnvelopes, topic, payload)
-	case <-time.After(2 * time.Second):
-		require.Fail(t, "timeout waiting for subscription")
+	var (
+		total int
+		after = time.After(2 * time.Second)
+		exit  bool
+	)
+	for !exit {
+		select {
+		case event := <-signals:
+			total += validateShhEvent(t, event, subID, topic, payload)
+			if total == numberOfEnvelopes {
+				exit = true
+			}
+		case <-after:
+			exit = true
+		}
 	}
+	require.Equal(t, numberOfEnvelopes, total, "total number of envelopes must be equal to sent number of envelopes")
 }
 
 // * * * * * * * * * * utility methods below * * * * * * * * * * *
 
-func validateShhEvent(t *testing.T, jsonEvent string, expectedSubID string, numberOfEnvelopes int, topic string, payload string) {
+func validateShhEvent(t *testing.T, jsonEvent string, expectedSubID string, topic string, payload string) int {
 	result := struct {
 		Event signal.SubscriptionDataEvent `json:"event"`
 		Type  string                       `json:"type"`
@@ -153,13 +164,12 @@ func validateShhEvent(t *testing.T, jsonEvent string, expectedSubID string, numb
 	require.Equal(t, signal.EventSubscriptionsData, result.Type)
 	require.Equal(t, expectedSubID, result.Event.FilterID)
 
-	require.Equal(t, numberOfEnvelopes, len(result.Event.Data))
-
 	for _, item := range result.Event.Data {
 		dict := item.(map[string]interface{})
 		require.Equal(t, dict["topic"], topic)
 		require.Equal(t, dict["payload"], payload)
 	}
+	return len(result.Event.Data)
 }
 
 func validateTxEvent(t *testing.T, expectedSubID string, jsonEvent string, txID string) {
@@ -193,11 +203,11 @@ func extractResult(t *testing.T, jsonString string) string {
 func createSubscription(t *testing.T, backend *StatusBackend, params string) string {
 	createSubFmt := `
 	{
-		"jsonrpc": "2.0", 
-        "id": 10,
-	    "method": "eth_subscribeSignal", 
-        "params": [%s]
-		
+		"jsonrpc": "2.0",
+	"id": 10,
+	    "method": "eth_subscribeSignal",
+	"params": [%s]
+
 	}`
 
 	jsonResponse, err := backend.CallPrivateRPC(fmt.Sprintf(createSubFmt, params))
@@ -220,9 +230,9 @@ func initNodeAndLogin(t *testing.T, backend *StatusBackend) (string, string) {
 
 	unlockFmt := `
 	{
-		"jsonrpc": "2.0", 
-        "id": 11,
-	    "method": "personal_unlockAccount", 
+		"jsonrpc": "2.0",
+	"id": 11,
+	    "method": "personal_unlockAccount",
 		"params": ["%s", "%s"]
 	}`
 
