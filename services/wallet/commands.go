@@ -13,11 +13,12 @@ import (
 )
 
 type ethHistoricalCommand struct {
-	db      *Database
-	eth     TransferDownloader
-	address common.Address
-	client  reactorClient
-	feed    *event.Feed
+	db          *Database
+	eth         TransferDownloader
+	address     common.Address
+	client      reactorClient
+	feed        *event.Feed
+	safetyDepth *big.Int
 
 	previous *DBHeader
 }
@@ -36,7 +37,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 			return err
 		}
 		if c.previous == nil {
-			c.previous, err = lastKnownHeader(c.db, c.client)
+			c.previous, err = lastKnownHeader(ctx, c.db, c.client, c.safetyDepth)
 			if err != nil {
 				return err
 			}
@@ -78,11 +79,12 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 }
 
 type erc20HistoricalCommand struct {
-	db      *Database
-	erc20   BatchDownloader
-	address common.Address
-	client  reactorClient
-	feed    *event.Feed
+	db          *Database
+	erc20       BatchDownloader
+	address     common.Address
+	client      reactorClient
+	feed        *event.Feed
+	safetyDepth *big.Int
 
 	iterator *IterativeDownloader
 }
@@ -96,7 +98,9 @@ func (c *erc20HistoricalCommand) Command() FiniteCommand {
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	if c.iterator == nil {
-		c.iterator, err = SetupIterativeDownloader(c.db, c.client, c.address, erc20Sync, c.erc20, erc20BatchSize)
+		c.iterator, err = SetupIterativeDownloader(
+			c.db, c.client, c.address, erc20Sync,
+			c.erc20, erc20BatchSize, c.safetyDepth)
 		if err != nil {
 			log.Error("failed to setup historical downloader for erc20")
 			return err
@@ -129,12 +133,13 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 }
 
 type newBlocksTransfersCommand struct {
-	db     *Database
-	chain  *big.Int
-	erc20  *ERC20TransfersDownloader
-	eth    *ETHTransferDownloader
-	client reactorClient
-	feed   *event.Feed
+	db          *Database
+	chain       *big.Int
+	erc20       *ERC20TransfersDownloader
+	eth         *ETHTransferDownloader
+	client      reactorClient
+	feed        *event.Feed
+	safetyDepth *big.Int
 
 	previous *DBHeader
 }
@@ -148,7 +153,7 @@ func (c *newBlocksTransfersCommand) Command() InfiniteCommand {
 
 func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 	if c.previous == nil {
-		c.previous, err = lastKnownHeader(c.db, c.client)
+		c.previous, err = lastKnownHeader(parent, c.db, c.client, c.safetyDepth)
 		if err != nil {
 			log.Error("failed to get last known header", "error", err)
 			return err
@@ -267,4 +272,60 @@ func uniqueAccountsFromTransfers(transfers []Transfer) []common.Address {
 		accounts = append(accounts, transfers[i].Address)
 	}
 	return accounts
+}
+
+// lastKnownHeader selects last stored header in database. Such header should have atleast safety depth predecessor in our database.
+// We don't store every single header in the database.
+// Historical downloaders storing only block where transfer was found.
+// New block downloaders store every block it downloaded.
+// It could happen that historical downloader found transfers in block 15. With a current head set at 20.
+// If we will notice reorg at 20 but chain was rewritten starting from 10th block we won't be able to backtrack that transfer
+// found in 15 block was removed from chain.
+// See tests TestSafetyBufferFailed and TestSafetyBufferSuccess.
+func lastKnownHeader(parent context.Context, db *Database, client HeaderReader, safetyLimit *big.Int) (*DBHeader, error) {
+	headers, err := db.LastHeaders(safetyLimit)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(headers)) > limit.Int64() && isSequence(headers) {
+		return headers[0], nil
+	}
+	var latest *DBHeader
+	if len(headers) == 0 {
+		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+		header, err := client.HeaderByNumber(ctx, nil)
+		cancel()
+		if err != nil {
+			return nil, err
+		}
+		latest = toDBHeader(header)
+	} else {
+		latest = headers[0]
+	}
+	diff := new(big.Int).Sub(latest.Number, safetyLimit)
+	if diff.Cmp(zero) <= 0 {
+		diff = zero
+	}
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	header, err := client.HeaderByNumber(ctx, safetyLimit)
+	cancel()
+	if err != nil {
+		return nil, err
+	}
+	return toDBHeader(header), nil
+}
+
+func isSequence(headers []*DBHeader) bool {
+	if len(headers) == 0 {
+		return false
+	}
+	child := headers[0]
+	diff := big.NewInt(0)
+	for _, parent := range headers[1:] {
+		if diff.Sub(child.Number, parent.Number).Cmp(one) != 0 {
+			return false
+		}
+		child = parent
+	}
+	return true
 }

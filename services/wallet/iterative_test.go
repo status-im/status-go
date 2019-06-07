@@ -2,9 +2,12 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,4 +67,43 @@ func TestIterProgress(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, batch, 5)
 	require.True(t, iter.Finished())
+}
+
+type headers []*types.Header
+
+func (h headers) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	for _, item := range h {
+		if item.Hash() == hash {
+			return item, nil
+		}
+	}
+	return nil, errors.New("not found")
+}
+
+func (h headers) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	for _, item := range h {
+		if item.Number.Cmp(number) == 0 {
+			return item, nil
+		}
+	}
+	return nil, errors.New("not found")
+}
+
+func (h headers) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	return nil, errors.New("not implemented")
+}
+
+func genHeadersChain(size, difficulty int) []*types.Header {
+	rst := make([]*types.Header, size)
+	for i := 0; i < size; i++ {
+		rst[i] = &types.Header{
+			Number:     big.NewInt(int64(i)),
+			Difficulty: big.NewInt(int64(difficulty)),
+			Time:       big.NewInt(1),
+		}
+		if i != 0 {
+			rst[i].ParentHash = rst[i-1].Hash()
+		}
+	}
+	return rst
 }
