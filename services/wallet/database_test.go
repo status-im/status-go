@@ -15,7 +15,7 @@ import (
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-tests-")
 	require.NoError(t, err)
-	db, err := InitializeDB(tmpfile.Name())
+	db, err := InitializeDB(tmpfile.Name(), "wallet-tests")
 	require.NoError(t, err)
 	return db, func() {
 		require.NoError(t, db.Close())

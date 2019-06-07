@@ -36,8 +36,8 @@ const (
 )
 
 // InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path string) (*Database, error) {
-	db, err := sqlite.OpenDB(path)
+func InitializeDB(path, password string) (*Database, error) {
+	db, err := sqlite.OpenDB(path, password)
 	if err != nil {
 		return nil, err
 	}

@@ -2,12 +2,13 @@ package sqlite
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 )
 
-func openDB(path string) (*sql.DB, error) {
+func openDB(path, key string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
@@ -19,6 +20,11 @@ func openDB(path string) (*sql.DB, error) {
 	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
 		return nil, err
 	}
+	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
+	if _, err = db.Exec(keyString); err != nil {
+		return nil, errors.New("failed to set key pragma")
+	}
+
 	// readers do not block writers and faster i/o operations
 	// https://www.sqlite.org/draft/wal.html
 	// must be set after db is encrypted
@@ -35,6 +41,6 @@ func openDB(path string) (*sql.DB, error) {
 }
 
 // OpenDB opens not-encrypted database.
-func OpenDB(path string) (*sql.DB, error) {
-	return openDB(path)
+func OpenDB(path, key string) (*sql.DB, error) {
+	return openDB(path, key)
 }

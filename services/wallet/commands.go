@@ -116,7 +116,6 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 			break
 		}
 		headers := headersFromTransfers(transfers)
-		log.Info("storing header of the iterator", "header", c.iterator.Header().Number)
 		headers = append(headers, c.iterator.Header())
 		err = c.db.ProcessTranfers(transfers, []common.Address{c.address}, headers, nil, erc20Sync)
 		if err != nil {
