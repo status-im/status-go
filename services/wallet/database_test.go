@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -237,4 +238,28 @@ func TestDBProcessTransfersUpdate(t *testing.T) {
 	earliest, err := db.GetEarliestSynced(address, ethSync|erc20Sync)
 	require.NoError(t, err)
 	require.Equal(t, header.Hash, earliest.Hash)
+}
+
+func TestDBLastHeadersReverseSorted(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	headers := make([]*DBHeader, 10)
+	for i := range headers {
+		headers[i] = &DBHeader{Hash: common.Hash{byte(i)}, Number: big.NewInt(int64(i))}
+	}
+	require.NoError(t, db.ProcessTranfers(nil, headers, nil, ethSync))
+
+	headers, err := db.LastHeaders(big.NewInt(5))
+	require.NoError(t, err)
+	require.Len(t, headers, 5)
+
+	sorted := make([]*DBHeader, len(headers))
+	copy(sorted, headers)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Number.Cmp(sorted[j].Number) > 0
+	})
+	for i := range headers {
+		require.Equal(t, sorted[i], headers[i])
+	}
 }

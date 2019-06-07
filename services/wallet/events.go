@@ -11,11 +11,11 @@ type EventType string
 
 const (
 	// EventNewBlock emitted when new block was added to the same canonical chan.
-	EventNewBlock = "newblock"
+	EventNewBlock EventType = "newblock"
 	// EventReorg emitted when canonical chain was changed. In this case, BlockNumber will be an earliest added block.
-	EventReorg = "reorg"
+	EventReorg EventType = "reorg"
 	// EventNewHistory emitted if transfer from older block was added.
-	EventNewHistory = "history"
+	EventNewHistory EventType = "history"
 )
 
 // Event is a type for wallet events.

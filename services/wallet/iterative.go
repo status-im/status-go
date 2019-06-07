@@ -12,7 +12,7 @@ import (
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
 func SetupIterativeDownloader(
 	db *Database, client HeaderReader, address common.Address, option SyncOption,
-	downloader BatchDownloader, size *big.Int) (*IterativeDownloader, error) {
+	downloader BatchDownloader, size *big.Int, limit *big.Int) (*IterativeDownloader, error) {
 	d := &IterativeDownloader{
 		client:     client,
 		batchSize:  size,
@@ -24,7 +24,7 @@ func SetupIterativeDownloader(
 		return nil, err
 	}
 	if earliest == nil {
-		previous, err := lastKnownHeader(db, client)
+		previous, err := lastKnownHeader(context.Background(), db, client, limit)
 		if err != nil {
 			log.Error("failed to get last known header", "error", err)
 			return nil, err

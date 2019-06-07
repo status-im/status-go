@@ -85,10 +85,11 @@ func (r *Reactor) Start() error {
 	for _, address := range r.accounts {
 		r.group = NewGroup()
 		erc20 := &erc20HistoricalCommand{
-			db:     r.db,
-			erc20:  NewERC20TransfersDownloader(r.client, []common.Address{address}),
-			client: r.client,
-			feed:   r.feed,
+			db:          r.db,
+			erc20:       NewERC20TransfersDownloader(r.client, []common.Address{address}),
+			client:      r.client,
+			feed:        r.feed,
+			safetyDepth: reorgSafetyDepth,
 		}
 		r.group.Add(erc20.Command())
 		eth := &ethHistoricalCommand{
@@ -100,7 +101,8 @@ func (r *Reactor) Start() error {
 				accounts: []common.Address{address},
 				signer:   types.NewEIP155Signer(r.chain),
 			},
-			feed: r.feed,
+			feed:        r.feed,
+			safetyDepth: reorgSafetyDepth,
 		}
 		r.group.Add(eth.Command())
 	}
@@ -113,8 +115,9 @@ func (r *Reactor) Start() error {
 			accounts: r.accounts,
 			signer:   types.NewEIP155Signer(r.chain),
 		},
-		erc20: NewERC20TransfersDownloader(r.client, r.accounts),
-		feed:  r.feed,
+		erc20:       NewERC20TransfersDownloader(r.client, r.accounts),
+		feed:        r.feed,
+		safetyDepth: reorgSafetyDepth,
 	}
 	r.group.Add(newBlocks.Command())
 	return nil
@@ -145,39 +148,4 @@ func headersFromTransfers(transfers []Transfer) []*DBHeader {
 		})
 	}
 	return rst
-}
-
-// lastKnownHeader selects last stored header in database.
-// If not found it will get head of the chain and in this case last known header will be atleast
-// `reorgSafetyDepth` blocks away from chain head.
-// `reorgSafetyDepth` is used for two purposes:
-// 1. to minimize chances that historical downloader and new blocks downloader will find different transfers
-// due to hitting different replicas (infura load balancer). new blocks downloader will eventually resolve conflicts
-// by going back parent by parent but it will require more time.
-// 2. as we don't store whole chain of blocks, but only blocks with transfers we won't be always able to find parent
-// when reorg occurs if we won't start syncing headers atleast 15 blocks away from canonical chain head
-func lastKnownHeader(db *Database, client HeaderReader) (*DBHeader, error) {
-	known, err := db.LastHeader()
-	if err != nil {
-		return nil, err
-	}
-	if known == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		latest, err := client.HeaderByNumber(ctx, nil)
-		cancel()
-		if err != nil {
-			return nil, err
-		}
-		if latest.Number.Cmp(reorgSafetyDepth) >= 0 {
-			num := new(big.Int).Sub(latest.Number, reorgSafetyDepth)
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			latest, err = client.HeaderByNumber(ctx, num)
-			cancel()
-			if err != nil {
-				return nil, err
-			}
-		}
-		known = toDBHeader(latest)
-	}
-	return known, nil
 }
