@@ -287,7 +287,7 @@ func lastKnownHeader(parent context.Context, db *Database, client HeaderReader, 
 	if err != nil {
 		return nil, err
 	}
-	if int64(len(headers)) > limit.Int64() && isSequence(headers) {
+	if int64(len(headers)) > safetyLimit.Int64() && isSequence(headers) {
 		return headers[0], nil
 	}
 	var latest *DBHeader
