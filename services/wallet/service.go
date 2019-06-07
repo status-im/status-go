@@ -34,8 +34,8 @@ func (s *Service) Start(*p2p.Server) error {
 }
 
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
-func (s *Service) StartReactor(dbpath string, client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
-	db, err := InitializeDB(dbpath)
+func (s *Service) StartReactor(dbpath, password string, client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
+	db, err := InitializeDB(dbpath, password)
 	if err != nil {
 		return err
 	}
