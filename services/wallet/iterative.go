@@ -19,6 +19,7 @@ func SetupIterativeDownloader(
 		downloader: downloader,
 	}
 	earliest, err := db.GetEarliestSynced(address, option)
+	log.Info("earleist synced erc20 block", "address", address, "block", earliest)
 	if err != nil {
 		log.Error("failed to get earliest synced block", "error", err)
 		return nil, err

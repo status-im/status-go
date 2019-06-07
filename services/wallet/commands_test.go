@@ -41,8 +41,9 @@ func (s *NewBlocksSuite) SetupTest() {
 	s.address = crypto.PubkeyToAddress(account.PublicKey)
 	s.feed = &event.Feed{}
 	s.cmd = &newBlocksTransfersCommand{
-		db:    s.db,
-		erc20: NewERC20TransfersDownloader(s.backend.Client, []common.Address{s.address}),
+		db:       s.db,
+		accounts: []common.Address{s.address},
+		erc20:    NewERC20TransfersDownloader(s.backend.Client, []common.Address{s.address}),
 		eth: &ETHTransferDownloader{
 			client:   s.backend.Client,
 			signer:   s.backend.Signer,

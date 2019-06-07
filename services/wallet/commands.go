@@ -42,7 +42,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 				return err
 			}
 		}
-		log.Info("initialized downloader for eth historical transfers", "address", c.address, "starting at", c.previous.Number)
+		log.Debug("initialized downloader for eth historical transfers", "address", c.address, "starting at", c.previous.Number)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -62,7 +62,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	transfers := concurrent.Get()
 	log.Info("eth historical downloader finished succesfully", "total transfers", len(transfers), "time", time.Since(start))
 	// TODO(dshulyak) insert 0 block number with transfers
-	err = c.db.ProcessTranfers(transfers, headersFromTransfers(transfers), nil, ethSync)
+	err = c.db.ProcessTranfers(transfers, []common.Address{c.address}, headersFromTransfers(transfers), nil, ethSync)
 	if err != nil {
 		log.Error("failed to save downloaded erc20 transfers", "error", err)
 		return err
@@ -106,23 +106,26 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 			log.Error("failed to setup historical downloader for erc20")
 			return err
 		}
-		log.Info("initialized downloader for erc20 historical transfers", "address", c.address, "starting at", c.iterator.Header().Number)
+		log.Debug("initialized downloader for erc20 historical transfers", "address", c.address, "starting at", c.iterator.Header().Number)
 	}
 	for !c.iterator.Finished() {
+		start := time.Now()
 		transfers, err := c.iterator.Next(ctx)
 		if err != nil {
 			log.Error("failed to get next batch", "error", err)
 			break
 		}
 		headers := headersFromTransfers(transfers)
+		log.Info("storing header of the iterator", "header", c.iterator.Header().Number)
 		headers = append(headers, c.iterator.Header())
-		err = c.db.ProcessTranfers(transfers, headers, nil, erc20Sync)
+		err = c.db.ProcessTranfers(transfers, []common.Address{c.address}, headers, nil, erc20Sync)
 		if err != nil {
 			c.iterator.Revert()
 			log.Error("failed to save downloaded erc20 transfers", "error", err)
 			return err
 		}
 		if len(transfers) > 0 {
+			log.Debug("erc20 downloader imported transfers", "len", len(transfers), "time", time.Since(start))
 			c.feed.Send(Event{
 				Type:        EventNewHistory,
 				BlockNumber: c.iterator.Header().Number,
@@ -136,6 +139,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 
 type newBlocksTransfersCommand struct {
 	db          *Database
+	accounts    []common.Address
 	chain       *big.Int
 	erc20       *ERC20TransfersDownloader
 	eth         *ETHTransferDownloader
@@ -160,7 +164,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 			log.Error("failed to get last known header", "error", err)
 			return err
 		}
-		log.Info("initialized downloader for new blocks transfers", "starting at", c.previous.Number)
+		log.Debug("initialized downloader for new blocks transfers", "starting at", c.previous.Number)
 	}
 	num := new(big.Int).Add(c.previous.Number, one)
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
@@ -190,7 +194,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 		log.Debug("reactor adding transfers", "block", added[i].Hash, "number", added[i].Number, "len", len(transfers))
 		all = append(all, transfers...)
 	}
-	err = c.db.ProcessTranfers(all, added, removed, erc20Sync|ethSync)
+	err = c.db.ProcessTranfers(all, c.accounts, added, removed, erc20Sync|ethSync)
 	if err != nil {
 		log.Error("failed to persist transfers", "error", err)
 		return err
@@ -299,7 +303,6 @@ func lastKnownHeader(parent context.Context, db *Database, client HeaderReader, 
 	if err != nil {
 		return nil, err
 	}
-	log.Info("head of the chain", "number", header.Number)
 	latest := toDBHeader(header)
 	diff := new(big.Int).Sub(latest.Number, safetyLimit)
 	if diff.Cmp(zero) <= 0 {

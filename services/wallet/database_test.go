@@ -114,7 +114,7 @@ func TestDBProcessTransfer(t *testing.T) {
 			Receipt:     types.NewReceipt(nil, false, 100),
 		},
 	}
-	require.NoError(t, db.ProcessTranfers(transfers, []*DBHeader{header}, nil, 0))
+	require.NoError(t, db.ProcessTranfers(transfers, nil, []*DBHeader{header}, nil, 0))
 }
 
 func TestDBReorgTransfers(t *testing.T) {
@@ -134,10 +134,10 @@ func TestDBReorgTransfers(t *testing.T) {
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	require.NoError(t, db.ProcessTranfers([]Transfer{
 		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, originalTX, rcpt},
-	}, []*DBHeader{original}, nil, 0))
+	}, nil, []*DBHeader{original}, nil, 0))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
 		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, replacedTX, rcpt},
-	}, []*DBHeader{replaced}, []*DBHeader{original}, 0))
+	}, nil, []*DBHeader{replaced}, []*DBHeader{original}, 0))
 
 	all, err := db.GetTransfers(big.NewInt(0), nil)
 	require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		}
 		transfers = append(transfers, transfer)
 	}
-	require.NoError(t, db.ProcessTranfers(transfers, headers, nil, 0))
+	require.NoError(t, db.ProcessTranfers(transfers, nil, headers, nil, 0))
 	rst, err := db.GetTransfers(big.NewInt(7), nil)
 	require.NoError(t, err)
 	require.Len(t, rst, 3)
@@ -232,8 +232,8 @@ func TestDBProcessTransfersUpdate(t *testing.T) {
 		Transaction: types.NewTransaction(0, common.Address{}, nil, 0, nil, nil),
 		Address:     address,
 	}
-	require.NoError(t, db.ProcessTranfers([]Transfer{transfer}, []*DBHeader{header}, nil, ethSync))
-	require.NoError(t, db.ProcessTranfers([]Transfer{transfer}, []*DBHeader{header}, nil, erc20Sync))
+	require.NoError(t, db.ProcessTranfers([]Transfer{transfer}, []common.Address{address}, []*DBHeader{header}, nil, ethSync))
+	require.NoError(t, db.ProcessTranfers([]Transfer{transfer}, []common.Address{address}, []*DBHeader{header}, nil, erc20Sync))
 
 	earliest, err := db.GetEarliestSynced(address, ethSync|erc20Sync)
 	require.NoError(t, err)
@@ -248,7 +248,7 @@ func TestDBLastHeadersReverseSorted(t *testing.T) {
 	for i := range headers {
 		headers[i] = &DBHeader{Hash: common.Hash{byte(i)}, Number: big.NewInt(int64(i))}
 	}
-	require.NoError(t, db.ProcessTranfers(nil, headers, nil, ethSync))
+	require.NoError(t, db.ProcessTranfers(nil, nil, headers, nil, ethSync))
 
 	headers, err := db.LastHeaders(big.NewInt(5))
 	require.NoError(t, err)

@@ -105,7 +105,7 @@ func (db Database) Close() error {
 }
 
 // ProcessTranfers atomically adds/removes blocks and adds new tranfers.
-func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*DBHeader, option SyncOption) (err error) {
+func (db Database) ProcessTranfers(transfers []Transfer, accounts []common.Address, added, removed []*DBHeader, option SyncOption) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -132,7 +132,7 @@ func (db Database) ProcessTranfers(transfers []Transfer, added, removed []*DBHea
 	if err != nil {
 		return
 	}
-	err = updateAccounts(tx, transfers, option)
+	err = updateAccounts(tx, accounts, added, option)
 	return
 }
 
@@ -351,7 +351,7 @@ func insertTransfers(creator statementCreator, transfers []Transfer) error {
 	return nil
 }
 
-func updateAccounts(creator statementCreator, transfers []Transfer, option SyncOption) error {
+func updateAccounts(creator statementCreator, accounts []common.Address, headers []*DBHeader, option SyncOption) error {
 	update, err := creator.Prepare("UPDATE accounts_to_blocks SET sync=sync|? WHERE address=? AND blk_number=?")
 	if err != nil {
 		return err
@@ -360,21 +360,23 @@ func updateAccounts(creator statementCreator, transfers []Transfer, option SyncO
 	if err != nil {
 		return err
 	}
-	for _, t := range transfers {
-		rst, err := update.Exec(option, t.Address, (*SQLBigInt)(t.BlockNumber))
-		if err != nil {
-			return err
-		}
-		affected, err := rst.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if affected > 0 {
-			continue
-		}
-		_, err = insert.Exec(t.Address, (*SQLBigInt)(t.BlockNumber), option)
-		if err != nil {
-			return err
+	for _, acc := range accounts {
+		for _, h := range headers {
+			rst, err := update.Exec(option, acc, (*SQLBigInt)(h.Number))
+			if err != nil {
+				return err
+			}
+			affected, err := rst.RowsAffected()
+			if err != nil {
+				return err
+			}
+			if affected > 0 {
+				continue
+			}
+			_, err = insert.Exec(acc, (*SQLBigInt)(h.Number), option)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
