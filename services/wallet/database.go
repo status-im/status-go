@@ -242,6 +242,24 @@ func (db *Database) LastHeader() (header *DBHeader, err error) {
 	return nil, nil
 }
 
+func (db *Database) LastHeaders(limit *big.Int) ([]*DBHeader, error) {
+	rows, err := db.db.Query("SELECT hash,number FROM blocks WHERE number ORDER BY number DESC LIMIT ?", (*SQLBigInt)(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	headers := []*DBHeader{}
+	for rows.Next() {
+		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
+		err = rows.Scan(&header.Hash, (*SQLBigInt)(header.Number))
+		if err != nil {
+			return nil, err
+		}
+		headers = append(headers, header)
+	}
+	return headers, nil
+}
+
 // HeaderExists checks if header with hash exists in db.
 func (db *Database) HeaderExists(hash common.Hash) (bool, error) {
 	var val sql.NullBool
