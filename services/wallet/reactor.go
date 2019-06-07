@@ -108,9 +108,10 @@ func (r *Reactor) Start() error {
 		r.group.Add(eth.Command())
 	}
 	newBlocks := &newBlocksTransfersCommand{
-		db:     r.db,
-		chain:  r.chain,
-		client: r.client,
+		db:       r.db,
+		chain:    r.chain,
+		client:   r.client,
+		accounts: r.accounts,
 		eth: &ETHTransferDownloader{
 			client:   r.client,
 			accounts: r.accounts,
