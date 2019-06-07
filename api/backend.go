@@ -510,7 +510,7 @@ func (b *StatusBackend) reSelectAccount() error {
 	default:
 		return err
 	}
-	return b.startWallet()
+	return nil
 }
 
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
@@ -551,10 +551,10 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 			return err
 		}
 	}
-	return b.startWallet()
+	return b.startWallet(password)
 }
 
-func (b *StatusBackend) startWallet() error {
+func (b *StatusBackend) startWallet(password string) error {
 	if !b.statusNode.Config().WalletConfig.Enabled {
 		return nil
 	}
@@ -567,7 +567,7 @@ func (b *StatusBackend) startWallet() error {
 		return err
 	}
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", account.Address))
-	return wallet.StartReactor(path,
+	return wallet.StartReactor(path, password,
 		b.statusNode.RPCClient().Ethclient(),
 		[]common.Address{account.Address},
 		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
