@@ -5,16 +5,21 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-circuit/pb"
 
-	logging "github.com/ipfs/go-log"
-	host "github.com/libp2p/go-libp2p-host"
-	inet "github.com/libp2p/go-libp2p-net"
-	peer "github.com/libp2p/go-libp2p-peer"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"github.com/libp2p/go-libp2p-core/helpers"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+
+	pool "github.com/libp2p/go-buffer-pool"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+
+	logging "github.com/ipfs/go-log"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -24,29 +29,53 @@ const ProtoID = "/libp2p/circuit/relay/0.1.0"
 
 const maxMessageSize = 4096
 
-var RelayAcceptTimeout = time.Minute
-var HopConnectTimeout = 10 * time.Second
+var (
+	RelayAcceptTimeout   = 10 * time.Second
+	HopConnectTimeout    = 30 * time.Second
+	StopHandshakeTimeout = 1 * time.Minute
 
+	HopStreamBufferSize = 4096
+	HopStreamLimit      = 1 << 19 // 512K hops for 1M goroutines
+)
+
+// Relay is the relay transport and service.
 type Relay struct {
 	host     host.Host
 	upgrader *tptu.Upgrader
 	ctx      context.Context
 	self     peer.ID
 
-	active bool
-	hop    bool
+	active    bool
+	hop       bool
+	discovery bool
 
 	incoming chan *Conn
 
 	relays map[peer.ID]struct{}
 	mx     sync.Mutex
+
+	// atomic counters
+	streamCount  int32
+	liveHopCount int32
 }
 
+// RelayOpts are options for configuring the relay transport.
 type RelayOpt int
 
 var (
+	// OptActive configures the relay transport to actively establish
+	// outbound connections on behalf of clients. You probably don't want to
+	// enable this unless you know what you're doing.
 	OptActive = RelayOpt(0)
-	OptHop    = RelayOpt(1)
+	// OptHop configures the relay transport to accept requests to relay
+	// traffic on behalf of third-parties. Unless OptActive is specified,
+	// this will only relay traffic between peers already connected to this
+	// node.
+	OptHop = RelayOpt(1)
+	// OptDiscovery configures this relay transport to discover new relays
+	// by probing every new peer. You almost _certainly_ don't want to
+	// enable this.
+	OptDiscovery = RelayOpt(2)
 )
 
 type RelayError struct {
@@ -57,6 +86,7 @@ func (e RelayError) Error() string {
 	return fmt.Sprintf("error opening relay circuit: %s (%d)", pb.CircuitRelay_Status_name[int32(e.Code)], e.Code)
 }
 
+// NewRelay constructs a new relay.
 func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ...RelayOpt) (*Relay, error) {
 	r := &Relay{
 		upgrader: upgrader,
@@ -73,23 +103,50 @@ func NewRelay(ctx context.Context, h host.Host, upgrader *tptu.Upgrader, opts ..
 			r.active = true
 		case OptHop:
 			r.hop = true
+		case OptDiscovery:
+			r.discovery = true
 		default:
 			return nil, fmt.Errorf("unrecognized option: %d", opt)
 		}
 	}
 
 	h.SetStreamHandler(ProtoID, r.handleNewStream)
-	h.Network().Notify(r.Notifiee())
+
+	if r.discovery {
+		h.Network().Notify(r.notifiee())
+	}
 
 	return r, nil
 }
 
-func (r *Relay) DialPeer(ctx context.Context, relay pstore.PeerInfo, dest pstore.PeerInfo) (*Conn, error) {
+// Increment the live hop count and increment the connection manager tags by 1 for the two
+// sides of the hop stream. This ensures that connections with many hop streams will be protected
+// from pruning, thus minimizing disruption from connection trimming in a relay node.
+func (r *Relay) addLiveHop(from, to peer.ID) {
+	atomic.AddInt32(&r.liveHopCount, 1)
+	r.host.ConnManager().UpsertTag(from, "relay-hop-stream", incrementTag)
+	r.host.ConnManager().UpsertTag(to, "relay-hop-stream", incrementTag)
+}
+
+// Decrement the live hpo count and decrement the connection manager tags for the two sides
+// of the hop stream.
+func (r *Relay) rmLiveHop(from, to peer.ID) {
+	atomic.AddInt32(&r.liveHopCount, -1)
+	r.host.ConnManager().UpsertTag(from, "relay-hop-stream", decrementTag)
+	r.host.ConnManager().UpsertTag(to, "relay-hop-stream", decrementTag)
+
+}
+
+func (r *Relay) GetActiveHops() int32 {
+	return atomic.LoadInt32(&r.liveHopCount)
+}
+
+func (r *Relay) DialPeer(ctx context.Context, relay peer.AddrInfo, dest peer.AddrInfo) (*Conn, error) {
 
 	log.Debugf("dialing peer %s through relay %s", dest.ID, relay.ID)
 
 	if len(relay.Addrs) > 0 {
-		r.host.Peerstore().AddAddrs(relay.ID, relay.Addrs, pstore.TempAddrTTL)
+		r.host.Peerstore().AddAddrs(relay.ID, relay.Addrs, peerstore.TempAddrTTL)
 	}
 
 	s, err := r.host.NewStream(ctx, relay.ID, ProtoID)
@@ -99,6 +156,7 @@ func (r *Relay) DialPeer(ctx context.Context, relay pstore.PeerInfo, dest pstore
 
 	rd := newDelimitedReader(s, maxMessageSize)
 	wr := newDelimitedWriter(s)
+	defer rd.Close()
 
 	var msg pb.CircuitRelay
 
@@ -130,7 +188,7 @@ func (r *Relay) DialPeer(ctx context.Context, relay pstore.PeerInfo, dest pstore
 		return nil, RelayError{msg.GetCode()}
 	}
 
-	return &Conn{Stream: s, remote: dest}, nil
+	return &Conn{stream: s, remote: dest, host: r.host}, nil
 }
 
 func (r *Relay) Matches(addr ma.Multiaddr) bool {
@@ -147,6 +205,7 @@ func (r *Relay) CanHop(ctx context.Context, id peer.ID) (bool, error) {
 
 	rd := newDelimitedReader(s, maxMessageSize)
 	wr := newDelimitedWriter(s)
+	defer rd.Close()
 
 	var msg pb.CircuitRelay
 
@@ -163,7 +222,7 @@ func (r *Relay) CanHop(ctx context.Context, id peer.ID) (bool, error) {
 		s.Reset()
 		return false, err
 	}
-	if err := inet.FullClose(s); err != nil {
+	if err := helpers.FullClose(s); err != nil {
 		return false, err
 	}
 
@@ -174,10 +233,11 @@ func (r *Relay) CanHop(ctx context.Context, id peer.ID) (bool, error) {
 	return msg.GetCode() == pb.CircuitRelay_SUCCESS, nil
 }
 
-func (r *Relay) handleNewStream(s inet.Stream) {
+func (r *Relay) handleNewStream(s network.Stream) {
 	log.Infof("new relay stream from: %s", s.Conn().RemotePeer())
 
 	rd := newDelimitedReader(s, maxMessageSize)
+	defer rd.Close()
 
 	var msg pb.CircuitRelay
 
@@ -200,9 +260,19 @@ func (r *Relay) handleNewStream(s inet.Stream) {
 	}
 }
 
-func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
+func (r *Relay) handleHopStream(s network.Stream, msg *pb.CircuitRelay) {
 	if !r.hop {
 		r.handleError(s, pb.CircuitRelay_HOP_CANT_SPEAK_RELAY)
+		return
+	}
+
+	streamCount := atomic.AddInt32(&r.streamCount, 1)
+	liveHopCount := atomic.LoadInt32(&r.liveHopCount)
+	defer atomic.AddInt32(&r.streamCount, -1)
+
+	if (streamCount + liveHopCount) > int32(HopStreamLimit) {
+		log.Warning("hop stream limit exceeded; resetting stream")
+		s.Reset()
 		return
 	}
 
@@ -229,30 +299,33 @@ func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	}
 
 	// open stream
-	ctp := r.host.Network().ConnsToPeer(dst.ID)
-
-	if len(ctp) == 0 && !r.active {
-		r.handleError(s, pb.CircuitRelay_HOP_NO_CONN_TO_DST)
-		return
-	}
-
-	if len(dst.Addrs) > 0 {
-		r.host.Peerstore().AddAddrs(dst.ID, dst.Addrs, pstore.TempAddrTTL)
-	}
-
 	ctx, cancel := context.WithTimeout(r.ctx, HopConnectTimeout)
 	defer cancel()
+
+	if !r.active {
+		ctx = network.WithNoDial(ctx, "relay hop")
+	} else if len(dst.Addrs) > 0 {
+		r.host.Peerstore().AddAddrs(dst.ID, dst.Addrs, peerstore.TempAddrTTL)
+	}
 
 	bs, err := r.host.NewStream(ctx, dst.ID, ProtoID)
 	if err != nil {
 		log.Debugf("error opening relay stream to %s: %s", dst.ID.Pretty(), err.Error())
-		r.handleError(s, pb.CircuitRelay_HOP_CANT_DIAL_DST)
+		if err == network.ErrNoConn {
+			r.handleError(s, pb.CircuitRelay_HOP_NO_CONN_TO_DST)
+		} else {
+			r.handleError(s, pb.CircuitRelay_HOP_CANT_DIAL_DST)
+		}
 		return
 	}
 
 	// stop handshake
 	rd := newDelimitedReader(bs, maxMessageSize)
 	wr := newDelimitedWriter(bs)
+	defer rd.Close()
+
+	// set handshake deadline
+	bs.SetDeadline(time.Now().Add(StopHandshakeTimeout))
 
 	msg.Type = pb.CircuitRelay_STOP.Enum()
 
@@ -299,10 +372,28 @@ func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	// relay connection
 	log.Infof("relaying connection between %s and %s", src.ID.Pretty(), dst.ID.Pretty())
 
+	// reset deadline
+	bs.SetDeadline(time.Time{})
+
+	r.addLiveHop(src.ID, dst.ID)
+
+	goroutines := new(int32)
+	*goroutines = 2
+	done := func() {
+		if atomic.AddInt32(goroutines, -1) == 0 {
+			r.rmLiveHop(src.ID, dst.ID)
+		}
+	}
+
 	// Don't reset streams after finishing or the other side will get an
 	// error, not an EOF.
 	go func() {
-		count, err := io.Copy(s, bs)
+		defer done()
+
+		buf := pool.Get(HopStreamBufferSize)
+		defer pool.Put(buf)
+
+		count, err := io.CopyBuffer(s, bs, buf)
 		if err != nil {
 			log.Debugf("relay copy error: %s", err)
 			// Reset both.
@@ -316,7 +407,12 @@ func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	}()
 
 	go func() {
-		count, err := io.Copy(bs, s)
+		defer done()
+
+		buf := pool.Get(HopStreamBufferSize)
+		defer pool.Put(buf)
+
+		count, err := io.CopyBuffer(bs, s, buf)
 		if err != nil {
 			log.Debugf("relay copy error: %s", err)
 			// Reset both.
@@ -330,7 +426,7 @@ func (r *Relay) handleHopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	}()
 }
 
-func (r *Relay) handleStopStream(s inet.Stream, msg *pb.CircuitRelay) {
+func (r *Relay) handleStopStream(s network.Stream, msg *pb.CircuitRelay) {
 	src, err := peerToPeerInfo(msg.GetSrcPeer())
 	if err != nil {
 		r.handleError(s, pb.CircuitRelay_STOP_SRC_MULTIADDR_INVALID)
@@ -346,17 +442,17 @@ func (r *Relay) handleStopStream(s inet.Stream, msg *pb.CircuitRelay) {
 	log.Infof("relay connection from: %s", src.ID)
 
 	if len(src.Addrs) > 0 {
-		r.host.Peerstore().AddAddrs(src.ID, src.Addrs, pstore.TempAddrTTL)
+		r.host.Peerstore().AddAddrs(src.ID, src.Addrs, peerstore.TempAddrTTL)
 	}
 
 	select {
-	case r.incoming <- &Conn{Stream: s, remote: src}:
+	case r.incoming <- &Conn{stream: s, remote: src, host: r.host}:
 	case <-time.After(RelayAcceptTimeout):
 		r.handleError(s, pb.CircuitRelay_STOP_RELAY_REFUSED)
 	}
 }
 
-func (r *Relay) handleCanHop(s inet.Stream, msg *pb.CircuitRelay) {
+func (r *Relay) handleCanHop(s network.Stream, msg *pb.CircuitRelay) {
 	var err error
 
 	if r.hop {
@@ -369,22 +465,22 @@ func (r *Relay) handleCanHop(s inet.Stream, msg *pb.CircuitRelay) {
 		s.Reset()
 		log.Debugf("error writing relay response: %s", err.Error())
 	} else {
-		inet.FullClose(s)
+		helpers.FullClose(s)
 	}
 }
 
-func (r *Relay) handleError(s inet.Stream, code pb.CircuitRelay_Status) {
+func (r *Relay) handleError(s network.Stream, code pb.CircuitRelay_Status) {
 	log.Warningf("relay error: %s (%d)", pb.CircuitRelay_Status_name[int32(code)], code)
 	err := r.writeResponse(s, code)
 	if err != nil {
 		s.Reset()
 		log.Debugf("error writing relay response: %s", err.Error())
 	} else {
-		inet.FullClose(s)
+		helpers.FullClose(s)
 	}
 }
 
-func (r *Relay) writeResponse(s inet.Stream, code pb.CircuitRelay_Status) error {
+func (r *Relay) writeResponse(s network.Stream, code pb.CircuitRelay_Status) error {
 	wr := newDelimitedWriter(s)
 
 	var msg pb.CircuitRelay

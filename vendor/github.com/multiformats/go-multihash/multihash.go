@@ -58,9 +58,13 @@ const (
 	BLAKE2S_MIN = 0xb241
 	BLAKE2S_MAX = 0xb260
 
+	MD5 = 0xd5
+
 	DBL_SHA2_256 = 0x56
 
 	MURMUR3 = 0x22
+
+	X11 = 0x1100
 )
 
 func init() {
@@ -102,6 +106,8 @@ var Names = map[string]uint64{
 	"keccak-512":   KECCAK_512,
 	"shake-128":    SHAKE_128,
 	"shake-256":    SHAKE_256,
+	"x11":          X11,
+	"md5":          MD5,
 }
 
 // Codes maps a hash code to it's name
@@ -122,6 +128,8 @@ var Codes = map[uint64]string{
 	KECCAK_512:   "keccak-512",
 	SHAKE_128:    "shake-128",
 	SHAKE_256:    "shake-256",
+	X11:          "x11",
+	MD5:          "md5",
 }
 
 // DefaultLengths maps a hash code to it's default length
@@ -142,6 +150,8 @@ var DefaultLengths = map[uint64]int{
 	KECCAK_512:   64,
 	SHAKE_128:    32,
 	SHAKE_256:    64,
+	X11:          64,
+	MD5:          16,
 }
 
 func uvarint(buf []byte) (uint64, []byte, error) {
@@ -266,7 +276,7 @@ func Encode(buf []byte, code uint64) ([]byte, error) {
 		return nil, ErrUnknownCode
 	}
 
-	start := make([]byte, 2*binary.MaxVarintLen64)
+	start := make([]byte, 2*binary.MaxVarintLen64, 2*binary.MaxVarintLen64+len(buf))
 	spot := start
 	n := binary.PutUvarint(spot, code)
 	spot = start[n:]
@@ -283,18 +293,6 @@ func EncodeName(buf []byte, name string) ([]byte, error) {
 
 // ValidCode checks whether a multihash code is valid.
 func ValidCode(code uint64) bool {
-	if AppCode(code) {
-		return true
-	}
-
-	if _, ok := Codes[code]; ok {
-		return true
-	}
-
-	return false
-}
-
-// AppCode checks whether a multihash code is part of the App range.
-func AppCode(code uint64) bool {
-	return code >= 0 && code < 0x10
+	_, ok := Codes[code]
+	return ok
 }

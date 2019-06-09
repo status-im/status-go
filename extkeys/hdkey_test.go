@@ -477,7 +477,7 @@ func TestErrors(t *testing.T) {
 		{
 			name: "pubkey not on curve",
 			key:  "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ1hr9Rwbk95YadvBkQXxzHBSngB8ndpW6QH7zhhsXZ2jHyZqPjk",
-			err:  errors.New("pubkey isn't on secp256k1 curve"),
+			err:  errors.New("invalid square root"),
 		},
 		{
 			name:      "unsupported version",
@@ -505,26 +505,28 @@ func TestErrors(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		extKey, err := NewKeyFromString(test.key)
-		if !reflect.DeepEqual(err, test.err) {
-			t.Errorf("NewKeyFromString #%d (%s): mismatched error -- got: %v, want: %v", i, test.name, err, test.err)
-			continue
-		}
-
-		if test.neuter {
-			_, err := extKey.Neuter()
-			if !reflect.DeepEqual(err, test.neuterErr) {
-				t.Errorf("Neuter #%d (%s): mismatched error -- got: %v, want: %v", i, test.name, err, test.neuterErr)
-				continue
+		t.Run(test.name, func(t *testing.T) {
+			extKey, err := NewKeyFromString(test.key)
+			if !reflect.DeepEqual(err, test.err) {
+				t.Errorf("NewKeyFromString #%d (%s): mismatched error -- got: %v, want: %v", i, test.name, err, test.err)
+				return
 			}
-		}
 
-		if test.extKey != nil {
-			if !reflect.DeepEqual(extKey, test.extKey) {
-				t.Errorf("ExtKey #%d (%s): mismatched extended key -- got: %+v, want: %+v", i, test.name, extKey, test.extKey)
-				continue
+			if test.neuter {
+				_, err := extKey.Neuter()
+				if !reflect.DeepEqual(err, test.neuterErr) {
+					t.Errorf("Neuter #%d (%s): mismatched error -- got: %v, want: %v", i, test.name, err, test.neuterErr)
+					return
+				}
 			}
-		}
+
+			if test.extKey != nil {
+				if !reflect.DeepEqual(extKey, test.extKey) {
+					t.Errorf("ExtKey #%d (%s): mismatched extended key -- got: %+v, want: %+v", i, test.name, extKey, test.extKey)
+					return
+				}
+			}
+		})
 	}
 }
 

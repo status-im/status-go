@@ -32,8 +32,9 @@ func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, erro
 	x3 := new(big.Int).Mul(x, x)
 	x3.Mul(x3, x)
 	x3.Add(x3, curve.Params().B)
+	x3.Mod(x3, curve.Params().P)
 
-	// now calculate sqrt mod p of x2 + B
+	// Now calculate sqrt mod p of x^3 + B
 	// This code used to do a full sqrt based on tonelli/shanks,
 	// but this was replaced by the algorithms referenced in
 	// https://bitcointalk.org/index.php?topic=162805.msg1712294#msg1712294
@@ -42,9 +43,19 @@ func decompressPoint(curve *KoblitzCurve, x *big.Int, ybit bool) (*big.Int, erro
 	if ybit != isOdd(y) {
 		y.Sub(curve.Params().P, y)
 	}
+
+	// Check that y is a square root of x^3 + B.
+	y2 := new(big.Int).Mul(y, y)
+	y2.Mod(y2, curve.Params().P)
+	if y2.Cmp(x3) != 0 {
+		return nil, fmt.Errorf("invalid square root")
+	}
+
+	// Verify that y-coord has expected parity.
 	if ybit != isOdd(y) {
 		return nil, fmt.Errorf("ybit doesn't match oddness")
 	}
+
 	return y, nil
 }
 
@@ -53,6 +64,15 @@ const (
 	pubkeyUncompressed byte = 0x4 // x coord + y coord
 	pubkeyHybrid       byte = 0x6 // y_bit + x coord + y coord
 )
+
+// IsCompressedPubKey returns true the the passed serialized public key has
+// been encoded in compressed format, and false otherwise.
+func IsCompressedPubKey(pubKey []byte) bool {
+	// The public key is only compressed if it is the correct length and
+	// the format (first byte) is one of the compressed pubkey values.
+	return len(pubKey) == PubKeyBytesLenCompressed &&
+		(pubKey[0]&^byte(0x1) == pubkeyCompressed)
+}
 
 // ParsePubKey parses a public key for a koblitz curve from a bytestring into a
 // ecdsa.Publickey, verifying that it is valid. It supports compressed,

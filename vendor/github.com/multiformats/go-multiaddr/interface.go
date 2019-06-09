@@ -1,5 +1,10 @@
 package multiaddr
 
+import (
+	"encoding"
+	"encoding/json"
+)
+
 /*
 Multiaddr is a cross-protocol, cross-platform format for representing
 internet addresses. It emphasizes explicitness and self-description.
@@ -14,10 +19,19 @@ Multiaddrs have both a binary and string representation.
 
 */
 type Multiaddr interface {
+	json.Marshaler
+	json.Unmarshaler
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+
 	// Equal returns whether two Multiaddrs are exactly equal
 	Equal(Multiaddr) bool
 
 	// Bytes returns the []byte representation of this Multiaddr
+	//
+	// This function may expose immutable, internal state. Do not modify.
 	Bytes() []byte
 
 	// String returns the string representation of this Multiaddr
@@ -41,5 +55,8 @@ type Multiaddr interface {
 	Decapsulate(Multiaddr) Multiaddr
 
 	// ValueForProtocol returns the value (if any) following the specified protocol
+	//
+	// Note: protocols can appear multiple times in a single multiaddr.
+	// Consider using `ForEach` to walk over the addr manually.
 	ValueForProtocol(code int) (string, error)
 }

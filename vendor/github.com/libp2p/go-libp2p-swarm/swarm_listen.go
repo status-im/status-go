@@ -3,7 +3,8 @@ package swarm
 import (
 	"fmt"
 
-	inet "github.com/libp2p/go-libp2p-net"
+	"github.com/libp2p/go-libp2p-core/network"
+
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -59,7 +60,7 @@ func (s *Swarm) AddListenAddr(a ma.Multiaddr) error {
 	maddr := list.Multiaddr()
 
 	// signal to our notifiees on successful conn.
-	s.notifyAll(func(n inet.Notifiee) {
+	s.notifyAll(func(n network.Notifiee) {
 		n.Listen(s, maddr)
 	})
 
@@ -74,14 +75,16 @@ func (s *Swarm) AddListenAddr(a ma.Multiaddr) error {
 		for {
 			c, err := list.Accept()
 			if err != nil {
-				log.Warningf("swarm listener accept error: %s", err)
+				if s.ctx.Err() == nil {
+					log.Errorf("swarm listener accept error: %s", err)
+				}
 				return
 			}
 			log.Debugf("swarm listener accepted connection: %s", c)
 			s.refs.Add(1)
 			go func() {
 				defer s.refs.Done()
-				_, err := s.addConn(c)
+				_, err := s.addConn(c, network.DirInbound)
 				if err != nil {
 					// Probably just means that the swarm has been closed.
 					log.Warningf("add conn failed: ", err)

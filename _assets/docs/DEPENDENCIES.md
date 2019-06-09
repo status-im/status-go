@@ -1,61 +1,21 @@
 # Dependency Management
 
-[`dep`](https://github.com/golang/dep) is a tool of choice when it comes to dependency management.
+Dependencies are managed by Go modules. They should be managed automatically and additionally we vendor all dependencies into `vendor/`. More on [Go Modules](https://github.com/golang/go/wiki/Modules).
 
-## How we use `dep`
+## Adding and updating a dependency
 
-1. Transitive dependencies of `go-ethereum`. The most important thing for us is
-   to be in-sync there. We want to reduce the regression scope.
-   Hence, we pin down all the dependencies of `go-ethereum` with SHAs in `Gopkg.toml` when
-   importing a new version of upstream. (This is considered a bad practice for
-   `dep` but we are willing to take the risk to keep consistency with the upstream).
-1. Exclusive `status-go` dependencies. The policy there is to keep them as
-   fresh as possible. Hence, no constraints for them in the `toml` file.
-
-## Installing `dep`
-
-`go get -u github.com/golang/dep/cmd/dep`
-
-## Docs (worth reading)
-
-1. [README](https://github.com/golang/dep/blob/master/README.md)
-1. [F.A.Q.](https://github.com/golang/dep/blob/master/docs/FAQ.md)
-
-## Checking-out all dependencies
-
-`dep ensure` - download all the dependencies based on `Gopkg.lock`.
-`make dep-ensure` - ensure all patches are applied, too. **(Recommended)**
-
-`Gopkg.lock` is kept inact if it is in-sync with `Gopkg.toml`. If the `toml`
-file is changed, `dep ensure` will re-generate `Gopkg.lock` as well.
-
-## Adding a new Dependency
-
-(see [Adding a new dependency](https://github.com/golang/dep#adding-a-dependency))
-
-1. `$ dep ensure -add github.com/foo/bar`
-1. Commit changes.
-
-## Updating a dependency
-
-(see: [Changing a Dependency](https://github.com/golang/dep#changing-dependencies))
-
-1. Update constraint in the `Gopkg.toml` file if needed.
-2. Run `dep ensure -update github.com/foo/bar`
+1. `$ get get -u github.com/foo/bar`
+2. `$ make vendor`
 3. Commit changes.
 
-## Updating all dependencies
+## Updating go-ethereum
 
-`dep ensure -update`
-
-## Updating `Geth`
-
-Use the `update-geth` make target. For major releases, provide the GETH_BRANCH parameter. (e.g. `make update-geth GETH_BRANCH=release/1.9`). If there were any changes made, they will be committed while running this target.
+Remember that we use our fork of go-ethereum. It is included in the list of dependencies (`go.mod`) as a regular package: `github.com/ethereum/go-ethereum v1.8.27`, however, at the bottom of `go.mod` there is a replace directive. So, if you want to upgrade go-ethereum, these two lines need to be updated.
 
 ## Committing changes
 
-Make sure that you don't commit unnecessary changes to `Gopkg.toml` and
-`Gopkg.lock`.
+Make sure that you don't commit unnecessary changes to `go.mod` and
+`go.sum`.
 
 ## Common issues
 

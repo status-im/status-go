@@ -1,0 +1,30 @@
+{
+  "author": "whyrusleeping",
+  "bugs": {},
+  "gx": {
+    "dvcsimport": "github.com/multiformats/go-multiaddr-fmt"
+  },
+  "gxDependencies": [
+    {
+      "author": "whyrusleeping",
+      "hash": "QmTZBfrPJmjWsCvHEtX5FE6KimVJhsJg5sBbqEFYf4UZtL",
+      "name": "go-multiaddr",
+      "version": "1.4.1"
+    },
+    {
+      "author": "lgierth",
+      "hash": "QmR1T4gAM6XCHQugKnPZgZVPzo8WkuvSpL57EKQFgFbwfd",
+      "name": "go-multiaddr-dns",
+      "version": "0.3.2"
+    }
+  ],
+  "gxVersion": "0.6.0",
+  "gx_version": "0.4.0",
+  "issues_url": "https://github.com/multiformats/go-multiaddr-fmt",
+  "language": "go",
+  "license": "",
+  "name": "go-multiaddr-fmt",
+  "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
+  "version": "1.2.11"
+}
+

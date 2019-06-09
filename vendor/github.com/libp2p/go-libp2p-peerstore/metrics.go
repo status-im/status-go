@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	moved "github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-peer"
 )
 
@@ -12,17 +13,8 @@ import (
 // 1 is 100% change, 0 is no change.
 var LatencyEWMASmoothing = 0.1
 
-// Metrics is just an object that tracks metrics
-// across a set of peers.
-type Metrics interface {
-
-	// RecordLatency records a new latency measurement
-	RecordLatency(peer.ID, time.Duration)
-
-	// LatencyEWMA returns an exponentially-weighted moving avg.
-	// of all measurements of a peer's latency.
-	LatencyEWMA(peer.ID) time.Duration
-}
+// Deprecated: use github.com/libp2p/go-libp2p-core/peerstore.Metrics instead.
+type Metrics = moved.Metrics
 
 type metrics struct {
 	latmap map[peer.ID]time.Duration

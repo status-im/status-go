@@ -2,6 +2,7 @@ package multiaddr
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -50,20 +51,59 @@ func (m *multiaddr) Equal(m2 Multiaddr) bool {
 }
 
 // Bytes returns the []byte representation of this Multiaddr
+//
+// Do not modify the returned buffer, it may be shared.
 func (m *multiaddr) Bytes() []byte {
-	// consider returning copy to prevent changing underneath us?
-	cpy := make([]byte, len(m.bytes))
-	copy(cpy, m.bytes)
-	return cpy
+	return m.bytes
 }
 
 // String returns the string representation of a Multiaddr
 func (m *multiaddr) String() string {
 	s, err := bytesToString(m.bytes)
 	if err != nil {
-		panic("multiaddr failed to convert back to string. corrupted?")
+		panic(fmt.Errorf("multiaddr failed to convert back to string. corrupted? %s", err))
 	}
 	return s
+}
+
+func (m *multiaddr) MarshalBinary() ([]byte, error) {
+	return m.Bytes(), nil
+}
+
+func (m *multiaddr) UnmarshalBinary(data []byte) error {
+	new, err := NewMultiaddrBytes(data)
+	if err != nil {
+		return err
+	}
+	*m = *(new.(*multiaddr))
+	return nil
+}
+
+func (m *multiaddr) MarshalText() ([]byte, error) {
+	return []byte(m.String()), nil
+}
+
+func (m *multiaddr) UnmarshalText(data []byte) error {
+	new, err := NewMultiaddr(string(data))
+	if err != nil {
+		return err
+	}
+	*m = *(new.(*multiaddr))
+	return nil
+}
+
+func (m *multiaddr) MarshalJSON() ([]byte, error) {
+	return json.Marshal(m.String())
+}
+
+func (m *multiaddr) UnmarshalJSON(data []byte) error {
+	var v string
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	new, err := NewMultiaddr(v)
+	*m = *(new.(*multiaddr))
+	return err
 }
 
 // Protocols returns the list of protocols this Multiaddr has.
@@ -86,12 +126,12 @@ func (m *multiaddr) Protocols() []Protocol {
 		ps = append(ps, p)
 		b = b[n:]
 
-		size, err := sizeForAddr(p, b)
+		n, size, err := sizeForAddr(p, b)
 		if err != nil {
 			panic(err)
 		}
 
-		b = b[size:]
+		b = b[n+size:]
 	}
 	return ps
 }
@@ -119,6 +159,10 @@ func (m *multiaddr) Decapsulate(o Multiaddr) Multiaddr {
 		return &multiaddr{bytes: cpy}
 	}
 
+	if i == 0 {
+		return nil
+	}
+
 	ma, err := NewMultiaddr(s1[:i])
 	if err != nil {
 		panic("Multiaddr.Decapsulate incorrect byte boundaries.")
@@ -128,16 +172,15 @@ func (m *multiaddr) Decapsulate(o Multiaddr) Multiaddr {
 
 var ErrProtocolNotFound = fmt.Errorf("protocol not found in multiaddr")
 
-func (m *multiaddr) ValueForProtocol(code int) (string, error) {
-	for _, sub := range Split(m) {
-		p := sub.Protocols()[0]
-		if p.Code == code {
-			if p.Size == 0 {
-				return "", nil
-			}
-			return strings.SplitN(sub.String(), "/", 3)[2], nil
+func (m *multiaddr) ValueForProtocol(code int) (value string, err error) {
+	err = ErrProtocolNotFound
+	ForEach(m, func(c Component) bool {
+		if c.Protocol().Code == code {
+			value = c.Value()
+			err = nil
+			return false
 		}
-	}
-
-	return "", ErrProtocolNotFound
+		return true
+	})
+	return
 }

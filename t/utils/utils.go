@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"go/build"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,9 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/static"
+	"github.com/status-im/status-go/t"
 	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
 
@@ -54,9 +54,6 @@ var (
 		params.StatusChainNetworkID: "StatusChain",
 		params.GoerliNetworkID:      "Goerli",
 	}
-
-	// All general log messages in this package should be routed through this logger.
-	logger = log.New("package", "status-go/t/utils")
 
 	syncTimeout = 50 * time.Minute
 )
@@ -331,32 +328,22 @@ type testConfig struct {
 
 const passphraseEnvName = "ACCOUNT_PASSWORD"
 
-// getStatusHome gets home directory of status-go
-func getStatusHome() string {
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		gopath = build.Default.GOPATH
-	}
-	return path.Join(gopath, "/src/github.com/status-im/status-go/")
-}
-
 // loadTestConfig loads test configuration values from disk
 func loadTestConfig() (*testConfig, error) {
 	var config testConfig
 
-	pathOfConfig := path.Join(getStatusHome(), "/t/config")
-	err := getTestConfigFromFile(path.Join(pathOfConfig, "test-data.json"), &config)
+	err := parseTestConfigFromFile("config/test-data.json", &config)
 	if err != nil {
 		return nil, err
 	}
 
 	if GetNetworkID() == params.StatusChainNetworkID {
-		err := getTestConfigFromFile(path.Join(pathOfConfig, "status-chain-accounts.json"), &config)
+		err := parseTestConfigFromFile("config/status-chain-accounts.json", &config)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err := getTestConfigFromFile(path.Join(pathOfConfig, "public-chain-accounts.json"), &config)
+		err := parseTestConfigFromFile("public-chain-accounts.json", &config)
 		if err != nil {
 			return nil, err
 		}
@@ -381,46 +368,56 @@ func ImportTestAccount(keystoreDir, accountFile string) error {
 		os.MkdirAll(keystoreDir, os.ModePerm) // nolint: errcheck, gas
 	}
 
-	dst := filepath.Join(keystoreDir, accountFile)
-	err := copyFile(path.Join(getStatusHome(), "static/keys/", accountFile), dst)
-	if err != nil {
-		logger.Warn("cannot copy test account PK", "error", err)
+	var (
+		data []byte
+		err  error
+	)
+
+	// Allow to read keys from a custom dir.
+	// Fallback to embedded data.
+	if dir := os.Getenv("TEST_KEYS_DIR"); dir != "" {
+		data, err = ioutil.ReadFile(filepath.Join(dir, accountFile))
+	} else {
+		data, err = static.Asset(filepath.Join("keys", accountFile))
 	}
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	return createFile(data, filepath.Join(keystoreDir, accountFile))
 }
 
-func getTestConfigFromFile(fileName string, config *testConfig) error {
-	configData, err := ioutil.ReadFile(fileName)
+func parseTestConfigFromFile(file string, config *testConfig) error {
+	var (
+		data []byte
+		err  error
+	)
+
+	// Allow to read config from a custom dir.
+	// Fallback to embedded data.
+	if dir := os.Getenv("TEST_CONFIG_DIR"); dir != "" {
+		data, err = ioutil.ReadFile(filepath.Join(dir, file))
+	} else {
+		data, err = t.Asset(file)
+	}
+
 	if err != nil {
 		return err
 	}
 
-	if err := json.Unmarshal(configData, &config); err != nil {
-		return err
-	}
-
-	return nil
+	return json.Unmarshal(data, &config)
 }
 
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
+func createFile(data []byte, dst string) error {
 	out, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err = io.Copy(out, bytes.NewBuffer(data))
+	return err
 }
 
 // Eventually will raise error if condition won't be met during the given timeout.

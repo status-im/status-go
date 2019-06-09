@@ -21,6 +21,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type ltrInfo struct {
@@ -113,12 +114,13 @@ func (self *LesTxRelay) send(txs types.Transactions, count int) {
 	for p, list := range sendTo {
 		pp := p
 		ll := list
+		enc, _ := rlp.EncodeToBytes(ll)
 
 		reqID := genReqID()
 		rq := &distReq{
 			getCost: func(dp distPeer) uint64 {
 				peer := dp.(*peer)
-				return peer.GetRequestCost(SendTxMsg, len(ll))
+				return peer.GetTxRelayCost(len(ll), len(enc))
 			},
 			canSend: func(dp distPeer) bool {
 				if !dp.(*peer).isOnlyAnnounce {
@@ -128,9 +130,9 @@ func (self *LesTxRelay) send(txs types.Transactions, count int) {
 			},
 			request: func(dp distPeer) func() {
 				peer := dp.(*peer)
-				cost := peer.GetRequestCost(SendTxMsg, len(ll))
+				cost := peer.GetTxRelayCost(len(ll), len(enc))
 				peer.fcServer.QueueRequest(reqID, cost)
-				return func() { peer.SendTxs(reqID, cost, ll) }
+				return func() { peer.SendTxs(reqID, cost, enc) }
 			},
 		}
 		self.reqDist.queue(rq)

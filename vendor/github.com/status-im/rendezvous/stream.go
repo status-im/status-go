@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/metrics"
-	inet "github.com/libp2p/go-libp2p-net"
-	protocol "github.com/libp2p/go-libp2p-protocol"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/protocol"
 )
 
 var (
@@ -15,7 +15,7 @@ var (
 
 // InstrumentedStream implements read writer interface and collects metrics.
 type InstrumentedStream struct {
-	s inet.Stream
+	s network.Stream
 }
 
 func (si InstrumentedStream) Write(p []byte) (int, error) {
@@ -58,6 +58,10 @@ func (si InstrumentedStream) SetProtocol(pid protocol.ID) {
 	si.s.SetProtocol(pid)
 }
 
-func (si InstrumentedStream) Conn() inet.Conn {
+func (si InstrumentedStream) Conn() network.Conn {
 	return si.s.Conn()
+}
+
+func (si InstrumentedStream) Stat() network.Stat {
+	return si.s.Stat()
 }

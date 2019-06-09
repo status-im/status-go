@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-	lcrypto "github.com/libp2p/go-libp2p-crypto"
+	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/server"
 	"github.com/stretchr/testify/assert"

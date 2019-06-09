@@ -2,14 +2,13 @@ notifications:
   email: false
 language: go
 go:
-- 1.10.x
+- 1.12.x
 sudo: false
 dist: trusty
 install: make setup
 jobs:
   include:
   - stage: Lint
-    before_script: make dep-ensure
     script:
       - make lint
   - stage: Test with deployed mailservers

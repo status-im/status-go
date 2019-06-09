@@ -104,13 +104,6 @@ var (
 	}
 )
 
-// trustedCheckpoints associates each known checkpoint with the genesis hash of the chain it belongs to
-var trustedCheckpoints = map[common.Hash]*params.TrustedCheckpoint{
-	params.MainnetGenesisHash: params.MainnetTrustedCheckpoint,
-	params.TestnetGenesisHash: params.TestnetTrustedCheckpoint,
-	params.RinkebyGenesisHash: params.RinkebyTrustedCheckpoint,
-}
-
 var (
 	ErrNoTrustedCht       = errors.New("no trusted canonical hash trie")
 	ErrNoTrustedBloomTrie = errors.New("no trusted bloom trie")
