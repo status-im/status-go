@@ -46,10 +46,6 @@ pipeline {
       sh 'make lint'
     } } }
 
-    stage('Dep-Ensure') { steps { dir(env.STATUS_PATH) {
-      sh 'make dep-ensure'
-    } } }
-
     stage('Canary') { steps { dir(env.STATUS_PATH) {
       sh 'make canary-test'
     } } }

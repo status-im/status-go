@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
-	"github.com/libp2p/go-libp2p-crypto"
-	"github.com/libp2p/go-libp2p-peer"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	mh "github.com/multiformats/go-multihash"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 const (
@@ -16,12 +16,20 @@ const (
 )
 
 func init() {
-	if err := ma.AddProtocol(ma.Protocol{P_ETHv4, 39 * 8, "ethv4", ma.CodeToVarint(P_ETHv4), false, TranscoderETHv4}); err != nil {
+	if err := ma.AddProtocol(
+		ma.Protocol{
+			Name:       "ethv4",
+			Code:       P_ETHv4,
+			VCode:      ma.CodeToVarint(P_ETHv4),
+			Size:       312,
+			Path:       false,
+			Transcoder: TranscoderETHv4,
+		}); err != nil {
 		panic(err)
 	}
 }
 
-var TranscoderETHv4 = ma.NewTranscoderFromFunctions(ethv4StB, ethv4BtS)
+var TranscoderETHv4 = ma.NewTranscoderFromFunctions(ethv4StB, ethv4BtS, func([]byte) error { return nil })
 
 func ethv4StB(s string) ([]byte, error) {
 	id, err := mh.FromB58String(s)

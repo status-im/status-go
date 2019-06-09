@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -84,6 +85,16 @@ const (
 	// DeploymentTestDummy defines the rule change deployment ID for testing
 	// purposes.
 	DeploymentTestDummy = iota
+
+	// DeploymentCSV defines the rule change deployment ID for the CSV
+	// soft-fork package. The CSV package includes the deployment of BIPS
+	// 68, 112, and 113.
+	DeploymentCSV
+
+	// DeploymentSegwit defines the rule change deployment ID for the
+	// Segregated Witness (segwit) soft-fork package. The segwit package
+	// includes the deployment of BIPS 141, 142, 144, 145, 147 and 173.
+	DeploymentSegwit
 
 	// NOTE: DefinedDeployments must always come last since it is used to
 	// determine how many defined deployments there currently are.
@@ -190,10 +201,16 @@ type Params struct {
 	// Mempool parameters
 	RelayNonStdTxs bool
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined
+	// in BIP 173.
+	Bech32HRPSegwit string
+
 	// Address encoding magics
-	PubKeyHashAddrID byte // First byte of a P2PKH address
-	ScriptHashAddrID byte // First byte of a P2SH address
-	PrivateKeyID     byte // First byte of a WIF private key
+	PubKeyHashAddrID        byte // First byte of a P2PKH address
+	ScriptHashAddrID        byte // First byte of a P2SH address
+	PrivateKeyID            byte // First byte of a WIF private key
+	WitnessPubKeyHashAddrID byte // First byte of a P2WPKH address
+	WitnessScriptHashAddrID byte // First byte of a P2WSH address
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID [4]byte
@@ -215,7 +232,6 @@ var MainNetParams = Params{
 		{"dnsseed.bitcoin.dashjr.org", false},
 		{"seed.bitcoinstats.com", true},
 		{"seed.bitnodes.io", false},
-		{"bitseed.xf2.org", false},
 		{"seed.bitcoin.jonasschnelli.ch", true},
 	},
 
@@ -256,6 +272,13 @@ var MainNetParams = Params{
 		{343185, newHashFromStr("0000000000000000072b8bf361d01a6ba7d445dd024203fafc78768ed4368554")},
 		{352940, newHashFromStr("000000000000000010755df42dba556bb72be6a32f3ce0b6941ce4430152c9ff")},
 		{382320, newHashFromStr("00000000000000000a8dc6ed5b133d0eb2fd6af56203e4159789b092defd8ab2")},
+		{400000, newHashFromStr("000000000000000004ec466ce4732fe6f1ed1cddc2ed4b328fff5224276e3f6f")},
+		{430000, newHashFromStr("000000000000000001868b2bb3a285f3cc6b33ea234eb70facf4dcdf22186b87")},
+		{460000, newHashFromStr("000000000000000000ef751bbce8e744ad303c47ece06c8d863e4d417efc258c")},
+		{490000, newHashFromStr("000000000000000000de069137b17b8d5a3dfbd5b145b2dcfb203f15d0c4de90")},
+		{520000, newHashFromStr("0000000000000000000d26984c0229c9f6962dc74db0a6d525f2f1640396f69c")},
+		{550000, newHashFromStr("000000000000000000223b7a2298fb1c6c75fb0efc28a4c56853ff4112ec6bc9")},
+		{560000, newHashFromStr("0000000000000000002c7b276daf6efb2b6aa68e2ce3be67ef925b3264ae7122")},
 	},
 
 	// Consensus rule change deployments.
@@ -270,15 +293,31 @@ var MainNetParams = Params{
 			StartTime:  1199145601, // January 1, 2008 UTC
 			ExpireTime: 1230767999, // December 31, 2008 UTC
 		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  1462060800, // May 1st, 2016
+			ExpireTime: 1493596800, // May 1st, 2017
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  1479168000, // November 15, 2016 UTC
+			ExpireTime: 1510704000, // November 15, 2017 UTC.
+		},
 	},
 
 	// Mempool parameters
 	RelayNonStdTxs: false,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "bc", // always bc for main net
+
 	// Address encoding magics
-	PubKeyHashAddrID: 0x00, // starts with 1
-	ScriptHashAddrID: 0x05, // starts with 3
-	PrivateKeyID:     0x80, // starts with 5 (uncompressed) or K (compressed)
+	PubKeyHashAddrID:        0x00, // starts with 1
+	ScriptHashAddrID:        0x05, // starts with 3
+	PrivateKeyID:            0x80, // starts with 5 (uncompressed) or K (compressed)
+	WitnessPubKeyHashAddrID: 0x06, // starts with p2
+	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x88, 0xad, 0xe4}, // starts with xprv
@@ -330,10 +369,24 @@ var RegressionNetParams = Params{
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires.
+		},
 	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
+
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "bcrt", // always bcrt for reg test net
 
 	// Address encoding magics
 	PubKeyHashAddrID: 0x6f, // starts with m or n
@@ -393,6 +446,9 @@ var TestNet3Params = Params{
 		{800010, newHashFromStr("000000000017ed35296433190b6829db01e657d80631d43f5983fa403bfdb4c1")},
 		{900000, newHashFromStr("0000000000356f8d8924556e765b7a94aaebc6b5c8685dcfa2b1ee8b41acd89b")},
 		{1000007, newHashFromStr("00000000001ccb893d8a1f25b70ad173ce955e5f50124261bbbc50379a612ddf")},
+		{1100007, newHashFromStr("00000000000abc7b2cd18768ab3dee20857326a818d1946ed6796f42d66dd1e8")},
+		{1200007, newHashFromStr("00000000000004f2dc41845771909db57e04191714ed8c963f7e56713a7b6cea")},
+		{1300007, newHashFromStr("0000000072eab69d54df75107c052b26b0395b44f77578184293bf1bb1dbd9fa")},
 	},
 
 	// Consensus rule change deployments.
@@ -407,15 +463,31 @@ var TestNet3Params = Params{
 			StartTime:  1199145601, // January 1, 2008 UTC
 			ExpireTime: 1230767999, // December 31, 2008 UTC
 		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  1456790400, // March 1st, 2016
+			ExpireTime: 1493596800, // May 1st, 2017
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  1462060800, // May 1, 2016 UTC
+			ExpireTime: 1493596800, // May 1, 2017 UTC.
+		},
 	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "tb", // always tb for test net
+
 	// Address encoding magics
-	PubKeyHashAddrID: 0x6f, // starts with m or n
-	ScriptHashAddrID: 0xc4, // starts with 2
-	PrivateKeyID:     0xef, // starts with 9 (uncompressed) or c (compressed)
+	PubKeyHashAddrID:        0x6f, // starts with m or n
+	ScriptHashAddrID:        0xc4, // starts with 2
+	WitnessPubKeyHashAddrID: 0x03, // starts with QW
+	WitnessScriptHashAddrID: 0x28, // starts with T7n
+	PrivateKeyID:            0xef, // starts with 9 (uncompressed) or c (compressed)
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x35, 0x83, 0x94}, // starts with tprv
@@ -471,15 +543,31 @@ var SimNetParams = Params{
 			StartTime:  0,             // Always available for vote
 			ExpireTime: math.MaxInt64, // Never expires
 		},
+		DeploymentCSV: {
+			BitNumber:  0,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires
+		},
+		DeploymentSegwit: {
+			BitNumber:  1,
+			StartTime:  0,             // Always available for vote
+			ExpireTime: math.MaxInt64, // Never expires.
+		},
 	},
 
 	// Mempool parameters
 	RelayNonStdTxs: true,
 
+	// Human-readable part for Bech32 encoded segwit addresses, as defined in
+	// BIP 173.
+	Bech32HRPSegwit: "sb", // always sb for sim net
+
 	// Address encoding magics
-	PubKeyHashAddrID: 0x3f, // starts with S
-	ScriptHashAddrID: 0x7b, // starts with s
-	PrivateKeyID:     0x64, // starts with 4 (uncompressed) or F (compressed)
+	PubKeyHashAddrID:        0x3f, // starts with S
+	ScriptHashAddrID:        0x7b, // starts with s
+	PrivateKeyID:            0x64, // starts with 4 (uncompressed) or F (compressed)
+	WitnessPubKeyHashAddrID: 0x19, // starts with Gg
+	WitnessScriptHashAddrID: 0x28, // starts with ?
 
 	// BIP32 hierarchical deterministic extended key magics
 	HDPrivateKeyID: [4]byte{0x04, 0x20, 0xb9, 0x00}, // starts with sprv
@@ -503,10 +591,11 @@ var (
 )
 
 var (
-	registeredNets    = make(map[wire.BitcoinNet]struct{})
-	pubKeyHashAddrIDs = make(map[byte]struct{})
-	scriptHashAddrIDs = make(map[byte]struct{})
-	hdPrivToPubKeyIDs = make(map[[4]byte][]byte)
+	registeredNets       = make(map[wire.BitcoinNet]struct{})
+	pubKeyHashAddrIDs    = make(map[byte]struct{})
+	scriptHashAddrIDs    = make(map[byte]struct{})
+	bech32SegwitPrefixes = make(map[string]struct{})
+	hdPrivToPubKeyIDs    = make(map[[4]byte][]byte)
 )
 
 // String returns the hostname of the DNS seed in human-readable form.
@@ -531,6 +620,10 @@ func Register(params *Params) error {
 	pubKeyHashAddrIDs[params.PubKeyHashAddrID] = struct{}{}
 	scriptHashAddrIDs[params.ScriptHashAddrID] = struct{}{}
 	hdPrivToPubKeyIDs[params.HDPrivateKeyID] = params.HDPublicKeyID[:]
+
+	// A valid Bech32 encoded segwit address always has as prefix the
+	// human-readable part for the given net followed by '1'.
+	bech32SegwitPrefixes[params.Bech32HRPSegwit+"1"] = struct{}{}
 	return nil
 }
 
@@ -561,6 +654,15 @@ func IsPubKeyHashAddrID(id byte) bool {
 // undeterminable (if both return true).
 func IsScriptHashAddrID(id byte) bool {
 	_, ok := scriptHashAddrIDs[id]
+	return ok
+}
+
+// IsBech32SegwitPrefix returns whether the prefix is a known prefix for segwit
+// addresses on any default or registered network.  This is used when decoding
+// an address string into a specific address type.
+func IsBech32SegwitPrefix(prefix string) bool {
+	prefix = strings.ToLower(prefix)
+	_, ok := bech32SegwitPrefixes[prefix]
 	return ok
 }
 

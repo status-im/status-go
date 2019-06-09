@@ -12,10 +12,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
-	libp2p "github.com/libp2p/go-libp2p"
-	crypto "github.com/libp2p/go-libp2p-crypto"
-	host "github.com/libp2p/go-libp2p-host"
-	net "github.com/libp2p/go-libp2p-net"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/status-im/rendezvous/protocol"
 )
@@ -117,7 +117,7 @@ func (srv *Server) startListener() error {
 		return err
 	}
 	srv.h = h
-	srv.h.SetStreamHandler(protocol.VERSION, func(s net.Stream) {
+	srv.h.SetStreamHandler(protocol.VERSION, func(s network.Stream) {
 		defer s.Close()
 		for {
 			rs := rlp.NewStream(s, 0)

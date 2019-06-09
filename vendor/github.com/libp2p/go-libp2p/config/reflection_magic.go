@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"runtime"
 
-	host "github.com/libp2p/go-libp2p-host"
+	"github.com/libp2p/go-libp2p-core/host"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 )
 
@@ -23,7 +23,7 @@ func checkReturnType(fnType, tptType reflect.Type) error {
 		fallthrough
 	case 1:
 		if !fnType.Out(0).Implements(tptType) {
-			return fmt.Errorf("expected first return value from transport constructor to be a transport")
+			return fmt.Errorf("transport constructor returns %s which doesn't implement %s", fnType.Out(0), tptType)
 		}
 	default:
 		return fmt.Errorf("expected transport constructor to return a transport and, optionally, an error")

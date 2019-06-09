@@ -1,7 +1,5 @@
 package natpmp
 
-import "time"
-
 type callObserver interface {
 	observeCall(msg []byte, result []byte, err error)
 }
@@ -12,8 +10,8 @@ type recorder struct {
 	observer callObserver
 }
 
-func (n *recorder) call(msg []byte, timeout time.Duration) (result []byte, err error) {
-	result, err = n.child.call(msg, timeout)
+func (n *recorder) call(msg []byte) (result []byte, err error) {
+	result, err = n.child.call(msg)
 	n.observer.observeCall(msg, result, err)
 	return
 }

@@ -9,11 +9,12 @@ import (
 	"net"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/sec"
+
 	proto "github.com/gogo/protobuf/proto"
 	logging "github.com/ipfs/go-log"
-	cs "github.com/libp2p/go-conn-security"
-	ci "github.com/libp2p/go-libp2p-crypto"
-	peer "github.com/libp2p/go-libp2p-peer"
+	ci "github.com/libp2p/go-libp2p-core/crypto"
 	pb "github.com/libp2p/go-libp2p-secio/pb"
 	msgio "github.com/libp2p/go-msgio"
 	mh "github.com/multiformats/go-multihash"
@@ -63,7 +64,7 @@ type secureSession struct {
 	sharedSecret []byte
 }
 
-var _ cs.Conn = &secureSession{}
+var _ sec.SecureConn = &secureSession{}
 
 func (s *secureSession) Loggable() map[string]interface{} {
 	m := make(map[string]interface{})
@@ -155,9 +156,9 @@ func (s *secureSession) runHandshakeSync() error {
 	proposeOut := new(pb.Propose)
 	proposeOut.Rand = nonceOut
 	proposeOut.Pubkey = myPubKeyBytes
-	proposeOut.Exchanges = &SupportedExchanges
-	proposeOut.Ciphers = &SupportedCiphers
-	proposeOut.Hashes = &SupportedHashes
+	proposeOut.Exchanges = SupportedExchanges
+	proposeOut.Ciphers = SupportedCiphers
+	proposeOut.Hashes = SupportedHashes
 
 	// log.Debugf("1.0 Propose: nonce:%s exchanges:%s ciphers:%s hashes:%s",
 	// 	nonceOut, SupportedExchanges, SupportedCiphers, SupportedHashes)

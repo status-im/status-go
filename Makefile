@@ -10,27 +10,6 @@ RELEASE_TYPE := $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else ec
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-ifndef GOPATH
-	$(error GOPATH not set. Please set GOPATH and make sure status-go is located at $$GOPATH/src/github.com/status-im/status-go. \
-	For more information about the GOPATH environment variable, see https://golang.org/doc/code.html#GOPATH)
-endif
-
-
-EXPECTED_PATH=$(shell go env GOPATH)/src/github.com/status-im/status-go
-ifneq ($(CURDIR),$(EXPECTED_PATH))
-define NOT_IN_GOPATH_ERROR
-
-Current dir is $(CURDIR), which seems to be different from your GOPATH.
-Please, build status-go from GOPATH for proper build.
-  GOPATH       = $(shell go env GOPATH)
-  Current dir  = $(CURDIR)
-  Expected dir = $(EXPECTED_PATH))
-See https://golang.org/doc/code.html#GOPATH for more info
-
-endef
-$(error $(NOT_IN_GOPATH_ERROR))
-endif
-
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
@@ -111,14 +90,14 @@ statusgo-cross: statusgo-android statusgo-ios
 
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
-	@gomobile init
-	@gomobile bind -target=android -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	gomobile init
+	gomobile bind -target=android -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
-	@gomobile init
-	@gomobile bind -target=ios -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	gomobile init
+	gomobile bind -v -target=ios -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-xgo: xgo-install ##@cross-compile Build status-go for xgo targets
@@ -186,12 +165,12 @@ install-os-dependencies:
 
 setup-dev: setup-build mock-install install-os-dependencies gen-install ##@other Prepare project for development
 
-setup-build: dep-install lint-install release-install gomobile-install ##@other Prepare project for build
+setup-build: lint-install release-install gomobile-install ##@other Prepare project for build
 
-setup: setup-build setup-dev ##@other Prepare project for development and building
+setup: setup-build setup-dev tidy ##@other Prepare project for development and building
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/encryption_migrations ./static/mailserver_db_migrations
+	go generate ./static ./static/encryption_migrations ./static/mailserver_db_migrations ./t
 	$(shell cd ./services/shhext/chat && exec protoc --go_out=. ./*.proto)
 
 prepare-release: clean-release
@@ -233,13 +212,16 @@ release-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
-	go get -u github.com/jteeuwen/go-bindata
-	go get -u github.com/jteeuwen/go-bindata/go-bindata
-	go get -u github.com/golang/protobuf/protoc-gen-go
+	go get -u github.com/kevinburke/go-bindata/go-bindata@v3.13.0
+	go get -u github.com/golang/protobuf/protoc-gen-go@v1.3.1
+
+modvendor-install:
+	# a tool to vendor non-go files
+	go get -u github.com/goware/modvendor
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
-	dep ensure -update github.com/golang/mock
+	go get -u github.com/golang/mock
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
@@ -293,9 +275,9 @@ lint:
 	@echo "lint"
 	@golangci-lint run ./...
 
-ci: lint dep-ensure canary-test test-unit test-e2e ##@tests Run all linters and tests at once
+ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
-ci-race: lint dep-ensure canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
+ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
 	rm -fr build/bin/*
@@ -303,11 +285,14 @@ clean: ##@other Cleanup
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
 
-dep-ensure: ##@dependencies Ensure all dependencies are in place with dep
-	@dep ensure
+tidy:
+	go mod tidy
 
-dep-install: ##@dependencies Install vendoring tool
-	go get -u github.com/golang/dep/cmd/dep
+vendor:
+	go mod tidy
+	go mod vendor
+	modvendor -copy="**/*.c **/*.h" -v
+.PHONY: vendor
 
 update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	./_assets/ci/update-fleet-config.sh

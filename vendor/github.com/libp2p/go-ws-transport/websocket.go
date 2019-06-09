@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"net/url"
 
-	ws "github.com/gorilla/websocket"
-	peer "github.com/libp2p/go-libp2p-peer"
-	tpt "github.com/libp2p/go-libp2p-transport"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/transport"
+
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+
+	ws "github.com/gorilla/websocket"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
 	mafmt "github.com/whyrusleeping/mafmt"
@@ -61,7 +63,7 @@ func New(u *tptu.Upgrader) *WebsocketTransport {
 	return &WebsocketTransport{u}
 }
 
-var _ tpt.Transport = (*WebsocketTransport)(nil)
+var _ transport.Transport = (*WebsocketTransport)(nil)
 
 func (t *WebsocketTransport) CanDial(a ma.Multiaddr) bool {
 	return WsFmt.Matches(a)
@@ -86,7 +88,7 @@ func (t *WebsocketTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (ma
 		return nil, err
 	}
 
-	mnc, err := manet.WrapNetConn(NewConn(wscon, nil))
+	mnc, err := manet.WrapNetConn(NewConn(wscon))
 	if err != nil {
 		wscon.Close()
 		return nil, err
@@ -94,7 +96,7 @@ func (t *WebsocketTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (ma
 	return mnc, nil
 }
 
-func (t *WebsocketTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tpt.Conn, error) {
+func (t *WebsocketTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
 	macon, err := t.maDial(ctx, raddr)
 	if err != nil {
 		return nil, err
@@ -130,7 +132,7 @@ func (t *WebsocketTransport) maListen(a ma.Multiaddr) (manet.Listener, error) {
 	return malist, nil
 }
 
-func (t *WebsocketTransport) Listen(a ma.Multiaddr) (tpt.Listener, error) {
+func (t *WebsocketTransport) Listen(a ma.Multiaddr) (transport.Listener, error) {
 	malist, err := t.maListen(a)
 	if err != nil {
 		return nil, err

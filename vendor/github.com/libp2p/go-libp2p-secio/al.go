@@ -12,7 +12,7 @@ import (
 	"crypto/sha512"
 	"hash"
 
-	ci "github.com/libp2p/go-libp2p-crypto"
+	ci "github.com/libp2p/go-libp2p-core/crypto"
 	sha256 "github.com/minio/sha256-simd"
 	bfish "golang.org/x/crypto/blowfish"
 )

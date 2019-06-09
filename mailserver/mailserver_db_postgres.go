@@ -7,9 +7,9 @@ import (
 
 	// Import postgres driver
 	_ "github.com/lib/pq"
-	"github.com/status-im/migrate"
-	"github.com/status-im/migrate/database/postgres"
-	"github.com/status-im/migrate/source/go_bindata"
+	"github.com/status-im/migrate/v4"
+	"github.com/status-im/migrate/v4/database/postgres"
+	"github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/status-im/status-go/mailserver/migrations"
 	"github.com/status-im/status-go/params"
 

@@ -9,14 +9,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/metrics"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/transport"
+
 	logging "github.com/ipfs/go-log"
 	"github.com/jbenet/goprocess"
 	goprocessctx "github.com/jbenet/goprocess/context"
-	metrics "github.com/libp2p/go-libp2p-metrics"
-	inet "github.com/libp2p/go-libp2p-net"
-	peer "github.com/libp2p/go-libp2p-peer"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
-	transport "github.com/libp2p/go-libp2p-transport"
+
 	filter "github.com/libp2p/go-maddr-filter"
 	mafilter "github.com/whyrusleeping/multiaddr-filter"
 )
@@ -47,7 +49,7 @@ type Swarm struct {
 	refs sync.WaitGroup
 
 	local peer.ID
-	peers pstore.Peerstore
+	peers peerstore.Peerstore
 
 	conns struct {
 		sync.RWMutex
@@ -61,7 +63,7 @@ type Swarm struct {
 
 	notifs struct {
 		sync.RWMutex
-		m map[inet.Notifiee]struct{}
+		m map[network.Notifiee]struct{}
 	}
 
 	transports struct {
@@ -87,7 +89,7 @@ type Swarm struct {
 }
 
 // NewSwarm constructs a Swarm
-func NewSwarm(ctx context.Context, local peer.ID, peers pstore.Peerstore, bwc metrics.Reporter) *Swarm {
+func NewSwarm(ctx context.Context, local peer.ID, peers peerstore.Peerstore, bwc metrics.Reporter) *Swarm {
 	s := &Swarm{
 		local:   local,
 		peers:   peers,
@@ -98,7 +100,7 @@ func NewSwarm(ctx context.Context, local peer.ID, peers pstore.Peerstore, bwc me
 	s.conns.m = make(map[peer.ID][]*Conn)
 	s.listeners.m = make(map[transport.Listener]struct{})
 	s.transports.m = make(map[int]transport.Transport)
-	s.notifs.m = make(map[inet.Notifiee]struct{})
+	s.notifs.m = make(map[network.Notifiee]struct{})
 
 	s.dsync = NewDialSync(s.doDial)
 	s.limiter = newDialLimiter(s.dialAddr)
@@ -121,8 +123,8 @@ func (s *Swarm) teardown() error {
 	s.conns.m = nil
 	s.conns.Unlock()
 
-	// Lots of go routines but we might as well do this in parallel. We want
-	// to shut down as fast as possible.
+	// Lots of goroutines but we might as well do this in parallel. We want to shut down as fast as
+	// possible.
 
 	for l := range listeners {
 		go func(l transport.Listener) {
@@ -148,8 +150,8 @@ func (s *Swarm) teardown() error {
 	return nil
 }
 
-// AddAddrFilter adds a multiaddr filter to the set of filters the swarm will
-// use to determine which addresses not to dial to.
+// AddAddrFilter adds a multiaddr filter to the set of filters the swarm will use to determine which
+// addresses not to dial to.
 func (s *Swarm) AddAddrFilter(f string) error {
 	m, err := mafilter.NewMask(f)
 	if err != nil {
@@ -165,7 +167,7 @@ func (s *Swarm) Process() goprocess.Process {
 	return s.proc
 }
 
-func (s *Swarm) addConn(tc transport.Conn) (*Conn, error) {
+func (s *Swarm) addConn(tc transport.CapableConn, dir network.Direction) (*Conn, error) {
 	// The underlying transport (or the dialer) *should* filter it's own
 	// connections but we should double check anyways.
 	raddr := tc.RemoteMultiaddr()
@@ -194,9 +196,11 @@ func (s *Swarm) addConn(tc transport.Conn) (*Conn, error) {
 	}
 
 	// Wrap and register the connection.
+	stat := network.Stat{Direction: dir}
 	c := &Conn{
 		conn:  tc,
 		swarm: s,
+		stat:  stat,
 	}
 	c.streams.m = make(map[*Stream]struct{})
 	s.conns.m[p] = append(s.conns.m[p], c)
@@ -215,7 +219,7 @@ func (s *Swarm) addConn(tc transport.Conn) (*Conn, error) {
 	// This should be fast, no reason to wait till later.
 	s.dsync.CancelDial(p)
 
-	s.notifyAll(func(f inet.Notifiee) {
+	s.notifyAll(func(f network.Notifiee) {
 		f.Connected(s, c)
 	})
 	c.notifyLk.Unlock()
@@ -233,7 +237,7 @@ func (s *Swarm) addConn(tc transport.Conn) (*Conn, error) {
 }
 
 // Peerstore returns this swarms internal Peerstore.
-func (s *Swarm) Peerstore() pstore.Peerstore {
+func (s *Swarm) Peerstore() peerstore.Peerstore {
 	return s.peers
 }
 
@@ -251,30 +255,30 @@ func (s *Swarm) Close() error {
 
 // SetConnHandler assigns the handler for new connections.
 // You will rarely use this. See SetStreamHandler
-func (s *Swarm) SetConnHandler(handler inet.ConnHandler) {
+func (s *Swarm) SetConnHandler(handler network.ConnHandler) {
 	s.connh.Store(handler)
 }
 
 // ConnHandler gets the handler for new connections.
-func (s *Swarm) ConnHandler() inet.ConnHandler {
-	handler, _ := s.connh.Load().(inet.ConnHandler)
+func (s *Swarm) ConnHandler() network.ConnHandler {
+	handler, _ := s.connh.Load().(network.ConnHandler)
 	return handler
 }
 
 // SetStreamHandler assigns the handler for new streams.
-func (s *Swarm) SetStreamHandler(handler inet.StreamHandler) {
+func (s *Swarm) SetStreamHandler(handler network.StreamHandler) {
 	s.streamh.Store(handler)
 }
 
 // StreamHandler gets the handler for new streams.
-func (s *Swarm) StreamHandler() inet.StreamHandler {
-	handler, _ := s.streamh.Load().(inet.StreamHandler)
+func (s *Swarm) StreamHandler() network.StreamHandler {
+	handler, _ := s.streamh.Load().(network.StreamHandler)
 	return handler
 }
 
 // NewStream creates a new stream on any available connection to peer, dialing
 // if necessary.
-func (s *Swarm) NewStream(ctx context.Context, p peer.ID) (inet.Stream, error) {
+func (s *Swarm) NewStream(ctx context.Context, p peer.ID) (network.Stream, error) {
 	log.Debugf("[%s] opening stream to peer [%s]", s.local, p)
 
 	// Algorithm:
@@ -293,6 +297,10 @@ func (s *Swarm) NewStream(ctx context.Context, p peer.ID) (inet.Stream, error) {
 	for {
 		c := s.bestConnToPeer(p)
 		if c == nil {
+			if nodial, _ := network.GetNoDial(ctx); nodial {
+				return nil, network.ErrNoConn
+			}
+
 			if dials >= DialAttempts {
 				return nil, errors.New("max dial attempts exceeded")
 			}
@@ -316,13 +324,13 @@ func (s *Swarm) NewStream(ctx context.Context, p peer.ID) (inet.Stream, error) {
 }
 
 // ConnsToPeer returns all the live connections to peer.
-func (s *Swarm) ConnsToPeer(p peer.ID) []inet.Conn {
+func (s *Swarm) ConnsToPeer(p peer.ID) []network.Conn {
 	// TODO: Consider sorting the connection list best to worst. Currently,
 	// it's sorted oldest to newest.
 	s.conns.RLock()
 	defer s.conns.RUnlock()
 	conns := s.conns.m[p]
-	output := make([]inet.Conn, len(conns))
+	output := make([]network.Conn, len(conns))
 	for i, c := range conns {
 		output[i] = c
 	}
@@ -360,20 +368,20 @@ func (s *Swarm) bestConnToPeer(p peer.ID) *Conn {
 // Connectedness returns our "connectedness" state with the given peer.
 //
 // To check if we have an open connection, use `s.Connectedness(p) ==
-// inet.Connected`.
-func (s *Swarm) Connectedness(p peer.ID) inet.Connectedness {
+// network.Connected`.
+func (s *Swarm) Connectedness(p peer.ID) network.Connectedness {
 	if s.bestConnToPeer(p) != nil {
-		return inet.Connected
+		return network.Connected
 	}
-	return inet.NotConnected
+	return network.NotConnected
 }
 
 // Conns returns a slice of all connections.
-func (s *Swarm) Conns() []inet.Conn {
+func (s *Swarm) Conns() []network.Conn {
 	s.conns.RLock()
 	defer s.conns.RUnlock()
 
-	conns := make([]inet.Conn, 0, len(s.conns.m))
+	conns := make([]network.Conn, 0, len(s.conns.m))
 	for _, cs := range s.conns.m {
 		for _, c := range cs {
 			conns = append(conns, c)
@@ -393,7 +401,7 @@ func (s *Swarm) ClosePeer(p peer.ID) error {
 	default:
 		errCh := make(chan error)
 		for _, c := range conns {
-			go func(c inet.Conn) {
+			go func(c network.Conn) {
 				errCh <- c.Close()
 			}(c)
 		}
@@ -435,13 +443,13 @@ func (s *Swarm) Backoff() *DialBackoff {
 }
 
 // notifyAll sends a signal to all Notifiees
-func (s *Swarm) notifyAll(notify func(inet.Notifiee)) {
+func (s *Swarm) notifyAll(notify func(network.Notifiee)) {
 	var wg sync.WaitGroup
 
 	s.notifs.RLock()
 	wg.Add(len(s.notifs.m))
 	for f := range s.notifs.m {
-		go func(f inet.Notifiee) {
+		go func(f network.Notifiee) {
 			defer wg.Done()
 			notify(f)
 		}(f)
@@ -452,14 +460,14 @@ func (s *Swarm) notifyAll(notify func(inet.Notifiee)) {
 }
 
 // Notify signs up Notifiee to receive signals when events happen
-func (s *Swarm) Notify(f inet.Notifiee) {
+func (s *Swarm) Notify(f network.Notifiee) {
 	s.notifs.Lock()
 	s.notifs.m[f] = struct{}{}
 	s.notifs.Unlock()
 }
 
 // StopNotify unregisters Notifiee fromr receiving signals
-func (s *Swarm) StopNotify(f inet.Notifiee) {
+func (s *Swarm) StopNotify(f network.Notifiee) {
 	s.notifs.Lock()
 	delete(s.notifs.m, f)
 	s.notifs.Unlock()
@@ -494,5 +502,5 @@ func (s *Swarm) String() string {
 }
 
 // Swarm is a Network.
-var _ inet.Network = (*Swarm)(nil)
-var _ transport.Network = (*Swarm)(nil)
+var _ network.Network = (*Swarm)(nil)
+var _ transport.TransportNetwork = (*Swarm)(nil)

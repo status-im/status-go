@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	inet "github.com/libp2p/go-libp2p-net"
-	protocol "github.com/libp2p/go-libp2p-protocol"
-	smux "github.com/libp2p/go-stream-muxer"
+	"github.com/libp2p/go-libp2p-core/mux"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/protocol"
 )
 
 type streamState int
@@ -22,10 +22,13 @@ const (
 	streamReset
 )
 
+// Validate Stream conforms to the go-libp2p-net Stream interface
+var _ network.Stream = &Stream{}
+
 // Stream is the stream type used by swarm. In general, you won't use this type
 // directly.
 type Stream struct {
-	stream smux.Stream
+	stream mux.MuxedStream
 	conn   *Conn
 
 	state struct {
@@ -36,6 +39,8 @@ type Stream struct {
 	notifyLk sync.Mutex
 
 	protocol atomic.Value
+
+	stat network.Stat
 }
 
 func (s *Stream) String() string {
@@ -49,8 +54,8 @@ func (s *Stream) String() string {
 	)
 }
 
-// Conn returns the Conn associated with this stream, as an inet.Conn
-func (s *Stream) Conn() inet.Conn {
+// Conn returns the Conn associated with this stream, as an network.Conn
+func (s *Stream) Conn() network.Conn {
 	return s.conn
 }
 
@@ -128,7 +133,7 @@ func (s *Stream) remove() {
 		s.notifyLk.Lock()
 		defer s.notifyLk.Unlock()
 
-		s.conn.swarm.notifyAll(func(f inet.Notifiee) {
+		s.conn.swarm.notifyAll(func(f network.Notifiee) {
 			f.ClosedStream(s.conn.swarm, s)
 		})
 		s.conn.swarm.refs.Done()
@@ -164,4 +169,9 @@ func (s *Stream) SetReadDeadline(t time.Time) error {
 // SetWriteDeadline sets the write deadline for this stream.
 func (s *Stream) SetWriteDeadline(t time.Time) error {
 	return s.stream.SetWriteDeadline(t)
+}
+
+// Stat returns metadata information for this stream.
+func (s *Stream) Stat() network.Stat {
+	return s.stat
 }
