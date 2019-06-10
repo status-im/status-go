@@ -76,7 +76,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "wallet",
 			Version:   "0.1.0",
-			Service:   &API{s},
+			Service:   NewAPI(s),
 			Public:    true,
 		},
 	}

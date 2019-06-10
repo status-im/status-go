@@ -61,7 +61,6 @@ func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, down
 			return nil
 		}
 		if new(big.Int).Sub(high, low).Cmp(one) == 0 {
-			log.Debug("higher block is a parent", "low", low, "high", high)
 			transfers, err := downloader.GetTransfersByNumber(ctx, high)
 			if err != nil {
 				return err
@@ -71,7 +70,7 @@ func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, down
 		}
 		mid := new(big.Int).Add(low, high)
 		mid = mid.Div(mid, two)
-		log.Debug("balances are not equal spawn two concurrent downloaders", "low", low, "mid", mid, "high", high)
+		log.Debug("balances are not equal. spawn two concurrent downloaders", "low", low, "mid", mid, "high", high)
 		downloadEthConcurrently(c, client, downloader, account, low, mid)
 		downloadEthConcurrently(c, client, downloader, account, mid, high)
 		return nil

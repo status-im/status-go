@@ -30,7 +30,7 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 
 var (
 	reorgSafetyDepth = big.NewInt(15)
-	erc20BatchSize   = big.NewInt(50000)
+	erc20BatchSize   = big.NewInt(100000)
 )
 
 // HeaderReader interface for reading headers using block number or hash.
@@ -79,35 +79,11 @@ func (r *Reactor) Start() error {
 	if r.group != nil {
 		return errors.New("already running")
 	}
-	r.group = NewGroup()
+	r.group = NewGroup(context.Background())
 	// TODO(dshulyak) to support adding accounts in runtime implement keyed group
 	// and export private api to start downloaders from accounts
 	// private api should have access only to reactor
-	for _, address := range r.accounts {
-		erc20 := &erc20HistoricalCommand{
-			db:          r.db,
-			erc20:       NewERC20TransfersDownloader(r.client, []common.Address{address}),
-			client:      r.client,
-			feed:        r.feed,
-			safetyDepth: reorgSafetyDepth,
-			address:     address,
-		}
-		r.group.Add(erc20.Command())
-		eth := &ethHistoricalCommand{
-			db:      r.db,
-			client:  r.client,
-			address: address,
-			eth: &ETHTransferDownloader{
-				client:   r.client,
-				accounts: []common.Address{address},
-				signer:   types.NewEIP155Signer(r.chain),
-			},
-			feed:        r.feed,
-			safetyDepth: reorgSafetyDepth,
-		}
-		r.group.Add(eth.Command())
-	}
-	newBlocks := &newBlocksTransfersCommand{
+	ctl := &controlCommand{
 		db:       r.db,
 		chain:    r.chain,
 		client:   r.client,
@@ -121,7 +97,7 @@ func (r *Reactor) Start() error {
 		feed:        r.feed,
 		safetyDepth: reorgSafetyDepth,
 	}
-	r.group.Add(newBlocks.Command())
+	r.group.Add(ctl.Command())
 	return nil
 }
 

@@ -10,6 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+func NewAPI(s *Service) *API {
+	return &API{s}
+}
+
 // API is class with methods available over RPC.
 type API struct {
 	s *Service
