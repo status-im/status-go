@@ -23,11 +23,11 @@ type ethHistoricalCommand struct {
 	previous *DBHeader
 }
 
-func (c *ethHistoricalCommand) Command() FiniteCommand {
+func (c *ethHistoricalCommand) Command() Command {
 	return FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
-	}
+	}.Run
 }
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
@@ -90,11 +90,11 @@ type erc20HistoricalCommand struct {
 	iterator *IterativeDownloader
 }
 
-func (c *erc20HistoricalCommand) Command() FiniteCommand {
+func (c *erc20HistoricalCommand) Command() Command {
 	return FiniteCommand{
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
-	}
+	}.Run
 }
 
 func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
@@ -149,11 +149,11 @@ type newBlocksTransfersCommand struct {
 	previous *DBHeader
 }
 
-func (c *newBlocksTransfersCommand) Command() InfiniteCommand {
+func (c *newBlocksTransfersCommand) Command() Command {
 	return InfiniteCommand{
 		Interval: pollingPeriodByChain(c.chain),
 		Runable:  c.Run,
-	}
+	}.Run
 }
 
 func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
@@ -329,4 +329,20 @@ func isSequence(headers []*DBHeader) bool {
 		child = parent
 	}
 	return true
+}
+
+func headersFromTransfers(transfers []Transfer) []*DBHeader {
+	byHash := map[common.Hash]struct{}{}
+	rst := []*DBHeader{}
+	for i := range transfers {
+		_, exists := byHash[transfers[i].BlockHash]
+		if exists {
+			continue
+		}
+		rst = append(rst, &DBHeader{
+			Hash:   transfers[i].BlockHash,
+			Number: transfers[i].BlockNumber,
+		})
+	}
+	return rst
 }

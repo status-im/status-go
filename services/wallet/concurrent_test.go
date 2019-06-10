@@ -15,7 +15,7 @@ import (
 func TestConcurrentErrorInterrupts(t *testing.T) {
 	concurrent := NewConcurrentDownloader(context.Background())
 	var interrupted bool
-	concurrent.Go(func(ctx context.Context) error {
+	concurrent.Add(func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			interrupted = true
@@ -24,7 +24,7 @@ func TestConcurrentErrorInterrupts(t *testing.T) {
 		return nil
 	})
 	err := errors.New("interrupt")
-	concurrent.Go(func(ctx context.Context) error {
+	concurrent.Add(func(ctx context.Context) error {
 		return err
 	})
 	concurrent.Wait()
@@ -34,12 +34,12 @@ func TestConcurrentErrorInterrupts(t *testing.T) {
 
 func TestConcurrentCollectsTransfers(t *testing.T) {
 	concurrent := NewConcurrentDownloader(context.Background())
-	concurrent.Go(func(context.Context) error {
-		concurrent.Add(Transfer{})
+	concurrent.Add(func(context.Context) error {
+		concurrent.Push(Transfer{})
 		return nil
 	})
-	concurrent.Go(func(context.Context) error {
-		concurrent.Add(Transfer{})
+	concurrent.Add(func(context.Context) error {
+		concurrent.Push(Transfer{})
 		return nil
 	})
 	concurrent.Wait()

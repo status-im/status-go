@@ -79,11 +79,11 @@ func (r *Reactor) Start() error {
 	if r.group != nil {
 		return errors.New("already running")
 	}
+	r.group = NewGroup()
 	// TODO(dshulyak) to support adding accounts in runtime implement keyed group
 	// and export private api to start downloaders from accounts
 	// private api should have access only to reactor
 	for _, address := range r.accounts {
-		r.group = NewGroup()
 		erc20 := &erc20HistoricalCommand{
 			db:          r.db,
 			erc20:       NewERC20TransfersDownloader(r.client, []common.Address{address}),
@@ -133,21 +133,6 @@ func (r *Reactor) Stop() {
 		return
 	}
 	r.group.Stop()
+	r.group.Wait()
 	r.group = nil
-}
-
-func headersFromTransfers(transfers []Transfer) []*DBHeader {
-	byHash := map[common.Hash]struct{}{}
-	rst := []*DBHeader{}
-	for i := range transfers {
-		_, exists := byHash[transfers[i].BlockHash]
-		if exists {
-			continue
-		}
-		rst = append(rst, &DBHeader{
-			Hash:   transfers[i].BlockHash,
-			Number: transfers[i].BlockNumber,
-		})
-	}
-	return rst
 }

@@ -63,9 +63,8 @@ func (s *Service) StopReactor() error {
 
 // Stop reactor, signals transmitter and close db.
 func (s *Service) Stop() error {
-	log.Info("wallet stopping reactor")
+	log.Info("wallet will be stopped")
 	err := s.StopReactor()
-	log.Info("wallet stopping signals")
 	s.signals.Stop()
 	log.Info("wallet stopped")
 	return err

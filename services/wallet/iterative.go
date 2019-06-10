@@ -67,7 +67,7 @@ func (d *IterativeDownloader) Header() *DBHeader {
 func (d *IterativeDownloader) Next(parent context.Context) ([]Transfer, error) {
 	start := new(big.Int).Sub(d.known.Number, d.batchSize)
 	// if start < 0; start = 0
-	if start.Cmp(big.NewInt(0)) <= 0 {
+	if start.Cmp(zero) <= 0 {
 		start = big.NewInt(0)
 	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
