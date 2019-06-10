@@ -11,7 +11,8 @@ CONSTRAINT unique_transfer_on_hash_address UNIQUE (hash,address)
 
 CREATE TABLE IF NOT EXISTS blocks (
 hash VARCHAR PRIMARY KEY,
-number BIGINT UNIQUE NOT NULL
+number BIGINT UNIQUE NOT NULL,
+head BOOL DEFAULT FALSE
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS accounts_to_blocks (
