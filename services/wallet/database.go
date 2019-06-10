@@ -17,12 +17,22 @@ import (
 type DBHeader struct {
 	Number *big.Int
 	Hash   common.Hash
+	// Head is true if the block was a head at the time it was pulled from chain.
+	Head bool
 }
 
 func toDBHeader(header *types.Header) *DBHeader {
 	return &DBHeader{
 		Hash:   header.Hash(),
 		Number: header.Number,
+	}
+}
+
+func toHead(header *types.Header) *DBHeader {
+	return &DBHeader{
+		Hash:   header.Hash(),
+		Number: header.Number,
+		Head:   true,
 	}
 }
 
@@ -283,6 +293,18 @@ func (db *Database) GetHeaderByNumber(number *big.Int) (header *DBHeader, err er
 	return nil, err
 }
 
+func (db *Database) GetLastHead() (header *DBHeader, err error) {
+	header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
+	err = db.db.QueryRow("SELECT hash,number FROM blocks WHERE head = 1").Scan(&header.Hash, (*SQLBigInt)(header.Number))
+	if err == nil {
+		return header, nil
+	}
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return nil, err
+}
+
 func (db *Database) GetEarliestSynced(address common.Address, option SyncOption) (header *DBHeader, err error) {
 	rows, err := db.db.Query(`
 SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number = blocks.number WHERE address = $1 AND blk_number
@@ -302,6 +324,20 @@ SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number
 		}
 	}
 	return nil, nil
+}
+
+func (db *Database) GetLatestSynced(address common.Address, option SyncOption) (header *DBHeader, err error) {
+	header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
+	err = db.db.QueryRow(`
+SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number = blocks.number WHERE address = $1 AND blk_number
+= (SELECT MAX(blk_number) FROM accounts_to_blocks WHERE address = $1 AND sync & $2 = $2)`, address, option).Scan(&header.Hash, (*SQLBigInt)(header.Number))
+	if err == nil {
+		return header, nil
+	}
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return nil, err
 }
 
 // statementCreator allows to pass transaction or database to use in consumer.
@@ -324,12 +360,12 @@ func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
 }
 
 func insertHeaders(creator statementCreator, headers []*DBHeader) error {
-	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(hash, number) VALUES (?, ?)")
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(hash, number, head) VALUES (?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	for _, h := range headers {
-		_, err = insert.Exec(h.Hash, (*SQLBigInt)(h.Number))
+		_, err = insert.Exec(h.Hash, (*SQLBigInt)(h.Number), h.Head)
 		if err != nil {
 			return err
 		}
