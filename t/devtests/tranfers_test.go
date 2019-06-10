@@ -77,7 +77,7 @@ func (s *TransfersSuite) TestNewTransfers() {
 			return fmt.Errorf("waiting for one transfer")
 		}
 		return nil
-	}, 10*time.Second, 1*time.Second))
+	}, 20*time.Second, 1*time.Second))
 
 	go func() {
 		for i := 1; i < 10; i++ {
