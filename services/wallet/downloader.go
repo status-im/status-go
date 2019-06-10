@@ -194,12 +194,12 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	concurrent := NewConcurrentDownloader(parent)
 	for i := range logs {
 		l := logs[i]
-		concurrent.Go(func(ctx context.Context) error {
+		concurrent.Add(func(ctx context.Context) error {
 			transfer, err := d.transferFromLog(ctx, l, address)
 			if err != nil {
 				return err
 			}
-			concurrent.Add(transfer)
+			concurrent.Push(transfer)
 			return nil
 		})
 	}
