@@ -414,21 +414,6 @@ func (c *controlCommand) Command() Command {
 	}.Run
 }
 
-func isSequence(headers []*DBHeader) bool {
-	if len(headers) == 0 {
-		return false
-	}
-	child := headers[0]
-	diff := big.NewInt(0)
-	for _, parent := range headers[1:] {
-		if diff.Sub(child.Number, parent.Number).Cmp(one) != 0 {
-			return false
-		}
-		child = parent
-	}
-	return true
-}
-
 func headersFromTransfers(transfers []Transfer) []*DBHeader {
 	byHash := map[common.Hash]struct{}{}
 	rst := []*DBHeader{}
