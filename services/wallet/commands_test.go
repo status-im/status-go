@@ -49,9 +49,8 @@ func (s *NewBlocksSuite) SetupTest() {
 			signer:   s.backend.Signer,
 			accounts: []common.Address{s.address},
 		},
-		feed:        s.feed,
-		client:      s.backend.Client,
-		safetyDepth: big.NewInt(15),
+		feed:   s.feed,
+		client: s.backend.Client,
 	}
 }
 
@@ -126,6 +125,7 @@ func (s *NewBlocksSuite) TestReorg() {
 	// `not found` returned when we query head+1 block
 	ctx, cancel = context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+	s.cmd.from = toDBHeader(s.backend.Ethereum.BlockChain().GetHeaderByNumber(15))
 	s.Require().EqualError(s.runCmdUntilError(ctx), "not found")
 
 	transfers, err := s.db.GetTransfers(big.NewInt(0), nil)
@@ -139,7 +139,7 @@ func (s *NewBlocksSuite) TestReorg() {
 	s.Require().Equal(10, n)
 	s.Require().NoError(err)
 
-	// it will be less but even if something wrong we can't get more
+	// it will be less but even if something went wrong we can't get more
 	events := make(chan Event, 10)
 	sub := s.feed.Subscribe(events)
 	defer sub.Unsubscribe()
@@ -181,10 +181,10 @@ func (s *NewBlocksSuite) downloadHistorical() {
 			signer:   s.backend.Signer,
 			accounts: []common.Address{s.address},
 		},
-		feed:        s.feed,
-		address:     s.address,
-		client:      s.backend.Client,
-		safetyDepth: big.NewInt(0),
+		feed:    s.feed,
+		address: s.address,
+		client:  s.backend.Client,
+		to:      s.backend.Ethereum.BlockChain().CurrentBlock().Number(),
 	}
 	s.Require().NoError(eth.Run(context.Background()), "eth historical command failed to sync transfers")
 	transfers, err := s.db.GetTransfers(big.NewInt(0), nil)
@@ -211,7 +211,6 @@ func (s *NewBlocksSuite) reorgHistorical() {
 func (s *NewBlocksSuite) TestSafetyBufferFailure() {
 	s.downloadHistorical()
 
-	s.cmd.safetyDepth = big.NewInt(0)
 	s.reorgHistorical()
 
 	transfers, err := s.db.GetTransfers(big.NewInt(0), nil)
@@ -222,7 +221,8 @@ func (s *NewBlocksSuite) TestSafetyBufferFailure() {
 func (s *NewBlocksSuite) TestSafetyBufferSuccess() {
 	s.downloadHistorical()
 
-	s.cmd.safetyDepth = big.NewInt(10)
+	safety := new(big.Int).Sub(s.backend.Ethereum.BlockChain().CurrentHeader().Number, big.NewInt(10))
+	s.cmd.from = toDBHeader(s.backend.Ethereum.BlockChain().GetHeaderByNumber(safety.Uint64()))
 	s.reorgHistorical()
 
 	transfers, err := s.db.GetTransfers(big.NewInt(0), nil)

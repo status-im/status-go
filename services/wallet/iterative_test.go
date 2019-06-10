@@ -24,19 +24,26 @@ func (f transfersFixture) GetTransfersInRange(ctx context.Context, from, to *big
 }
 
 func TestIterFinished(t *testing.T) {
-	iterator := IterativeDownloader{known: &DBHeader{Number: big.NewInt(0)}}
+	iterator := IterativeDownloader{
+		from: &DBHeader{Number: big.NewInt(10)},
+		to:   &DBHeader{Number: big.NewInt(10)},
+	}
 	require.True(t, iterator.Finished())
 }
 
 func TestIterNotFinished(t *testing.T) {
-	iterator := IterativeDownloader{known: &DBHeader{Number: big.NewInt(2)}}
+	iterator := IterativeDownloader{
+		from: &DBHeader{Number: big.NewInt(2)},
+		to:   &DBHeader{Number: big.NewInt(5)},
+	}
 	require.False(t, iterator.Finished())
 }
 
 func TestIterRevert(t *testing.T) {
 	iterator := IterativeDownloader{
-		known:    &DBHeader{Number: big.NewInt(0)},
-		previous: &DBHeader{Number: big.NewInt(10)},
+		from:     &DBHeader{Number: big.NewInt(12)},
+		to:       &DBHeader{Number: big.NewInt(12)},
+		previous: &DBHeader{Number: big.NewInt(9)},
 	}
 	require.True(t, iterator.Finished())
 	iterator.Revert()
@@ -58,7 +65,8 @@ func TestIterProgress(t *testing.T) {
 		client:     chain,
 		downloader: transfers,
 		batchSize:  big.NewInt(5),
-		known:      &DBHeader{Number: big.NewInt(9)},
+		from:       &DBHeader{Number: big.NewInt(0)},
+		to:         &DBHeader{Number: big.NewInt(9)},
 	}
 	batch, err := iter.Next(context.TODO())
 	require.NoError(t, err)
