@@ -47,8 +47,8 @@ func (c InfiniteCommand) Run(ctx context.Context) error {
 	}
 }
 
-func NewGroup() *Group {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewGroup(parent context.Context) *Group {
+	ctx, cancel := context.WithCancel(parent)
 	return &Group{
 		ctx:    ctx,
 		cancel: cancel,
@@ -75,6 +75,15 @@ func (g *Group) Stop() {
 
 func (g *Group) Wait() {
 	g.wg.Wait()
+}
+
+func (g *Group) WaitAsync() <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		g.Wait()
+		close(ch)
+	}()
+	return ch
 }
 
 func NewAtomicGroup(parent context.Context) *AtomicGroup {
