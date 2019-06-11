@@ -31,7 +31,7 @@ pipeline {
     STATUS_PATH      = "${env.WORKSPACE}/src/github.com/status-im/status-go"
     CI_DIR           = "${env.STATUS_PATH}/_assets/ci"
     GOPATH           = "${env.WORKSPACE}"
-    PATH             = "${env.PATH}:${env.GOPATH}/bin"
+    PATH             = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     ANDROID_HOME     = '/usr/lib/android-sdk'
     ANDROID_SDK_ROOT = '/usr/lib/android-sdk'
     /* gomobile requires a specific NDK version */
