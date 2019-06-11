@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
-	"sort"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -66,34 +65,6 @@ func TestDBHeaderDoesntExist(t *testing.T) {
 	rst, err := db.HeaderExists(common.Hash{1})
 	require.NoError(t, err)
 	require.False(t, rst)
-}
-
-func TestDBLastHeader(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	template := types.Header{
-		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
-	}
-	first := template
-	first.Number = big.NewInt(10)
-	second := template
-	second.Number = big.NewInt(11)
-	require.NoError(t, db.SaveHeader(&second))
-	require.NoError(t, db.SaveHeader(&first))
-
-	rst, err := db.LastHeader()
-	require.NoError(t, err)
-	require.Equal(t, second.Hash(), rst.Hash)
-}
-
-func TestDBNoLastHeader(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-	header, err := db.LastHeader()
-	require.NoError(t, err)
-	require.Nil(t, header)
 }
 
 func TestDBProcessTransfer(t *testing.T) {
@@ -180,7 +151,7 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 
 }
 
-func TestDBEarliestSynced(t *testing.T) {
+func TestDBLatestSynced(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
@@ -200,20 +171,20 @@ func TestDBEarliestSynced(t *testing.T) {
 	require.NoError(t, db.SaveSyncedHeader(address, h1, ethSync))
 	require.NoError(t, db.SaveSyncedHeader(address, h2, ethSync))
 
-	earliest, err := db.GetEarliestSynced(address, ethSync)
+	latest, err := db.GetLatestSynced(address, ethSync)
 	require.NoError(t, err)
-	require.NotNil(t, earliest)
-	require.Equal(t, h2.Number, earliest.Number)
-	require.Equal(t, h2.Hash(), earliest.Hash)
+	require.NotNil(t, latest)
+	require.Equal(t, h1.Number, latest.Number)
+	require.Equal(t, h1.Hash(), latest.Hash)
 }
 
-func TestDBEarliestSyncedDoesntExist(t *testing.T) {
+func TestDBLatestSyncedDoesntExist(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	earliest, err := db.GetEarliestSynced(common.Address{1}, ethSync)
+	latest, err := db.GetLatestSynced(common.Address{1}, ethSync)
 	require.NoError(t, err)
-	require.Nil(t, earliest)
+	require.Nil(t, latest)
 }
 
 func TestDBProcessTransfersUpdate(t *testing.T) {
@@ -235,31 +206,30 @@ func TestDBProcessTransfersUpdate(t *testing.T) {
 	require.NoError(t, db.ProcessTranfers([]Transfer{transfer}, []common.Address{address}, []*DBHeader{header}, nil, ethSync))
 	require.NoError(t, db.ProcessTranfers([]Transfer{transfer}, []common.Address{address}, []*DBHeader{header}, nil, erc20Sync))
 
-	earliest, err := db.GetEarliestSynced(address, ethSync|erc20Sync)
+	latest, err := db.GetLatestSynced(address, ethSync|erc20Sync)
 	require.NoError(t, err)
-	require.Equal(t, header.Hash, earliest.Hash)
+	require.Equal(t, header.Hash, latest.Hash)
 }
 
-func TestDBLastHeadersReverseSorted(t *testing.T) {
+func TestDBLastHeadExist(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	headers := make([]*DBHeader, 10)
-	for i := range headers {
-		headers[i] = &DBHeader{Hash: common.Hash{byte(i)}, Number: big.NewInt(int64(i))}
+	headers := []*DBHeader{
+		{Number: big.NewInt(1), Hash: common.Hash{1}, Head: true},
+		{Number: big.NewInt(2), Hash: common.Hash{2}, Head: true},
+		{Number: big.NewInt(3), Hash: common.Hash{3}, Head: true},
 	}
-	require.NoError(t, db.ProcessTranfers(nil, nil, headers, nil, ethSync))
-
-	headers, err := db.LastHeaders(big.NewInt(5))
+	require.NoError(t, db.ProcessTranfers(nil, nil, headers, nil, 0))
+	last, err := db.GetLastHead()
 	require.NoError(t, err)
-	require.Len(t, headers, 5)
+	require.Equal(t, headers[2].Hash, last.Hash)
+}
 
-	sorted := make([]*DBHeader, len(headers))
-	copy(sorted, headers)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Number.Cmp(sorted[j].Number) > 0
-	})
-	for i := range headers {
-		require.Equal(t, sorted[i], headers[i])
-	}
+func TestDBLastHeadDoesntExist(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	last, err := db.GetLastHead()
+	require.NoError(t, err)
+	require.Nil(t, last)
 }

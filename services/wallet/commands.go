@@ -60,7 +60,6 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	}
 	transfers := concurrent.Get()
 	log.Info("eth historical downloader finished succesfully", "total transfers", len(transfers), "time", time.Since(start))
-	// TODO(dshulyak) insert 0 block number with transfers
 	err = c.db.ProcessTranfers(transfers, []common.Address{c.address}, headersFromTransfers(transfers), nil, ethSync)
 	if err != nil {
 		log.Error("failed to save downloaded erc20 transfers", "error", err)
@@ -202,6 +201,10 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 		log.Error("failed to process new header", "header", latest, "error", err)
 		return err
 	}
+	if len(added) == 0 && len(removed) == 0 {
+		log.Debug("new block already in the database", "block", latest.Number)
+		return nil
+	}
 	// for each added block get tranfers from downloaders
 	all := []Transfer{}
 	for i := range added {
@@ -287,6 +290,10 @@ func (c *newBlocksTransfersCommand) getTransfers(parent context.Context, header 
 	return append(ethT, erc20T...), nil
 }
 
+// controlCommand implements following procedure (following parts are executed sequeantially):
+// - verifies that the last header that was synced is still in the canonical chain
+// - runs fast indexing for each account separately
+// - starts listening to new blocks and watches for reorgs
 type controlCommand struct {
 	accounts    []common.Address
 	db          *Database
@@ -298,7 +305,8 @@ type controlCommand struct {
 	safetyDepth *big.Int
 }
 
-// run fast indexing for every accont managed by this command.
+// run fast indexing for every accont up to canonical chain head minus safety depth.
+// every account will run it from last synced header.
 func (c *controlCommand) fastIndex(ctx context.Context, to *DBHeader) error {
 	start := time.Now()
 	group := NewGroup(ctx)
@@ -335,25 +343,30 @@ func (c *controlCommand) fastIndex(ctx context.Context, to *DBHeader) error {
 	}
 }
 
+// verifyLastSynced verifies that last header that was added to the database is still in the canonical chain.
+// it is done by downloading configured number of parents for the last header in the db.
 func (c *controlCommand) verifyLastSynced(parent context.Context, last *DBHeader, head *types.Header) error {
 	log.Debug("verifying that previous header is still in canonical chan", "from", last.Number, "chain head", head.Number)
 	if new(big.Int).Sub(head.Number, last.Number).Cmp(c.safetyDepth) <= 0 {
 		log.Debug("no need to verify. last block is close enough to chain head")
 		return nil
 	}
-	header, err := c.client.HeaderByNumber(parent, new(big.Int).Add(last.Number, c.safetyDepth))
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	header, err := c.client.HeaderByNumber(ctx, new(big.Int).Add(last.Number, c.safetyDepth))
+	cancel()
 	if err != nil {
 		return err
 	}
 	log.Debug("spawn reorg verifier", "from", last.Number, "to", header.Number)
+	// TODO(dshulyak) make a standalone command that
+	// doesn't manage transfers and has an upper limit
 	cmd := &newBlocksTransfersCommand{
-		db:       c.db,
-		chain:    c.chain,
-		client:   c.client,
-		accounts: c.accounts,
-		eth:      c.eth,
-		erc20:    c.erc20,
-		feed:     c.feed,
+		db:     c.db,
+		chain:  c.chain,
+		client: c.client,
+		eth:    c.eth,
+		erc20:  c.erc20,
+		feed:   c.feed,
 
 		from: last,
 		to:   toDBHeader(header),
@@ -363,7 +376,9 @@ func (c *controlCommand) verifyLastSynced(parent context.Context, last *DBHeader
 
 func (c *controlCommand) Run(parent context.Context) error {
 	log.Debug("start control command")
-	head, err := c.client.HeaderByNumber(parent, nil)
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	head, err := c.client.HeaderByNumber(ctx, nil)
+	cancel()
 	if err != nil {
 		return err
 	}
@@ -384,7 +399,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 	if target.Cmp(zero) <= 0 {
 		target = zero
 	}
-	head, err = c.client.HeaderByNumber(parent, target)
+	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
+	head, err = c.client.HeaderByNumber(ctx, target)
+	cancel()
 	if err != nil {
 		return err
 	}

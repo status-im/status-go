@@ -232,44 +232,6 @@ func (db *Database) SaveSyncedHeader(address common.Address, header *types.Heade
 	return err
 }
 
-// LastHeader selects last header by block number.
-func (db *Database) LastHeader() (header *DBHeader, err error) {
-	rows, err := db.db.Query("SELECT hash,number FROM blocks WHERE number = (SELECT MAX(number) FROM blocks)")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-		err = rows.Scan(&header.Hash, (*SQLBigInt)(header.Number))
-		if err != nil {
-			return nil, err
-		}
-		if header != nil {
-			return header, nil
-		}
-	}
-	return nil, nil
-}
-
-func (db *Database) LastHeaders(limit *big.Int) ([]*DBHeader, error) {
-	rows, err := db.db.Query("SELECT hash,number FROM blocks WHERE number ORDER BY number DESC LIMIT ?", (*SQLBigInt)(limit))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	headers := []*DBHeader{}
-	for rows.Next() {
-		header := &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-		err = rows.Scan(&header.Hash, (*SQLBigInt)(header.Number))
-		if err != nil {
-			return nil, err
-		}
-		headers = append(headers, header)
-	}
-	return headers, nil
-}
-
 // HeaderExists checks if header with hash exists in db.
 func (db *Database) HeaderExists(hash common.Hash) (bool, error) {
 	var val sql.NullBool
@@ -295,7 +257,7 @@ func (db *Database) GetHeaderByNumber(number *big.Int) (header *DBHeader, err er
 
 func (db *Database) GetLastHead() (header *DBHeader, err error) {
 	header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
-	err = db.db.QueryRow("SELECT hash,number FROM blocks WHERE head = 1").Scan(&header.Hash, (*SQLBigInt)(header.Number))
+	err = db.db.QueryRow("SELECT hash,number FROM blocks WHERE head = 1 AND number = (SELECT MAX(number) FROM blocks)").Scan(&header.Hash, (*SQLBigInt)(header.Number))
 	if err == nil {
 		return header, nil
 	}
@@ -305,27 +267,7 @@ func (db *Database) GetLastHead() (header *DBHeader, err error) {
 	return nil, err
 }
 
-func (db *Database) GetEarliestSynced(address common.Address, option SyncOption) (header *DBHeader, err error) {
-	rows, err := db.db.Query(`
-SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number = blocks.number WHERE address = $1 AND blk_number
-= (SELECT MIN(blk_number) FROM accounts_to_blocks WHERE address = $1 AND sync & $2 = $2)`, address, option)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		header = &DBHeader{Number: new(big.Int)}
-		err = rows.Scan(&header.Hash, (*SQLBigInt)(header.Number))
-		if err != nil {
-			return nil, err
-		}
-		if header != nil {
-			return header, nil
-		}
-	}
-	return nil, nil
-}
-
+// GetLatestSynced downloads last synced block with a given option.
 func (db *Database) GetLatestSynced(address common.Address, option SyncOption) (header *DBHeader, err error) {
 	header = &DBHeader{Hash: common.Hash{}, Number: new(big.Int)}
 	err = db.db.QueryRow(`
