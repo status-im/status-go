@@ -159,7 +159,7 @@ Objects in the same format.
 Signals
 -------
 
-Three signals will are emitted:
+Two signals can be emitted:
 
 1. `newblock` signal
 
@@ -190,24 +190,6 @@ Client expected to request new transfers from received block and replace transfe
   "type": "wallet",
   "event": {
     "type": "reorg",
-    "blockNumber": 0,
-    "accounts": [
-      "0x42c8f505b4006d417dd4e0ba0e880692986adbd8"
-    ]
-  }
-}
-```
-
-3. `history`  signal.
-
-Emmited if new transfer in old block was found.
-Client expected to request transfers starting from this new block till the earliest known block.
-
-```json
-{
-  "type": "wallet",
-  "event": {
-    "type": "history",
     "blockNumber": 0,
     "accounts": [
       "0x42c8f505b4006d417dd4e0ba0e880692986adbd8"
