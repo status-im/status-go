@@ -271,7 +271,7 @@ func NewOnboarding(n, mnemonicPhraseLength C.int) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//ImportOnboardingAccount re-creates and imports an account created during onboarding.
+// ImportOnboardingAccount re-creates and imports an account created during onboarding.
 //export ImportOnboardingAccount
 func ImportOnboardingAccount(id, password *C.char) *C.char {
 	info, mnemonic, err := statusBackend.AccountManager().ImportOnboardingAccount(C.GoString(id), C.GoString(password))
@@ -294,6 +294,12 @@ func ImportOnboardingAccount(id, password *C.char) *C.char {
 	}
 	outBytes, _ := json.Marshal(out)
 	return C.CString(string(outBytes))
+}
+
+// ResetOnboarding resets the current onboarding removing from memory all the generated keys.
+//export ResetOnboarding
+func ResetOnboarding() {
+	statusBackend.AccountManager().ResetOnboarding()
 }
 
 //VerifyAccountPassword verifies account password

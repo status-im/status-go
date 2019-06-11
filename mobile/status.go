@@ -298,6 +298,11 @@ func ImportOnboardingAccount(id, password string) string {
 	return string(outBytes)
 }
 
+// ResetOnboarding resets the current onboarding removing from memory all the generated keys.
+func ResetOnboarding() {
+	statusBackend.AccountManager().ResetOnboarding()
+}
+
 // VerifyAccountPassword verifies account password.
 func VerifyAccountPassword(keyStoreDir, address, password string) string {
 	_, err := statusBackend.AccountManager().VerifyAccountPassword(keyStoreDir, address, password)
