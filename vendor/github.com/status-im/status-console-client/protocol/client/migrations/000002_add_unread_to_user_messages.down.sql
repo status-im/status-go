@@ -1,0 +1,4 @@
+-- TODO(adam): cannot drop column without copying a table.
+-- Implement copying is easy but we need to duplicate schema
+-- to recreate it. Unless there is a smarter way to get a schema
+-- of an existing table.

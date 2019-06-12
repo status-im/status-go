@@ -91,14 +91,14 @@ type cTag struct {
 	aliasTag       string
 	actualAliasTag string
 	param          string
-	typeof         tagType
 	keys           *cTag // only populated when using tag's 'keys' and 'endkeys' for map key validation
 	next           *cTag
+	fn             FuncCtx
+	typeof         tagType
 	hasTag         bool
 	hasAlias       bool
 	hasParam       bool // true if parameter used eg. eq= where the equal sign has been set
 	isBlockEnd     bool // indicates the current tag represents the last validation in the block
-	fn             FuncCtx
 }
 
 func (v *Validate) extractStructCache(current reflect.Value, sName string) *cStruct {
@@ -223,7 +223,7 @@ func (v *Validate) parseFieldTagsRecursive(tag string, fieldName string, alias s
 			current.typeof = typeKeys
 
 			if i == 0 || prevTag != typeDive {
-				panic(fmt.Sprintf("'%s' tag must be immediately preceeded by the '%s' tag", keysTag, diveTag))
+				panic(fmt.Sprintf("'%s' tag must be immediately preceded by the '%s' tag", keysTag, diveTag))
 			}
 
 			current.typeof = typeKeys
