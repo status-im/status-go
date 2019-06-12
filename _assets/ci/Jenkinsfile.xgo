@@ -33,7 +33,6 @@ pipeline {
     CI_DIR         = "${env.STATUS_PATH}/_assets/ci"
     GOPATH         = "${env.WORKSPACE}"
     PATH           = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
-    GOCACHE        = "off"
   }
 
   stages {
