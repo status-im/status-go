@@ -17,10 +17,10 @@ import (
 )
 
 type callTracker struct {
-	mu        sync.Mutex
-	calls     int
-	reply     [][]types.Log
-	criterias []map[string]interface{}
+	mu       sync.Mutex
+	calls    int
+	reply    [][]types.Log
+	criteria []map[string]interface{}
 }
 
 func (c *callTracker) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
@@ -31,7 +31,7 @@ func (c *callTracker) CallContext(ctx context.Context, result interface{}, metho
 		return errors.New("unexpected length of args")
 	}
 	crit := args[0].(map[string]interface{})
-	c.criterias = append(c.criterias, crit)
+	c.criteria = append(c.criteria, crit)
 	select {
 	case <-ctx.Done():
 		return errors.New("context canceled")
@@ -73,7 +73,7 @@ func runLogsFetcherTest(t *testing.T, f *logsFilter, replies [][]types.Log, quer
 		}
 	}()
 	wg.Wait()
-	require.Len(t, c.criterias, queries)
+	require.Len(t, c.criteria, queries)
 	return &c
 }
 
@@ -90,8 +90,8 @@ func TestLogsFetcherAdjusted(t *testing.T) {
 		{BlockNumber: 11}, {BlockNumber: 12},
 	}
 	c := runLogsFetcherTest(t, f, [][]types.Log{logs}, 2)
-	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[0]["fromBlock"])
-	require.Equal(t, c.criterias[1]["fromBlock"], "latest")
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criteria[0]["fromBlock"])
+	require.Equal(t, c.criteria[1]["fromBlock"], "latest")
 }
 
 func TestAdjustedDueToReorg(t *testing.T) {
@@ -110,9 +110,9 @@ func TestAdjustedDueToReorg(t *testing.T) {
 		{BlockNumber: 12, BlockHash: common.Hash{2, 2}},
 	}
 	c := runLogsFetcherTest(t, f, [][]types.Log{logs, reorg}, 3)
-	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[0]["fromBlock"])
-	require.Equal(t, "latest", c.criterias[1]["fromBlock"])
-	require.Equal(t, hexutil.EncodeBig(big.NewInt(11)), c.criterias[2]["fromBlock"])
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criteria[0]["fromBlock"])
+	require.Equal(t, "latest", c.criteria[1]["fromBlock"])
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(11)), c.criteria[2]["fromBlock"])
 }
 
 func TestLogsFetcherCanceledContext(t *testing.T) {
@@ -127,6 +127,6 @@ func TestLogsFetcherCanceledContext(t *testing.T) {
 	}
 	cancel()
 	c := runLogsFetcherTest(t, f, [][]types.Log{make([]types.Log, 2)}, 2)
-	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[0]["fromBlock"])
-	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criterias[1]["fromBlock"])
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criteria[0]["fromBlock"])
+	require.Equal(t, hexutil.EncodeBig(big.NewInt(10)), c.criteria[1]["fromBlock"])
 }

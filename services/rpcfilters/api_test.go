@@ -94,8 +94,8 @@ func TestGetFilterLogs(t *testing.T) {
 	logs, err := api.GetFilterLogs(context.TODO(), id)
 	require.NoError(t, err)
 	require.Empty(t, logs)
-	require.Len(t, tracker.criterias, 1)
-	rst, err := hexutil.DecodeBig(tracker.criterias[0]["fromBlock"].(string))
+	require.Len(t, tracker.criteria, 1)
+	rst, err := hexutil.DecodeBig(tracker.criteria[0]["fromBlock"].(string))
 	require.NoError(t, err)
 	require.Equal(t, block, rst)
 }

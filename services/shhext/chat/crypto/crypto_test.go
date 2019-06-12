@@ -115,7 +115,7 @@ func TestSymmetricEncryption(t *testing.T) {
 		t,
 		32,
 		len(cyphertext1),
-		"Cyphertext with the correct lenght should be generated")
+		"Cyphertext with the correct length should be generated")
 
 	require.NotEqualf(
 		t,

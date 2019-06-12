@@ -30,7 +30,7 @@ const (
 	defaultTimeoutWaitAdded = 5 * time.Second
 )
 
-var errProtocolNotInitialized = errors.New("procotol is not initialized")
+var errProtocolNotInitialized = errors.New("protocol is not initialized")
 
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {

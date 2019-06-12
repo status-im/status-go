@@ -122,7 +122,7 @@ func (ps *ConnectionManager) Start() {
 						continue
 					}
 					failuresPerServer[ev.Peer]++
-					log.Debug("request to a mail server expired, disconncet a peer", "address", ev.Peer)
+					log.Debug("request to a mail server expired, disconnect a peer", "address", ev.Peer)
 					if failuresPerServer[ev.Peer] >= ps.maxFailures {
 						state.nodeDisconnected(ev.Peer)
 					}
