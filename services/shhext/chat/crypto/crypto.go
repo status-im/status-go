@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -103,11 +104,7 @@ func EncryptSymmetric(key, plaintext []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	encrypted, err := aesgcm.Seal(nil, salt, plaintext, nil), nil
-	if err != nil {
-		return nil, err
-	}
-
+	encrypted := aesgcm.Seal(nil, salt, plaintext, nil)
 	return append(encrypted, salt...), nil
 }
 

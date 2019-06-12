@@ -95,9 +95,7 @@ func main() {
 	)
 	if err != nil {
 		printUsage()
-		if err != nil {
-			logger.Error(err.Error())
-		}
+		logger.Error(err.Error())
 		os.Exit(1)
 	}
 

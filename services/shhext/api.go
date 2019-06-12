@@ -650,9 +650,6 @@ func (api *PublicAPI) SendPairingMessage(ctx context.Context, msg chat.SendDirec
 	}
 
 	msg.PubKey = crypto.FromECDSAPub(&privateKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
 
 	protocolMessage, err := api.service.protocol.BuildDHMessage(privateKey, &privateKey.PublicKey, msg.Payload)
 	if err != nil {
