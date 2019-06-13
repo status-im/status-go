@@ -6,6 +6,7 @@ RELEASE_BRANCH := develop
 RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
 PRE_RELEASE := "1"
 RELEASE_TYPE := $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi)
+GOLANGCI_BINARY=golangci-lint
 
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
@@ -269,11 +270,11 @@ canary-test: node-canary
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b $(GOPATH)/bin v1.17.1
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.17.1
 
 lint:
 	@echo "lint"
-	@golangci-lint run ./...
+	@golangci-lint run ./... --deadline=5m
 
 ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
