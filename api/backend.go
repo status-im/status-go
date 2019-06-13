@@ -137,7 +137,7 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) chatAPIService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return chatapi.New(b.statusNode, b.accountManager), nil
+		return chatapi.New(b.statusNode, b.accountManager)
 	}
 }
 
