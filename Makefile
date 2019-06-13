@@ -274,7 +274,7 @@ lint-install:
 
 lint:
 	@echo "lint"
-	@golangci-lint run ./...
+	@golangci-lint run ./... --deadline=5m
 
 ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at once
 
