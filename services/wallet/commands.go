@@ -59,7 +59,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 		return concurrent.Error()
 	}
 	transfers := concurrent.Get()
-	log.Info("eth historical downloader finished succesfully", "total transfers", len(transfers), "time", time.Since(start))
+	log.Info("eth historical downloader finished successfully", "total transfers", len(transfers), "time", time.Since(start))
 	err = c.db.ProcessTranfers(transfers, []common.Address{c.address}, headersFromTransfers(transfers), nil, ethSync)
 	if err != nil {
 		log.Error("failed to save downloaded erc20 transfers", "error", err)

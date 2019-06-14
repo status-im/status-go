@@ -68,7 +68,7 @@ func (d *IterativeDownloader) Next(parent context.Context) ([]Transfer, error) {
 	}
 	transfers, err := d.downloader.GetTransfersInRange(parent, d.from.Number, to)
 	if err != nil {
-		log.Error("failed to get transfer inbetween two bloks", "from", d.from.Number, "to", to, "error", err)
+		log.Error("failed to get transfer in between two bloks", "from", d.from.Number, "to", to, "error", err)
 		return nil, err
 	}
 	// use integers instead of DBHeader
