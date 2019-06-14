@@ -3,9 +3,9 @@ package migrations
 import (
 	"database/sql"
 
-	"github.com/status-im/migrate"
-	"github.com/status-im/migrate/database/sqlcipher"
-	bindata "github.com/status-im/migrate/source/go_bindata"
+	"github.com/status-im/migrate/v4"
+	"github.com/status-im/migrate/v4/database/sqlcipher"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 )
 
 // Migrate applies migrations.

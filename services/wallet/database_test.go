@@ -28,7 +28,7 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 	header := &types.Header{
 		Number:     big.NewInt(10),
 		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+		Time:       1,
 	}
 	require.NoError(t, db.SaveHeader(header))
 	rst, err := db.GetHeaderByNumber(header.Number)
@@ -50,7 +50,7 @@ func TestDBHeaderExists(t *testing.T) {
 	header := &types.Header{
 		Number:     big.NewInt(10),
 		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+		Time:       1,
 	}
 	require.NoError(t, db.SaveHeader(header))
 	rst, err := db.HeaderExists(header.Hash())
@@ -159,12 +159,12 @@ func TestDBLatestSynced(t *testing.T) {
 	h1 := &types.Header{
 		Number:     big.NewInt(10),
 		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+		Time:       1,
 	}
 	h2 := &types.Header{
 		Number:     big.NewInt(9),
 		Difficulty: big.NewInt(1),
-		Time:       big.NewInt(1),
+		Time:       1,
 	}
 	require.NoError(t, db.SaveHeader(h1))
 	require.NoError(t, db.SaveHeader(h2))

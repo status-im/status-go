@@ -107,7 +107,7 @@ func genHeadersChain(size, difficulty int) []*types.Header {
 		rst[i] = &types.Header{
 			Number:     big.NewInt(int64(i)),
 			Difficulty: big.NewInt(int64(difficulty)),
-			Time:       big.NewInt(1),
+			Time:       1,
 		}
 		if i != 0 {
 			rst[i].ParentHash = rst[i-1].Hash()
