@@ -6,6 +6,7 @@ run:
   skip-dirs:
     - static
   skip-files:
+    - bindata.go
     - .*_mock.go
     - jail/doc.go
 

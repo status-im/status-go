@@ -340,8 +340,11 @@ type NodeConfig struct {
 	// IncentivisationConfig extra configuration for incentivisation service
 	IncentivisationConfig IncentivisationConfig `json:"IncentivisationConfig," validate:"structonly"`
 
-	// ShhextConfig keeps configuration for service running under shhext namespace.
+	// ShhextConfig extra configuration for service running under shhext namespace.
 	ShhextConfig ShhextConfig `json:"ShhextConfig," validate:"structonly"`
+
+	// WalletConfig extra configuration for wallet.Service.
+	WalletConfig WalletConfig
 
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
@@ -356,6 +359,11 @@ type NodeConfig struct {
 
 	// MailServerRegistryAddress is the MailServerRegistry contract address
 	MailServerRegistryAddress string
+}
+
+// WalletConfig extra configuration for wallet.Service.
+type WalletConfig struct {
+	Enabled bool
 }
 
 // ShhextConfig defines options used by shhext service.
@@ -523,7 +531,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		HTTPPort:         8545,
 		HTTPVirtualHosts: []string{"localhost"},
 		ListenAddr:       ":0",
-		APIModules:       "eth,net,web3,peer",
+		APIModules:       "eth,net,web3,peer,wallet",
 		MaxPeers:         25,
 		MaxPendingPeers:  0,
 		IPCFile:          "geth.ipc",
