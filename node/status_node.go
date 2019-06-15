@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/wallet"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -587,6 +588,17 @@ func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
 		err = ErrServiceUnknown
 	}
 
+	return
+}
+
+// WalletService returns wallet.Service instance if it is started.
+func (n *StatusNode) WalletService() (s *wallet.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
 	return
 }
 
