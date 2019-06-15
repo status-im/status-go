@@ -12,8 +12,8 @@ import (
 	"github.com/status-im/status-go/node"
 
 	"github.com/status-im/status-console-client/protocol/adapter"
-	"github.com/status-im/status-console-client/protocol/transport"
 	"github.com/status-im/status-console-client/protocol/client"
+	"github.com/status-im/status-console-client/protocol/transport"
 )
 
 // Make sure that Service implements node.Service interface.
