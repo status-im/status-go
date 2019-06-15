@@ -11,7 +11,8 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/node"
 
-	"github.com/status-im/status-console-client/protocol/adapters"
+	"github.com/status-im/status-console-client/protocol/adapter"
+	"github.com/status-im/status-console-client/protocol/transport"
 	"github.com/status-im/status-console-client/protocol/client"
 )
 
@@ -72,8 +73,9 @@ func (s *Service) Start(server *p2p.Server) error {
 	if err != nil {
 		return err
 	}
-	adapter := adapters.NewWhisperServiceAdapter(s.node, shhService, privateKey)
-	s.messenger = client.NewMessenger(privateKey, adapter, db)
+	transp := transport.NewWhisperServiceTransport(s.node, shhService, privateKey)
+	protocolAdapter := adapter.NewProtocolWhisperAdapter(transp, nil)
+	s.messenger = client.NewMessenger(privateKey, protocolAdapter, db)
 	return nil
 }
 

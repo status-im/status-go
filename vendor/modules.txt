@@ -55,6 +55,7 @@ github.com/ethereum/go-ethereum/rpc
 github.com/ethereum/go-ethereum/ethapi
 github.com/ethereum/go-ethereum/eth/filters
 github.com/ethereum/go-ethereum/crypto/ecies
+github.com/ethereum/go-ethereum/consensus/ethash
 github.com/ethereum/go-ethereum/common/math
 github.com/ethereum/go-ethereum/crypto/secp256k1
 github.com/ethereum/go-ethereum/accounts/usbwallet
@@ -72,7 +73,6 @@ github.com/ethereum/go-ethereum/core/rawdb
 github.com/ethereum/go-ethereum/core/state
 github.com/ethereum/go-ethereum/core/vm
 github.com/ethereum/go-ethereum/consensus/clique
-github.com/ethereum/go-ethereum/consensus/ethash
 github.com/ethereum/go-ethereum/core/bloombits
 github.com/ethereum/go-ethereum/eth/fetcher
 github.com/ethereum/go-ethereum/eth/gasprice
@@ -311,16 +311,25 @@ github.com/status-im/migrate/v4
 github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/migrate/v4/database/sqlcipher
+# github.com/status-im/mvds v0.0.14
+github.com/status-im/mvds/node
+github.com/status-im/mvds/protobuf
+github.com/status-im/mvds/state
+github.com/status-im/mvds/transport
+github.com/status-im/mvds/store
 # github.com/status-im/rendezvous v1.3.0
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
 # github.com/status-im/status-console-client v0.0.0-20190615195328-a020c363b02f
+github.com/status-im/status-console-client/protocol/adapter
 github.com/status-im/status-console-client/protocol/client
+github.com/status-im/status-console-client/protocol/transport
 github.com/status-im/status-console-client/protocol/v1
+github.com/status-im/status-console-client/protocol/datasync/peer
+github.com/status-im/status-console-client/protocol/subscription
 github.com/status-im/status-console-client/protocol/client/migrations
 github.com/status-im/status-console-client/protocol/client/sqlite
-github.com/status-im/status-console-client/protocol/subscription
 # github.com/status-im/whisper v1.4.13
 github.com/status-im/whisper/whisperv6
 # github.com/stretchr/testify v1.3.0
