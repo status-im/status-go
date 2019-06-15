@@ -20,7 +20,7 @@ require (
 	github.com/status-im/doubleratchet v2.0.0+incompatible
 	github.com/status-im/migrate/v4 v4.3.1-status
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-console-client v0.0.0-20190606085928-6009b73feb65
+	github.com/status-im/status-console-client v0.0.0-20190615195328-a020c363b02f
 	github.com/status-im/whisper v1.4.13
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0

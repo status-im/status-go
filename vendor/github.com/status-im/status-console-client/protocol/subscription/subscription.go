@@ -1,4 +1,4 @@
-package protocol
+package subscription
 
 import (
 	"sync"
@@ -11,7 +11,7 @@ type Subscription struct {
 	done chan struct{}
 }
 
-func NewSubscription() *Subscription {
+func New() *Subscription {
 	return &Subscription{
 		done: make(chan struct{}),
 	}

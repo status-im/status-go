@@ -5,12 +5,14 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"time"
+
+	"github.com/status-im/status-console-client/protocol/subscription"
 )
 
 // Protocol is an interface defining basic methods to receive and send messages.
 type Protocol interface {
 	// Subscribe listens to new messages.
-	Subscribe(ctx context.Context, messages chan<- *Message, options SubscribeOptions) (*Subscription, error)
+	Subscribe(ctx context.Context, messages chan<- *Message, options SubscribeOptions) (*subscription.Subscription, error)
 
 	// Send sends a message to the network.
 	// Identity is required as the protocol requires
@@ -22,6 +24,7 @@ type Protocol interface {
 }
 
 // ChatOptions are chat specific options, usually related to the recipient/destination.
+// TODO: split it into PublicRoomOptions and PrivateChatOptions.
 type ChatOptions struct {
 	ChatName  string           // for public chats
 	Recipient *ecdsa.PublicKey // for private chats
@@ -105,11 +108,13 @@ func (o RequestOptions) Validate() error {
 }
 
 // SubscribeOptions are options for Chat.Subscribe method.
+// TODO: split it into SubPublicRoomOptions and SubPrivateChatOptions.
 type SubscribeOptions struct {
 	ChatOptions
 }
 
 // SendOptions are options for Chat.Send.
+// TODO: split it into SendPublicRoomOptions and SendPrivateChatOptions.
 type SendOptions struct {
 	ChatOptions
 }

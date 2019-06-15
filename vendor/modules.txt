@@ -315,15 +315,14 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-console-client v0.0.0-20190606085928-6009b73feb65
-github.com/status-im/status-console-client/protocol/adapters
+# github.com/status-im/status-console-client v0.0.0-20190615195328-a020c363b02f
 github.com/status-im/status-console-client/protocol/client
 github.com/status-im/status-console-client/protocol/v1
 github.com/status-im/status-console-client/protocol/client/migrations
 github.com/status-im/status-console-client/protocol/client/sqlite
+github.com/status-im/status-console-client/protocol/subscription
 # github.com/status-im/whisper v1.4.13
 github.com/status-im/whisper/whisperv6
-github.com/status-im/whisper/shhclient
 # github.com/stretchr/testify v1.3.0
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
