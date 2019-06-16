@@ -3,7 +3,6 @@ package chatapi
 import (
 	"fmt"
 
-	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -60,7 +59,7 @@ type API struct {
 	cs map[string]ChatView
 }
 
-func NewMockAPI(node *node.StatusNode) *API {
+func NewMockAPI() *API {
 	return &API{
 		cs: map[string]ChatView{
 			"status": {

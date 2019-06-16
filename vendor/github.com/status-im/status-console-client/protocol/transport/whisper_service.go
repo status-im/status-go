@@ -8,9 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/pkg/errors"
-	"github.com/status-im/status-go/node"
+
+	"github.com/ethereum/go-ethereum/p2p"
+	gethnode "github.com/ethereum/go-ethereum/node"
+
 	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 
@@ -60,20 +62,34 @@ func (m *WhisperServiceKeysManager) GetRawSymKey(id string) ([]byte, error) {
 
 // WhisperServiceTransport is a transport based on Whisper service.
 type WhisperServiceTransport struct {
-	node        *node.StatusNode // TODO: replace with an interface
+	node        StatusNode // TODO: replace with an interface
 	shh         *whisper.Whisper
+	shhextAPI *shhext.PublicAPI
 	keysManager *WhisperServiceKeysManager
 
+	mailservers []string
 	selectedMailServerEnode string
 }
 
 var _ WhisperTransport = (*WhisperServiceTransport)(nil)
 
+type StatusNode interface {
+	GethNode() *gethnode.Node
+	AddPeer(string) error
+}
+
 // NewWhisperService returns a new WhisperServiceTransport.
-func NewWhisperServiceTransport(node *node.StatusNode, shh *whisper.Whisper, privateKey *ecdsa.PrivateKey) *WhisperServiceTransport {
+func NewWhisperServiceTransport(
+	node StatusNode,
+	mailservers []string,
+	shh *whisper.Whisper,
+	shhextService *shhext.Service,
+	privateKey *ecdsa.PrivateKey,
+) *WhisperServiceTransport {
 	return &WhisperServiceTransport{
 		node: node,
 		shh:  shh,
+		shhextAPI: shhext.NewPublicAPI(shhextService),
 		keysManager: &WhisperServiceKeysManager{
 			shh:               shh,
 			privateKey:        privateKey,
@@ -169,8 +185,7 @@ func (a *WhisperServiceTransport) selectAndAddMailServer() (string, error) {
 		return a.selectedMailServerEnode, nil
 	}
 
-	config := a.node.Config()
-	enode := randomItem(config.ClusterConfig.TrustedMailServers)
+	enode := randomItem(a.mailservers)
 	errCh := waitForPeerAsync(
 		a.node.GethNode().Server(),
 		enode,
@@ -195,16 +210,10 @@ func (a *WhisperServiceTransport) selectAndAddMailServer() (string, error) {
 }
 
 func (a *WhisperServiceTransport) requestMessages(ctx context.Context, req shhext.MessagesRequest, followCursor bool) (resp shhext.MessagesResponse, err error) {
-	shhextService, err := a.node.ShhExtService()
-	if err != nil {
-		return
-	}
-	shhextAPI := shhext.NewPublicAPI(shhextService)
-
 	log.Printf("[WhisperServiceTransport::requestMessages] request for a chunk with %d messages", req.Limit)
 
 	start := time.Now()
-	resp, err = shhextAPI.RequestMessagesSync(shhext.RetryConfig{
+	resp, err = a.shhextAPI.RequestMessagesSync(shhext.RetryConfig{
 		BaseTimeout: time.Second * 10,
 		StepTimeout: time.Second,
 		MaxRetries:  3,

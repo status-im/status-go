@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/services/chatapi"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -580,6 +581,19 @@ func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 
 // ShhExtService exposes reference to shh extension service running on top of the node
 func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// ChatAPIService exposes reference to a chat API serivce.
+func (n *StatusNode) ChatAPIService() (s *chatapi.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 

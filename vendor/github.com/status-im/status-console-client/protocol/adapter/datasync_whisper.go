@@ -96,7 +96,7 @@ func (w *DataSyncWhisperAdapter) decodePayload(message *whisper.ReceivedMessage)
 }
 
 func (w *DataSyncWhisperAdapter) decodeMessages(payload protobuf.Payload) []*protocol.Message {
-	messages := make([]*protocol.Message, len(payload.Messages))
+	messages := make([]*protocol.Message, 0)
 
 	for _, message := range payload.Messages {
 		decoded, err := protocol.DecodeMessage(message.Body)

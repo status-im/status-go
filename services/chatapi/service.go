@@ -1,6 +1,7 @@
 package chatapi
 
 import (
+	"crypto/ecdsa"
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -8,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/services/shhext"
+	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-console-client/protocol/adapter"
 	"github.com/status-im/status-console-client/protocol/client"
@@ -21,17 +22,39 @@ var _ gethnode.Service = (*Service)(nil)
 
 // Service represents our own implementation of personal sign operations.
 type Service struct {
-	node           *node.StatusNode
-	accountManager *account.Manager
-	messenger      *client.Messenger
+	mailservers []string
+	dataDir     string
+	shh         *whisper.Whisper
+	shhExt      *shhext.Service
+
+	messenger *client.Messenger
 }
 
 // New returns a new Service.
-func New(node *node.StatusNode, accountManager *account.Manager) (*Service, error) {
+func New(mailservers []string, dataDir string, shh *whisper.Whisper, shhExt *shhext.Service) *Service {
 	return &Service{
-		node:           node,
-		accountManager: accountManager,
-	}, nil
+		mailservers: mailservers,
+		dataDir:     dataDir,
+		shh:         shh,
+		shhExt:      shhExt,
+	}
+}
+
+// Init initialize the service. An account must be already selected
+// before calling this method.
+func (s *Service) Init(pk *ecdsa.PrivateKey, node transport.StatusNode) error {
+	// TODO(adam): replace it with a proper key
+	dbKey := crypto.PubkeyToAddress(pk.PublicKey).String()
+	dbPath := filepath.Join(s.dataDir, "chat.sql")
+	db, err := client.InitializeDB(dbPath, dbKey)
+	if err != nil {
+		return err
+	}
+
+	trnsp := transport.NewWhisperServiceTransport(node, s.mailservers, s.shh, s.shhExt, pk)
+	protocolAdapter := adapter.NewProtocolWhisperAdapter(trnsp, nil)
+	s.messenger = client.NewMessenger(pk, protocolAdapter, db)
+	return nil
 }
 
 // Protocols returns a new protocols list. In this case, there are none.
@@ -53,29 +76,6 @@ func (s *Service) APIs() []rpc.API {
 
 // Start is run when a service is started.
 func (s *Service) Start(server *p2p.Server) error {
-	// get the current account's private key
-	chatAccount, err := s.accountManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-	privateKey := chatAccount.AccountKey.PrivateKey
-
-	// setup database
-	// TODO(adam): replace it with a proper key
-	dbKey := crypto.PubkeyToAddress(privateKey.PublicKey).String()
-	dbPath := filepath.Join(s.node.Config().DataDir, "chat.sql")
-	db, err := client.InitializeDB(dbPath, dbKey)
-	if err != nil {
-		return err
-	}
-
-	shhService, err := s.node.WhisperService()
-	if err != nil {
-		return err
-	}
-	transp := transport.NewWhisperServiceTransport(s.node, shhService, privateKey)
-	protocolAdapter := adapter.NewProtocolWhisperAdapter(transp, nil)
-	s.messenger = client.NewMessenger(privateKey, protocolAdapter, db)
 	return nil
 }
 

@@ -138,7 +138,20 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) chatAPIService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return chatapi.New(b.statusNode, b.accountManager)
+		config := b.statusNode.Config()
+		mailservers := config.ClusterConfig.TrustedMailServers
+		dataDir := config.DataDir
+
+		shhService, err := b.statusNode.WhisperService()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ChatAPI service: %v", err)
+		}
+		shhextService, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ChatAPI service: %v", err)
+		}
+
+		return chatapi.New(mailservers, dataDir, shhService, shhextService), nil
 	}
 }
 
@@ -524,6 +537,9 @@ func (b *StatusBackend) reSelectAccount() error {
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
+// TODO(adam): make it even driven so that an event is sent
+// that an account got selected and all services can listen to
+// that signal and initialize.
 func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -550,6 +566,7 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 	}
 
 	if whisperService != nil {
+		// Init shhext service.
 		st, err := b.statusNode.ShhExtService()
 		if err != nil {
 			return err
@@ -557,6 +574,24 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 
 		if err := st.InitProtocolWithPassword(chatAddress, password); err != nil {
 			return err
+		}
+
+		// Init ChatAPI which is the Status Messaging service.
+		chatAPI, err := b.statusNode.ChatAPIService()
+		switch err {
+		case node.ErrServiceUnknown, nil:
+		default:
+			return err
+		}
+
+		chatAccount, err := b.accountManager.SelectedChatAccount()
+		if err != nil {
+			return err
+		}
+
+		err = chatAPI.Init(chatAccount.AccountKey.PrivateKey, b.statusNode)
+		if err != nil {
+			return fmt.Errorf("failed to initialize Chat API service: %v", err)
 		}
 	}
 	return b.startWallet(password)

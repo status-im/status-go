@@ -321,7 +321,7 @@ github.com/status-im/mvds/store
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-console-client v0.0.0-20190615195328-a020c363b02f
+# github.com/status-im/status-console-client v0.0.0-20190616193151-48ff50d16de2
 github.com/status-im/status-console-client/protocol/adapter
 github.com/status-im/status-console-client/protocol/client
 github.com/status-im/status-console-client/protocol/transport
