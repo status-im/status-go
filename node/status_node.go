@@ -29,11 +29,11 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/chatapi"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/services/chatapi"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
