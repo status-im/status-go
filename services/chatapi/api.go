@@ -2,11 +2,16 @@ package chatapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/status-im/status-console-client/protocol/client"
 	"github.com/status-im/status-console-client/protocol/v1"
 	"github.com/status-im/status-go/signal"
+)
+
+var (
+	ErrMessengerNotInitialized = errors.New("messenger not initialized")
 )
 
 type PrivateAPI struct {
@@ -19,8 +24,20 @@ func NewPrivateAPI(s *Service) *PrivateAPI {
 	}
 }
 
+// Start starts listening for messages for all existing contacts.
+func (api *PrivateAPI) Start() error {
+	if api.s.messenger == nil {
+		return ErrMessengerNotInitialized
+	}
+	return api.s.messenger.Start()
+}
+
 func (api *PrivateAPI) Chats() (ChatsResponse, error) {
 	var result ChatsResponse
+
+	if api.s.messenger == nil {
+		return result, ErrMessengerNotInitialized
+	}
 
 	contacts, err := api.s.messenger.Contacts()
 	if err != nil {
@@ -102,6 +119,10 @@ func countUnread(messages []*protocol.Message) int {
 }
 
 func (api *PrivateAPI) JoinPublicChat(name string) error {
+	if api.s.messenger == nil {
+		return ErrMessengerNotInitialized
+	}
+
 	c := client.CreateContactPublicRoom(name, client.ContactAdded)
 
 	if err := api.s.messenger.Join(context.Background(), c); err != nil {
@@ -114,6 +135,10 @@ func (api *PrivateAPI) JoinPublicChat(name string) error {
 }
 
 func (api *PrivateAPI) StartOneOnOneChat(recipient string) error {
+	if api.s.messenger == nil {
+		return ErrMessengerNotInitialized
+	}
+
 	c, err := client.CreateContactPrivate(recipient, recipient, client.ContactAdded)
 	if err != nil {
 		return err
@@ -129,6 +154,10 @@ func (api *PrivateAPI) StartOneOnOneChat(recipient string) error {
 }
 
 func (api *PrivateAPI) RemoveChat(id string) error {
+	if api.s.messenger == nil {
+		return ErrMessengerNotInitialized
+	}
+
 	contacts, err := api.s.messenger.Contacts()
 	if err != nil {
 		return err

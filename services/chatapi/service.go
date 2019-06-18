@@ -2,14 +2,15 @@ package chatapi
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/services/shhext/chat"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-console-client/protocol/adapter"
@@ -17,42 +18,60 @@ import (
 	"github.com/status-im/status-console-client/protocol/transport"
 )
 
+const (
+	chatSQLFileName        = "chat.sql"
+	pfsSQLFileNameV1Format = "pfs_v1.%s.sql"
+)
+
 // Make sure that Service implements node.Service interface.
 var _ gethnode.Service = (*Service)(nil)
 
+type Config struct {
+	Mailservers    []string
+	DataDir        string // ShhextConfig.BackupDisabledDataDir
+	PFSEnabled     bool   // ShhextConfig.PFSEnabled
+	InstallationID string // ShhextConfig.InstalationID
+}
+
 // Service represents our own implementation of personal sign operations.
 type Service struct {
-	mailservers []string
-	dataDir     string
-	shh         *whisper.Whisper
-	shhExt      *shhext.Service
-
+	config Config
 	messenger *client.Messenger
 }
 
 // New returns a new Service.
-func New(mailservers []string, dataDir string, shh *whisper.Whisper, shhExt *shhext.Service) *Service {
+func New(c Config) *Service {
 	return &Service{
-		mailservers: mailservers,
-		dataDir:     dataDir,
-		shh:         shh,
-		shhExt:      shhExt,
+		config: c,
 	}
 }
 
 // Init initialize the service. An account must be already selected
 // before calling this method.
-func (s *Service) Init(pk *ecdsa.PrivateKey, node transport.StatusNode) error {
-	// TODO(adam): replace it with a proper key
-	dbKey := crypto.PubkeyToAddress(pk.PublicKey).String()
-	dbPath := filepath.Join(s.dataDir, "chat.sql")
-	db, err := client.InitializeDB(dbPath, dbKey)
+// This method can be called multiple times with different keys.
+func (s *Service) Init(
+	node transport.StatusNode,
+	shh *whisper.Whisper,
+	shhExt *shhext.Service,
+	pk *ecdsa.PrivateKey,
+	encryptionKey string,
+) error {
+	dbPath := filepath.Join(s.config.DataDir, chatSQLFileName)
+	db, err := client.InitializeDB(dbPath, encryptionKey)
 	if err != nil {
 		return err
 	}
 
-	trnsp := transport.NewWhisperServiceTransport(node, s.mailservers, s.shh, s.shhExt, pk)
-	protocolAdapter := adapter.NewProtocolWhisperAdapter(trnsp, nil)
+	trnsp := transport.NewWhisperServiceTransport(node, s.config.Mailservers, shh, shhExt, pk)
+	pfs, err := pfsFactory(s.config.PFSEnabled, s.config.DataDir, s.config.InstallationID, encryptionKey)
+	if err != nil {
+		return err
+	}
+	protocolAdapter := adapter.NewProtocolWhisperAdapter(trnsp, pfs)
+
+	if s.messenger != nil {
+		s.messenger.Stop()
+	}
 	s.messenger = client.NewMessenger(pk, protocolAdapter, db)
 	return nil
 }
@@ -83,4 +102,31 @@ func (s *Service) Start(server *p2p.Server) error {
 func (s *Service) Stop() error {
 	// TODO: should be able to stop Messenger
 	return nil
+}
+
+func pfsFactory(enabled bool, baseDir, installationID, encKey string) (*chat.ProtocolService, error) {
+	if !enabled {
+		return nil, nil
+	}
+
+	dbPath := filepath.Join(baseDir, fmt.Sprintf(pfsSQLFileNameV1Format, installationID))
+	persistence, err := chat.NewSQLLitePersistence(dbPath, encKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return chat.NewProtocolService(
+		chat.NewEncryptionService(
+			persistence,
+			chat.DefaultEncryptionServiceConfig(installationID),
+		),
+		addedBundlesHandler,
+	), nil
+}
+
+func addedBundlesHandler(addedBundles []chat.IdentityAndIDPair) {
+	handler := shhext.EnvelopeSignalHandler{}
+	for _, bundle := range addedBundles {
+		handler.BundleAdded(bundle[0], bundle[1])
+	}
 }

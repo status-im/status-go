@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -136,22 +137,15 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) chatAPIService() gethnode.ServiceConstructor {
+func (b *StatusBackend) chatAPIService(config *params.NodeConfig) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		config := b.statusNode.Config()
-		mailservers := config.ClusterConfig.TrustedMailServers
-		dataDir := config.DataDir
-
-		shhService, err := b.statusNode.WhisperService()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ChatAPI service: %v", err)
+		chatAPIConfig := chatapi.Config{
+			Mailservers:    config.ClusterConfig.TrustedMailServers,
+			DataDir:        config.DataDir,
+			PFSEnabled:     config.ShhextConfig.PFSEnabled,
+			InstallationID: config.ShhextConfig.InstallationID,
 		}
-		shhextService, err := b.statusNode.ShhExtService()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ChatAPI service: %v", err)
-		}
-
-		return chatapi.New(mailservers, dataDir, shhService, shhextService), nil
+		return chatapi.New(chatAPIConfig), nil
 	}
 }
 
@@ -170,7 +164,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
-	services = append(services, b.chatAPIService())
+	services = append(services, b.chatAPIService(config))
 
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
 		Services: services,
@@ -578,23 +572,43 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 
 		// Init ChatAPI which is the Status Messaging service.
 		chatAPI, err := b.statusNode.ChatAPIService()
-		switch err {
-		case node.ErrServiceUnknown, nil:
-		default:
+		if err == node.ErrServiceUnknown {
+			log.Debug("ChatAPIService not found")
+		} else if err != nil {
 			return err
-		}
-
-		chatAccount, err := b.accountManager.SelectedChatAccount()
-		if err != nil {
-			return err
-		}
-
-		err = chatAPI.Init(chatAccount.AccountKey.PrivateKey, b.statusNode)
-		if err != nil {
-			return fmt.Errorf("failed to initialize Chat API service: %v", err)
+		} else {
+			if err := b.initChatAPI(chatAPI, chatAccount, password); err != nil {
+				return err
+			}
 		}
 	}
 	return b.startWallet(password)
+}
+
+func (b *StatusBackend) initChatAPI(chatAPI *chatapi.Service, account *account.SelectedExtKey, password string) error {
+	shhService, err := b.statusNode.WhisperService()
+	if err != nil {
+		return err
+	}
+	shhextService, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+
+	// TODO(adam): converting password to hex should be defined here.
+	// Currently, it's duplicated in ShhExtService.InitProtocolWithPassword and here.
+	digest := sha3.Sum256([]byte(password))
+	err = chatAPI.Init(
+		b.statusNode,
+		shhService,
+		shhextService,
+		account.AccountKey.PrivateKey,
+		hex.EncodeToString(digest[:]),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Chat API service: %v", err)
+	}
+	return nil
 }
 
 func (b *StatusBackend) startWallet(password string) error {
@@ -675,6 +689,24 @@ func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) e
 
 		if err := st.InitProtocolWithEncyptionKey(chatAccount.Address.Hex(), encryptionKeyHex); err != nil {
 			return err
+		}
+
+		// TODO(adam): change name to ChatService.
+		chatAPI, err := b.statusNode.ChatAPIService()
+		if err == node.ErrServiceUnknown {
+			log.Debug("ChatAPIService not found")
+		} else if err != nil {
+			return err
+		} else {
+			if err := chatAPI.Init(
+				b.statusNode,
+				whisperService,
+				st,
+				chatAccount.AccountKey.PrivateKey,
+				encryptionKeyHex,
+			); err != nil {
+				return err
+			}
 		}
 	}
 
