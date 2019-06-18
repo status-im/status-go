@@ -67,6 +67,20 @@ func (m *Messenger) Start() error {
 	return m.RequestAll(context.Background(), true)
 }
 
+func (m *Messenger) Stop() {
+	log.Printf("[Messenger::Stop]")
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, s := range m.private {
+		s.Stop()
+	}
+	for _, s := range m.public {
+		s.Stop()
+	}
+}
+
 // addStream creates a new Stream and adds it to the Messenger.
 // For contacts with public key, we just need to make sure
 // each possible topic has a stream. For a single topic

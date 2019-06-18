@@ -563,8 +563,6 @@ github.com/status-im/mvds v0.0.14/go.mod h1:cgNgcRbLwE4TMPMSax7xl+Ca/Q8rIklZLDwA
 github.com/status-im/rendezvous v1.2.0/go.mod h1:vUZNaCYr2AsFngV2IW5NsnPBRK/h+x57nsMINkhrVCQ=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
-github.com/status-im/status-console-client v0.0.0-20190616193151-48ff50d16de2 h1:aY4P4OvErEha4EM8qYpK4D5gLP0bh62Nhw0iP8HE4iY=
-github.com/status-im/status-console-client v0.0.0-20190616193151-48ff50d16de2/go.mod h1:N6TgLJ4P1bNB8vtCh9RgCtKM2qsCzli+UKszPOhSmJ8=
 github.com/status-im/status-console-client v0.0.0-20190618073748-7212a9e79ffe h1:VkjM6XxafWjD3NBrQ2pQzMnVRcB2nkaOCcXcEJpGesQ=
 github.com/status-im/status-console-client v0.0.0-20190618073748-7212a9e79ffe/go.mod h1:N6TgLJ4P1bNB8vtCh9RgCtKM2qsCzli+UKszPOhSmJ8=
 github.com/status-im/status-go v0.25.0-beta.2/go.mod h1:3ky7GKNvGXC46HmjcVnDe+3cCkzP+JTzPRz4d50AQ4w=
