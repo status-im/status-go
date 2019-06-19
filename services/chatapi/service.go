@@ -35,7 +35,7 @@ type Config struct {
 
 // Service represents our own implementation of personal sign operations.
 type Service struct {
-	config Config
+	config    Config
 	messenger *client.Messenger
 }
 
