@@ -2,9 +2,12 @@ package chatapi
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
+	"os"
 	"path/filepath"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -56,14 +59,25 @@ func (s *Service) Init(
 	pk *ecdsa.PrivateKey,
 	encryptionKey string,
 ) error {
-	dbPath := filepath.Join(s.config.DataDir, chatSQLFileName)
+	encodedPubKey := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
+	keyBasePath := filepath.Join(s.config.DataDir, encodedPubKey)
+	if err := os.MkdirAll(keyBasePath, 0755); err != nil {
+		return err
+	}
+
+	dbPath := filepath.Join(keyBasePath, chatSQLFileName)
 	db, err := client.InitializeDB(dbPath, encryptionKey)
 	if err != nil {
 		return err
 	}
 
 	trnsp := transport.NewWhisperServiceTransport(node, s.config.Mailservers, shh, shhExt, pk)
-	pfs, err := pfsFactory(s.config.PFSEnabled, s.config.DataDir, s.config.InstallationID, encryptionKey)
+	pfs, err := pfsFactory(
+		s.config.PFSEnabled,
+		keyBasePath,
+		s.config.InstallationID,
+		encryptionKey,
+	)
 	if err != nil {
 		return err
 	}
