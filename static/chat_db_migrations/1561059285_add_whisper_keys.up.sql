@@ -1,0 +1,4 @@
+CREATE TABLE whisper_keys (
+  chat_id TEXT NOT NULL PRIMARY KEY ON CONFLICT IGNORE,
+  key BLOB NOT NULL
+)
