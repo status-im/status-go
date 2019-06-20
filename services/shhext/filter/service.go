@@ -52,7 +52,6 @@ type Service struct {
 	whisper *whisper.Whisper
 	secret  *sharedsecret.Service
 	chats   map[string]*Chat
-	mutex   sync.Mutex
 }
 
 // New returns a new filter service
@@ -60,7 +59,6 @@ func New(w *whisper.Whisper, s *sharedsecret.Service) *Service {
 	return &Service{
 		whisper: w,
 		secret:  s,
-		mutex:   sync.Mutex{},
 		chats:   make(map[string]*Chat),
 	}
 }
@@ -116,9 +114,6 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 		}
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	var allChats []*Chat
 	for _, chat := range s.chats {
 		allChats = append(allChats, chat)
@@ -137,8 +132,6 @@ func (s *Service) Stop() error {
 
 // Remove remove all the filters associated with a chat/identity
 func (s *Service) Remove(chats []*Chat) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 	log.Debug("Removing chats", "chats", chats)
 
 	for _, chat := range chats {
@@ -157,8 +150,6 @@ func (s *Service) Remove(chats []*Chat) error {
 
 // LoadPartitioned creates a filter for a partitioned topic
 func (s *Service) LoadPartitioned(myKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, listen bool) (*Chat, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 
 	chatID := PublicKeyToPartitionedTopic(theirPublicKey)
 
@@ -208,25 +199,16 @@ func ContactCodeTopic(identity string) string {
 
 // Get returns a negotiated chat given an identity
 func (s *Service) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.chats[negotiatedID(identity)]
 }
 
 // GetByID returns a chat by chatID
 func (s *Service) GetByID(chatID string) *Chat {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.chats[chatID]
 }
 
 // ProcessNegotiatedSecret adds a filter based on the agreed secret
 func (s *Service) ProcessNegotiatedSecret(secret *sharedsecret.Secret) (*Chat, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	chatID := negotiatedID(secret.Identity)
 	// If we already have a chat do nothing
 	if _, ok := s.chats[chatID]; ok {
@@ -278,9 +260,6 @@ func PublicKeyToPartitionedTopicBytes(publicKey *ecdsa.PublicKey) []byte {
 
 // loadDiscovery adds the discovery filter
 func (s *Service) loadDiscovery(myKey *ecdsa.PrivateKey) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	if _, ok := s.chats[discoveryTopic]; ok {
 		return nil
 	}
@@ -308,9 +287,6 @@ func (s *Service) loadDiscovery(myKey *ecdsa.PrivateKey) error {
 
 // loadPublic adds a filter for a public chat
 func (s *Service) loadPublic(chat *Chat) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	if _, ok := s.chats[chat.ChatID]; ok {
 		return nil
 	}
@@ -363,9 +339,6 @@ func (s *Service) loadOneToOne(myKey *ecdsa.PrivateKey, identity string, listen 
 
 // loadContactCode creates a filter for the topic are advertised for a given identity
 func (s *Service) loadContactCode(identity string) (*Chat, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	chatID := ContactCodeTopic(identity)
 	if _, ok := s.chats[chatID]; ok {
 		return s.chats[chatID], nil
