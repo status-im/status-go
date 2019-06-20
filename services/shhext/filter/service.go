@@ -290,7 +290,9 @@ func (s *Service) loadPublic(chat *Chat) error {
 		return nil
 	}
 
+	log.Debug("adding symmetric")
 	filterAndTopic, err := s.addSymmetric(chat.ChatID)
+	log.Debug("added symmetric")
 	if err != nil {
 		return err
 	}
@@ -363,19 +365,23 @@ func (s *Service) loadContactCode(identity string) (*Chat, error) {
 // addSymmetric adds a symmetric key filter
 func (s *Service) addSymmetric(chatID string) (*Filter, error) {
 	var symKey []byte
+	log.Debug("1")
 
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
+	log.Debug("2")
 
 	symKeyID, err := s.whisper.AddSymKeyFromPassword(chatID)
 	if err != nil {
 		log.Error("SYM KEYN FAILED", "err", err)
 		return nil, err
 	}
+	log.Debug("3")
 
 	if symKey, err = s.whisper.GetSymKey(symKeyID); err != nil {
 		return nil, err
 	}
+	log.Debug("4")
 
 	f := &whisper.Filter{
 		KeySym:   symKey,
@@ -385,10 +391,12 @@ func (s *Service) addSymmetric(chatID string) (*Filter, error) {
 		Messages: s.whisper.NewMessageStore(),
 	}
 
+	log.Debug("5")
 	id, err := s.whisper.Subscribe(f)
 	if err != nil {
 		return nil, err
 	}
+	log.Debug("6")
 
 	return &Filter{
 		FilterID: id,
