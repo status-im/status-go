@@ -15,6 +15,8 @@
 // 1559627659_add_contact_code.up.sql
 // 1561059285_add_whisper_keys.down.sql
 // 1561059285_add_whisper_keys.up.sql
+// 1561368210_add_installation_metadata.down.sql
+// 1561368210_add_installation_metadata.up.sql
 // static.go
 // DO NOT EDIT!
 
@@ -358,7 +360,7 @@ func _1561059285_add_whisper_keysDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059285_add_whisper_keys.down.sql", size: 25, mode: os.FileMode(420), modTime: time.Unix(1561059394, 0)}
+	info := bindataFileInfo{name: "1561059285_add_whisper_keys.down.sql", size: 25, mode: os.FileMode(420), modTime: time.Unix(1561361219, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -378,7 +380,47 @@ func _1561059285_add_whisper_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059285_add_whisper_keys.up.sql", size: 112, mode: os.FileMode(420), modTime: time.Unix(1561097945, 0)}
+	info := bindataFileInfo{name: "1561059285_add_whisper_keys.up.sql", size: 112, mode: os.FileMode(420), modTime: time.Unix(1561361219, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var __1561368210_add_installation_metadataDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\xc8\xcc\x2b\x2e\x49\xcc\xc9\x49\x2c\xc9\xcc\xcf\x2b\x8e\xcf\x4d\x2d\x49\x4c\x49\x2c\x49\xb4\xe6\x02\x04\x00\x00\xff\xff\x03\x72\x7f\x08\x23\x00\x00\x00")
+
+func _1561368210_add_installation_metadataDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1561368210_add_installation_metadataDownSql,
+		"1561368210_add_installation_metadata.down.sql",
+	)
+}
+
+func _1561368210_add_installation_metadataDownSql() (*asset, error) {
+	bytes, err := _1561368210_add_installation_metadataDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1561368210_add_installation_metadata.down.sql", size: 35, mode: os.FileMode(420), modTime: time.Unix(1561459323, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var __1561368210_add_installation_metadataUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\xce\xc1\x8a\x83\x30\x10\xc6\xf1\xbb\x4f\xf1\xdd\x54\xf0\x0d\xf6\x14\xb3\x23\x08\x21\xd9\x95\x04\x7a\x93\x60\x52\x08\xd5\x58\xe8\x50\xf0\xed\x8b\x87\x42\xed\xc1\xeb\xcc\xef\x83\xbf\x1c\x48\x58\x82\x15\xad\x22\xa4\xfc\x60\x3f\xcf\x9e\xd3\x9a\xc7\x25\xb2\x0f\x9e\x3d\x50\x15\x40\x0a\x31\x73\xe2\x0d\xad\x32\x2d\xb4\xb1\xd0\x4e\xa9\x66\xff\x7c\x8e\x52\x80\xa5\x8b\x3d\x80\xec\x97\x78\xbc\xe2\x97\x3a\xe1\x94\x45\x59\xee\x20\xc4\x67\x9a\xe2\xc8\xdb\xfd\xdc\x5d\xa7\x65\xe4\xf5\x16\xf3\xa9\x72\xba\xff\x77\x54\xbd\x83\x9b\xef\xc0\x1a\x46\x43\x1a\xdd\xa9\x5e\x5a\x0c\xf4\xa7\x84\xa4\xa2\xfe\x29\x5e\x01\x00\x00\xff\xff\x5d\x6f\xe6\xd3\x0b\x01\x00\x00")
+
+func _1561368210_add_installation_metadataUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1561368210_add_installation_metadataUpSql,
+		"1561368210_add_installation_metadata.up.sql",
+	)
+}
+
+func _1561368210_add_installation_metadataUpSql() (*asset, error) {
+	bytes, err := _1561368210_add_installation_metadataUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1561368210_add_installation_metadata.up.sql", size: 267, mode: os.FileMode(420), modTime: time.Unix(1561459769, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -470,6 +512,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1559627659_add_contact_code.up.sql": _1559627659_add_contact_codeUpSql,
 	"1561059285_add_whisper_keys.down.sql": _1561059285_add_whisper_keysDownSql,
 	"1561059285_add_whisper_keys.up.sql": _1561059285_add_whisper_keysUpSql,
+	"1561368210_add_installation_metadata.down.sql": _1561368210_add_installation_metadataDownSql,
+	"1561368210_add_installation_metadata.up.sql": _1561368210_add_installation_metadataUpSql,
 	"static.go": staticGo,
 }
 
@@ -528,6 +572,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1559627659_add_contact_code.up.sql": &bintree{_1559627659_add_contact_codeUpSql, map[string]*bintree{}},
 	"1561059285_add_whisper_keys.down.sql": &bintree{_1561059285_add_whisper_keysDownSql, map[string]*bintree{}},
 	"1561059285_add_whisper_keys.up.sql": &bintree{_1561059285_add_whisper_keysUpSql, map[string]*bintree{}},
+	"1561368210_add_installation_metadata.down.sql": &bintree{_1561368210_add_installation_metadataDownSql, map[string]*bintree{}},
+	"1561368210_add_installation_metadata.up.sql": &bintree{_1561368210_add_installation_metadataUpSql, map[string]*bintree{}},
 	"static.go": &bintree{staticGo, map[string]*bintree{}},
 }}
 

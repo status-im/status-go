@@ -93,42 +93,6 @@ func SignGroupMembership(content *C.char) *C.char {
 	return C.CString(string(data))
 }
 
-// EnableInstallation enables an installation for multi-device sync.
-//export EnableInstallation
-func EnableInstallation(installationID *C.char) *C.char {
-	err := statusBackend.EnableInstallation(C.GoString(installationID))
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Response string `json:"response"`
-	}{Response: "ok"})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(data))
-}
-
-// DisableInstallation disables an installation for multi-device sync.
-//export DisableInstallation
-func DisableInstallation(installationID *C.char) *C.char {
-	err := statusBackend.DisableInstallation(C.GoString(installationID))
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Response string `json:"response"`
-	}{Response: "ok"})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return C.CString(string(data))
-}
-
 //ValidateNodeConfig validates config for status node
 //export ValidateNodeConfig
 func ValidateNodeConfig(configJSON *C.char) *C.char {
