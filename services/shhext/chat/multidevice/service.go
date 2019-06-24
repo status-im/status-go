@@ -7,11 +7,26 @@ import (
 	"github.com/status-im/status-go/services/shhext/chat/protobuf"
 )
 
+type InstallationMetadata struct {
+	// The name of the device
+	Name string `json:"name"`
+	// The type of device
+	DeviceType string `json:"deviceType"`
+	// The FCMToken for mobile devices
+	FCMToken string `json:"fcmToken"`
+}
+
 type Installation struct {
+	// Identity is the string identity of the owner
+	Identity string `json:"identity"`
 	// The installation-id of the device
-	ID string
+	ID string `json:"id"`
 	// The last known protocol version of the device
-	Version uint32
+	Version uint32 `json:"version"`
+	// Enabled is whether the installation is enabled
+	Enabled bool `json:"enabled"`
+	// InstallationMetadata
+	InstallationMetadata *InstallationMetadata `json:"metadata"`
 }
 
 type Config struct {
@@ -30,11 +45,6 @@ func New(config *Config, persistence Persistence) *Service {
 type Service struct {
 	persistence Persistence
 	config      *Config
-}
-
-type IdentityAndID struct {
-	Identity string
-	ID       string
 }
 
 func (s *Service) GetActiveInstallations(identity *ecdsa.PublicKey) ([]*Installation, error) {
@@ -57,6 +67,38 @@ func (s *Service) GetOurActiveInstallations(identity *ecdsa.PublicKey) ([]*Insta
 	return installations, nil
 }
 
+func (s *Service) GetOurInstallations(identity *ecdsa.PublicKey) ([]*Installation, error) {
+	var found bool
+	identityC := crypto.CompressPubkey(identity)
+	installations, err := s.persistence.GetInstallations(identityC)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, installation := range installations {
+		if installation.ID == s.config.InstallationID {
+			found = true
+			installation.Enabled = true
+			installation.Version = s.config.ProtocolVersion
+		}
+
+	}
+	if !found {
+		installations = append(installations, &Installation{
+			ID:      s.config.InstallationID,
+			Enabled: true,
+			Version: s.config.ProtocolVersion,
+		})
+	}
+
+	return installations, nil
+}
+
+func (s *Service) SetInstallationMetadata(identity *ecdsa.PublicKey, installationID string, metadata *InstallationMetadata) error {
+	identityC := crypto.CompressPubkey(identity)
+	return s.persistence.SetInstallationMetadata(identityC, installationID, metadata)
+}
+
 func (s *Service) EnableInstallation(identity *ecdsa.PublicKey, installationID string) error {
 	identityC := crypto.CompressPubkey(identity)
 	return s.persistence.EnableInstallation(identityC, installationID)
@@ -68,9 +110,8 @@ func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installati
 }
 
 // ProcessPublicBundle persists a bundle and returns a list of tuples identity/installationID
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIdentity *ecdsa.PublicKey, b *protobuf.Bundle) ([]*IdentityAndID, error) {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIdentity *ecdsa.PublicKey, b *protobuf.Bundle) ([]*Installation, error) {
 	signedPreKeys := b.GetSignedPreKeys()
-	var response []*IdentityAndID
 	var installations []*Installation
 
 	myIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(&myIdentityKey.PublicKey))
@@ -83,16 +124,12 @@ func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIden
 	for installationID, signedPreKey := range signedPreKeys {
 		if installationID != s.config.InstallationID {
 			installations = append(installations, &Installation{
-				ID:      installationID,
-				Version: signedPreKey.GetProtocolVersion(),
+				Identity: theirIdentityStr,
+				ID:       installationID,
+				Version:  signedPreKey.GetProtocolVersion(),
 			})
-			response = append(response, &IdentityAndID{theirIdentityStr, installationID})
 		}
 	}
 
-	if err := s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installations, fromOurIdentity); err != nil {
-		return nil, err
-	}
-
-	return response, nil
+	return s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installations, fromOurIdentity)
 }

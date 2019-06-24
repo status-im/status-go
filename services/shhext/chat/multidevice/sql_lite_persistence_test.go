@@ -36,30 +36,30 @@ func (s *SQLLitePersistenceTestSuite) SetupTest() {
 func (s *SQLLitePersistenceTestSuite) TestAddInstallations() {
 	identity := []byte("alice")
 	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
-		{ID: "alice-2", Version: 2},
+		{ID: "alice-1", Version: 1, Enabled: true},
+		{ID: "alice-2", Version: 2, Enabled: true},
 	}
-	err := s.service.AddInstallations(
+	addedInstallations, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
 		true,
 	)
-
 	s.Require().NoError(err)
 
 	enabledInstallations, err := s.service.GetActiveInstallations(5, identity)
 	s.Require().NoError(err)
 
 	s.Require().Equal(installations, enabledInstallations)
+	s.Require().Equal(installations, addedInstallations)
 }
 
 func (s *SQLLitePersistenceTestSuite) TestAddInstallationVersions() {
 	identity := []byte("alice")
 	installations := []*Installation{
-		{ID: "alice-1", Version: 1},
+		{ID: "alice-1", Version: 1, Enabled: true},
 	}
-	err := s.service.AddInstallations(
+	_, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
@@ -77,7 +77,7 @@ func (s *SQLLitePersistenceTestSuite) TestAddInstallationVersions() {
 		{ID: "alice-1", Version: 0},
 	}
 
-	err = s.service.AddInstallations(
+	_, err = s.service.AddInstallations(
 		identity,
 		3,
 		installationsWithDowngradedVersion,
@@ -98,7 +98,7 @@ func (s *SQLLitePersistenceTestSuite) TestAddInstallationsLimit() {
 		{ID: "alice-2", Version: 2},
 	}
 
-	err := s.service.AddInstallations(
+	_, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
@@ -111,7 +111,7 @@ func (s *SQLLitePersistenceTestSuite) TestAddInstallationsLimit() {
 		{ID: "alice-3", Version: 3},
 	}
 
-	err = s.service.AddInstallations(
+	_, err = s.service.AddInstallations(
 		identity,
 		2,
 		installations,
@@ -120,12 +120,12 @@ func (s *SQLLitePersistenceTestSuite) TestAddInstallationsLimit() {
 	s.Require().NoError(err)
 
 	installations = []*Installation{
-		{ID: "alice-2", Version: 2},
-		{ID: "alice-3", Version: 3},
-		{ID: "alice-4", Version: 4},
+		{ID: "alice-2", Version: 2, Enabled: true},
+		{ID: "alice-3", Version: 3, Enabled: true},
+		{ID: "alice-4", Version: 4, Enabled: true},
 	}
 
-	err = s.service.AddInstallations(
+	_, err = s.service.AddInstallations(
 		identity,
 		3,
 		installations,
@@ -147,7 +147,7 @@ func (s *SQLLitePersistenceTestSuite) TestAddInstallationsDisabled() {
 		{ID: "alice-2", Version: 2},
 	}
 
-	err := s.service.AddInstallations(
+	_, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
@@ -169,7 +169,7 @@ func (s *SQLLitePersistenceTestSuite) TestDisableInstallation() {
 		{ID: "alice-2", Version: 2},
 	}
 
-	err := s.service.AddInstallations(
+	_, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
@@ -186,18 +186,19 @@ func (s *SQLLitePersistenceTestSuite) TestDisableInstallation() {
 		{ID: "alice-2", Version: 2},
 	}
 
-	err = s.service.AddInstallations(
+	addedInstallations, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
 		true,
 	)
 	s.Require().NoError(err)
+	s.Require().Equal(0, len(addedInstallations))
 
 	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
 	s.Require().NoError(err)
 
-	expected := []*Installation{{ID: "alice-2", Version: 2}}
+	expected := []*Installation{{ID: "alice-2", Version: 2, Enabled: true}}
 	s.Require().Equal(expected, actualInstallations)
 }
 
@@ -209,7 +210,7 @@ func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
 		{ID: "alice-2", Version: 2},
 	}
 
-	err := s.service.AddInstallations(
+	_, err := s.service.AddInstallations(
 		identity,
 		1,
 		installations,
@@ -223,7 +224,7 @@ func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
 	actualInstallations, err := s.service.GetActiveInstallations(3, identity)
 	s.Require().NoError(err)
 
-	expected := []*Installation{{ID: "alice-2", Version: 2}}
+	expected := []*Installation{{ID: "alice-2", Version: 2, Enabled: true}}
 	s.Require().Equal(expected, actualInstallations)
 
 	err = s.service.EnableInstallation(identity, "alice-1")
@@ -233,9 +234,79 @@ func (s *SQLLitePersistenceTestSuite) TestEnableInstallation() {
 	s.Require().NoError(err)
 
 	expected = []*Installation{
+		{ID: "alice-1", Version: 1, Enabled: true},
+		{ID: "alice-2", Version: 2, Enabled: true},
+	}
+	s.Require().Equal(expected, actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestGetInstallations() {
+	identity := []byte("alice")
+
+	installations := []*Installation{
 		{ID: "alice-1", Version: 1},
 		{ID: "alice-2", Version: 2},
 	}
-	s.Require().Equal(expected, actualInstallations)
 
+	_, err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DisableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetInstallations(identity)
+	s.Require().NoError(err)
+
+	emptyMetadata := &InstallationMetadata{}
+
+	expected := []*Installation{
+		{ID: "alice-1", Version: 1, Enabled: false, InstallationMetadata: emptyMetadata},
+		{ID: "alice-2", Version: 2, Enabled: true, InstallationMetadata: emptyMetadata},
+	}
+	s.Require().Equal(2, len(actualInstallations))
+	s.Require().ElementsMatch(expected, actualInstallations)
+}
+
+func (s *SQLLitePersistenceTestSuite) TestSetMetadata() {
+	identity := []byte("alice")
+
+	installations := []*Installation{
+		{ID: "alice-1", Version: 1},
+		{ID: "alice-2", Version: 2},
+	}
+
+	_, err := s.service.AddInstallations(
+		identity,
+		1,
+		installations,
+		true,
+	)
+	s.Require().NoError(err)
+
+	err = s.service.DisableInstallation(identity, "alice-1")
+	s.Require().NoError(err)
+
+	emptyMetadata := &InstallationMetadata{}
+	setMetadata := &InstallationMetadata{
+		Name:       "a",
+		FCMToken:   "b",
+		DeviceType: "c",
+	}
+
+	err = s.service.SetInstallationMetadata(identity, "alice-2", setMetadata)
+	s.Require().NoError(err)
+
+	actualInstallations, err := s.service.GetInstallations(identity)
+	s.Require().NoError(err)
+
+	expected := []*Installation{
+		{ID: "alice-1", Version: 1, Enabled: false, InstallationMetadata: emptyMetadata},
+		{ID: "alice-2", Version: 2, Enabled: true, InstallationMetadata: setMetadata},
+	}
+	s.Require().ElementsMatch(expected, actualInstallations)
 }
