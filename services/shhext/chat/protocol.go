@@ -27,7 +27,7 @@ type ProtocolService struct {
 	encryption               *EncryptionService
 	secret                   *sharedsecret.Service
 	multidevice              *multidevice.Service
-	addedBundlesHandler      func([]*multidevice.IdentityAndID)
+	addedBundlesHandler      func([]*multidevice.Installation)
 	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	Enabled                  bool
 }
@@ -35,7 +35,7 @@ type ProtocolService struct {
 var ErrNotProtocolMessage = errors.New("Not a protocol message")
 
 // NewProtocolService creates a new ProtocolService instance
-func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]*multidevice.IdentityAndID), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
+func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]*multidevice.Installation), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
 	return &ProtocolService{
 		log:                      log.New("package", "status-go/services/sshext.chat"),
 		encryption:               encryption,
@@ -193,7 +193,7 @@ func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destin
 }
 
 // ProcessPublicBundle processes a received X3DH bundle.
-func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.IdentityAndID, error) {
+func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
 	if err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle); err != nil {
 		return nil, err
 	}
@@ -225,6 +225,16 @@ func (p *ProtocolService) EnableInstallation(myIdentityKey *ecdsa.PublicKey, ins
 // DisableInstallation disables an installation for multi-device sync.
 func (p *ProtocolService) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
 	return p.multidevice.DisableInstallation(myIdentityKey, installationID)
+}
+
+// GetOurInstallations returns all the installations available given an identity
+func (p *ProtocolService) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*multidevice.Installation, error) {
+	return p.multidevice.GetOurInstallations(myIdentityKey)
+}
+
+// SetInstallationMetadata sets the metadata for our own installation
+func (p *ProtocolService) SetInstallationMetadata(myIdentityKey *ecdsa.PublicKey, installationID string, data *multidevice.InstallationMetadata) error {
+	return p.multidevice.SetInstallationMetadata(myIdentityKey, installationID, data)
 }
 
 // GetPublicBundle retrieves a public bundle given an identity

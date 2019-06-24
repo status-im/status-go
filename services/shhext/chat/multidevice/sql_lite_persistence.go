@@ -44,6 +44,7 @@ func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations int, identi
 		installations = append(installations, &Installation{
 			ID:      installationID,
 			Version: version,
+			Enabled: true,
 		})
 
 	}
@@ -52,12 +53,65 @@ func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations int, identi
 
 }
 
+// GetInstallations returns all the installations for a given identity
+func (s *SQLLitePersistence) GetInstallations(identity []byte) ([]*Installation, error) {
+	stmt, err := s.db.Prepare(`SELECT installation_id, version, enabled, name, fcm_token, device_type
+				   FROM installations
+				   WHERE identity = ?
+				   ORDER BY timestamp DESC`)
+	if err != nil {
+		return nil, err
+	}
+
+	var installations []*Installation
+	rows, err := stmt.Query(identity)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var installationID string
+		var version uint32
+		var enabled bool
+		var name string
+		var token string
+		var deviceType string
+
+		err = rows.Scan(
+			&installationID,
+			&version,
+			&enabled,
+			&name,
+			&token,
+			&deviceType,
+		)
+		if err != nil {
+			return nil, err
+		}
+		installations = append(installations, &Installation{
+			ID:      installationID,
+			Version: version,
+			Enabled: enabled,
+			InstallationMetadata: &InstallationMetadata{
+				Name:       name,
+				FCMToken:   token,
+				DeviceType: deviceType,
+			},
+		})
+
+	}
+
+	return installations, nil
+}
+
 // AddInstallations adds the installations for a given identity, maintaining the enabled flag
-func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, installations []*Installation, defaultEnabled bool) error {
+func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, installations []*Installation, defaultEnabled bool) ([]*Installation, error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return nil
+		return nil, err
 	}
+
+	var insertedInstallations []*Installation
 
 	for _, installation := range installations {
 		stmt, err := tx.Prepare(`SELECT enabled, version
@@ -65,7 +119,7 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 					 WHERE identity = ? AND installation_id = ?
 					 LIMIT 1`)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer stmt.Close()
 
@@ -76,14 +130,14 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 
 		err = stmt.QueryRow(identity, installation.ID).Scan(&oldEnabled, &oldVersion)
 		if err != nil && err != sql.ErrNoRows {
-			return err
+			return nil, err
 		}
 
 		if err == sql.ErrNoRows {
 			stmt, err = tx.Prepare(`INSERT INTO installations(identity, installation_id, timestamp, enabled, version)
 						VALUES (?, ?, ?, ?, ?)`)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer stmt.Close()
 
@@ -95,8 +149,9 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 				latestVersion,
 			)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			insertedInstallations = append(insertedInstallations, installation)
 		} else {
 			// We update timestamp if present without changing enabled, only if this is a new bundle
 			// and we set the version to the latest we ever saw
@@ -110,7 +165,7 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 						AND installation_id = ?
 						AND timestamp < ?`)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			defer stmt.Close()
 
@@ -123,7 +178,7 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 				timestamp,
 			)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -131,10 +186,10 @@ func (s *SQLLitePersistence) AddInstallations(identity []byte, timestamp int64, 
 
 	if err := tx.Commit(); err != nil {
 		_ = tx.Rollback()
-		return err
+		return nil, err
 	}
 
-	return nil
+	return insertedInstallations, nil
 
 }
 
@@ -163,5 +218,19 @@ func (s *SQLLitePersistence) DisableInstallation(identity []byte, installationID
 	}
 
 	_, err = stmt.Exec(identity, installationID)
+	return err
+}
+
+// SetInstallationMetadata sets the metadata for a given installation
+func (s *SQLLitePersistence) SetInstallationMetadata(identity []byte, installationID string, metadata *InstallationMetadata) error {
+
+	stmt, err := s.db.Prepare(`UPDATE installations
+				   SET name = ?, device_type = ?, fcm_token = ?
+				   WHERE identity = ? AND installation_id = ?`)
+	if err != nil {
+		return err
+	}
+
+	_, err = stmt.Exec(metadata.Name, metadata.DeviceType, metadata.FCMToken, identity, installationID)
 	return err
 }
