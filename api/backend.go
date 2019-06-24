@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -552,45 +553,60 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
 	case nil:
-		if err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey); err != nil {
+		err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey)
+		if err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
 	default:
-		return err
+		return fmt.Errorf("failed to get Whisper service: %v", err)
 	}
 
-	if whisperService != nil {
-		// Init shhext service.
-		st, err := b.statusNode.ShhExtService()
-		if err != nil {
-			return err
-		}
-
-		if err := st.InitProtocolWithPassword(chatAddress, password); err != nil {
-			return err
-		}
-
-		// Init ChatAPI which is the Status Messaging service.
-		chatAPI, err := b.statusNode.ChatAPIService()
-		if err == node.ErrServiceUnknown {
-			log.Debug("ChatAPIService not found")
-		} else if err != nil {
-			return err
-		} else {
-			if err := b.initChatAPI(chatAPI, chatAccount, password); err != nil {
-				return err
-			}
-		}
-	}
-	return b.startWallet(password)
-}
-
-func (b *StatusBackend) initChatAPI(chatAPI *chatapi.Service, account *account.SelectedExtKey, password string) error {
-	shhService, err := b.statusNode.WhisperService()
+	err = b.initPFS(chatAddress, password)
 	if err != nil {
 		return err
 	}
+
+	err = b.initChatAPI(chatAccount.AccountKey.PrivateKey, password)
+	if err != nil {
+		return fmt.Errorf("failed to initialize ChatAPI")
+	}
+
+	return b.startWallet(password)
+}
+
+func (b *StatusBackend) initPFS(address, password string) error {
+	_, err := b.statusNode.WhisperService()
+	if err == node.ErrServiceUnknown {
+		// Whisper was never registered
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to init PFS: %v", err)
+	}
+
+	st, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return fmt.Errorf("failed to init PFS: %v", err)
+	}
+
+	if err := st.InitProtocolWithPassword(address, password); err != nil {
+		return fmt.Errorf("failed to init PFS: %v", err)
+	}
+	return nil
+}
+
+func (b *StatusBackend) initChatAPI(privateKey *ecdsa.PrivateKey, password string) error {
+	shhService, err := b.statusNode.WhisperService()
+	if err == node.ErrServiceUnknown {
+		// Whisper was never registered
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to init Chat API: %v", err)
+	}
 	shhextService, err := b.statusNode.ShhExtService()
+	if err != nil {
+		return err
+	}
+	chatAPService, err := b.statusNode.ChatAPIService()
 	if err != nil {
 		return err
 	}
@@ -598,15 +614,15 @@ func (b *StatusBackend) initChatAPI(chatAPI *chatapi.Service, account *account.S
 	// TODO(adam): converting password to hex should be defined here.
 	// Currently, it's duplicated in ShhExtService.InitProtocolWithPassword and here.
 	digest := sha3.Sum256([]byte(password))
-	err = chatAPI.Init(
+	err = chatAPService.Init(
 		b.statusNode,
 		shhService,
 		shhextService,
-		account.AccountKey.PrivateKey,
+		privateKey,
 		hex.EncodeToString(digest[:]),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to initialize Chat API service: %v", err)
+		return fmt.Errorf("failed to init Chat API: %v", err)
 	}
 	return nil
 }

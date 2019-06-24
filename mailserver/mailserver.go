@@ -564,7 +564,7 @@ func (s *WMailServer) processRequestInBundles(
 		"batchesCount", len(batches),
 		"envelopeCount", processedEnvelopes,
 		"processedEnvelopesSize", processedEnvelopesSize,
-		"cursor", nextCursor)
+		"cursor", string(nextCursor))
 
 	// Publish
 	for _, batch := range batches {
