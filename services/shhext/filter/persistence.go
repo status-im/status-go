@@ -47,7 +47,7 @@ func (s *SQLLitePersistence) All() (map[string][]byte, error) {
 }
 
 func (s *SQLLitePersistence) Add(chatID string, key []byte) error {
-	statement := "INSERT INTO whisper_keys(chat_id,key) VALUES(?,?)"
+	statement := "INSERT INTO whisper_keys(chat_id, key) VALUES(?, ?)"
 	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return err
