@@ -134,7 +134,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	addedBundlesHandler := func(addedBundles []*multidevice.IdentityAndID) {
+	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {
 		handler := SignalHandler{}
 		for _, bundle := range addedBundles {
 			handler.BundleAdded(bundle.Identity, bundle.ID)
@@ -142,7 +142,6 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	}
 
 	// Initialize persistence
-
 	s.persistence = NewSQLLitePersistence(persistence.DB)
 
 	// Initialize sharedsecret
@@ -171,7 +170,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.IdentityAndID, error) {
+func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
 	if s.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
@@ -188,12 +187,61 @@ func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*protobuf.Bundle, 
 }
 
 // EnableInstallation enables an installation for multi-device sync.
-func (s *Service) EnableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
+func (s *Service) EnableInstallation(installationID string) error {
 	if s.protocol == nil {
 		return errProtocolNotInitialized
 	}
 
-	return s.protocol.EnableInstallation(myIdentityKey, installationID)
+	privateKeyID := s.whisper.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return errors.New("no key selected")
+	}
+
+	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return err
+	}
+
+	return s.protocol.EnableInstallation(&privateKey.PublicKey, installationID)
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func (s *Service) DisableInstallation(installationID string) error {
+	privateKeyID := s.whisper.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return errors.New("no key selected")
+	}
+
+	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return err
+	}
+
+	return s.protocol.DisableInstallation(&privateKey.PublicKey, installationID)
+}
+
+// GetOurInstallations returns all the installations available given an identity
+func (s *Service) GetOurInstallations() ([]*multidevice.Installation, error) {
+	if s.protocol == nil {
+		return nil, errProtocolNotInitialized
+	}
+
+	return nil, nil
+}
+
+// SetInstallationMetadata sets the metadata for our own installation
+func (s *Service) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
+	privateKeyID := s.whisper.SelectedKeyPairID()
+	if privateKeyID == "" {
+		return errors.New("no key selected")
+	}
+
+	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	if err != nil {
+		return err
+	}
+
+	return s.protocol.SetInstallationMetadata(&privateKey.PublicKey, installationID, data)
 }
 
 func (s *Service) GetPublicBundle(identityKey *ecdsa.PublicKey) (*protobuf.Bundle, error) {
@@ -202,15 +250,6 @@ func (s *Service) GetPublicBundle(identityKey *ecdsa.PublicKey) (*protobuf.Bundl
 	}
 
 	return s.protocol.GetPublicBundle(identityKey)
-}
-
-// DisableInstallation disables an installation for multi-device sync.
-func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
-	if s.protocol == nil {
-		return errProtocolNotInitialized
-	}
-
-	return s.protocol.DisableInstallation(myIdentityKey, installationID)
 }
 
 func (s *Service) Start(online func() bool, startTicker bool) error {
