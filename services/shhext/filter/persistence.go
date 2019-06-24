@@ -18,7 +18,6 @@ func NewSQLLitePersistence(db *sql.DB) *SQLLitePersistence {
 }
 
 func (s *SQLLitePersistence) All() (map[string][]byte, error) {
-
 	keys := make(map[string][]byte)
 
 	statement := "SELECT chat_id, key FROM whisper_keys"
