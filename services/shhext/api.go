@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/services/shhext/chat"
+	"github.com/status-im/status-go/services/shhext/chat/multidevice"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
@@ -606,6 +607,36 @@ func (api *PublicAPI) LoadFilter(parent context.Context, chat *filter.Chat) ([]*
 // RemoveFilter remove a single filter
 func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
 	return api.service.RemoveFilters(chats)
+}
+
+// EnableInstallation enables an installation for multi-device sync.
+func (api *PublicAPI) EnableInstallation(installationID string) error {
+	return api.service.EnableInstallation(installationID)
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func (api *PublicAPI) DisableInstallation(installationID string) error {
+	return api.service.DisableInstallation(installationID)
+}
+
+// GetOurInstallations returns all the installations available given an identity
+func (api *PublicAPI) GetOurInstallations() ([]*multidevice.Installation, error) {
+	api.log.Info("Getting our installations")
+	installations, err := api.service.GetOurInstallations()
+	if err != nil {
+		api.log.Error("Got error", "err", err)
+		return nil, err
+	}
+
+	api.log.Info("installations", "inst", installations)
+	return installations, nil
+}
+
+// SetInstallationMetadata sets the metadata for our own installation
+func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
+	api.log.Info("setting metadata", "name", data.Name, "deviceType", data.DeviceType, "token", data.FCMToken)
+
+	return api.service.SetInstallationMetadata(installationID, data)
 }
 
 // -----
