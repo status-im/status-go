@@ -72,7 +72,9 @@ func (s *ServiceTestSuite) SetupTest() {
 	_, err = whisper.AddKeyPair(s.keys[0].privateKey)
 	s.Require().NoError(err)
 
-	s.service = New(whisper, sharedSecretService)
+	persistence := NewSQLLitePersistence(db)
+
+	s.service = New(whisper, persistence, sharedSecretService)
 }
 
 func (s *ServiceTestSuite) TearDownTest() {
@@ -134,6 +136,24 @@ func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 	contactCodeFilter := actualChats[contactCodeTopic]
 	s.Require().NotNil(contactCodeFilter, "It adds the contact code filter")
 	s.Require().True(contactCodeFilter.Listen)
+}
+
+func (s *ServiceTestSuite) TestLoadFromCache() {
+	chats := []*Chat{
+		{
+			ChatID: "status",
+		},
+		{
+			ChatID: "status-1",
+		},
+	}
+	_, err := s.service.Init(chats)
+	s.Require().NoError(err)
+
+	// We create another service using the same persistence
+	service2 := New(s.service.whisper, s.service.persistence, s.service.secret)
+	_, err = service2.Init(chats)
+	s.Require().NoError(err)
 }
 
 func (s *ServiceTestSuite) TestNegotiatedTopic() {

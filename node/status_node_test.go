@@ -373,7 +373,7 @@ func TestChaosModeCheckRPCClientsUpstreamURL(t *testing.T) {
 
 	// assert
 	err = client.Call(nil, "net_version")
-	require.EqualError(t, err, `500 Internal Server Error "500 Internal Server Error"`)
+	require.EqualError(t, err, `500 Internal Server Error {"code": 500, "description": "Internal Server Error"}`)
 
 	// act
 	err = n.ChaosModeCheckRPCClientsUpstreamURL(false)

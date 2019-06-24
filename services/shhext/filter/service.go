@@ -49,25 +49,35 @@ type Chat struct {
 }
 
 type Service struct {
-	whisper *whisper.Whisper
-	secret  *sharedsecret.Service
-	chats   map[string]*Chat
-	mutex   sync.Mutex
+	whisper     *whisper.Whisper
+	secret      *sharedsecret.Service
+	chats       map[string]*Chat
+	persistence Persistence
+	mutex       sync.Mutex
+	keys        map[string][]byte
 }
 
 // New returns a new filter service
-func New(w *whisper.Whisper, s *sharedsecret.Service) *Service {
+func New(w *whisper.Whisper, p Persistence, s *sharedsecret.Service) *Service {
 	return &Service{
-		whisper: w,
-		secret:  s,
-		mutex:   sync.Mutex{},
-		chats:   make(map[string]*Chat),
+		whisper:     w,
+		secret:      s,
+		mutex:       sync.Mutex{},
+		persistence: p,
+		chats:       make(map[string]*Chat),
 	}
 }
 
 // LoadChat should return a list of newly chats loaded
 func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 	log.Debug("Initializing filter service", "chats", chats)
+
+	keys, err := s.persistence.All()
+	if err != nil {
+		return nil, err
+	}
+	s.keys = keys
+
 	keyID := s.whisper.SelectedKeyPairID()
 	if keyID == "" {
 		return nil, errors.New("no key selected")
@@ -123,6 +133,7 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 	for _, chat := range s.chats {
 		allChats = append(allChats, chat)
 	}
+	log.Debug("Loaded chats")
 	return allChats, nil
 }
 
@@ -390,19 +401,36 @@ func (s *Service) loadContactCode(identity string) (*Chat, error) {
 
 // addSymmetric adds a symmetric key filter
 func (s *Service) addSymmetric(chatID string) (*Filter, error) {
-	var symKey []byte
+	var symKeyID string
+	var err error
 
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
-	symKeyID, err := s.whisper.AddSymKeyFromPassword(chatID)
-	if err != nil {
-		log.Error("SYM KEYN FAILED", "err", err)
-		return nil, err
-	}
+	symKey, ok := s.keys[chatID]
+	if ok {
+		log.Debug("Loading from cache", "chat-id", chatID)
+		symKeyID, err = s.whisper.AddSymKeyDirect(symKey)
+		if err != nil {
+			log.Error("Adding symkey failed", "err", err)
+			return nil, err
+		}
+	} else {
+		log.Debug("Generating symkey", "chat-id", chatID)
+		symKeyID, err = s.whisper.AddSymKeyFromPassword(chatID)
+		if err != nil {
+			log.Error("Adding symkey from password failed", "err", err)
+			return nil, err
+		}
+		if symKey, err = s.whisper.GetSymKey(symKeyID); err != nil {
+			return nil, err
+		}
+		s.keys[chatID] = symKey
 
-	if symKey, err = s.whisper.GetSymKey(symKeyID); err != nil {
-		return nil, err
+		err = s.persistence.Add(chatID, symKey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	f := &whisper.Filter{

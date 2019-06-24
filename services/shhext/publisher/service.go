@@ -148,7 +148,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	// Initialize sharedsecret
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 	// Initialize filter
-	filterService := filter.New(s.whisper, sharedSecretService)
+	filterService := filter.New(s.whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
 	s.filter = filterService
 
 	// Initialize multidevice
