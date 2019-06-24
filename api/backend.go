@@ -658,46 +658,6 @@ func (b *StatusBackend) SignGroupMembership(content string) (string, error) {
 	return crypto.Sign(content, selectedChatAccount.AccountKey.PrivateKey)
 }
 
-// EnableInstallation enables an installation for multi-device sync.
-func (b *StatusBackend) EnableInstallation(installationID string) error {
-	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	if err := st.EnableInstallation(&selectedChatAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
-		b.log.Error("error enabling installation", "err", err)
-		return err
-	}
-
-	return nil
-}
-
-// DisableInstallation disables an installation for multi-device sync.
-func (b *StatusBackend) DisableInstallation(installationID string) error {
-	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
-	if err != nil {
-		return err
-	}
-
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	if err := st.DisableInstallation(&selectedChatAccount.AccountKey.PrivateKey.PublicKey, installationID); err != nil {
-		b.log.Error("error disabling installation", "err", err)
-		return err
-	}
-
-	return nil
-}
-
 // UpdateMailservers on ShhExtService.
 func (b *StatusBackend) UpdateMailservers(enodes []string) error {
 	st, err := b.statusNode.ShhExtService()
