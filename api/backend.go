@@ -140,12 +140,14 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) chatAPIService(config *params.NodeConfig) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		// TODO(adam): Get Whisper and ShhExt from ServiceContext.
 		chatAPIConfig := chatapi.Config{
 			Mailservers:    config.ClusterConfig.TrustedMailServers,
 			DataDir:        config.DataDir,
 			PFSEnabled:     config.ShhextConfig.PFSEnabled,
 			InstallationID: config.ShhextConfig.InstallationID,
 		}
+		log.Info("create ChatAPI", "config", chatAPIConfig)
 		return chatapi.New(chatAPIConfig), nil
 	}
 }
@@ -195,6 +197,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	b.log.Info("Account reselected")
 
 	if st, err := b.statusNode.StatusService(); err == nil {
+		st.SetStatusAPI(b)
 		st.SetAccountManager(b.AccountManager())
 	}
 
@@ -606,7 +609,7 @@ func (b *StatusBackend) initChatAPI(privateKey *ecdsa.PrivateKey, password strin
 	if err != nil {
 		return err
 	}
-	chatAPService, err := b.statusNode.ChatAPIService()
+	chatAPIService, err := b.statusNode.ChatAPIService()
 	if err != nil {
 		return err
 	}
@@ -614,7 +617,7 @@ func (b *StatusBackend) initChatAPI(privateKey *ecdsa.PrivateKey, password strin
 	// TODO(adam): converting password to hex should be defined here.
 	// Currently, it's duplicated in ShhExtService.InitProtocolWithPassword and here.
 	digest := sha3.Sum256([]byte(password))
-	err = chatAPService.Init(
+	err = chatAPIService.Init(
 		b.statusNode,
 		shhService,
 		shhextService,

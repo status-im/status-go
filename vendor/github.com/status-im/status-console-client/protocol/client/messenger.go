@@ -141,7 +141,8 @@ func (m *Messenger) Join(ctx context.Context, c Contact) error {
 	}
 
 	opts := protocol.DefaultRequestOptions()
-	if err := m.Request(ctx, c, opts); err != nil {
+	// NOTE(dshulyak) join ctx shouldn't have an impact on history timeout.
+	if err := m.Request(context.Background(), c, opts); err != nil {
 		return err
 	}
 	return m.db.UpdateHistories([]History{{Contact: c, Synced: opts.To}})

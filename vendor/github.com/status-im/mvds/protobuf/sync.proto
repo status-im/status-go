@@ -4,26 +4,14 @@ package mvds;
 option go_package = "protobuf";
 
 message Payload {
-  Ack ack = 1;
-  Offer offer = 2;
-  Request request = 3;
+  repeated bytes acks = 1;
+  repeated bytes offers = 2;
+  repeated bytes requests = 3;
   repeated Message messages = 4;
-}
-
-message Ack {
-  repeated bytes id = 1;
 }
 
 message Message {
   bytes group_id = 1;
   int64 timestamp = 2;
   bytes body = 3;
-}
-
-message Offer {
-  repeated bytes id = 1;
-}
-
-message Request {
-  repeated bytes id = 1;
 }

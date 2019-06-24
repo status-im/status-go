@@ -13,7 +13,6 @@ package unix
 
 import (
 	"encoding/binary"
-	"net"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -765,7 +764,7 @@ const px_proto_oe = 0
 
 type SockaddrPPPoE struct {
 	SID    uint16
-	Remote net.HardwareAddr
+	Remote []byte
 	Dev    string
 	raw    RawSockaddrPPPoX
 }
@@ -916,7 +915,7 @@ func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
 		}
 		sa := &SockaddrPPPoE{
 			SID:    binary.BigEndian.Uint16(pp[6:8]),
-			Remote: net.HardwareAddr(pp[8:14]),
+			Remote: pp[8:14],
 		}
 		for i := 14; i < 14+IFNAMSIZ; i++ {
 			if pp[i] == 0 {
@@ -1450,6 +1449,8 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Acct(path string) (err error)
 //sys	AddKey(keyType string, description string, payload []byte, ringid int) (id int, err error)
 //sys	Adjtimex(buf *Timex) (state int, err error)
+//sys	Capget(hdr *CapUserHeader, data *CapUserData) (err error)
+//sys	Capset(hdr *CapUserHeader, data *CapUserData) (err error)
 //sys	Chdir(path string) (err error)
 //sys	Chroot(path string) (err error)
 //sys	ClockGetres(clockid int32, res *Timespec) (err error)
@@ -1755,8 +1756,6 @@ func OpenByHandleAt(mountFD int, handle FileHandle, flags int) (fd int, err erro
 // Alarm
 // ArchPrctl
 // Brk
-// Capget
-// Capset
 // ClockNanosleep
 // ClockSettime
 // Clone

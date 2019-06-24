@@ -10,13 +10,18 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/ethereum/go-ethereum/p2p"
 	gethnode "github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/p2p"
 
 	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-console-client/protocol/subscription"
+)
+
+var (
+	// ErrNoMailservers returned if there is no configured mailservers that can be used.
+	ErrNoMailservers = errors.New("no configured mailservers")
 )
 
 type WhisperServiceKeysManager struct {
@@ -64,10 +69,10 @@ func (m *WhisperServiceKeysManager) GetRawSymKey(id string) ([]byte, error) {
 type WhisperServiceTransport struct {
 	node        StatusNode // TODO: replace with an interface
 	shh         *whisper.Whisper
-	shhextAPI *shhext.PublicAPI
+	shhextAPI   *shhext.PublicAPI
 	keysManager *WhisperServiceKeysManager
 
-	mailservers []string
+	mailservers             []string
 	selectedMailServerEnode string
 }
 
@@ -87,9 +92,10 @@ func NewWhisperServiceTransport(
 	privateKey *ecdsa.PrivateKey,
 ) *WhisperServiceTransport {
 	return &WhisperServiceTransport{
-		node: node,
-		shh:  shh,
-		shhextAPI: shhext.NewPublicAPI(shhextService),
+		node:        node,
+		shh:         shh,
+		mailservers: mailservers,
+		shhextAPI:   shhext.NewPublicAPI(shhextService),
 		keysManager: &WhisperServiceKeysManager{
 			shh:               shh,
 			privateKey:        privateKey,
@@ -183,6 +189,9 @@ func (a *WhisperServiceTransport) Request(ctx context.Context, options RequestOp
 func (a *WhisperServiceTransport) selectAndAddMailServer() (string, error) {
 	if a.selectedMailServerEnode != "" {
 		return a.selectedMailServerEnode, nil
+	}
+	if len(a.mailservers) == 0 {
+		return "", ErrNoMailservers
 	}
 
 	enode := randomItem(a.mailservers)

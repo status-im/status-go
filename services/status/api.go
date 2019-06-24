@@ -24,27 +24,9 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// LoginResponse : json response returned by status_login.
-type LoginResponse struct {
-	AddressKeyID string `json:"address_key_id"`
-}
-
 // Login is an implementation of `status_login` or `web3.status.login` API
-func (api *PublicAPI) Login(context context.Context, req LoginRequest) (res LoginResponse, err error) {
-	_, accountKey, err := api.s.am.AddressToDecryptedAccount(req.Addr, req.Password)
-	if err != nil {
-		return
-	}
-
-	if res.AddressKeyID, err = api.s.w.AddKeyPair(accountKey.PrivateKey); err != nil {
-		return
-	}
-
-	if err = api.s.am.SelectAccount(req.Addr, req.Addr, req.Password); err != nil {
-		return
-	}
-
-	return
+func (api *PublicAPI) Login(context context.Context, req LoginRequest) error {
+	return api.s.status.SelectAccount(req.Addr, req.Addr, req.Password)
 }
 
 // SignupRequest : json request for status_signup.

@@ -5,7 +5,7 @@ go 1.12
 require (
 	github.com/NaySoftware/go-fcm v0.0.0-20190516140123-808e978ddcd2
 	github.com/beevik/ntp v0.2.0
-	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
+	github.com/btcsuite/btcd v0.0.0-20190614013741-962a206e94e9
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/golang-migrate/migrate/v4 v4.4.0 // indirect
@@ -16,15 +16,16 @@ require (
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/mutecomm/go-sqlcipher v0.0.0-20170920224653-f799951b4ab2
 	github.com/pborman/uuid v1.2.0
+	github.com/prometheus/prometheus v1.7.1-0.20170814170113-3101606756c5 // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v2.0.0+incompatible
 	github.com/status-im/migrate/v4 v4.3.1-status
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-console-client v0.0.0-20190618073748-7212a9e79ffe
+	github.com/status-im/status-console-client v0.0.0-20190623063107-4a992229902d
 	github.com/status-im/whisper v1.4.13
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
-	golang.org/x/crypto v0.0.0-20190530122614-20be4c3c3ed5
+	golang.org/x/crypto v0.0.0-20190618222545-ea8f1a30c443
 	golang.org/x/text v0.3.2
 	gopkg.in/go-playground/validator.v9 v9.24.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

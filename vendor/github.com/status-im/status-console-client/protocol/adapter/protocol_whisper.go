@@ -22,7 +22,7 @@ type ProtocolWhisperAdapter struct {
 // ProtocolWhisperAdapter must implement Protocol interface.
 var _ protocol.Protocol = (*ProtocolWhisperAdapter)(nil)
 
-func NewProtocolWhisperAdapter(t *transport.WhisperServiceTransport, pfs *chat.ProtocolService) *ProtocolWhisperAdapter {
+func NewProtocolWhisperAdapter(t transport.WhisperTransport, pfs *chat.ProtocolService) *ProtocolWhisperAdapter {
 	return &ProtocolWhisperAdapter{
 		transport: t,
 		pfs:       pfs,
@@ -146,6 +146,13 @@ func (w *ProtocolWhisperAdapter) Request(ctx context.Context, params protocol.Re
 		From:     params.From,
 		To:       params.To,
 		Limit:    params.Limit,
+	}
+	for _, chat := range params.Chats {
+		topic, err := ToTopic(chat.ChatName)
+		if err != nil {
+			return err
+		}
+		transOptions.Topics = append(transOptions.Topics, topic)
 	}
 	now := time.Now()
 	err := w.transport.Request(ctx, transOptions)

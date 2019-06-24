@@ -22,14 +22,18 @@ type WhisperService interface {
 // AccountManager interface to manage account actions
 type AccountManager interface {
 	AddressToDecryptedAccount(string, string) (accounts.Account, *keystore.Key, error)
-	SelectAccount(walletAddress, chatAddress, password string) error
 	CreateAccount(password string) (accountInfo account.Info, mnemonic string, err error)
+}
+
+type StatusAPI interface {
+	SelectAccount(walletAddress, chatAddress, password string) error
 }
 
 // Service represents our own implementation of status status operations.
 type Service struct {
-	am AccountManager
-	w  WhisperService
+	status StatusAPI
+	am     AccountManager
+	w      WhisperService
 }
 
 // New returns a new Service.
@@ -53,6 +57,10 @@ func (s *Service) APIs() []rpc.API {
 			Public:    false,
 		},
 	}
+}
+
+func (s *Service) SetStatusAPI(api StatusAPI) {
+	s.status = api
 }
 
 // SetAccountManager sets account manager for the API calls.

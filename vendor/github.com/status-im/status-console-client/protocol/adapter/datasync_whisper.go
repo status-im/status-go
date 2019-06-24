@@ -148,22 +148,22 @@ func (w *DataSyncWhisperAdapter) Send(ctx context.Context, data []byte, options 
 }
 
 // Request retrieves historic messages.
-func (m *DataSyncWhisperAdapter) Request(ctx context.Context, params protocol.RequestOptions) error {
+func (w *DataSyncWhisperAdapter) Request(ctx context.Context, params protocol.RequestOptions) error {
 	return nil
 }
 
-func (c *DataSyncWhisperAdapter) peer(id state.GroupID, peer *ecdsa.PublicKey) {
+func (w *DataSyncWhisperAdapter) peer(id state.GroupID, peer *ecdsa.PublicKey) {
 	if peer == nil {
 		return
 	}
 
 	p := dspeer.PublicKeyToPeerID(*peer)
 
-	if c.node.IsPeerInGroup(id, p) {
+	if w.node.IsPeerInGroup(id, p) {
 		return
 	}
 
-	c.node.AddPeer(id, p)
+	w.node.AddPeer(id, p)
 }
 
 func toGroupId(topicType whisper.TopicType) state.GroupID {
