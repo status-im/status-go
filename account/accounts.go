@@ -303,6 +303,31 @@ func (m *Manager) Logout() {
 	m.selectedChatAccount = nil
 }
 
+func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return "", "", err
+	}
+
+	// imports extended key, create key file (if necessary)
+	account, err := keyStore.ImportSingleExtendedKey(extKey, password)
+	if err != nil {
+		return "", "", err
+	}
+
+	address = account.Address.Hex()
+
+	// obtain public key to return
+	account, key, err := keyStore.AccountDecryptedKey(account, password)
+	if err != nil {
+		return address, "", err
+	}
+
+	pubKey = hexutil.Encode(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+
+	return
+}
+
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {

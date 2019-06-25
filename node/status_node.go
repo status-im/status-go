@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/statusaccounts"
 	"github.com/status-im/status-go/services/wallet"
 )
 
@@ -546,6 +547,19 @@ func (n *StatusNode) StatusService() (st *status.Service, err error) {
 	defer n.mu.RUnlock()
 
 	err = n.gethService(&st)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// StatusService exposes reference to status service running on top of the node
+func (n *StatusNode) StatusAccountsService() (sa *statusaccounts.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&sa)
 	if err == node.ErrServiceUnknown {
 		err = ErrServiceUnknown
 	}

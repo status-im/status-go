@@ -180,6 +180,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 		st.SetAccountManager(b.AccountManager())
 	}
 
+	if sa, err := b.statusNode.StatusAccountsService(); err == nil {
+		sa.SetAccountManager(b.AccountManager())
+	}
+
 	if st, err := b.statusNode.PeerService(); err == nil {
 		st.SetDiscoverer(b.StatusNode())
 	}

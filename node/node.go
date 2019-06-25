@@ -30,6 +30,7 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/statusaccounts"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
@@ -49,6 +50,7 @@ var (
 	ErrIncentivisationServiceRegistrationFailure  = errors.New("failed to register the Incentivisation service")
 	ErrWalletServiceRegistrationFailure           = errors.New("failed to register the Wallet service")
 	ErrBrowsersServiceRegistrationFailure         = errors.New("failed to register the Browsers service")
+	ErrStatusAccountsServiceRegistrationFailure   = errors.New("failed to register the StatusAccounts service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -128,6 +130,10 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 
 	if err := activateBrowsersService(stack, config.BrowsersConfig); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
+	}
+
+	if err := activateStatusAccountsService(stack); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrStatusAccountsServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -298,6 +304,13 @@ func activateBrowsersService(stack *node.Node, config params.BrowsersConfig) err
 	}
 	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		return browsers.NewService(), nil
+	})
+}
+
+func activateStatusAccountsService(stack *node.Node) error {
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		acc := statusaccounts.New(stack.AccountManager())
+		return acc, nil
 	})
 }
 
