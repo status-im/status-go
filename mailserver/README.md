@@ -28,6 +28,8 @@ $ echo '{"jsonrpc":"2.0","method":"shhext_syncMessages","params":[{"mailServerPe
     sudo socat -d -d - UNIX-CONNECT:/docker/statusd-mail/data/geth.ipc
 ```
 
+You can add `"followCursor": true` if you want it to automatically download messages until the cursor is empty meaning all data was synced.
+
 ### Debugging
 
 To verify that your mail server received any responses, watch logs and seek for logs like this:

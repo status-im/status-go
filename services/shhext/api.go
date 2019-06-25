@@ -400,7 +400,7 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 
 		log.Info("Syncing messages response", "error", resp.Error, "cursor", fmt.Sprintf("%#x", resp.Cursor))
 
-		if resp.Error != "" || len(resp.Cursor) == 0 {
+		if resp.Error != "" || len(resp.Cursor) == 0 || r.FollowCursor == false {
 			return createSyncMessagesResponse(resp), nil
 		}
 
