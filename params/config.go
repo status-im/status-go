@@ -325,6 +325,9 @@ type NodeConfig struct {
 	// EnableStatusService should be true to enable methods under status namespace.
 	EnableStatusService bool
 
+	// EnableStatusAccountsService should be true to enable methods under statusaccounts namespace.
+	EnableStatusAccountsService bool
+
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
