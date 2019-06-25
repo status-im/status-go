@@ -24,7 +24,7 @@ $ echo '{"jsonrpc":"2.0","method":"shh_markTrustedPeer", "params": ["enode://c42
 4. Finally, trigger the sync command:
 ```
 # sudo might be not needed in your setup
-$ echo '{"jsonrpc":"2.0","method":"shhext_syncMessages","params":[{"mailServerPeer":"enode://c42f368a23fa98ee546fd247220759062323249ef657d26d357a777443aec04db1b29a3a22ef3e7c548e18493ddaf51a31b0aed6079bd6ebe5ae838fcfaf3a49@206.189.243.162:30504", "to": 1550479953, "from": 1550393583}],"id":1}' | \
+$ echo '{"jsonrpc":"2.0","method":"shhext_syncMessages","params":[{"mailServerPeer":"enode://c42f368a23fa98ee546fd247220759062323249ef657d26d357a777443aec04db1b29a3a22ef3e7c548e18493ddaf51a31b0aed6079bd6ebe5ae838fcfaf3a49@206.189.243.162:30504", "to": 1550479953, "from": 1550393583, "limit": 1000}],"id":1}' | \
     sudo socat -d -d - UNIX-CONNECT:/docker/statusd-mail/data/geth.ipc
 ```
 
