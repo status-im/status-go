@@ -196,7 +196,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 
 	// Add explicit timeout context, otherwise the request
 	// can hang indefinitely if not specified by the sender.
-	// Sender is usually throug netcat or some bash tool
+	// Sender is usually through netcat or some bash tool
 	// so it's not really possible to specify the timeout.
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*30)
 	defer cancel()
