@@ -6,11 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/extkeys"
 )
 
 // errors
 var (
-	ErrInvalidAccountAddressOrKey = errors.New("cannot parse address or key to valid account address")
+	ErrInvalidAccountAddressOrKey  = errors.New("cannot parse address or key to valid account address")
+	ErrInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 )
 
 // Info contains wallet and chat addresses and public keys of an account.
@@ -67,4 +69,16 @@ func ToAddress(accountAddress string) *common.Address {
 	}
 
 	return &to.Address
+}
+
+// MnemonicPhraseLengthToEntropyStrength returns the entropy strength for a given mnemonic length
+func MnemonicPhraseLengthToEntropyStrength(length int) (extkeys.EntropyStrength, error) {
+	if length < 12 || length > 24 || length%3 != 0 {
+		return 0, ErrInvalidMnemonicPhraseLength
+	}
+
+	bitsLength := length * 11
+	checksumLength := bitsLength % 32
+
+	return extkeys.EntropyStrength(bitsLength - checksumLength), nil
 }
