@@ -10,6 +10,8 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
+// ErrInvalidMnemonicPhraseLength is returned if the requested mnemonic length is invalid.
+// Valid lengths are 12, 15, 18, 21, and 24.
 var ErrInvalidMnemonicPhraseLength = errors.New("mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
