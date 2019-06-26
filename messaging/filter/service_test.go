@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	chatDB "github.com/status-im/status-go/services/shhext/chat/db"
-	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
+	chatDB "github.com/status-im/status-go/messaging/chat/db"
+	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )

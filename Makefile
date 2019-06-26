@@ -172,7 +172,7 @@ setup: setup-build setup-dev tidy ##@other Prepare project for development and b
 
 generate: ##@other Regenerate assets and other auto-generated stuff
 	go generate ./static ./static/chat_db_migrations ./static/mailserver_db_migrations ./t
-	$(shell cd ./services/shhext/chat/protobuf && exec protoc --go_out=. ./*.proto)
+	$(shell cd ./messaging/chat/protobuf && exec protoc --go_out=. ./*.proto)
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)

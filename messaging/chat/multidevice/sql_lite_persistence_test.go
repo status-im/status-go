@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	chatDB "github.com/status-im/status-go/services/shhext/chat/db"
+	chatDB "github.com/status-im/status-go/messaging/chat/db"
 	"github.com/stretchr/testify/suite"
 )
 

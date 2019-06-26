@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	dr "github.com/status-im/doubleratchet"
 
-	"github.com/status-im/status-go/services/shhext/chat/crypto"
-	"github.com/status-im/status-go/services/shhext/chat/multidevice"
-	"github.com/status-im/status-go/services/shhext/chat/protobuf"
+	"github.com/status-im/status-go/messaging/chat/crypto"
+	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
 var ErrSessionNotFound = errors.New("session not found")

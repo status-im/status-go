@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	"github.com/status-im/migrate/v4/source/go_bindata"
-	"github.com/status-im/status-go/services/shhext/chat/db/migrations"
+	"github.com/status-im/status-go/messaging/chat/db/migrations"
 )
 
 const exportDB = "SELECT sqlcipher_export('newdb')"

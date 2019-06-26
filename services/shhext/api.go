@@ -17,10 +17,10 @@ import (
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/services/shhext/chat"
-	"github.com/status-im/status-go/services/shhext/chat/multidevice"
+	"github.com/status-im/status-go/messaging/chat"
+	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/services/shhext/dedup"
-	"github.com/status-im/status-go/services/shhext/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
