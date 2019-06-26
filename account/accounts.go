@@ -26,6 +26,8 @@ var (
 	ErrAccountToKeyMappingFailure     = errors.New("cannot retrieve a valid key for a given account")
 	ErrNoAccountSelected              = errors.New("no account has been selected, please login")
 	ErrInvalidMasterKeyCreated        = errors.New("can not create master extended key")
+	ErrOnboardingNotStarted           = errors.New("onboarding must be started before choosing an account")
+	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 )
 
 // GethServiceProvider provides required geth services.
@@ -38,7 +40,10 @@ type GethServiceProvider interface {
 type Manager struct {
 	geth GethServiceProvider
 
-	mu                    sync.RWMutex
+	mu sync.RWMutex
+
+	onboarding *Onboarding
+
 	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
 	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectAccount()
 }
@@ -363,6 +368,55 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	}
 
 	return filtered, nil
+}
+
+// StartOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
+func (m *Manager) StartOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	onboarding, err := NewOnboarding(accountsCount, mnemonicPhraseLength)
+	if err != nil {
+		return nil, err
+	}
+
+	m.onboarding = onboarding
+
+	return m.onboarding.Accounts(), nil
+}
+
+// RemoveOnboarding reset the current onboarding struct setting it to nil and deleting the accounts from memory.
+func (m *Manager) RemoveOnboarding() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.onboarding = nil
+}
+
+// ImportOnboardingAccount imports the account specified by id and encrypts it with password.
+func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
+	var info Info
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.onboarding == nil {
+		return info, "", ErrOnboardingNotStarted
+	}
+
+	acc, err := m.onboarding.Account(id)
+	if err != nil {
+		return info, "", err
+	}
+
+	info, err = m.RecoverAccount(password, acc.mnemonic)
+	if err != nil {
+		return info, "", err
+	}
+
+	m.onboarding = nil
+
+	return info, acc.mnemonic, nil
 }
 
 // refreshSelectedWalletAccount re-populates list of sub-accounts of the currently selected account (if any)

@@ -238,6 +238,69 @@ func RecoverAccount(password, mnemonic string) string {
 	return string(outBytes)
 }
 
+// StartOnboarding initialize the onboarding with n random accounts
+func StartOnboarding(n, mnemonicPhraseLength int) string {
+	out := struct {
+		Accounts []OnboardingAccount `json:"accounts"`
+		Error    string              `json:"error"`
+	}{
+		Accounts: make([]OnboardingAccount, 0),
+	}
+
+	accounts, err := statusBackend.AccountManager().StartOnboarding(n, mnemonicPhraseLength)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		out.Error = err.Error()
+	}
+
+	if err == nil {
+		for _, account := range accounts {
+			out.Accounts = append(out.Accounts, OnboardingAccount{
+				ID:            account.ID,
+				Address:       account.Info.WalletAddress,
+				PubKey:        account.Info.WalletPubKey,
+				WalletAddress: account.Info.WalletAddress,
+				WalletPubKey:  account.Info.WalletPubKey,
+				ChatAddress:   account.Info.ChatAddress,
+				ChatPubKey:    account.Info.ChatPubKey,
+			})
+		}
+	}
+
+	outBytes, _ := json.Marshal(out)
+	return string(outBytes)
+}
+
+//ImportOnboardingAccount re-creates and imports an account created during onboarding.
+func ImportOnboardingAccount(id, password string) string {
+	info, mnemonic, err := statusBackend.AccountManager().ImportOnboardingAccount(id, password)
+
+	errString := ""
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AccountInfo{
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
+	}
+	outBytes, _ := json.Marshal(out)
+	return string(outBytes)
+}
+
+// RemoveOnboarding resets the current onboarding removing from memory all the generated keys.
+func RemoveOnboarding() {
+	statusBackend.AccountManager().RemoveOnboarding()
+}
+
 // VerifyAccountPassword verifies account password.
 func VerifyAccountPassword(keyStoreDir, address, password string) string {
 	_, err := statusBackend.AccountManager().VerifyAccountPassword(keyStoreDir, address, password)

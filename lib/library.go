@@ -234,6 +234,72 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
+// StartOnboarding initialize the onboarding with n random accounts
+//export StartOnboarding
+func StartOnboarding(n, mnemonicPhraseLength C.int) *C.char {
+	out := struct {
+		Accounts []OnboardingAccount `json:"accounts"`
+		Error    string              `json:"error"`
+	}{
+		Accounts: make([]OnboardingAccount, 0),
+	}
+
+	accounts, err := statusBackend.AccountManager().StartOnboarding(int(n), int(mnemonicPhraseLength))
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		out.Error = err.Error()
+	}
+
+	if err == nil {
+		for _, account := range accounts {
+			out.Accounts = append(out.Accounts, OnboardingAccount{
+				ID:            account.ID,
+				Address:       account.Info.WalletAddress,
+				PubKey:        account.Info.WalletPubKey,
+				WalletAddress: account.Info.WalletAddress,
+				WalletPubKey:  account.Info.WalletPubKey,
+				ChatAddress:   account.Info.ChatAddress,
+				ChatPubKey:    account.Info.ChatPubKey,
+			})
+		}
+	}
+
+	outBytes, _ := json.Marshal(out)
+	return C.CString(string(outBytes))
+}
+
+// ImportOnboardingAccount re-creates and imports an account created during onboarding.
+//export ImportOnboardingAccount
+func ImportOnboardingAccount(id, password *C.char) *C.char {
+	info, mnemonic, err := statusBackend.AccountManager().ImportOnboardingAccount(C.GoString(id), C.GoString(password))
+
+	errString := ""
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		errString = err.Error()
+	}
+
+	out := AccountInfo{
+		Address:       info.WalletAddress,
+		PubKey:        info.WalletPubKey,
+		WalletAddress: info.WalletAddress,
+		WalletPubKey:  info.WalletPubKey,
+		ChatAddress:   info.ChatAddress,
+		ChatPubKey:    info.ChatPubKey,
+		Mnemonic:      mnemonic,
+		Error:         errString,
+	}
+	outBytes, _ := json.Marshal(out)
+	return C.CString(string(outBytes))
+}
+
+// RemoveOnboarding resets the current onboarding removing from memory all the generated keys.
+//export RemoveOnboarding
+func RemoveOnboarding() {
+	statusBackend.AccountManager().RemoveOnboarding()
+}
+
 //VerifyAccountPassword verifies account password
 //export VerifyAccountPassword
 func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {

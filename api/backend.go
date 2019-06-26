@@ -493,6 +493,8 @@ func (b *StatusBackend) Logout() error {
 
 // reSelectAccount selects previously selected account, often, after node restart.
 func (b *StatusBackend) reSelectAccount() error {
+	b.AccountManager().RemoveOnboarding()
+
 	selectedChatAccount, err := b.AccountManager().SelectedChatAccount()
 	if selectedChatAccount == nil || err == account.ErrNoAccountSelected {
 		return nil
@@ -517,6 +519,8 @@ func (b *StatusBackend) reSelectAccount() error {
 func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	b.AccountManager().RemoveOnboarding()
 
 	err := b.accountManager.SelectAccount(walletAddress, chatAddress, password)
 	if err != nil {

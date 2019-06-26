@@ -40,11 +40,11 @@ const (
 	totalAvailableLanguages
 )
 
-type entropyStrength int
+type EntropyStrength int
 
 // Valid entropy strengths
 const (
-	EntropyStrength128 entropyStrength = 128 + 32*iota
+	EntropyStrength128 EntropyStrength = 128 + 32*iota
 	EntropyStrength160
 	EntropyStrength192
 	EntropyStrength224
@@ -129,7 +129,7 @@ func (m *Mnemonic) MnemonicSeed(mnemonic string, password string) []byte {
 }
 
 // MnemonicPhrase returns a human readable seed for BIP32 Hierarchical Deterministic Wallets
-func (m *Mnemonic) MnemonicPhrase(strength entropyStrength, language Language) (string, error) {
+func (m *Mnemonic) MnemonicPhrase(strength EntropyStrength, language Language) (string, error) {
 	wordList, err := m.WordList(language)
 	if err != nil {
 		return "", err
