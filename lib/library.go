@@ -237,20 +237,19 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 // StartOnboarding initialize the onboarding with n random accounts
 //export StartOnboarding
 func StartOnboarding(n, mnemonicPhraseLength C.int) *C.char {
-	accounts, err := statusBackend.AccountManager().StartOnboarding(int(n), int(mnemonicPhraseLength))
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
 	out := struct {
 		Accounts []OnboardingAccount `json:"accounts"`
 		Error    string              `json:"error"`
 	}{
 		Accounts: make([]OnboardingAccount, 0),
-		Error:    errString,
+	}
+
+	accounts, err := statusBackend.AccountManager().StartOnboarding(int(n), int(mnemonicPhraseLength))
+
+	errString := ""
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		out.Error = err.Error()
 	}
 
 	if err == nil {
