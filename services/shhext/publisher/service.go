@@ -37,6 +37,7 @@ var (
 	// ErrPFSNotEnabled is returned when an endpoint PFS only is called but
 	// PFS is disabled
 	ErrPFSNotEnabled = errors.New("pfs not enabled")
+	errNoKeySelected = errors.New("no key selected")
 )
 
 type Service struct {
@@ -194,7 +195,7 @@ func (s *Service) EnableInstallation(installationID string) error {
 
 	privateKeyID := s.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
-		return errors.New("no key selected")
+		return errNoKeySelected
 	}
 
 	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
@@ -213,7 +214,7 @@ func (s *Service) DisableInstallation(installationID string) error {
 
 	privateKeyID := s.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
-		return errors.New("no key selected")
+		return errNoKeySelected
 	}
 
 	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
@@ -232,7 +233,7 @@ func (s *Service) GetOurInstallations() ([]*multidevice.Installation, error) {
 
 	privateKeyID := s.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
-		return nil, errors.New("no key selected")
+		return nil, errNoKeySelected
 	}
 
 	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
@@ -251,7 +252,7 @@ func (s *Service) SetInstallationMetadata(installationID string, data *multidevi
 
 	privateKeyID := s.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
-		return errors.New("no key selected")
+		return errNoKeySelected
 	}
 
 	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
@@ -340,7 +341,7 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 
 	privateKeyID := s.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
-		return errors.New("no key selected")
+		return errNoKeySelected
 	}
 
 	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
@@ -482,7 +483,7 @@ func (s *Service) CreatePublicMessage(signature string, chatID string, payload [
 	if wrap {
 		privateKeyID := s.whisper.SelectedKeyPairID()
 		if privateKeyID == "" {
-			return nil, errors.New("no key selected")
+			return nil, errNoKeySelected
 		}
 
 		privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
@@ -558,7 +559,7 @@ func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
 
 	privateKeyID := s.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
-		return nil, errors.New("no key selected")
+		return nil, errNoKeySelected
 	}
 
 	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)

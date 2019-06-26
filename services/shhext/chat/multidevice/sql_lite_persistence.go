@@ -32,8 +32,10 @@ func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations int, identi
 	}
 
 	for rows.Next() {
-		var installationID string
-		var version uint32
+		var (
+			installationID string
+			version        uint32
+		)
 		err = rows.Scan(
 			&installationID,
 			&version,
@@ -55,11 +57,13 @@ func (s *SQLLitePersistence) GetActiveInstallations(maxInstallations int, identi
 
 // GetInstallations returns all the installations for a given identity
 // we both return the installations & the metadata
+// metadata is currently stored in a separate table, as in some cases we
+// might have metadata for a device, but no other information on the device
 func (s *SQLLitePersistence) GetInstallations(identity []byte) ([]*Installation, error) {
 	installationMap := make(map[string]*Installation)
 	var installations []*Installation
 
-	// We query both tables as sqlite does not support outer joins
+	// We query both tables as sqlite does not support full outer joins
 	installationsStmt, err := s.db.Prepare(`SELECT installation_id, version, enabled, timestamp FROM installations WHERE identity = ?`)
 	if err != nil {
 		return nil, err
@@ -72,10 +76,12 @@ func (s *SQLLitePersistence) GetInstallations(identity []byte) ([]*Installation,
 	}
 
 	for installationRows.Next() {
-		var installationID string
-		var version uint32
-		var enabled bool
-		var timestamp int64
+		var (
+			installationID string
+			version        uint32
+			enabled        bool
+			timestamp      int64
+		)
 		err = installationRows.Scan(
 			&installationID,
 			&version,
@@ -107,11 +113,13 @@ func (s *SQLLitePersistence) GetInstallations(identity []byte) ([]*Installation,
 	}
 
 	for metadataRows.Next() {
-		var installationID string
-		var name sql.NullString
-		var deviceType sql.NullString
-		var fcmToken sql.NullString
-		var installation *Installation
+		var (
+			installationID string
+			name           sql.NullString
+			deviceType     sql.NullString
+			fcmToken       sql.NullString
+			installation   *Installation
+		)
 		err = metadataRows.Scan(
 			&installationID,
 			&name,
