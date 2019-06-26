@@ -249,7 +249,6 @@ func StartOnboarding(n, mnemonicPhraseLength int) string {
 
 	accounts, err := statusBackend.AccountManager().StartOnboarding(n, mnemonicPhraseLength)
 
-	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		out.Error = err.Error()
