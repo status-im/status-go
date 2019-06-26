@@ -76,29 +76,20 @@ func (s *SQLLitePersistence) GetInstallations(identity []byte) ([]*Installation,
 	}
 
 	for installationRows.Next() {
-		var (
-			installationID string
-			version        uint32
-			enabled        bool
-			timestamp      int64
-		)
+		var installation Installation
 		err = installationRows.Scan(
-			&installationID,
-			&version,
-			&enabled,
-			&timestamp,
+			&installation.ID,
+			&installation.Version,
+			&installation.Enabled,
+			&installation.Timestamp,
 		)
 		if err != nil {
 			return nil, err
 		}
-		installationMap[installationID] = &Installation{
-			ID:                   installationID,
-			Version:              version,
-			Enabled:              enabled,
-			Timestamp:            timestamp,
-			InstallationMetadata: &InstallationMetadata{},
-		}
-
+		// We initialized to empty in this case as we want to
+		// return metadata as well in this endpoint, but not in others
+		installation.InstallationMetadata = &InstallationMetadata{}
+		installationMap[installation.ID] = &installation
 	}
 
 	metadataStmt, err := s.db.Prepare(`SELECT installation_id, name, device_type, fcm_token FROM installation_metadata WHERE identity = ?`)
