@@ -45,7 +45,7 @@ func NewOnboarding(n, mnemonicPhraseLength int) (*Onboarding, error) {
 
 // Accounts return the list of OnboardingAccount generated.
 func (o *Onboarding) Accounts() []*OnboardingAccount {
-	accounts := make([]*OnboardingAccount, len(o.accounts))
+	accounts := make([]*OnboardingAccount, 0)
 	for _, a := range o.accounts {
 		accounts = append(accounts, a)
 	}
