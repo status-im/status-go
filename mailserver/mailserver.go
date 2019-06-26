@@ -523,10 +523,12 @@ func (s *WMailServer) processRequestInBundles(
 
 		}
 
+		// TODO(adam): this is invalid code. If the limit is 1000,
+		// it will only send 999 items and send a cursor.
 		lastEnvelopeHash = key.EnvelopeHash()
 		processedEnvelopes++
 		envelopeSize := uint32(len(rawValue))
-		limitReached := processedEnvelopes == limit
+		limitReached := processedEnvelopes >= limit
 		newSize := bundleSize + envelopeSize
 
 		// If we still have some room for messages, add and continue

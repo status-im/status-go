@@ -139,6 +139,9 @@ type SyncMessagesRequest struct {
 	// Cursor is used as starting point for paginated requests
 	Cursor string `json:"cursor"`
 
+	// FollowCursor if true loads messages until cursor is empty.
+	FollowCursor bool `json:"followCursor"`
+
 	// Topics is a list of Whisper topics.
 	// If empty, a full bloom filter will be used.
 	Topics []whisper.TopicType `json:"topics"`
@@ -373,44 +376,36 @@ func createSyncMessagesResponse(r whisper.SyncEventResponse) SyncMessagesRespons
 // SyncMessages sends a request to a given MailServerPeer to sync historic messages.
 // MailServerPeers needs to be added as a trusted peer first.
 func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (SyncMessagesResponse, error) {
+	log.Info("SyncMessages start", "request", r)
+
 	var response SyncMessagesResponse
 
 	mailServerEnode, err := enode.ParseV4(r.MailServerPeer)
 	if err != nil {
 		return response, fmt.Errorf("invalid MailServerPeer: %v", err)
 	}
+	mailServerID := mailServerEnode.ID().Bytes()
 
 	request, err := createSyncMailRequest(r)
 	if err != nil {
 		return response, fmt.Errorf("failed to create a sync mail request: %v", err)
 	}
 
-	if err := api.service.w.SyncMessages(mailServerEnode.ID().Bytes(), request); err != nil {
-		return response, fmt.Errorf("failed to send a sync request: %v", err)
-	}
-
-	// Wait for the response which is received asynchronously as a p2p packet.
-	// This packet handler will send an event which contains the response payload.
-	events := make(chan whisper.EnvelopeEvent)
-	sub := api.service.w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
 	for {
-		select {
-		case event := <-events:
-			if event.Event != whisper.EventMailServerSyncFinished {
-				continue
-			}
+		log.Info("Sending a request to sync messages", "request", request)
 
-			log.Info("received EventMailServerSyncFinished event", "data", event.Data)
-
-			if resp, ok := event.Data.(whisper.SyncEventResponse); ok {
-				return createSyncMessagesResponse(resp), nil
-			}
-			return response, fmt.Errorf("did not understand the response event data")
-		case <-ctx.Done():
-			return response, ctx.Err()
+		resp, err := api.service.syncMessages(ctx, mailServerID, request)
+		if err != nil {
+			return response, err
 		}
+
+		log.Info("Syncing messages response", "error", resp.Error, "cursor", fmt.Sprintf("%#x", resp.Cursor))
+
+		if resp.Error != "" || len(resp.Cursor) == 0 || !r.FollowCursor {
+			return createSyncMessagesResponse(resp), nil
+		}
+
+		request.Cursor = resp.Cursor
 	}
 }
 

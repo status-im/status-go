@@ -1,7 +1,9 @@
 package shhext
 
 import (
+	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -178,4 +180,47 @@ func (s *Service) Stop() error {
 	}
 
 	return s.Service.Stop()
+}
+
+func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisper.SyncMailRequest) (resp whisper.SyncEventResponse, err error) {
+	err = s.w.SyncMessages(mailServerID, r)
+	if err != nil {
+		return
+	}
+
+	// Wait for the response which is received asynchronously as a p2p packet.
+	// This packet handler will send an event which contains the response payload.
+	events := make(chan whisper.EnvelopeEvent, 1024)
+	sub := s.w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	// Add explicit timeout context, otherwise the request
+	// can hang indefinitely if not specified by the sender.
+	// Sender is usually through netcat or some bash tool
+	// so it's not really possible to specify the timeout.
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+
+	for {
+		select {
+		case event := <-events:
+			if event.Event != whisper.EventMailServerSyncFinished {
+				continue
+			}
+
+			log.Info("received EventMailServerSyncFinished event", "data", event.Data)
+
+			var ok bool
+
+			resp, ok = event.Data.(whisper.SyncEventResponse)
+			if !ok {
+				err = fmt.Errorf("did not understand the response event data")
+				return
+			}
+			return
+		case <-timeoutCtx.Done():
+			err = timeoutCtx.Err()
+			return
+		}
+	}
 }

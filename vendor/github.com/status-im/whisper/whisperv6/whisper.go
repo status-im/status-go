@@ -1058,7 +1058,15 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 
 				if err := whisper.mailServer.SyncMail(p, request); err != nil {
-					log.Error("failed to sync envelopes", "peer", p.peer.ID().String())
+					log.Error(
+						"failed to sync envelopes",
+						"peer", p.peer.ID().String(),
+					)
+					_ = whisper.SendSyncResponse(
+						p,
+						SyncResponse{Error: err.Error()},
+					)
+					return err
 				}
 			} else {
 				log.Debug("requested to sync messages but mail servers is not registered", "peer", p.peer.ID().String())
