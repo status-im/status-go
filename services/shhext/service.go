@@ -13,11 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/db"
+	"github.com/status-im/status-go/messaging/filter"
+	"github.com/status-im/status-go/messaging/publisher"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/dedup"
-	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/services/shhext/mailservers"
-	"github.com/status-im/status-go/messaging/publisher"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
