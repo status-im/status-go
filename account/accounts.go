@@ -370,8 +370,8 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	return filtered, nil
 }
 
-// NewOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
-func (m *Manager) NewOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
+// StartOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
+func (m *Manager) StartOnboarding(accountsCount, mnemonicPhraseLength int) ([]*OnboardingAccount, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -385,8 +385,8 @@ func (m *Manager) NewOnboarding(accountsCount, mnemonicPhraseLength int) ([]*Onb
 	return m.onboarding.Accounts(), nil
 }
 
-// ResetOnboarding reset the current onboarding struct setting it to nil and deleting the accounts from memory.
-func (m *Manager) ResetOnboarding() {
+// RemoveOnboarding reset the current onboarding struct setting it to nil and deleting the accounts from memory.
+func (m *Manager) RemoveOnboarding() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -395,21 +395,23 @@ func (m *Manager) ResetOnboarding() {
 
 // ImportOnboardingAccount imports the account specified by id and encrypts it with password.
 func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, string, error) {
+	var info Info
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.onboarding == nil {
-		return Info{}, "", ErrOnboardingNotStarted
+		return info, "", ErrOnboardingNotStarted
 	}
 
 	acc, err := m.onboarding.Account(id)
 	if err != nil {
-		return Info{}, "", err
+		return info, "", err
 	}
 
-	info, err := m.RecoverAccount(password, acc.mnemonic)
+	info, err = m.RecoverAccount(password, acc.mnemonic)
 	if err != nil {
-		return Info{}, "", err
+		return info, "", err
 	}
 
 	m.onboarding = nil

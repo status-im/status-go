@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
-var errInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length")
+var ErrInvalidMnemonicPhraseLength = errors.New("mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
 type OnboardingAccount struct {
@@ -35,9 +35,7 @@ func NewOnboarding(n, mnemonicPhraseLength int) (*Onboarding, error) {
 		if err != nil {
 			return nil, err
 		}
-		uuid := uuid.NewRandom().String()
-		account.ID = uuid
-		onboarding.accounts[uuid] = account
+		onboarding.accounts[account.ID] = account
 	}
 
 	return onboarding, nil
@@ -45,7 +43,7 @@ func NewOnboarding(n, mnemonicPhraseLength int) (*Onboarding, error) {
 
 // Accounts return the list of OnboardingAccount generated.
 func (o *Onboarding) Accounts() []*OnboardingAccount {
-	accounts := make([]*OnboardingAccount, 0)
+	accounts := make([]*OnboardingAccount, len(o.accounts))
 	for _, a := range o.accounts {
 		accounts = append(accounts, a)
 	}
@@ -92,7 +90,10 @@ func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccou
 		ChatPubKey:    walletPubKey,
 	}
 
+	uuid := uuid.NewRandom().String()
+
 	account := &OnboardingAccount{
+		ID:       uuid,
 		mnemonic: mnemonicPhrase,
 		Info:     info,
 	}
@@ -115,7 +116,7 @@ func (o *Onboarding) deriveAccount(masterExtendedKey *extkeys.ExtendedKey, purpo
 
 func mnemonicPhraseLengthToEntropyStrenght(length int) (extkeys.EntropyStrength, error) {
 	if length < 12 || length > 24 || length%3 != 0 {
-		return 0, errInvalidMnemonicPhraseLength
+		return 0, ErrInvalidMnemonicPhraseLength
 	}
 
 	bitsLength := length * 11

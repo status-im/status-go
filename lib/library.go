@@ -234,10 +234,10 @@ func RecoverAccount(password, mnemonic *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//NewOnboarding initialize the onboarding with n random accounts
-//export NewOnboarding
-func NewOnboarding(n, mnemonicPhraseLength C.int) *C.char {
-	accounts, err := statusBackend.AccountManager().NewOnboarding(int(n), int(mnemonicPhraseLength))
+// StartOnboarding initialize the onboarding with n random accounts
+//export StartOnboarding
+func StartOnboarding(n, mnemonicPhraseLength C.int) *C.char {
+	accounts, err := statusBackend.AccountManager().StartOnboarding(int(n), int(mnemonicPhraseLength))
 
 	errString := ""
 	if err != nil {
@@ -296,10 +296,10 @@ func ImportOnboardingAccount(id, password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-// ResetOnboarding resets the current onboarding removing from memory all the generated keys.
-//export ResetOnboarding
-func ResetOnboarding() {
-	statusBackend.AccountManager().ResetOnboarding()
+// RemoveOnboarding resets the current onboarding removing from memory all the generated keys.
+//export RemoveOnboarding
+func RemoveOnboarding() {
+	statusBackend.AccountManager().RemoveOnboarding()
 }
 
 //VerifyAccountPassword verifies account password

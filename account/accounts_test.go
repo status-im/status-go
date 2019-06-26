@@ -231,7 +231,7 @@ func (s *ManagerTestSuite) TestOnboarding() {
 
 	// generates 5 random accounts
 	count := 5
-	accounts, err := s.accManager.NewOnboarding(count, 24)
+	accounts, err := s.accManager.StartOnboarding(count, 24)
 	s.Require().NoError(err)
 	s.Equal(count, len(accounts))
 
@@ -256,11 +256,11 @@ func (s *ManagerTestSuite) TestOnboarding() {
 	s.Equal(info.WalletAddress, decAccount.Address.Hex())
 
 	// try resetting onboarding
-	_, err = s.accManager.NewOnboarding(count, 24)
+	_, err = s.accManager.StartOnboarding(count, 24)
 	s.Require().NoError(err)
 	s.NotNil(s.accManager.onboarding)
 
-	s.accManager.ResetOnboarding()
+	s.accManager.RemoveOnboarding()
 	s.Nil(s.accManager.onboarding)
 }
 

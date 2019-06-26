@@ -21,9 +21,9 @@ func TestMnemonicPhraseLengthToEntropyStrenght(t *testing.T) {
 		{21, 224, nil},
 		{24, 256, nil},
 		// invalid
-		{11, 0, errInvalidMnemonicPhraseLength},
-		{14, 0, errInvalidMnemonicPhraseLength},
-		{25, 0, errInvalidMnemonicPhraseLength},
+		{11, 0, ErrInvalidMnemonicPhraseLength},
+		{14, 0, ErrInvalidMnemonicPhraseLength},
+		{25, 0, ErrInvalidMnemonicPhraseLength},
 	}
 
 	for _, s := range scenarios {
