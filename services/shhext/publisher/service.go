@@ -5,6 +5,10 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -20,9 +24,6 @@ import (
 	"github.com/status-im/status-go/signal"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"golang.org/x/crypto/sha3"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 const (
@@ -42,15 +43,15 @@ var (
 
 type Service struct {
 	whisper     *whisper.Whisper
-	online      func() bool
 	whisperAPI  *whisper.PublicWhisperAPI
+	online      func() bool // returns true if a node is online and connected to peers
 	protocol    *chat.ProtocolService
 	persistence Persistence
-	log         log.Logger
 	filter      *filter.Service
 	config      *Config
 	quit        chan struct{}
-	ticker      *time.Ticker
+	ticker      *time.Ticker // TODO(adam): replace with contactCodeBroadcastTicker. Or even move it to a separate struct.
+	log         log.Logger
 }
 
 type Config struct {
@@ -69,6 +70,7 @@ func New(config *Config, w *whisper.Whisper) *Service {
 }
 
 // InitProtocolWithPassword creates an instance of ProtocolService given an address and password used to generate an encryption key.
+// TODO(adam): replace with SetPFSProtocolService()
 func (s *Service) InitProtocolWithPassword(address string, password string) error {
 	digest := sha3.Sum256([]byte(password))
 	encKey := fmt.Sprintf("%x", digest)
@@ -76,10 +78,12 @@ func (s *Service) InitProtocolWithPassword(address string, password string) erro
 }
 
 // InitProtocolWithEncyptionKey creates an instance of ProtocolService given an address and encryption key.
+// TODO(adam): replace with SetPFSProtocolService()
 func (s *Service) InitProtocolWithEncyptionKey(address string, encKey string) error {
 	return s.initProtocol(address, encKey, "")
 }
 
+// TODO(adam): move somewhere else out of publisher/
 func (s *Service) initProtocol(address, encKey, password string) error {
 	if !s.config.PfsEnabled {
 		return nil
@@ -148,6 +152,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	// Initialize sharedsecret
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 	// Initialize filter
+	// TODO(adam): replace with SetFilter()
 	filterService := filter.New(s.whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
 	s.filter = filterService
 
@@ -159,6 +164,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	}
 	multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
 
+	// TODO(adam): replace with SetPFSProtocolService()
 	s.protocol = chat.NewProtocolService(
 		chat.NewEncryptionService(
 			persistence,
@@ -305,6 +311,7 @@ func (s *Service) RemoveFilters(chats []*filter.Chat) error {
 	return s.filter.Remove(chats)
 }
 
+// TODO(adam): replace with a handler passed to New() constructor.
 func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
 	var filters []*signal.Filter
 	for _, sharedSecret := range sharedSecrets {
@@ -333,6 +340,7 @@ func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret)
 
 }
 
+// TODO(adam): it should accept a regular Whisper message instead.
 func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 	if !s.config.PfsEnabled {
 		return nil
