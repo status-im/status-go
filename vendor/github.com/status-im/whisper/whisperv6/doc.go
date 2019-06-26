@@ -122,8 +122,12 @@ type SyncMailRequest struct {
 
 // Validate checks request's fields if they are valid.
 func (r SyncMailRequest) Validate() error {
+	if r.Limit == 0 {
+		return errors.New("invalid 'Limit' value, expected value greater than 0")
+	}
+
 	if r.Limit > MaxLimitInSyncMailRequest {
-		return fmt.Errorf("invalid 'Limit' value, expected lower than %d", MaxLimitInSyncMailRequest)
+		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInSyncMailRequest)
 	}
 
 	if r.Lower > r.Upper {
