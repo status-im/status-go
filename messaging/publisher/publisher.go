@@ -15,7 +15,6 @@ import (
 	"github.com/status-im/status-go/messaging/chat/protobuf"
 	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 	"github.com/status-im/status-go/messaging/filter"
-	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/whisperutils"
 	"github.com/status-im/status-go/signal"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -40,7 +39,7 @@ var (
 	errNoKeySelected = errors.New("no key selected")
 )
 
-type Service struct {
+type Publisher struct {
 	whisper     *whisper.Whisper
 	online      func() bool
 	whisperAPI  *whisper.PublicWhisperAPI
@@ -59,40 +58,40 @@ type Config struct {
 	InstallationID string
 }
 
-func New(config *Config, w *whisper.Whisper) *Service {
-	return &Service{
+func New(config *Config, w *whisper.Whisper) *Publisher {
+	return &Publisher{
 		config:     config,
 		whisper:    w,
 		whisperAPI: whisper.NewPublicWhisperAPI(w),
-		log:        log.New("package", "status-go/services/publisher.Service"),
+		log:        log.New("package", "status-go/services/publisher.Publisher"),
 	}
 }
 
 // InitProtocolWithPassword creates an instance of ProtocolService given an address and password used to generate an encryption key.
-func (s *Service) InitProtocolWithPassword(address string, password string) error {
+func (p *Publisher) InitProtocolWithPassword(address string, password string) error {
 	digest := sha3.Sum256([]byte(password))
 	encKey := fmt.Sprintf("%x", digest)
-	return s.initProtocol(address, encKey, password)
+	return p.initProtocol(address, encKey, password)
 }
 
 // InitProtocolWithEncyptionKey creates an instance of ProtocolService given an address and encryption key.
-func (s *Service) InitProtocolWithEncyptionKey(address string, encKey string) error {
-	return s.initProtocol(address, encKey, "")
+func (p *Publisher) InitProtocolWithEncyptionKey(address string, encKey string) error {
+	return p.initProtocol(address, encKey, "")
 }
 
-func (s *Service) initProtocol(address, encKey, password string) error {
-	if !s.config.PfsEnabled {
+func (p *Publisher) initProtocol(address, encKey, password string) error {
+	if !p.config.PfsEnabled {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Clean(s.config.DataDir), os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Clean(p.config.DataDir), os.ModePerm); err != nil {
 		return err
 	}
-	v0Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%x.db", address))
-	v1Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%s.db", s.config.InstallationID))
-	v2Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%s.v2.db", s.config.InstallationID))
-	v3Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%s.v3.db", s.config.InstallationID))
-	v4Path := filepath.Join(s.config.DataDir, fmt.Sprintf("%s.v4.db", s.config.InstallationID))
+	v0Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%x.db", address))
+	v1Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.db", p.config.InstallationID))
+	v2Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.v2.db", p.config.InstallationID))
+	v3Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.v3.db", p.config.InstallationID))
+	v4Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.v4.db", p.config.InstallationID))
 
 	if password != "" {
 		if err := chatDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
@@ -121,7 +120,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	// Desktop was passing a network dependent directory, which meant that
 	// if running on testnet it would not access the right db. This copies
 	// the db from mainnet to the root location.
-	networkDependentPath := filepath.Join(s.config.DataDir, "ethereum", "mainnet_rpc", fmt.Sprintf("%s.v4.db", s.config.InstallationID))
+	networkDependentPath := filepath.Join(p.config.DataDir, "ethereum", "mainnet_rpc", fmt.Sprintf("%p.v4.db", p.config.InstallationID))
 	if _, err := os.Stat(networkDependentPath); err == nil {
 		if err := os.Rename(networkDependentPath, v4Path); err != nil {
 			return err
@@ -143,145 +142,145 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	}
 
 	// Initialize persistence
-	s.persistence = NewSQLLitePersistence(persistence.DB)
+	p.persistence = NewSQLLitePersistence(persistence.DB)
 
 	// Initialize sharedsecret
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 	// Initialize filter
-	filterService := filter.New(s.whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
-	s.filter = filterService
+	filterService := filter.New(p.whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
+	p.filter = filterService
 
 	// Initialize multidevice
 	multideviceConfig := &multidevice.Config{
-		InstallationID:   s.config.InstallationID,
+		InstallationID:   p.config.InstallationID,
 		ProtocolVersion:  chat.ProtocolVersion,
 		MaxInstallations: maxInstallations,
 	}
 	multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
 
-	s.protocol = chat.NewProtocolService(
+	p.protocol = chat.NewProtocolService(
 		chat.NewEncryptionService(
 			persistence,
-			chat.DefaultEncryptionServiceConfig(s.config.InstallationID)),
+			chat.DefaultEncryptionServiceConfig(p.config.InstallationID)),
 		sharedSecretService,
 		multideviceService,
 		addedBundlesHandler,
-		s.onNewSharedSecretHandler)
+		p.onNewSharedSecretHandler)
 
 	return nil
 }
 
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
-	if s.protocol == nil {
+func (p *Publisher) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
+	if p.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
 
-	return s.protocol.ProcessPublicBundle(myIdentityKey, bundle)
+	return p.protocol.ProcessPublicBundle(myIdentityKey, bundle)
 }
 
-func (s *Service) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*protobuf.Bundle, error) {
-	if s.protocol == nil {
+func (p *Publisher) GetBundle(myIdentityKey *ecdsa.PrivateKey) (*protobuf.Bundle, error) {
+	if p.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
 
-	return s.protocol.GetBundle(myIdentityKey)
+	return p.protocol.GetBundle(myIdentityKey)
 }
 
 // EnableInstallation enables an installation for multi-device sync.
-func (s *Service) EnableInstallation(installationID string) error {
-	if s.protocol == nil {
+func (p *Publisher) EnableInstallation(installationID string) error {
+	if p.protocol == nil {
 		return errProtocolNotInitialized
 	}
 
-	privateKeyID := s.whisper.SelectedKeyPairID()
+	privateKeyID := p.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return errNoKeySelected
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 	if err != nil {
 		return err
 	}
 
-	return s.protocol.EnableInstallation(&privateKey.PublicKey, installationID)
+	return p.protocol.EnableInstallation(&privateKey.PublicKey, installationID)
 }
 
 // DisableInstallation disables an installation for multi-device sync.
-func (s *Service) DisableInstallation(installationID string) error {
-	if s.protocol == nil {
+func (p *Publisher) DisableInstallation(installationID string) error {
+	if p.protocol == nil {
 		return errProtocolNotInitialized
 	}
 
-	privateKeyID := s.whisper.SelectedKeyPairID()
+	privateKeyID := p.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return errNoKeySelected
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 	if err != nil {
 		return err
 	}
 
-	return s.protocol.DisableInstallation(&privateKey.PublicKey, installationID)
+	return p.protocol.DisableInstallation(&privateKey.PublicKey, installationID)
 }
 
 // GetOurInstallations returns all the installations available given an identity
-func (s *Service) GetOurInstallations() ([]*multidevice.Installation, error) {
-	if s.protocol == nil {
+func (p *Publisher) GetOurInstallations() ([]*multidevice.Installation, error) {
+	if p.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
 
-	privateKeyID := s.whisper.SelectedKeyPairID()
+	privateKeyID := p.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return nil, errNoKeySelected
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.protocol.GetOurInstallations(&privateKey.PublicKey)
+	return p.protocol.GetOurInstallations(&privateKey.PublicKey)
 }
 
 // SetInstallationMetadata sets the metadata for our own installation
-func (s *Service) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
-	if s.protocol == nil {
+func (p *Publisher) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
+	if p.protocol == nil {
 		return errProtocolNotInitialized
 	}
 
-	privateKeyID := s.whisper.SelectedKeyPairID()
+	privateKeyID := p.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return errNoKeySelected
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 	if err != nil {
 		return err
 	}
 
-	return s.protocol.SetInstallationMetadata(&privateKey.PublicKey, installationID, data)
+	return p.protocol.SetInstallationMetadata(&privateKey.PublicKey, installationID, data)
 }
 
-func (s *Service) GetPublicBundle(identityKey *ecdsa.PublicKey) (*protobuf.Bundle, error) {
-	if s.protocol == nil {
+func (p *Publisher) GetPublicBundle(identityKey *ecdsa.PublicKey) (*protobuf.Bundle, error) {
+	if p.protocol == nil {
 		return nil, errProtocolNotInitialized
 	}
 
-	return s.protocol.GetPublicBundle(identityKey)
+	return p.protocol.GetPublicBundle(identityKey)
 }
 
-func (s *Service) Start(online func() bool, startTicker bool) error {
-	s.online = online
+func (p *Publisher) Start(online func() bool, startTicker bool) error {
+	p.online = online
 	if startTicker {
-		s.startTicker()
+		p.startTicker()
 	}
 	return nil
 }
 
-func (s *Service) Stop() error {
-	if s.filter != nil {
-		if err := s.filter.Stop(); err != nil {
+func (p *Publisher) Stop() error {
+	if p.filter != nil {
+		if err := p.filter.Stop(); err != nil {
 			log.Error("Failed to stop filter service with error", "err", err)
 		}
 	}
@@ -289,26 +288,26 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func (s *Service) getNegotiatedChat(identity *ecdsa.PublicKey) *filter.Chat {
-	return s.filter.GetNegotiated(identity)
+func (p *Publisher) getNegotiatedChat(identity *ecdsa.PublicKey) *filter.Chat {
+	return p.filter.GetNegotiated(identity)
 }
 
-func (s *Service) LoadFilters(chats []*filter.Chat) ([]*filter.Chat, error) {
-	return s.filter.Init(chats)
+func (p *Publisher) LoadFilters(chats []*filter.Chat) ([]*filter.Chat, error) {
+	return p.filter.Init(chats)
 }
 
-func (s *Service) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
-	return s.filter.Load(chat)
+func (p *Publisher) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
+	return p.filter.Load(chat)
 }
 
-func (s *Service) RemoveFilters(chats []*filter.Chat) error {
-	return s.filter.Remove(chats)
+func (p *Publisher) RemoveFilters(chats []*filter.Chat) error {
+	return p.filter.Remove(chats)
 }
 
-func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
+func (p *Publisher) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
 	var filters []*signal.Filter
 	for _, sharedSecret := range sharedSecrets {
-		chat, err := s.filter.ProcessNegotiatedSecret(sharedSecret)
+		chat, err := p.filter.ProcessNegotiatedSecret(sharedSecret)
 		if err != nil {
 			log.Error("Failed to process negotiated secret", "err", err)
 			return
@@ -333,18 +332,17 @@ func (s *Service) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret)
 
 }
 
-func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
-	if !s.config.PfsEnabled {
+func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
+	if !p.config.PfsEnabled {
 		return nil
 	}
-	msg := dedupMessage.Message
 
-	privateKeyID := s.whisper.SelectedKeyPairID()
+	privateKeyID := p.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return errNoKeySelected
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 	if err != nil {
 		return err
 	}
@@ -358,11 +356,11 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 	protocolMessage := &protobuf.ProtocolMessage{}
 
 	if err := proto.Unmarshal(msg.Payload, protocolMessage); err != nil {
-		s.log.Debug("Not a protocol message", "err", err)
+		p.log.Debug("Not a protocol message", "err", err)
 		return nil
 	}
 
-	response, err := s.protocol.HandleMessage(privateKey, publicKey, protocolMessage, dedupMessage.DedupID)
+	response, err := p.protocol.HandleMessage(privateKey, publicKey, protocolMessage, msgID)
 
 	switch err {
 	case nil:
@@ -371,26 +369,26 @@ func (s *Service) ProcessMessage(dedupMessage dedup.DeduplicateMessage) error {
 	case chat.ErrDeviceNotFound:
 		// Notify that someone tried to contact us using an invalid bundle
 		if privateKey.PublicKey != *publicKey {
-			s.log.Warn("Device not found, sending signal", "err", err)
+			p.log.Warn("Device not found, sending signal", "err", err)
 			keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
 			handler := SignalHandler{}
 			handler.DecryptMessageFailed(keyString)
 		}
 	default:
 		// Log and pass to the client, even if failed to decrypt
-		s.log.Error("Failed handling message with error", "err", err)
+		p.log.Error("Failed handling message with error", "err", err)
 	}
 
 	return nil
 }
 
 // CreateDirectMessage creates a 1:1 chat message
-func (s *Service) CreateDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
-	if !s.config.PfsEnabled {
+func (p *Publisher) CreateDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
+	if !p.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(signature)
+	privateKey, err := p.whisper.GetPrivateKey(signature)
 	if err != nil {
 		return nil, err
 	}
@@ -403,30 +401,30 @@ func (s *Service) CreateDirectMessage(signature string, destination hexutil.Byte
 	var msgSpec *chat.ProtocolMessageSpec
 
 	if DH {
-		s.log.Debug("Building dh message")
-		msgSpec, err = s.protocol.BuildDHMessage(privateKey, publicKey, payload)
+		p.log.Debug("Building dh message")
+		msgSpec, err = p.protocol.BuildDHMessage(privateKey, publicKey, payload)
 	} else {
-		s.log.Debug("Building direct message")
-		msgSpec, err = s.protocol.BuildDirectMessage(privateKey, publicKey, payload)
+		p.log.Debug("Building direct message")
+		msgSpec, err = p.protocol.BuildDirectMessage(privateKey, publicKey, payload)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	whisperMessage, err := s.directMessageToWhisper(privateKey, publicKey, destination, signature, msgSpec)
+	whisperMessage, err := p.directMessageToWhisper(privateKey, publicKey, destination, signature, msgSpec)
 	if err != nil {
-		s.log.Error("sshext-service", "error building whisper message", err)
+		p.log.Error("sshext-service", "error building whisper message", err)
 		return nil, err
 	}
 
 	return whisperMessage, nil
 }
 
-func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
+func (p *Publisher) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
 	// marshal for sending to wire
 	marshaledMessage, err := proto.Marshal(spec.Message)
 	if err != nil {
-		s.log.Error("encryption-service", "error marshaling message", err)
+		p.log.Error("encryption-service", "error marshaling message", err)
 		return nil, err
 	}
 
@@ -435,18 +433,18 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 	whisperMessage.Sig = signature
 
 	if spec.SharedSecret != nil {
-		chat := s.getNegotiatedChat(theirPublicKey)
+		chat := p.getNegotiatedChat(theirPublicKey)
 		if chat != nil {
-			s.log.Debug("Sending on negotiated topic", "public-key", destination)
+			p.log.Debug("Sending on negotiated topic", "public-key", destination)
 			whisperMessage.SymKeyID = chat.SymKeyID
 			whisperMessage.Topic = chat.Topic
 			whisperMessage.PublicKey = nil
 			return &whisperMessage, nil
 		}
 	} else if spec.PartitionedTopic() == chat.PartitionTopicV1 {
-		s.log.Debug("Sending on partitioned topic", "public-key", destination)
+		p.log.Debug("Sending on partitioned topic", "public-key", destination)
 		// Create filter on demand
-		if _, err := s.filter.LoadPartitioned(myPrivateKey, theirPublicKey, false); err != nil {
+		if _, err := p.filter.LoadPartitioned(myPrivateKey, theirPublicKey, false); err != nil {
 			return nil, err
 		}
 		t := filter.PublicKeyToPartitionedTopicBytes(theirPublicKey)
@@ -455,7 +453,7 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 		return &whisperMessage, nil
 	}
 
-	s.log.Debug("Sending on old discovery topic", "public-key", destination)
+	p.log.Debug("Sending on old discovery topic", "public-key", destination)
 	whisperMessage.Topic = whisperutils.DiscoveryTopicBytes
 	whisperMessage.PublicKey = destination
 
@@ -463,16 +461,16 @@ func (s *Service) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPu
 }
 
 // CreatePublicMessage sends a public chat message to the underlying transport
-func (s *Service) CreatePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
-	if !s.config.PfsEnabled {
+func (p *Publisher) CreatePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
+	if !p.config.PfsEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
-	filter := s.filter.GetByID(chatID)
+	filter := p.filter.GetByID(chatID)
 	if filter == nil {
 		return nil, errors.New("not subscribed to chat")
 	}
-	s.log.Info("SIG", signature)
+	p.log.Info("SIG", signature)
 
 	// Enrich with transport layer info
 	whisperMessage := whisperutils.DefaultWhisperMessage()
@@ -481,23 +479,23 @@ func (s *Service) CreatePublicMessage(signature string, chatID string, payload [
 	whisperMessage.SymKeyID = filter.SymKeyID
 
 	if wrap {
-		privateKeyID := s.whisper.SelectedKeyPairID()
+		privateKeyID := p.whisper.SelectedKeyPairID()
 		if privateKeyID == "" {
 			return nil, errNoKeySelected
 		}
 
-		privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+		privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 		if err != nil {
 			return nil, err
 		}
 
-		message, err := s.protocol.BuildPublicMessage(privateKey, payload)
+		message, err := p.protocol.BuildPublicMessage(privateKey, payload)
 		if err != nil {
 			return nil, err
 		}
 		marshaledMessage, err := proto.Marshal(message)
 		if err != nil {
-			s.log.Error("encryption-service", "error marshaling message", err)
+			p.log.Error("encryption-service", "error marshaling message", err)
 			return nil, err
 		}
 		whisperMessage.Payload = marshaledMessage
@@ -509,38 +507,38 @@ func (s *Service) CreatePublicMessage(signature string, chatID string, payload [
 	return &whisperMessage, nil
 }
 
-func (s *Service) ConfirmMessagesProcessed(ids [][]byte) error {
-	return s.protocol.ConfirmMessagesProcessed(ids)
+func (p *Publisher) ConfirmMessagesProcessed(ids [][]byte) error {
+	return p.protocol.ConfirmMessagesProcessed(ids)
 }
 
-func (s *Service) startTicker() {
-	s.ticker = time.NewTicker(tickerInterval * time.Second)
-	s.quit = make(chan struct{})
+func (p *Publisher) startTicker() {
+	p.ticker = time.NewTicker(tickerInterval * time.Second)
+	p.quit = make(chan struct{})
 	go func() {
 		for {
 			select {
-			case <-s.ticker.C:
-				_, err := s.sendContactCode()
+			case <-p.ticker.C:
+				_, err := p.sendContactCode()
 				if err != nil {
-					s.log.Error("could not execute tick", "err", err)
+					p.log.Error("could not execute tick", "err", err)
 				}
-			case <-s.quit:
-				s.ticker.Stop()
+			case <-p.quit:
+				p.ticker.Stop()
 				return
 			}
 		}
 	}()
 }
 
-func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
-	s.log.Info("publishing bundle")
-	if !s.config.PfsEnabled {
+func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
+	p.log.Info("publishing bundle")
+	if !p.config.PfsEnabled {
 		return nil, nil
 	}
 
-	lastPublished, err := s.persistence.Get()
+	lastPublished, err := p.persistence.Get()
 	if err != nil {
-		s.log.Error("could not fetch config from db", "err", err)
+		p.log.Error("could not fetch config from db", "err", err)
 		return nil, err
 	}
 
@@ -548,42 +546,42 @@ func (s *Service) sendContactCode() (*whisper.NewMessage, error) {
 
 	if now-lastPublished < publishInterval {
 		fmt.Println("NOTHING")
-		s.log.Debug("nothing to do")
+		p.log.Debug("nothing to do")
 		return nil, nil
 	}
 
-	if !s.online() {
-		s.log.Debug("not connected")
+	if !p.online() {
+		p.log.Debug("not connected")
 		return nil, nil
 	}
 
-	privateKeyID := s.whisper.SelectedKeyPairID()
+	privateKeyID := p.whisper.SelectedKeyPairID()
 	if privateKeyID == "" {
 		return nil, errNoKeySelected
 	}
 
-	privateKey, err := s.whisper.GetPrivateKey(privateKeyID)
+	privateKey, err := p.whisper.GetPrivateKey(privateKeyID)
 	if err != nil {
 		return nil, err
 	}
 
 	identity := fmt.Sprintf("%x", crypto.FromECDSAPub(&privateKey.PublicKey))
 
-	message, err := s.CreatePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
+	message, err := p.CreatePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
 	if err != nil {
-		s.log.Error("could not build contact code", "identity", identity, "err", err)
+		p.log.Error("could not build contact code", "identity", identity, "err", err)
 		return nil, err
 	}
 
-	_, err = s.whisperAPI.Post(context.TODO(), *message)
+	_, err = p.whisperAPI.Post(context.TODO(), *message)
 	if err != nil {
-		s.log.Error("could not publish contact code on whisper", "identity", identity, "err", err)
+		p.log.Error("could not publish contact code on whisper", "identity", identity, "err", err)
 		return nil, err
 	}
 
-	err = s.persistence.Set(now)
+	err = p.persistence.Set(now)
 	if err != nil {
-		s.log.Error("could not set last published", "err", err)
+		p.log.Error("could not set last published", "err", err)
 		return nil, err
 	}
 

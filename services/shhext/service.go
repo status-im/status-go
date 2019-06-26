@@ -39,7 +39,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	*publisher.Service
+	*publisher.Publisher
 	storage          db.TransactionalStorage
 	w                *whisper.Whisper
 	config           params.ShhextConfig
@@ -82,9 +82,9 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		DataDir:        config.BackupDisabledDataDir,
 		InstallationID: config.InstallationID,
 	}
-	publisherService := publisher.New(publisherConfig, w)
+	publisher := publisher.New(publisherConfig, w)
 	return &Service{
-		Service:          publisherService,
+		Publisher:        publisher,
 		storage:          db.NewLevelDBStorage(ldb),
 		w:                w,
 		config:           config,
@@ -154,7 +154,7 @@ func (s *Service) Start(server *p2p.Server) error {
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
-	return s.Service.Start(s.online, true)
+	return s.Publisher.Start(s.online, true)
 }
 
 func (s *Service) online() bool {
@@ -179,7 +179,7 @@ func (s *Service) Stop() error {
 		}
 	}
 
-	return s.Service.Stop()
+	return s.Publisher.Stop()
 }
 
 func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisper.SyncMailRequest) (resp whisper.SyncEventResponse, err error) {

@@ -420,8 +420,7 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 
 	// Attempt to decrypt message, otherwise leave unchanged
 	for _, dedupMessage := range dedupMessages {
-
-		if err := api.service.ProcessMessage(dedupMessage); err != nil {
+		if err := api.service.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID); err != nil {
 			return nil, err
 		}
 	}

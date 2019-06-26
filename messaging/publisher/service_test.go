@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/status-im/status-go/messaging/filter"
-	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/whisperutils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
@@ -28,8 +27,8 @@ type TestKey struct {
 
 type ServiceTestSuite struct {
 	suite.Suite
-	alice    *Service
-	bob      *Service
+	alice    *Publisher
+	bob      *Publisher
 	aliceKey *TestKey
 	bobKey   *TestKey
 }
@@ -125,12 +124,8 @@ func (s *ServiceTestSuite) TestCreateDirectMessage() {
 		Payload: newMessage.Payload,
 		Dst:     newMessage.PublicKey,
 	}
-	dedupMessage := dedup.DeduplicateMessage{
-		DedupID: []byte("1"),
-		Message: message,
-	}
 
-	err = s.bob.ProcessMessage(dedupMessage)
+	err = s.bob.ProcessMessage(message, []byte("1"))
 	s.Require().NoError(err)
 
 	s.Require().Equal([]byte("hello"), message.Payload)
@@ -164,12 +159,7 @@ func (s *ServiceTestSuite) TestTopic() {
 	}
 
 	// We receive the contact code
-	dedupMessage2 := dedup.DeduplicateMessage{
-		DedupID: []byte("1"),
-		Message: message2,
-	}
-
-	err = s.alice.ProcessMessage(dedupMessage2)
+	err = s.alice.ProcessMessage(message2, []byte("1"))
 	s.Require().NoError(err)
 
 	// We build another message, this time it should use the partitioned topic
@@ -187,12 +177,7 @@ func (s *ServiceTestSuite) TestTopic() {
 	s.Require().Equal(expectedTopic3, message3.Topic)
 
 	// We receive the message
-	dedupMessage3 := dedup.DeduplicateMessage{
-		DedupID: []byte("1"),
-		Message: message3,
-	}
-
-	err = s.bob.ProcessMessage(dedupMessage3)
+	err = s.bob.ProcessMessage(message3, []byte("1"))
 	s.Require().NoError(err)
 
 	// We build another message, this time it should use the negotiated topic
@@ -217,12 +202,7 @@ func (s *ServiceTestSuite) TestTopic() {
 	s.Require().Equal(negotiatedTopic, message4.Topic)
 
 	// We receive the message
-	dedupMessage4 := dedup.DeduplicateMessage{
-		DedupID: []byte("1"),
-		Message: message4,
-	}
-
-	err = s.alice.ProcessMessage(dedupMessage4)
+	err = s.alice.ProcessMessage(message4, []byte("1"))
 	s.Require().NoError(err)
 
 	// Alice sends another message to Bob, this time it should use the negotiated topic
