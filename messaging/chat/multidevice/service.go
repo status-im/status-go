@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/services/shhext/chat/protobuf"
+	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
 type InstallationMetadata struct {

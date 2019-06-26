@@ -9,7 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/status-im/status-go/services/shhext/chat/protobuf"
+	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
 const (

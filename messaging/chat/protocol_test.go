@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/services/shhext/chat/multidevice"
-	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
+	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 	"github.com/stretchr/testify/suite"
 )
 

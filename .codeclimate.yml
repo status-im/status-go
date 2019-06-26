@@ -15,7 +15,7 @@ checks:
   # Functions or methods that may be hard to understand. This is disabled as it doesn't appear to be a reliable metric.
   method-complexity:
     enabled: false
-  # Classes defined with a high number of functions or methods. 
+  # Classes defined with a high number of functions or methods.
   method-count:
     config:
       threshold: 20
@@ -42,4 +42,4 @@ exclude_patterns:
   - static/
   - t/
   - mailserver/migrations
-  - services/shhext/chat/migrations
+  - messaging/chat/migrations

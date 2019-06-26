@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	dr "github.com/status-im/doubleratchet"
-	ecrypto "github.com/status-im/status-go/services/shhext/chat/crypto"
-	chatDB "github.com/status-im/status-go/services/shhext/chat/db"
-	"github.com/status-im/status-go/services/shhext/chat/multidevice"
-	"github.com/status-im/status-go/services/shhext/chat/protobuf"
-	"github.com/status-im/status-go/services/shhext/chat/sharedsecret"
+	ecrypto "github.com/status-im/status-go/messaging/chat/crypto"
+	chatDB "github.com/status-im/status-go/messaging/chat/db"
+	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/chat/protobuf"
+	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 )
 
 // A safe max number of rows

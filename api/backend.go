@@ -25,7 +25,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
-	"github.com/status-im/status-go/services/shhext/chat/crypto"
+	"github.com/status-im/status-go/messaging/chat/crypto"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"

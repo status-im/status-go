@@ -4,8 +4,8 @@ import (
 	"crypto/ecdsa"
 
 	dr "github.com/status-im/doubleratchet"
-	"github.com/status-im/status-go/services/shhext/chat/multidevice"
-	"github.com/status-im/status-go/services/shhext/chat/protobuf"
+	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
 // RatchetInfo holds the current ratchet state
