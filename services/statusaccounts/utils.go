@@ -6,7 +6,9 @@ import (
 	"github.com/status-im/status-go/extkeys"
 )
 
-var errInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length")
+// ErrInvalidMnemonicPhraseLength is returned if the requested mnemonic length is invalid.
+// Valid lengths are 12, 15, 18, 21, and 24.
+var ErrInvalidMnemonicPhraseLength = errors.New("mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 
 func mnemonicPhraseLengthToEntropyStrenght(length int) (extkeys.EntropyStrength, error) {
 	if length < 12 || length > 24 || length%3 != 0 {

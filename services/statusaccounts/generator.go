@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 	staccount "github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/extkeys"
 )
@@ -63,18 +63,12 @@ func (g *generator) importMnemonic(mnemonicPhrase string) (CreatedAccountInfo, e
 		return CreatedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
 
-	uuid, err := uuid.NewRandom()
-	if err != nil {
-		return CreatedAccountInfo{}, err
-	}
-
-	id := uuid.String()
-
 	acc := &account{
 		privateKey:  masterExtendedKey.ToECDSA(),
 		extendedKey: masterExtendedKey,
 	}
 
+	id := uuid.NewRandom().String()
 	g.accounts[id] = acc
 
 	return acc.toCreatedAccountInfo(id, mnemonicPhrase), nil
