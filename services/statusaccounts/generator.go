@@ -155,18 +155,12 @@ func (g *generator) loadAccount(address string, password string) (IdentifiedAcco
 		return IdentifiedAccountInfo{}, err
 	}
 
-	uuid, err := uuid.NewRandom()
-	if err != nil {
-		return IdentifiedAccountInfo{}, err
-	}
-
-	id := uuid.String()
-
 	account := &account{
 		privateKey:  key.PrivateKey,
 		extendedKey: key.ExtendedKey,
 	}
 
+	id := uuid.NewRandom().String()
 	g.accounts[id] = account
 
 	return IdentifiedAccountInfo{

@@ -12,7 +12,7 @@ var ErrInvalidMnemonicPhraseLength = errors.New("mnemonic phrase length; valid l
 
 func mnemonicPhraseLengthToEntropyStrenght(length int) (extkeys.EntropyStrength, error) {
 	if length < 12 || length > 24 || length%3 != 0 {
-		return 0, errInvalidMnemonicPhraseLength
+		return 0, ErrInvalidMnemonicPhraseLength
 	}
 
 	bitsLength := length * 11
