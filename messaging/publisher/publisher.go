@@ -38,8 +38,6 @@ var (
 	// ErrNoProtocolMessage means that a message was not a protocol message,
 	// that is it could not be unmarshaled.
 	ErrNoProtocolMessage = errors.New("not a protocol message")
-	//
-	ErrDeviceNotFound = errors.New("device not found")
 )
 
 type Publisher struct {
@@ -247,7 +245,6 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 		// Notify that someone tried to contact us using an invalid bundle
 		// if privateKey.PublicKey != *publicKey {
 		// 	p.log.Warn("Device not found, sending signal", "err", err)
-		// 	return ErrDeviceNotFound
 		// 	// keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
 		// 	// TODO(adam): pass a handler as an argument to handle this or event emitting
 		// 	// handler := SignalHandler{}

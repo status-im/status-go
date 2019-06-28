@@ -127,10 +127,10 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 	v0Path := filepath.Join(dataDir, fmt.Sprintf("%x.db", address))
-	v1Path := filepath.Join(dataDir, fmt.Sprintf("%p.db", s.config.InstallationID))
-	v2Path := filepath.Join(dataDir, fmt.Sprintf("%p.v2.db", s.config.InstallationID))
-	v3Path := filepath.Join(dataDir, fmt.Sprintf("%p.v3.db", s.config.InstallationID))
-	v4Path := filepath.Join(dataDir, fmt.Sprintf("%p.v4.db", s.config.InstallationID))
+	v1Path := filepath.Join(dataDir, fmt.Sprintf("%s.db", s.config.InstallationID))
+	v2Path := filepath.Join(dataDir, fmt.Sprintf("%s.v2.db", s.config.InstallationID))
+	v3Path := filepath.Join(dataDir, fmt.Sprintf("%s.v3.db", s.config.InstallationID))
+	v4Path := filepath.Join(dataDir, fmt.Sprintf("%s.v4.db", s.config.InstallationID))
 
 	if password != "" {
 		if err := chatDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
@@ -159,7 +159,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	// Desktop was passing a network dependent directory, which meant that
 	// if running on testnet it would not access the right db. This copies
 	// the db from mainnet to the root location.
-	networkDependentPath := filepath.Join(dataDir, "ethereum", "mainnet_rpc", fmt.Sprintf("%p.v4.db", s.config.InstallationID))
+	networkDependentPath := filepath.Join(dataDir, "ethereum", "mainnet_rpc", fmt.Sprintf("%s.v4.db", s.config.InstallationID))
 	if _, err := os.Stat(networkDependentPath); err == nil {
 		if err := os.Rename(networkDependentPath, v4Path); err != nil {
 			return err
