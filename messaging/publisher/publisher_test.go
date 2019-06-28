@@ -152,7 +152,7 @@ func (s *ServiceTestSuite) TestTopic() {
 
 	// We receive the contact code
 	err = s.alice.ProcessMessage(message2, []byte("1"))
-	s.Require().NoError(err)
+	s.Require().EqualError(err, chat.ErrNoPayload.Error())
 
 	// We build another message, this time it should use the partitioned topic
 	newMessage3, err := s.alice.CreateDirectMessage(s.aliceKey.keyID, s.bobKey.publicKeyBytes, false, []byte("hello"))

@@ -32,7 +32,10 @@ type ProtocolService struct {
 	Enabled                  bool
 }
 
-var ErrNotProtocolMessage = errors.New("Not a protocol message")
+var (
+	ErrNotProtocolMessage = errors.New("not a protocol message")
+	ErrNoPayload          = errors.New("no payload")
+)
 
 // NewProtocolService creates a new ProtocolService instance
 func NewProtocolService(encryption *EncryptionService, secret *sharedsecret.Service, multidevice *multidevice.Service, addedBundlesHandler func([]*multidevice.Installation), onNewSharedSecretHandler func([]*sharedsecret.Secret)) *ProtocolService {
@@ -313,7 +316,7 @@ func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPu
 	}
 
 	// Return error
-	return nil, errors.New("no payload")
+	return nil, ErrNoPayload
 }
 
 func getProtocolVersion(bundles []*protobuf.Bundle, installationID string) uint32 {
