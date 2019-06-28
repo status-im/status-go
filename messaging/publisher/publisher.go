@@ -235,26 +235,16 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 	}
 
 	response, err := p.protocol.HandleMessage(privateKey, publicKey, protocolMessage, msgID)
-
 	switch err {
 	case nil:
-		// Set the decrypted payload
 		msg.Payload = response
 	case chat.ErrDeviceNotFound:
-		// TODO: move this logic to the caller
-		// Notify that someone tried to contact us using an invalid bundle
-		// if privateKey.PublicKey != *publicKey {
-		// 	p.log.Warn("Device not found, sending signal", "err", err)
-		// 	// keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
-		// 	// TODO(adam): pass a handler as an argument to handle this or event emitting
-		// 	// handler := SignalHandler{}
-		// 	// handler.DecryptMessageFailed(keyString)
-		// }
-	default:
-		// Log and pass to the client, even if failed to decrypt
-		p.log.Error("Failed handling message with error", "err", err)
+		// TODO(adam): why is this condition needed? What's the different if it it's false?
+		if privateKey.PublicKey != *publicKey {
+			// TODO(adam): return a specific error
+			return err
+		}
 	}
-
 	return err
 }
 

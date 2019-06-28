@@ -420,8 +420,19 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 
 	// Attempt to decrypt message, otherwise leave unchanged
 	for _, dedupMessage := range dedupMessages {
-		if err := api.service.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID); err != nil {
-			return nil, err
+		err := api.service.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID)
+		switch err {
+		// case TBD:
+		// TODO(adam): chat.ErrDeviceNotFound will be split into more specific err
+		// and handled here.
+		// api.log.Warn("Device not found, sending signal", "err", err)
+		// keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
+		// handler := PublisherSignalHandler{}
+		// handler.DecryptMessageFailed(keyString)
+		case chat.ErrDeviceNotFound:
+			// ignore by purpose
+		default:
+			api.log.Error("Failed handling message with error", "err", err)
 		}
 	}
 
