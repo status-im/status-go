@@ -4,11 +4,15 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/status-im/status-go/messaging/chat"
+	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/services/shhext/whisperutils"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -33,85 +37,74 @@ type ServiceTestSuite struct {
 	bobKey   *TestKey
 }
 
+func (s *ServiceTestSuite) createPublisher(installationID string) (*Publisher, *TestKey) {
+	dir, err := ioutil.TempDir("", "publisher-test")
+	s.Require().NoError(err)
+
+	config := Config{PFSEnabled: true}
+
+	whisper := whisper.New(nil)
+	err = whisper.SetMinimumPoW(0)
+	s.Require().NoError(err)
+
+	publisher := New(whisper, config)
+
+	pk, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	keyID, err := whisper.AddKeyPair(pk)
+	s.Require().NoError(err)
+
+	testKey := TestKey{
+		privateKey:     pk,
+		keyID:          keyID,
+		publicKeyBytes: crypto.FromECDSAPub(&pk.PublicKey),
+	}
+
+	persistence, err := chat.NewSQLLitePersistence(filepath.Join(dir, "db1.sql"), "pass")
+	s.Require().NoError(err)
+
+	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
+
+	filterService := filter.New(whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
+
+	multideviceConfig := &multidevice.Config{
+		InstallationID:   installationID,
+		ProtocolVersion:  chat.ProtocolVersion,
+		MaxInstallations: 3,
+	}
+	multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
+
+	protocolService := chat.NewProtocolService(
+		chat.NewEncryptionService(
+			persistence,
+			chat.DefaultEncryptionServiceConfig(installationID)),
+		sharedSecretService,
+		multideviceService,
+		func(addedBundles []*multidevice.Installation) {},
+		func(sharedSecrets []*sharedsecret.Secret) {
+			for _, sharedSecret := range sharedSecrets {
+				_, _ = filterService.ProcessNegotiatedSecret(sharedSecret)
+			}
+		},
+	)
+
+	publisher.Init(persistence.DB, protocolService, filterService)
+
+	err = publisher.Start(func() bool { return true }, false)
+	s.Require().NoError(err)
+
+	return publisher, &testKey
+}
+
 func (s *ServiceTestSuite) SetupTest() {
-
-	dir1, err := ioutil.TempDir("", "publisher-test")
+	s.alice, s.aliceKey = s.createPublisher("installation-1")
+	_, err := s.alice.LoadFilters([]*filter.Chat{})
 	s.Require().NoError(err)
 
-	config1 := &Config{
-		PfsEnabled:     true,
-		DataDir:        dir1,
-		InstallationID: "1",
-	}
-
-	whisper1 := whisper.New(nil)
-	err = whisper1.SetMinimumPoW(0)
+	s.bob, s.bobKey = s.createPublisher("installation-2")
+	_, err = s.bob.LoadFilters([]*filter.Chat{})
 	s.Require().NoError(err)
-
-	service1 := New(config1, whisper1)
-
-	pk1, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	keyID1, err := whisper1.AddKeyPair(pk1)
-	s.Require().NoError(err)
-
-	key1 := &TestKey{
-		privateKey:     pk1,
-		keyID:          keyID1,
-		publicKeyBytes: crypto.FromECDSAPub(&pk1.PublicKey),
-	}
-
-	s.Require().NoError(err)
-
-	err = service1.Start(func() bool { return true }, false)
-	s.Require().NoError(err)
-
-	err = service1.InitProtocolWithPassword("1", "")
-	s.Require().NoError(err)
-	_, err = service1.LoadFilters([]*filter.Chat{})
-	s.Require().NoError(err)
-
-	dir2, err := ioutil.TempDir("", "publisher-test")
-	s.Require().NoError(err)
-
-	config2 := &Config{
-		PfsEnabled:     true,
-		DataDir:        dir2,
-		InstallationID: "2",
-	}
-
-	whisper2 := whisper.New(nil)
-	err = whisper2.SetMinimumPoW(0)
-	s.Require().NoError(err)
-
-	service2 := New(config2, whisper2)
-
-	pk2, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-
-	keyID2, err := whisper2.AddKeyPair(pk2)
-	s.Require().NoError(err)
-
-	key2 := &TestKey{
-		privateKey:     pk2,
-		keyID:          keyID2,
-		publicKeyBytes: crypto.FromECDSAPub(&pk2.PublicKey),
-	}
-
-	err = service2.Start(func() bool { return true }, false)
-	s.Require().NoError(err)
-
-	err = service2.InitProtocolWithPassword("1", "")
-	s.Require().NoError(err)
-
-	_, err = service2.LoadFilters([]*filter.Chat{})
-	s.Require().NoError(err)
-
-	s.alice = service1
-	s.aliceKey = key1
-	s.bob = service2
-	s.bobKey = key2
 }
 
 func (s *ServiceTestSuite) TestCreateDirectMessage() {
@@ -127,7 +120,6 @@ func (s *ServiceTestSuite) TestCreateDirectMessage() {
 
 	err = s.bob.ProcessMessage(message, []byte("1"))
 	s.Require().NoError(err)
-
 	s.Require().Equal([]byte("hello"), message.Payload)
 }
 

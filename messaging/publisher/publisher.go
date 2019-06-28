@@ -3,43 +3,47 @@ package publisher
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/messaging/chat"
-	chatDB "github.com/status-im/status-go/messaging/chat/db"
 	"github.com/status-im/status-go/messaging/chat/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 	"github.com/status-im/status-go/messaging/filter"
+
 	"github.com/status-im/status-go/services/shhext/whisperutils"
-	"github.com/status-im/status-go/signal"
+
+	"github.com/golang/protobuf/proto"
 	whisper "github.com/status-im/whisper/whisperv6"
-	"golang.org/x/crypto/sha3"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 const (
 	tickerInterval = 120
 	// How often we should publish a contact code in seconds
-	publishInterval  = 21600
-	maxInstallations = 3
+	publishInterval = 21600
 )
 
 var (
 	errProtocolNotInitialized = errors.New("protocol is not initialized")
 	// ErrPFSNotEnabled is returned when an endpoint PFS only is called but
-	// PFS is disabled
+	// PFS is disabled.
 	ErrPFSNotEnabled = errors.New("pfs not enabled")
 	errNoKeySelected = errors.New("no key selected")
+	// ErrNoProtocolMessage means that a message was not a protocol message,
+	// that is it could not be unmarshaled.
+	ErrNoProtocolMessage = errors.New("not a protocol message")
+	//
+	ErrDeviceNotFound = errors.New("device not found")
 )
 
 type Publisher struct {
+	config      Config
 	whisper     *whisper.Whisper
 	online      func() bool
 	whisperAPI  *whisper.PublicWhisperAPI
@@ -47,127 +51,27 @@ type Publisher struct {
 	persistence Persistence
 	log         log.Logger
 	filter      *filter.Service
-	config      *Config
 	quit        chan struct{}
 	ticker      *time.Ticker
 }
 
 type Config struct {
-	PfsEnabled     bool
-	DataDir        string
-	InstallationID string
+	PFSEnabled bool
 }
 
-func New(config *Config, w *whisper.Whisper) *Publisher {
+func New(w *whisper.Whisper, c Config) *Publisher {
 	return &Publisher{
-		config:     config,
+		config:     c,
 		whisper:    w,
 		whisperAPI: whisper.NewPublicWhisperAPI(w),
 		log:        log.New("package", "status-go/services/publisher.Publisher"),
 	}
 }
 
-// InitProtocolWithPassword creates an instance of ProtocolService given an address and password used to generate an encryption key.
-func (p *Publisher) InitProtocolWithPassword(address string, password string) error {
-	digest := sha3.Sum256([]byte(password))
-	encKey := fmt.Sprintf("%x", digest)
-	return p.initProtocol(address, encKey, password)
-}
-
-// InitProtocolWithEncyptionKey creates an instance of ProtocolService given an address and encryption key.
-func (p *Publisher) InitProtocolWithEncyptionKey(address string, encKey string) error {
-	return p.initProtocol(address, encKey, "")
-}
-
-func (p *Publisher) initProtocol(address, encKey, password string) error {
-	if !p.config.PfsEnabled {
-		return nil
-	}
-
-	if err := os.MkdirAll(filepath.Clean(p.config.DataDir), os.ModePerm); err != nil {
-		return err
-	}
-	v0Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%x.db", address))
-	v1Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.db", p.config.InstallationID))
-	v2Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.v2.db", p.config.InstallationID))
-	v3Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.v3.db", p.config.InstallationID))
-	v4Path := filepath.Join(p.config.DataDir, fmt.Sprintf("%p.v4.db", p.config.InstallationID))
-
-	if password != "" {
-		if err := chatDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
-			return err
-		}
-
-		if err := chatDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
-			// Remove db file as created with a blank password and never used,
-			// and there's no need to rekey in this case
-			os.Remove(v1Path)
-			os.Remove(v2Path)
-		}
-	}
-
-	if err := chatDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
-		os.Remove(v2Path)
-		os.Remove(v3Path)
-	}
-
-	// Fix IOS not encrypting database
-	if err := chatDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
-		os.Remove(v3Path)
-		os.Remove(v4Path)
-	}
-
-	// Desktop was passing a network dependent directory, which meant that
-	// if running on testnet it would not access the right db. This copies
-	// the db from mainnet to the root location.
-	networkDependentPath := filepath.Join(p.config.DataDir, "ethereum", "mainnet_rpc", fmt.Sprintf("%p.v4.db", p.config.InstallationID))
-	if _, err := os.Stat(networkDependentPath); err == nil {
-		if err := os.Rename(networkDependentPath, v4Path); err != nil {
-			return err
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-
-	persistence, err := chat.NewSQLLitePersistence(v4Path, encKey)
-	if err != nil {
-		return err
-	}
-
-	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {
-		handler := SignalHandler{}
-		for _, bundle := range addedBundles {
-			handler.BundleAdded(bundle.Identity, bundle.ID)
-		}
-	}
-
-	// Initialize persistence
-	p.persistence = NewSQLLitePersistence(persistence.DB)
-
-	// Initialize sharedsecret
-	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
-	// Initialize filter
-	filterService := filter.New(p.whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
-	p.filter = filterService
-
-	// Initialize multidevice
-	multideviceConfig := &multidevice.Config{
-		InstallationID:   p.config.InstallationID,
-		ProtocolVersion:  chat.ProtocolVersion,
-		MaxInstallations: maxInstallations,
-	}
-	multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
-
-	p.protocol = chat.NewProtocolService(
-		chat.NewEncryptionService(
-			persistence,
-			chat.DefaultEncryptionServiceConfig(p.config.InstallationID)),
-		sharedSecretService,
-		multideviceService,
-		addedBundlesHandler,
-		p.onNewSharedSecretHandler)
-
-	return nil
+func (p *Publisher) Init(db *sql.DB, protocol *chat.ProtocolService, filter *filter.Service) {
+	p.persistence = NewSQLLitePersistence(db)
+	p.protocol = protocol
+	p.filter = filter
 }
 
 func (p *Publisher) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
@@ -304,37 +208,9 @@ func (p *Publisher) RemoveFilters(chats []*filter.Chat) error {
 	return p.filter.Remove(chats)
 }
 
-func (p *Publisher) onNewSharedSecretHandler(sharedSecrets []*sharedsecret.Secret) {
-	var filters []*signal.Filter
-	for _, sharedSecret := range sharedSecrets {
-		chat, err := p.filter.ProcessNegotiatedSecret(sharedSecret)
-		if err != nil {
-			log.Error("Failed to process negotiated secret", "err", err)
-			return
-		}
-
-		filter := &signal.Filter{
-			ChatID:   chat.ChatID,
-			SymKeyID: chat.SymKeyID,
-			Listen:   chat.Listen,
-			FilterID: chat.FilterID,
-			Identity: chat.Identity,
-			Topic:    chat.Topic,
-		}
-
-		filters = append(filters, filter)
-
-	}
-	if len(filters) != 0 {
-		handler := SignalHandler{}
-		handler.WhisperFilterAdded(filters)
-	}
-
-}
-
 func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
-	if !p.config.PfsEnabled {
-		return nil
+	if !p.config.PFSEnabled {
+		return ErrPFSNotEnabled
 	}
 
 	privateKeyID := p.whisper.SelectedKeyPairID()
@@ -357,7 +233,7 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 
 	if err := proto.Unmarshal(msg.Payload, protocolMessage); err != nil {
 		p.log.Debug("Not a protocol message", "err", err)
-		return nil
+		return ErrNoProtocolMessage
 	}
 
 	response, err := p.protocol.HandleMessage(privateKey, publicKey, protocolMessage, msgID)
@@ -367,24 +243,27 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 		// Set the decrypted payload
 		msg.Payload = response
 	case chat.ErrDeviceNotFound:
+		// TODO: move this logic to the caller
 		// Notify that someone tried to contact us using an invalid bundle
-		if privateKey.PublicKey != *publicKey {
-			p.log.Warn("Device not found, sending signal", "err", err)
-			keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
-			handler := SignalHandler{}
-			handler.DecryptMessageFailed(keyString)
-		}
+		// if privateKey.PublicKey != *publicKey {
+		// 	p.log.Warn("Device not found, sending signal", "err", err)
+		// 	return ErrDeviceNotFound
+		// 	// keyString := fmt.Sprintf("0x%x", crypto.FromECDSAPub(publicKey))
+		// 	// TODO(adam): pass a handler as an argument to handle this or event emitting
+		// 	// handler := SignalHandler{}
+		// 	// handler.DecryptMessageFailed(keyString)
+		// }
 	default:
 		// Log and pass to the client, even if failed to decrypt
 		p.log.Error("Failed handling message with error", "err", err)
 	}
 
-	return nil
+	return err
 }
 
 // CreateDirectMessage creates a 1:1 chat message
 func (p *Publisher) CreateDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
-	if !p.config.PfsEnabled {
+	if !p.config.PFSEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
@@ -462,7 +341,7 @@ func (p *Publisher) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, their
 
 // CreatePublicMessage sends a public chat message to the underlying transport
 func (p *Publisher) CreatePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
-	if !p.config.PfsEnabled {
+	if !p.config.PFSEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
@@ -532,7 +411,7 @@ func (p *Publisher) startTicker() {
 
 func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
 	p.log.Info("publishing bundle")
-	if !p.config.PfsEnabled {
+	if !p.config.PFSEnabled {
 		return nil, nil
 	}
 
