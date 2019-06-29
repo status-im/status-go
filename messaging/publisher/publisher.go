@@ -235,15 +235,8 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 	}
 
 	response, err := p.protocol.HandleMessage(privateKey, publicKey, protocolMessage, msgID)
-	switch err {
-	case nil:
+	if err == nil {
 		msg.Payload = response
-	case chat.ErrDeviceNotFound:
-		// TODO(adam): why is this condition needed? What's the different if it it's false?
-		if privateKey.PublicKey != *publicKey {
-			// TODO(adam): return a specific error
-			return err
-		}
 	}
 	return err
 }

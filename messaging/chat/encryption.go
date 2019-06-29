@@ -17,8 +17,15 @@ import (
 	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
-var ErrSessionNotFound = errors.New("session not found")
-var ErrDeviceNotFound = errors.New("device not found")
+var (
+	ErrSessionNotFound = errors.New("session not found")
+	ErrDeviceNotFound  = errors.New("device not found")
+	// ErrNotPairedDevice means that we received a message signed with our public key
+	// but from a device that has not been paired.
+	// This should not happen because the protocol forbids sending a message to
+	// non-paired devices, however, in theory it is possible to receive such a message.
+	ErrNotPairedDevice = errors.New("received a message from not paired device")
+)
 
 // If we have no bundles, we use a constant so that the message can reach any device.
 const noInstallationID = "none"
@@ -230,7 +237,10 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
 	if msg == nil && *theirIdentityKey != myIdentityKey.PublicKey {
 		return nil, ErrDeviceNotFound
+	} else if msg == nil {
+		return nil, ErrNotPairedDevice
 	}
+
 	payload := msg.GetPayload()
 
 	if x3dhHeader := msg.GetX3DHHeader(); x3dhHeader != nil {
