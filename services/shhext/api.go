@@ -424,7 +424,7 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 		err := api.service.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID)
 		switch err {
 		case chat.ErrNotPairedDevice:
-			api.log.Warn("Received a message from non-paired device", "err", err)
+			api.log.Info("Received a message from non-paired device", "err", err)
 		case chat.ErrDeviceNotFound:
 			api.log.Warn("Device not found, sending signal", "err", err)
 
