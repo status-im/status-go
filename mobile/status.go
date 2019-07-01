@@ -104,6 +104,40 @@ func SignGroupMembership(content string) string {
 	return string(data)
 }
 
+// EnableInstallation enables an installation for multi-device sync.
+func EnableInstallation(installationID string) string {
+	err := statusBackend.EnableInstallation(installationID)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func DisableInstallation(installationID string) string {
+	err := statusBackend.DisableInstallation(installationID)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Response string `json:"response"`
+	}{Response: "ok"})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
+
 // ValidateNodeConfig validates config for the Status node.
 func ValidateNodeConfig(configJSON string) string {
 	var resp APIDetailedResponse
