@@ -395,6 +395,11 @@ func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
 		return nil, nil
 	}
 
+	if p.persistence == nil {
+		p.log.Info("not initialized, skipping")
+		return nil, nil
+	}
+
 	lastPublished, err := p.persistence.Get()
 	if err != nil {
 		p.log.Error("could not fetch config from db", "err", err)
@@ -404,7 +409,6 @@ func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
 	now := time.Now().Unix()
 
 	if now-lastPublished < publishInterval {
-		fmt.Println("NOTHING")
 		p.log.Debug("nothing to do")
 		return nil, nil
 	}

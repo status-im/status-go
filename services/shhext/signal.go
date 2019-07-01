@@ -42,3 +42,7 @@ func (h PublisherSignalHandler) BundleAdded(identity string, installationID stri
 func (h PublisherSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
 	signal.SendWhisperFilterAdded(filters)
 }
+
+func (h PublisherSignalHandler) NewMessages(messages []*signal.Messages) {
+	signal.SendNewMessages(messages)
+}
