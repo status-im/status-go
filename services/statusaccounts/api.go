@@ -16,6 +16,14 @@ func (api *API) ImportMnemonic(ctx context.Context, mnemonic string) (CreatedAcc
 	return api.s.g.importMnemonic(mnemonic)
 }
 
+func (api *API) ImportPrivateKey(ctx context.Context, privateKeyHex string) (IdentifiedAccountInfo, error) {
+	return api.s.g.importPrivateKey(privateKeyHex)
+}
+
+func (api *API) ImportJSONKey(ctx context.Context, json string, password string) (IdentifiedAccountInfo, error) {
+	return api.s.g.importJSONKey(json, password)
+}
+
 func (api *API) DeriveAddresses(ctx context.Context, accountID string, paths []string) (map[string]AccountInfo, error) {
 	return api.s.g.deriveAddresses(accountID, paths)
 }

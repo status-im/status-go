@@ -303,6 +303,16 @@ func (m *Manager) Logout() {
 	m.selectedChatAccount = nil
 }
 
+func (m *Manager) ImportNormalAccount(privateKey *ecdsa.PrivateKey, password string) error {
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return err
+	}
+
+	_, err = keyStore.ImportECDSA(privateKey, password)
+	return err
+}
+
 func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	keyStore, err := m.geth.AccountKeyStore()
 	if err != nil {

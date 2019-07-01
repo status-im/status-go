@@ -3,7 +3,10 @@ package statusaccounts
 import (
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 	staccount "github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/extkeys"
@@ -56,6 +59,40 @@ func (g *generator) generate(mnemonicPhraseLength int, n int) ([]CreatedAccountI
 	return infos, err
 }
 
+func (g *generator) importPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
+	if strings.HasPrefix(privateKeyHex, "0x") {
+		privateKeyHex = privateKeyHex[2:]
+	}
+
+	privateKey, err := crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		return IdentifiedAccountInfo{}, err
+	}
+
+	acc := &account{
+		privateKey: privateKey,
+	}
+
+	id := g.addAccount(acc)
+
+	return acc.toIdentifiedAccountInfo(id), nil
+}
+
+func (g *generator) importJSONKey(json string, password string) (IdentifiedAccountInfo, error) {
+	key, err := keystore.DecryptKey([]byte(json), password)
+	if err != nil {
+		return IdentifiedAccountInfo{}, err
+	}
+
+	acc := &account{
+		privateKey: key.PrivateKey,
+	}
+
+	id := g.addAccount(acc)
+
+	return acc.toIdentifiedAccountInfo(id), nil
+}
+
 func (g *generator) importMnemonic(mnemonicPhrase string) (CreatedAccountInfo, error) {
 	mnemonic := extkeys.NewMnemonic()
 	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, ""))
@@ -68,8 +105,7 @@ func (g *generator) importMnemonic(mnemonicPhrase string) (CreatedAccountInfo, e
 		extendedKey: masterExtendedKey,
 	}
 
-	id := uuid.NewRandom().String()
-	g.accounts[id] = acc
+	id := g.addAccount(acc)
 
 	return acc.toCreatedAccountInfo(id, mnemonicPhrase), nil
 }
@@ -155,18 +191,14 @@ func (g *generator) loadAccount(address string, password string) (IdentifiedAcco
 		return IdentifiedAccountInfo{}, err
 	}
 
-	account := &account{
+	acc := &account{
 		privateKey:  key.PrivateKey,
 		extendedKey: key.ExtendedKey,
 	}
 
-	id := uuid.NewRandom().String()
-	g.accounts[id] = account
+	id := g.addAccount(acc)
 
-	return IdentifiedAccountInfo{
-		AccountInfo: account.toAccountInfo(),
-		ID:          id,
-	}, nil
+	return acc.toIdentifiedAccountInfo(id), nil
 }
 
 func (g *generator) deriveChildAccounts(acc *account, pathStrings []string) (map[string]*account, error) {
@@ -206,17 +238,26 @@ func (g *generator) deriveChildAccount(acc *account, pathString string) (*accoun
 }
 
 func (g *generator) store(acc *account, password string) (AccountInfo, error) {
-	address, publicKey, err := g.am.ImportSingleExtendedKey(acc.extendedKey, password)
-	if err != nil {
-		return AccountInfo{}, err
+	if acc.extendedKey != nil {
+		if _, _, err := g.am.ImportSingleExtendedKey(acc.extendedKey, password); err != nil {
+			return AccountInfo{}, err
+		}
+	} else {
+		if err := g.am.ImportNormalAccount(acc.privateKey, password); err != nil {
+			return AccountInfo{}, err
+		}
 	}
 
 	g.reset()
 
-	return AccountInfo{
-		Address:   address,
-		PublicKey: publicKey,
-	}, nil
+	return acc.toAccountInfo(), nil
+}
+
+func (g *generator) addAccount(acc *account) string {
+	id := uuid.NewRandom().String()
+	g.accounts[id] = acc
+
+	return id
 }
 
 func (g *generator) reset() {
