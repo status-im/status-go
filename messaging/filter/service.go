@@ -345,6 +345,26 @@ func (s *Service) loadDiscovery(myKey *ecdsa.PrivateKey) error {
 	discoveryChat.FilterID = discoveryResponse.FilterID
 
 	s.chats[discoveryChat.ChatID] = discoveryChat
+
+	// Load personal discovery
+	personalDiscoveryTopic := fmt.Sprintf("contact-discovery-%s", identityStr)
+	personalDiscoveryChat := &Chat{
+		ChatID:    personalDiscoveryTopic,
+		Listen:    true,
+		Identity:  identityStr,
+		Discovery: true,
+	}
+
+	discoveryResponse, err = s.addAsymmetricFilter(myKey, personalDiscoveryChat.ChatID, true)
+	if err != nil {
+		return err
+	}
+
+	personalDiscoveryChat.Topic = discoveryResponse.Topic
+	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
+
+	s.chats[personalDiscoveryChat.ChatID] = personalDiscoveryChat
+
 	return nil
 }
 
