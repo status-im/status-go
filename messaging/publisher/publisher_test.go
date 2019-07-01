@@ -66,7 +66,7 @@ func (s *ServiceTestSuite) createPublisher(installationID string) (*Publisher, *
 
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 
-	filterService := filter.New(whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
+	filterService := filter.New(whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService, func([]*filter.Messages) {})
 
 	multideviceConfig := &multidevice.Config{
 		InstallationID:   installationID,

@@ -75,7 +75,7 @@ func (s *ServiceTestSuite) SetupTest() {
 
 	persistence := NewSQLLitePersistence(db)
 
-	s.service = New(whisper, persistence, sharedSecretService)
+	s.service = New(whisper, persistence, sharedSecretService, func([]*Messages) {})
 }
 
 func (s *ServiceTestSuite) TearDownTest() {
@@ -152,7 +152,7 @@ func (s *ServiceTestSuite) TestLoadFromCache() {
 	s.Require().NoError(err)
 
 	// We create another service using the same persistence
-	service2 := New(s.service.whisper, s.service.persistence, s.service.secret)
+	service2 := New(s.service.whisper, s.service.persistence, s.service.secret, func([]*Messages) {})
 	_, err = service2.Init(chats)
 	s.Require().NoError(err)
 }
