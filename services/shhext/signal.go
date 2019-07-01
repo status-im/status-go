@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -41,4 +42,8 @@ func (h PublisherSignalHandler) BundleAdded(identity string, installationID stri
 
 func (h PublisherSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
 	signal.SendWhisperFilterAdded(filters)
+}
+
+func (h PublisherSignalHandler) NewMessages(messages []*filter.Messages) {
+	signal.SendNewMessages(messages)
 }

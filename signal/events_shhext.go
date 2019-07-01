@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/messaging/filter"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -35,6 +36,9 @@ const (
 
 	// EventWhisperFilterAdded is triggered when we setup a new filter or restore existing ones
 	EventWhisperFilterAdded = "whisper.filter.added"
+
+	// EventNewMessages is triggered when we receive new messages
+	EventNewMessages = "messages.new"
 )
 
 // EnvelopeSignal includes hash of the envelope.
@@ -79,6 +83,11 @@ type Filter struct {
 
 type WhisperFilterAddedSignal struct {
 	Filters []*Filter `json:"filters"`
+}
+
+// NewMessagesSignal notifies clients of new messages
+type NewMessagesSignal struct {
+	Messages []*filter.Messages `json:"messages"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -140,4 +149,8 @@ func SendBundleAdded(identity string, installationID string) {
 
 func SendWhisperFilterAdded(filters []*Filter) {
 	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
+}
+
+func SendNewMessages(messages []*filter.Messages) {
+	send(EventNewMessages, NewMessagesSignal{Messages: messages})
 }
