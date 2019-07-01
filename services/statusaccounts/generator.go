@@ -60,10 +60,7 @@ func (g *generator) generate(mnemonicPhraseLength int, n int) ([]CreatedAccountI
 }
 
 func (g *generator) importPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
-	if strings.HasPrefix(privateKeyHex, "0x") {
-		privateKeyHex = privateKeyHex[2:]
-	}
-
+	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
 		return IdentifiedAccountInfo{}, err
