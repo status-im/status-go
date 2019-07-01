@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -177,9 +178,43 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 
 	onNewMessagesHandler := func(messages []*filter.Messages) {
+		var signalMessages []*signal.Messages
 		handler := PublisherSignalHandler{}
 		log.Info("NEW MESSAGES", "msgs", messages)
-		handler.NewMessages(messages)
+		for _, chatMessages := range messages {
+			signalMessage := &signal.Messages{
+				Error: chatMessages.Error,
+				Chat:  chatMessages.Chat,
+			}
+			signalMessages = append(signalMessages, signalMessage)
+			dedupMessages := s.deduplicator.Deduplicate(chatMessages.Messages)
+
+			// Attempt to decrypt message, otherwise leave unchanged
+			for _, dedupMessage := range dedupMessages {
+				err := s.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID)
+				switch err {
+				case chat.ErrNotPairedDevice:
+					log.Info("Received a message from non-paired device", "err", err)
+				case chat.ErrDeviceNotFound:
+					log.Warn("Device not found, sending signal", "err", err)
+
+					publicKey, err := crypto.UnmarshalPubkey(dedupMessage.Message.Sig)
+					if err != nil {
+						log.Error("could not unmarshal key", "err", err)
+						continue
+					}
+
+					keyString := fmt.Sprintf("%#x", crypto.FromECDSAPub(publicKey))
+					handler := PublisherSignalHandler{}
+					handler.DecryptMessageFailed(keyString)
+				default:
+					log.Error("Failed handling message with error", "err", err)
+				}
+			}
+			signalMessage.Messages = dedupMessages
+		}
+		handler.NewMessages(signalMessages)
+
 	}
 	// Initialize filter
 	filterService := filter.New(s.w, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService, onNewMessagesHandler)
