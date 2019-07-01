@@ -85,16 +85,21 @@ func (s *ServiceTestSuite) TearDownTest() {
 func (s *ServiceTestSuite) TestDiscoveryAndPartitionedTopic() {
 	chats := []*Chat{}
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.keys[0].partitionedTopic)
+	personalDiscoveryTopic := fmt.Sprintf("contact-discovery-%s", s.keys[0].PublicKeyString())
 	contactCodeTopic := "0x" + s.keys[0].PublicKeyString() + "-contact-code"
 
 	_, err := s.service.Init(chats)
 	s.Require().NoError(err)
 
-	s.Require().Equal(3, len(s.service.chats), "It creates two filters")
+	s.Require().Equal(4, len(s.service.chats), "It creates four filters")
 
 	discoveryFilter := s.service.chats[discoveryTopic]
 	s.Require().NotNil(discoveryFilter, "It adds the discovery filter")
 	s.Require().True(discoveryFilter.Listen)
+
+	personalDiscoveryFilter := s.service.chats[personalDiscoveryTopic]
+	s.Require().NotNil(personalDiscoveryFilter, "It adds the discovery filter")
+	s.Require().True(personalDiscoveryFilter.Listen)
 
 	contactCodeFilter := s.service.chats[contactCodeTopic]
 	s.Require().NotNil(contactCodeFilter, "It adds the contact code filter")
@@ -127,7 +132,7 @@ func (s *ServiceTestSuite) TestPublicAndOneToOneChats() {
 		actualChats[chat.ChatID] = chat
 	}
 
-	s.Require().Equal(5, len(actualChats), "It creates two additional filters for the one to one and one for the public chat")
+	s.Require().Equal(6, len(actualChats), "It creates two additional filters for the one to one and one for the public chat")
 
 	statusFilter := actualChats["status"]
 	s.Require().NotNil(statusFilter, "It creates a filter for the public chat")
@@ -180,7 +185,7 @@ func (s *ServiceTestSuite) TestNegotiatedTopic() {
 		actualChats[chat.ChatID] = chat
 	}
 
-	s.Require().Equal(5, len(actualChats), "It creates two additional filters for the negotiated topics")
+	s.Require().Equal(6, len(actualChats), "It creates two additional filters for the negotiated topics")
 
 	negotiatedFilter1 := actualChats[negotiatedTopic1]
 	s.Require().NotNil(negotiatedFilter1, "It adds the negotiated filter")
@@ -221,7 +226,7 @@ func (s *ServiceTestSuite) TestNoInstallationIDs() {
 		actualChats[chat.ChatID] = chat
 	}
 
-	s.Require().Equal(4, len(actualChats), "It creates two additional filters for the negotiated topics")
+	s.Require().Equal(5, len(actualChats), "It creates two additional filters for the negotiated topics")
 
 	negotiatedFilter1 := actualChats[negotiatedTopic1]
 	s.Require().NotNil(negotiatedFilter1, "It adds the negotiated filter")
