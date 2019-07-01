@@ -1,7 +1,7 @@
 // TODO: These types should be defined using protobuf, but protoc can only emit []byte instead of hexutil.Bytes,
 // which causes issues when marshalong to JSON on the react side. Let's do that once the chat protocol is moved to the go repo.
 
-package chat
+package shhext
 
 import (
 	"github.com/ethereum/go-ethereum/common/hexutil"

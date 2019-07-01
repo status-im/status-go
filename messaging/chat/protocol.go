@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 )
 
 const ProtocolVersion = 1

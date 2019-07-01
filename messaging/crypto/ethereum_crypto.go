@@ -10,7 +10,6 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	dr "github.com/status-im/doubleratchet"
 	"golang.org/x/crypto/hkdf"

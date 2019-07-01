@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	chatDB "github.com/status-im/status-go/messaging/chat/db"
+	msgdb "github.com/status-im/status-go/messaging/db"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,7 +25,7 @@ func (s *ServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.path = dbFile.Name()
 
-	db, err := chatDB.Open(s.path, "", 0)
+	db, err := msgdb.Open(s.path, "", 0)
 
 	s.Require().NoError(err)
 

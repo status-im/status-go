@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 
 	dr "github.com/status-im/doubleratchet"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 

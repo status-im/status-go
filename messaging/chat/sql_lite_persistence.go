@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
-
 	dr "github.com/status-im/doubleratchet"
-	ecrypto "github.com/status-im/status-go/messaging/chat/crypto"
-	chatDB "github.com/status-im/status-go/messaging/chat/db"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
+
+	ecrypto "github.com/status-im/status-go/messaging/crypto"
+	msgdb "github.com/status-im/status-go/messaging/db"
+	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 )
 
 // A safe max number of rows
@@ -92,7 +92,7 @@ func (s *SQLLitePersistence) GetMultideviceStorage() multidevice.Persistence {
 
 // Open opens a file at the specified path
 func (s *SQLLitePersistence) Open(path string, key string) error {
-	db, err := chatDB.Open(path, key, chatDB.KdfIterationsNumber)
+	db, err := msgdb.Open(path, key, msgdb.KdfIterationsNumber)
 	if err != nil {
 		return err
 	}

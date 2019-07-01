@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"math/big"
 	"sync"

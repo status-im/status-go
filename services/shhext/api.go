@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/messaging/chat"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
@@ -477,7 +477,7 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 }
 
 // SendPublicMessage sends a public chat message to the underlying transport
-func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublicMessageRPC) (hexutil.Bytes, error) {
+func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
 	message, err := api.service.CreatePublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
 	if err != nil {
 		return nil, err
@@ -487,7 +487,7 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg chat.SendPublic
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
-func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg chat.SendDirectMessageRPC) (hexutil.Bytes, error) {
+func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (hexutil.Bytes, error) {
 	message, err := api.service.CreateDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
 	if err != nil {
 		return nil, err

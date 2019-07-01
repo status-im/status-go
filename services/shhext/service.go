@@ -17,9 +17,9 @@ import (
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/messaging/chat"
-	chatDB "github.com/status-im/status-go/messaging/chat/db"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
+	msgdb "github.com/status-im/status-go/messaging/db"
+	"github.com/status-im/status-go/messaging/multidevice"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/messaging/publisher"
 	"github.com/status-im/status-go/params"
@@ -133,11 +133,11 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	v4Path := filepath.Join(dataDir, fmt.Sprintf("%s.v4.db", s.config.InstallationID))
 
 	if password != "" {
-		if err := chatDB.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
+		if err := msgdb.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 			return err
 		}
 
-		if err := chatDB.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
+		if err := msgdb.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
 			// Remove db file as created with a blank password and never used,
 			// and there's no need to rekey in this case
 			os.Remove(v1Path)
@@ -145,13 +145,13 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	if err := chatDB.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
+	if err := msgdb.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
 		os.Remove(v2Path)
 		os.Remove(v3Path)
 	}
 
 	// Fix IOS not encrypting database
-	if err := chatDB.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
+	if err := msgdb.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
