@@ -7,7 +7,7 @@ type Persistence interface {
 	EnableInstallation(identity []byte, installationID string) error
 	// DisableInstallation disable the installation.
 	DisableInstallation(identity []byte, installationID string) error
-	// AddInstallations adds the installations for a given identity, maintaining the enabled flag
+	// AddInstallations adds the installations for a given identity, maintaining the enabled flag and returns the newly inserted installations
 	AddInstallations(identity []byte, timestamp int64, installations []*Installation, defaultEnabled bool) ([]*Installation, error)
 	// GetInstallations returns all the installations for a given identity
 	GetInstallations(identity []byte) ([]*Installation, error)
