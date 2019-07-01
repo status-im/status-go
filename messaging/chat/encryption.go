@@ -235,7 +235,7 @@ func (s *EncryptionService) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, thei
 	}
 
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
-	if msg == nil && *theirIdentityKey != myIdentityKey.PublicKey {
+	if msg == nil && !samePublicKeys(*theirIdentityKey, myIdentityKey.PublicKey) {
 		return nil, ErrDeviceNotFound
 	} else if msg == nil {
 		return nil, ErrNotPairedDevice
@@ -576,4 +576,8 @@ func (s *EncryptionService) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, my
 	s.log.Debug("Built message", "theirKey", theirIdentityKey)
 
 	return response, targetedInstallations, nil
+}
+
+func samePublicKeys(pubKey1, pubKey2 ecdsa.PublicKey) bool {
+	return pubKey1.X.Cmp(pubKey2.X) == 0 && pubKey1.Y.Cmp(pubKey2.Y) == 0
 }
