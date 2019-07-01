@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -39,6 +40,8 @@ const (
 	defaultTimeoutWaitAdded = 5 * time.Second
 	// maxInstallations is a maximum number of supported devices for one account.
 	maxInstallations = 3
+	// filterCheckIntervalMs is a how often we should check whisper filters for new messages
+	filterCheckIntervalMs = 300
 )
 
 // EnvelopeEventsHandler used for two different event types.
@@ -177,7 +180,28 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 
 	// Initialize filter
-	filterService := filter.New(s.w, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService)
+	onNewMessagesHandler := func(messages []*filter.Messages) {
+		var signalMessages []*signal.Messages
+		handler := PublisherSignalHandler{}
+		for _, chatMessages := range messages {
+			signalMessage := &signal.Messages{
+				Error: chatMessages.Error,
+				Chat:  chatMessages.Chat,
+			}
+			signalMessages = append(signalMessages, signalMessage)
+			dedupMessages, err := s.processReceivedMessages(chatMessages.Messages)
+			if err != nil {
+				log.Error("could not process messages", "err", err)
+				continue
+			}
+
+			signalMessage.Messages = dedupMessages
+		}
+		handler.NewMessages(signalMessages)
+	}
+
+	filterService := filter.New(s.w, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService, onNewMessagesHandler)
+	go filterService.Start(filterCheckIntervalMs * time.Millisecond)
 
 	// Initialize multidevice
 	multideviceConfig := &multidevice.Config{
@@ -206,6 +230,34 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	s.Publisher.Init(persistence.DB, protocolService, filterService)
 
 	return nil
+}
+
+func (s *Service) processReceivedMessages(messages []*whisper.Message) ([]dedup.DeduplicateMessage, error) {
+	dedupMessages := s.deduplicator.Deduplicate(messages)
+
+	// Attempt to decrypt message, otherwise leave unchanged
+	for _, dedupMessage := range dedupMessages {
+		err := s.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID)
+		switch err {
+		case chat.ErrNotPairedDevice:
+			log.Info("Received a message from non-paired device", "err", err)
+		case chat.ErrDeviceNotFound:
+			log.Warn("Device not found, sending signal", "err", err)
+
+			publicKey, err := crypto.UnmarshalPubkey(dedupMessage.Message.Sig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to handler chat.ErrDeviceNotFound: %v", err)
+			}
+
+			keyString := fmt.Sprintf("%#x", crypto.FromECDSAPub(publicKey))
+			handler := PublisherSignalHandler{}
+			handler.DecryptMessageFailed(keyString)
+		default:
+			log.Error("Failed handling message with error", "err", err)
+		}
+	}
+
+	return dedupMessages, nil
 }
 
 func (s *Service) newSharedSecretHandler(filterService *filter.Service) func([]*sharedsecret.Secret) {

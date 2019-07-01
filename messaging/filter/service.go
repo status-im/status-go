@@ -11,6 +11,7 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 	"math/big"
 	"sync"
+	"time"
 )
 
 const (
@@ -48,23 +49,33 @@ type Chat struct {
 	Negotiated bool `json:"negotiated"`
 }
 
+type Messages struct {
+	Chat     *Chat              `json:"chat"`
+	Messages []*whisper.Message `json:"messages"`
+	Error    error              `json:"error"`
+}
+
 type Service struct {
-	whisper     *whisper.Whisper
-	secret      *sharedsecret.Service
-	chats       map[string]*Chat
-	persistence Persistence
-	mutex       sync.Mutex
-	keys        map[string][]byte
+	whisper       *whisper.Whisper
+	secret        *sharedsecret.Service
+	chats         map[string]*Chat
+	persistence   Persistence
+	mutex         sync.Mutex
+	keys          map[string][]byte
+	quit          chan struct{}
+	onNewMessages func([]*Messages)
 }
 
 // New returns a new filter service
-func New(w *whisper.Whisper, p Persistence, s *sharedsecret.Service) *Service {
+func New(w *whisper.Whisper, p Persistence, s *sharedsecret.Service, onNewMessages func([]*Messages)) *Service {
 	return &Service{
-		whisper:     w,
-		secret:      s,
-		mutex:       sync.Mutex{},
-		persistence: p,
-		chats:       make(map[string]*Chat),
+		whisper:       w,
+		secret:        s,
+		mutex:         sync.Mutex{},
+		persistence:   p,
+		chats:         make(map[string]*Chat),
+		quit:          make(chan struct{}),
+		onNewMessages: onNewMessages,
 	}
 }
 
@@ -137,9 +148,29 @@ func (s *Service) Init(chats []*Chat) ([]*Chat, error) {
 	return allChats, nil
 }
 
+func (s *Service) Start(checkPeriod time.Duration) {
+	ticker := time.NewTicker(checkPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			messages := s.getMessages()
+
+			if len(messages) != 0 {
+				s.onNewMessages(messages)
+			}
+		case <-s.quit:
+			return
+		}
+	}
+}
+
 // Stop removes all the filters
 func (s *Service) Stop() error {
 	var chats []*Chat
+
+	close(s.quit)
 	for _, chat := range s.chats {
 		chats = append(chats, chat)
 	}
@@ -482,6 +513,46 @@ func (s *Service) addAsymmetricFilter(keyAsym *ecdsa.PrivateKey, chatID string, 
 	}
 
 	return &Filter{FilterID: id, Topic: whisper.BytesToTopic(topic)}, nil
+}
+
+func (s *Service) getMessages() []*Messages {
+	var response []*Messages
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for chatID := range s.chats {
+		messages := s.getMessagesForChat(chatID)
+		if messages.Error != nil || len(messages.Messages) != 0 {
+			response = append(response, messages)
+		}
+	}
+
+	return response
+}
+
+func (s *Service) getMessagesForChat(chatID string) *Messages {
+	response := &Messages{}
+
+	response.Chat = s.chats[chatID]
+	if response.Chat == nil {
+		response.Error = errors.New("Chat not found")
+
+		return response
+	}
+
+	filter := s.whisper.GetFilter(response.Chat.FilterID)
+	if filter == nil {
+		response.Error = errors.New("Filter not found")
+		return response
+	}
+
+	receivedMessages := filter.Retrieve()
+	response.Messages = make([]*whisper.Message, 0, len(receivedMessages))
+	for _, msg := range receivedMessages {
+		response.Messages = append(response.Messages, whisper.ToWhisperMessage(msg))
+	}
+
+	return response
 }
 
 func negotiatedID(identity *ecdsa.PublicKey) string {
