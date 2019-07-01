@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -420,9 +421,23 @@ func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.Deduplicate
 
 	// Attempt to decrypt message, otherwise leave unchanged
 	for _, dedupMessage := range dedupMessages {
+		err := api.service.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID)
+		switch err {
+		case chat.ErrNotPairedDevice:
+			api.log.Info("Received a message from non-paired device", "err", err)
+		case chat.ErrDeviceNotFound:
+			api.log.Warn("Device not found, sending signal", "err", err)
 
-		if err := api.service.ProcessMessage(dedupMessage); err != nil {
-			return nil, err
+			publicKey, err := crypto.UnmarshalPubkey(dedupMessage.Message.Sig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to handler chat.ErrDeviceNotFound: %v", err)
+			}
+
+			keyString := fmt.Sprintf("%#x", crypto.FromECDSAPub(publicKey))
+			handler := PublisherSignalHandler{}
+			handler.DecryptMessageFailed(keyString)
+		default:
+			api.log.Error("Failed handling message with error", "err", err)
 		}
 	}
 
