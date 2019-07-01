@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/messaging/filter"
+	"github.com/status-im/status-go/services/shhext/dedup"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -87,7 +88,7 @@ type WhisperFilterAddedSignal struct {
 
 // NewMessagesSignal notifies clients of new messages
 type NewMessagesSignal struct {
-	Messages []*filter.Messages `json:"messages"`
+	Messages []*Messages `json:"messages"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -130,6 +131,12 @@ type EnodeDiscoveredSignal struct {
 	Topic string `json:"topic"`
 }
 
+type Messages struct {
+	Error    error `json:"error"`
+	Messages []dedup.DeduplicateMessage
+	Chat     *filter.Chat
+}
+
 // SendEnodeDiscovered tiggered when an enode is discovered.
 // finds a new enode.
 func SendEnodeDiscovered(enode, topic string) {
@@ -151,6 +158,6 @@ func SendWhisperFilterAdded(filters []*Filter) {
 	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
 }
 
-func SendNewMessages(messages []*filter.Messages) {
+func SendNewMessages(messages []*Messages) {
 	send(EventNewMessages, NewMessagesSignal{Messages: messages})
 }
