@@ -178,11 +178,12 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 
 	onNewMessagesHandler := func(messages []*filter.Messages) {
 		handler := PublisherSignalHandler{}
+		log.Info("NEW MESSAGES", "msgs", messages)
 		handler.NewMessages(messages)
 	}
 	// Initialize filter
 	filterService := filter.New(s.w, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService, onNewMessagesHandler)
-	filterService.Start(300 * time.Millisecond)
+	go filterService.Start(300 * time.Millisecond)
 
 	// Initialize multidevice
 	multideviceConfig := &multidevice.Config{

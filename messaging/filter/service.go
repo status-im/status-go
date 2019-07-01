@@ -158,7 +158,7 @@ func (s *Service) Start(checkPeriod time.Duration) {
 			messages := s.getMessages()
 
 			if len(messages) != 0 {
-				s.onNewMessages(s.getMessages())
+				s.onNewMessages(messages)
 			}
 
 		case <-s.quit:
@@ -523,7 +523,9 @@ func (s *Service) getMessages() []*Messages {
 
 	for chatID := range s.chats {
 		messages := s.getMessagesForChat(chatID)
-		response = append(response, messages)
+		if messages.Error != nil || len(messages.Messages) != 0 {
+			response = append(response, messages)
+		}
 	}
 
 	return response
