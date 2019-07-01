@@ -168,12 +168,16 @@ func (s *Service) Start(checkPeriod time.Duration) {
 
 // Stop removes all the filters
 func (s *Service) Stop() error {
+	close(s.quit)
+
 	var chats []*Chat
 
-	close(s.quit)
+	s.mutex.Lock()
 	for _, chat := range s.chats {
 		chats = append(chats, chat)
 	}
+	s.mutex.Unlock()
+
 	return s.Remove(chats)
 }
 
@@ -345,6 +349,26 @@ func (s *Service) loadDiscovery(myKey *ecdsa.PrivateKey) error {
 	discoveryChat.FilterID = discoveryResponse.FilterID
 
 	s.chats[discoveryChat.ChatID] = discoveryChat
+
+	// Load personal discovery
+	personalDiscoveryTopic := fmt.Sprintf("contact-discovery-%s", identityStr)
+	personalDiscoveryChat := &Chat{
+		ChatID:    personalDiscoveryTopic,
+		Listen:    true,
+		Identity:  identityStr,
+		Discovery: true,
+	}
+
+	discoveryResponse, err = s.addAsymmetricFilter(myKey, personalDiscoveryChat.ChatID, true)
+	if err != nil {
+		return err
+	}
+
+	personalDiscoveryChat.Topic = discoveryResponse.Topic
+	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
+
+	s.chats[personalDiscoveryChat.ChatID] = personalDiscoveryChat
+
 	return nil
 }
 
