@@ -155,7 +155,11 @@ func (s *Service) Start(checkPeriod time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			s.onNewMessages(s.getMessages())
+			messages := s.getMessages()
+
+			if len(messages) != 0 {
+				s.onNewMessages(s.getMessages())
+			}
 
 		case <-s.quit:
 			return
