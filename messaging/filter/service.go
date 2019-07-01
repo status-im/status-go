@@ -523,7 +523,9 @@ func (s *Service) getMessages() []*Messages {
 
 	for chatID := range s.chats {
 		messages := s.getMessagesForChat(chatID)
-		response = append(response, messages)
+		if messages.Error != nil || len(messages.Messages) != 0 {
+			response = append(response, messages)
+		}
 	}
 
 	return response
