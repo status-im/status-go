@@ -11,10 +11,10 @@ const sskLen = 16
 
 type Service struct {
 	log         log.Logger
-	persistence PersistenceService
+	persistence Persistence
 }
 
-func NewService(persistence PersistenceService) *Service {
+func NewService(persistence Persistence) *Service {
 	return &Service{
 		log:         log.New("package", "status-go/services/sshext/chat.sharedsecret"),
 		persistence: persistence,

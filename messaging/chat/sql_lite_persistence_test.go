@@ -23,7 +23,7 @@ type SQLLitePersistenceTestSuite struct {
 	suite.Suite
 	// nolint: structcheck, megacheck
 	db      *sql.DB
-	service PersistenceService
+	service Persistence
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {

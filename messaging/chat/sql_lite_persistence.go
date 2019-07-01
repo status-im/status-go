@@ -23,7 +23,7 @@ type SQLLitePersistence struct {
 	DB                 *sql.DB
 	keysStorage        dr.KeysStorage
 	sessionStorage     dr.SessionStorage
-	secretStorage      sharedsecret.PersistenceService
+	secretStorage      sharedsecret.Persistence
 	multideviceStorage multidevice.Persistence
 }
 
@@ -81,7 +81,7 @@ func (s *SQLLitePersistence) GetSessionStorage() dr.SessionStorage {
 }
 
 // GetSharedSecretStorage returns the associated secretStorageObject
-func (s *SQLLitePersistence) GetSharedSecretStorage() sharedsecret.PersistenceService {
+func (s *SQLLitePersistence) GetSharedSecretStorage() sharedsecret.Persistence {
 	return s.secretStorage
 }
 

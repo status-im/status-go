@@ -38,7 +38,7 @@ type ConfirmationData struct {
 // EncryptionService defines a service that is responsible for the encryption aspect of the protocol.
 type EncryptionService struct {
 	log         log.Logger
-	persistence PersistenceService
+	persistence Persistence
 	config      EncryptionServiceConfig
 	messageIDs  map[string]*ConfirmationData
 	mutex       sync.Mutex
@@ -71,7 +71,7 @@ func DefaultEncryptionServiceConfig(installationID string) EncryptionServiceConf
 }
 
 // NewEncryptionService creates a new EncryptionService instance.
-func NewEncryptionService(p PersistenceService, config EncryptionServiceConfig) *EncryptionService {
+func NewEncryptionService(p Persistence, config EncryptionServiceConfig) *EncryptionService {
 	logger := log.New("package", "status-go/services/sshext.chat")
 	logger.Info("Initialized encryption service", "installationID", config.InstallationID)
 	return &EncryptionService{

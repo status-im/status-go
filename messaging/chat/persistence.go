@@ -20,8 +20,8 @@ type RatchetInfo struct {
 	InstallationID string
 }
 
-// PersistenceService defines the interface for a storage service
-type PersistenceService interface {
+// Persistence defines the interface for a storage service
+type Persistence interface {
 	// GetKeysStorage returns the associated double ratchet KeysStorage object.
 	GetKeysStorage() dr.KeysStorage
 	// GetSessionStorage returns the associated double ratchet SessionStorage object.
