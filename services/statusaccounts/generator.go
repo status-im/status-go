@@ -33,7 +33,7 @@ func (g *generator) setAccountManager(am *staccount.Manager) {
 	g.am = am
 }
 
-func (g *generator) generate(mnemonicPhraseLength int, n int) ([]CreatedAccountInfo, error) {
+func (g *generator) Generate(mnemonicPhraseLength int, n int, bip39Passphrase string) ([]CreatedAccountInfo, error) {
 	entropyStrength, err := mnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (g *generator) generate(mnemonicPhraseLength int, n int) ([]CreatedAccountI
 			return nil, fmt.Errorf("can not create mnemonic seed: %v", err)
 		}
 
-		info, err := g.importMnemonic(mnemonicPhrase)
+		info, err := g.ImportMnemonic(mnemonicPhrase, bip39Passphrase)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +59,7 @@ func (g *generator) generate(mnemonicPhraseLength int, n int) ([]CreatedAccountI
 	return infos, err
 }
 
-func (g *generator) importPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
+func (g *generator) ImportPrivateKey(privateKeyHex string) (IdentifiedAccountInfo, error) {
 	privateKeyHex = strings.TrimPrefix(privateKeyHex, "0x")
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
 	if err != nil {
@@ -90,9 +90,9 @@ func (g *generator) importJSONKey(json string, password string) (IdentifiedAccou
 	return acc.toIdentifiedAccountInfo(id), nil
 }
 
-func (g *generator) importMnemonic(mnemonicPhrase string) (CreatedAccountInfo, error) {
+func (g *generator) ImportMnemonic(mnemonicPhrase string, bip39Passphrase string) (CreatedAccountInfo, error) {
 	mnemonic := extkeys.NewMnemonic()
-	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, ""))
+	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))
 	if err != nil {
 		return CreatedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
@@ -116,7 +116,7 @@ func (g *generator) findAccount(accountID string) (*account, error) {
 	return acc, nil
 }
 
-func (g *generator) deriveAddresses(accountID string, pathStrings []string) (map[string]AccountInfo, error) {
+func (g *generator) DeriveAddresses(accountID string, pathStrings []string) (map[string]AccountInfo, error) {
 	acc, err := g.findAccount(accountID)
 	if err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func (g *generator) deriveAddresses(accountID string, pathStrings []string) (map
 	return pathAccountsInfo, nil
 }
 
-func (g *generator) storeAccount(accountID string, password string) (AccountInfo, error) {
+func (g *generator) StoreAccount(accountID string, password string) (AccountInfo, error) {
 	if g.am == nil {
 		return AccountInfo{}, errAccountManagerNotSet
 	}
@@ -149,7 +149,7 @@ func (g *generator) storeAccount(accountID string, password string) (AccountInfo
 	return g.store(acc, password)
 }
 
-func (g *generator) storeDerivedAccounts(accountID string, password string, pathStrings []string) (map[string]AccountInfo, error) {
+func (g *generator) StoreDerivedAccounts(accountID string, password string, pathStrings []string) (map[string]AccountInfo, error) {
 	if g.am == nil {
 		return nil, errAccountManagerNotSet
 	}
@@ -178,7 +178,7 @@ func (g *generator) storeDerivedAccounts(accountID string, password string, path
 	return pathAccountsInfo, nil
 }
 
-func (g *generator) loadAccount(address string, password string) (IdentifiedAccountInfo, error) {
+func (g *generator) LoadAccount(address string, password string) (IdentifiedAccountInfo, error) {
 	if g.am == nil {
 		return IdentifiedAccountInfo{}, errAccountManagerNotSet
 	}
