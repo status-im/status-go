@@ -10,6 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+var (
+	// ErrServiceNotInitialized returned when wallet is not initialized/started,.
+	ErrServiceNotInitialized = errors.New("wallet service is not initialized")
+)
+
 func NewAPI(s *Service) *API {
 	return &API{s}
 }
@@ -28,7 +33,7 @@ func (api *API) GetTransfers(ctx context.Context, start, end *hexutil.Big) ([]Tr
 		return nil, errors.New("start of the query must be provided. use 0 if you want to load all transfers")
 	}
 	if api.s.db == nil {
-		return nil, errors.New("wallet service is not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 	rst, err := api.s.db.GetTransfers((*big.Int)(start), (*big.Int)(end))
 	if err != nil {
@@ -45,7 +50,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 		return nil, errors.New("start of the query must be provided. use 0 if you want to load all transfers")
 	}
 	if api.s.db == nil {
-		return nil, errors.New("wallet service is not initialized")
+		return nil, ErrServiceNotInitialized
 	}
 	rst, err := api.s.db.GetTransfersByAddress(address, (*big.Int)(start), (*big.Int)(end))
 	if err != nil {
@@ -53,4 +58,12 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 	}
 	log.Debug("result from database for address", "address", address, "start", start, "end", end, "len", len(rst))
 	return rst, nil
+}
+
+// GetTokensBalances return mapping of token balances for every account.
+func (api *API) GetTokensBalances(ctx context.Context, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*big.Int, error) {
+	if api.s.client == nil {
+		return nil, ErrServiceNotInitialized
+	}
+	return GetTokensBalances(ctx, api.s.client, accounts, tokens)
 }
