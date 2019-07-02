@@ -155,6 +155,35 @@ Returns avaiable transfers in a given range.
 
 Objects in the same format.
 
+#### wallet_getTokensBalances
+
+Returns tokens balances mapping for every account. See section below for the response example.
+
+##### Parameters
+
+- `accounts` `HEX` - list of ethereum addresses encoded in hex
+- `tokens` `HEX` - list of ethereum addresses encoded in hex
+
+```json
+{"jsonrpc":"2.0","id":11,"method":"wallet_getTokensBalances","params":[["0x066ed5c2ed45d70ad72f40de0b4dd97bd67d84de", "0x0ed535be4c0aa276942a1a782669790547ad8768"], ["0x5e4bbdc178684478a615354d83c748a4393b20f0", "0x5e4bbdc178684478a615354d83c748a4393b20f0"]]}
+```
+
+#### Returns
+
+First level keys accounts, second level keys are tokens.
+
+```json
+{
+  "0x066ed5c2ed45d70ad72f40de0b4dd97bd67d84de": {
+    "0x1dfb2099f936b3e98bfc9b7059a8fb04edcce5b3": 12,
+    "0x5e4bbdc178684478a615354d83c748a4393b20f0": 12
+  },
+  "0x0ed535be4c0aa276942a1a782669790547ad8768": {
+    "0x1dfb2099f936b3e98bfc9b7059a8fb04edcce5b3": 14,
+    "0x5e4bbdc178684478a615354d83c748a4393b20f0": 14
+  }
+}
+```
 
 Signals
 -------

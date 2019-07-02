@@ -28,10 +28,10 @@ var (
 )
 
 // ERC20TransferABI is the input ABI used to generate the binding from.
-const ERC20TransferABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"to\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"}]"
+const ERC20TransferABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"balances\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"account\",\"type\":\"address\"}],\"name\":\"balanceOf\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"to\",\"type\":\"address\"},{\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"to\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"Transfer\",\"type\":\"event\"}]"
 
 // ERC20TransferBin is the compiled bytecode used for deploying new contracts.
-const ERC20TransferBin = `0x6080604052348015600f57600080fd5b5060c88061001e6000396000f3fe6080604052348015600f57600080fd5b506004361060285760003560e01c8063a9059cbb14602d575b600080fd5b605660048036036040811015604157600080fd5b506001600160a01b0381351690602001356058565b005b6040805182815290516001600160a01b0384169133917fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9181900360200190a3505056fea165627a7a72305820821ecaa5ed56957610817ecaabbb288ac338db81a0f09fc3ce5c7ddfa17351b60029`
+const ERC20TransferBin = `0x608060405234801561001057600080fd5b50610181806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c806327e235e31461004657806370a082311461007e578063a9059cbb146100a4575b600080fd5b61006c6004803603602081101561005c57600080fd5b50356001600160a01b03166100d2565b60408051918252519081900360200190f35b61006c6004803603602081101561009457600080fd5b50356001600160a01b03166100e4565b6100d0600480360360408110156100ba57600080fd5b506001600160a01b0381351690602001356100ff565b005b60006020819052908152604090205481565b6001600160a01b031660009081526020819052604090205490565b6001600160a01b038216600081815260208181526040918290208054850190558151848152915133927fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef92908290030190a3505056fea165627a7a72305820ce4a8618526aef925c173a7501883068de371638ddfe96d61116807d93bf0e010029`
 
 // DeployERC20Transfer deploys a new Ethereum contract, binding an instance of ERC20Transfer to it.
 func DeployERC20Transfer(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ERC20Transfer, error) {
@@ -186,6 +186,58 @@ func (_ERC20Transfer *ERC20TransferTransactorRaw) Transfer(opts *bind.TransactOp
 // Transact invokes the (paid) contract method with params as input values.
 func (_ERC20Transfer *ERC20TransferTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
 	return _ERC20Transfer.Contract.contract.Transact(opts, method, params...)
+}
+
+// BalanceOf is a free data retrieval call binding the contract method 0x70a08231.
+//
+// Solidity: function balanceOf(address account) constant returns(uint256)
+func (_ERC20Transfer *ERC20TransferCaller) BalanceOf(opts *bind.CallOpts, account common.Address) (*big.Int, error) {
+	var (
+		ret0 = new(*big.Int)
+	)
+	out := ret0
+	err := _ERC20Transfer.contract.Call(opts, out, "balanceOf", account)
+	return *ret0, err
+}
+
+// BalanceOf is a free data retrieval call binding the contract method 0x70a08231.
+//
+// Solidity: function balanceOf(address account) constant returns(uint256)
+func (_ERC20Transfer *ERC20TransferSession) BalanceOf(account common.Address) (*big.Int, error) {
+	return _ERC20Transfer.Contract.BalanceOf(&_ERC20Transfer.CallOpts, account)
+}
+
+// BalanceOf is a free data retrieval call binding the contract method 0x70a08231.
+//
+// Solidity: function balanceOf(address account) constant returns(uint256)
+func (_ERC20Transfer *ERC20TransferCallerSession) BalanceOf(account common.Address) (*big.Int, error) {
+	return _ERC20Transfer.Contract.BalanceOf(&_ERC20Transfer.CallOpts, account)
+}
+
+// Balances is a free data retrieval call binding the contract method 0x27e235e3.
+//
+// Solidity: function balances(address ) constant returns(uint256)
+func (_ERC20Transfer *ERC20TransferCaller) Balances(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
+	var (
+		ret0 = new(*big.Int)
+	)
+	out := ret0
+	err := _ERC20Transfer.contract.Call(opts, out, "balances", arg0)
+	return *ret0, err
+}
+
+// Balances is a free data retrieval call binding the contract method 0x27e235e3.
+//
+// Solidity: function balances(address ) constant returns(uint256)
+func (_ERC20Transfer *ERC20TransferSession) Balances(arg0 common.Address) (*big.Int, error) {
+	return _ERC20Transfer.Contract.Balances(&_ERC20Transfer.CallOpts, arg0)
+}
+
+// Balances is a free data retrieval call binding the contract method 0x27e235e3.
+//
+// Solidity: function balances(address ) constant returns(uint256)
+func (_ERC20Transfer *ERC20TransferCallerSession) Balances(arg0 common.Address) (*big.Int, error) {
+	return _ERC20Transfer.Contract.Balances(&_ERC20Transfer.CallOpts, arg0)
 }
 
 // Transfer is a paid mutator transaction binding the contract method 0xa9059cbb.
