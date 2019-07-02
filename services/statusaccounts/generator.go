@@ -34,7 +34,7 @@ func (g *generator) setAccountManager(am *staccount.Manager) {
 }
 
 func (g *generator) Generate(mnemonicPhraseLength int, n int, bip39Passphrase string) ([]CreatedAccountInfo, error) {
-	entropyStrength, err := mnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
+	entropyStrength, err := staccount.MnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
 	}
