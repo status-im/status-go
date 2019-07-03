@@ -188,6 +188,10 @@ func (g *generator) LoadAccount(address string, password string) (IdentifiedAcco
 		return IdentifiedAccountInfo{}, err
 	}
 
+	if err := ValidateKeystoreExtendedKey(key); err != nil {
+		return IdentifiedAccountInfo{}, err
+	}
+
 	acc := &account{
 		privateKey:  key.PrivateKey,
 		extendedKey: key.ExtendedKey,
