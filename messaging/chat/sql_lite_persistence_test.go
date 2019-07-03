@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
+	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -23,7 +23,7 @@ type SQLLitePersistenceTestSuite struct {
 	suite.Suite
 	// nolint: structcheck, megacheck
 	db      *sql.DB
-	service PersistenceService
+	service Persistence
 }
 
 func (s *SQLLitePersistenceTestSuite) SetupTest() {

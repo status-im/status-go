@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/mailserver/registry"
-	"github.com/status-im/status-go/messaging/chat/crypto"
+	"github.com/status-im/status-go/messaging/crypto"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"

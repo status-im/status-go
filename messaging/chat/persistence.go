@@ -4,8 +4,8 @@ import (
 	"crypto/ecdsa"
 
 	dr "github.com/status-im/doubleratchet"
-	"github.com/status-im/status-go/messaging/chat/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
+	"github.com/status-im/status-go/messaging/multidevice"
 )
 
 // RatchetInfo holds the current ratchet state
@@ -20,8 +20,8 @@ type RatchetInfo struct {
 	InstallationID string
 }
 
-// PersistenceService defines the interface for a storage service
-type PersistenceService interface {
+// Persistence defines the interface for a storage service
+type Persistence interface {
 	// GetKeysStorage returns the associated double ratchet KeysStorage object.
 	GetKeysStorage() dr.KeysStorage
 	// GetSessionStorage returns the associated double ratchet SessionStorage object.

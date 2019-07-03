@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type PersistenceService interface {
+type Persistence interface {
 	// Add adds a shared secret, associated with an identity and an installationID
 	Add(identity []byte, secret []byte, installationID string) error
 	// Get returns a shared secret associated with multiple installationIDs

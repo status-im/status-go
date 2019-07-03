@@ -9,9 +9,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ethereum/go-ethereum/crypto/ecies"
-
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
 	dr "github.com/status-im/doubleratchet"
 	"golang.org/x/crypto/hkdf"
 )

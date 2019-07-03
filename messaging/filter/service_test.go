@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	chatDB "github.com/status-im/status-go/messaging/chat/db"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
+
+	msgdb "github.com/status-im/status-go/messaging/db"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 )
 
 func TestServiceTestSuite(t *testing.T) {
@@ -63,7 +64,7 @@ func (s *ServiceTestSuite) SetupTest() {
 		s.keys = append(s.keys, testKey)
 	}
 
-	db, err := chatDB.Open(s.path, "", 0)
+	db, err := msgdb.Open(s.path, "", 0)
 	s.Require().NoError(err)
 
 	// Build services

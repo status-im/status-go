@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	chatDB "github.com/status-im/status-go/messaging/chat/db"
+	msgdb "github.com/status-im/status-go/messaging/db"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -27,7 +27,7 @@ type SQLLitePersistenceTestSuite struct {
 func (s *SQLLitePersistenceTestSuite) SetupTest() {
 	os.Remove(dbPath)
 
-	db, err := chatDB.Open(dbPath, "", 0)
+	db, err := msgdb.Open(dbPath, "", 0)
 	s.Require().NoError(err)
 
 	s.service = NewSQLLitePersistence(db)

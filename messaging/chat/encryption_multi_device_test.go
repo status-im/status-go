@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/status-im/status-go/messaging/chat/multidevice"
-	"github.com/status-im/status-go/messaging/chat/sharedsecret"
+	"github.com/status-im/status-go/messaging/multidevice"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 )
 
 const (

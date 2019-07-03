@@ -2,9 +2,8 @@ package multidevice
 
 import (
 	"crypto/ecdsa"
-	"fmt"
+
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
 type InstallationMetadata struct {
@@ -47,6 +46,10 @@ func New(config *Config, persistence Persistence) *Service {
 type Service struct {
 	persistence Persistence
 	config      *Config
+}
+
+func (s *Service) InstallationID() string {
+	return s.config.InstallationID
 }
 
 func (s *Service) GetActiveInstallations(identity *ecdsa.PublicKey) ([]*Installation, error) {
@@ -96,6 +99,10 @@ func (s *Service) GetOurInstallations(identity *ecdsa.PublicKey) ([]*Installatio
 	return installations, nil
 }
 
+func (s *Service) AddInstallations(identity []byte, timestamp int64, installations []*Installation, defaultEnabled bool) ([]*Installation, error) {
+	return s.persistence.AddInstallations(identity, timestamp, installations, defaultEnabled)
+}
+
 func (s *Service) SetInstallationMetadata(identity *ecdsa.PublicKey, installationID string, metadata *InstallationMetadata) error {
 	identityC := crypto.CompressPubkey(identity)
 	return s.persistence.SetInstallationMetadata(identityC, installationID, metadata)
@@ -109,29 +116,4 @@ func (s *Service) EnableInstallation(identity *ecdsa.PublicKey, installationID s
 func (s *Service) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installationID string) error {
 	myIdentityKeyC := crypto.CompressPubkey(myIdentityKey)
 	return s.persistence.DisableInstallation(myIdentityKeyC, installationID)
-}
-
-// ProcessPublicBundle persists a bundle and returns a list of tuples identity/installationID
-func (s *Service) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, theirIdentity *ecdsa.PublicKey, b *protobuf.Bundle) ([]*Installation, error) {
-	signedPreKeys := b.GetSignedPreKeys()
-	var installations []*Installation
-
-	myIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(&myIdentityKey.PublicKey))
-	theirIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(theirIdentity))
-
-	// Any device from other peers will be considered enabled, ours needs to
-	// be explicitly enabled
-	fromOurIdentity := theirIdentityStr != myIdentityStr
-
-	for installationID, signedPreKey := range signedPreKeys {
-		if installationID != s.config.InstallationID {
-			installations = append(installations, &Installation{
-				Identity: theirIdentityStr,
-				ID:       installationID,
-				Version:  signedPreKey.GetProtocolVersion(),
-			})
-		}
-	}
-
-	return s.persistence.AddInstallations(b.GetIdentity(), b.GetTimestamp(), installations, fromOurIdentity)
 }
