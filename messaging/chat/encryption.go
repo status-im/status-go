@@ -12,9 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	dr "github.com/status-im/doubleratchet"
 
+	"github.com/status-im/status-go/messaging/chat/protobuf"
 	"github.com/status-im/status-go/messaging/crypto"
 	"github.com/status-im/status-go/messaging/multidevice"
-	"github.com/status-im/status-go/messaging/chat/protobuf"
 )
 
 var (
