@@ -13,9 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/messaging/chat"
-	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
 	"github.com/status-im/status-go/messaging/filter"
+	"github.com/status-im/status-go/messaging/multidevice"
 
 	"github.com/status-im/status-go/services/shhext/whisperutils"
 
@@ -62,7 +62,7 @@ func New(w *whisper.Whisper, c Config) *Publisher {
 		config:     c,
 		whisper:    w,
 		whisperAPI: whisper.NewPublicWhisperAPI(w),
-		log:        log.New("package", "status-go/services/publisher.Publisher"),
+		log:        log.New("package", "status-go/messaging/publisher.Publisher"),
 	}
 }
 

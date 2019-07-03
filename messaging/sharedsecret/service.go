@@ -2,6 +2,7 @@ package sharedsecret
 
 import (
 	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/log"
@@ -16,7 +17,7 @@ type Service struct {
 
 func NewService(persistence Persistence) *Service {
 	return &Service{
-		log:         log.New("package", "status-go/services/sshext/chat.sharedsecret"),
+		log:         log.New("package", "status-go/messaging/sharedsecret.Service"),
 		persistence: persistence,
 	}
 }

@@ -3,8 +3,11 @@ package chat
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/messaging/chat/protobuf"
 	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/sharedsecret"
@@ -197,17 +200,52 @@ func (p *ProtocolService) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destin
 
 // ProcessPublicBundle processes a received X3DH bundle.
 func (p *ProtocolService) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
+	p.log.Debug("Processing bundle", "bundle", bundle)
+
 	if err := p.encryption.ProcessPublicBundle(myIdentityKey, bundle); err != nil {
 		return nil, err
 	}
 
-	theirIdentityKey, err := ExtractIdentity(bundle)
-	p.log.Debug("Processing bundle", "bundle", bundle)
+	installations, fromOurs, err := p.recoverInstallationsFromBundle(myIdentityKey, bundle)
 	if err != nil {
 		return nil, err
 	}
 
-	return p.multidevice.ProcessPublicBundle(myIdentityKey, theirIdentityKey, bundle)
+	// TODO(adam): why do we add installations using identity obtained from GetIdentity()
+	// instead of the output of crypto.CompressPubkey()? I tried the second option
+	// and the unit tests TestTopic and TestMaxDevices fail.
+	return p.multidevice.AddInstallations(bundle.GetIdentity(), bundle.GetTimestamp(), installations, fromOurs)
+}
+
+// recoverInstallationsFromBundle extracts installations from the bundle.
+// It returns extracted installations and true if the installations
+// are ours, i.e. the bundle was created by our identity key.
+func (p *ProtocolService) recoverInstallationsFromBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, bool, error) {
+	var installations []*multidevice.Installation
+
+	theirIdentity, err := ExtractIdentity(bundle)
+	if err != nil {
+		return nil, false, err
+	}
+
+	myIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(&myIdentityKey.PublicKey))
+	theirIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(theirIdentity))
+	// Any device from other peers will be considered enabled, ours needs to
+	// be explicitly enabled
+	fromOurIdentity := theirIdentityStr != myIdentityStr
+	signedPreKeys := bundle.GetSignedPreKeys()
+
+	for installationID, signedPreKey := range signedPreKeys {
+		if installationID != p.multidevice.InstallationID() {
+			installations = append(installations, &multidevice.Installation{
+				Identity: theirIdentityStr,
+				ID:       installationID,
+				Version:  signedPreKey.GetProtocolVersion(),
+			})
+		}
+	}
+
+	return installations, fromOurIdentity, nil
 }
 
 // GetBundle retrieves or creates a X3DH bundle, given a private identity key.
