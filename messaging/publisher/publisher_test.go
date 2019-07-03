@@ -108,7 +108,7 @@ func (s *ServiceTestSuite) SetupTest() {
 }
 
 func (s *ServiceTestSuite) TestCreateDirectMessage() {
-	newMessage, err := s.alice.CreateDirectMessage(s.aliceKey.keyID, s.bobKey.publicKeyBytes, false, []byte("hello"))
+	newMessage, err := s.alice.CreateDirectMessage(s.aliceKey.privateKey, &s.bobKey.privateKey.PublicKey, false, []byte("hello"))
 	s.Require().NoError(err)
 
 	message := &whisper.Message{
@@ -125,7 +125,7 @@ func (s *ServiceTestSuite) TestCreateDirectMessage() {
 
 func (s *ServiceTestSuite) TestTopic() {
 	// We build an initial message
-	newMessage1, err := s.alice.CreateDirectMessage(s.aliceKey.keyID, s.bobKey.publicKeyBytes, false, []byte("hello"))
+	newMessage1, err := s.alice.CreateDirectMessage(s.aliceKey.privateKey, &s.bobKey.privateKey.PublicKey, false, []byte("hello"))
 	s.Require().NoError(err)
 
 	message1 := &whisper.Message{
@@ -155,7 +155,7 @@ func (s *ServiceTestSuite) TestTopic() {
 	s.Require().EqualError(err, chat.ErrNoPayload.Error())
 
 	// We build another message, this time it should use the partitioned topic
-	newMessage3, err := s.alice.CreateDirectMessage(s.aliceKey.keyID, s.bobKey.publicKeyBytes, false, []byte("hello"))
+	newMessage3, err := s.alice.CreateDirectMessage(s.aliceKey.privateKey, &s.bobKey.privateKey.PublicKey, false, []byte("hello"))
 	s.Require().NoError(err)
 
 	message3 := &whisper.Message{
@@ -173,7 +173,7 @@ func (s *ServiceTestSuite) TestTopic() {
 	s.Require().NoError(err)
 
 	// We build another message, this time it should use the negotiated topic
-	newMessage4, err := s.bob.CreateDirectMessage(s.bobKey.keyID, s.aliceKey.publicKeyBytes, false, []byte("hello"))
+	newMessage4, err := s.bob.CreateDirectMessage(s.bobKey.privateKey, &s.aliceKey.privateKey.PublicKey, false, []byte("hello"))
 	s.Require().NoError(err)
 
 	message4 := &whisper.Message{
@@ -198,7 +198,7 @@ func (s *ServiceTestSuite) TestTopic() {
 	s.Require().NoError(err)
 
 	// Alice sends another message to Bob, this time it should use the negotiated topic
-	newMessage5, err := s.alice.CreateDirectMessage(s.aliceKey.keyID, s.bobKey.publicKeyBytes, false, []byte("hello"))
+	newMessage5, err := s.alice.CreateDirectMessage(s.aliceKey.privateKey, &s.bobKey.privateKey.PublicKey, false, []byte("hello"))
 	s.Require().NoError(err)
 
 	message5 := &whisper.Message{

@@ -242,22 +242,15 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 }
 
 // CreateDirectMessage creates a 1:1 chat message
-func (p *Publisher) CreateDirectMessage(signature string, destination hexutil.Bytes, DH bool, payload []byte) (*whisper.NewMessage, error) {
+func (p *Publisher) CreateDirectMessage(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, DH bool, payload []byte) (*whisper.NewMessage, error) {
 	if !p.config.PFSEnabled {
 		return nil, ErrPFSNotEnabled
 	}
 
-	privateKey, err := p.whisper.GetPrivateKey(signature)
-	if err != nil {
-		return nil, err
-	}
-
-	publicKey, err := crypto.UnmarshalPubkey(destination)
-	if err != nil {
-		return nil, err
-	}
-
-	var msgSpec *chat.ProtocolMessageSpec
+	var (
+		msgSpec *chat.ProtocolMessageSpec
+		err     error
+	)
 
 	if DH {
 		p.log.Debug("Building dh message")
@@ -270,7 +263,7 @@ func (p *Publisher) CreateDirectMessage(signature string, destination hexutil.By
 		return nil, err
 	}
 
-	whisperMessage, err := p.directMessageToWhisper(privateKey, publicKey, destination, signature, msgSpec)
+	whisperMessage, err := p.directMessageToWhisper(privateKey, publicKey, msgSpec)
 	if err != nil {
 		p.log.Error("sshext-service", "error building whisper message", err)
 		return nil, err
@@ -279,7 +272,7 @@ func (p *Publisher) CreateDirectMessage(signature string, destination hexutil.By
 	return whisperMessage, nil
 }
 
-func (p *Publisher) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, destination hexutil.Bytes, signature string, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
+func (p *Publisher) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, spec *chat.ProtocolMessageSpec) (*whisper.NewMessage, error) {
 	// marshal for sending to wire
 	marshaledMessage, err := proto.Marshal(spec.Message)
 	if err != nil {
@@ -287,9 +280,18 @@ func (p *Publisher) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, their
 		return nil, err
 	}
 
+	// We rely on the fact that a deterministic ID is created for the same keys.
+	sigID, err := p.whisper.AddKeyPair(myPrivateKey)
+	if err != nil {
+		p.log.Error("failed to add key pair in order to get signature ID", "err", err)
+		return nil, err
+	}
+
+	destination := hexutil.Bytes(crypto.FromECDSAPub(theirPublicKey))
+
 	whisperMessage := whisperutils.DefaultWhisperMessage()
 	whisperMessage.Payload = marshaledMessage
-	whisperMessage.Sig = signature
+	whisperMessage.Sig = sigID
 
 	if spec.SharedSecret != nil {
 		chat := p.getNegotiatedChat(theirPublicKey)
@@ -320,7 +322,7 @@ func (p *Publisher) directMessageToWhisper(myPrivateKey *ecdsa.PrivateKey, their
 }
 
 // CreatePublicMessage sends a public chat message to the underlying transport
-func (p *Publisher) CreatePublicMessage(signature string, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
+func (p *Publisher) CreatePublicMessage(privateKey *ecdsa.PrivateKey, chatID string, payload []byte, wrap bool) (*whisper.NewMessage, error) {
 	if !p.config.PFSEnabled {
 		return nil, ErrPFSNotEnabled
 	}
@@ -329,11 +331,17 @@ func (p *Publisher) CreatePublicMessage(signature string, chatID string, payload
 	if filter == nil {
 		return nil, errors.New("not subscribed to chat")
 	}
-	p.log.Info("SIG", signature)
+
+	sigID, err := p.whisper.AddKeyPair(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get a signature ID: %v", err)
+	}
+
+	p.log.Info("signature ID", sigID)
 
 	// Enrich with transport layer info
 	whisperMessage := whisperutils.DefaultWhisperMessage()
-	whisperMessage.Sig = signature
+	whisperMessage.Sig = sigID
 	whisperMessage.Topic = whisperutils.ToTopic(chatID)
 	whisperMessage.SymKeyID = filter.SymKeyID
 
@@ -426,7 +434,7 @@ func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
 
 	identity := fmt.Sprintf("%x", crypto.FromECDSAPub(&privateKey.PublicKey))
 
-	message, err := p.CreatePublicMessage("0x"+identity, filter.ContactCodeTopic(identity), nil, true)
+	message, err := p.CreatePublicMessage(privateKey, filter.ContactCodeTopic(identity), nil, true)
 	if err != nil {
 		p.log.Error("could not build contact code", "identity", identity, "err", err)
 		return nil, err

@@ -478,7 +478,12 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 
 // SendPublicMessage sends a public chat message to the underlying transport
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
-	message, err := api.service.CreatePublicMessage(msg.Sig, msg.Chat, msg.Payload, false)
+	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain a private key from Sig: %v", err)
+	}
+
+	message, err := api.service.CreatePublicMessage(privateKey, msg.Chat, msg.Payload, false)
 	if err != nil {
 		return nil, err
 	}
@@ -488,7 +493,17 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessa
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (hexutil.Bytes, error) {
-	message, err := api.service.CreateDirectMessage(msg.Sig, msg.PubKey, msg.DH, msg.Payload)
+	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, err := crypto.UnmarshalPubkey(msg.PubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := api.service.CreateDirectMessage(privateKey, publicKey, msg.DH, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
