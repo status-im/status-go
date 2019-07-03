@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	dr "github.com/status-im/doubleratchet"
 
+	"github.com/status-im/status-go/messaging/chat/protobuf"
 	ecrypto "github.com/status-im/status-go/messaging/crypto"
 	msgdb "github.com/status-im/status-go/messaging/db"
 	"github.com/status-im/status-go/messaging/multidevice"
-	"github.com/status-im/status-go/messaging/chat/protobuf"
 	"github.com/status-im/status-go/messaging/sharedsecret"
 )
 

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/chat/protobuf"
+	"github.com/status-im/status-go/messaging/multidevice"
 	"github.com/status-im/status-go/messaging/sharedsecret"
 	"github.com/stretchr/testify/suite"
 )
