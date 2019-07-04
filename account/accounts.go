@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,15 +31,15 @@ var (
 	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 )
 
-// GethServiceProvider provides required geth services.
-type GethServiceProvider interface {
-	AccountManager() (*accounts.Manager, error)
-	AccountKeyStore() (*keystore.KeyStore, error)
+type Keystore interface {
+	ImportKey(ekey *extkeys.ExtendedKey, auth string) (common.Address, error)
+	GetDecryptedKey(address common.Address, auth string) (*keystore.Key, error)
+	Accounts() ([]common.Address, error)
 }
 
 // Manager represents account manager interface.
 type Manager struct {
-	geth GethServiceProvider
+	keystore Keystore
 
 	mu sync.RWMutex
 
@@ -49,9 +50,9 @@ type Manager struct {
 }
 
 // NewManager returns new node account manager.
-func NewManager(geth GethServiceProvider) *Manager {
+func NewManager(keystore Keystore) *Manager {
 	return &Manager{
-		geth: geth,
+		keystore: keystore,
 	}
 }
 
@@ -97,11 +98,6 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	keyStore, err := m.geth.AccountKeyStore()
-	if err != nil {
-		return "", "", err
-	}
-
 	if parentAddress == "" && m.selectedWalletAccount != nil { // derive from selected account by default
 		parentAddress = m.selectedWalletAccount.Address.Hex()
 	}
@@ -116,7 +112,7 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	}
 
 	// make sure that given password can decrypt key associated with a given parent address
-	account, accountKey, err := keyStore.AccountDecryptedKey(account, password)
+	accountKey, err := m.keystore.GetDecryptedKey(account.Address, password)
 	if err != nil {
 		return "", "", fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
 	}
@@ -131,9 +127,10 @@ func (m *Manager) CreateChildAccount(parentAddress, password string) (address, p
 	if err != nil {
 		return "", "", err
 	}
-	if err = keyStore.IncSubAccountIndex(account, password); err != nil {
-		return "", "", err
-	}
+	// FIXME(dshulyak) implement this in keystore
+	//if err = keyStore.IncSubAccountIndex(account, password); err != nil {
+	//	return "", "", err
+	//}
 	accountKey.SubAccountIndex++
 
 	// import derived key into account keystore
@@ -306,20 +303,15 @@ func (m *Manager) Logout() {
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	keyStore, err := m.geth.AccountKeyStore()
-	if err != nil {
-		return "", "", err
-	}
-
 	// imports extended key, create key file (if necessary)
-	account, err := keyStore.ImportExtendedKeyForPurpose(keyPurpose, extKey, password)
+	account, err := m.keystore.ImportKey(extKey, password)
 	if err != nil {
 		return "", "", err
 	}
-	address = account.Address.Hex()
+	address = account.String()
 
 	// obtain public key to return
-	account, key, err := keyStore.AccountDecryptedKey(account, password)
+	key, err := m.keystore.GetDecryptedKey(account, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -334,18 +326,10 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	am, err := m.geth.AccountManager()
+	addresses, err := m.keystore.Accounts()
 	if err != nil {
 		return nil, err
 	}
-
-	var addresses []gethcommon.Address
-	for _, wallet := range am.Wallets() {
-		for _, account := range wallet.Accounts() {
-			addresses = append(addresses, account.Address)
-		}
-	}
-
 	if m.selectedWalletAccount == nil {
 		return []gethcommon.Address{}, nil
 	}
@@ -446,11 +430,6 @@ func (m *Manager) refreshSelectedWalletAccount() {
 // that belong to the currently selected account.
 // The extKey is CKD#2 := root of sub-accounts of the main account
 func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
-	keyStore, err := m.geth.AccountKeyStore()
-	if err != nil {
-		return []accounts.Account{}, err
-	}
-
 	subAccounts := make([]accounts.Account, 0)
 	if extKey.Depth == 5 { // CKD#2 level
 		// gather possible sub-account addresses
@@ -462,12 +441,15 @@ func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex u
 			}
 			subAccountAddresses = append(subAccountAddresses, crypto.PubkeyToAddress(childKey.ToECDSA().PublicKey))
 		}
-
+		accounts, err := m.keystore.Accounts()
+		if err != nil {
+			return nil, err
+		}
 		// see if any of the gathered addresses actually exist in cached accounts list
-		for _, cachedAccount := range keyStore.Accounts() {
+		for _, account := range accounts {
 			for _, possibleAddress := range subAccountAddresses {
-				if possibleAddress.Hex() == cachedAccount.Address.Hex() {
-					subAccounts = append(subAccounts, cachedAccount)
+				if possibleAddress == account {
+					subAccounts = append(subAccounts, account)
 				}
 			}
 		}
@@ -480,11 +462,6 @@ func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex u
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
 func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
-	keyStore, err := m.geth.AccountKeyStore()
-	if err != nil {
-		return accounts.Account{}, nil, err
-	}
-
 	account, err := ParseAccountString(address)
 	if err != nil {
 		return accounts.Account{}, nil, ErrAddressToAccountMappingFailure
@@ -492,7 +469,7 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.
 
 	var key *keystore.Key
 
-	account, key, err = keyStore.AccountDecryptedKey(account, password)
+	key, err = m.keystore.GetDecryptedKey(account, password)
 	if err != nil {
 		err = fmt.Errorf("%s: %s", ErrAccountToKeyMappingFailure, err)
 	}

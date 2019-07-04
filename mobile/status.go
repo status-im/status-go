@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/keychain"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
@@ -675,4 +676,10 @@ func SignHash(hexEncodedHash string) string {
 	}
 
 	return hexEncodedSignature
+}
+
+// UseKeychain updates keychain to be used in status backend.
+func UseKeychain(keychain keychain.Keychain) string {
+	err := statusBackend.UseKeychain(keychain)
+	return makeJSONResponse(err)
 }

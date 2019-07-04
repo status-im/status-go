@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/keychain"
+	"github.com/status-im/status-go/keystore"
 	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/messaging/chat/crypto"
 	"github.com/status-im/status-go/node"
@@ -63,6 +66,8 @@ type StatusBackend struct {
 	appState        appState
 	log             log.Logger
 	allowAllRPC     bool // used only for tests, disables api method restrictions
+	keychain        keychain.Keychain
+	keystore        *keystore.Keystore
 }
 
 // NewStatusBackend create a new NewStatusBackend instance
@@ -70,7 +75,6 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
 
 	statusNode := node.New()
-	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
@@ -78,13 +82,24 @@ func NewStatusBackend() *StatusBackend {
 
 	return &StatusBackend{
 		statusNode:      statusNode,
-		accountManager:  accountManager,
 		transactor:      transactor,
 		personalAPI:     personalAPI,
 		rpcFilters:      rpcFilters,
 		newNotification: notificationManager,
 		log:             log.New("package", "status-go/api.StatusBackend"),
 	}
+}
+
+func (b *StatusBackend) UseKeychain(keychain keychain.Keychain) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.keychain != nil {
+		return errors.New("keychain already set")
+	}
+	keystore = keystore.NewKeystore(filepath.Join(b.statusNode.Config().DataDir, "keystore"), keychain)
+	b.keychain = keychain
+	b.accountManager = account.NewManager(keystore)
+	return nil
 }
 
 // StatusNode returns reference to node manager
