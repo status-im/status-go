@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -229,16 +228,7 @@ func (s *Service) processReceivedMessages(messages []*whisper.Message) ([]dedup.
 		case chat.ErrNotPairedDevice:
 			log.Info("Received a message from non-paired device", "err", err)
 		case chat.ErrDeviceNotFound:
-			log.Warn("Device not found, sending signal", "err", err)
-
-			publicKey, err := crypto.UnmarshalPubkey(dedupMessage.Message.Sig)
-			if err != nil {
-				return nil, fmt.Errorf("failed to handler chat.ErrDeviceNotFound: %v", err)
-			}
-
-			keyString := fmt.Sprintf("%#x", crypto.FromECDSAPub(publicKey))
-			handler := PublisherSignalHandler{}
-			handler.DecryptMessageFailed(keyString)
+			log.Warn("Received a message not targeted to us", "err", err)
 		default:
 			if err != nil {
 				log.Error("Failed handling message with error", "err", err)
