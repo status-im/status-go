@@ -30,6 +30,8 @@ const (
 	publishInterval = 21600
 	// How often we should check for new messages
 	pollIntervalMs = 300
+	// Cooldown period on acking messages when not targeting our device
+	deviceNotFoundAckInterval = 7200
 )
 
 var (
@@ -256,7 +258,15 @@ func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {
 	response, err := p.protocol.HandleMessage(privateKey, publicKey, protocolMessage, msgID)
 	if err == nil {
 		msg.Payload = response
+	} else if err == chat.ErrDeviceNotFound {
+		if err := p.handleDeviceNotFound(privateKey, publicKey); err != nil {
+			p.log.Error("Failed to handle DeviceNotFound", "err", err)
+		}
+
+		// Return the original error
+		return err
 	}
+
 	return err
 }
 
@@ -427,7 +437,7 @@ func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
 		return nil, nil
 	}
 
-	lastPublished, err := p.persistence.Get()
+	lastPublished, err := p.persistence.GetLastPublished()
 	if err != nil {
 		p.log.Error("could not fetch config from db", "err", err)
 		return nil, err
@@ -469,11 +479,40 @@ func (p *Publisher) sendContactCode() (*whisper.NewMessage, error) {
 		return nil, err
 	}
 
-	err = p.persistence.Set(now)
+	err = p.persistence.SetLastPublished(now)
 	if err != nil {
 		p.log.Error("could not set last published", "err", err)
 		return nil, err
 	}
 
 	return message, nil
+}
+
+// handleDeviceNotFound sends an empty message to publicKey containing our bundle information
+// so it's notified of our devices
+func (p *Publisher) handleDeviceNotFound(privateKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey) error {
+	now := time.Now().Unix()
+	identity := crypto.CompressPubkey(publicKey)
+
+	lastAcked, err := p.persistence.GetLastAcked(identity)
+	if err != nil {
+		return err
+	}
+
+	if now-lastAcked < deviceNotFoundAckInterval {
+		p.log.Debug("already acked identity", "identity", identity, "lastAcked", lastAcked)
+		return nil
+	}
+
+	message, err := p.CreateDirectMessage(privateKey, publicKey, true, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.whisperAPI.Post(context.TODO(), *message)
+	if err != nil {
+		return err
+	}
+
+	return p.persistence.SetLastAcked(identity, now)
 }
