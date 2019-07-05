@@ -40,8 +40,6 @@ const (
 	defaultTimeoutWaitAdded = 5 * time.Second
 	// maxInstallations is a maximum number of supported devices for one account.
 	maxInstallations = 3
-	// filterCheckIntervalMs is a how often we should check whisper filters for new messages
-	filterCheckIntervalMs = 300
 )
 
 // EnvelopeEventsHandler used for two different event types.
@@ -176,13 +174,30 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	// Initialize sharedsecret
-	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
+	multideviceConfig := &multidevice.Config{
+		InstallationID:   s.config.InstallationID,
+		ProtocolVersion:  chat.ProtocolVersion,
+		MaxInstallations: maxInstallations,
+	}
 
-	// Initialize filter
+	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {
+		handler := PublisherSignalHandler{}
+		for _, bundle := range addedBundles {
+			handler.BundleAdded(bundle.Identity, bundle.ID)
+		}
+	}
+
+	protocolService := chat.NewProtocolService(
+		chat.NewEncryptionService(
+			persistence,
+			chat.DefaultEncryptionServiceConfig(s.config.InstallationID)),
+		sharedsecret.NewService(persistence.GetSharedSecretStorage()),
+		multidevice.New(multideviceConfig, persistence.GetMultideviceStorage()),
+		addedBundlesHandler,
+		s.ProcessNegotiatedSecret)
+
 	onNewMessagesHandler := func(messages []*filter.Messages) {
 		var signalMessages []*signal.Messages
-		handler := PublisherSignalHandler{}
 		for _, chatMessages := range messages {
 			signalMessage := &signal.Messages{
 				Error: chatMessages.Error,
@@ -197,37 +212,9 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 
 			signalMessage.Messages = dedupMessages
 		}
-		handler.NewMessages(signalMessages)
+		PublisherSignalHandler{}.NewMessages(signalMessages)
 	}
-
-	filterService := filter.New(s.w, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService, onNewMessagesHandler)
-	go filterService.Start(filterCheckIntervalMs * time.Millisecond)
-
-	// Initialize multidevice
-	multideviceConfig := &multidevice.Config{
-		InstallationID:   s.config.InstallationID,
-		ProtocolVersion:  chat.ProtocolVersion,
-		MaxInstallations: maxInstallations,
-	}
-	multideviceService := multidevice.New(multideviceConfig, persistence.GetMultideviceStorage())
-
-	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {
-		handler := PublisherSignalHandler{}
-		for _, bundle := range addedBundles {
-			handler.BundleAdded(bundle.Identity, bundle.ID)
-		}
-	}
-
-	protocolService := chat.NewProtocolService(
-		chat.NewEncryptionService(
-			persistence,
-			chat.DefaultEncryptionServiceConfig(s.config.InstallationID)),
-		sharedSecretService,
-		multideviceService,
-		addedBundlesHandler,
-		s.newSharedSecretHandler(filterService))
-
-	s.Publisher.Init(persistence.DB, protocolService, filterService)
+	s.Publisher.Init(persistence.DB, protocolService, onNewMessagesHandler)
 
 	return nil
 }
@@ -258,34 +245,6 @@ func (s *Service) processReceivedMessages(messages []*whisper.Message) ([]dedup.
 	}
 
 	return dedupMessages, nil
-}
-
-func (s *Service) newSharedSecretHandler(filterService *filter.Service) func([]*sharedsecret.Secret) {
-	return func(sharedSecrets []*sharedsecret.Secret) {
-		var filters []*signal.Filter
-		for _, sharedSecret := range sharedSecrets {
-			chat, err := filterService.ProcessNegotiatedSecret(sharedSecret)
-			if err != nil {
-				log.Error("Failed to process negotiated secret", "err", err)
-				return
-			}
-
-			filter := &signal.Filter{
-				ChatID:   chat.ChatID,
-				SymKeyID: chat.SymKeyID,
-				Listen:   chat.Listen,
-				FilterID: chat.FilterID,
-				Identity: chat.Identity,
-				Topic:    chat.Topic,
-			}
-
-			filters = append(filters, filter)
-		}
-		if len(filters) != 0 {
-			handler := PublisherSignalHandler{}
-			handler.WhisperFilterAdded(filters)
-		}
-	}
 }
 
 // UpdateMailservers updates information about selected mail servers.
@@ -344,7 +303,10 @@ func (s *Service) Start(server *p2p.Server) error {
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
-	return s.Publisher.Start(s.online, true)
+	if s.config.PFSEnabled {
+		return s.Publisher.Start(s.online, true)
+	}
+	return nil
 }
 
 func (s *Service) online() bool {

@@ -66,8 +66,6 @@ func (s *ServiceTestSuite) createPublisher(installationID string) (*Publisher, *
 
 	sharedSecretService := sharedsecret.NewService(persistence.GetSharedSecretStorage())
 
-	filterService := filter.New(whisper, filter.NewSQLLitePersistence(persistence.DB), sharedSecretService, func([]*filter.Messages) {})
-
 	multideviceConfig := &multidevice.Config{
 		InstallationID:   installationID,
 		ProtocolVersion:  chat.ProtocolVersion,
@@ -82,14 +80,10 @@ func (s *ServiceTestSuite) createPublisher(installationID string) (*Publisher, *
 		sharedSecretService,
 		multideviceService,
 		func(addedBundles []*multidevice.Installation) {},
-		func(sharedSecrets []*sharedsecret.Secret) {
-			for _, sharedSecret := range sharedSecrets {
-				_, _ = filterService.ProcessNegotiatedSecret(sharedSecret)
-			}
-		},
+		publisher.ProcessNegotiatedSecret,
 	)
 
-	publisher.Init(persistence.DB, protocolService, filterService)
+	publisher.Init(persistence.DB, protocolService, func(msg []*filter.Messages) {})
 
 	err = publisher.Start(func() bool { return true }, false)
 	s.Require().NoError(err)
