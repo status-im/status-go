@@ -218,7 +218,6 @@ func (p *Publisher) RemoveFilters(chats []*filter.Chat) error {
 }
 func (p *Publisher) ProcessNegotiatedSecret(secrets []*sharedsecret.Secret) {
 	for _, secret := range secrets {
-
 		_, err := p.filter.ProcessNegotiatedSecret(secret)
 		if err != nil {
 			log.Error("could not process negotiated filter", "err", err)
