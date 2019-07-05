@@ -292,6 +292,10 @@ func (p *ProtocolService) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 	return p.encryption.ConfirmMessagesProcessed(messageIDs)
 }
 
+func (p *ProtocolService) GetSharedSecretService() *sharedsecret.Service {
+	return p.secret
+}
+
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *ProtocolService) HandleMessage(myIdentityKey *ecdsa.PrivateKey, theirPublicKey *ecdsa.PublicKey, protocolMessage *protobuf.ProtocolMessage, messageID []byte) ([]byte, error) {
 	p.log.Debug("Received message from", "public-key", theirPublicKey)
