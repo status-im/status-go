@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/messaging/chat/protobuf"
 	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/messaging/multidevice"
+	"github.com/status-im/status-go/messaging/sharedsecret"
 
 	"github.com/status-im/status-go/services/shhext/whisperutils"
 
@@ -27,6 +28,8 @@ const (
 	tickerInterval = 120
 	// How often we should publish a contact code in seconds
 	publishInterval = 21600
+	// How often we should check for new messages
+	pollIntervalMs = 300
 )
 
 var (
@@ -66,10 +69,13 @@ func New(w *whisper.Whisper, c Config) *Publisher {
 	}
 }
 
-func (p *Publisher) Init(db *sql.DB, protocol *chat.ProtocolService, filter *filter.Service) {
+func (p *Publisher) Init(db *sql.DB, protocol *chat.ProtocolService, onNewMessagesHandler func([]*filter.Messages)) {
+
+	filterService := filter.New(p.whisper, filter.NewSQLLitePersistence(db), protocol.GetSharedSecretService(), onNewMessagesHandler)
+
 	p.persistence = NewSQLLitePersistence(db)
 	p.protocol = protocol
-	p.filter = filter
+	p.filter = filterService
 }
 
 func (p *Publisher) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *protobuf.Bundle) ([]*multidevice.Installation, error) {
@@ -173,10 +179,15 @@ func (p *Publisher) GetPublicBundle(identityKey *ecdsa.PublicKey) (*protobuf.Bun
 }
 
 func (p *Publisher) Start(online func() bool, startTicker bool) error {
+	if p.protocol == nil {
+		return errProtocolNotInitialized
+	}
+
 	p.online = online
 	if startTicker {
 		p.startTicker()
 	}
+	go p.filter.Start(pollIntervalMs * time.Millisecond)
 	return nil
 }
 
@@ -204,6 +215,15 @@ func (p *Publisher) LoadFilter(chat *filter.Chat) ([]*filter.Chat, error) {
 
 func (p *Publisher) RemoveFilters(chats []*filter.Chat) error {
 	return p.filter.Remove(chats)
+}
+func (p *Publisher) ProcessNegotiatedSecret(secrets []*sharedsecret.Secret) {
+	for _, secret := range secrets {
+
+		_, err := p.filter.ProcessNegotiatedSecret(secret)
+		if err != nil {
+			log.Error("could not process negotiated filter", "err", err)
+		}
+	}
 }
 
 func (p *Publisher) ProcessMessage(msg *whisper.Message, msgID []byte) error {

@@ -129,6 +129,7 @@ func (s *ShhExtSuite) SetupTest() {
 		db, err := leveldb.Open(storage.NewMemStorage(), nil)
 		s.Require().NoError(err)
 		s.services[i] = New(s.whisper[i], nil, db, config)
+		s.Require().NoError(s.services[i].InitProtocolWithPassword(fmt.Sprintf("%d", i), "password"))
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -139,12 +140,26 @@ func (s *ShhExtSuite) SetupTest() {
 }
 
 func (s *ShhExtSuite) TestInitProtocol() {
-	err := s.services[0].InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
+	directory, err := ioutil.TempDir("", "status-go-testing")
+	s.Require().NoError(err)
+
+	config := params.ShhextConfig{
+		InstallationID:          "2",
+		BackupDisabledDataDir:   directory,
+		PFSEnabled:              true,
+		MailServerConfirmations: true,
+		ConnectionTarget:        10,
+	}
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.Require().NoError(err)
+	service := New(whisper.New(nil), nil, db, config)
+
+	err = service.InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
 	s.NoError(err)
 
 	digest := sha3.Sum256([]byte("`090///\nhtaa\rhta9x8923)$$'23"))
 	encKey := fmt.Sprintf("%x", digest)
-	err = s.services[0].InitProtocolWithEncyptionKey("example-address", encKey)
+	err = service.InitProtocolWithEncyptionKey("example-address", encKey)
 	s.NoError(err)
 }
 
@@ -351,6 +366,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		PFSEnabled:            true,
 	}
 	service := New(shh, mock, nil, config)
+	s.Require().NoError(service.InitProtocolWithPassword("abc", "password"))
 	s.Require().NoError(service.Start(aNode.Server()))
 	api := NewPublicAPI(service)
 
@@ -721,6 +737,7 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	s.localContext = NewContextFromService(context.Background(), s.localService, s.localService.storage)
 	localPkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
+	s.Require().NoError(s.localService.InitProtocolWithPassword("local-service", "password"))
 	s.Require().NoError(s.localService.Start(&p2p.Server{Config: p2p.Config{PrivateKey: localPkey}}))
 	s.localAPI = NewPublicAPI(s.localService)
 
