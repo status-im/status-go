@@ -223,7 +223,7 @@ func (g *generator) deriveChildAccount(acc *account, pathString string) (*accoun
 		return nil, err
 	}
 
-	if acc.extendedKey == nil {
+	if acc.extendedKey.IsZeroed() {
 		return nil, errAccountCannotDeriveChildKeys
 	}
 

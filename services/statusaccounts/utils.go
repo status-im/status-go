@@ -10,7 +10,7 @@ import (
 var ErrInvalidKeystoreExtendedKey = errors.New("PrivateKey and ExtendedKey are different")
 
 func ValidateKeystoreExtendedKey(key *keystore.Key) error {
-	if key.ExtendedKey == nil {
+	if key.ExtendedKey.IsZeroed() {
 		return nil
 	}
 
