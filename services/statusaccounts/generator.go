@@ -244,7 +244,7 @@ func (g *generator) store(acc *account, password string) (AccountInfo, error) {
 			return AccountInfo{}, err
 		}
 	} else {
-		if err := g.am.ImportNormalAccount(acc.privateKey, password); err != nil {
+		if _, err := g.am.ImportNormalAccount(acc.privateKey, password); err != nil {
 			return AccountInfo{}, err
 		}
 	}

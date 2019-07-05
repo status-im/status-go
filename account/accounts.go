@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -303,14 +304,15 @@ func (m *Manager) Logout() {
 	m.selectedChatAccount = nil
 }
 
-func (m *Manager) ImportNormalAccount(privateKey *ecdsa.PrivateKey, password string) error {
+func (m *Manager) ImportNormalAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error) {
 	keyStore, err := m.geth.AccountKeyStore()
 	if err != nil {
-		return err
+		return common.Address{}, err
 	}
 
-	_, err = keyStore.ImportECDSA(privateKey, password)
-	return err
+	account, err := keyStore.ImportECDSA(privateKey, password)
+
+	return account.Address, err
 }
 
 func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
@@ -526,7 +528,6 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.
 	}
 
 	var key *keystore.Key
-
 	account, key, err = keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		err = fmt.Errorf("%s: %s", ErrAccountToKeyMappingFailure, err)
