@@ -43,11 +43,11 @@ const testAccountJSONFile = `{
 	"version":3
 }`
 
-func TestGenerator_Generate(t *testing.T) {
+func TestGenerator_generate(t *testing.T) {
 	g := newGenerator()
 	assert.Equal(t, 0, len(g.accounts))
 
-	accountsInfo, err := g.Generate(12, 5, "")
+	accountsInfo, err := g.generate(12, 5, "")
 	assert.NoError(t, err)
 	assert.Equal(t, 5, len(g.accounts))
 
@@ -57,11 +57,11 @@ func TestGenerator_Generate(t *testing.T) {
 	}
 }
 
-func TestGenerator_ImportPrivateKey(t *testing.T) {
+func TestGenerator_importPrivateKey(t *testing.T) {
 	g := newGenerator()
 	assert.Equal(t, 0, len(g.accounts))
 
-	info, err := g.ImportPrivateKey(testAccount.bip44Key0)
+	info, err := g.importPrivateKey(testAccount.bip44Key0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(g.accounts))
 
@@ -69,11 +69,11 @@ func TestGenerator_ImportPrivateKey(t *testing.T) {
 	assert.Equal(t, testAccount.bip44Address0, info.Address)
 }
 
-func TestGenerator_ImportMnemonic(t *testing.T) {
+func TestGenerator_importMnemonic(t *testing.T) {
 	g := newGenerator()
 	assert.Equal(t, 0, len(g.accounts))
 
-	info, err := g.ImportMnemonic(testAccount.mnemonic, testAccount.bip39Passphrase)
+	info, err := g.importMnemonic(testAccount.mnemonic, testAccount.bip39Passphrase)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(g.accounts))
 
@@ -81,7 +81,7 @@ func TestGenerator_ImportMnemonic(t *testing.T) {
 	assert.Equal(t, testAccount.extendedMasterKey, key.extendedKey.String())
 }
 
-func TestGenerator_ImportJSONKey(t *testing.T) {
+func TestGenerator_importJSONKey(t *testing.T) {
 	g := newGenerator()
 	assert.Equal(t, 0, len(g.accounts))
 
@@ -100,18 +100,18 @@ func TestGenerator_ImportJSONKey(t *testing.T) {
 	assert.Equal(t, testAccount.bip44Key0, keyHex)
 }
 
-func TestGenerator_DeriveAddresses(t *testing.T) {
+func TestGenerator_deriveAddresses(t *testing.T) {
 	g := newGenerator()
 	assert.Equal(t, 0, len(g.accounts))
 
-	info, err := g.ImportMnemonic(testAccount.mnemonic, testAccount.bip39Passphrase)
+	info, err := g.importMnemonic(testAccount.mnemonic, testAccount.bip39Passphrase)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(g.accounts))
 
 	path0 := "m/44'/60'/0'/0/0"
 	path1 := "m/44'/60'/0'/0/1"
 
-	addresses, err := g.DeriveAddresses(info.ID, []string{path0, path1})
+	addresses, err := g.deriveAddresses(info.ID, []string{path0, path1})
 	assert.NoError(t, err)
 
 	assert.Equal(t, testAccount.bip44Address0, addresses[path0].Address)

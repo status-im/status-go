@@ -39,16 +39,19 @@ func (a *account) toCreatedAccountInfo(id string, mnemonic string) CreatedAccoun
 	}
 }
 
+// AccountInfo contains a PublicKey and an Address of an account.
 type AccountInfo struct {
 	PublicKey string `json:"publicKey"`
 	Address   string `json:"address"`
 }
 
+// IdentifiedAccountInfo contains AccountInfo and the ID of an account.
 type IdentifiedAccountInfo struct {
 	AccountInfo
 	ID string `json:"id"`
 }
 
+// CreatedAccountInfo contains IdentifiedAccountInfo and the mnemonic of an account.
 type CreatedAccountInfo struct {
 	IdentifiedAccountInfo
 	Mnemonic string `json:"mnemonic"`

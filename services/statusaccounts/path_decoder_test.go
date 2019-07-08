@@ -11,43 +11,43 @@ func TestDecodePath(t *testing.T) {
 	scenarios := []struct {
 		path                  string
 		expectedPath          []uint32
-		expectedStartingPoint StartingPoint
+		expectedStartingPoint startingPoint
 		err                   error
 	}{
 		{
 			path:                  "",
 			expectedPath:          []uint32{},
-			expectedStartingPoint: StartingPointCurrent,
+			expectedStartingPoint: startingPointCurrent,
 		},
 		{
 			path:                  "1",
 			expectedPath:          []uint32{1},
-			expectedStartingPoint: StartingPointCurrent,
+			expectedStartingPoint: startingPointCurrent,
 		},
 		{
 			path:                  "..",
 			expectedPath:          []uint32{},
-			expectedStartingPoint: StartingPointParent,
+			expectedStartingPoint: startingPointParent,
 		},
 		{
 			path:                  "m",
 			expectedPath:          []uint32{},
-			expectedStartingPoint: StartingPointMaster,
+			expectedStartingPoint: startingPointMaster,
 		},
 		{
 			path:                  "m/1",
 			expectedPath:          []uint32{1},
-			expectedStartingPoint: StartingPointMaster,
+			expectedStartingPoint: startingPointMaster,
 		},
 		{
 			path:                  "m/1/2",
 			expectedPath:          []uint32{1, 2},
-			expectedStartingPoint: StartingPointMaster,
+			expectedStartingPoint: startingPointMaster,
 		},
 		{
 			path:                  "m/1/2'/3",
 			expectedPath:          []uint32{1, 2147483650, 3},
-			expectedStartingPoint: StartingPointMaster,
+			expectedStartingPoint: startingPointMaster,
 		},
 		{
 			path: "m/",
@@ -73,10 +73,10 @@ func TestDecodePath(t *testing.T) {
 
 	for i, s := range scenarios {
 		t.Run(fmt.Sprintf("scenario %d", i), func(t *testing.T) {
-			startingPoint, path, err := decodePath(s.path)
+			startingP, path, err := decodePath(s.path)
 			if s.err == nil {
 				assert.NoError(t, err)
-				assert.Equal(t, s.expectedStartingPoint, startingPoint)
+				assert.Equal(t, s.expectedStartingPoint, startingP)
 				assert.Equal(t, s.expectedPath, path)
 			} else {
 				assert.Equal(t, s.err, err)

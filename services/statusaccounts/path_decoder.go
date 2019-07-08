@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type StartingPoint int
+type startingPoint int
 
 const (
 	tokenMaster    = 0x6D // char m
@@ -19,9 +19,9 @@ const (
 )
 
 const (
-	StartingPointMaster StartingPoint = iota + 1
-	StartingPointCurrent
-	StartingPointParent
+	startingPointMaster startingPoint = iota + 1
+	startingPointCurrent
+	startingPointParent
 )
 
 type parseFunc = func() error
@@ -32,7 +32,7 @@ type pathDecoder struct {
 	f                    parseFunc
 	pos                  int
 	path                 []uint32
-	start                StartingPoint
+	start                startingPoint
 	currentToken         string
 	currentTokenHardened bool
 }
@@ -55,7 +55,7 @@ func (d *pathDecoder) reset() error {
 	}
 
 	d.pos = 0
-	d.start = StartingPointCurrent
+	d.start = startingPointCurrent
 	d.f = d.parseStart
 	d.path = make([]uint32, 0)
 	d.resetCurrentToken()
@@ -68,7 +68,7 @@ func (d *pathDecoder) resetCurrentToken() {
 	d.currentTokenHardened = false
 }
 
-func (d *pathDecoder) parse() (StartingPoint, []uint32, error) {
+func (d *pathDecoder) parse() (startingPoint, []uint32, error) {
 	for {
 		err := d.f()
 		if err != nil {
@@ -112,7 +112,7 @@ func (d *pathDecoder) parseStart() error {
 	}
 
 	if b == tokenMaster {
-		d.start = StartingPointMaster
+		d.start = startingPointMaster
 		d.f = d.parseSeparator
 		return nil
 	}
@@ -125,12 +125,12 @@ func (d *pathDecoder) parseStart() error {
 
 		if b2 == tokenDot {
 			d.f = d.parseSeparator
-			d.start = StartingPointParent
+			d.start = startingPointParent
 			return nil
 		}
 
 		d.f = d.parseSeparator
-		d.start = StartingPointCurrent
+		d.start = startingPointCurrent
 		return d.unreadByte()
 	}
 
@@ -214,7 +214,7 @@ func (d *pathDecoder) parseSegment() error {
 	return nil
 }
 
-func decodePath(str string) (StartingPoint, []uint32, error) {
+func decodePath(str string) (startingPoint, []uint32, error) {
 	d, err := newPathDecoder(str)
 	if err != nil {
 		return 0, nil, err
