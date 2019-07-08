@@ -240,7 +240,7 @@ func (g *generator) store(acc *account, password string) (AccountInfo, error) {
 		}
 	}
 
-	g.reset()
+	g.Reset()
 
 	return acc.toAccountInfo(), nil
 }
@@ -252,7 +252,8 @@ func (g *generator) addAccount(acc *account) string {
 	return id
 }
 
-func (g *generator) reset() {
+// Reset resets the accounts map removing all the accounts from memory.
+func (g *generator) Reset() {
 	g.accounts = make(map[string]*account)
 }
 

@@ -132,7 +132,7 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 		return nil, fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
 	}
 
-	if err := activateStatusAccountsService(stack, config); err != nil {
+	if err := activateStatusAccountsService(stack, config.StatusAccountsConfig); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrStatusAccountsServiceRegistrationFailure, err)
 	}
 
@@ -307,9 +307,9 @@ func activateBrowsersService(stack *node.Node, config params.BrowsersConfig) err
 	})
 }
 
-func activateStatusAccountsService(stack *node.Node, config *params.NodeConfig) error {
-	if !config.EnableStatusAccountsService {
-		logger.Info("Status Accounts service api is disabled")
+func activateStatusAccountsService(stack *node.Node, config params.StatusAccountsConfig) error {
+	if !config.Enabled {
+		logger.Info("StatusAccountsService is disabled")
 		return nil
 	}
 

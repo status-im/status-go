@@ -255,7 +255,6 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		"WSPort": ` + strconv.Itoa(TestConfig.Node.WSPort) + `,
 		"LogLevel": "` + errorLevel + `",
 		"NoDiscovery": true,
-		"EnableStatusAccountsService": true,
 		"LightEthConfig": {
 			"Enabled": true
 		},
@@ -266,6 +265,9 @@ func MakeTestNodeConfig(networkID int) (*params.NodeConfig, error) {
 		},
 		"ShhextConfig": {
 			"BackupDisabledDataDir": "` + testDir + `"
+		},
+		"StatusAccountsConfig": {
+			"Enabled": true
 		}
 	}`
 

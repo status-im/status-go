@@ -19,6 +19,12 @@ func New(accountManager *accounts.Manager) *Service {
 	}
 }
 
+func (s *Service) Reset() {
+	if s.g != nil {
+		s.g.Reset()
+	}
+}
+
 // Start is called when a service is started.
 func (s *Service) Start(*p2p.Server) error {
 	return nil

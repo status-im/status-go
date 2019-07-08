@@ -325,9 +325,6 @@ type NodeConfig struct {
 	// EnableStatusService should be true to enable methods under status namespace.
 	EnableStatusService bool
 
-	// EnableStatusAccountsService should be true to enable methods under statusaccounts namespace.
-	EnableStatusAccountsService bool
-
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
@@ -352,6 +349,9 @@ type NodeConfig struct {
 	// BrowsersConfig extra configuration for browsers.Service.
 	BrowsersConfig BrowsersConfig
 
+	// StatusAccountsConfig add extra configuration for the StatusAccountsService.
+	StatusAccountsConfig StatusAccountsConfig
+
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 
@@ -374,6 +374,11 @@ type WalletConfig struct {
 
 // BrowsersConfig extra configuration for browsers.Service.
 type BrowsersConfig struct {
+	Enabled bool
+}
+
+// StatusAccountsConfig extra configuration for the StatusAccountsService.
+type StatusAccountsConfig struct {
 	Enabled bool
 }
 

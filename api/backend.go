@@ -490,6 +490,7 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 	}
+
 	if b.statusNode.Config().BrowsersConfig.Enabled {
 		svc, err := b.statusNode.BrowsersService()
 		switch err {
@@ -502,6 +503,15 @@ func (b *StatusBackend) Logout() error {
 		default:
 			return err
 		}
+	}
+
+	statusAccountsService, err := b.statusNode.StatusAccountsService()
+	switch err {
+	case node.ErrServiceUnknown:
+	case nil:
+		statusAccountsService.Reset()
+	default:
+		return err
 	}
 
 	b.AccountManager().Logout()
@@ -540,7 +550,16 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 
 	b.AccountManager().RemoveOnboarding()
 
-	err := b.accountManager.SelectAccount(walletAddress, chatAddress, password)
+	statusAccountsService, err := b.statusNode.StatusAccountsService()
+	switch err {
+	case node.ErrServiceUnknown:
+	case nil:
+		statusAccountsService.Reset()
+	default:
+		return err
+	}
+
+	err = b.accountManager.SelectAccount(walletAddress, chatAddress, password)
 	if err != nil {
 		return err
 	}
