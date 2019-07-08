@@ -101,7 +101,7 @@ func (s *AccountsTestSuite) TestImportSingleExtendedKey() {
 	s.NoError(err)
 
 	// import single extended key
-	password := "test-password"
+	password := "test-password-1"
 	addr, _, err := s.Backend.AccountManager().ImportSingleExtendedKey(derivedExtendedKey, password)
 	s.NoError(err)
 
@@ -124,7 +124,7 @@ func (s *AccountsTestSuite) TestImportNormalAccount() {
 	s.NoError(err)
 
 	// import as normal account
-	password := "test-password"
+	password := "test-password-2"
 	addr, err := s.Backend.AccountManager().ImportNormalAccount(privateKey, password)
 	s.NoError(err)
 

@@ -80,7 +80,8 @@ func (s *StatusAccountsAPISuite) TestLoginLogout() {
 	// try Login with empty credential
 	// it won't really log in but it should remove all the account
 	// from memory.
-	s.Backend.SelectAccount("", "", "")
+	err := s.Backend.SelectAccount("", "", "")
+	s.Error(err)
 
 	// all accounts should be in memory
 	checkAccounts(ids, true)
