@@ -1,10 +1,11 @@
 package statusaccounts
 
 import (
+	"bytes"
 	"errors"
-	"reflect"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var ErrInvalidKeystoreExtendedKey = errors.New("PrivateKey and ExtendedKey are different")
@@ -14,7 +15,7 @@ func ValidateKeystoreExtendedKey(key *keystore.Key) error {
 		return nil
 	}
 
-	if !reflect.DeepEqual(key.PrivateKey, key.ExtendedKey.ToECDSA()) {
+	if !bytes.Equal(crypto.FromECDSA(key.PrivateKey), crypto.FromECDSA(key.ExtendedKey.ToECDSA())) {
 		return ErrInvalidKeystoreExtendedKey
 	}
 
