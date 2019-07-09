@@ -237,10 +237,10 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, log t
 	}
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
 	blk, err := d.client.BlockByHash(ctx, log.BlockHash)
+	cancel()
 	if err != nil {
 		return Transfer{}, err
 	}
-	cancel()
 	// TODO(dshulyak) what is the max number of logs?
 	index := [4]byte{}
 	binary.BigEndian.PutUint32(index[:], uint32(log.Index))
