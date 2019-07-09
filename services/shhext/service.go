@@ -214,8 +214,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		PublisherSignalHandler{}.NewMessages(signalMessages)
 	}
 	s.Publisher.Init(persistence.DB, protocolService, onNewMessagesHandler)
-
-	return nil
+	return s.Publisher.Start(s.online, true)
 }
 
 func (s *Service) processReceivedMessages(messages []*whisper.Message) ([]dedup.DeduplicateMessage, error) {
@@ -295,9 +294,6 @@ func (s *Service) Start(server *p2p.Server) error {
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
-	if s.config.PFSEnabled {
-		return s.Publisher.Start(s.online, true)
-	}
 	return nil
 }
 
