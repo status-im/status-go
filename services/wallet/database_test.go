@@ -30,7 +30,7 @@ func TestDBGetHeaderByNumber(t *testing.T) {
 		Difficulty: big.NewInt(1),
 		Time:       1,
 	}
-	require.NoError(t, db.SaveHeader(header))
+	require.NoError(t, db.SaveHeaders([]*types.Header{header}))
 	rst, err := db.GetHeaderByNumber(header.Number)
 	require.NoError(t, err)
 	require.Equal(t, header.Hash(), rst.Hash)
@@ -52,7 +52,7 @@ func TestDBHeaderExists(t *testing.T) {
 		Difficulty: big.NewInt(1),
 		Time:       1,
 	}
-	require.NoError(t, db.SaveHeader(header))
+	require.NoError(t, db.SaveHeaders([]*types.Header{header}))
 	rst, err := db.HeaderExists(header.Hash())
 	require.NoError(t, err)
 	require.True(t, rst)
@@ -104,10 +104,10 @@ func TestDBReorgTransfers(t *testing.T) {
 	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, originalTX, rcpt},
+		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, common.Address{1}, rcpt},
 	}, nil, []*DBHeader{original}, nil, 0))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, replacedTX, rcpt},
+		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, common.Address{1}, rcpt},
 	}, nil, []*DBHeader{replaced}, []*DBHeader{original}, 0))
 
 	all, err := db.GetTransfers(big.NewInt(0), nil)
@@ -166,8 +166,7 @@ func TestDBLatestSynced(t *testing.T) {
 		Difficulty: big.NewInt(1),
 		Time:       1,
 	}
-	require.NoError(t, db.SaveHeader(h1))
-	require.NoError(t, db.SaveHeader(h2))
+	require.NoError(t, db.SaveHeaders([]*types.Header{h1, h2}))
 	require.NoError(t, db.SaveSyncedHeader(address, h1, ethSync))
 	require.NoError(t, db.SaveSyncedHeader(address, h2, ethSync))
 

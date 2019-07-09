@@ -80,6 +80,7 @@ func (r *Reactor) Start() error {
 		return errors.New("already running")
 	}
 	r.group = NewGroup(context.Background())
+	signer := types.NewEIP155Signer(r.chain)
 	// TODO(dshulyak) to support adding accounts in runtime implement keyed group
 	// and export private api to start downloaders from accounts
 	// private api should have access only to reactor
@@ -91,9 +92,9 @@ func (r *Reactor) Start() error {
 		eth: &ETHTransferDownloader{
 			client:   r.client,
 			accounts: r.accounts,
-			signer:   types.NewEIP155Signer(r.chain),
+			signer:   signer,
 		},
-		erc20:       NewERC20TransfersDownloader(r.client, r.accounts),
+		erc20:       NewERC20TransfersDownloader(r.client, r.accounts, signer),
 		feed:        r.feed,
 		safetyDepth: reorgSafetyDepth,
 	}

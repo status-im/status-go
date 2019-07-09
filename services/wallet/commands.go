@@ -68,7 +68,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	if len(transfers) > 0 {
 		// we download all or nothing
 		c.feed.Send(Event{
-			Type:        EventNewBlock,
+			Type:        EventNewHistory,
 			BlockNumber: c.from,
 			Accounts:    []common.Address{c.address},
 		})
@@ -123,7 +123,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		if len(transfers) > 0 {
 			log.Debug("erc20 downloader imported transfers", "len", len(transfers), "time", time.Since(start))
 			c.feed.Send(Event{
-				Type:        EventNewBlock,
+				Type:        EventNewHistory,
 				BlockNumber: c.iterator.Header().Number,
 				Accounts:    []common.Address{c.address},
 			})
@@ -313,7 +313,7 @@ func (c *controlCommand) fastIndex(ctx context.Context, to *DBHeader) error {
 	for _, address := range c.accounts {
 		erc20 := &erc20HistoricalCommand{
 			db:      c.db,
-			erc20:   NewERC20TransfersDownloader(c.client, []common.Address{address}),
+			erc20:   NewERC20TransfersDownloader(c.client, []common.Address{address}, types.NewEIP155Signer(c.chain)),
 			client:  c.client,
 			feed:    c.feed,
 			address: address,
@@ -440,8 +440,9 @@ func headersFromTransfers(transfers []Transfer) []*DBHeader {
 			continue
 		}
 		rst = append(rst, &DBHeader{
-			Hash:   transfers[i].BlockHash,
-			Number: transfers[i].BlockNumber,
+			Hash:      transfers[i].BlockHash,
+			Number:    transfers[i].BlockNumber,
+			Timestamp: transfers[i].Timestamp,
 		})
 	}
 	return rst

@@ -43,7 +43,7 @@ func (s *NewBlocksSuite) SetupTest() {
 	s.cmd = &newBlocksTransfersCommand{
 		db:       s.db,
 		accounts: []common.Address{s.address},
-		erc20:    NewERC20TransfersDownloader(s.backend.Client, []common.Address{s.address}),
+		erc20:    NewERC20TransfersDownloader(s.backend.Client, []common.Address{s.address}, s.backend.Signer),
 		eth: &ETHTransferDownloader{
 			client:   s.backend.Client,
 			signer:   s.backend.Signer,
