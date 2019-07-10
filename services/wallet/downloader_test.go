@@ -138,6 +138,7 @@ type ERC20TransferSuite struct {
 
 func (s *ERC20TransferSuite) SetupTest() {
 	var err error
+	s.signer = types.NewEIP155Signer(big.NewInt(1337))
 	s.identity, err = crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.faucet, err = crypto.GenerateKey()
@@ -150,7 +151,7 @@ func (s *ERC20TransferSuite) SetupTest() {
 	client, err := node.Attach()
 	s.Require().NoError(err)
 	s.ethclient = ethclient.NewClient(client)
-	s.downloader = NewERC20TransfersDownloader(s.ethclient, []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)})
+	s.downloader = NewERC20TransfersDownloader(s.ethclient, []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)}, s.signer)
 
 	_, tx, contract, err := erc20.DeployERC20Transfer(bind.NewKeyedTransactor(s.faucet), s.ethclient)
 	s.Require().NoError(err)
@@ -159,7 +160,6 @@ func (s *ERC20TransferSuite) SetupTest() {
 	_, err = bind.WaitMined(timeout, s.ethclient, tx)
 	s.Require().NoError(err)
 	s.contract = contract
-	s.signer = types.NewEIP155Signer(big.NewInt(1337))
 }
 
 func (s *ERC20TransferSuite) TestNoEvents() {

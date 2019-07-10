@@ -15,25 +15,25 @@ import (
 
 // DBHeader fields from header that are stored in database.
 type DBHeader struct {
-	Number *big.Int
-	Hash   common.Hash
+	Number    *big.Int
+	Hash      common.Hash
+	Timestamp uint64
 	// Head is true if the block was a head at the time it was pulled from chain.
 	Head bool
 }
 
 func toDBHeader(header *types.Header) *DBHeader {
 	return &DBHeader{
-		Hash:   header.Hash(),
-		Number: header.Number,
+		Hash:      header.Hash(),
+		Number:    header.Number,
+		Timestamp: header.Time,
 	}
 }
 
 func toHead(header *types.Header) *DBHeader {
-	return &DBHeader{
-		Hash:   header.Hash(),
-		Number: header.Number,
-		Head:   true,
-	}
+	dbheader := toDBHeader(header)
+	dbheader.Head = true
+	return dbheader
 }
 
 // SyncOption is used to specify that application processed transfers for that block.
@@ -76,7 +76,7 @@ func (i *SQLBigInt) Scan(value interface{}) error {
 // Value implements interface.
 func (i *SQLBigInt) Value() (driver.Value, error) {
 	if !(*big.Int)(i).IsInt64() {
-		return nil, errors.New("not at int64")
+		return nil, errors.New("not an int64")
 	}
 	return (*big.Int)(i).Int64(), nil
 }
@@ -168,12 +168,6 @@ func (db *Database) GetTransfers(start, end *big.Int) (rst []Transfer, err error
 	return query.Scan(rows)
 }
 
-// SaveHeader stores a single header.
-func (db *Database) SaveHeader(header *types.Header) error {
-	_, err := db.db.Exec("INSERT INTO blocks(number, hash) VALUES (?, ?)", (*SQLBigInt)(header.Number), header.Hash())
-	return err
-}
-
 // SaveHeaders stores a list of headers atomically.
 func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	var (
@@ -184,7 +178,7 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	if err != nil {
 		return
 	}
-	insert, err = tx.Prepare("INSERT INTO blocks(number, hash) VALUES (?,?)")
+	insert, err = tx.Prepare("INSERT INTO blocks(number, hash, timestamp) VALUES (?, ?, ?)")
 	if err != nil {
 		return
 	}
@@ -197,7 +191,7 @@ func (db *Database) SaveHeaders(headers []*types.Header) (err error) {
 	}()
 
 	for _, h := range headers {
-		_, err = insert.Exec((*SQLBigInt)(h.Number), h.Hash())
+		_, err = insert.Exec((*SQLBigInt)(h.Number), h.Hash(), h.Time)
 		if err != nil {
 			return
 		}
@@ -302,12 +296,12 @@ func deleteHeaders(creator statementCreator, headers []*DBHeader) error {
 }
 
 func insertHeaders(creator statementCreator, headers []*DBHeader) error {
-	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(hash, number, head) VALUES (?, ?, ?)")
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks(hash, number, timestamp, head) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	for _, h := range headers {
-		_, err = insert.Exec(h.Hash, (*SQLBigInt)(h.Number), h.Head)
+		_, err = insert.Exec(h.Hash, (*SQLBigInt)(h.Number), h.Timestamp, h.Head)
 		if err != nil {
 			return err
 		}
@@ -316,12 +310,12 @@ func insertHeaders(creator statementCreator, headers []*DBHeader) error {
 }
 
 func insertTransfers(creator statementCreator, transfers []Transfer) error {
-	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, address, tx, receipt, type) VALUES (?, ?, ?, ?, ?, ?)")
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, address, tx, sender, receipt, type) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	for _, t := range transfers {
-		_, err = insert.Exec(t.ID, t.BlockHash, t.Address, &JSONBlob{t.Transaction}, &JSONBlob{t.Receipt}, t.Type)
+		_, err = insert.Exec(t.ID, t.BlockHash, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, t.Type)
 		if err != nil {
 			return err
 		}
