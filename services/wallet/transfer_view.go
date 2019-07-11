@@ -20,6 +20,7 @@ func castToTransferViews(transfers []Transfer) []TransferView {
 func castToTransferView(t Transfer) TransferView {
 	view := TransferView{}
 	view.Type = t.Type
+	view.Address = t.Address
 	view.BlockNumber = (*hexutil.Big)(t.BlockNumber)
 	view.BlockHash = t.BlockHash
 	view.Timestamp = hexutil.Uint64(t.Timestamp)
@@ -38,9 +39,7 @@ func castToTransferView(t Transfer) TransferView {
 		view.Value = (*hexutil.Big)(t.Transaction.Value())
 		view.Contract = t.Receipt.ContractAddress
 	case erc20Transfer:
-		if t.Transaction.To() != nil {
-			view.Contract = *t.Transaction.To()
-		}
+		view.Contract = t.Log.Address
 		from, to, amount := parseLog(t.Log)
 		view.From, view.To, view.Value = from, to, (*hexutil.Big)(amount)
 	}
@@ -74,6 +73,7 @@ func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 // encoded in hex.
 type TransferView struct {
 	Type        TransferType   `json:"type"`
+	Address     common.Address `json:"address"`
 	BlockNumber *hexutil.Big   `json:"blockNumber"`
 	BlockHash   common.Hash    `json:"blockhash"`
 	Timestamp   hexutil.Uint64 `json:"timestamp"`
