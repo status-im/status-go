@@ -67,3 +67,17 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, tokens []common
 	}
 	return GetTokensBalances(ctx, api.s.client, accounts, tokens)
 }
+
+func (api *API) AddBrowser(ctx context.Context, browser Browser) error {
+	if api.s.db == nil {
+		return ErrServiceNotInitialized
+	}
+	return api.s.db.InsertBrowser(browser)
+}
+
+func (api *API) GetBrowsers(ctx context.Context) ([]Browser, error) {
+	if api.s.db == nil {
+		return nil, ErrServiceNotInitialized
+	}
+	return api.s.db.GetBrowsers()
+}
