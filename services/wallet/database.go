@@ -360,8 +360,8 @@ type Browser struct {
 	Name         string         `json:"name"`
 	Timestamp    hexutil.Uint64 `json:"timestamp"`
 	Dapp         bool           `json:"dapp"`
-	HistoryIndex hexutil.Uint   `json:"historyIndex"`
-	History      []string       `json:"history"`
+	HistoryIndex hexutil.Uint   `json:"historyIndex,omitempty"`
+	History      []string       `json:"history,omitempty"`
 }
 
 func (db *Database) InsertBrowser(browser Browser) (err error) {
@@ -452,4 +452,9 @@ func (db *Database) GetBrowsers() (rst []Browser, err error) {
 		rst = append(rst, *browser)
 	}
 	return rst, nil
+}
+
+func (db *Database) DeleteBrowser(id string) error {
+	_, err := db.db.Exec("DELETE from browsers WHERE id = ?", id)
+	return err
 }

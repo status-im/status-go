@@ -33,8 +33,13 @@ func TestBrowsers(t *testing.T) {
 	}))
 	browsers, err := api.GetBrowsers(context.TODO())
 	require.NoError(t, err)
+	require.Len(t, browsers, 3)
 	bytes, err := json.Marshal(browsers)
 	require.NoError(t, err)
 	fmt.Println(string(bytes))
+	require.NoError(t, api.DeleteBrowser(context.TODO(), "1"))
+	browsers, err = api.GetBrowsers(context.TODO())
+	require.NoError(t, err)
+	require.Len(t, browsers, 2)
 
 }

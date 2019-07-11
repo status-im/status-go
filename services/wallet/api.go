@@ -81,3 +81,10 @@ func (api *API) GetBrowsers(ctx context.Context) ([]Browser, error) {
 	}
 	return api.s.db.GetBrowsers()
 }
+
+func (api *API) DeleteBrowser(ctx context.Context, id string) error {
+	if api.s.db == nil {
+		return ErrServiceNotInitialized
+	}
+	return api.s.db.DeleteBrowser(id)
+}
