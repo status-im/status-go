@@ -41,7 +41,7 @@ func castToTransferView(t Transfer) TransferView {
 		if t.Transaction.To() != nil {
 			view.Contract = *t.Transaction.To()
 		}
-		from, to, amount := parseLog(t.Receipt.Logs[int(t.Index)])
+		from, to, amount := parseLog(t.Log)
 		view.From, view.To, view.Value = from, to, (*hexutil.Big)(amount)
 	}
 	return view

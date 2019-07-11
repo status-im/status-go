@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -44,9 +43,8 @@ type Transfer struct {
 	// From is derived from tx signature in order to offload this computation from UI component.
 	From    common.Address `json:"from"`
 	Receipt *types.Receipt `json:"receipt"`
-	// Index is used if same transaction has several transfers.
-	// For erc20 index refers to a log index in receipt.
-	Index uint `json:"index"`
+	// Log that was used to generate erc20 transfer. Nil for eth transfer.
+	Log *types.Log `json:"log"`
 }
 
 // ETHTransferDownloader downloads regular eth transfers.
@@ -199,9 +197,6 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlo
 	if err != nil {
 		return Transfer{}, err
 	}
-	if int(ethlog.Index) > len(receipt.Logs)-1 {
-		return Transfer{}, fmt.Errorf("log index %d is not set in receipt for tx %s", ethlog.Index, receipt.TxHash)
-	}
 	index := [4]byte{}
 	binary.BigEndian.PutUint32(index[:], uint32(ethlog.Index))
 	id := crypto.Keccak256Hash(ethlog.TxHash.Bytes(), index[:])
@@ -215,7 +210,7 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlo
 		From:        from,
 		Receipt:     receipt,
 		Timestamp:   blk.Time(),
-		Index:       ethlog.Index,
+		Log:         &ethlog,
 	}, nil
 }
 
@@ -223,6 +218,9 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	concurrent := NewConcurrentDownloader(parent)
 	for i := range logs {
 		l := logs[i]
+		if l.Removed {
+			continue
+		}
 		concurrent.Add(func(ctx context.Context) error {
 			transfer, err := d.transferFromLog(ctx, l, address)
 			if err != nil {
@@ -237,7 +235,7 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	case <-parent.Done():
 		return nil, errors.New("logs downloader stuck")
 	}
-	return concurrent.Get(), nil
+	return concurrent.Get(), concurrent.Error()
 }
 
 // GetTransfers for erc20 uses eth_getLogs rpc with Transfer event signature and our address acount.
