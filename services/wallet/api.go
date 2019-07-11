@@ -27,7 +27,7 @@ type API struct {
 // GetTransfers returns transfers in range of blocks. If `end` is nil all transfers from `start` will be returned.
 // TODO(dshulyak) benchmark loading many transfers from database. We can avoid json unmarshal/marshal if we will
 // read header, tx and receipt as a raw json.
-func (api *API) GetTransfers(ctx context.Context, start, end *hexutil.Big) ([]Transfer, error) {
+func (api *API) GetTransfers(ctx context.Context, start, end *hexutil.Big) ([]TransferView, error) {
 	log.Debug("call to get transfers", "start", start, "end", end)
 	if start == nil {
 		return nil, errors.New("start of the query must be provided. use 0 if you want to load all transfers")
@@ -40,11 +40,11 @@ func (api *API) GetTransfers(ctx context.Context, start, end *hexutil.Big) ([]Tr
 		return nil, err
 	}
 	log.Debug("result from database for transfers", "start", start, "end", end, "len", len(rst))
-	return rst, nil
+	return castToTransferViews(rst), nil
 }
 
 // GetTransfersByAddress returns transfers for a single address between two blocks.
-func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, start, end *hexutil.Big) ([]Transfer, error) {
+func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, start, end *hexutil.Big) ([]TransferView, error) {
 	log.Debug("call to get transfers for an address", "address", address, "start", start, "end", end)
 	if start == nil {
 		return nil, errors.New("start of the query must be provided. use 0 if you want to load all transfers")
@@ -57,7 +57,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 		return nil, err
 	}
 	log.Debug("result from database for address", "address", address, "start", start, "end", end, "len", len(rst))
-	return rst, nil
+	return castToTransferViews(rst), nil
 }
 
 // GetTokensBalances return mapping of token balances for every account.

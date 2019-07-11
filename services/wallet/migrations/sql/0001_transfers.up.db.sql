@@ -5,6 +5,7 @@ blk_hash VARCHAR NOT NULL,
 tx BLOB,
 sender VARCHAR NOT NULL,
 receipt BLOB,
+transferIndex UNSIGNED INT,
 type VARCHAR NOT NULL,
 FOREIGN KEY(blk_hash) REFERENCES blocks(hash) ON DELETE CASCADE,
 CONSTRAINT unique_transfer_on_hash_address UNIQUE (hash,address)
