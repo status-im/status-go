@@ -1,7 +1,9 @@
 package wallet
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"math/big"
 
@@ -80,6 +82,21 @@ func (api *API) GetBrowsers(ctx context.Context) ([]Browser, error) {
 		return nil, ErrServiceNotInitialized
 	}
 	return api.s.db.GetBrowsers()
+}
+
+func (api *API) GetBrowsersTransit(ctx context.Context) (json.RawMessage, error) {
+	browsers, err := api.GetBrowsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	enc := NewEncoder(buf)
+	err = enc.Encode(browsers)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(buf.Bytes()), nil
+
 }
 
 func (api *API) DeleteBrowser(ctx context.Context, id string) error {
