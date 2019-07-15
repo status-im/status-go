@@ -63,3 +63,8 @@ func (api *API) StoreDerivedAccounts(ctx context.Context, accountID string, pass
 func (api *API) LoadAccount(ctx context.Context, address string, password string) (IdentifiedAccountInfo, error) {
 	return api.s.g.loadAccount(address, password)
 }
+
+// Reset resets the accounts mapping removing all the keys from memory.
+func (api *API) Reset(ctx context.Context) {
+	api.s.g.Reset()
+}
