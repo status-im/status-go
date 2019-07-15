@@ -19,6 +19,7 @@ func castToTransferViews(transfers []Transfer) []TransferView {
 
 func castToTransferView(t Transfer) TransferView {
 	view := TransferView{}
+	view.ID = t.ID
 	view.Type = t.Type
 	view.Address = t.Address
 	view.BlockNumber = (*hexutil.Big)(t.BlockNumber)
@@ -28,6 +29,7 @@ func castToTransferView(t Transfer) TransferView {
 	view.GasLimit = hexutil.Uint64(t.Transaction.Gas())
 	view.GasUsed = hexutil.Uint64(t.Receipt.GasUsed)
 	view.Nonce = hexutil.Uint64(t.Transaction.Nonce())
+	view.TxStatus = hexutil.Uint64(t.Receipt.Status)
 	view.Input = hexutil.Bytes(t.Transaction.Data())
 	view.TxHash = t.Transaction.Hash()
 	switch t.Type {
@@ -72,6 +74,7 @@ func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 // TransferView stores only fields used by a client and ensures that all relevant fields are
 // encoded in hex.
 type TransferView struct {
+	ID          common.Hash    `json:"id"`
 	Type        TransferType   `json:"type"`
 	Address     common.Address `json:"address"`
 	BlockNumber *hexutil.Big   `json:"blockNumber"`
@@ -81,6 +84,7 @@ type TransferView struct {
 	GasLimit    hexutil.Uint64 `json:"gasLimit"`
 	GasUsed     hexutil.Uint64 `json:"gasUsed"`
 	Nonce       hexutil.Uint64 `json:"nonce"`
+	TxStatus    hexutil.Uint64 `json:"txStatus"`
 	Input       hexutil.Bytes  `json:"input"`
 	TxHash      common.Hash    `json:"txHash"`
 	Value       *hexutil.Big   `json:"value"`

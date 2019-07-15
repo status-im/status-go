@@ -48,7 +48,9 @@ List of objects like:
 
 ```
 [
+
   {
+    "id": "0xac14e5fb9a81fd7d0517e51e23c4f3a8040459bfe0c4bee97b813db2d0438e2e",
     "type": "eth",
     "blockNumber": "0x1",
     "blockhash": "0x1471b02682f2308ce74314d89009251afb1f2d5dedc6835d069b1ad6edf98257",
@@ -58,6 +60,7 @@ List of objects like:
     "gasUsed": "0x5208",
     "nonce": "0x0",
     "input": "0x",
+    "txStatus": "0x1",
     "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "value": "0xde0b6b3a7640000",
     "from": "0xd1c9bfa31ae8c085ba4672b165151245b9bfc25e",
@@ -65,6 +68,7 @@ List of objects like:
     "contract": "0x0000000000000000000000000000000000000000"
   },
   {
+    "id": "0x2629ee5f443d558ee4ae9e1cf202d76c04e262051b8d8acde7b766bb9d95068e",
     "type": "erc20",
     "blockNumber": "0x2",
     "blockhash": "0x046ad915b86a5eaa6026c8cdd09ea2f09fd3e603dd6e1ea86e8318f4a4b7d4e0",
@@ -73,6 +77,7 @@ List of objects like:
     "gasLimit": "0xb0b8",
     "gasUsed": "0xb0b8",
     "nonce": "0x1",
+    "txStatus": "0x1",
     "input": "0xa9059cbb000000000000000000000000f759c6683dfc5dad899eb86529dfaf4d0b25af1b0000000000000000000000000000000000000000000000000000000000000064",
     "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "value": "0x64",
