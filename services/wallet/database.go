@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/status-im/status-go/services/wallet/migrations"
 	"github.com/status-im/status-go/sqlite"
@@ -353,108 +352,4 @@ func updateAccounts(creator statementCreator, accounts []common.Address, headers
 		}
 	}
 	return nil
-}
-
-type Browser struct {
-	ID           string         `json:"id"`
-	Name         string         `json:"name"`
-	Timestamp    hexutil.Uint64 `json:"timestamp"`
-	Dapp         bool           `json:"dapp"`
-	HistoryIndex hexutil.Uint   `json:"historyIndex,omitempty"`
-	History      []string       `json:"history,omitempty"`
-}
-
-func (db *Database) InsertBrowser(browser Browser) (err error) {
-	var (
-		tx     *sql.Tx
-		insert *sql.Stmt
-	)
-	tx, err = db.db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-	insert, err = tx.Prepare("INSERT INTO browsers(id, name, timestamp, dapp, historyIndex) VALUES(?, ?, ?, ?, ?)")
-	if err != nil {
-		return
-	}
-	_, err = insert.Exec(browser.ID, browser.Name, browser.Timestamp, browser.Dapp, browser.HistoryIndex)
-	insert.Close()
-	if err != nil {
-		return
-	}
-	insert, err = tx.Prepare("INSERT INTO browsers_history(browser_id, history) VALUES(?, ?)")
-	if err != nil {
-		return
-	}
-	defer insert.Close()
-	for _, history := range browser.History {
-		_, err = insert.Exec(browser.ID, history)
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-func (db *Database) GetBrowsers() (rst []Browser, err error) {
-	var (
-		tx   *sql.Tx
-		rows *sql.Rows
-	)
-	tx, err = db.db.Begin()
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		_ = tx.Rollback()
-	}()
-	rows, err = tx.Query("SELECT id, name, timestamp, dapp, historyIndex FROM browsers")
-	if err != nil {
-		return
-	}
-	browsers := map[string]*Browser{}
-	for rows.Next() {
-		browser := Browser{}
-		err = rows.Scan(&browser.ID, &browser.Name, &browser.Timestamp, &browser.Dapp, &browser.HistoryIndex)
-		if err != nil {
-			return nil, err
-		}
-		browsers[browser.ID] = &browser
-	}
-	rows, err = tx.Query("SELECT browser_id, history from browsers_history")
-	if err != nil {
-		return
-	}
-	var (
-		id      string
-		history string
-	)
-	for rows.Next() {
-		err = rows.Scan(&id, &history)
-		if err != nil {
-			return
-		}
-		browsers[id].History = append(browsers[id].History, history)
-	}
-	rst = make([]Browser, 0, len(browsers))
-	for _, browser := range browsers {
-		rst = append(rst, *browser)
-	}
-	return rst, nil
-}
-
-func (db *Database) DeleteBrowser(id string) error {
-	_, err := db.db.Exec("DELETE from browsers WHERE id = ?", id)
-	return err
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
@@ -591,8 +592,19 @@ func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
 	return
 }
 
-// WalletService returns wallet.Service instance if it is started.
+// WalletService returns wallet.Service instance if it was started.
 func (n *StatusNode) WalletService() (s *wallet.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+	return
+}
+
+// BrowsersService returns browsers.Service instance if it was started.
+func (n *StatusNode) BrowsersService() (s *browsers.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	err = n.gethService(&s)

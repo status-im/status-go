@@ -486,6 +486,20 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 	}
+	if b.statusNode.Config().BrowsersConfig.Enabled {
+		svc, err := b.statusNode.BrowsersService()
+		switch err {
+		case node.ErrServiceUnknown:
+		case nil:
+			err = svc.StopDatabase()
+			if err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+	}
+
 	b.AccountManager().Logout()
 
 	return nil
@@ -553,7 +567,11 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 			return err
 		}
 	}
-	return b.startWallet(password)
+	err = b.startWallet(password)
+	if err != nil {
+		return err
+	}
+	return b.startBrowsers(password)
 }
 
 func (b *StatusBackend) startWallet(password string) error {
@@ -573,6 +591,22 @@ func (b *StatusBackend) startWallet(password string) error {
 		b.statusNode.RPCClient().Ethclient(),
 		[]common.Address{account.Address},
 		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
+}
+
+func (b *StatusBackend) startBrowsers(password string) error {
+	if !b.statusNode.Config().BrowsersConfig.Enabled {
+		return nil
+	}
+	svc, err := b.statusNode.BrowsersService()
+	if err != nil {
+		return err
+	}
+	account, err := b.accountManager.SelectedWalletAccount()
+	if err != nil {
+		return err
+	}
+	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("browsers-%x.sql", account.Address))
+	return svc.StartDatabase(path, password)
 }
 
 // SendDataNotification sends data push notifications to users.
