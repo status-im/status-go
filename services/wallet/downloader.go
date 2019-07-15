@@ -3,14 +3,12 @@ package wallet
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -45,50 +43,8 @@ type Transfer struct {
 	// From is derived from tx signature in order to offload this computation from UI component.
 	From    common.Address `json:"from"`
 	Receipt *types.Receipt `json:"receipt"`
-}
-
-func (t Transfer) MarshalJSON() ([]byte, error) {
-	m := transferMarshaling{}
-	m.Type = t.Type
-	m.Address = t.Address
-	m.BlockNumber = (*hexutil.Big)(t.BlockNumber)
-	m.BlockHash = t.BlockHash
-	m.Timestamp = hexutil.Uint64(t.Timestamp)
-	m.Transaction = t.Transaction
-	m.From = t.From
-	m.Receipt = t.Receipt
-	return json.Marshal(m)
-}
-
-func (t *Transfer) UnmarshalJSON(input []byte) error {
-	m := transferMarshaling{}
-	err := json.Unmarshal(input, &m)
-	if err != nil {
-		return err
-	}
-	t.Type = m.Type
-	t.Address = m.Address
-	t.BlockNumber = (*big.Int)(m.BlockNumber)
-	t.BlockHash = m.BlockHash
-	t.Timestamp = uint64(m.Timestamp)
-	t.Transaction = m.Transaction
-	m.From = t.From
-	m.Receipt = t.Receipt
-	return nil
-}
-
-// transferMarshaling ensures that all integers will be marshalled with hexutil
-// to be consistent with types.Transaction and types.Receipt.
-type transferMarshaling struct {
-	Type        TransferType       `json:"type"`
-	Address     common.Address     `json:"address"`
-	BlockNumber *hexutil.Big       `json:"blockNumber"`
-	BlockHash   common.Hash        `json:"blockhash"`
-	Timestamp   hexutil.Uint64     `json:"timestamp"`
-	Transaction *types.Transaction `json:"transaction"`
-	// From is derived from tx signature in order to offload this computation from UI component.
-	From    common.Address `json:"from"`
-	Receipt *types.Receipt `json:"receipt"`
+	// Log that was used to generate erc20 transfer. Nil for eth transfer.
+	Log *types.Log `json:"log"`
 }
 
 // ETHTransferDownloader downloads regular eth transfers.
@@ -218,9 +174,9 @@ func (d *ERC20TransfersDownloader) outboundTopics(address common.Address) [][]co
 	return [][]common.Hash{{d.signature}, {d.paddedAddress(address)}, {}}
 }
 
-func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, log types.Log, address common.Address) (Transfer, error) {
+func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, ethlog types.Log, address common.Address) (Transfer, error) {
 	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-	tx, _, err := d.client.TransactionByHash(ctx, log.TxHash)
+	tx, _, err := d.client.TransactionByHash(ctx, ethlog.TxHash)
 	cancel()
 	if err != nil {
 		return Transfer{}, err
@@ -230,31 +186,31 @@ func (d *ERC20TransfersDownloader) transferFromLog(parent context.Context, log t
 		return Transfer{}, err
 	}
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	receipt, err := d.client.TransactionReceipt(ctx, log.TxHash)
+	receipt, err := d.client.TransactionReceipt(ctx, ethlog.TxHash)
 	cancel()
 	if err != nil {
 		return Transfer{}, err
 	}
 	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	blk, err := d.client.BlockByHash(ctx, log.BlockHash)
+	blk, err := d.client.BlockByHash(ctx, ethlog.BlockHash)
 	cancel()
 	if err != nil {
 		return Transfer{}, err
 	}
-	// TODO(dshulyak) what is the max number of logs?
 	index := [4]byte{}
-	binary.BigEndian.PutUint32(index[:], uint32(log.Index))
-	id := crypto.Keccak256Hash(log.TxHash.Bytes(), index[:])
+	binary.BigEndian.PutUint32(index[:], uint32(ethlog.Index))
+	id := crypto.Keccak256Hash(ethlog.TxHash.Bytes(), index[:])
 	return Transfer{
 		Address:     address,
 		ID:          id,
 		Type:        erc20Transfer,
-		BlockNumber: new(big.Int).SetUint64(log.BlockNumber),
-		BlockHash:   log.BlockHash,
+		BlockNumber: new(big.Int).SetUint64(ethlog.BlockNumber),
+		BlockHash:   ethlog.BlockHash,
 		Transaction: tx,
 		From:        from,
 		Receipt:     receipt,
 		Timestamp:   blk.Time(),
+		Log:         &ethlog,
 	}, nil
 }
 
@@ -262,6 +218,9 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	concurrent := NewConcurrentDownloader(parent)
 	for i := range logs {
 		l := logs[i]
+		if l.Removed {
+			continue
+		}
 		concurrent.Add(func(ctx context.Context) error {
 			transfer, err := d.transferFromLog(ctx, l, address)
 			if err != nil {
@@ -276,7 +235,7 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	case <-parent.Done():
 		return nil, errors.New("logs downloader stuck")
 	}
-	return concurrent.Get(), nil
+	return concurrent.Get(), concurrent.Error()
 }
 
 // GetTransfers for erc20 uses eth_getLogs rpc with Transfer event signature and our address acount.

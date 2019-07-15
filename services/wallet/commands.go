@@ -110,7 +110,7 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 		transfers, err := c.iterator.Next(ctx)
 		if err != nil {
 			log.Error("failed to get next batch", "error", err)
-			break
+			return err
 		}
 		headers := headersFromTransfers(transfers)
 		headers = append(headers, c.iterator.Header())

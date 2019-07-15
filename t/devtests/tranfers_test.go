@@ -49,7 +49,7 @@ func (s *TransfersSuite) TearDownTest() {
 	s.DevNodeSuite.TearDownTest()
 }
 
-func (s *TransfersSuite) getAllTranfers() (rst []wallet.Transfer, err error) {
+func (s *TransfersSuite) getAllTranfers() (rst []wallet.TransferView, err error) {
 	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.Address, (*hexutil.Big)(big.NewInt(0)))
 }
 

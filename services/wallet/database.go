@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -88,6 +89,9 @@ type JSONBlob struct {
 
 // Scan implements interface.
 func (blob *JSONBlob) Scan(value interface{}) error {
+	if value == nil || reflect.ValueOf(blob.data).IsNil() {
+		return nil
+	}
 	bytes, ok := value.([]byte)
 	if !ok {
 		return errors.New("not a byte slice")
@@ -101,6 +105,9 @@ func (blob *JSONBlob) Scan(value interface{}) error {
 
 // Value implements interface.
 func (blob *JSONBlob) Value() (driver.Value, error) {
+	if blob.data == nil || reflect.ValueOf(blob.data).IsNil() {
+		return nil, nil
+	}
 	return json.Marshal(blob.data)
 }
 
@@ -310,12 +317,12 @@ func insertHeaders(creator statementCreator, headers []*DBHeader) error {
 }
 
 func insertTransfers(creator statementCreator, transfers []Transfer) error {
-	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, address, tx, sender, receipt, type) VALUES (?, ?, ?, ?, ?, ?, ?)")
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(hash, blk_hash, address, tx, sender, receipt, log, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	for _, t := range transfers {
-		_, err = insert.Exec(t.ID, t.BlockHash, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, t.Type)
+		_, err = insert.Exec(t.ID, t.BlockHash, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type)
 		if err != nil {
 			return err
 		}

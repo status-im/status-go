@@ -104,10 +104,10 @@ func TestDBReorgTransfers(t *testing.T) {
 	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, common.Address{1}, rcpt},
+		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, common.Address{1}, rcpt, nil},
 	}, nil, []*DBHeader{original}, nil, 0))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, common.Address{1}, rcpt},
+		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, common.Address{1}, rcpt, nil},
 	}, nil, []*DBHeader{replaced}, []*DBHeader{original}, 0))
 
 	all, err := db.GetTransfers(big.NewInt(0), nil)
