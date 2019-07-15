@@ -31,9 +31,9 @@ func (a *account) toIdentifiedAccountInfo(id string) IdentifiedAccountInfo {
 	}
 }
 
-func (a *account) toCreatedAccountInfo(id string, mnemonic string) CreatedAccountInfo {
+func (a *account) toGeneratedAccountInfo(id string, mnemonic string) GeneratedAccountInfo {
 	idInfo := a.toIdentifiedAccountInfo(id)
-	return CreatedAccountInfo{
+	return GeneratedAccountInfo{
 		IdentifiedAccountInfo: idInfo,
 		Mnemonic:              mnemonic,
 	}
@@ -51,8 +51,21 @@ type IdentifiedAccountInfo struct {
 	ID string `json:"id"`
 }
 
-// CreatedAccountInfo contains IdentifiedAccountInfo and the mnemonic of an account.
-type CreatedAccountInfo struct {
+// GeneratedAccountInfo contains IdentifiedAccountInfo and the mnemonic of an account.
+type GeneratedAccountInfo struct {
 	IdentifiedAccountInfo
 	Mnemonic string `json:"mnemonic"`
+}
+
+func (a GeneratedAccountInfo) toGeneratedAndDerived(derived map[string]AccountInfo) GeneratedAndDerivedAccountInfo {
+	return GeneratedAndDerivedAccountInfo{
+		GeneratedAccountInfo: a,
+		Derived:              derived,
+	}
+}
+
+// GeneratedAndDerivedAccountInfo contains GeneratedAccountInfo and derived AccountInfo mapped by derivation path.
+type GeneratedAndDerivedAccountInfo struct {
+	GeneratedAccountInfo
+	Derived map[string]AccountInfo `json:"derived"`
 }

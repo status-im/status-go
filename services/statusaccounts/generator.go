@@ -33,13 +33,13 @@ func (g *generator) setAccountManager(am *staccount.Manager) {
 	g.am = am
 }
 
-func (g *generator) generate(mnemonicPhraseLength int, n int, bip39Passphrase string) ([]CreatedAccountInfo, error) {
+func (g *generator) generate(mnemonicPhraseLength int, n int, bip39Passphrase string) ([]GeneratedAccountInfo, error) {
 	entropyStrength, err := staccount.MnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
 	}
 
-	infos := make([]CreatedAccountInfo, 0)
+	infos := make([]GeneratedAccountInfo, 0)
 
 	for i := 0; i < n; i++ {
 		mnemonic := extkeys.NewMnemonic()
@@ -90,11 +90,11 @@ func (g *generator) importJSONKey(json string, password string) (IdentifiedAccou
 	return acc.toIdentifiedAccountInfo(id), nil
 }
 
-func (g *generator) importMnemonic(mnemonicPhrase string, bip39Passphrase string) (CreatedAccountInfo, error) {
+func (g *generator) importMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
 	mnemonic := extkeys.NewMnemonic()
 	masterExtendedKey, err := extkeys.NewMaster(mnemonic.MnemonicSeed(mnemonicPhrase, bip39Passphrase))
 	if err != nil {
-		return CreatedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
+		return GeneratedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
 
 	acc := &account{
@@ -104,7 +104,28 @@ func (g *generator) importMnemonic(mnemonicPhrase string, bip39Passphrase string
 
 	id := g.addAccount(acc)
 
-	return acc.toCreatedAccountInfo(id, mnemonicPhrase), nil
+	return acc.toGeneratedAccountInfo(id, mnemonicPhrase), nil
+}
+
+func (g *generator) generateAndDeriveAddresses(mnemonicPhraseLength int, n int, bip39Passphrase string, pathStrings []string) ([]GeneratedAndDerivedAccountInfo, error) {
+	masterAccounts, err := g.generate(mnemonicPhraseLength, n, bip39Passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	accs := make([]GeneratedAndDerivedAccountInfo, n)
+
+	for i := 0; i < len(masterAccounts); i++ {
+		acc := masterAccounts[i]
+		derived, err := g.deriveAddresses(acc.ID, pathStrings)
+		if err != nil {
+			return nil, err
+		}
+
+		accs[i] = acc.toGeneratedAndDerived(derived)
+	}
+
+	return accs, nil
 }
 
 func (g *generator) deriveAddresses(accountID string, pathStrings []string) (map[string]AccountInfo, error) {

@@ -10,15 +10,20 @@ type API struct {
 
 // Generate generates n accounts identified by mnemonic phrases with mnemonicPhraseLength words
 // and using bip39Passphrase as extra entropy if needed.
-// A slice of CreatedAccountInfo is returned with each account identified by an ID, a public key, and an address.
+// A slice of GeneratedAccountInfo is returned with each account identified by an ID, a public key, and an address.
 // Keys are kept in memory until explicitly stored.
-func (api *API) Generate(ctx context.Context, mnemonicPhraseLength int, n int, bip39Passphrase string) ([]CreatedAccountInfo, error) {
+func (api *API) Generate(ctx context.Context, mnemonicPhraseLength int, n int, bip39Passphrase string) ([]GeneratedAccountInfo, error) {
 	return api.s.g.generate(mnemonicPhraseLength, n, bip39Passphrase)
+}
+
+// GenerateAndDeriveAddresses combines Generate and DeriveAddresses in one call.
+func (api *API) GenerateAndDeriveAddresses(ctx context.Context, mnemonicPhraseLength int, n int, bip39Passphrase string, paths []string) ([]GeneratedAndDerivedAccountInfo, error) {
+	return api.s.g.generateAndDeriveAddresses(mnemonicPhraseLength, n, bip39Passphrase, paths)
 }
 
 // ImportMnemonic generates a master key from mnemonicPhrase and bip39Passphrase and keeps it in memory
 // until explicitly stored.
-func (api *API) ImportMnemonic(ctx context.Context, mnemonicPhrase string, bip39Passphrase string) (CreatedAccountInfo, error) {
+func (api *API) ImportMnemonic(ctx context.Context, mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
 	return api.s.g.importMnemonic(mnemonicPhrase, bip39Passphrase)
 }
 
