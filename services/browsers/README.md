@@ -29,7 +29,7 @@ All fields are specified below:
 {
   "id": "1",
   "name": "first",
-  "timestamp": "10,
+  "timestamp": 10,
   "dapp": true,
   "historyIndex": 1,
   "history": [
