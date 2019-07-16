@@ -23,15 +23,15 @@ Enabling service will expose three additional methods:
 #### browsers_addBrowser
 
 Stores browser in the database.
-All fields are specified below, integers are encoded in hex.
+All fields are specified below:
 
 ```json
 {
   "id": "1",
   "name": "first",
-  "timestamp": "0xa",
+  "timestamp": "10,
   "dapp": true,
-  "historyIndex": "0x1",
+  "historyIndex": 1,
   "history": [
     "one",
     "two"

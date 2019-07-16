@@ -7,7 +7,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,22 +35,21 @@ func TestBrowsersOrderedNewestFirst(t *testing.T) {
 			ID:        "1",
 			Name:      "first",
 			Dapp:      true,
-			Timestamp: hexutil.Uint64(10),
+			Timestamp: 10,
 		},
 		{
 			ID:        "2",
 			Name:      "second",
 			Dapp:      true,
-			Timestamp: hexutil.Uint64(50),
+			Timestamp: 50,
 		},
 		{
 			ID:        "3",
 			Name:      "third",
 			Dapp:      true,
-			Timestamp: hexutil.Uint64(100),
+			Timestamp: 100,
 		},
 	}
-	// insert in reverse order for a clean test
 	for i := 0; i < len(browsers); i++ {
 		require.NoError(t, api.AddBrowser(context.TODO(), *browsers[i]))
 	}
@@ -73,8 +71,8 @@ func TestBrowsersHistoryIncluded(t *testing.T) {
 		ID:           "1",
 		Name:         "first",
 		Dapp:         true,
-		Timestamp:    hexutil.Uint64(10),
-		HistoryIndex: hexutil.Uint(1),
+		Timestamp:    10,
+		HistoryIndex: 1,
 		History:      []string{"one", "two"},
 	}
 	require.NoError(t, api.AddBrowser(context.TODO(), *browser))
@@ -92,13 +90,13 @@ func TestBrowsersReplaceOnUpdate(t *testing.T) {
 		ID:        "1",
 		Name:      "first",
 		Dapp:      true,
-		Timestamp: hexutil.Uint64(10),
+		Timestamp: 10,
 		History:   []string{"one", "two"},
 	}
 	require.NoError(t, api.AddBrowser(context.TODO(), *browser))
 	browser.Dapp = false
 	browser.History = []string{"one", "three"}
-	browser.Timestamp = hexutil.Uint64(107)
+	browser.Timestamp = 107
 	require.NoError(t, api.AddBrowser(context.TODO(), *browser))
 	rst, err := api.GetBrowsers(context.TODO())
 	require.NoError(t, err)
@@ -114,7 +112,7 @@ func TestDeleteBrowser(t *testing.T) {
 		ID:        "1",
 		Name:      "first",
 		Dapp:      true,
-		Timestamp: hexutil.Uint64(10),
+		Timestamp: 10,
 		History:   []string{"one", "two"},
 	}
 

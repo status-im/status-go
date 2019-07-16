@@ -3,12 +3,11 @@ package browsers
 import (
 	"database/sql"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/browsers/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
 
-// Database sql wrapper for operations with wallet objects.
+// Database sql wrapper for operations with browser objects.
 type Database struct {
 	db *sql.DB
 }
@@ -32,12 +31,12 @@ func InitializeDB(path, password string) (*Database, error) {
 }
 
 type Browser struct {
-	ID           string         `json:"id"`
-	Name         string         `json:"name"`
-	Timestamp    hexutil.Uint64 `json:"timestamp"`
-	Dapp         bool           `json:"dapp"`
-	HistoryIndex hexutil.Uint   `json:"historyIndex,omitempty"`
-	History      []string       `json:"history,omitempty"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Timestamp    uint64   `json:"timestamp"`
+	Dapp         bool     `json:"dapp"`
+	HistoryIndex int      `json:"historyIndex,omitempty"`
+	History      []string `json:"history,omitempty"`
 }
 
 func (db *Database) InsertBrowser(browser Browser) (err error) {
