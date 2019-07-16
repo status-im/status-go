@@ -12,9 +12,9 @@ import (
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
-	tmpfile, err := ioutil.TempFile("", "wallet-tests-")
+	tmpfile, err := ioutil.TempFile("", "browsers-tests-")
 	require.NoError(t, err)
-	db, err := InitializeDB(tmpfile.Name(), "wallet-tests")
+	db, err := InitializeDB(tmpfile.Name(), "browsers-tests")
 	require.NoError(t, err)
 	return db, func() {
 		require.NoError(t, db.Close())
@@ -70,12 +70,35 @@ func TestBrowsersHistoryIncluded(t *testing.T) {
 	defer cancel()
 
 	browser := &Browser{
+		ID:           "1",
+		Name:         "first",
+		Dapp:         true,
+		Timestamp:    hexutil.Uint64(10),
+		HistoryIndex: hexutil.Uint(1),
+		History:      []string{"one", "two"},
+	}
+	require.NoError(t, api.AddBrowser(context.TODO(), *browser))
+	rst, err := api.GetBrowsers(context.TODO())
+	require.NoError(t, err)
+	require.Len(t, rst, 1)
+	require.Equal(t, browser, rst[0])
+}
+
+func TestBrowsersReplaceOnUpdate(t *testing.T) {
+	api, cancel := setupTestAPI(t)
+	defer cancel()
+
+	browser := &Browser{
 		ID:        "1",
 		Name:      "first",
 		Dapp:      true,
 		Timestamp: hexutil.Uint64(10),
 		History:   []string{"one", "two"},
 	}
+	require.NoError(t, api.AddBrowser(context.TODO(), *browser))
+	browser.Dapp = false
+	browser.History = []string{"one", "three"}
+	browser.Timestamp = hexutil.Uint64(107)
 	require.NoError(t, api.AddBrowser(context.TODO(), *browser))
 	rst, err := api.GetBrowsers(context.TODO())
 	require.NoError(t, err)

@@ -56,7 +56,7 @@ func (db *Database) InsertBrowser(browser Browser) (err error) {
 		}
 		_ = tx.Rollback()
 	}()
-	insert, err = tx.Prepare("INSERT INTO browsers(id, name, timestamp, dapp, historyIndex) VALUES(?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT OR REPLACE INTO browsers(id, name, timestamp, dapp, historyIndex) VALUES(?, ?, ?, ?, ?)")
 	if err != nil {
 		return
 	}
