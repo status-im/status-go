@@ -9,20 +9,21 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/status-im/status-go/services/shhext/dedup"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/messaging/filter"
-	"github.com/status-im/status-go/messaging/multidevice"
-	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
+
+	"github.com/status-im/status-protocol-go/encryption/multidevice"
+	"github.com/status-im/status-protocol-go/transport/whisper/filter"
 )
 
 const (
@@ -186,18 +187,6 @@ func NewPublicAPI(s *Service) *PublicAPI {
 		publicAPI: whisper.NewPublicWhisperAPI(s.w),
 		log:       log.New("package", "status-go/services/sshext.PublicAPI"),
 	}
-}
-
-// Post shamelessly copied from whisper codebase with slight modifications.
-func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hexutil.Bytes, error) {
-	hexID, err := api.publicAPI.Post(ctx, req)
-	if err == nil {
-		api.service.envelopesMonitor.Add(common.BytesToHash(hexID), req)
-	} else {
-		return nil, err
-	}
-	mID := messageID(req)
-	return mID[:], err
 }
 
 func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
@@ -409,14 +398,13 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 	}
 }
 
-// GetNewFilterMessages is a prototype method with deduplication
+// GetNewFilterMessages is a prototype method with deduplication.
 func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.DeduplicateMessage, error) {
-	msgs, err := api.publicAPI.GetFilterMessages(filterID)
+	messages, err := api.publicAPI.GetFilterMessages(filterID)
 	if err != nil {
 		return nil, err
 	}
-
-	return api.service.processReceivedMessages(msgs)
+	return api.service.deduplicator.Deduplicate(messages), nil
 }
 
 // ConfirmMessagesProcessed is a method to confirm that messages was consumed by
@@ -443,47 +431,49 @@ func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) (err
 
 // ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
 // the client side.
+// TODO: this is broken now as it requires dedup ID while a message hash should be used.
 func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
-	if err := api.service.ConfirmMessagesProcessed(messageIDs); err != nil {
+	/*if err := api.service.ConfirmMessagesProcessed(messageIDs); err != nil {
 		return err
-	}
+	}*/
 
 	return api.service.deduplicator.AddMessageByID(messageIDs)
 }
 
-// SendPublicMessage sends a public chat message to the underlying transport
-func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
-	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to obtain a private key from Sig: %v", err)
-	}
-
-	message, err := api.service.CreatePublicMessage(privateKey, msg.Chat, msg.Payload, false)
+// Post is used to send one-to-one for those who did not enabled device-to-device sync,
+// in other words don't use PFS-enabled messages. Otherwise, SendDirectMessage is used.
+// It's important to call PublicAPI.afterSend() so that the client receives a signal
+// with confirmation that the message left the device.
+func (api *PublicAPI) Post(ctx context.Context, newMessage whisper.NewMessage) (hexutil.Bytes, error) {
+	hash, err := api.publicAPI.Post(ctx, newMessage)
 	if err != nil {
 		return nil, err
 	}
+	return api.service.afterPost(hash, newMessage), nil
+}
 
-	return api.Post(ctx, *message)
+// SendPublicMessage sends a public chat message to the underlying transport.
+// Message's payload is a transit encoded message.
+// It's important to call PublicAPI.afterSend() so that the client receives a signal
+// with confirmation that the message left the device.
+func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
+	hash, newMessage, err := api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return api.service.afterPost(hash, newMessage), nil
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
+// Message's payload is a transit encoded message.
+// It's important to call PublicAPI.afterSend() so that the client receives a signal
+// with confirmation that the message left the device.
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (hexutil.Bytes, error) {
-	privateKey, err := api.service.w.GetPrivateKey(msg.Sig)
+	hash, newMessage, err := api.service.messenger.SendRaw(ctx, msg, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
-
-	publicKey, err := crypto.UnmarshalPubkey(msg.PubKey)
-	if err != nil {
-		return nil, err
-	}
-
-	message, err := api.service.CreateDirectMessage(privateKey, publicKey, msg.DH, msg.Payload)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.Post(ctx, *message)
+	return api.service.afterPost(hash, newMessage), nil
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
@@ -594,39 +584,32 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-// LoadFilters load all the necessary filters
 func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
-	return api.service.LoadFilters(chats)
+	return api.service.messenger.LoadFilters(chats)
 }
 
-// LoadFilter load a single filter
-func (api *PublicAPI) LoadFilter(parent context.Context, chat *filter.Chat) ([]*filter.Chat, error) {
-	return api.service.LoadFilter(chat)
-}
-
-// RemoveFilter remove a single filter
 func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
-	return api.service.RemoveFilters(chats)
+	return api.service.messenger.RemoveFilters(chats)
 }
 
 // EnableInstallation enables an installation for multi-device sync.
 func (api *PublicAPI) EnableInstallation(installationID string) error {
-	return api.service.EnableInstallation(installationID)
+	return api.service.messenger.EnableInstallation(installationID)
 }
 
 // DisableInstallation disables an installation for multi-device sync.
 func (api *PublicAPI) DisableInstallation(installationID string) error {
-	return api.service.DisableInstallation(installationID)
+	return api.service.messenger.DisableInstallation(installationID)
 }
 
 // GetOurInstallations returns all the installations available given an identity
 func (api *PublicAPI) GetOurInstallations() ([]*multidevice.Installation, error) {
-	return api.service.GetOurInstallations()
+	return api.service.messenger.Installations()
 }
 
 // SetInstallationMetadata sets the metadata for our own installation
 func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
-	return api.service.SetInstallationMetadata(installationID, data)
+	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
 // -----

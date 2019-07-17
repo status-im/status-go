@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/messaging/filter"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	whisper "github.com/status-im/whisper/whisperv6"
+
+	"github.com/status-im/status-protocol-go/transport/whisper/filter"
 )
 
 const (
@@ -134,7 +135,7 @@ type EnodeDiscoveredSignal struct {
 type Messages struct {
 	Error    error                      `json:"error"`
 	Messages []dedup.DeduplicateMessage `json:"messages"`
-	Chat     *filter.Chat               `json:"chat"`
+	Chat     filter.Chat                `json:"chat"`
 }
 
 // SendEnodeDiscovered tiggered when an enode is discovered.

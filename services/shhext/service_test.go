@@ -3,8 +3,10 @@ package shhext
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/signal"
 	"io/ioutil"
 	"math"
 	"net"
@@ -115,6 +117,12 @@ func (s *ShhExtSuite) SetupTest() {
 		stack, err := node.New(cfg)
 		s.NoError(err)
 		s.whisper[i] = whisper.New(nil)
+
+		privateKey, err := crypto.GenerateKey()
+		s.NoError(err)
+		err = s.whisper[i].SelectKeyPair(privateKey)
+		s.NoError(err)
+
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
@@ -152,7 +160,14 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	}
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
-	service := New(whisper.New(nil), nil, db, config)
+
+	shh := whisper.New(nil)
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	err = shh.SelectKeyPair(privateKey)
+	s.Require().NoError(err)
+
+	service := New(shh, nil, db, config)
 
 	err = service.InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
 	s.NoError(err)
@@ -344,6 +359,10 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	var err error
 
 	shh := whisper.New(nil)
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	err = shh.SelectKeyPair(privateKey)
+	s.Require().NoError(err)
 	aNode, err := node.New(&node.Config{
 		P2P: p2p.Config{
 			MaxPeers:    math.MaxInt32,
@@ -416,6 +435,94 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	s.Require().NoError(err)
 	s.Require().NotNil(hash)
 	s.Require().NoError(waitForHashInMonitor(api.service.mailMonitor, common.BytesToHash(hash), MailServerRequestSent, time.Second))
+}
+
+// TestRetrieveMessageLoopNoMessages verifies that there are no signals sent
+// if there are no messages.
+func (s *ShhExtSuite) TestRetrieveMessageLoopNoMessages() {
+	shhConfig := whisper.DefaultConfig
+	shhConfig.MinimumAcceptedPOW = 0 // accept all messages
+	shh := whisper.New(&shhConfig)
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	err = shh.SelectKeyPair(privateKey)
+	s.Require().NoError(err)
+	aNode, err := node.New(&node.Config{
+		P2P: p2p.Config{
+			MaxPeers:    math.MaxInt32,
+			NoDiscovery: true,
+		},
+		NoUSB: true,
+	}) // in-memory node as no data dir
+	s.Require().NoError(err)
+	err = aNode.Register(func(*node.ServiceContext) (node.Service, error) { return shh, nil })
+	s.Require().NoError(err)
+
+	err = aNode.Start()
+	s.Require().NoError(err)
+	defer func() { err := aNode.Stop(); s.NoError(err) }()
+
+	mock := newHandlerMock(1)
+	config := params.ShhextConfig{
+		InstallationID:        "1",
+		BackupDisabledDataDir: os.TempDir(),
+		PFSEnabled:            true,
+	}
+	db, err := leveldb.Open(storage.NewMemStorage(), nil)
+	s.Require().NoError(err)
+	service := New(shh, mock, db, config)
+	s.Require().NoError(service.InitProtocolWithPassword("abc", "password"))
+
+	testCases := []struct {
+		name          string
+		signalName    string
+		action        func()
+		expectedValue int
+	}{
+		{
+			name:       "send one public message",
+			signalName: signal.EventNewMessages,
+			action: func() {
+				api := NewPublicAPI(service)
+				_, err = api.SendPublicMessage(context.Background(), SendPublicMessageRPC{
+					Chat:    "test",
+					Payload: []byte("abc"),
+				})
+				s.Require().NoError(err)
+			},
+			expectedValue: 1,
+		},
+		{
+			name:          "no messages",
+			action:        func() {},
+			expectedValue: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		s.Run(tc.name, func() {
+			// Verify a proper signal is sent when a message is received.
+			var counter int64
+			signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
+				var envelope signal.Envelope
+				err := json.Unmarshal([]byte(jsonEvent), &envelope)
+				s.NoError(err)
+
+				switch envelope.Type {
+				case signal.EventNewMessages:
+					atomic.AddInt64(&counter, 1)
+				}
+			})
+
+			tc.action()
+
+			cancel := make(chan struct{})
+			go service.retrieveMessagesLoop(time.Millisecond*10, cancel)
+			time.Sleep(time.Millisecond * 100)
+			close(cancel)
+			s.Require().EqualValues(tc.expectedValue, counter)
+		})
+	}
 }
 
 func (s *ShhExtSuite) TearDown() {

@@ -47,7 +47,6 @@ linters:
     - golint
     - govet
     - ineffassign
-    - interfacer
     - megacheck
     - misspell
     - structcheck
