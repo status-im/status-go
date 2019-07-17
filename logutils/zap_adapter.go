@@ -3,9 +3,13 @@ package logutils
 import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/log"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"math"
+	"sync"
 	"time"
+
+	protocol "github.com/status-im/status-protocol-go"
 )
 
 type gethLoggerCore struct {
@@ -112,4 +116,31 @@ func NewZapAdapter(logger log.Logger, enab zapcore.LevelEnabler) zapcore.Core {
 		LevelEnabler: enab,
 		logger:       logger,
 	}
+}
+
+var registerOnce sync.Once
+
+// NewZapLoggerWithAdapter returns a logger forwarding all logs with level info and above.
+func NewZapLoggerWithAdapter(logger log.Logger) (*zap.Logger, error) {
+	registerOnce.Do(func() {
+		if err := protocol.RegisterJSONHexEncoder(); err != nil {
+			panic(err)
+		}
+	})
+
+	cfg := zap.Config{
+		Level:            zap.NewAtomicLevelAt(zapcore.DebugLevel),
+		Development:      false,
+		Sampling:         nil,
+		Encoding:         "json-hex",
+		EncoderConfig:    zap.NewProductionEncoderConfig(),
+		OutputPaths:      []string{"stderr"},
+		ErrorOutputPaths: []string{"stderr"},
+	}
+	adapter := zap.WrapCore(
+		func(zapcore.Core) zapcore.Core {
+			return NewZapAdapter(logger, cfg.Level)
+		},
+	)
+	return cfg.Build(adapter)
 }

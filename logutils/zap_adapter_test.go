@@ -11,7 +11,6 @@ import (
 
 func TestNewZapAdapter(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
-
 	logger := log.New()
 	handler := log.StreamHandler(buf, log.LogfmtFormat())
 	logger.SetHandler(handler)
@@ -39,4 +38,20 @@ func TestNewZapAdapter(t *testing.T) {
 		With(zap.String("site", "SomeSite")).
 		Info("some message with param")
 	require.Contains(t, buf.String(), `lvl=info msg="some message with param" namespace=some-namespace site=SomeSite`)
+}
+
+func TestNewZapLoggerWithAdapter(t *testing.T) {
+	buf := bytes.NewBuffer(nil)
+	logger := log.New()
+	handler := log.StreamHandler(buf, log.LogfmtFormat())
+	logger.SetHandler(handler)
+
+	zapLogger, err := NewZapLoggerWithAdapter(logger)
+	require.NoError(t, err)
+
+	buf.Reset()
+	zapLogger.
+		With(zap.Error(errors.New("some error"))).
+		Error("some message with error level")
+	require.Contains(t, buf.String(), `lvl=eror msg="some message with error level" error="some error`)
 }
