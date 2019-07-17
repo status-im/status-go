@@ -115,6 +115,12 @@ func (s *ShhExtSuite) SetupTest() {
 		stack, err := node.New(cfg)
 		s.NoError(err)
 		s.whisper[i] = whisper.New(nil)
+
+		privateKey, err := crypto.GenerateKey()
+		s.NoError(err)
+		err = s.whisper[i].SelectKeyPair(privateKey)
+		s.NoError(err)
+
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.whisper[i], nil
 		}))
@@ -152,7 +158,14 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	}
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	s.Require().NoError(err)
-	service := New(whisper.New(nil), nil, db, config)
+
+	shh := whisper.New(nil)
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	err = shh.SelectKeyPair(privateKey)
+	s.Require().NoError(err)
+
+	service := New(shh, nil, db, config)
 
 	err = service.InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
 	s.NoError(err)
@@ -344,6 +357,10 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	var err error
 
 	shh := whisper.New(nil)
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	err = shh.SelectKeyPair(privateKey)
+	s.Require().NoError(err)
 	aNode, err := node.New(&node.Config{
 		P2P: p2p.Config{
 			MaxPeers:    math.MaxInt32,

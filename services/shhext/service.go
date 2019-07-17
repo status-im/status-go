@@ -16,17 +16,12 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/db"
-	"github.com/status-im/status-go/messaging/chat"
-	msgdb "github.com/status-im/status-go/messaging/db"
-	"github.com/status-im/status-go/messaging/filter"
-	"github.com/status-im/status-go/messaging/multidevice"
-	"github.com/status-im/status-go/messaging/publisher"
-	"github.com/status-im/status-go/messaging/sharedsecret"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
 
+	protocol "github.com/status-im/status-protocol-go"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"golang.org/x/crypto/sha3"
@@ -51,7 +46,9 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	*publisher.Publisher
+	messenger *protocol.Messenger
+	cancelMessenger chan struct{}
+
 	storage          db.TransactionalStorage
 	w                *whisper.Whisper
 	config           params.ShhextConfig
@@ -66,7 +63,6 @@ type Service struct {
 	cache            *mailservers.Cache
 	connManager      *mailservers.ConnectionManager
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
-	filter           *filter.Service
 }
 
 // Make sure that Service implements node.Service interface.
@@ -89,9 +85,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		requestsRegistry: requestsRegistry,
 	}
 	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps, config.MaxMessageDeliveryAttempts)
-	publisher := publisher.New(w, publisher.Config{PFSEnabled: config.PFSEnabled})
 	return &Service{
-		Publisher:        publisher,
 		storage:          db.NewLevelDBStorage(ldb),
 		w:                w,
 		config:           config,
@@ -133,11 +127,11 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	v4Path := filepath.Join(dataDir, fmt.Sprintf("%s.v4.db", s.config.InstallationID))
 
 	if password != "" {
-		if err := msgdb.MigrateDBFile(v0Path, v1Path, "ON", password); err != nil {
+		if err := migrateDBFile(v0Path, v1Path, "ON", password); err != nil {
 			return err
 		}
 
-		if err := msgdb.MigrateDBFile(v1Path, v2Path, password, encKey); err != nil {
+		if err := migrateDBFile(v1Path, v2Path, password, encKey); err != nil {
 			// Remove db file as created with a blank password and never used,
 			// and there's no need to rekey in this case
 			os.Remove(v1Path)
@@ -145,13 +139,13 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		}
 	}
 
-	if err := msgdb.MigrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
+	if err := migrateDBKeyKdfIterations(v2Path, v3Path, encKey); err != nil {
 		os.Remove(v2Path)
 		os.Remove(v3Path)
 	}
 
 	// Fix IOS not encrypting database
-	if err := msgdb.EncryptDatabase(v3Path, v4Path, encKey); err != nil {
+	if err := encryptDatabase(v3Path, v4Path, encKey); err != nil {
 		os.Remove(v3Path)
 		os.Remove(v4Path)
 	}
@@ -168,74 +162,74 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	persistence, err := chat.NewSQLLitePersistence(v4Path, encKey)
+	selectedKeyID := s.w.SelectedKeyPairID()
+	identity, err := s.w.GetPrivateKey(selectedKeyID)
 	if err != nil {
 		return err
 	}
 
-	multideviceConfig := &multidevice.Config{
-		InstallationID:   s.config.InstallationID,
-		ProtocolVersion:  chat.ProtocolVersion,
-		MaxInstallations: maxInstallations,
+	// TODO: v4Path is the current database file. We should figure out
+	// how to split it into multiple files and migrate data.
+	// TODO: pass onNewMessagesHandler.
+	messenger, err := protocol.NewMessenger(
+		identity,
+		&server{server:s.server},
+		s.w,
+		dataDir,
+		encKey,
+		s.config.InstallationID,
+	)
+	if err != nil {
+		return err
 	}
+	s.messenger = messenger
 
-	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {
-		handler := PublisherSignalHandler{}
-		for _, bundle := range addedBundles {
-			handler.BundleAdded(bundle.Identity, bundle.ID)
-		}
-	}
+	s.cancelMessenger = make(chan struct{})
+	go s.retrieveMessagesLoop(s.cancelMessenger)
 
-	protocolService := chat.NewProtocolService(
-		chat.NewEncryptionService(
-			persistence,
-			chat.DefaultEncryptionServiceConfig(s.config.InstallationID)),
-		sharedsecret.NewService(persistence.GetSharedSecretStorage()),
-		multidevice.New(multideviceConfig, persistence.GetMultideviceStorage()),
-		addedBundlesHandler,
-		s.ProcessNegotiatedSecret)
-
-	onNewMessagesHandler := func(messages []*filter.Messages) {
-		var signalMessages []*signal.Messages
-		for _, chatMessages := range messages {
-			signalMessage := &signal.Messages{
-				Error: chatMessages.Error,
-				Chat:  chatMessages.Chat,
-			}
-			signalMessages = append(signalMessages, signalMessage)
-			dedupMessages, err := s.processReceivedMessages(chatMessages.Messages)
-			if err != nil {
-				log.Error("could not process messages", "err", err)
-				continue
-			}
-
-			signalMessage.Messages = dedupMessages
-		}
-		PublisherSignalHandler{}.NewMessages(signalMessages)
-	}
-	s.Publisher.Init(persistence.DB, protocolService, onNewMessagesHandler)
-	return s.Publisher.Start(s.online, true)
+	return nil
 }
 
-func (s *Service) processReceivedMessages(messages []*whisper.Message) ([]dedup.DeduplicateMessage, error) {
-	dedupMessages := s.deduplicator.Deduplicate(messages)
+func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	// Attempt to decrypt message, otherwise leave unchanged
-	for _, dedupMessage := range dedupMessages {
-		err := s.ProcessMessage(dedupMessage.Message, dedupMessage.DedupID)
-		switch err {
-		case chat.ErrNotPairedDevice:
-			log.Info("Received a message from non-paired device", "err", err)
-		case chat.ErrDeviceNotFound:
-			log.Warn("Received a message not targeted to us", "err", err)
-		default:
+	for {
+		select {
+		case <-ticker.C:
+			chatWithMessages, err := s.messenger.RetrieveAllRaw()
 			if err != nil {
-				log.Error("Failed handling message with error", "err", err)
+				log.Error("failed to retrieve raw messages", "err", err)
+				break
 			}
+
+			var signalMessages []*signal.Messages
+			for chat, messages := range chatWithMessages {
+				signalMessage := &signal.Messages{
+					Chat:  chat,
+					Error: nil, // TODO
+					Messages: s.deduplicator.Deduplicate(messages),
+				}
+				signalMessages = append(signalMessages, signalMessage)
+			}
+			PublisherSignalHandler{}.NewMessages(signalMessages)
+			case <-cancel:
+				return
 		}
 	}
+}
 
-	return dedupMessages, nil
+func (s *Service) ConfirmMessagesProcessed(messageIDs [][]byte) error {
+	return s.messenger.ConfirmMessagesProcessed(messageIDs)
+}
+
+func (s *Service) EnableInstallation(installationID string) error {
+	return s.messenger.EnableInstallation(installationID)
+}
+
+// DisableInstallation disables an installation for multi-device sync.
+func (s *Service) DisableInstallation(installationID string) error {
+	return s.messenger.DisableInstallation(installationID)
 }
 
 // UpdateMailservers updates information about selected mail servers.
@@ -297,10 +291,6 @@ func (s *Service) Start(server *p2p.Server) error {
 	return nil
 }
 
-func (s *Service) online() bool {
-	return s.server.PeerCount() != 0
-}
-
 // Stop is run when a service is stopped.
 func (s *Service) Stop() error {
 	log.Info("Stopping shhext service")
@@ -313,13 +303,20 @@ func (s *Service) Stop() error {
 	s.requestsRegistry.Clear()
 	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
-	if s.filter != nil {
-		if err := s.filter.Stop(); err != nil {
-			log.Error("Failed to stop filter service with error", "err", err)
+
+	if s.cancelMessenger != nil {
+		select {
+		case _, ok := <-s.cancelMessenger:
+			if !ok {
+				// channel already closed
+			}
+		default:
+			close(s.cancelMessenger)
+			s.cancelMessenger = nil
 		}
 	}
 
-	return s.Publisher.Stop()
+	return nil
 }
 
 func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisper.SyncMailRequest) (resp whisper.SyncEventResponse, err error) {

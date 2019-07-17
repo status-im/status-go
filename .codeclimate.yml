@@ -42,4 +42,3 @@ exclude_patterns:
   - static/
   - t/
   - mailserver/migrations
-  - messaging/chat/migrations
