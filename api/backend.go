@@ -376,7 +376,12 @@ func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*acc
 	var validAddress bool
 
 	addresses := b.accountManager.WatchAddresses()
-	addresses = append(addresses, b.accountManager.MainAccountAddress())
+	mainAccountAddress, err := b.accountManager.MainAccountAddress()
+	if err != nil {
+		return nil, err
+	}
+
+	addresses = append(addresses, mainAccountAddress)
 	for _, a := range addresses {
 		if a.String() == address {
 			validAddress = true
@@ -633,7 +638,11 @@ func (b *StatusBackend) startWallet(password string) error {
 		return err
 	}
 
-	mainAccountAddress := b.accountManager.MainAccountAddress()
+	mainAccountAddress, err := b.accountManager.MainAccountAddress()
+	if err != nil {
+		return err
+	}
+
 	allAddresses := append(watchAddresses, mainAccountAddress)
 
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", mainAccountAddress))
@@ -652,7 +661,11 @@ func (b *StatusBackend) startBrowsers(password string) error {
 		return err
 	}
 
-	mainAccountAddress := b.accountManager.MainAccountAddress()
+	mainAccountAddress, err := b.accountManager.MainAccountAddress()
+	if err != nil {
+		return err
+	}
+
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("browsers-%x.sql", mainAccountAddress))
 	return svc.StartDatabase(path, password)
 }

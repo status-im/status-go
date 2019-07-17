@@ -31,6 +31,8 @@ var (
 	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 )
 
+var zeroAddress = common.Address{}
+
 // GethServiceProvider provides required geth services.
 type GethServiceProvider interface {
 	AccountManager() (*accounts.Manager, error)
@@ -211,11 +213,15 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 }
 
 // MainAccountAddress returns currently selected watch addresses.
-func (m *Manager) MainAccountAddress() common.Address {
+func (m *Manager) MainAccountAddress() (common.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	return m.mainAccountAddress
+	if m.mainAccountAddress == zeroAddress {
+		return zeroAddress, ErrNoAccountSelected
+	}
+
+	return m.mainAccountAddress, nil
 }
 
 // WatchAddresses returns currently selected watch addresses.
