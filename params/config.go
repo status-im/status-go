@@ -349,6 +349,9 @@ type NodeConfig struct {
 	// BrowsersConfig extra configuration for browsers.Service.
 	BrowsersConfig BrowsersConfig
 
+	// PermissionsConfig extra configuration for permissions.Service.
+	PermissionsConfig PermissionsConfig
+
 	// SwarmConfig extra configuration for Swarm and ENS
 	SwarmConfig SwarmConfig `json:"SwarmConfig," validate:"structonly"`
 
@@ -371,6 +374,11 @@ type WalletConfig struct {
 
 // BrowsersConfig extra configuration for browsers.Service.
 type BrowsersConfig struct {
+	Enabled bool
+}
+
+// PermissionsConfig extra configuration for permissions.Service.
+type PermissionsConfig struct {
 	Enabled bool
 }
 

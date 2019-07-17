@@ -571,7 +571,11 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 	if err != nil {
 		return err
 	}
-	return b.startBrowsers(password)
+	err = b.startBrowsers(password)
+	if err != nil {
+		return err
+	}
+	return b.startPermissions(password)
 }
 
 func (b *StatusBackend) startWallet(password string) error {
@@ -606,6 +610,22 @@ func (b *StatusBackend) startBrowsers(password string) error {
 		return err
 	}
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("browsers-%x.sql", account.Address))
+	return svc.StartDatabase(path, password)
+}
+
+func (b *StatusBackend) startPermissions(password string) error {
+	if !b.statusNode.Config().PermissionsConfig.Enabled {
+		return nil
+	}
+	svc, err := b.statusNode.PermissionsService()
+	if err != nil {
+		return err
+	}
+	account, err := b.accountManager.SelectedWalletAccount()
+	if err != nil {
+		return err
+	}
+	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("permissions-%x.sql", account.Address))
 	return svc.StartDatabase(path, password)
 }
 

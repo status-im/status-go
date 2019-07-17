@@ -27,6 +27,7 @@ import (
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/incentivisation"
 	"github.com/status-im/status-go/services/peer"
+	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
@@ -49,6 +50,7 @@ var (
 	ErrIncentivisationServiceRegistrationFailure  = errors.New("failed to register the Incentivisation service")
 	ErrWalletServiceRegistrationFailure           = errors.New("failed to register the Wallet service")
 	ErrBrowsersServiceRegistrationFailure         = errors.New("failed to register the Browsers service")
+	ErrPermissionsServiceRegistrationFailure      = errors.New("failed to register the Permissions service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -128,6 +130,10 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 
 	if err := activateBrowsersService(stack, config.BrowsersConfig); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
+	}
+
+	if err := activatePermissionsService(stack, config.PermissionsConfig); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrPermissionsServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -298,6 +304,16 @@ func activateBrowsersService(stack *node.Node, config params.BrowsersConfig) err
 	}
 	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		return browsers.NewService(), nil
+	})
+}
+
+func activatePermissionsService(stack *node.Node, config params.PermissionsConfig) error {
+	if !config.Enabled {
+		logger.Info("dapps permissions service is disabled")
+		return nil
+	}
+	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		return permissions.NewService(), nil
 	})
 }
 
