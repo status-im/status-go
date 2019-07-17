@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/incentivisation"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
@@ -47,6 +48,7 @@ var (
 	ErrPeerServiceRegistrationFailure             = errors.New("failed to register the Peer service")
 	ErrIncentivisationServiceRegistrationFailure  = errors.New("failed to register the Incentivisation service")
 	ErrWalletServiceRegistrationFailure           = errors.New("failed to register the Wallet service")
+	ErrBrowsersServiceRegistrationFailure         = errors.New("failed to register the Browsers service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -122,6 +124,10 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 
 	if err := activateWalletService(stack, config.WalletConfig); err != nil {
 		return nil, fmt.Errorf("%v: %v", ErrWalletServiceRegistrationFailure, err)
+	}
+
+	if err := activateBrowsersService(stack, config.BrowsersConfig); err != nil {
+		return nil, fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
 	}
 
 	return stack, nil
@@ -277,11 +283,21 @@ func activatePeerService(stack *node.Node) error {
 
 func activateWalletService(stack *node.Node, config params.WalletConfig) error {
 	if !config.Enabled {
-		logger.Info("service.Wallet is disabled")
+		logger.Info("wallet service is disabled")
 		return nil
 	}
 	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
 		return wallet.NewService(), nil
+	})
+}
+
+func activateBrowsersService(stack *node.Node, config params.BrowsersConfig) error {
+	if !config.Enabled {
+		logger.Info("browsers service is disabled")
+		return nil
+	}
+	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
+		return browsers.NewService(), nil
 	})
 }
 
