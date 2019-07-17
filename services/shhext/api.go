@@ -557,7 +557,7 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-func (api *PublicAPI) Join(chat JoinRPC) error  {
+func (api *PublicAPI) Join(chat JoinRPC) error {
 	return api.service.messenger.Join(chat)
 }
 
