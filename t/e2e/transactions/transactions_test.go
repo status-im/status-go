@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
@@ -16,6 +17,14 @@ import (
 )
 
 type initFunc func([]byte, *transactions.SendTxArgs)
+
+func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
+	return account.LoginParams{
+		ChatAddress: common.HexToAddress(chatAddress),
+		Password:    password,
+		MainAccount: common.HexToAddress(mainAccountAddress),
+	}
+}
 
 func TestTransactionsTestSuite(t *testing.T) {
 	suite.Run(t, new(TransactionsTestSuite))
@@ -70,7 +79,7 @@ func (s *TransactionsTestSuite) TestCallUpstreamPrivateRPCSendTransaction() {
 func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(
 	callRPCFn func(string) (string, error),
 ) {
-	err := s.Backend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
 	s.NoError(err)
 
 	result, err := callRPCFn(`{
@@ -94,7 +103,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	defer s.StopTestBackend()
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
-	err := s.Backend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
+	err := s.Backend.SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
 	s.NoError(err)
 
 	args := transactions.SendTxArgs{
@@ -162,7 +171,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
 	s.NoError(err)
 
 	// this call blocks, up until Complete Transaction is called
@@ -196,7 +205,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
-	err := s.Backend.AccountManager().SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
+	err := s.Backend.AccountManager().SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
 	s.NoError(err)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
@@ -216,7 +225,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	s.StartTestBackend(e2e.WithUpstream(addr))
 	defer s.StopTestBackend()
 
-	err = s.Backend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)
+	err = s.Backend.SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
 	s.NoError(err)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{

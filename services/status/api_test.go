@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/account"
 	"github.com/stretchr/testify/suite"
@@ -48,9 +49,15 @@ var logintests = []struct {
 			key := keystore.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("addressKey", nil)
-			s.am.EXPECT().SelectAccount("address...", "address...", "password").Return(nil)
+
+			loginParams := account.LoginParams{
+				MainAccount: common.HexToAddress("0x01"),
+				ChatAddress: common.HexToAddress("0x01"),
+				Password:    "password",
+			}
+			s.am.EXPECT().SelectAccount(loginParams).Return(nil)
 		},
 	},
 	{
@@ -61,7 +68,7 @@ var logintests = []struct {
 			key := keystore.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, errors.New("foo"))
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, errors.New("foo"))
 		},
 	},
 	{
@@ -72,7 +79,7 @@ var logintests = []struct {
 			key := keystore.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", errors.New("foo"))
 		},
 	},
@@ -84,16 +91,22 @@ var logintests = []struct {
 			key := keystore.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("address...", "password").Return(accounts.Account{}, &key, nil)
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", nil)
-			s.am.EXPECT().SelectAccount("address...", "address...", "password").Return(errors.New("foo"))
+
+			loginParams := account.LoginParams{
+				MainAccount: common.HexToAddress("0x01"),
+				ChatAddress: common.HexToAddress("0x01"),
+				Password:    "password",
+			}
+			s.am.EXPECT().SelectAccount(loginParams).Return(errors.New("foo"))
 		},
 	},
 }
 
 func (s *StatusSuite) TestLogin() {
 	for _, t := range logintests {
-		req := LoginRequest{Addr: "address...", Password: "password"}
+		req := LoginRequest{Addr: "0x01", Password: "password"}
 
 		t.prepareExpectations(s)
 

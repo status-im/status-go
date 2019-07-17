@@ -32,6 +32,8 @@ var (
 	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
 )
 
+var zeroAddress = common.Address{}
+
 // GethServiceProvider provides required geth services.
 type GethServiceProvider interface {
 	AccountManager() (*accounts.Manager, error)
@@ -47,8 +49,9 @@ type Manager struct {
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
 
-	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
-	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectAccount()
+	selectedChatAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
+	mainAccountAddress  common.Address
+	watchAddresses      []common.Address
 }
 
 // NewManager returns new node account manager.
@@ -101,66 +104,6 @@ func (m *Manager) CreateAccount(password string) (Info, string, error) {
 	info.ChatPubKey = info.WalletPubKey
 
 	return info, mnemonic, nil
-}
-
-// CreateChildAccount creates sub-account for an account identified by parent address.
-// CKD#2 is used as root for master accounts (when parentAddress is "").
-// Otherwise (when parentAddress != ""), child is derived directly from parent.
-func (m *Manager) CreateChildAccount(parentAddress, password string) (address, pubKey string, err error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	keyStore, err := m.geth.AccountKeyStore()
-	if err != nil {
-		return "", "", err
-	}
-
-	if parentAddress == "" && m.selectedWalletAccount != nil { // derive from selected account by default
-		parentAddress = m.selectedWalletAccount.Address.Hex()
-	}
-
-	if parentAddress == "" {
-		return "", "", ErrNoAccountSelected
-	}
-
-	account, err := ParseAccountString(parentAddress)
-	if err != nil {
-		return "", "", ErrAddressToAccountMappingFailure
-	}
-
-	// make sure that given password can decrypt key associated with a given parent address
-	account, accountKey, err := keyStore.AccountDecryptedKey(account, password)
-	if err != nil {
-		return "", "", fmt.Errorf("%s: %v", ErrAccountToKeyMappingFailure.Error(), err)
-	}
-
-	parentKey, err := extkeys.NewKeyFromString(accountKey.ExtendedKey.String())
-	if err != nil {
-		return "", "", err
-	}
-
-	// derive child key
-	childKey, err := parentKey.Child(accountKey.SubAccountIndex)
-	if err != nil {
-		return "", "", err
-	}
-	if err = keyStore.IncSubAccountIndex(account, password); err != nil {
-		return "", "", err
-	}
-	accountKey.SubAccountIndex++
-
-	// import derived key into account keystore
-	address, pubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, childKey, password)
-	if err != nil {
-		return
-	}
-
-	// update in-memory selected account
-	if m.selectedWalletAccount != nil {
-		m.selectedWalletAccount.AccountKey = accountKey
-	}
-
-	return address, pubKey, nil
 }
 
 // RecoverAccount re-creates master key using given details.
@@ -246,23 +189,19 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted
 // using provided password. Once verification is done, all previous identities are removed).
-func (m *Manager) SelectAccount(walletAddress, chatAddress, password string) error {
+func (m *Manager) SelectAccount(loginParams LoginParams) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.accountsGenerator.Reset()
 
-	selectedWalletAccount, err := m.unlockExtendedKey(walletAddress, password)
+	selectedChatAccount, err := m.unlockExtendedKey(loginParams.ChatAddress.String(), loginParams.Password)
 	if err != nil {
 		return err
 	}
 
-	selectedChatAccount, err := m.unlockExtendedKey(chatAddress, password)
-	if err != nil {
-		return err
-	}
-
-	m.selectedWalletAccount = selectedWalletAccount
+	m.watchAddresses = loginParams.WatchAddresses
+	m.mainAccountAddress = loginParams.MainAccount
 	m.selectedChatAccount = selectedChatAccount
 
 	return nil
@@ -287,15 +226,24 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 	}
 }
 
-// SelectedWalletAccount returns currently selected wallet account
-func (m *Manager) SelectedWalletAccount() (*SelectedExtKey, error) {
+// MainAccountAddress returns currently selected watch addresses.
+func (m *Manager) MainAccountAddress() (common.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if m.selectedWalletAccount == nil {
-		return nil, ErrNoAccountSelected
+	if m.mainAccountAddress == zeroAddress {
+		return zeroAddress, ErrNoAccountSelected
 	}
-	return m.selectedWalletAccount, nil
+
+	return m.mainAccountAddress, nil
+}
+
+// WatchAddresses returns currently selected watch addresses.
+func (m *Manager) WatchAddresses() []common.Address {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return m.watchAddresses
 }
 
 // SelectedChatAccount returns currently selected chat account
@@ -309,13 +257,14 @@ func (m *Manager) SelectedChatAccount() (*SelectedExtKey, error) {
 	return m.selectedChatAccount, nil
 }
 
-// Logout clears selectedWalletAccount.
+// Logout clears selected accounts.
 func (m *Manager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.accountsGenerator.Reset()
-	m.selectedWalletAccount = nil
+	m.mainAccountAddress = zeroAddress
+	m.watchAddresses = make([]common.Address, 0)
 	m.selectedChatAccount = nil
 }
 
@@ -387,40 +336,17 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	am, err := m.geth.AccountManager()
+	_, err := m.geth.AccountManager()
 	if err != nil {
 		return nil, err
 	}
 
-	var addresses []gethcommon.Address
-	for _, wallet := range am.Wallets() {
-		for _, account := range wallet.Accounts() {
-			addresses = append(addresses, account.Address)
-		}
+	addresses := make([]gethcommon.Address, 0)
+	if m.mainAccountAddress != zeroAddress {
+		addresses = append(addresses, m.mainAccountAddress)
 	}
 
-	if m.selectedWalletAccount == nil {
-		return []gethcommon.Address{}, nil
-	}
-
-	m.refreshSelectedWalletAccount()
-
-	filtered := make([]gethcommon.Address, 0)
-	for _, account := range addresses {
-		// main account
-		if m.selectedWalletAccount.Address.Hex() == account.Hex() {
-			filtered = append(filtered, account)
-		} else {
-			// sub accounts
-			for _, subAccount := range m.selectedWalletAccount.SubAccounts {
-				if subAccount.Address.Hex() == account.Hex() {
-					filtered = append(filtered, account)
-				}
-			}
-		}
-	}
-
-	return filtered, nil
+	return addresses, nil
 }
 
 // StartOnboarding starts the onboarding process generating accountsCount accounts and returns a slice of OnboardingAccount.
@@ -472,63 +398,6 @@ func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, str
 	return info, acc.mnemonic, nil
 }
 
-// refreshSelectedWalletAccount re-populates list of sub-accounts of the currently selected account (if any)
-func (m *Manager) refreshSelectedWalletAccount() {
-	if m.selectedWalletAccount == nil {
-		return
-	}
-
-	accountKey := m.selectedWalletAccount.AccountKey
-	if accountKey == nil {
-		return
-	}
-
-	// re-populate list of sub-accounts
-	subAccounts, err := m.findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
-	if err != nil {
-		return
-	}
-	m.selectedWalletAccount = &SelectedExtKey{
-		Address:     m.selectedWalletAccount.Address,
-		AccountKey:  m.selectedWalletAccount.AccountKey,
-		SubAccounts: subAccounts,
-	}
-}
-
-// findSubAccounts traverses cached accounts and adds as a sub-accounts any
-// that belong to the currently selected account.
-// The extKey is CKD#2 := root of sub-accounts of the main account
-func (m *Manager) findSubAccounts(extKey *extkeys.ExtendedKey, subAccountIndex uint32) ([]accounts.Account, error) {
-	keyStore, err := m.geth.AccountKeyStore()
-	if err != nil {
-		return []accounts.Account{}, err
-	}
-
-	subAccounts := make([]accounts.Account, 0)
-	if extKey.Depth == 5 { // CKD#2 level
-		// gather possible sub-account addresses
-		subAccountAddresses := make([]gethcommon.Address, 0)
-		for i := uint32(0); i < subAccountIndex; i++ {
-			childKey, err := extKey.Child(i)
-			if err != nil {
-				return []accounts.Account{}, err
-			}
-			subAccountAddresses = append(subAccountAddresses, crypto.PubkeyToAddress(childKey.ToECDSA().PublicKey))
-		}
-
-		// see if any of the gathered addresses actually exist in cached accounts list
-		for _, cachedAccount := range keyStore.Accounts() {
-			for _, possibleAddress := range subAccountAddresses {
-				if possibleAddress.Hex() == cachedAccount.Address.Hex() {
-					subAccounts = append(subAccounts, cachedAccount)
-				}
-			}
-		}
-	}
-
-	return subAccounts, nil
-}
-
 // AddressToDecryptedAccount tries to load decrypted key for a given account.
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
@@ -558,16 +427,9 @@ func (m *Manager) unlockExtendedKey(address, password string) (*SelectedExtKey, 
 		return nil, err
 	}
 
-	// persist account key for easier recovery of currently selected key
-	subAccounts, err := m.findSubAccounts(accountKey.ExtendedKey, accountKey.SubAccountIndex)
-	if err != nil {
-		return nil, err
-	}
-
 	selectedExtendedKey := &SelectedExtKey{
-		Address:     account.Address,
-		AccountKey:  accountKey,
-		SubAccounts: subAccounts,
+		Address:    account.Address,
+		AccountKey: accountKey,
 	}
 
 	return selectedExtendedKey, nil

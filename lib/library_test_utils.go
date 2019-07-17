@@ -46,6 +46,22 @@ var (
 	nodeConfigJSON string
 )
 
+func buildLoginParamsJSON(chatAddress, password string) *C.char {
+	return C.CString(fmt.Sprintf(`{
+		"chatAddress": "%s",
+		"password": "%s",
+		"mainAccount": "%s"
+	}`, chatAddress, password, chatAddress))
+}
+
+func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
+	return account.LoginParams{
+		ChatAddress: gethcommon.HexToAddress(chatAddress),
+		Password:    password,
+		MainAccount: gethcommon.HexToAddress(mainAccountAddress),
+	}
+}
+
 func init() {
 	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
 
@@ -109,10 +125,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		{
 			"call private API using private RPC client",
 			testCallPrivateRPCWithPrivateAPI,
-		},
-		{
-			"create main and child accounts",
-			testCreateChildAccount,
 		},
 		{
 			"verify account password",
@@ -257,7 +269,7 @@ func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
 
 	// select account
 	loginResponse := APIResponse{}
-	rawResponse := Login(C.CString(account1.WalletAddress), C.CString(TestConfig.Account1.Password))
+	rawResponse := Login(buildLoginParamsJSON(account1.WalletAddress, TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -367,149 +379,6 @@ func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
 	received := C.GoString(rawResponse)
 	if strings.Contains(received, "error") {
 		t.Errorf("unexpected response containing error: %v", received)
-		return false
-	}
-
-	return true
-}
-
-func testCreateChildAccount(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might get populated during previous tests)
-	if err := statusBackend.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
-	keyStore, err := statusBackend.StatusNode().AccountKeyStore()
-	if err != nil {
-		t.Error(err)
-		return false
-	}
-
-	// create an account
-	createAccountResponse := AccountInfo{}
-	rawResponse := CreateAccount(C.CString(TestConfig.Account1.Password))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createAccountResponse.Error != "" {
-		t.Errorf("could not create account: %s", err)
-		return false
-	}
-
-	if createAccountResponse.Address != createAccountResponse.WalletAddress ||
-		createAccountResponse.PubKey != createAccountResponse.WalletPubKey {
-		t.Error("for backward compatibility pubkey/address should be equal to walletAddress/walletPubKey")
-	}
-
-	walletAddress, walletPubKey, chatAddress, _, mnemonic := createAccountResponse.Address, createAccountResponse.PubKey,
-		createAccountResponse.ChatAddress, createAccountResponse.ChatPubKey, createAccountResponse.Mnemonic
-	t.Logf("Account created: {address: %s, key: %s, mnemonic:%s}", walletAddress, walletPubKey, mnemonic)
-
-	acct, err := account.ParseAccountString(walletAddress)
-	if err != nil {
-		t.Errorf("can not get account from address: %v", err)
-		return false
-	}
-
-	// obtain decrypted key, and make sure that extended key (which will be used as root for sub-accounts) is present
-	_, key, err := keyStore.AccountDecryptedKey(acct, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("can not obtain decrypted account key: %v", err)
-		return false
-	}
-
-	if key.ExtendedKey == nil {
-		t.Error("CKD#2 has not been generated for new account")
-		return false
-	}
-
-	// try creating sub-account, w/o selecting main account i.e. w/o login to main account
-	createSubAccountResponse := AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse.Error != account.ErrNoAccountSelected.Error() {
-		t.Errorf("expected error is not returned (tried to create sub-account w/o login): %v", createSubAccountResponse.Error)
-		return false
-	}
-
-	err = statusBackend.SelectAccount(walletAddress, chatAddress, TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("Test failed: could not select account: %v", err)
-		return false
-	}
-
-	// try to create sub-account with wrong password
-	createSubAccountResponse = AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString("wrong password"))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse.Error != "cannot retrieve a valid key for a given account: could not decrypt key with given passphrase" {
-		t.Errorf("expected error is not returned (tried to create sub-account with wrong password): %v", createSubAccountResponse.Error)
-		return false
-	}
-
-	// create sub-account (from implicit parent)
-	createSubAccountResponse1 := AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse1); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse1.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse1.Error)
-		return false
-	}
-
-	// make sure that sub-account index automatically progresses
-	createSubAccountResponse2 := AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(""), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse2); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse2.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse2.Error)
-	}
-
-	if createSubAccountResponse1.Address == createSubAccountResponse2.Address || createSubAccountResponse1.PubKey == createSubAccountResponse2.PubKey {
-		t.Error("sub-account index auto-increament failed")
-		return false
-	}
-
-	// create sub-account (from explicit parent)
-	createSubAccountResponse3 := AccountInfo{}
-	rawResponse = CreateChildAccount(C.CString(createSubAccountResponse2.Address), C.CString(TestConfig.Account1.Password))
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &createSubAccountResponse3); err != nil {
-		t.Errorf("cannot decode CreateChildAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-
-	if createSubAccountResponse3.Error != "" {
-		t.Errorf("cannot create sub-account: %v", createSubAccountResponse3.Error)
-	}
-
-	subAccount1, subAccount2, subAccount3 := createSubAccountResponse1.Address, createSubAccountResponse2.Address, createSubAccountResponse3.Address
-	subPubKey1, subPubKey2, subPubKey3 := createSubAccountResponse1.PubKey, createSubAccountResponse2.PubKey, createSubAccountResponse3.PubKey
-
-	if subAccount1 == subAccount3 || subPubKey1 == subPubKey3 || subAccount2 == subAccount3 || subPubKey2 == subPubKey3 {
-		t.Error("sub-account index auto-increament failed")
 		return false
 	}
 
@@ -639,7 +508,7 @@ func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
 	if whisperService.HasKeyPair(chatPubKeyCheck) {
 		t.Error("identity already present in whisper")
 	}
-	err = statusBackend.SelectAccount(walletAddressCheck, chatAddressCheck, TestConfig.Account1.Password)
+	err = statusBackend.SelectAccount(buildLoginParams(walletAddressCheck, chatAddressCheck, TestConfig.Account1.Password))
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
@@ -680,7 +549,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 
 	// try selecting with wrong password
 	loginResponse := APIResponse{}
-	rawResponse := Login(C.CString(accountInfo1.WalletAddress), C.CString("wrongPassword"))
+	rawResponse := Login(buildLoginParamsJSON(accountInfo1.WalletAddress, "wrongPassword"))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -693,7 +562,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	loginResponse = APIResponse{}
-	rawResponse = Login(C.CString(accountInfo1.WalletAddress), C.CString(TestConfig.Account1.Password))
+	rawResponse = Login(buildLoginParamsJSON(accountInfo1.WalletAddress, TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -714,7 +583,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	loginResponse = APIResponse{}
-	rawResponse = Login(C.CString(accountInfo2.WalletAddress), C.CString(TestConfig.Account1.Password))
+	rawResponse = Login(buildLoginParamsJSON(accountInfo2.WalletAddress, TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -803,7 +672,7 @@ func testAccountLogout(t *testing.T) bool {
 	}
 
 	// select/login
-	err = statusBackend.SelectAccount(accountInfo.WalletAddress, accountInfo.ChatAddress, TestConfig.Account1.Password)
+	err = statusBackend.SelectAccount(buildLoginParams(accountInfo.WalletAddress, accountInfo.ChatAddress, TestConfig.Account1.Password))
 	if err != nil {
 		t.Errorf("Test failed: could not select account: %v", err)
 		return false
@@ -844,7 +713,7 @@ func testSendTransaction(t *testing.T) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
-	if err := statusBackend.SelectAccount(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password); err != nil {
+	if err := statusBackend.SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password)); err != nil {
 		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.WalletAddress, err)
 		return false
 	}
@@ -882,11 +751,11 @@ func testSendTransactionInvalidPassword(t *testing.T) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into account from which transactions will be sent
-	if err := statusBackend.SelectAccount(
+	if err := statusBackend.SelectAccount(buildLoginParams(
 		TestConfig.Account1.WalletAddress,
 		TestConfig.Account1.ChatAddress,
 		TestConfig.Account1.Password,
-	); err != nil {
+	)); err != nil {
 		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.WalletAddress, err)
 		return false
 	}
@@ -919,8 +788,8 @@ func testFailedTransaction(t *testing.T) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	// log into wrong account in order to get selectedAccount error
-	if err := statusBackend.SelectAccount(TestConfig.Account2.WalletAddress, TestConfig.Account2.ChatAddress, TestConfig.Account2.Password); err != nil {
-		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.WalletAddress, err)
+	if err := statusBackend.SelectAccount(buildLoginParams(TestConfig.Account2.WalletAddress, TestConfig.Account2.ChatAddress, TestConfig.Account2.Password)); err != nil {
+		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account2.WalletAddress, err)
 		return false
 	}
 

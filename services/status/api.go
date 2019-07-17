@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
 )
 
@@ -40,7 +41,12 @@ func (api *PublicAPI) Login(context context.Context, req LoginRequest) (res Logi
 		return
 	}
 
-	if err = api.s.am.SelectAccount(req.Addr, req.Addr, req.Password); err != nil {
+	loginParams := account.LoginParams{
+		ChatAddress: common.HexToAddress(req.Addr),
+		Password:    req.Password,
+		MainAccount: common.HexToAddress(req.Addr),
+	}
+	if err = api.s.am.SelectAccount(loginParams); err != nil {
 		return
 	}
 
