@@ -82,14 +82,22 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 		return nil, fmt.Errorf(ErrNodeMakeFailureFormat, err.Error())
 	}
 
+	err = activateServices(stack, config, db)
+	if err != nil {
+		return nil, err
+	}
+	return stack, nil
+}
+
+func activateServices(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) error {
 	// start Ethereum service if we are not expected to use an upstream server
 	if !config.UpstreamConfig.Enabled {
 		if err := activateLightEthService(stack, config); err != nil {
-			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
+			return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 		}
 	} else {
 		if config.LightEthConfig.Enabled {
-			return nil, fmt.Errorf("%v: %v", ErrLightEthRegistrationFailureUpstreamEnabled, err)
+			return ErrLightEthRegistrationFailureUpstreamEnabled
 		}
 
 		logger.Info("LES protocol is disabled")
@@ -100,43 +108,43 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 		// upstream, we don't start any of these, so we need to start our own
 		// implementation.
 		if err := activatePersonalService(stack, config); err != nil {
-			return nil, fmt.Errorf("%v: %v", ErrPersonalServiceRegistrationFailure, err)
+			return fmt.Errorf("%v: %v", ErrPersonalServiceRegistrationFailure, err)
 		}
 	}
 
 	// start Whisper service.
 	if err := activateShhService(stack, config, db); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
 	// start incentivisation service
 	if err := activateIncentivisationService(stack, config); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrIncentivisationServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrIncentivisationServiceRegistrationFailure, err)
 	}
 
 	// start status service.
 	if err := activateStatusService(stack, config); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
 	}
 
 	// start peer service
 	if err := activatePeerService(stack); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
 	}
 
 	if err := activateWalletService(stack, config.WalletConfig); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrWalletServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrWalletServiceRegistrationFailure, err)
 	}
 
 	if err := activateBrowsersService(stack, config.BrowsersConfig); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
 	}
 
 	if err := activatePermissionsService(stack, config.PermissionsConfig); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrPermissionsServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrPermissionsServiceRegistrationFailure, err)
 	}
 
-	return stack, nil
+	return nil
 }
 
 // newGethNodeConfig returns default stack configuration for mobile client node
