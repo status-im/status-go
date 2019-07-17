@@ -505,6 +505,16 @@ func (b *StatusBackend) Logout() error {
 		}
 	}
 
+	if err := b.resetStatusAccountsService(); err != nil {
+		return err
+	}
+
+	b.AccountManager().Logout()
+
+	return nil
+}
+
+func (b *StatusBackend) resetStatusAccountsService() error {
 	statusAccountsService, err := b.statusNode.StatusAccountsService()
 	switch err {
 	case node.ErrServiceUnknown:
@@ -513,8 +523,6 @@ func (b *StatusBackend) Logout() error {
 	default:
 		return err
 	}
-
-	b.AccountManager().Logout()
 
 	return nil
 }

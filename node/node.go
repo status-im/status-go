@@ -104,39 +104,47 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 		}
 	}
 
+	if err := activateNodeServices(stack, config, db); err != nil {
+		return nil, err
+	}
+
+	return stack, nil
+}
+
+func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) error {
 	// start Whisper service.
 	if err := activateShhService(stack, config, db); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
 	}
 
 	// start incentivisation service
 	if err := activateIncentivisationService(stack, config); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrIncentivisationServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrIncentivisationServiceRegistrationFailure, err)
 	}
 
 	// start status service.
 	if err := activateStatusService(stack, config); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrStatusServiceRegistrationFailure, err)
 	}
 
 	// start peer service
 	if err := activatePeerService(stack); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrPeerServiceRegistrationFailure, err)
 	}
 
 	if err := activateWalletService(stack, config.WalletConfig); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrWalletServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrWalletServiceRegistrationFailure, err)
 	}
 
 	if err := activateBrowsersService(stack, config.BrowsersConfig); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrBrowsersServiceRegistrationFailure, err)
 	}
 
 	if err := activateStatusAccountsService(stack, config.StatusAccountsConfig); err != nil {
-		return nil, fmt.Errorf("%v: %v", ErrStatusAccountsServiceRegistrationFailure, err)
+		return fmt.Errorf("%v: %v", ErrStatusAccountsServiceRegistrationFailure, err)
 	}
 
-	return stack, nil
+	return nil
 }
 
 // newGethNodeConfig returns default stack configuration for mobile client node
