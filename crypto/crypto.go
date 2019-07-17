@@ -9,10 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-const (
-	aesNonceLength = 12
-)
-
 // Sign signs the hash of an arbitrary string
 func Sign(content string, identity *ecdsa.PrivateKey) (string, error) {
 	signature, err := crypto.Sign(crypto.Keccak256([]byte(content)), identity)
