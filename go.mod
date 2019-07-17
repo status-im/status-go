@@ -10,7 +10,6 @@ require (
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/golang-migrate/migrate/v4 v4.5.0 // indirect
 	github.com/golang/mock v1.2.0
-	github.com/golang/protobuf v1.3.1
 	github.com/lib/pq v1.0.0
 	github.com/libp2p/go-libp2p-core v0.0.3
 	github.com/multiformats/go-multiaddr v0.0.4

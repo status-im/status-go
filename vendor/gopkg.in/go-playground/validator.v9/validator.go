@@ -14,24 +14,19 @@ type validate struct {
 	ns             []byte
 	actualNs       []byte
 	errs           ValidationErrors
+	includeExclude map[string]struct{} // reset only if StructPartial or StructExcept are called, no need otherwise
+	ffn            FilterFunc
+	slflParent     reflect.Value // StructLevel & FieldLevel
+	slCurrent      reflect.Value // StructLevel & FieldLevel
+	flField        reflect.Value // StructLevel & FieldLevel
+	cf             *cField       // StructLevel & FieldLevel
+	ct             *cTag         // StructLevel & FieldLevel
+	misc           []byte        // misc reusable
+	str1           string        // misc reusable
+	str2           string        // misc reusable
+	fldIsPointer   bool          // StructLevel & FieldLevel
 	isPartial      bool
 	hasExcludes    bool
-	includeExclude map[string]struct{} // reset only if StructPartial or StructExcept are called, no need otherwise
-
-	ffn FilterFunc
-
-	// StructLevel & FieldLevel fields
-	slflParent   reflect.Value
-	slCurrent    reflect.Value
-	flField      reflect.Value
-	fldIsPointer bool
-	cf           *cField
-	ct           *cTag
-
-	// misc reusable values
-	misc []byte
-	str1 string
-	str2 string
 }
 
 // parent and current will be the same the first run of validateStruct
@@ -127,7 +122,6 @@ func (v *validate) traverseField(ctx context.Context, parent reflect.Value, curr
 			}
 
 			if kind == reflect.Invalid {
-
 				v.errs = append(v.errs,
 					&fieldError{
 						v:              v.v,
@@ -219,8 +213,8 @@ func (v *validate) traverseField(ctx context.Context, parent reflect.Value, curr
 		CONTINUE:
 			// if len == 0 then validating using 'Var' or 'VarWithValue'
 			// Var - doesn't make much sense to do it that way, should call 'Struct', but no harm...
-			// VarWithField - this allows for validating against each field withing the struct against a specific value
-			//                pretty handly in certain situations
+			// VarWithField - this allows for validating against each field within the struct against a specific value
+			//                pretty handy in certain situations
 			if len(cf.name) > 0 {
 				ns = append(append(ns, cf.altName...), '.')
 				structNs = append(append(structNs, cf.name...), '.')

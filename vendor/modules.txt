@@ -3,7 +3,7 @@ github.com/NaySoftware/go-fcm
 # github.com/allegro/bigcache v0.0.0-20190218064605-e24eb225f156
 github.com/allegro/bigcache
 github.com/allegro/bigcache/queue
-# github.com/aristanetworks/goarista v0.0.0-20190502180301-283422fc1708
+# github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
 github.com/beevik/ntp
@@ -20,7 +20,7 @@ github.com/btcsuite/btcutil/bech32
 github.com/coreos/go-semver/semver
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
-# github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea
+# github.com/deckarep/golang-set v1.7.1
 github.com/deckarep/golang-set
 # github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712
 github.com/edsrzf/mmap-go
@@ -38,6 +38,7 @@ github.com/ethereum/go-ethereum/p2p/discv5
 github.com/ethereum/go-ethereum/p2p
 github.com/ethereum/go-ethereum/metrics
 github.com/ethereum/go-ethereum
+github.com/ethereum/go-ethereum/crypto/ecies
 github.com/ethereum/go-ethereum/p2p/enr
 github.com/ethereum/go-ethereum/rlp
 github.com/ethereum/go-ethereum/accounts/abi
@@ -102,7 +103,7 @@ github.com/go-stack/stack
 # github.com/gogo/protobuf v1.2.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/io
-# github.com/golang-migrate/migrate/v4 v4.4.0
+# github.com/golang-migrate/migrate/v4 v4.5.0
 github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4/source
 github.com/golang-migrate/migrate/v4
@@ -156,6 +157,8 @@ github.com/jbenet/goprocess/ratelimit
 github.com/karalabe/hid
 # github.com/koron/go-ssdp v0.0.0-20180514024734-4a0ed625a78b
 github.com/koron/go-ssdp
+# github.com/leodido/go-urn v1.1.0
+github.com/leodido/go-urn
 # github.com/lib/pq v1.0.0
 github.com/lib/pq
 github.com/lib/pq/oid
@@ -287,10 +290,8 @@ github.com/pmezard/go-difflib/difflib
 github.com/prometheus/prometheus/util/flock
 # github.com/rjeczalik/notify v0.9.1
 github.com/rjeczalik/notify
-# github.com/rs/cors v0.0.0-20160617231935-a62a804a8a00
+# github.com/rs/cors v1.6.0
 github.com/rs/cors
-# github.com/rs/xhandler v0.0.0-20160618193221-ed27b6fd6521
-github.com/rs/xhandler
 # github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 github.com/russolsen/transit
 # github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
@@ -315,6 +316,20 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
+# github.com/status-im/status-protocol-go v0.0.0-20190717215441-05bc8ec1cf9b
+github.com/status-im/status-protocol-go
+github.com/status-im/status-protocol-go/encryption/multidevice
+github.com/status-im/status-protocol-go/sqlite
+github.com/status-im/status-protocol-go/transport/whisper/filter
+github.com/status-im/status-protocol-go/encryption
+github.com/status-im/status-protocol-go/encryption/sharedsecret
+github.com/status-im/status-protocol-go/internal/sqlite
+github.com/status-im/status-protocol-go/transport/whisper
+github.com/status-im/status-protocol-go/v1
+github.com/status-im/status-protocol-go/transport/whisper/internal/sqlite
+github.com/status-im/status-protocol-go/crypto
+github.com/status-im/status-protocol-go/encryption/internal/sqlite
+github.com/status-im/status-protocol-go/encryption/publisher
 # github.com/status-im/whisper v1.4.14
 github.com/status-im/whisper/whisperv6
 # github.com/stretchr/testify v1.3.0
@@ -356,11 +371,11 @@ go.uber.org/zap
 # golang.org/x/crypto v0.0.0-20190530122614-20be4c3c3ed5
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
-golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/hkdf
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/scrypt
-golang.org/x/crypto/ripemd160
 golang.org/x/crypto/curve25519
+golang.org/x/crypto/ripemd160
 golang.org/x/crypto/blake2s
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/blowfish
@@ -400,7 +415,7 @@ golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
-# gopkg.in/go-playground/validator.v9 v9.9.3
+# gopkg.in/go-playground/validator.v9 v9.29.0
 gopkg.in/go-playground/validator.v9
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
