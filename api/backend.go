@@ -299,7 +299,7 @@ func (b *StatusBackend) CallPrivateRPC(inputJSON string) (string, error) {
 
 // SendTransaction creates a new transaction and waits until it's complete.
 func (b *StatusBackend) SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash gethcommon.Hash, err error) {
-	verifiedAccount, err := b.getVerifiedWalletAccount(password)
+	verifiedAccount, err := b.getVerifiedWalletAccount(sendArgs.From.String(), password)
 	if err != nil {
 		return hash, err
 	}
@@ -333,7 +333,7 @@ func (b *StatusBackend) HashTransaction(sendArgs transactions.SendTxArgs) (trans
 // SignMessage checks the pwd vs the selected account and passes on the signParams
 // to personalAPI for message signature
 func (b *StatusBackend) SignMessage(rpcParams personal.SignParams) (hexutil.Bytes, error) {
-	verifiedAccount, err := b.getVerifiedWalletAccount(rpcParams.Password)
+	verifiedAccount, err := b.getVerifiedWalletAccount(rpcParams.Address, rpcParams.Password)
 	if err != nil {
 		return hexutil.Bytes{}, err
 	}
@@ -347,8 +347,8 @@ func (b *StatusBackend) Recover(rpcParams personal.RecoverParams) (gethcommon.Ad
 }
 
 // SignTypedData accepts data and password. Gets verified account and signs typed data.
-func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, password string) (hexutil.Bytes, error) {
-	account, err := b.getVerifiedWalletAccount(password)
+func (b *StatusBackend) SignTypedData(typed typeddata.TypedData, address string, password string) (hexutil.Bytes, error) {
+	account, err := b.getVerifiedWalletAccount(address, password)
 	if err != nil {
 		return hexutil.Bytes{}, err
 	}
@@ -370,19 +370,35 @@ func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (common.Hash, e
 	return hash, err
 }
 
-func (b *StatusBackend) getVerifiedWalletAccount(password string) (*account.SelectedExtKey, error) {
-	selectedWalletAccount, err := b.accountManager.SelectedWalletAccount()
-	if err != nil {
-		b.log.Error("failed to get a selected account", "err", err)
-		return nil, err
-	}
+func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	config := b.StatusNode().Config()
-	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, selectedWalletAccount.Address.String(), password)
+
+	var validAddress bool
+
+	addresses := b.accountManager.WatchAddresses()
+	addresses = append(addresses, b.accountManager.MainAccountAddress())
+	for _, a := range addresses {
+		if a.String() == address {
+			validAddress = true
+			break
+		}
+	}
+
+	if !validAddress {
+		b.log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
+		return nil, transactions.ErrInvalidTxSender
+	}
+
+	key, err := b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)
 	if err != nil {
-		b.log.Error("failed to verify account", "account", selectedWalletAccount.Address.String(), "error", err)
+		b.log.Error("failed to verify account", "account", address, "error", err)
 		return nil, err
 	}
-	return selectedWalletAccount, nil
+
+	return &account.SelectedExtKey{
+		Address:    key.Address,
+		AccountKey: key,
+	}, nil
 }
 
 // registerHandlers attaches Status callback handlers to running node
@@ -552,7 +568,7 @@ func (b *StatusBackend) reSelectAccount() error {
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
-func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password string) error {
+func (b *StatusBackend) SelectAccount(loginParams account.LoginParams) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -562,7 +578,7 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 		return err
 	}
 
-	err = b.accountManager.SelectAccount(walletAddress, chatAddress, password)
+	err = b.accountManager.SelectAccount(loginParams)
 	if err != nil {
 		return err
 	}
@@ -589,33 +605,41 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 			return err
 		}
 
-		if err := st.InitProtocolWithPassword(chatAddress, password); err != nil {
+		if err := st.InitProtocolWithPassword(loginParams.ChatAddress.String(), loginParams.Password); err != nil {
 			return err
 		}
 	}
-	err = b.startWallet(password)
+
+	err = b.startWallet(loginParams.Password)
 	if err != nil {
 		return err
 	}
-	return b.startBrowsers(password)
+
+	return b.startBrowsers(loginParams.Password)
 }
 
 func (b *StatusBackend) startWallet(password string) error {
 	if !b.statusNode.Config().WalletConfig.Enabled {
 		return nil
 	}
+
 	wallet, err := b.statusNode.WalletService()
 	if err != nil {
 		return err
 	}
-	account, err := b.accountManager.SelectedWalletAccount()
+
+	watchAddresses := b.accountManager.WatchAddresses()
 	if err != nil {
 		return err
 	}
-	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", account.Address))
+
+	mainAccountAddress := b.accountManager.MainAccountAddress()
+	allAddresses := append(watchAddresses, mainAccountAddress)
+
+	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", mainAccountAddress))
 	return wallet.StartReactor(path, password,
 		b.statusNode.RPCClient().Ethclient(),
-		[]common.Address{account.Address},
+		allAddresses,
 		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
 }
 
@@ -627,11 +651,9 @@ func (b *StatusBackend) startBrowsers(password string) error {
 	if err != nil {
 		return err
 	}
-	account, err := b.accountManager.SelectedWalletAccount()
-	if err != nil {
-		return err
-	}
-	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("browsers-%x.sql", account.Address))
+
+	mainAccountAddress := b.accountManager.MainAccountAddress()
+	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("browsers-%x.sql", mainAccountAddress))
 	return svc.StartDatabase(path, password)
 }
 
