@@ -135,7 +135,7 @@ type EnodeDiscoveredSignal struct {
 type Messages struct {
 	Error    error                      `json:"error"`
 	Messages []dedup.DeduplicateMessage `json:"messages"`
-	Chat     filter.Chat               `json:"chat"`
+	Chat     filter.Chat                `json:"chat"`
 }
 
 // SendEnodeDiscovered tiggered when an enode is discovered.

@@ -32,8 +32,6 @@ const (
 	defaultConnectionsTarget = 1
 	// defaultTimeoutWaitAdded is a timeout to use to establish initial connections.
 	defaultTimeoutWaitAdded = 5 * time.Second
-	// maxInstallations is a maximum number of supported devices for one account.
-	maxInstallations = 3
 )
 
 // EnvelopeEventsHandler used for two different event types.
@@ -46,7 +44,7 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	messenger *protocol.Messenger
+	messenger       *protocol.Messenger
 	cancelMessenger chan struct{}
 
 	storage          db.TransactionalStorage
@@ -173,7 +171,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	// TODO: pass onNewMessagesHandler.
 	messenger, err := protocol.NewMessenger(
 		identity,
-		&server{server:s.server},
+		&server{server: s.server},
 		s.w,
 		dataDir,
 		encKey,
@@ -206,15 +204,15 @@ func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
 			var signalMessages []*signal.Messages
 			for chat, messages := range chatWithMessages {
 				signalMessage := &signal.Messages{
-					Chat:  chat,
-					Error: nil, // TODO
+					Chat:     chat,
+					Error:    nil, // TODO
 					Messages: s.deduplicator.Deduplicate(messages),
 				}
 				signalMessages = append(signalMessages, signalMessage)
 			}
 			PublisherSignalHandler{}.NewMessages(signalMessages)
-			case <-cancel:
-				return
+		case <-cancel:
+			return
 		}
 	}
 }
@@ -306,10 +304,8 @@ func (s *Service) Stop() error {
 
 	if s.cancelMessenger != nil {
 		select {
-		case _, ok := <-s.cancelMessenger:
-			if !ok {
-				// channel already closed
-			}
+		case <-s.cancelMessenger:
+			// channel already closed
 		default:
 			close(s.cancelMessenger)
 			s.cancelMessenger = nil

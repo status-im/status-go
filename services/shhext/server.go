@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"crypto/ecdsa"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
@@ -35,4 +36,3 @@ func (s *server) Connected(id enode.ID) (bool, error) {
 	}
 	return false, nil
 }
-
