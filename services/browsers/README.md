@@ -27,11 +27,11 @@ All fields are specified below:
 
 ```json
 {
-  "id": "1",
+  "browser-id": "1",
   "name": "first",
   "timestamp": 10,
-  "dapp": true,
-  "historyIndex": 1,
+  "dapp?": true,
+  "history-index": 1,
   "history": [
     "one",
     "two"

@@ -31,11 +31,11 @@ func InitializeDB(path, password string) (*Database, error) {
 }
 
 type Browser struct {
-	ID           string   `json:"id"`
+	ID           string   `json:"browser-id"`
 	Name         string   `json:"name"`
 	Timestamp    uint64   `json:"timestamp"`
-	Dapp         bool     `json:"dapp"`
-	HistoryIndex int      `json:"historyIndex,omitempty"`
+	Dapp         bool     `json:"dapp?"`
+	HistoryIndex int      `json:"history-index,omitempty"`
 	History      []string `json:"history,omitempty"`
 }
 
