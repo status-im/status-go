@@ -19,7 +19,7 @@ To simply start a container run `make`, other commands include:
 * `make show` - Shows you current status of the container.
 * `make logs` - Shows you logs of the container.
 * `make config` - Creates `config.json` with your Public IP.
-* `make enode` - Shows your currently running container's enode.
+* `make enode` - Shows `enode://` address of the container.
 
 # Settings
 
