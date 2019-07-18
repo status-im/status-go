@@ -320,6 +320,11 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	_, err := m.geth.AccountManager()
+	if err != nil {
+		return nil, err
+	}
+
 	addresses := make([]gethcommon.Address, 0)
 	if m.mainAccountAddress != zeroAddress {
 		addresses = append(addresses, m.mainAccountAddress)

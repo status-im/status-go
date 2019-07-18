@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/mock/gomock"
@@ -290,20 +291,12 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 			errKeyStore,
 		},
 		{
-			"fail_wrongWalletAddress",
-			[]interface{}{s.keyStore, nil},
-			"wrong-wallet-address",
-			s.chatAddress,
-			s.password,
-			ErrAddressToAccountMappingFailure,
-		},
-		{
 			"fail_wrongChatAddress",
 			[]interface{}{s.keyStore, nil},
 			s.walletAddress,
-			"wrong-chat-address",
+			"0x0000000000000000000000000000000000000001",
 			s.password,
-			ErrAddressToAccountMappingFailure,
+			errors.New("cannot retrieve a valid key for a given account: no key for given address or file"),
 		},
 		{
 			"fail_wrongPassword",
@@ -319,18 +312,24 @@ func (s *ManagerTestSuite) TestSelectAccount() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.reinitMock()
 			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			err := s.accManager.SelectAccount(testCase.walletAddress, testCase.chatAddress, testCase.password)
+			loginParams := LoginParams{
+				ChatAddress: common.HexToAddress(testCase.chatAddress),
+				MainAccount: common.HexToAddress(testCase.walletAddress),
+				Password:    testCase.password,
+			}
+			err := s.accManager.SelectAccount(loginParams)
 			s.Equal(testCase.expectedError, err)
 
-			selectedWalletAccount, walletErr := s.accManager.SelectedWalletAccount()
+			selectedMainAccountAddress, walletErr := s.accManager.MainAccountAddress()
 			selectedChatAccount, chatErr := s.accManager.SelectedChatAccount()
 
 			if testCase.expectedError == nil {
-				s.Equal(selectedWalletAccount.AccountKey, selectedChatAccount.AccountKey)
+				s.Equal(testCase.walletAddress, selectedMainAccountAddress.String())
+				s.Equal(testCase.chatAddress, crypto.PubkeyToAddress(selectedChatAccount.AccountKey.PrivateKey.PublicKey).Hex())
 				s.NoError(walletErr)
 				s.NoError(chatErr)
 			} else {
-				s.Nil(selectedWalletAccount)
+				s.Equal(common.Address{}, selectedMainAccountAddress)
 				s.Nil(selectedChatAccount)
 				s.Equal(walletErr, ErrNoAccountSelected)
 				s.Equal(chatErr, ErrNoAccountSelected)
@@ -356,95 +355,28 @@ func (s *ManagerTestSuite) TestSetChatAccount() {
 	s.Equal(privKey, selectedChatAccount.AccountKey.PrivateKey)
 	s.Equal(address, selectedChatAccount.Address)
 
-	selectedWalletAccount, err := s.accManager.SelectedWalletAccount()
+	selectedMainAccountAddress, err := s.accManager.MainAccountAddress()
 	s.Error(err)
-	s.Nil(selectedWalletAccount)
-}
-
-func (s *ManagerTestSuite) TestCreateChildAccount() {
-	// First, test the negative case where an account is not selected
-	// and an address is not provided.
-	s.accManager.selectedWalletAccount = nil
-	s.T().Run("fail_noAccount", func(t *testing.T) {
-		s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-		_, _, err := s.accManager.CreateChildAccount("", s.password)
-		s.Equal(ErrNoAccountSelected, err)
-	})
-
-	// Now, select the test account for rest of the test cases.
-	s.reinitMock()
-	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.walletAddress, s.chatAddress, s.password)
-	s.NoError(err)
-
-	testCases := []struct {
-		name                  string
-		walletAddress         string
-		chatAddress           string
-		password              string
-		accountKeyStoreReturn []interface{}
-		expectedError         error
-	}{
-		{
-			"success",
-			s.walletAddress,
-			s.chatAddress,
-			s.password,
-			[]interface{}{s.keyStore, nil},
-			nil,
-		},
-		{
-			"fail_keyStore",
-			s.walletAddress,
-			s.chatAddress,
-			s.password,
-			[]interface{}{nil, errKeyStore},
-			errKeyStore,
-		},
-		{
-			"fail_wrongWalletAddress",
-			"wrong-address",
-			s.chatAddress,
-			s.password,
-			[]interface{}{s.keyStore, nil},
-			ErrAddressToAccountMappingFailure,
-		},
-		{
-			"fail_wrongPassword",
-			s.walletAddress,
-			s.chatAddress,
-			"wrong-password",
-			[]interface{}{s.keyStore, nil},
-			errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"),
-		},
-	}
-
-	for _, testCase := range testCases {
-		s.T().Run(testCase.name, func(t *testing.T) {
-			s.reinitMock()
-			s.gethServiceProvider.EXPECT().AccountKeyStore().Return(testCase.accountKeyStoreReturn...).AnyTimes()
-			childAddr, childPubKey, err := s.accManager.CreateChildAccount(testCase.walletAddress, testCase.password)
-			if testCase.expectedError != nil {
-				s.Equal(testCase.expectedError, err)
-			} else {
-				s.NoError(err)
-				s.NotEmpty(childAddr)
-				s.NotEmpty(childPubKey)
-			}
-		})
-	}
+	s.Equal(common.Address{}, selectedMainAccountAddress)
 }
 
 func (s *ManagerTestSuite) TestLogout() {
 	s.accManager.Logout()
-	s.Nil(s.accManager.selectedWalletAccount)
+	s.Equal(common.Address{}, s.accManager.mainAccountAddress)
+	s.Nil(s.accManager.selectedChatAccount)
+	s.Len(s.accManager.watchAddresses, 0)
 }
 
 // TestAccounts tests cases for (*Manager).Accounts.
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
 	s.gethServiceProvider.EXPECT().AccountKeyStore().Return(s.keyStore, nil).AnyTimes()
-	err := s.accManager.SelectAccount(s.walletAddress, s.chatAddress, s.password)
+	loginParams := LoginParams{
+		MainAccount: common.HexToAddress(s.walletAddress),
+		ChatAddress: common.HexToAddress(s.chatAddress),
+		Password:    s.password,
+	}
+	err := s.accManager.SelectAccount(loginParams)
 	s.NoError(err)
 
 	// Success
@@ -458,8 +390,8 @@ func (s *ManagerTestSuite) TestAccounts() {
 	_, err = s.accManager.Accounts()
 	s.Equal(errAccManager, err)
 
-	// Selected account is nil but doesn't fail
-	s.accManager.selectedWalletAccount = nil
+	// Selected main account address is zero address but doesn't fail
+	s.accManager.mainAccountAddress = common.Address{}
 	s.gethServiceProvider.EXPECT().AccountManager().Return(s.gethAccManager, nil)
 	accs, err = s.accManager.Accounts()
 	s.NoError(err)
