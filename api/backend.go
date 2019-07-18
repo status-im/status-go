@@ -634,10 +634,6 @@ func (b *StatusBackend) startWallet(password string) error {
 	}
 
 	watchAddresses := b.accountManager.WatchAddresses()
-	if err != nil {
-		return err
-	}
-
 	mainAccountAddress, err := b.accountManager.MainAccountAddress()
 	if err != nil {
 		return err
