@@ -170,7 +170,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	// make sure that no wallet account is selected by default
 	selectedWalletAccount, err := s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
-	s.Nil(selectedWalletAccount)
+	s.Equal(common.Address{}, selectedWalletAccount)
 
 	// make sure that no chat account is selected by default
 	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
@@ -213,7 +213,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	selectedWalletAccount, err = s.Backend.AccountManager().MainAccountAddress()
 	s.NoError(err)
 	s.NotNil(selectedWalletAccount)
-	s.Equal(selectedWalletAccount, accountInfo2.WalletAddress, "incorrect wallet address selected")
+	s.Equal(selectedWalletAccount.String(), accountInfo2.WalletAddress, "incorrect wallet address selected")
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
 	s.NoError(err)
 	s.NotNil(selectedChatAccount)
@@ -241,7 +241,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 
 	selectedWalletAccount, err = s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
-	s.Nil(selectedWalletAccount)
+	s.Equal(common.Address{}, selectedWalletAccount)
 
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
