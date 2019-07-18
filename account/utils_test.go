@@ -68,7 +68,7 @@ func TestAccountUtilsTestSuite(t *testing.T) {
 	suite.Run(t, new(AccountUtilsTestSuite))
 }
 
-func TestMnemonicPhraseLengthToEntropyStrenght(t *testing.T) {
+func TestMnemonicPhraseLengthToEntropyStrength(t *testing.T) {
 	scenarios := []struct {
 		phraseLength     int
 		expectedStrength extkeys.EntropyStrength
@@ -86,7 +86,7 @@ func TestMnemonicPhraseLengthToEntropyStrenght(t *testing.T) {
 	}
 
 	for _, s := range scenarios {
-		strength, err := MnemonicPhraseLengthToEntropyStrenght(s.phraseLength)
+		strength, err := MnemonicPhraseLengthToEntropyStrength(s.phraseLength)
 		assert.Equal(t, s.expectedError, err)
 		assert.Equal(t, s.expectedStrength, strength)
 	}

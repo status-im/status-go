@@ -12,7 +12,7 @@ import (
 // errors
 var (
 	ErrInvalidAccountAddressOrKey  = errors.New("cannot parse address or key to valid account address")
-	ErrInvalidMnemonicPhraseLength = errors.New("mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
+	ErrInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 )
 
 // Info contains wallet and chat addresses and public keys of an account.
@@ -71,8 +71,8 @@ func ToAddress(accountAddress string) *common.Address {
 	return &to.Address
 }
 
-// MnemonicPhraseLengthToEntropyStrenght returns the entropy strength for a given mnemonic length
-func MnemonicPhraseLengthToEntropyStrenght(length int) (extkeys.EntropyStrength, error) {
+// MnemonicPhraseLengthToEntropyStrength returns the entropy strength for a given mnemonic length
+func MnemonicPhraseLengthToEntropyStrength(length int) (extkeys.EntropyStrength, error) {
 	if length < 12 || length > 24 || length%3 != 0 {
 		return 0, ErrInvalidMnemonicPhraseLength
 	}

@@ -126,7 +126,7 @@ func (s *AccountsTestSuite) TestImportNormalAccount() {
 	// import as normal account
 	password := "test-password-2"
 	addr, err := s.Backend.AccountManager().ImportNormalAccount(privateKey, password)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	_, key, err := s.Backend.AccountManager().AddressToDecryptedAccount(addr.String(), password)
 	s.NoError(err)

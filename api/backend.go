@@ -557,13 +557,8 @@ func (b *StatusBackend) SelectAccount(walletAddress, chatAddress, password strin
 	defer b.mu.Unlock()
 
 	b.AccountManager().RemoveOnboarding()
-
-	statusAccountsService, err := b.statusNode.StatusAccountsService()
-	switch err {
-	case node.ErrServiceUnknown:
-	case nil:
-		statusAccountsService.Reset()
-	default:
+	err := b.resetStatusAccountsService()
+	if err != nil {
 		return err
 	}
 

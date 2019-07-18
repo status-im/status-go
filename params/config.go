@@ -349,7 +349,7 @@ type NodeConfig struct {
 	// BrowsersConfig extra configuration for browsers.Service.
 	BrowsersConfig BrowsersConfig
 
-	// StatusAccountsConfig add extra configuration for the StatusAccountsService.
+	// StatusAccountsConfig adds extra configuration for the StatusAccountsService.
 	StatusAccountsConfig StatusAccountsConfig
 
 	// SwarmConfig extra configuration for Swarm and ENS
@@ -377,7 +377,7 @@ type BrowsersConfig struct {
 	Enabled bool
 }
 
-// StatusAccountsConfig extra configuration for the StatusAccountsService.
+// StatusAccountsConfig defines extra configuration for the StatusAccountsService.
 type StatusAccountsConfig struct {
 	Enabled bool
 }

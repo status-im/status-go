@@ -59,7 +59,7 @@ func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
 }
 
 func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccount, error) {
-	entropyStrength, err := MnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
+	entropyStrength, err := MnemonicPhraseLengthToEntropyStrength(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
 	}
