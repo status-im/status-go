@@ -7,9 +7,11 @@ import (
 	"errors"
 	"math/big"
 	"reflect"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/services/wallet/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -48,6 +50,7 @@ const (
 
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string) (*Database, error) {
+	start := time.Now()
 	db, err := sqlite.OpenDB(path, password)
 	if err != nil {
 		return nil, err
@@ -56,6 +59,7 @@ func InitializeDB(path, password string) (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Info("time spent for opening wallet database", "time", time.Since(start))
 	return &Database{db: db}, nil
 }
 
