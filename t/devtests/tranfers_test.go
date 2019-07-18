@@ -30,8 +30,17 @@ type TransfersSuite struct {
 }
 
 func (s *TransfersSuite) SelectAccount() {
-	s.Require().NoError(s.backend.SelectAccount(s.Info.WalletAddress, s.Info.ChatAddress, s.Password))
-	_, err := s.backend.AccountManager().SelectedWalletAccount()
+	loginParams := account.LoginParams{
+		ChatAddress: common.HexToAddress(s.Info.ChatAddress),
+		Password:    s.Password,
+		MainAccount: common.HexToAddress(s.Info.WalletAddress),
+	}
+
+	s.Require().NoError(s.backend.SelectAccount(loginParams))
+	_, err := s.backend.AccountManager().MainAccountAddress()
+	s.Require().NoError(err)
+
+	_, err = s.backend.AccountManager().SelectedChatAccount()
 	s.Require().NoError(err)
 }
 
