@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -80,7 +81,7 @@ func (s *StatusAccountsAPISuite) TestLoginLogout() {
 	// try Login with empty credential
 	// it won't really log in but it should remove all the account
 	// from memory.
-	err := s.Backend.SelectAccount("", "", "")
+	err := s.Backend.SelectAccount(account.LoginParams{})
 	s.Error(err)
 
 	// all accounts should be in memory
