@@ -54,3 +54,31 @@ func openDB(path, key string) (*sql.DB, error) {
 func OpenDB(path, key string) (*sql.DB, error) {
 	return openDB(path, key)
 }
+
+// OpenUnecryptedDB opens database with setting PRAGMA key.
+func OpenUnecryptedDB(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Disable concurrent access as not supported by the driver
+	db.SetMaxOpenConns(1)
+
+	if _, err = db.Exec("PRAGMA foreign_keys=ON"); err != nil {
+		return nil, err
+	}
+	// readers do not block writers and faster i/o operations
+	// https://www.sqlite.org/draft/wal.html
+	// must be set after db is encrypted
+	var mode string
+	err = db.QueryRow("PRAGMA journal_mode=WAL").Scan(&mode)
+	if err != nil {
+		return nil, err
+	}
+	if mode != "wal" {
+		return nil, fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
+	}
+
+	return db, nil
+}
