@@ -167,7 +167,12 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	for tuple := range addressCh {
 		wg.Add(1)
 		go func(tuple [3]string) {
-			assert.NoError(t, backend.SelectAccount(tuple[0], tuple[1], tuple[2]))
+			loginParams := account.LoginParams{
+				MainAccount: common.HexToAddress(tuple[0]),
+				ChatAddress: common.HexToAddress(tuple[1]),
+				Password:    tuple[2],
+			}
+			assert.NoError(t, backend.SelectAccount(loginParams))
 			wg.Done()
 		}(tuple)
 
@@ -219,8 +224,8 @@ func TestBackendInjectChatAccount(t *testing.T) {
 	require.True(t, whisperService.HasKeyPair(chatPubKeyHex), "identity not injected into whisper")
 
 	// wallet account should not be selected
-	walletAcc, err := backend.AccountManager().SelectedWalletAccount()
-	require.Nil(t, walletAcc)
+	mainAccountAddress, err := backend.AccountManager().MainAccountAddress()
+	require.Equal(t, common.Address{}, mainAccountAddress)
 	require.Equal(t, account.ErrNoAccountSelected, err)
 
 	// selected chat account should have the key injected previously
