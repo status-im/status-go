@@ -248,6 +248,7 @@ func (m *Manager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.mainAccountAddress = zeroAddress
 	m.watchAddresses = make([]common.Address, 0)
 	m.selectedChatAccount = nil
 }
@@ -319,8 +320,10 @@ func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// FIXME: return error if nothing set?
-	addresses := []gethcommon.Address{m.mainAccountAddress}
+	addresses := make([]gethcommon.Address, 0)
+	if m.mainAccountAddress != zeroAddress {
+		addresses = append(addresses, m.mainAccountAddress)
+	}
 
 	return addresses, nil
 }
