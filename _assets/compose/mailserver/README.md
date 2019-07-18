@@ -57,4 +57,4 @@ enode://dccd2f3c1df42c23af6672df28f287893ab70a5d45668637576a759b6db10b83e83fc025
 
 ### Should I set a secure mail-password?
 
-This password is only used to symmetrically secure history requests. It is not used to secure messages or authorize users in any way.
+This password is only used to symmetrically secure history requests. It is not used to secure messages or authorize users in any way. It's only purpose is to add another layer of encryption for whisper communication between whisper peers.
