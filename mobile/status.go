@@ -332,7 +332,7 @@ func Login(loginParamsJSON string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 
-	err := statusBackend.SelectAccount(params)
+	err = statusBackend.SelectAccount(params)
 	return makeJSONResponse(err)
 }
 
