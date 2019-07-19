@@ -43,9 +43,11 @@ func newPathDecoder(path string) (*pathDecoder, error) {
 		r: strings.NewReader(path),
 	}
 
-	err := d.reset()
+	if err := d.reset(); err != nil {
+		return nil, err
+	}
 
-	return d, err
+	return d, nil
 }
 
 func (d *pathDecoder) reset() error {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -21,6 +22,7 @@ var (
 type generator struct {
 	am       *staccount.Manager
 	accounts map[string]*account
+	sync.Mutex
 }
 
 func newGenerator() *generator {
@@ -256,7 +258,7 @@ func (g *generator) store(acc *account, password string) (AccountInfo, error) {
 			return AccountInfo{}, err
 		}
 	} else {
-		if _, err := g.am.ImportNormalAccount(acc.privateKey, password); err != nil {
+		if _, err := g.am.ImportAccount(acc.privateKey, password); err != nil {
 			return AccountInfo{}, err
 		}
 	}
@@ -267,6 +269,9 @@ func (g *generator) store(acc *account, password string) (AccountInfo, error) {
 }
 
 func (g *generator) addAccount(acc *account) string {
+	g.Lock()
+	defer g.Unlock()
+
 	id := uuid.NewRandom().String()
 	g.accounts[id] = acc
 
@@ -275,10 +280,16 @@ func (g *generator) addAccount(acc *account) string {
 
 // Reset resets the accounts map removing all the accounts from memory.
 func (g *generator) Reset() {
+	g.Lock()
+	defer g.Unlock()
+
 	g.accounts = make(map[string]*account)
 }
 
 func (g *generator) findAccount(accountID string) (*account, error) {
+	g.Lock()
+	defer g.Unlock()
+
 	acc, ok := g.accounts[accountID]
 	if !ok {
 		return nil, errAccountNotFoundByID

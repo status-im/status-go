@@ -111,7 +111,7 @@ func (s *AccountsTestSuite) TestImportSingleExtendedKey() {
 	s.Equal(crypto.FromECDSA(key.PrivateKey), crypto.FromECDSA(key.ExtendedKey.ToECDSA()))
 }
 
-func (s *AccountsTestSuite) TestImportNormalAccount() {
+func (s *AccountsTestSuite) TestImportAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
@@ -125,7 +125,7 @@ func (s *AccountsTestSuite) TestImportNormalAccount() {
 
 	// import as normal account
 	password := "test-password-2"
-	addr, err := s.Backend.AccountManager().ImportNormalAccount(privateKey, password)
+	addr, err := s.Backend.AccountManager().ImportAccount(privateKey, password)
 	s.Require().NoError(err)
 
 	_, key, err := s.Backend.AccountManager().AddressToDecryptedAccount(addr.String(), password)

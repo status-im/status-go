@@ -304,7 +304,8 @@ func (m *Manager) Logout() {
 	m.selectedChatAccount = nil
 }
 
-func (m *Manager) ImportNormalAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error) {
+// ImportAccount imports the account specified with privateKey.
+func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error) {
 	keyStore, err := m.geth.AccountKeyStore()
 	if err != nil {
 		return common.Address{}, err
