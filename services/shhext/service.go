@@ -160,15 +160,26 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
+	// Because status-protocol-go split a single database file into multiple ones,
+	// in order to keep the backward compatibility, we just copy existing database
+	// into multiple locations. The tables and schemas did not change so it will work.
+	sessionsDatabasePath := filepath.Join(dataDir, fmt.Sprintf("%s.sessions.v4.sql", s.config.InstallationID))
+	transportDatabasePath := filepath.Join(dataDir, fmt.Sprintf("%s.transport.v4.sql", s.config.InstallationID))
+	if _, err := os.Stat(v4Path); err == nil {
+		if err := copyFile(v4Path, sessionsDatabasePath); err != nil {
+			return fmt.Errorf("failed to copy a file from %s to %s: %v", v4Path, sessionsDatabasePath, err)
+		}
+		if err := copyFile(v4Path, transportDatabasePath); err != nil {
+			return fmt.Errorf("failed to copy a file from %s to %s: %v", v4Path, transportDatabasePath, err)
+		}
+	}
+
 	selectedKeyID := s.w.SelectedKeyPairID()
 	identity, err := s.w.GetPrivateKey(selectedKeyID)
 	if err != nil {
 		return err
 	}
 
-	// TODO: v4Path is the current database file. We should figure out
-	// how to split it into multiple files and migrate data.
-	// TODO: pass onNewMessagesHandler.
 	messenger, err := protocol.NewMessenger(
 		identity,
 		&server{server: s.server},
@@ -176,12 +187,16 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		dataDir,
 		encKey,
 		s.config.InstallationID,
+		protocol.WithDatabaseFilePaths(
+			sessionsDatabasePath,
+			transportDatabasePath,
+		),
 	)
 	if err != nil {
 		return err
 	}
 	s.messenger = messenger
-
+	// Start a loop that retrieves all messages and propagates them to status-react.
 	s.cancelMessenger = make(chan struct{})
 	go s.retrieveMessagesLoop(s.cancelMessenger)
 
@@ -195,7 +210,7 @@ func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
-			chatWithMessages, err := s.messenger.RetrieveAllRaw()
+			chatWithMessages, err := s.messenger.RetrieveRawAll()
 			if err != nil {
 				log.Error("failed to retrieve raw messages", "err", err)
 				break
@@ -205,7 +220,7 @@ func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
 			for chat, messages := range chatWithMessages {
 				signalMessage := &signal.Messages{
 					Chat:     chat,
-					Error:    nil, // TODO
+					Error:    nil, // TODO: what is it needed for?
 					Messages: s.deduplicator.Deduplicate(messages),
 				}
 				signalMessages = append(signalMessages, signalMessage)
@@ -309,6 +324,12 @@ func (s *Service) Stop() error {
 		default:
 			close(s.cancelMessenger)
 			s.cancelMessenger = nil
+		}
+	}
+
+	if s.messenger != nil {
+		if err := s.messenger.Shutdown(); err != nil {
+			return err
 		}
 	}
 

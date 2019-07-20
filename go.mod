@@ -19,7 +19,7 @@ require (
 	github.com/status-im/doubleratchet v2.0.0+incompatible
 	github.com/status-im/migrate/v4 v4.3.1-status
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.0.0-20190717215441-05bc8ec1cf9b
+	github.com/status-im/status-protocol-go v0.0.0-20190720143650-5a6fbb245d66
 	github.com/status-im/whisper v1.4.14
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
