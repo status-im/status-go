@@ -9,6 +9,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/status-im/status-go/services/shhext/dedup"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/log"
@@ -21,6 +23,7 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
+	"github.com/status-im/status-protocol-go/transport/whisper/filter"
 )
 
 const (
@@ -407,6 +410,15 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 	}
 }
 
+// GetNewFilterMessages is a prototype method with deduplication.
+func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.DeduplicateMessage, error) {
+	messages, err := api.publicAPI.GetFilterMessages(filterID)
+	if err != nil {
+		return nil, err
+	}
+	return api.service.deduplicator.Deduplicate(messages), nil
+}
+
 // ConfirmMessagesProcessed is a method to confirm that messages was consumed by
 // the client side.
 func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) (err error) {
@@ -439,14 +451,16 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 	return api.service.deduplicator.AddMessageByID(messageIDs)
 }
 
-// SendPublicMessage sends a public chat message to the underlying transport
+// SendPublicMessage sends a public chat message to the underlying transport.
+// Message's payload is a transit encoded message.
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
-	return api.service.messenger.Send(ctx, msg, msg.Payload)
+	return api.service.messenger.SendRaw(ctx, msg, msg.Payload)
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
+// Message's payload is a transit encoded message.
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (hexutil.Bytes, error) {
-	return api.service.messenger.Send(ctx, msg, msg.Payload)
+	return api.service.messenger.SendRaw(ctx, msg, msg.Payload)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
@@ -559,6 +573,14 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 
 func (api *PublicAPI) Join(chat JoinRPC) error {
 	return api.service.messenger.Join(chat)
+}
+
+func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
+	return api.service.messenger.LoadFilters(chats)
+}
+
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
+	return api.service.messenger.RemoveFilters(chats)
 }
 
 // EnableInstallation enables an installation for multi-device sync.
