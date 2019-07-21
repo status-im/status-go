@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/browsers"
 	"github.com/status-im/status-go/services/peer"
+	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wallet"
@@ -605,6 +606,17 @@ func (n *StatusNode) WalletService() (s *wallet.Service, err error) {
 
 // BrowsersService returns browsers.Service instance if it was started.
 func (n *StatusNode) BrowsersService() (s *browsers.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+	return
+}
+
+// PermissionsService returns browsers.Service instance if it was started.
+func (n *StatusNode) PermissionsService() (s *permissions.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	err = n.gethService(&s)
