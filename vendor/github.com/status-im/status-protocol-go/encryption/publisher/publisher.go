@@ -4,10 +4,10 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"go.uber.org/zap"
 )
 
 const (
@@ -25,18 +25,26 @@ var (
 
 type Publisher struct {
 	persistence *sqlitePersistence
+	logger      *zap.Logger
 	notifyCh    chan struct{}
 	quit        chan struct{}
 }
 
-func New(db *sql.DB) *Publisher {
+func New(db *sql.DB, logger *zap.Logger) *Publisher {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return &Publisher{
 		persistence: newSQLitePersistence(db),
+		logger:      logger.With(zap.Namespace("Publisher")),
 	}
 }
 
 func (p *Publisher) Start() <-chan struct{} {
-	log.Printf("[Publisher::Start] starting publisher")
+	logger := p.logger.With(zap.String("site", "Start"))
+
+	logger.Info("starting publisher")
 
 	p.notifyCh = make(chan struct{})
 	p.quit = make(chan struct{})
@@ -62,17 +70,19 @@ func (p *Publisher) tickerLoop() {
 	ticker := time.NewTicker(tickerInterval * time.Second)
 
 	go func() {
+		logger := p.logger.With(zap.String("site", "tickerLoop"))
+
 		for {
 			select {
 			case <-ticker.C:
 				err := p.notify()
 				switch err {
 				case errNotEnoughTimePassed:
-					log.Printf("[Publisher::startTicker] not enough time passed")
+					logger.Debug("not enough time passed")
 				case nil:
 					// skip
 				default:
-					log.Printf("[Publisher::startTicker] error while sending a contact code: %v", err)
+					logger.Error("error while sending a contact code", zap.Error(err))
 				}
 			case <-p.quit:
 				ticker.Stop()

@@ -3,11 +3,12 @@ package encryption
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
-	"log"
+
+	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/pkg/errors"
 
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
 	"github.com/status-im/status-protocol-go/encryption/publisher"
@@ -71,6 +72,8 @@ type Protocol struct {
 	onAddedBundlesHandler    func([]*multidevice.Installation)
 	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	onSendContactCodeHandler func(*ProtocolMessageSpec)
+
+	logger *zap.Logger
 }
 
 var (
@@ -80,34 +83,37 @@ var (
 
 // New creates a new ProtocolService instance
 func New(
-	dataDir string,
+	dbPath string,
 	dbKey string,
 	installationID string,
 	addedBundlesHandler func([]*multidevice.Installation),
 	onNewSharedSecretHandler func([]*sharedsecret.Secret),
 	onSendContactCodeHandler func(*ProtocolMessageSpec),
+	logger *zap.Logger,
 ) (*Protocol, error) {
 	return NewWithEncryptorConfig(
-		dataDir,
+		dbPath,
 		dbKey,
 		installationID,
-		defaultEncryptorConfig(installationID),
+		defaultEncryptorConfig(installationID, logger),
 		addedBundlesHandler,
 		onNewSharedSecretHandler,
 		onSendContactCodeHandler,
+		logger,
 	)
 }
 
 func NewWithEncryptorConfig(
-	dataDir string,
+	dbPath string,
 	dbKey string,
 	installationID string,
 	encryptorConfig encryptorConfig,
 	addedBundlesHandler func([]*multidevice.Installation),
 	onNewSharedSecretHandler func([]*sharedsecret.Secret),
 	onSendContactCodeHandler func(*ProtocolMessageSpec),
+	logger *zap.Logger,
 ) (*Protocol, error) {
-	encryptor, err := newEncryptor(dataDir, dbKey, encryptorConfig)
+	encryptor, err := newEncryptor(dbPath, dbKey, encryptorConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -118,20 +124,28 @@ func NewWithEncryptorConfig(
 
 	return &Protocol{
 		encryptor: encryptor,
-		secret:    sharedsecret.New(db),
+		secret:    sharedsecret.New(db, logger),
 		multidevice: multidevice.New(db, &multidevice.Config{
 			MaxInstallations: 3,
 			ProtocolVersion:  protocolVersion,
 			InstallationID:   installationID,
 		}),
-		publisher:                publisher.New(db),
+		publisher:                publisher.New(db, logger),
 		onAddedBundlesHandler:    addedBundlesHandler,
 		onNewSharedSecretHandler: onNewSharedSecretHandler,
 		onSendContactCodeHandler: onSendContactCodeHandler,
+		logger:                   logger.With(zap.Namespace("Protocol")),
 	}, nil
 }
 
-func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) {
+func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) error {
+	// Propagate currently cached shared secrets.
+	secrets, err := p.secret.All()
+	if err != nil {
+		return errors.Wrap(err, "failed to get all secrets")
+	}
+	p.onNewSharedSecretHandler(secrets)
+
 	// Handle Publisher system messages.
 	publisherCh := p.publisher.Start()
 
@@ -139,23 +153,31 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) {
 		for range publisherCh {
 			messageSpec, err := p.buildContactCodeMessage(myIdentity)
 			if err != nil {
-				log.Printf("[Protocol::Start] failed to build contact code message: %v", err)
+				p.logger.Error("failed to build contact code message",
+					zap.String("site", "Start"),
+					zap.Error(err))
 				continue
 			}
 
 			p.onSendContactCodeHandler(messageSpec)
 		}
 	}()
+
+	return nil
 }
 
 func (p *Protocol) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage, sendSingle bool) error {
+	logger := p.logger.With(zap.String("site", "addBundle"))
+
 	// Get a bundle
 	installations, err := p.multidevice.GetOurActiveInstallations(&myIdentityKey.PublicKey)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("[Protocol::addBundle] adding bundle to the message with installatoins %#v", installations)
+	logger.Info("adding bundle to the message",
+		zap.Any("installations", installations),
+	)
 
 	bundle, err := p.encryptor.CreateBundle(myIdentityKey, installations)
 	if err != nil {
@@ -197,7 +219,12 @@ func (p *Protocol) buildContactCodeMessage(myIdentityKey *ecdsa.PrivateKey) (*Pr
 
 // BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
 func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey *ecdsa.PublicKey, payload []byte) (*ProtocolMessageSpec, error) {
-	log.Printf("[Protocol::BuildDirectMessage] to %#x", crypto.FromECDSAPub(publicKey))
+	logger := p.logger.With(
+		zap.String("site", "BuildDirectMessage"),
+		zap.Binary("public-key", crypto.FromECDSAPub(publicKey)),
+	)
+
+	logger.Debug("building direct message")
 
 	// Get recipients installations.
 	activeInstallations, err := p.multidevice.GetActiveInstallations(publicKey)
@@ -236,7 +263,9 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 		return nil, err
 	}
 
-	log.Printf("[Protocol::BuildDirectMessage] found shared secret %t and agreed %t", sharedSecret != nil, agreed)
+	logger.Debug("shared secret agreement",
+		zap.Bool("has-shared-secret", sharedSecret != nil),
+		zap.Bool("agreed", agreed))
 
 	// Call handler
 	if sharedSecret != nil {
@@ -277,7 +306,9 @@ func (p *Protocol) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *
 
 // ProcessPublicBundle processes a received X3DH bundle.
 func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *Bundle) ([]*multidevice.Installation, error) {
-	log.Printf("[Protocol::ProcessPublicBundle] processing public bundle")
+	logger := p.logger.With(zap.String("site", "ProcessPublicBundle"))
+
+	logger.Debug("processing public bundle")
 
 	if err := p.encryptor.ProcessPublicBundle(myIdentityKey, bundle); err != nil {
 		return nil, err
@@ -288,7 +319,9 @@ func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *
 		return nil, err
 	}
 
-	log.Printf("[Protocol::ProcessPublicBundle] recovered %d installation enabled %t", len(installations), enabled)
+	logger.Debug("recovered installations",
+		zap.Int("installations", len(installations)),
+		zap.Bool("enabled", enabled))
 
 	// TODO(adam): why do we add installations using identity obtained from GetIdentity()
 	// instead of the output of crypto.CompressPubkey()? I tried the second option
@@ -296,11 +329,11 @@ func (p *Protocol) ProcessPublicBundle(myIdentityKey *ecdsa.PrivateKey, bundle *
 	identityFromBundle := bundle.GetIdentity()
 	theirIdentity, err := ExtractIdentity(bundle)
 	if err != nil {
-		panic(err)
+		logger.Panic("unrecoverable error extracting identity", zap.Error(err))
 	}
 	compressedIdentity := crypto.CompressPubkey(theirIdentity)
 	if !bytes.Equal(identityFromBundle, compressedIdentity) {
-		panic("identity from bundle and compressed are not equal")
+		logger.Panic("identity from bundle and compressed are not equal")
 	}
 
 	return p.multidevice.AddInstallations(bundle.GetIdentity(), bundle.GetTimestamp(), installations, enabled)
@@ -317,6 +350,8 @@ func (p *Protocol) recoverInstallationsFromBundle(myIdentityKey *ecdsa.PrivateKe
 		return nil, false, err
 	}
 
+	logger := p.logger.With(zap.String("site", "recoverInstallationsFromBundle"))
+
 	myIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(&myIdentityKey.PublicKey))
 	theirIdentityStr := fmt.Sprintf("0x%x", crypto.FromECDSAPub(theirIdentity))
 	// Any device from other peers will be considered enabled, ours needs to
@@ -325,7 +360,7 @@ func (p *Protocol) recoverInstallationsFromBundle(myIdentityKey *ecdsa.PrivateKe
 	signedPreKeys := bundle.GetSignedPreKeys()
 
 	for installationID, signedPreKey := range signedPreKeys {
-		log.Printf("[Protocol::recoverInstallationsFromBundle] recovered installation %s", installationID)
+		logger.Info("recovered installation", zap.String("installation-id", installationID))
 		if installationID != p.multidevice.InstallationID() {
 			installations = append(installations, &multidevice.Installation{
 				Identity: theirIdentityStr,
@@ -389,7 +424,9 @@ func (p *Protocol) HandleMessage(
 	protocolMessage *ProtocolMessage,
 	messageID []byte,
 ) ([]byte, error) {
-	log.Printf("[Protocol::HandleMessage] received a protocol message from %#x", crypto.FromECDSAPub(theirPublicKey))
+	logger := p.logger.With(zap.String("site", "HandleMessage"))
+
+	logger.Debug("received a protocol message", zap.Binary("sender-public-key", crypto.FromECDSAPub(theirPublicKey)))
 
 	if p.encryptor == nil {
 		return nil, errors.New("encryption service not initialized")
@@ -419,14 +456,14 @@ func (p *Protocol) HandleMessage(
 
 	// Check if it's a public message
 	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
-		log.Printf("[Protocol::HandleMessage] received a public message in direct message")
+		logger.Debug("received a public message in direct message")
 		// Nothing to do, as already in cleartext
 		return publicMessage, nil
 	}
 
 	// Decrypt message
 	if directMessage := protocolMessage.GetDirectMessage(); directMessage != nil {
-		log.Printf("[Protocol::HandleMessage] processing direct message")
+		logger.Debug("processing direct message")
 		message, err := p.encryptor.DecryptPayload(
 			myIdentityKey,
 			theirPublicKey,
@@ -441,9 +478,10 @@ func (p *Protocol) HandleMessage(
 		// Handle protocol negotiation for compatible clients
 		bundles := append(protocolMessage.GetBundles(), protocolMessage.GetBundle())
 		version := getProtocolVersion(bundles, protocolMessage.GetInstallationId())
-		log.Printf("[Protocol::HandleMessage] direct message version: %d", version)
+		logger.Debug("direct message version", zap.Uint32("version", version))
 		if version >= sharedSecretNegotiationVersion {
-			log.Printf("[Protocol::HandleMessage] negotiating shared secret for %#x", crypto.FromECDSAPub(theirPublicKey))
+			logger.Debug("negotiating shared secret",
+				zap.Binary("public-key", crypto.FromECDSAPub(theirPublicKey)))
 			sharedSecret, err := p.secret.Generate(myIdentityKey, theirPublicKey, protocolMessage.GetInstallationId())
 			if err != nil {
 				return nil, err

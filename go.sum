@@ -449,12 +449,8 @@ github.com/status-im/migrate/v4 v4.3.1-status/go.mod h1:r8HggRBZ/k7TRwByq/Hp3P/u
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
 github.com/status-im/status-go v0.29.0-beta.3/go.mod h1:8OHekmRoYTn9oZgMsBdhMEgeyfaQ4eI4ycOFHJCoX7M=
-github.com/status-im/status-protocol-go v0.0.0-20190717215441-05bc8ec1cf9b h1:bMICZJ39KmJnWqDyio926NLi5FyoG2snyf2mWoHnyHs=
-github.com/status-im/status-protocol-go v0.0.0-20190717215441-05bc8ec1cf9b/go.mod h1:KLYS+kMJcpMzYB023EfQq3tnSpKq1QSMMDyUekiLjuc=
-github.com/status-im/status-protocol-go v0.0.0-20190720091909-cf52ccb61117 h1:OykgEWk5kfAMzEHnuuc3BkuBloPsvMxLNAKBFKbd/ZE=
-github.com/status-im/status-protocol-go v0.0.0-20190720091909-cf52ccb61117/go.mod h1:rqlsXFR7WENTB4HDJRByRg95UfRo8pjGWvrvVrC2Dm4=
-github.com/status-im/status-protocol-go v0.0.0-20190720143650-5a6fbb245d66 h1:rHYq4Y3V+wdH2j+/1JwP6ocAcaR74nH+wSXOspPQUJs=
-github.com/status-im/status-protocol-go v0.0.0-20190720143650-5a6fbb245d66/go.mod h1:rqlsXFR7WENTB4HDJRByRg95UfRo8pjGWvrvVrC2Dm4=
+github.com/status-im/status-protocol-go v0.0.0-20190720160910-e4c472717860 h1:ZEtg4+ko0aNhoSq4LKdDVlhJS/9VemyRgIYbD9z+CJA=
+github.com/status-im/status-protocol-go v0.0.0-20190720160910-e4c472717860/go.mod h1:rqlsXFR7WENTB4HDJRByRg95UfRo8pjGWvrvVrC2Dm4=
 github.com/status-im/whisper v1.4.14 h1:9VHqx4+PUYfhDnYYtDxHkg/3cfVvkHjPNciY4LO83yc=
 github.com/status-im/whisper v1.4.14/go.mod h1:WS6z39YJQ8WJa9s+DmTuEM/s2nVF6Iz3B1SZYw5cYf0=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
