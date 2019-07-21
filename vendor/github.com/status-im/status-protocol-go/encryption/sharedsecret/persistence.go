@@ -5,16 +5,6 @@ import (
 	"strings"
 )
 
-type Persistence interface {
-	// Add adds a shared secret, associated with an identity and an installationID.
-	Add(identity []byte, secret []byte, installationID string) error
-	// Get returns a shared secret associated with multiple installationIDs.
-	Get(identity []byte, installationIDs []string) (*Response, error)
-	// All returns an array of shared secrets, each one of them represented.
-	// as a byte array
-	All() ([][][]byte, error)
-}
-
 type Response struct {
 	secret          []byte
 	installationIDs map[string]bool

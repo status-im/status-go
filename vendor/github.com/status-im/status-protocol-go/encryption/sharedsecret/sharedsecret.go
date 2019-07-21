@@ -5,10 +5,10 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"errors"
-	"log"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"go.uber.org/zap"
 )
 
 const sskLen = 16
@@ -21,14 +21,20 @@ type Secret struct {
 // SharedSecret generates and manages negotiated secrets.
 // Identities (public keys) stored by SharedSecret
 // are compressed.
-// TODO: make it a part of sqlitePersistence instead of SharedSecret.
+// TODO: make compression of public keys a responsibility  of sqlitePersistence instead of SharedSecret.
 type SharedSecret struct {
 	persistence *sqlitePersistence
+	logger      *zap.Logger
 }
 
-func New(db *sql.DB) *SharedSecret {
+func New(db *sql.DB, logger *zap.Logger) *SharedSecret {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return &SharedSecret{
 		persistence: newSQLitePersistence(db),
+		logger:      logger.With(zap.Namespace("SharedSecret")),
 	}
 }
 
@@ -42,10 +48,12 @@ func (s *SharedSecret) generate(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *
 		return nil, err
 	}
 
-	log.Printf(
-		"[SharedSecret::generate] saving a shared key for %#x and installation %s",
-		crypto.FromECDSAPub(theirPublicKey),
-		installationID,
+	logger := s.logger.With(zap.String("site", "generate"))
+
+	logger.Debug(
+		"saving a shared key",
+		zap.Binary("their-public-key", crypto.FromECDSAPub(theirPublicKey)),
+		zap.String("installation-id", installationID),
 	)
 
 	theirIdentity := crypto.CompressPubkey(theirPublicKey)
@@ -63,10 +71,12 @@ func (s *SharedSecret) Generate(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *
 
 // Agreed returns true if a secret has been acknowledged by all the installationIDs.
 func (s *SharedSecret) Agreed(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, theirPublicKey *ecdsa.PublicKey, theirInstallationIDs []string) (*Secret, bool, error) {
-	log.Printf(
-		"[SharedSecret::Agreed] checking against for %#x and installations %#v",
-		crypto.FromECDSAPub(theirPublicKey),
-		theirInstallationIDs,
+	logger := s.logger.With(zap.String("site", "Agreed"))
+
+	logger.Debug(
+		"checking if shared secret is acknowledged",
+		zap.Binary("their-public-key", crypto.FromECDSAPub(theirPublicKey)),
+		zap.Strings("their-installation-ids", theirInstallationIDs),
 	)
 
 	secret, err := s.generate(myPrivateKey, theirPublicKey, myInstallationID)
@@ -86,7 +96,7 @@ func (s *SharedSecret) Agreed(myPrivateKey *ecdsa.PrivateKey, myInstallationID s
 
 	for _, installationID := range theirInstallationIDs {
 		if !response.installationIDs[installationID] {
-			log.Printf("[SharedSecret::Agreed] no shared secret with installation %s", installationID)
+			logger.Debug("no shared secret for installation", zap.String("installation-id", installationID))
 			return secret, false, nil
 		}
 	}

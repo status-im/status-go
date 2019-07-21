@@ -5,14 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
-	"path/filepath"
 	"sync"
 	"time"
 
 	ecrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	dr "github.com/status-im/doubleratchet"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-protocol-go/crypto"
 	migrations "github.com/status-im/status-protocol-go/encryption/internal/sqlite"
@@ -44,6 +43,7 @@ type encryptor struct {
 	config      encryptorConfig
 	messageIDs  map[string]*confirmationData
 	mutex       sync.Mutex
+	logger      *zap.Logger
 }
 
 type encryptorConfig struct {
@@ -58,10 +58,16 @@ type encryptorConfig struct {
 	MaxMessageKeysPerSession int
 	// How long before we refresh the interval in milliseconds
 	BundleRefreshInterval int64
+	// The logging object
+	Logger *zap.Logger
 }
 
 // defaultEncryptorConfig returns the default values used by the encryption service
-func defaultEncryptorConfig(installationID string) encryptorConfig {
+func defaultEncryptorConfig(installationID string, logger *zap.Logger) encryptorConfig {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return encryptorConfig{
 		MaxInstallations:         3,
 		MaxSkip:                  1000,
@@ -69,12 +75,12 @@ func defaultEncryptorConfig(installationID string) encryptorConfig {
 		MaxMessageKeysPerSession: 2000,
 		BundleRefreshInterval:    24 * 60 * 60 * 1000,
 		InstallationID:           installationID,
+		Logger:                   logger,
 	}
 }
 
 // newEncryptor creates a new EncryptionService instance.
-func newEncryptor(dbDir, dbKey string, config encryptorConfig) (*encryptor, error) {
-	dbPath := filepath.Join(dbDir, "sessions.sql")
+func newEncryptor(dbPath, dbKey string, config encryptorConfig) (*encryptor, error) {
 	db, err := sqlite.Open(dbPath, dbKey, sqlite.MigrationConfig{
 		AssetNames: migrations.AssetNames(),
 		AssetGetter: func(name string) ([]byte, error) {
@@ -89,6 +95,7 @@ func newEncryptor(dbDir, dbKey string, config encryptorConfig) (*encryptor, erro
 		persistence: newSQLitePersistence(db),
 		config:      config,
 		messageIDs:  make(map[string]*confirmationData),
+		logger:      config.Logger.With(zap.Namespace("encryptor")),
 	}, nil
 }
 
@@ -126,7 +133,7 @@ func (s *encryptor) ConfirmMessageProcessed(messageID []byte) error {
 	id := confirmationIDString(messageID)
 	confirmationData, ok := s.messageIDs[id]
 	if !ok {
-		// s.log.Debug("Could not confirm message", "messageID", id)
+		s.logger.Debug("could not confirm message", zap.String("messageID", id))
 		return fmt.Errorf("message with ID %#x not found", messageID)
 	}
 
@@ -201,7 +208,7 @@ func (s *encryptor) DecryptWithDH(myIdentityKey *ecdsa.PrivateKey, theirEphemera
 func (s *encryptor) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIdentityKey *ecdsa.PublicKey, theirEphemeralKey *ecdsa.PublicKey, ourBundleID []byte) ([]byte, error) {
 	bundlePrivateKey, err := s.persistence.GetPrivateKeyBundle(ourBundleID)
 	if err != nil {
-		// s.log.Error("Could not get private bundle", "err", err)
+		s.logger.Error("could not get private bundle", zap.Error(err))
 		return nil, err
 	}
 
@@ -211,7 +218,7 @@ func (s *encryptor) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIde
 
 	signedPreKey, err := ecrypto.ToECDSA(bundlePrivateKey)
 	if err != nil {
-		// s.log.Error("Could not convert to ecdsa", "err", err)
+		s.logger.Error("could not convert to ecdsa", zap.Error(err))
 		return nil, err
 	}
 
@@ -222,7 +229,7 @@ func (s *encryptor) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIde
 		myIdentityKey,
 	)
 	if err != nil {
-		// s.log.Error("Could not perform passive x3dh", "err", err)
+		s.logger.Error("could not perform passive x3dh", zap.Error(err))
 		return nil, err
 	}
 	return key, nil
@@ -289,18 +296,18 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 
 		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC, theirInstallationID)
 		if err != nil {
-			// s.log.Error("Could not get ratchet info", "err", err)
+			s.logger.Error("could not get ratchet info", zap.Error(err))
 			return nil, err
 		}
 
 		// We mark the exchange as successful so we stop sending x3dh header
 		if err = s.persistence.RatchetInfoConfirmed(drHeader.GetId(), theirIdentityKeyC, theirInstallationID); err != nil {
-			// s.log.Error("Could not confirm ratchet info", "err", err)
+			s.logger.Error("could not confirm ratchet info", zap.Error(err))
 			return nil, err
 		}
 
 		if drInfo == nil {
-			// s.log.Error("Could not find a session")
+			s.logger.Error("could not find a session")
 			return nil, errSessionNotFound
 		}
 
@@ -471,7 +478,11 @@ func (s *encryptor) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, installat
 
 // EncryptPayload returns a new DirectMessageProtocol with a given payload encrypted, given a recipient's public key and the sender private identity key
 func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*DirectMessageProtocol, []*multidevice.Installation, error) {
-	log.Printf("[Protocol::EncryptPayload] for %#x", ecrypto.FromECDSAPub(theirIdentityKey))
+	logger := s.logger.With(
+		zap.String("site", "EncryptPayload"),
+		zap.Binary("their-identity-key", ecrypto.FromECDSAPub(theirIdentityKey)))
+
+	logger.Debug("encrypting payload")
 	// Which installations we are sending the message to
 	var targetedInstallations []*multidevice.Installation
 
@@ -480,7 +491,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 
 	// We don't have any, send a message with DH
 	if len(installations) == 0 {
-		log.Printf("[Protocol::EncryptPayload] no installations, sending to all devices")
+		logger.Debug("no installations, sending to all devices")
 		encryptedPayload, err := s.EncryptPayloadWithDH(theirIdentityKey, payload)
 		return encryptedPayload, targetedInstallations, err
 	}
@@ -490,7 +501,8 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 
 	for _, installation := range installations {
 		installationID := installation.ID
-		log.Printf("[Protocol::EncryptPayload] processing installation %s", installationID)
+		ilogger := logger.With(zap.String("installation-id", installationID))
+		ilogger.Debug("processing installation")
 		if s.config.InstallationID == installationID {
 			continue
 		}
@@ -509,7 +521,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 		targetedInstallations = append(targetedInstallations, installation)
 
 		if drInfo != nil {
-			log.Printf("[Protocol::EncryptPayload] found DR info for installation %s", installationID)
+			ilogger.Debug("found DR info for installation")
 			encryptedPayload, drHeader, err := s.encryptUsingDR(theirIdentityKey, drInfo, payload)
 			if err != nil {
 				return nil, nil, err
@@ -535,12 +547,12 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 
 		// This should not be nil at this point
 		if theirSignedPreKeyContainer == nil {
-			log.Printf("[Protocol::EncryptPayload] could not find DR info or bundle for installation %s", installationID)
+			ilogger.Warn("could not find DR info or bundle for installation")
 			continue
 
 		}
 
-		log.Printf("[Protocol::EncryptPayload] DR info not found, using bundle for installation %s", installationID)
+		ilogger.Debug("DR info not found, using bundle")
 
 		theirSignedPreKey := theirSignedPreKeyContainer.GetSignedPreKey()
 
@@ -586,10 +598,9 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 	for _, i := range targetedInstallations {
 		installationIDs = append(installationIDs, i.ID)
 	}
-	log.Printf(
-		"[Protocol::EncryptPayload] built a message for %#x and installations %v",
-		ecrypto.FromECDSAPub(theirIdentityKey),
-		installationIDs,
+	logger.Info(
+		"built a message",
+		zap.Strings("installation-ids", installationIDs),
 	)
 
 	return response, targetedInstallations, nil
