@@ -431,6 +431,7 @@ func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) (err
 
 // ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
 // the client side.
+// TODO: this is broken now as it requires dedup ID while a message hash should be used.
 func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 	if err := api.service.ConfirmMessagesProcessed(messageIDs); err != nil {
 		return err
