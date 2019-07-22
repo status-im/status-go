@@ -571,10 +571,6 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-func (api *PublicAPI) Join(chat JoinRPC) error {
-	return api.service.messenger.Join(chat)
-}
-
 func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
 	return api.service.messenger.LoadFilters(chats)
 }

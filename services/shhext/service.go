@@ -198,13 +198,13 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	s.messenger = messenger
 	// Start a loop that retrieves all messages and propagates them to status-react.
 	s.cancelMessenger = make(chan struct{})
-	go s.retrieveMessagesLoop(s.cancelMessenger)
+	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 
 	return nil
 }
 
-func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
-	ticker := time.NewTicker(time.Second)
+func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
+	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
 	for {
@@ -213,7 +213,7 @@ func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
 			chatWithMessages, err := s.messenger.RetrieveRawAll()
 			if err != nil {
 				log.Error("failed to retrieve raw messages", "err", err)
-				break
+				continue
 			}
 
 			var signalMessages []*signal.Messages
@@ -225,6 +225,13 @@ func (s *Service) retrieveMessagesLoop(cancel <-chan struct{}) {
 				}
 				signalMessages = append(signalMessages, signalMessage)
 			}
+
+			log.Debug("retrieve messages loop", "messages", len(signalMessages))
+
+			if len(signalMessages) == 0 {
+				continue
+			}
+
 			PublisherSignalHandler{}.NewMessages(signalMessages)
 		case <-cancel:
 			return
