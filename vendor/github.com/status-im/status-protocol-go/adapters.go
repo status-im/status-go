@@ -315,7 +315,7 @@ func (a *whisperAdapter) SendPublic(ctx context.Context, chatName, chatID string
 
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.
 // DEPRECATED
-func (a *whisperAdapter) SendPublicRaw(ctx context.Context, chatName, chatID string, data []byte) ([]byte, error) {
+func (a *whisperAdapter) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, error) {
 	newMessage := whisper.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   data,
@@ -371,7 +371,6 @@ func (a *whisperAdapter) SendPrivate(
 func (a *whisperAdapter) SendPrivateRaw(
 	ctx context.Context,
 	publicKey *ecdsa.PublicKey,
-	chatID string,
 	data []byte,
 ) ([]byte, error) {
 	logger := a.logger.With(zap.String("site", "SendPrivateRaw"))
