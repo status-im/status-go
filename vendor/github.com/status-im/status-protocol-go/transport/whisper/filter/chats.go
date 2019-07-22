@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -37,6 +35,7 @@ type NegotiatedSecret struct {
 	Key       []byte
 }
 
+// TODO: revise fields encoding/decoding. Some are encoded using hexutil and some using encoding/hex.
 type Chat struct {
 	// ChatID is the identifier of the chat
 	ChatID string `json:"chatId"`
@@ -161,11 +160,7 @@ func (s *ChatsManager) InitWithChats(chats []*Chat, genericDiscoveryTopicEnabled
 
 	for _, chat := range chats {
 		if chat.Identity != "" && chat.OneToOne {
-			publicKeyBytes, err := hexutil.Decode(chat.Identity)
-			if err != nil {
-				return nil, err
-			}
-			publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+			publicKey, err := strToPublicKey(chat.Identity)
 			if err != nil {
 				return nil, err
 			}
@@ -547,6 +542,14 @@ func toTopic(s string) []byte {
 
 func ToTopic(s string) []byte {
 	return toTopic(s)
+}
+
+func strToPublicKey(str string) (*ecdsa.PublicKey, error) {
+	publicKeyBytes, err := hex.DecodeString(str)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.UnmarshalPubkey(publicKeyBytes)
 }
 
 func publicKeyToStr(publicKey *ecdsa.PublicKey) string {
