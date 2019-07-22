@@ -191,6 +191,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 			sessionsDatabasePath,
 			transportDatabasePath,
 		),
+		protocol.WithGenericDiscoveryTopicSupport(),
 	)
 	if err != nil {
 		return err
