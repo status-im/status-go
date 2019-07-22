@@ -14,7 +14,8 @@ type JSONBlob struct {
 
 // Scan implements interface.
 func (blob *JSONBlob) Scan(value interface{}) error {
-	if value == nil || reflect.ValueOf(blob.Data).IsNil() {
+	dataVal := reflect.ValueOf(blob.Data)
+	if value == nil || dataVal.Kind() == reflect.Ptr && dataVal.IsNil() {
 		return nil
 	}
 	bytes, ok := value.([]byte)
@@ -30,7 +31,8 @@ func (blob *JSONBlob) Scan(value interface{}) error {
 
 // Value implements interface.
 func (blob *JSONBlob) Value() (driver.Value, error) {
-	if blob.Data == nil || reflect.ValueOf(blob.Data).IsNil() {
+	dataVal := reflect.ValueOf(blob.Data)
+	if blob.Data == nil || dataVal.Kind() == reflect.Ptr && dataVal.IsNil() {
 		return nil, nil
 	}
 	return json.Marshal(blob.Data)

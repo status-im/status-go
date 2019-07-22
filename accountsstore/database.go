@@ -8,14 +8,15 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
+// Account stores public information about account.
 type Account struct {
-	Name    string
-	Address common.Address
+	Name    string         `json:"name"`
+	Address common.Address `json:"address"`
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path, password string) (*Database, error) {
-	db, err := sqlite.OpenDB(path, password)
+func InitializeDB(path string) (*Database, error) {
+	db, err := sqlite.OpenUnecryptedDB(path)
 	if err != nil {
 		return nil, err
 	}
@@ -28,6 +29,10 @@ func InitializeDB(path, password string) (*Database, error) {
 
 type Database struct {
 	db *sql.DB
+}
+
+func (db *Database) Close() error {
+	return db.db.Close()
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
@@ -47,8 +52,8 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	return rst, nil
 }
 
-func (db *Database) SaveAccount(acc Account) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name) VALUES (?, ?)", acc.Address, acc.Name)
+func (db *Database) SaveAccount(account Account) error {
+	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name) VALUES (?, ?)", account.Address, account.Name)
 	return err
 }
 

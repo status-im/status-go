@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/accountsstore"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/node"
@@ -56,6 +58,8 @@ type StatusBackend struct {
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
+	accountsMu      sync.Mutex
+	accounts        *accountsstore.Database
 	accountManager  *account.Manager
 	transactor      *transactions.Transactor
 	newNotification fcm.NotificationConstructor
@@ -75,7 +79,6 @@ func NewStatusBackend() *StatusBackend {
 	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
 	rpcFilters := rpcfilters.New(statusNode)
-
 	return &StatusBackend{
 		statusNode:      statusNode,
 		accountManager:  accountManager,
@@ -119,6 +122,50 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	}
 
 	return nil
+}
+
+func (b *StatusBackend) OpenAccounts(datadir string) error {
+	b.accountsMu.Lock()
+	defer b.accountsMu.Unlock()
+	if b.accounts != nil {
+		return nil
+	}
+	db, err := accountsstore.InitializeDB(filepath.Join(datadir, "accounts"))
+	if err != nil {
+		return err
+	}
+	b.accounts = db
+	return nil
+}
+
+func (b *StatusBackend) GetAccounts() ([]accountsstore.Account, error) {
+	b.accountsMu.Lock()
+	defer b.accountsMu.Unlock()
+	if b.accounts == nil {
+		return nil, errors.New("accoutns db wasn't initialized")
+	}
+	return b.accounts.GetAccounts()
+}
+
+func (b *StatusBackend) SaveAccount(account accountsstore.Account) error {
+	b.accountsMu.Lock()
+	defer b.accountsMu.Unlock()
+	if b.accounts == nil {
+		return errors.New("accoutns db wasn't initialized")
+	}
+	return b.accounts.SaveAccount(account)
+}
+
+func (b *StatusBackend) SaveNodeConfig(address common.Address, config *params.NodeConfig) error {
+	b.accountsMu.Lock()
+	defer b.accountsMu.Unlock()
+	return b.accounts.SaveConfig(address, "node-config", config)
+}
+
+func (b *StatusBackend) LoadNodeConfig(address common.Address) (conf *params.NodeConfig, err error) {
+	b.accountsMu.Lock()
+	defer b.accountsMu.Unlock()
+	return conf, b.accounts.GetConfig(address, "node-config", conf)
 }
 
 func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
