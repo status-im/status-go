@@ -189,18 +189,6 @@ func NewPublicAPI(s *Service) *PublicAPI {
 	}
 }
 
-// Post shamelessly copied from whisper codebase with slight modifications.
-func (api *PublicAPI) Post(ctx context.Context, req whisper.NewMessage) (hexutil.Bytes, error) {
-	hexID, err := api.publicAPI.Post(ctx, req)
-	if err == nil {
-		api.service.envelopesMonitor.Add(common.BytesToHash(hexID), req)
-	} else {
-		return nil, err
-	}
-	mID := messageID(req)
-	return mID[:], err
-}
-
 func (api *PublicAPI) getPeer(rawurl string) (*enode.Node, error) {
 	if len(rawurl) == 0 {
 		return mailservers.GetFirstConnected(api.service.server, api.service.peerStore)
@@ -451,16 +439,40 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 	return api.service.deduplicator.AddMessageByID(messageIDs)
 }
 
+// Post is used to send one-to-one for those who did not enabled device-to-device sync,
+// in other words don't use PFS-enabled messages. Otherwise, SendDirectMessage is used.
+// It's important to call PublicAPI.afterSend() so that the client receives a signal
+// with confirmation that the message left the device.
+func (api *PublicAPI) Post(ctx context.Context, newMessage whisper.NewMessage) (hexutil.Bytes, error) {
+	hash, err := api.publicAPI.Post(ctx, newMessage)
+	if err != nil {
+		return nil, err
+	}
+	return api.service.afterPost(hash, newMessage), nil
+}
+
 // SendPublicMessage sends a public chat message to the underlying transport.
 // Message's payload is a transit encoded message.
+// It's important to call PublicAPI.afterSend() so that the client receives a signal
+// with confirmation that the message left the device.
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
-	return api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	hash, newMessage, err := api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return api.service.afterPost(hash, newMessage), nil
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 // Message's payload is a transit encoded message.
+// It's important to call PublicAPI.afterSend() so that the client receives a signal
+// with confirmation that the message left the device.
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (hexutil.Bytes, error) {
-	return api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	hash, newMessage, err := api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return api.service.afterPost(hash, newMessage), nil
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {

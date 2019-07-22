@@ -367,13 +367,13 @@ func (m *Messenger) Send(ctx context.Context, chat Chat, data []byte) ([]byte, e
 
 // SendRaw takes encoded data, encrypts it and sends through the wire.
 // DEPRECATED
-func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte, error) {
+func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte, whisper.NewMessage, error) {
 	if chat.PublicKey() != nil {
 		return m.adapter.SendPrivateRaw(ctx, chat.PublicKey(), data)
 	} else if chat.PublicName() != "" {
 		return m.adapter.SendPublicRaw(ctx, chat.PublicName(), data)
 	}
-	return nil, errors.New("chat is neither public nor private")
+	return nil, whisper.NewMessage{}, errors.New("chat is neither public nor private")
 }
 
 type RetrieveConfig struct {

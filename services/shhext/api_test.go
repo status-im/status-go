@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/params"
+	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/mailserver"
 
+	protocol "github.com/status-im/status-protocol-go"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -236,4 +240,57 @@ func TestExpiredOrCompleted(t *testing.T) {
 	case err := <-errors:
 		require.EqualError(t, err, fmt.Sprintf("request %x expired", hash))
 	}
+}
+
+func TestAfterPostIsCalled(t *testing.T) {
+	shhConfig := whisper.DefaultConfig
+	shhConfig.MinimumAcceptedPOW = 0
+	w := whisper.New(&shhConfig)
+	symKeyID, err := w.AddSymKeyFromPassword("abc")
+	require.NoError(t, err)
+
+	identity, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	tmpDir, err := ioutil.TempDir("", "test-after-post")
+	require.NoError(t, err)
+
+	service := New(w, nil, nil, params.ShhextConfig{})
+	service.messenger, err = protocol.NewMessenger(
+		identity,
+		nil,
+		w,
+		tmpDir,
+		"encKey",
+		"installation1",
+	)
+	require.NoError(t, err)
+
+	api := NewPublicAPI(service)
+
+	// Using api.Post()
+	hash1, err := api.Post(context.Background(), whisper.NewMessage{
+		SymKeyID: symKeyID,
+		Topic:    stringToTopic("topic"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, EnvelopePosted, service.envelopesMonitor.GetMessageState(common.BytesToHash(hash1)))
+
+	// Using api.SendPublicMessage()
+	hash2, err := api.SendPublicMessage(context.Background(), SendPublicMessageRPC{
+		Chat:    "test-channel",
+		Payload: []byte("abc"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, EnvelopePosted, service.envelopesMonitor.GetMessageState(common.BytesToHash(hash2)))
+
+	// Using api.SendDirectMessage()
+	recipient, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	hash3, err := api.SendDirectMessage(context.Background(), SendDirectMessageRPC{
+		PubKey:  crypto.FromECDSAPub(&recipient.PublicKey),
+		Payload: []byte("abc"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, EnvelopePosted, service.envelopesMonitor.GetMessageState(common.BytesToHash(hash3)))
 }

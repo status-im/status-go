@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -385,4 +386,10 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 			return
 		}
 	}
+}
+
+func (s *Service) afterPost(hash []byte, newMessage whisper.NewMessage) hexutil.Bytes {
+	s.envelopesMonitor.Add(common.BytesToHash(hash), newMessage)
+	mID := messageID(newMessage)
+	return mID[:]
 }
