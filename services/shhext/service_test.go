@@ -473,19 +473,19 @@ func (s *ShhExtSuite) TestRetrieveMessageLoopNoMessages() {
 	service := New(shh, mock, db, config)
 	s.Require().NoError(service.InitProtocolWithPassword("abc", "password"))
 
-	testCases := []struct{
-		name string
-		signalName string
-		action func()
+	testCases := []struct {
+		name          string
+		signalName    string
+		action        func()
 		expectedValue int
 	}{
 		{
-			name: "send one public message",
+			name:       "send one public message",
 			signalName: signal.EventNewMessages,
 			action: func() {
 				api := NewPublicAPI(service)
 				_, err = api.SendPublicMessage(context.Background(), SendPublicMessageRPC{
-					Chat: "test",
+					Chat:    "test",
 					Payload: []byte("abc"),
 				})
 				s.Require().NoError(err)
@@ -493,13 +493,13 @@ func (s *ShhExtSuite) TestRetrieveMessageLoopNoMessages() {
 			expectedValue: 1,
 		},
 		{
-			name: "no messages",
-			action: func() {},
+			name:          "no messages",
+			action:        func() {},
 			expectedValue: 0,
 		},
 	}
 
-	for _, tc:= range testCases {
+	for _, tc := range testCases {
 		s.Run(tc.name, func() {
 			// Verify a proper signal is sent when a message is received.
 			var counter int64
@@ -517,7 +517,7 @@ func (s *ShhExtSuite) TestRetrieveMessageLoopNoMessages() {
 			tc.action()
 
 			cancel := make(chan struct{})
-			go service.retrieveMessagesLoop(time.Millisecond * 10, cancel)
+			go service.retrieveMessagesLoop(time.Millisecond*10, cancel)
 			time.Sleep(time.Millisecond * 100)
 			close(cancel)
 			s.Require().EqualValues(tc.expectedValue, counter)
