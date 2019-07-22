@@ -18,7 +18,8 @@ To simply start a container run `make`, other commands include:
 * `make stop` - Stops the container.
 * `make show` - Shows you current status of the container.
 * `make logs` - Shows you logs of the container.
-* `make config.json` - Creates `config.json` with your Public IP.
+* `make config` - Creates `config.json` with your Public IP.
+* `make enode` - Shows `enode://` address of the container.
 
 # Settings
 
@@ -51,3 +52,9 @@ Make sure that address and port are available from the internet!
 Your enode address is:
 enode://dccd2f3c1df42c23af6672df28f287893ab70a5d45668637576a759b6db10b83e83fc02598f36c80ac094fbf8621419153cfe539f56d278ab099da21800f880c@127.0.0.1:30303
 ```
+
+# F.A.Q.
+
+### Should I change the `MailServerPassword` in the `WhisperConfig` section for better security?
+
+This password is only used to symmetrically secure history requests. It is not used to secure messages or authorize users in any way. Whisper protocol requires each messages to be encrypted so a client and mailserver needs to agree on some password.
