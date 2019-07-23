@@ -324,6 +324,9 @@ func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 func Login(address, password *C.char) *C.char {
 	addr, pass := C.GoString(address), C.GoString(password)
 	err := statusBackend.SelectAccount(addr, addr, pass)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	// TODO(dshulyak) config should be stored in encrypted database.
 	config, err := statusBackend.LoadNodeConfig(common.HexToAddress(addr))
 	if err != nil {
