@@ -56,6 +56,11 @@ type Messenger struct {
 
 type featureFlags struct {
 	genericDiscoveryTopicEnabled bool
+	// sendV1Messages indicates whether we should send
+	// messages compatible only with V1 and later.
+	// V1 messages adds additional wrapping
+	// which contains a signature and payload.
+	sendV1Messages bool
 }
 
 type config struct {
@@ -116,6 +121,13 @@ func WithDatabaseFilePaths(encryptionLayerFilePath, transportLayerFilePath strin
 	return func(c *config) error {
 		c.encryptionLayerFilePath = encryptionLayerFilePath
 		c.transportLayerFilePath = transportLayerFilePath
+		return nil
+	}
+}
+
+func WithSendV1Messages() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.sendV1Messages = true
 		return nil
 	}
 }

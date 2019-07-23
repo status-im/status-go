@@ -6,9 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/golang/protobuf/proto"
+	"log"
 	"strings"
 	"time"
 )
+
+//go:generate protoc --go_out=. ./message.proto
 
 const (
 	// ContentTypeTextPlain means that the message contains plain text.
@@ -139,15 +144,59 @@ func CreatePrivateTextMessage(data []byte, lastClock int64, chatID string) Messa
 	return createTextMessage(data, lastClock, chatID, MessageTypePrivate)
 }
 
-// DecodeMessage decodes a raw payload to Message struct.
-func DecodeMessage(data []byte) (message StatusMessage, err error) {
+func unwrapMessage(data []byte) (*StatusProtocolMessage, error) {
+	var message StatusProtocolMessage
+	err := proto.Unmarshal(data, &message)
+	if err != nil {
+		return nil, err
+	}
+	return &message, nil
+}
+
+func decodeTransitMessage(data []byte) (interface{}, error) {
 	buf := bytes.NewBuffer(data)
 	decoder := NewMessageDecoder(buf)
 	value, err := decoder.Decode()
 	if err != nil {
-		return
+		return nil, err
 	}
-	return StatusMessage{Message: value}, nil
+	return value, nil
+}
+
+// DecodeMessage decodes a raw payload to StatusMessage struct.
+func DecodeMessage(transportPublicKey *ecdsa.PublicKey, data []byte) (message StatusMessage, err error) {
+	transitMessage := data
+
+	// Getting a signature from transport message should happen only if
+	// the signature was not defined in the payload itself.
+	message.SigPubKey = transportPublicKey
+
+	statusProtocolMessage, err := unwrapMessage(data)
+	if err == nil {
+		// Wrapped message, extract transit and signature
+		transitMessage = statusProtocolMessage.Payload
+		if statusProtocolMessage.Signature != nil {
+			recoveredKey, err := crypto.SigToPub(
+				crypto.Keccak256(transitMessage),
+				statusProtocolMessage.Signature,
+			)
+			if err != nil {
+				return message, err
+			}
+
+			message.SigPubKey = recoveredKey
+		}
+	}
+
+	message.ID = MessageID(message.SigPubKey, transitMessage)
+	value, err := decodeTransitMessage(transitMessage)
+	if err != nil {
+		log.Printf("[message::DecodeMessage] could not decode message: %#x", message.ID)
+		return message, err
+	}
+	message.Message = value
+
+	return message, nil
 }
 
 // EncodeMessage encodes a Message using Transit serialization.
@@ -158,4 +207,28 @@ func EncodeMessage(value Message) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// MessageID calculates the messageID, by appending the sha3-256 to the compress pubkey
+func MessageID(author *ecdsa.PublicKey, data []byte) []byte {
+	keyBytes := crypto.CompressPubkey(author)
+	return crypto.Keccak256(append(keyBytes, data...))
+}
+
+// WrapMessageV1 wraps a payload into a protobuf message and signs it if an identity is provided
+func WrapMessageV1(payload []byte, identity *ecdsa.PrivateKey) ([]byte, error) {
+	var signature []byte
+	if identity != nil {
+		var err error
+		signature, err = crypto.Sign(crypto.Keccak256(payload), identity)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	message := &StatusProtocolMessage{
+		Signature: signature,
+		Payload:   payload,
+	}
+	return proto.Marshal(message)
 }
