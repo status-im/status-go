@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/extkeys"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -80,6 +81,58 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	subAccount2MatchesKey1 := accounts[1].Hex() != "0x"+subAccount2
 	subAccount2MatchesKey2 := accounts[2].Hex() != "0x"+subAccount2
 	s.False(!subAccount2MatchesKey1 && !subAccount2MatchesKey2, "subAcount2 not returned")
+}
+
+func (s *AccountsTestSuite) TestImportSingleExtendedKey() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
+	s.NoError(err)
+	s.NotNil(keyStore)
+
+	// create a master extended key
+	mn := extkeys.NewMnemonic()
+	mnemonic, err := mn.MnemonicPhrase(extkeys.EntropyStrength128, extkeys.EnglishLanguage)
+	s.NoError(err)
+	extKey, err := extkeys.NewMaster(mn.MnemonicSeed(mnemonic, ""))
+	s.NoError(err)
+	derivedExtendedKey, err := extKey.EthBIP44Child(0)
+	s.NoError(err)
+
+	// import single extended key
+	password := "test-password-1"
+	addr, _, err := s.Backend.AccountManager().ImportSingleExtendedKey(derivedExtendedKey, password)
+	s.NoError(err)
+
+	_, key, err := s.Backend.AccountManager().AddressToDecryptedAccount(addr, password)
+	s.NoError(err)
+
+	s.Equal(crypto.FromECDSA(key.PrivateKey), crypto.FromECDSA(key.ExtendedKey.ToECDSA()))
+}
+
+func (s *AccountsTestSuite) TestImportAccount() {
+	s.StartTestBackend()
+	defer s.StopTestBackend()
+
+	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
+	s.NoError(err)
+	s.NotNil(keyStore)
+
+	// create a private key
+	privateKey, err := crypto.GenerateKey()
+	s.NoError(err)
+
+	// import as normal account
+	password := "test-password-2"
+	addr, err := s.Backend.AccountManager().ImportAccount(privateKey, password)
+	s.Require().NoError(err)
+
+	_, key, err := s.Backend.AccountManager().AddressToDecryptedAccount(addr.String(), password)
+	s.NoError(err)
+
+	s.Equal(crypto.FromECDSA(privateKey), crypto.FromECDSA(key.PrivateKey))
+	s.True(key.ExtendedKey.IsZeroed())
 }
 
 func (s *AccountsTestSuite) TestCreateChildAccount() {

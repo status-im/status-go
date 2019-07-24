@@ -112,6 +112,14 @@ func activateServices(stack *node.Node, config *params.NodeConfig, db *leveldb.D
 		}
 	}
 
+	if err := activateNodeServices(stack, config, db); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) error {
 	// start Whisper service.
 	if err := activateShhService(stack, config, db); err != nil {
 		return fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)

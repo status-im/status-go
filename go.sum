@@ -440,6 +440,8 @@ github.com/status-im/doubleratchet v2.0.0+incompatible h1:s77lF1lDubK0RKftxN2vH8
 github.com/status-im/doubleratchet v2.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/go-ethereum v1.8.27-status.3 h1:h+CsF2Z/HyERLo5qTQnrK0RXHuDJ605hG2BbqNOLAAc=
 github.com/status-im/go-ethereum v1.8.27-status.3/go.mod h1:Ulij8LMpMvXnbnPcmDqrpI+iXoXSjxItuY/wmbasTZU=
+github.com/status-im/go-ethereum v1.8.27-status.5 h1:FS+1KwA97yWh9BtHse0BLfEWtldboSiTMA7nCavxtzc=
+github.com/status-im/go-ethereum v1.8.27-status.5/go.mod h1:Ulij8LMpMvXnbnPcmDqrpI+iXoXSjxItuY/wmbasTZU=
 github.com/status-im/go-fcm v1.0.0-status h1:eUNKm4ooAXdEf9/GaTYeTELna5aVMOEbzjbm2irQ0gY=
 github.com/status-im/go-fcm v1.0.0-status/go.mod h1:0JGzul9SfemcbTdw0mkzLR42j+BTNci5aQWlI0o/uk8=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=

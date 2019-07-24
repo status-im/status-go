@@ -365,9 +365,14 @@ func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
 	}, nil
 }
 
+// IsZeroed returns true if key is nil or empty
+func (k *ExtendedKey) IsZeroed() bool {
+	return k == nil || len(k.KeyData) == 0
+}
+
 // String returns the extended key as a human-readable base58-encoded string.
 func (k *ExtendedKey) String() string {
-	if k == nil || len(k.KeyData) == 0 {
+	if k.IsZeroed() {
 		return EmptyExtendedKeyString
 	}
 

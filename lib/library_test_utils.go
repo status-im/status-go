@@ -146,6 +146,18 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"failed single transaction",
 			testFailedTransaction,
 		},
+		{
+			"MultiAccount - Generate/Derive/StoreDerived",
+			testMultiAccountGenerateDeriveAndStore,
+		},
+		{
+			"MultiAccount - GenerateAndDerive",
+			testMultiAccountGenerateAndDerive,
+		},
+		{
+			"MultiAccount - Import/Store",
+			testMultiAccountImportStore,
+		},
 	}
 
 	for _, test := range tests {
@@ -1017,17 +1029,4 @@ func testValidateNodeConfig(t *testing.T, config string, fn func(*testing.T, API
 	require.NoError(t, err)
 
 	fn(t, resp)
-}
-
-// PanicAfter throws panic() after waitSeconds, unless abort channel receives
-// notification.
-func PanicAfter(waitSeconds time.Duration, abort chan struct{}, desc string) {
-	go func() {
-		select {
-		case <-abort:
-			return
-		case <-time.After(waitSeconds):
-			panic("whatever you were doing takes toooo long: " + desc)
-		}
-	}()
 }

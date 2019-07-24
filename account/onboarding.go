@@ -1,18 +1,14 @@
 package account
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/extkeys"
 )
-
-// ErrInvalidMnemonicPhraseLength is returned if the requested mnemonic length is invalid.
-// Valid lengths are 12, 15, 18, 21, and 24.
-var ErrInvalidMnemonicPhraseLength = errors.New("mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
 type OnboardingAccount struct {
@@ -64,7 +60,7 @@ func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
 }
 
 func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccount, error) {
-	entropyStrength, err := mnemonicPhraseLengthToEntropyStrenght(mnemonicPhraseLength)
+	entropyStrength, err := generator.MnemonicPhraseLengthToEntropyStrength(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
 	}
@@ -114,15 +110,4 @@ func (o *Onboarding) deriveAccount(masterExtendedKey *extkeys.ExtendedKey, purpo
 	publicKeyHex := hexutil.Encode(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
 
 	return address.Hex(), publicKeyHex, nil
-}
-
-func mnemonicPhraseLengthToEntropyStrenght(length int) (extkeys.EntropyStrength, error) {
-	if length < 12 || length > 24 || length%3 != 0 {
-		return 0, ErrInvalidMnemonicPhraseLength
-	}
-
-	bitsLength := length * 11
-	checksumLength := bitsLength % 32
-
-	return extkeys.EntropyStrength(bitsLength - checksumLength), nil
 }

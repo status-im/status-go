@@ -486,6 +486,7 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 	}
+
 	if b.statusNode.Config().BrowsersConfig.Enabled {
 		svc, err := b.statusNode.BrowsersService()
 		switch err {

@@ -12,11 +12,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/extkeys"
 )
 
@@ -42,7 +44,8 @@ type Manager struct {
 
 	mu sync.RWMutex
 
-	onboarding *Onboarding
+	accountsGenerator *generator.Generator
+	onboarding        *Onboarding
 
 	selectedWalletAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
 	selectedChatAccount   *SelectedExtKey // account that was processed during the last call to SelectAccount()
@@ -50,9 +53,19 @@ type Manager struct {
 
 // NewManager returns new node account manager.
 func NewManager(geth GethServiceProvider) *Manager {
-	return &Manager{
+	manager := &Manager{
 		geth: geth,
 	}
+
+	accountsGenerator := generator.New(manager)
+	manager.accountsGenerator = accountsGenerator
+
+	return manager
+}
+
+// AccountsGenerator returns accountsGenerator.
+func (m *Manager) AccountsGenerator() *generator.Generator {
+	return m.accountsGenerator
 }
 
 // CreateAccount creates an internal geth account
@@ -237,6 +250,8 @@ func (m *Manager) SelectAccount(walletAddress, chatAddress, password string) err
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.accountsGenerator.Reset()
+
 	selectedWalletAccount, err := m.unlockExtendedKey(walletAddress, password)
 	if err != nil {
 		return err
@@ -299,8 +314,46 @@ func (m *Manager) Logout() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.accountsGenerator.Reset()
 	m.selectedWalletAccount = nil
 	m.selectedChatAccount = nil
+}
+
+// ImportAccount imports the account specified with privateKey.
+func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error) {
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return common.Address{}, err
+	}
+
+	account, err := keyStore.ImportECDSA(privateKey, password)
+
+	return account.Address, err
+}
+
+func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return "", "", err
+	}
+
+	// imports extended key, create key file (if necessary)
+	account, err := keyStore.ImportSingleExtendedKey(extKey, password)
+	if err != nil {
+		return "", "", err
+	}
+
+	address = account.Address.Hex()
+
+	// obtain public key to return
+	account, key, err := keyStore.AccountDecryptedKey(account, password)
+	if err != nil {
+		return address, "", err
+	}
+
+	pubKey = hexutil.Encode(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+
+	return
 }
 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
@@ -491,7 +544,6 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.
 	}
 
 	var key *keystore.Key
-
 	account, key, err = keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		err = fmt.Errorf("%s: %s", ErrAccountToKeyMappingFailure, err)
