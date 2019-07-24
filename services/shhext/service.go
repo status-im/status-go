@@ -170,9 +170,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		if err := copyFile(v4Path, sessionsDatabasePath); err != nil {
 			return fmt.Errorf("failed to copy a file from %s to %s: %v", v4Path, sessionsDatabasePath, err)
 		}
-		if err := copyFile(v4Path, transportDatabasePath); err != nil {
-			return fmt.Errorf("failed to copy a file from %s to %s: %v", v4Path, transportDatabasePath, err)
-		}
+		os.Remove(v4Path)
 	}
 
 	selectedKeyID := s.w.SelectedKeyPairID()
