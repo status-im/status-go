@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/account/generator"
+	mobile "github.com/status-im/status-go/mobile"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
@@ -1121,7 +1122,7 @@ func testMultiAccountGenerateDeriveAndStore(t *testing.T) bool { //nolint: gocyc
 }
 
 func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []string) bool { //nolint: gocyclo
-	params := MultiAccountDeriveAddressesParams{
+	params := mobile.MultiAccountDeriveAddressesParams{
 		AccountID: accountID,
 		Paths:     paths,
 	}
@@ -1156,8 +1157,8 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 func testMultiAccountStoreDerived(t *testing.T, accountID string, paths []string) bool { //nolint: gocyclo
 	password := "test-multiaccount-password"
 
-	params := MultiAccountStoreDerivedParams{
-		MultiAccountDeriveAddressesParams: MultiAccountDeriveAddressesParams{
+	params := mobile.MultiAccountStoreDerivedParams{
+		MultiAccountDeriveAddressesParams: mobile.MultiAccountDeriveAddressesParams{
 			AccountID: accountID,
 			Paths:     paths,
 		},
@@ -1205,8 +1206,8 @@ func testMultiAccountGenerateAndDerive(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	paths := []string{"m/0", "m/1"}
-	params := MultiAccountGenerateAndDeriveAddressesParams{
-		MultiAccountGenerateParams: MultiAccountGenerateParams{
+	params := mobile.MultiAccountGenerateAndDeriveAddressesParams{
+		MultiAccountGenerateParams: mobile.MultiAccountGenerateParams{
 			N:                    2,
 			MnemonicPhraseLength: 12,
 		},
@@ -1254,7 +1255,7 @@ func testMultiAccountImportStore(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	hex := fmt.Sprintf("%#x", crypto.FromECDSA(key))
-	importParams := MultiAccountImportPrivateKeyParams{
+	importParams := mobile.MultiAccountImportPrivateKeyParams{
 		PrivateKey: hex,
 	}
 
@@ -1272,7 +1273,7 @@ func testMultiAccountImportStore(t *testing.T) bool { //nolint: gocyclo
 
 	// prepare StoreAccount params
 	password := "test-multiaccount-imported-key-password"
-	storeParams := MultiAccountStoreAccountParams{
+	storeParams := mobile.MultiAccountStoreAccountParams{
 		AccountID: importResp.ID,
 		Password:  password,
 	}

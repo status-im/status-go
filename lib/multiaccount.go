@@ -4,48 +4,14 @@ package main
 import "C"
 import (
 	"encoding/json"
+
+	mobile "github.com/status-im/status-go/mobile"
 )
-
-// MultiAccountGenerateParams are the params sent to MultiAccountGenerate.
-type MultiAccountGenerateParams struct {
-	N                    int    `json:"n"`
-	MnemonicPhraseLength int    `json:"mnemonicPhraseLength"`
-	Bip39Passphrase      string `json:"bip39Passphrase"`
-}
-
-// MultiAccountGenerateAndDeriveAddressesParams are the params sent to MultiAccountGenerateAndDeriveAddresses.
-type MultiAccountGenerateAndDeriveAddressesParams struct {
-	MultiAccountGenerateParams
-	Paths []string `json:"paths"`
-}
-
-// MultiAccountDeriveAddressesParams are the params sent to MultiAccountDeriveAddresses.
-type MultiAccountDeriveAddressesParams struct {
-	AccountID string   `json:"accountID"`
-	Paths     []string `json:"paths"`
-}
-
-// MultiAccountStoreDerivedParams are the params sent to MultiAccountStoreDerived.
-type MultiAccountStoreDerivedParams struct {
-	MultiAccountDeriveAddressesParams
-	Password string `json:"password"`
-}
-
-// MultiAccountStoreAccountParams are the params sent to MultiAccountStoreAccount.
-type MultiAccountStoreAccountParams struct {
-	AccountID string `json:"accountID"`
-	Password  string `json:"password"`
-}
-
-// MultiAccountImportPrivateKeyParams are the params sent to MultiAccountImportPrivateKey.
-type MultiAccountImportPrivateKeyParams struct {
-	PrivateKey string `json:"privateKey"`
-}
 
 // MultiAccountGenerate generates account in memory without storing them.
 //export MultiAccountGenerate
 func MultiAccountGenerate(paramsJSON *C.char) *C.char {
-	var p MultiAccountGenerateParams
+	var p mobile.MultiAccountGenerateParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
@@ -67,7 +33,7 @@ func MultiAccountGenerate(paramsJSON *C.char) *C.char {
 // MultiAccountGenerateAndDeriveAddresses combines Generate and DeriveAddresses in one call.
 //export MultiAccountGenerateAndDeriveAddresses
 func MultiAccountGenerateAndDeriveAddresses(paramsJSON *C.char) *C.char {
-	var p MultiAccountGenerateAndDeriveAddressesParams
+	var p mobile.MultiAccountGenerateAndDeriveAddressesParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
@@ -89,7 +55,7 @@ func MultiAccountGenerateAndDeriveAddresses(paramsJSON *C.char) *C.char {
 // MultiAccountDeriveAddresses derive addresses from an account selected by ID, without storing them.
 //export MultiAccountDeriveAddresses
 func MultiAccountDeriveAddresses(paramsJSON *C.char) *C.char {
-	var p MultiAccountDeriveAddressesParams
+	var p mobile.MultiAccountDeriveAddressesParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
@@ -111,7 +77,7 @@ func MultiAccountDeriveAddresses(paramsJSON *C.char) *C.char {
 // MultiAccountStoreDerived derive accounts from the specified key and store them encrypted with the specified password.
 //export MultiAccountStoreDerived
 func MultiAccountStoreDerived(paramsJSON *C.char) *C.char {
-	var p MultiAccountStoreDerivedParams
+	var p mobile.MultiAccountStoreDerivedParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
@@ -133,7 +99,7 @@ func MultiAccountStoreDerived(paramsJSON *C.char) *C.char {
 // MultiAccountImportPrivateKey imports a raw private key without storing it.
 //export MultiAccountImportPrivateKey
 func MultiAccountImportPrivateKey(paramsJSON *C.char) *C.char {
-	var p MultiAccountImportPrivateKeyParams
+	var p mobile.MultiAccountImportPrivateKeyParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
@@ -155,7 +121,7 @@ func MultiAccountImportPrivateKey(paramsJSON *C.char) *C.char {
 // MultiAccountStoreAccount stores the select account.
 //export MultiAccountStoreAccount
 func MultiAccountStoreAccount(paramsJSON *C.char) *C.char {
-	var p MultiAccountStoreAccountParams
+	var p mobile.MultiAccountStoreAccountParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
