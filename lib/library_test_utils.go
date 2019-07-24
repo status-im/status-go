@@ -149,28 +149,6 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			"failed single transaction",
 			testFailedTransaction,
 		},
-	}
-
-	for _, test := range tests {
-		t.Logf("=== RUN   %s", test.name)
-		if ok := test.fn(t); !ok {
-			t.Logf("=== FAILED   %s", test.name)
-			break
-		}
-	}
-}
-
-// nolint: deadcode
-func testMultiAccountAPI(t *testing.T, done chan struct{}) {
-	<-startTestNode(t)
-	defer func() {
-		done <- struct{}{}
-	}()
-
-	tests := []struct {
-		name string
-		fn   func(t *testing.T) bool
-	}{
 		{
 			"MultiAccount - Generate/Derive/StoreDerived",
 			testMultiAccountGenerateDeriveAndStore,

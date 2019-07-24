@@ -22,13 +22,6 @@ func TestExportedAPI(t *testing.T) {
 	<-allTestsDone
 }
 
-func TestMultiAccountAPI(t *testing.T) {
-	allTestsDone := make(chan struct{}, 1)
-	go testMultiAccountAPI(t, allTestsDone)
-
-	<-allTestsDone
-}
-
 func TestValidateNodeConfig(t *testing.T) {
 	noErrorsCallback := func(t *testing.T, resp APIDetailedResponse) {
 		assert.Empty(t, resp.FieldErrors)
