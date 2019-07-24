@@ -13,7 +13,6 @@ import (
 	"github.com/status-im/status-go/accountsstore"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
-	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
@@ -30,7 +29,8 @@ var logger = log.New("package", "status-go/mobile")
 
 // OpenAccounts opens database and returns accounts list.
 func OpenAccounts(datadir string) string {
-	err := statusBackend.OpenAccounts(datadir)
+	statusBackend.UpdateRootDataDir(datadir)
+	err := statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -320,22 +320,13 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 // Login loads a key file (for a given address), tries to decrypt it using the password,
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity.
-func Login(address, password string) string {
-	err := statusBackend.SelectAccount(address, address, password)
-	if err != nil {
-		makeJSONResponse(err)
-	}
-	// TODO(dshulyak) config should be stored in encrypted database.
-	config, err := statusBackend.LoadNodeConfig(common.HexToAddress(address))
+func Login(accountData, password string) string {
+	var account accountsstore.Account
+	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-
-	if err := logutils.OverrideRootLogWithConfig(config, false); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	api.RunAsync(func() error { return statusBackend.StartNode(config) })
+	api.RunAsync(func() error { return statusBackend.StartNodeWithAccount(account, password) })
 	return makeJSONResponse(nil)
 }
 
@@ -346,21 +337,15 @@ func SaveAccountAndLogin(accountData, password, configJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	err = statusBackend.SaveAccount(account)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
 	var conf *params.NodeConfig
 	err = json.Unmarshal([]byte(configJSON), conf)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	// TODO(dshulyak) store in encrypted database.
-	err = statusBackend.SaveNodeConfig(account.Address, conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	return Login(account.Address.Hex(), password)
+	api.RunAsync(func() error {
+		return statusBackend.StartNodeWithAccountAndConfig(account, password, conf)
+	})
+	return makeJSONResponse(nil)
 }
 
 // UpdateNodeConfig updates node configuration in accounts database.

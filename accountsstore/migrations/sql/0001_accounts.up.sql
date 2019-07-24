@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS accounts (
 address VARCHAR PRIMARY KEY,
-name TEXT NOT NULL
+name TEXT NOT NULL,
+loginTimestamp BIG INT
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS configurations (
