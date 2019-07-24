@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/extkeys"
 )
 
@@ -59,7 +60,7 @@ func (o *Onboarding) Account(id string) (*OnboardingAccount, error) {
 }
 
 func (o *Onboarding) generateAccount(mnemonicPhraseLength int) (*OnboardingAccount, error) {
-	entropyStrength, err := MnemonicPhraseLengthToEntropyStrength(mnemonicPhraseLength)
+	entropyStrength, err := generator.MnemonicPhraseLengthToEntropyStrength(mnemonicPhraseLength)
 	if err != nil {
 		return nil, err
 	}

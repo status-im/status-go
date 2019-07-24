@@ -18,7 +18,7 @@ checks:
   # Classes defined with a high number of functions or methods.
   method-count:
     config:
-      threshold: 20
+      threshold: 21
   # Excessive lines of code within a single function or method
   method-lines:
     config:

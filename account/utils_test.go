@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -86,7 +87,7 @@ func TestMnemonicPhraseLengthToEntropyStrength(t *testing.T) {
 	}
 
 	for _, s := range scenarios {
-		strength, err := MnemonicPhraseLengthToEntropyStrength(s.phraseLength)
+		strength, err := generator.MnemonicPhraseLengthToEntropyStrength(s.phraseLength)
 		assert.Equal(t, s.expectedError, err)
 		assert.Equal(t, s.expectedStrength, strength)
 	}
