@@ -348,18 +348,6 @@ func SaveAccountAndLogin(accountData, password, configJSON string) string {
 	return makeJSONResponse(nil)
 }
 
-// UpdateNodeConfig updates node configuration in accounts database.
-func UpdateNodeConfig(address, configJSON string) string {
-	addr := common.HexToAddress(address)
-	var conf *params.NodeConfig
-	err := json.Unmarshal([]byte(configJSON), conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	err = statusBackend.SaveNodeConfig(addr, conf)
-	return makeJSONResponse(err)
-}
-
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
 // It purges all the previous identities from Whisper, and injects the key as shh identity.
 func LoginWithKeycard(chatKeyData, encryptionKeyData string) string {

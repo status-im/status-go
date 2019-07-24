@@ -30,7 +30,8 @@ var logger = log.New("package", "status-go/lib")
 // OpenAccounts opens database and returns accounts list.
 //export OpenAccounts
 func OpenAccounts(datadir *C.char) *C.char {
-	err := statusBackend.OpenAccounts(C.GoString(datadir))
+	statusBackend.UpdateRootDataDir(C.GoString(datadir))
+	err := statusBackend.OpenAccounts()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -349,19 +350,6 @@ func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
 		return statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), conf)
 	})
 	return makeJSONResponse(nil)
-}
-
-// UpdateNodeConfig updates node configuration in accounts database.
-//export UpdateNodeConfig
-func UpdateNodeConfig(address, configJSON *C.char) *C.char {
-	addr := common.HexToAddress(C.GoString(address))
-	var conf *params.NodeConfig
-	err := json.Unmarshal([]byte(C.GoString(configJSON)), conf)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	err = statusBackend.SaveNodeConfig(addr, conf)
-	return makeJSONResponse(err)
 }
 
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
