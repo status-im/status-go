@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,22 +29,6 @@ func TestAccounts(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, accounts, 1)
 	require.Equal(t, expected, accounts[0])
-}
-
-func TestConfig(t *testing.T) {
-	db, stop := setupTestDB(t)
-	defer stop()
-
-	expected := Account{Name: "string", Address: common.Address{0xff}}
-	require.NoError(t, db.SaveAccount(expected))
-	conf := params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
-	}
-	require.NoError(t, db.SaveConfig(expected.Address, "node-config", conf))
-	var rst params.NodeConfig
-	require.NoError(t, db.GetConfig(expected.Address, "node-config", &rst))
-	require.Equal(t, conf, rst)
 }
 
 func TestLoginUpdate(t *testing.T) {
