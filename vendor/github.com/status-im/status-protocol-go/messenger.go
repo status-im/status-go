@@ -248,7 +248,9 @@ func NewMessenger(
 		shutdownTasks: []func() error{
 			persistence.Close,
 			adapter.transport.Reset,
-			logger.Sync,
+			// Currently this often fails, seems like it's safe to ignore them
+			// https://github.com/uber-go/zap/issues/328
+			func() error { _ = logger.Sync; return nil },
 		},
 		logger: logger,
 	}
