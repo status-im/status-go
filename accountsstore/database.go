@@ -66,12 +66,3 @@ func (db *Database) DeleteAccount(address common.Address) error {
 	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
 	return err
 }
-
-func (db *Database) SaveConfig(address common.Address, typ string, value interface{}) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO configurations (address, type, value) VALUES (?, ?, ?)", address, typ, &sqlite.JSONBlob{value})
-	return err
-}
-
-func (db *Database) GetConfig(address common.Address, typ string, value interface{}) error {
-	return db.db.QueryRow("SELECT value FROM configurations WHERE address = ? AND type = ?", address, typ).Scan(&sqlite.JSONBlob{value})
-}

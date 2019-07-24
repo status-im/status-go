@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS settings (
+type VARCHAR PRIMARY KEY,
+value BLOB
+)

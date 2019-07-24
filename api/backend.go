@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/accountsstore"
+	"github.com/status-im/status-go/accountsstore/settings"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
@@ -29,6 +30,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
+	settingssvc "github.com/status-im/status-go/services/settings"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -58,6 +60,7 @@ type StatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
 	rootDataDir     string
+	settingsDB      *settings.Database
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
@@ -138,7 +141,7 @@ func (b *StatusBackend) OpenAccounts() error {
 	if b.accounts != nil {
 		return nil
 	}
-	db, err := accountsstore.InitializeDB(filepath.Join(b.rootDataDir, "accounts"))
+	db, err := accountsstore.InitializeDB(filepath.Join(b.rootDataDir, "accounts.sql"))
 	if err != nil {
 		return err
 	}
@@ -164,8 +167,26 @@ func (b *StatusBackend) SaveAccount(account accountsstore.Account) error {
 	return b.accounts.SaveAccount(account)
 }
 
+func (b *StatusBackend) ensureSettingsDBOpened(account accountsstore.Account, password string) (err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.settingsDB != nil {
+		return nil
+	}
+	if len(b.rootDataDir) == 0 {
+		return errors.New("root datadir wasn't provided")
+	}
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("settings-%x.sql", account.Address))
+	b.settingsDB, err = settings.InitializeDB(path, password)
+	return err
+}
+
 func (b *StatusBackend) StartNodeWithAccount(account accountsstore.Account, password string) error {
-	conf, err := b.LoadNodeConfig(account.Address)
+	err := b.ensureSettingsDBOpened(account, password)
+	if err != nil {
+		return err
+	}
+	conf, err := b.loadNodeConfig()
 	if err != nil {
 		return err
 	}
@@ -191,23 +212,27 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account accountsstore.Acco
 	if err != nil {
 		return err
 	}
-	err = b.SaveNodeConfig(account.Address, conf)
+	err = b.ensureSettingsDBOpened(account, password)
+	if err != nil {
+		return err
+	}
+	err = b.saveNodeConfig(conf)
 	if err != nil {
 		return err
 	}
 	return b.StartNodeWithAccount(account, password)
 }
 
-func (b *StatusBackend) SaveNodeConfig(address common.Address, config *params.NodeConfig) error {
+func (b *StatusBackend) saveNodeConfig(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.accounts.SaveConfig(address, "node-config", config)
+	return b.settingsDB.SaveConfig(settings.NodeConfigTag, config)
 }
 
-func (b *StatusBackend) LoadNodeConfig(address common.Address) (conf *params.NodeConfig, err error) {
+func (b *StatusBackend) loadNodeConfig() (conf *params.NodeConfig, err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return conf, b.accounts.GetConfig(address, "node-config", conf)
+	return conf, b.settingsDB.GetConfig(settings.NodeConfigTag, conf)
 }
 
 func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
@@ -219,6 +244,12 @@ func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
 		return subscriptions.New(b.statusNode), nil
+	}
+}
+
+func (b *StatusBackend) settingsService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return settingssvc.NewService(b.settingsDB), nil
 	}
 }
 
@@ -237,6 +268,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
+	services = appendIf(b.settingsDB != nil, services, b.settingsService())
 
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
 		Services: services,
@@ -573,6 +605,18 @@ func (b *StatusBackend) Logout() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	err := b.cleanupServices()
+	if err != nil {
+		return err
+	}
+
+	b.AccountManager().Logout()
+
+	return nil
+}
+
+// cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
+func (b *StatusBackend) cleanupServices() error {
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
@@ -610,9 +654,12 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 	}
-
-	b.AccountManager().Logout()
-
+	if b.settingsDB != nil {
+		err = b.settingsDB.Close()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
