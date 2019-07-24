@@ -36,7 +36,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, name from accounts")
+	rows, err := db.db.Query("SELECT address, name from accounts ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,12 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name) VALUES (?, ?)", account.Address, account.Name)
+	_, err := db.db.Exec("INSERT INTO accounts (address, name) VALUES (?, ?)", account.Address, account.Name)
+	return err
+}
+
+func (db *Database) UpdateAccountTimestamp(address common.Address, loginTimestamp int64) error {
+	_, err := db.db.Exec("UPDATE accounts SET loginTimestamp = ? WHERE address = ?", loginTimestamp, address)
 	return err
 }
 

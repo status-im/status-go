@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/accountsstore"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
@@ -54,11 +55,12 @@ var (
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
-	mu              sync.Mutex
+	mu sync.Mutex
+	// rootDataDir is the same for all networks.
+	rootDataDir     string
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
-	accountsMu      sync.Mutex
 	accounts        *accountsstore.Database
 	accountManager  *account.Manager
 	transactor      *transactions.Transactor
@@ -124,13 +126,19 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	return nil
 }
 
-func (b *StatusBackend) OpenAccounts(datadir string) error {
-	b.accountsMu.Lock()
-	defer b.accountsMu.Unlock()
+func (b *StatusBackend) UpdateRootDataDir(datadir string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.rootDataDir = datadir
+}
+
+func (b *StatusBackend) OpenAccounts() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.accounts != nil {
 		return nil
 	}
-	db, err := accountsstore.InitializeDB(filepath.Join(datadir, "accounts"))
+	db, err := accountsstore.InitializeDB(filepath.Join(b.rootDataDir, "accounts"))
 	if err != nil {
 		return err
 	}
@@ -139,8 +147,8 @@ func (b *StatusBackend) OpenAccounts(datadir string) error {
 }
 
 func (b *StatusBackend) GetAccounts() ([]accountsstore.Account, error) {
-	b.accountsMu.Lock()
-	defer b.accountsMu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.accounts == nil {
 		return nil, errors.New("accoutns db wasn't initialized")
 	}
@@ -148,23 +156,57 @@ func (b *StatusBackend) GetAccounts() ([]accountsstore.Account, error) {
 }
 
 func (b *StatusBackend) SaveAccount(account accountsstore.Account) error {
-	b.accountsMu.Lock()
-	defer b.accountsMu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.accounts == nil {
 		return errors.New("accoutns db wasn't initialized")
 	}
 	return b.accounts.SaveAccount(account)
 }
 
+func (b *StatusBackend) StartNodeWithAccount(account accountsstore.Account, password string) error {
+	conf, err := b.LoadNodeConfig(account.Address)
+	if err != nil {
+		return err
+	}
+	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
+		return err
+	}
+	err = b.StartNode(conf)
+	if err != nil {
+		return err
+	}
+	err = b.SelectAccount(account.Address.Hex(), account.Address.Hex(), password)
+	if err != nil {
+		return err
+	}
+	return b.accounts.UpdateAccountTimestamp(account.Address, time.Now().Unix())
+}
+
+// StartNodeWithAccountAndConfig is used after account and config was generated.
+// In current setup account name and config is generated on the client side. Once/if it will be generated on
+// status-go side this flow can be simplified.
+func (b *StatusBackend) StartNodeWithAccountAndConfig(account accountsstore.Account, password string, conf *params.NodeConfig) error {
+	err := b.SaveAccount(account)
+	if err != nil {
+		return err
+	}
+	err = b.SaveNodeConfig(account.Address, conf)
+	if err != nil {
+		return err
+	}
+	return b.StartNodeWithAccount(account, password)
+}
+
 func (b *StatusBackend) SaveNodeConfig(address common.Address, config *params.NodeConfig) error {
-	b.accountsMu.Lock()
-	defer b.accountsMu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return b.accounts.SaveConfig(address, "node-config", config)
 }
 
 func (b *StatusBackend) LoadNodeConfig(address common.Address) (conf *params.NodeConfig, err error) {
-	b.accountsMu.Lock()
-	defer b.accountsMu.Unlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return conf, b.accounts.GetConfig(address, "node-config", conf)
 }
 

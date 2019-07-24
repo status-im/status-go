@@ -47,3 +47,18 @@ func TestConfig(t *testing.T) {
 	require.NoError(t, db.GetConfig(expected.Address, "node-config", &rst))
 	require.Equal(t, conf, rst)
 }
+
+func TestLoginUpdate(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	accounts := []Account{{Name: "first", Address: common.Address{0xff}}, {Name: "second", Address: common.Address{0xf1}}}
+	for _, acc := range accounts {
+		require.NoError(t, db.SaveAccount(acc))
+	}
+	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].Address, 100))
+	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].Address, 10))
+	rst, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, accounts, rst)
+}
