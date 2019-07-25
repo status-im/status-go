@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -23,43 +22,10 @@ func TestTransfersSuite(t *testing.T) {
 
 type TransfersSuite struct {
 	DevNodeSuite
-
-	Password string
-	Info     account.Info
-	Address  common.Address
-}
-
-func (s *TransfersSuite) SelectAccount() {
-	loginParams := account.LoginParams{
-		ChatAddress: common.HexToAddress(s.Info.ChatAddress),
-		Password:    s.Password,
-		MainAccount: common.HexToAddress(s.Info.WalletAddress),
-	}
-
-	s.Require().NoError(s.backend.SelectAccount(loginParams))
-	_, err := s.backend.AccountManager().MainAccountAddress()
-	s.Require().NoError(err)
-
-	_, err = s.backend.AccountManager().SelectedChatAccount()
-	s.Require().NoError(err)
-}
-
-func (s *TransfersSuite) SetupTest() {
-	s.DevNodeSuite.SetupTest()
-	s.Password = "test"
-	info, _, err := s.backend.AccountManager().CreateAccount(s.Password)
-	s.Require().NoError(err)
-	s.Info = info
-	s.Address = common.HexToAddress(info.WalletAddress)
-}
-
-func (s *TransfersSuite) TearDownTest() {
-	s.Require().NoError(s.backend.Logout())
-	s.DevNodeSuite.TearDownTest()
 }
 
 func (s *TransfersSuite) getAllTranfers() (rst []wallet.TransferView, err error) {
-	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.Address, (*hexutil.Big)(big.NewInt(0)))
+	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.DevAccountAddress, (*hexutil.Big)(big.NewInt(0)))
 }
 
 func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
@@ -75,8 +41,7 @@ func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
 }
 
 func (s *TransfersSuite) TestNewTransfers() {
-	s.SelectAccount()
-	s.sendTx(0, s.Address)
+	s.sendTx(0, s.DevAccountAddress)
 	s.Require().NoError(utils.Eventually(func() error {
 		all, err := s.getAllTranfers()
 		if err != nil {
@@ -90,7 +55,7 @@ func (s *TransfersSuite) TestNewTransfers() {
 
 	go func() {
 		for i := 1; i < 10; i++ {
-			s.sendTx(uint64(i), s.Address)
+			s.sendTx(uint64(i), s.DevAccountAddress)
 		}
 	}()
 	s.Require().NoError(utils.Eventually(func() error {
@@ -107,9 +72,8 @@ func (s *TransfersSuite) TestNewTransfers() {
 
 func (s *TransfersSuite) TestHistoricalTransfers() {
 	for i := 0; i < 30; i++ {
-		s.sendTx(uint64(i), s.Address)
+		s.sendTx(uint64(i), s.DevAccountAddress)
 	}
-	s.SelectAccount()
 	s.Require().NoError(utils.Eventually(func() error {
 		all, err := s.getAllTranfers()
 		if err != nil {

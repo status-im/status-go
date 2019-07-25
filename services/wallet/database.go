@@ -10,8 +10,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/status-im/status-go/services/wallet/migrations"
-	"github.com/status-im/status-go/sqlite"
 )
 
 // DBHeader fields from header that are stored in database.
@@ -45,19 +43,6 @@ const (
 	ethSync   SyncOption = 1
 	erc20Sync SyncOption = 2
 )
-
-// InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path, password string) (*Database, error) {
-	db, err := sqlite.OpenDB(path, password)
-	if err != nil {
-		return nil, err
-	}
-	err = migrations.Migrate(db)
-	if err != nil {
-		return nil, err
-	}
-	return &Database{db: db}, nil
-}
 
 // SQLBigInt type for storing uint256 in the databse.
 // FIXME(dshulyak) SQL big int is max 64 bits. Maybe store as bytes in big endian and hope
@@ -109,6 +94,10 @@ func (blob *JSONBlob) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return json.Marshal(blob.data)
+}
+
+func NewDB(db *sql.DB) *Database {
+	return &Database{db}
 }
 
 // Database sql wrapper for operations with wallet objects.

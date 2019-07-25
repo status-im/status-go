@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	statusrpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/devtests/miner"
@@ -56,7 +58,14 @@ func (s *DevNodeSuite) SetupTest() {
 	config.UpstreamConfig.URL = s.miner.IPCEndpoint()
 	s.backend = api.NewStatusBackend()
 	s.Require().NoError(s.backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	s.Require().NoError(s.backend.StartNode(config))
+	_, err = s.backend.AccountManager().ImportAccount(s.DevAccount, "test")
+	s.Require().NoError(err)
+	s.backend.UpdateRootDataDir(s.dir)
+	s.Require().NoError(s.backend.OpenAccounts())
+	s.Require().NoError(s.backend.StartNodeWithAccountAndConfig(multiaccounts.Account{
+		Name:    "main",
+		Address: s.DevAccountAddress,
+	}, "test", config, []accounts.Account{{Address: s.DevAccountAddress, Wallet: true, Chat: true}}))
 	s.Remote, err = s.miner.Attach()
 	s.Require().NoError(err)
 	s.Eth = ethclient.NewClient(s.Remote)
@@ -70,7 +79,7 @@ func (s *DevNodeSuite) TearDownTest() {
 		s.miner = nil
 	}
 	if s.backend != nil {
-		s.Require().NoError(s.backend.StopNode())
+		s.Require().NoError(s.backend.Logout())
 		s.backend = nil
 	}
 	if len(s.dir) != 0 {
