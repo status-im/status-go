@@ -2,9 +2,6 @@ package browsers
 
 import (
 	"database/sql"
-
-	"github.com/status-im/status-go/services/browsers/migrations"
-	"github.com/status-im/status-go/sqlite"
 )
 
 // Database sql wrapper for operations with browser objects.
@@ -17,17 +14,8 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
-// InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path, password string) (*Database, error) {
-	db, err := sqlite.OpenDB(path, password)
-	if err != nil {
-		return nil, err
-	}
-	err = migrations.Migrate(db)
-	if err != nil {
-		return nil, err
-	}
-	return &Database{db: db}, nil
+func NewDB(db *sql.DB) *Database {
+	return &Database{db: db}
 }
 
 type Browser struct {

@@ -7,15 +7,16 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/stretchr/testify/require"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "browsers-tests-")
 	require.NoError(t, err)
-	db, err := InitializeDB(tmpfile.Name(), "browsers-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "browsers-tests")
 	require.NoError(t, err)
-	return db, func() {
+	return NewDB(db), func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
@@ -23,7 +24,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 
 func setupTestAPI(t *testing.T) (*API, func()) {
 	db, cancel := setupTestDB(t)
-	return &API{s: &Service{db: db}}, cancel
+	return &API{db: db}, cancel
 }
 
 func TestBrowsersOrderedNewestFirst(t *testing.T) {

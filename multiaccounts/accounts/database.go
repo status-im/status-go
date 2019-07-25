@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/multiaccounts/accounts/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
 
@@ -34,6 +33,10 @@ type Account struct {
 	Color     string         `json:"color"`
 }
 
+func NewDB(db *sql.DB) *Database {
+	return &Database{db: db}
+}
+
 // Database sql wrapper for operations with browser objects.
 type Database struct {
 	db *sql.DB
@@ -42,19 +45,6 @@ type Database struct {
 // Close closes database.
 func (db Database) Close() error {
 	return db.db.Close()
-}
-
-// InitializeDB creates db file at a given path and applies migrations.
-func InitializeDB(path, password string) (*Database, error) {
-	db, err := sqlite.OpenDB(path, password)
-	if err != nil {
-		return nil, err
-	}
-	err = migrations.Migrate(db)
-	if err != nil {
-		return nil, err
-	}
-	return &Database{db: db}, nil
 }
 
 func (db *Database) SaveConfig(typ string, value interface{}) error {

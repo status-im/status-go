@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
 )
@@ -16,9 +17,9 @@ import (
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "settings-tests-")
 	require.NoError(t, err)
-	db, err := InitializeDB(tmpfile.Name(), "settings-tests")
+	db, err := appdatabase.InitializeDB(tmpfile.Name(), "settings-tests")
 	require.NoError(t, err)
-	return db, func() {
+	return NewDB(db), func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
