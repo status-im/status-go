@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/accountsstore"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
@@ -316,6 +317,30 @@ func RemoveOnboarding() {
 func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 	_, err := statusBackend.AccountManager().VerifyAccountPassword(C.GoString(keyStoreDir), C.GoString(address), C.GoString(password))
 	return makeJSONResponse(err)
+}
+
+//StartNode - start Status node
+//export StartNode
+func StartNode(configJSON *C.char) *C.char {
+	config, err := params.NewConfigFromJSON(C.GoString(configJSON))
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	if err := logutils.OverrideRootLogWithConfig(config, false); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	api.RunAsync(func() error { return statusBackend.StartNode(config) })
+
+	return makeJSONResponse(nil)
+}
+
+//StopNode - stop status node
+//export StopNode
+func StopNode() *C.char {
+	api.RunAsync(statusBackend.StopNode)
+	return makeJSONResponse(nil)
 }
 
 //Login loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
