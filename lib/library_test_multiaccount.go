@@ -86,7 +86,7 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 			return false
 		}
 
-		if ok := testMultiAccountDeriveAddresses(t, info.ID, paths, false); !ok {
+		if _, ok := testMultiAccountDeriveAddresses(t, info.ID, paths, false); !ok {
 			return false
 		}
 	}
@@ -111,7 +111,7 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 
 		loadedIDs = append(loadedIDs, loadedID)
 
-		if ok := testMultiAccountDeriveAddresses(t, loadedID, paths, false); !ok {
+		if _, ok := testMultiAccountDeriveAddresses(t, loadedID, paths, false); !ok {
 			return false
 		}
 	}
@@ -121,7 +121,7 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 	// try again deriving addresses.
 	// it should fail because reset should remove all the accounts from memory.
 	for _, loadedID := range loadedIDs {
-		if ok := testMultiAccountDeriveAddresses(t, loadedID, paths, true); !ok {
+		if _, ok := testMultiAccountDeriveAddresses(t, loadedID, paths, true); !ok {
 			t.Errorf("account is still in memory, expected Reset to remove all accounts")
 			return false
 		}
@@ -130,7 +130,47 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 	return true
 }
 
-func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []string, expectAccountNotFoundError bool) bool { //nolint: gocyclo
+func testMultiAccountImportMnemonicAndDerive(t *testing.T) bool { //nolint: gocyclo
+	// to make sure that we start with empty account (which might have gotten populated during previous tests)
+	if err := statusBackend.Logout(); err != nil {
+		t.Fatal(err)
+	}
+
+	mnemonicPhrase := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	bip39Passphrase := "TREZOR"
+	params := mobile.MultiAccountImportMnemonicParams{
+		MnemonicPhrase:  mnemonicPhrase,
+		Bip39Passphrase: bip39Passphrase,
+	}
+
+	paramsJSON, err := json.Marshal(&params)
+	if err != nil {
+		t.Errorf("error encoding MultiAccountImportMnemonicParams")
+		return false
+	}
+
+	// import mnemonic
+	rawResp := MultiAccountImportMnemonic(C.CString(string(paramsJSON)))
+	var importResp generator.IdentifiedAccountInfo
+	// check the response doesn't have errors
+	checkMultiAccountResponse(t, rawResp, &importResp)
+
+	bip44DerivationPath := "m/44'/60'/0'/0/0"
+	expectedBip44Address := "0x9c32F71D4DB8Fb9e1A58B0a80dF79935e7256FA6"
+	addresses, ok := testMultiAccountDeriveAddresses(t, importResp.ID, []string{bip44DerivationPath}, false)
+	if !ok {
+		return false
+	}
+
+	if addresses[bip44DerivationPath] != expectedBip44Address {
+		t.Errorf("unexpected address; expected %s, got %s", expectedBip44Address, addresses[bip44DerivationPath])
+		return false
+	}
+
+	return true
+}
+
+func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []string, expectAccountNotFoundError bool) (map[string]string, bool) { //nolint: gocyclo
 	params := mobile.MultiAccountDeriveAddressesParams{
 		AccountID: accountID,
 		Paths:     paths,
@@ -139,7 +179,7 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 	paramsJSON, err := json.Marshal(&params)
 	if err != nil {
 		t.Errorf("error encoding MultiAccountDeriveAddressesParams")
-		return false
+		return nil, false
 	}
 
 	// derive addresses from account accountID
@@ -147,26 +187,31 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 
 	if expectAccountNotFoundError {
 		checkMultiAccountErrorResponse(t, rawResp, "account not found")
-		return true
+		return nil, true
 	}
 
 	var deriveResp map[string]generator.AccountInfo
 	// check the response doesn't have errors
 	checkMultiAccountResponse(t, rawResp, &deriveResp)
-	if len(deriveResp) != 2 {
-		t.Errorf("expected 2 derived accounts info, got %d", len(deriveResp))
-		return false
+	if len(deriveResp) != len(paths) {
+		t.Errorf("expected %d derived accounts info, got %d", len(paths), len(deriveResp))
+		return nil, false
 	}
+
+	addresses := make(map[string]string)
 
 	// check that we have an address for each derivation path we used.
 	for _, path := range paths {
-		if _, ok := deriveResp[path]; !ok {
+		info, ok := deriveResp[path]
+		if !ok {
 			t.Errorf("results doesn't contain account info for path %s", path)
-			return false
+			return nil, false
 		}
+
+		addresses[path] = info.Address
 	}
 
-	return true
+	return addresses, true
 }
 
 func testMultiAccountStoreDerived(t *testing.T, accountID string, password string, paths []string) ([]string, bool) { //nolint: gocyclo

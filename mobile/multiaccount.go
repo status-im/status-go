@@ -46,6 +46,12 @@ type MultiAccountLoadAccountParams struct {
 	Password string `json:"password"`
 }
 
+// MultiAccountImportMnemonicParams are the params sent to MultiAccountImportMnemonic.
+type MultiAccountImportMnemonicParams struct {
+	MnemonicPhrase  string `json:"mnemonicPhrase"`
+	Bip39Passphrase string `json:"Bip39Passphrase"`
+}
+
 // MultiAccountGenerate generates account in memory without storing them.
 func MultiAccountGenerate(paramsJSON string) string {
 	var p MultiAccountGenerateParams
@@ -139,6 +145,27 @@ func MultiAccountImportPrivateKey(paramsJSON string) string {
 	}
 
 	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportPrivateKey(p.PrivateKey)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
+// MultiAccountImportMnemonic imports an account derived from the mnemonic phrase and the Bip39Passphrase storing it.
+func MultiAccountImportMnemonic(paramsJSON string) string {
+	var p MultiAccountImportMnemonicParams
+
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportMnemonic(p.MnemonicPhrase, p.Bip39Passphrase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

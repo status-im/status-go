@@ -118,6 +118,28 @@ func MultiAccountImportPrivateKey(paramsJSON *C.char) *C.char {
 	return C.CString(string(out))
 }
 
+// MultiAccountImportMnemonic imports an account derived from the mnemonic phrase and the Bip39Passphrase storing it.
+//export MultiAccountImportMnemonic
+func MultiAccountImportMnemonic(paramsJSON *C.char) *C.char {
+	var p mobile.MultiAccountImportMnemonicParams
+
+	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportMnemonic(p.MnemonicPhrase, p.Bip39Passphrase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(out))
+}
+
 // MultiAccountStoreAccount stores the select account.
 //export MultiAccountStoreAccount
 func MultiAccountStoreAccount(paramsJSON *C.char) *C.char {

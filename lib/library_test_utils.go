@@ -151,6 +151,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testMultiAccountGenerateDeriveStoreLoadReset,
 		},
 		{
+			"MultiAccount - ImportMnemonic/Derive",
+			testMultiAccountImportMnemonicAndDerive,
+		},
+		{
 			"MultiAccount - GenerateAndDerive",
 			testMultiAccountGenerateAndDerive,
 		},
