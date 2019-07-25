@@ -23,7 +23,7 @@ type MultiAccountDeriveAddressesParams struct {
 	Paths     []string `json:"paths"`
 }
 
-// MultiAccountStoreDerivedAccountsParams are the params sent to MultiAccountStoreDerived.
+// MultiAccountStoreDerivedAccountsParams are the params sent to MultiAccountStoreDerivedAccounts.
 type MultiAccountStoreDerivedAccountsParams struct {
 	MultiAccountDeriveAddressesParams
 	Password string `json:"password"`
