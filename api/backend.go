@@ -2,10 +2,10 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math/big"
-	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -19,6 +19,7 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
@@ -29,10 +30,13 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
+	"github.com/status-im/status-go/services/browsers"
+	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
 )
@@ -60,7 +64,7 @@ type StatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
 	rootDataDir     string
-	accountsDB      *accounts.Database
+	appDB           *sql.DB
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
@@ -167,22 +171,25 @@ func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	return b.multiaccountsDB.SaveAccount(account)
 }
 
-func (b *StatusBackend) ensureAccountsDBOpened(account multiaccounts.Account, password string) (err error) {
+func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.accountsDB != nil {
+	if b.appDB != nil {
 		return nil
 	}
 	if len(b.rootDataDir) == 0 {
 		return errors.New("root datadir wasn't provided")
 	}
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("accounts-%x.sql", account.Address))
-	b.accountsDB, err = accounts.InitializeDB(path, password)
-	return err
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.Address))
+	b.appDB, err = appdatabase.InitializeDB(path, password)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
-	err := b.ensureAccountsDBOpened(acc, password)
+	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -193,15 +200,16 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
-	chatAddr, err := b.accountsDB.GetChatAddress()
+	accountsDB := accounts.NewDB(b.appDB)
+	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
 		return err
 	}
-	walletAddr, err := b.accountsDB.GetWalletAddress()
+	walletAddr, err := accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
 	}
-	watchAddrs, err := b.accountsDB.GetAddresses()
+	watchAddrs, err := accountsDB.GetAddresses()
 	if err != nil {
 		return err
 	}
@@ -235,7 +243,7 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Acco
 	if err != nil {
 		return err
 	}
-	err = b.ensureAccountsDBOpened(account, password)
+	err = b.ensureAppDBOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -243,7 +251,7 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Acco
 	if err != nil {
 		return err
 	}
-	err = b.accountsDB.SaveAccounts(subaccs)
+	err = accounts.NewDB(b.appDB).SaveAccounts(subaccs)
 	if err != nil {
 		return err
 	}
@@ -253,14 +261,14 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Acco
 func (b *StatusBackend) saveNodeConfig(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.accountsDB.SaveConfig(accounts.NodeConfigTag, config)
+	return accounts.NewDB(b.appDB).SaveConfig(accounts.NodeConfigTag, config)
 }
 
 func (b *StatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	conf := params.NodeConfig{}
-	err := b.accountsDB.GetConfig(accounts.NodeConfigTag, &conf)
+	err := accounts.NewDB(b.appDB).GetConfig(accounts.NodeConfigTag, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +289,25 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) accountsService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return accountssvc.NewService(b.accountsDB, b.multiaccountsDB, b.AccountManager()), nil
+		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, b.accountManager), nil
+	}
+}
+
+func (b *StatusBackend) browsersService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return browsers.NewService(browsers.NewDB(b.appDB)), nil
+	}
+}
+
+func (b *StatusBackend) permissionsService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return permissions.NewService(permissions.NewDB(b.appDB)), nil
+	}
+}
+
+func (b *StatusBackend) walletService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return wallet.NewService(wallet.NewDB(b.appDB)), nil
 	}
 }
 
@@ -299,7 +325,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
-	services = appendIf(b.accountsDB != nil, services, b.accountsService())
+	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService())
+	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
+	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
+	services = appendIf(config.WalletConfig.Enabled, services, b.walletService())
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
@@ -645,7 +674,7 @@ func (b *StatusBackend) Logout() error {
 	if err != nil {
 		return err
 	}
-	err = b.stopAccountsDB()
+	err = b.closeAppDB()
 	if err != nil {
 		return err
 	}
@@ -680,28 +709,17 @@ func (b *StatusBackend) cleanupServices() error {
 			return err
 		}
 	}
-
-	if b.statusNode.Config().BrowsersConfig.Enabled {
-		svc, err := b.statusNode.BrowsersService()
-		switch err {
-		case node.ErrServiceUnknown:
-		case nil:
-			err = svc.StopDatabase()
-			if err != nil {
-				return err
-			}
-		default:
-			return err
-		}
-	}
 	return nil
 }
 
-func (b *StatusBackend) stopAccountsDB() error {
-	if b.accountsDB != nil {
-		err := b.accountsDB.Close()
-		b.accountsDB = nil
-		return err
+func (b *StatusBackend) closeAppDB() error {
+	if b.appDB != nil {
+		err := b.appDB.Close()
+		if err != nil {
+			return err
+		}
+		b.appDB = nil
+		return nil
 	}
 	return nil
 }
@@ -768,18 +786,7 @@ func (b *StatusBackend) SelectAccount(loginParams account.LoginParams) error {
 			return err
 		}
 	}
-
-	err = b.startWallet(loginParams.Password)
-	if err != nil {
-		return err
-	}
-
-	err = b.startBrowsers(loginParams.Password)
-	if err != nil {
-		return err
-	}
-
-	return b.startPermissions(loginParams.Password)
+	return b.startWallet(loginParams.Password)
 }
 
 func (b *StatusBackend) startWallet(password string) error {
@@ -801,45 +808,10 @@ func (b *StatusBackend) startWallet(password string) error {
 	allAddresses := make([]common.Address, len(watchAddresses)+1)
 	allAddresses[0] = mainAccountAddress
 	copy(allAddresses[1:], watchAddresses)
-	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", mainAccountAddress))
-	return wallet.StartReactor(path, password,
+	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,
 		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
-}
-
-func (b *StatusBackend) startBrowsers(password string) error {
-	if !b.statusNode.Config().BrowsersConfig.Enabled {
-		return nil
-	}
-	svc, err := b.statusNode.BrowsersService()
-	if err != nil {
-		return err
-	}
-
-	mainAccountAddress, err := b.accountManager.MainAccountAddress()
-	if err != nil {
-		return err
-	}
-
-	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("browsers-%x.sql", mainAccountAddress))
-	return svc.StartDatabase(path, password)
-}
-
-func (b *StatusBackend) startPermissions(password string) error {
-	if !b.statusNode.Config().PermissionsConfig.Enabled {
-		return nil
-	}
-	svc, err := b.statusNode.PermissionsService()
-	if err != nil {
-		return err
-	}
-	mainAccountAddress, err := b.accountManager.MainAccountAddress()
-	if err != nil {
-		return err
-	}
-	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("permissions-%x.sql", mainAccountAddress))
-	return svc.StartDatabase(path, password)
 }
 
 // SendDataNotification sends data push notifications to users.

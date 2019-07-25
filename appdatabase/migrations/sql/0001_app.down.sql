@@ -1,0 +1,9 @@
+DROP TABLE settings;
+DROP TABLE accounts;
+DROP TABLE browsers;
+DROP TABLE browsers_history;
+DROP TABLE dapps;
+DROP TABLE permissions;
+DROP TABLE transfers;
+DROP TABLE blocks;
+DROP TABLE accounts_to_blocks;

@@ -1,20 +1,17 @@
 package browsers
 
 import (
-	"sync"
-
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // NewService initializes service instance.
-func NewService() *Service {
-	return &Service{}
+func NewService(db *Database) *Service {
+	return &Service{db: db}
 }
 
 // Service is a browsers service.
 type Service struct {
-	mu sync.Mutex
 	db *Database
 }
 
@@ -23,26 +20,9 @@ func (s *Service) Start(*p2p.Server) error {
 	return nil
 }
 
-// Start database after dbpath and password will become known.
-func (s *Service) StartDatabase(dbpath, password string) (err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.db, err = InitializeDB(dbpath, password)
-	return err
-}
-
-func (s *Service) StopDatabase() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.db != nil {
-		return s.db.Close()
-	}
-	return nil
-}
-
 // Stop a service.
 func (s *Service) Stop() error {
-	return s.StopDatabase()
+	return nil
 }
 
 // APIs returns list of available RPC APIs.
@@ -51,7 +31,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "browsers",
 			Version:   "0.1.0",
-			Service:   NewAPI(s),
+			Service:   NewAPI(s.db),
 			Public:    true,
 		},
 	}

@@ -12,9 +12,10 @@ import (
 )
 
 // NewService initializes service instance.
-func NewService() *Service {
+func NewService(db *Database) *Service {
 	feed := &event.Feed{}
 	return &Service{
+		db:      db,
 		feed:    feed,
 		signals: &SignalsTransmitter{publisher: feed},
 	}
@@ -35,17 +36,12 @@ func (s *Service) Start(*p2p.Server) error {
 }
 
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
-func (s *Service) StartReactor(dbpath, password string, client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
-	db, err := InitializeDB(dbpath, password)
+func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
+	reactor := NewReactor(s.db, s.feed, client, accounts, chain)
+	err := reactor.Start()
 	if err != nil {
 		return err
 	}
-	reactor := NewReactor(db, s.feed, client, accounts, chain)
-	err = reactor.Start()
-	if err != nil {
-		return err
-	}
-	s.db = db
 	s.reactor = reactor
 	s.client = client
 	return nil
@@ -57,10 +53,7 @@ func (s *Service) StopReactor() error {
 		return nil
 	}
 	s.reactor.Stop()
-	if s.db == nil {
-		return nil
-	}
-	return s.db.Close()
+	return nil
 }
 
 // Stop reactor, signals transmitter and close db.
