@@ -40,6 +40,12 @@ type MultiAccountImportPrivateKeyParams struct {
 	PrivateKey string `json:"privateKey"`
 }
 
+// MultiAccountLoadAccountParams are the params sent to MultiAccountLoadAccount.
+type MultiAccountLoadAccountParams struct {
+	Address  string `json:"address"`
+	Password string `json:"password"`
+}
+
 // MultiAccountGenerate generates account in memory without storing them.
 func MultiAccountGenerate(paramsJSON string) string {
 	var p MultiAccountGenerateParams
@@ -164,4 +170,31 @@ func MultiAccountStoreAccount(paramsJSON string) string {
 	}
 
 	return string(out)
+}
+
+// MultiAccountLoadAccount loads in memory the account specified by address unlocking it with password.
+func MultiAccountLoadAccount(paramsJSON string) string {
+	var p MultiAccountLoadAccountParams
+
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().LoadAccount(p.Address, p.Password)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
+// MultiAccountReset remove all the multi-account keys from memory.
+func MultiAccountReset() string {
+	statusBackend.AccountManager().AccountsGenerator().Reset()
+	return makeJSONResponse(nil)
 }

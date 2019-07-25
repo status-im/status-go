@@ -147,8 +147,8 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 			testFailedTransaction,
 		},
 		{
-			"MultiAccount - Generate/Derive/StoreDerived",
-			testMultiAccountGenerateDeriveAndStore,
+			"MultiAccount - Generate/Derive/StoreDerived/Load/Reset",
+			testMultiAccountGenerateDeriveStoreLoadReset,
 		},
 		{
 			"MultiAccount - GenerateAndDerive",

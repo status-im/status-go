@@ -139,3 +139,32 @@ func MultiAccountStoreAccount(paramsJSON *C.char) *C.char {
 
 	return C.CString(string(out))
 }
+
+// MultiAccountLoadAccount loads in memory the account specified by address unlocking it with password.
+//export MultiAccountLoadAccount
+func MultiAccountLoadAccount(paramsJSON *C.char) *C.char {
+	var p mobile.MultiAccountLoadAccountParams
+
+	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().LoadAccount(p.Address, p.Password)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(out))
+}
+
+// MultiAccountReset remove all the multi-account keys from memory.
+//export MultiAccountReset
+func MultiAccountReset() *C.char {
+	statusBackend.AccountManager().AccountsGenerator().Reset()
+	return makeJSONResponse(nil)
+}

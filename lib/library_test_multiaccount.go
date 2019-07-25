@@ -17,9 +17,27 @@ import (
 	"github.com/status-im/status-go/account/generator"
 )
 
+func checkMultiAccountErrorResponse(t *testing.T, respJSON *C.char, expectedError string) {
+	var e struct {
+		Error *string `json:"error,omitempty"`
+	}
+
+	if err := json.Unmarshal([]byte(C.GoString(respJSON)), &e); err != nil {
+		t.Fatalf("error unmarshaling error response")
+	}
+
+	if e.Error == nil {
+		t.Fatalf("unexpected empty error. expected %s, got nil", expectedError)
+	}
+
+	if *e.Error != expectedError {
+		t.Fatalf("unexpected error. expected %s, got %+v", expectedError, *e.Error)
+	}
+}
+
 func checkMultiAccountResponse(t *testing.T, respJSON *C.char, resp interface{}) {
 	var e struct {
-		Error *string `json:"error"`
+		Error *string `json:"error,omitempty"`
 	}
 
 	json.Unmarshal([]byte(C.GoString(respJSON)), &e)
@@ -32,7 +50,7 @@ func checkMultiAccountResponse(t *testing.T, respJSON *C.char, resp interface{})
 	}
 }
 
-func testMultiAccountGenerateDeriveAndStore(t *testing.T) bool { //nolint: gocyclo
+func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint: gocyclo
 	// to make sure that we start with empty account (which might have gotten populated during previous tests)
 	if err := statusBackend.Logout(); err != nil {
 		t.Fatal(err)
@@ -68,21 +86,51 @@ func testMultiAccountGenerateDeriveAndStore(t *testing.T) bool { //nolint: gocyc
 			return false
 		}
 
-		if ok := testMultiAccountDeriveAddresses(t, info.ID, paths); !ok {
+		if ok := testMultiAccountDeriveAddresses(t, info.ID, paths, false); !ok {
 			return false
 		}
 	}
 
+	password := "multi-account-test-password"
+
 	// store 2 derived child accounts from the first account.
 	// after that all the generated account should be remove from memory.
-	if ok := testMultiAccountStoreDerived(t, generateResp[0].ID, paths); !ok {
+	addresses, ok := testMultiAccountStoreDerived(t, generateResp[0].ID, password, paths)
+	if !ok {
 		return false
+	}
+
+	loadedIDs := make([]string, 0)
+
+	// unlock and load all stored accounts.
+	for _, address := range addresses {
+		loadedID, ok := testMultiAccountLoadAccount(t, address, password)
+		if !ok {
+			return false
+		}
+
+		loadedIDs = append(loadedIDs, loadedID)
+
+		if ok := testMultiAccountDeriveAddresses(t, loadedID, paths, false); !ok {
+			return false
+		}
+	}
+
+	rawResp = MultiAccountReset()
+
+	// try again deriving addresses.
+	// it should fail because reset should remove all the accounts from memory.
+	for _, loadedID := range loadedIDs {
+		if ok := testMultiAccountDeriveAddresses(t, loadedID, paths, true); !ok {
+			t.Errorf("account is still in memory, expected Reset to remove all accounts")
+			return false
+		}
 	}
 
 	return true
 }
 
-func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []string) bool { //nolint: gocyclo
+func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []string, expectAccountNotFoundError bool) bool { //nolint: gocyclo
 	params := mobile.MultiAccountDeriveAddressesParams{
 		AccountID: accountID,
 		Paths:     paths,
@@ -96,6 +144,12 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 
 	// derive addresses from account accountID
 	rawResp := MultiAccountDeriveAddresses(C.CString(string(paramsJSON)))
+
+	if expectAccountNotFoundError {
+		checkMultiAccountErrorResponse(t, rawResp, "account not found")
+		return true
+	}
+
 	var deriveResp map[string]generator.AccountInfo
 	// check the response doesn't have errors
 	checkMultiAccountResponse(t, rawResp, &deriveResp)
@@ -115,8 +169,7 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 	return true
 }
 
-func testMultiAccountStoreDerived(t *testing.T, accountID string, paths []string) bool { //nolint: gocyclo
-	password := "test-multiaccount-password"
+func testMultiAccountStoreDerived(t *testing.T, accountID string, password string, paths []string) ([]string, bool) { //nolint: gocyclo
 
 	params := mobile.MultiAccountStoreDerivedParams{
 		MultiAccountDeriveAddressesParams: mobile.MultiAccountDeriveAddressesParams{
@@ -129,7 +182,7 @@ func testMultiAccountStoreDerived(t *testing.T, accountID string, paths []string
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		t.Errorf("error encoding MultiAccountStoreDerivedParams")
-		return false
+		return nil, false
 	}
 
 	// store one child account for each derivation path.
@@ -145,7 +198,7 @@ func testMultiAccountStoreDerived(t *testing.T, accountID string, paths []string
 
 	if len(addresses) != 2 {
 		t.Errorf("expected 2 addresses, got %d", len(addresses))
-		return false
+		return nil, false
 	}
 
 	// for each stored account, check that we can decrypt it with the password we used.
@@ -154,10 +207,11 @@ func testMultiAccountStoreDerived(t *testing.T, accountID string, paths []string
 		_, err = statusBackend.AccountManager().VerifyAccountPassword(dir, address, password)
 		if err != nil {
 			t.Errorf("failed to verify password on stored derived account")
+			return nil, false
 		}
 	}
 
-	return true
+	return addresses, true
 }
 
 func testMultiAccountGenerateAndDerive(t *testing.T) bool { //nolint: gocyclo
@@ -258,4 +312,27 @@ func testMultiAccountImportStore(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	return true
+}
+
+func testMultiAccountLoadAccount(t *testing.T, address string, password string) (string, bool) { //nolint: gocyclo
+	t.Log("loading account")
+	params := mobile.MultiAccountLoadAccountParams{
+		Address:  address,
+		Password: password,
+	}
+
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		t.Errorf("error encoding MultiAccountLoadAccountParams")
+		return "", false
+	}
+
+	// load the account in memory
+	rawResp := MultiAccountLoadAccount(C.CString(string(paramsJSON)))
+	var loadResp generator.IdentifiedAccountInfo
+
+	// check that we don't have errors in the response
+	checkMultiAccountResponse(t, rawResp, &loadResp)
+
+	return loadResp.ID, true
 }
