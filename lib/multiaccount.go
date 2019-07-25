@@ -74,10 +74,10 @@ func MultiAccountDeriveAddresses(paramsJSON *C.char) *C.char {
 	return C.CString(string(out))
 }
 
-// MultiAccountStoreDerived derive accounts from the specified key and store them encrypted with the specified password.
-//export MultiAccountStoreDerived
-func MultiAccountStoreDerived(paramsJSON *C.char) *C.char {
-	var p mobile.MultiAccountStoreDerivedParams
+// MultiAccountStoreDerivedAccounts derive accounts from the specified key and store them encrypted with the specified password.
+//export MultiAccountStoreDerivedAccounts
+func MultiAccountStoreDerivedAccounts(paramsJSON *C.char) *C.char {
+	var p mobile.MultiAccountStoreDerivedAccountsParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)

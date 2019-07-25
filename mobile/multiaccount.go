@@ -23,8 +23,8 @@ type MultiAccountDeriveAddressesParams struct {
 	Paths     []string `json:"paths"`
 }
 
-// MultiAccountStoreDerivedParams are the params sent to MultiAccountStoreDerived.
-type MultiAccountStoreDerivedParams struct {
+// MultiAccountStoreDerivedAccountsParams are the params sent to MultiAccountStoreDerived.
+type MultiAccountStoreDerivedAccountsParams struct {
 	MultiAccountDeriveAddressesParams
 	Password string `json:"password"`
 }
@@ -115,9 +115,9 @@ func MultiAccountDeriveAddresses(paramsJSON string) string {
 	return string(out)
 }
 
-// MultiAccountStoreDerived derive accounts from the specified key and store them encrypted with the specified password.
-func MultiAccountStoreDerived(paramsJSON string) string {
-	var p MultiAccountStoreDerivedParams
+// MultiAccountStoreDerivedAccounts derive accounts from the specified key and store them encrypted with the specified password.
+func MultiAccountStoreDerivedAccounts(paramsJSON string) string {
+	var p MultiAccountStoreDerivedAccountsParams
 
 	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
 		return makeJSONResponse(err)

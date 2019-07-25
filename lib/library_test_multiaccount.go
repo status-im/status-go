@@ -216,7 +216,7 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 
 func testMultiAccountStoreDerived(t *testing.T, accountID string, password string, paths []string) ([]string, bool) { //nolint: gocyclo
 
-	params := mobile.MultiAccountStoreDerivedParams{
+	params := mobile.MultiAccountStoreDerivedAccountsParams{
 		MultiAccountDeriveAddressesParams: mobile.MultiAccountDeriveAddressesParams{
 			AccountID: accountID,
 			Paths:     paths,
@@ -231,7 +231,7 @@ func testMultiAccountStoreDerived(t *testing.T, accountID string, password strin
 	}
 
 	// store one child account for each derivation path.
-	rawResp := MultiAccountStoreDerived(C.CString(string(paramsJSON)))
+	rawResp := MultiAccountStoreDerivedAccounts(C.CString(string(paramsJSON)))
 	var storeResp map[string]generator.AccountInfo
 
 	// check that we don't have errors in the response
