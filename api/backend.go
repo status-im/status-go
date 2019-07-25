@@ -609,6 +609,10 @@ func (b *StatusBackend) Logout() error {
 	if err != nil {
 		return err
 	}
+	err = b.stopSettingsDB()
+	if err != nil {
+		return err
+	}
 
 	b.AccountManager().Logout()
 
@@ -654,11 +658,12 @@ func (b *StatusBackend) cleanupServices() error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (b *StatusBackend) stopSettingsDB() error {
 	if b.settingsDB != nil {
-		err = b.settingsDB.Close()
-		if err != nil {
-			return err
-		}
+		return b.settingsDB.Close()
 	}
 	return nil
 }
