@@ -2,26 +2,22 @@ notifications:
   email: false
 
 language: go
+go:
+  - "1.12.x"
+  - "1.13beta1"
 
 install: true
 
 env:
-- GO111MODULE=on
-
-before_script:
-- make install-linter
+  - GO111MODULE=on GOFLAGS=-mod=vendor
 
 matrix:
-  include:
-  - go: "1.11.x"
-    env: GOFLAGS=-mod=vendor
-    script:
-    - make lint
-    # fails without -a
-    - go test -a ./... # make test
-  - go: "1.12.x"
-    env: GOFLAGS=-mod=vendor
-    script:
-    - make lint
-    # fails without -a
-    - go test -a ./... # make test
+  allow_failures:
+    - go: "1.13beta1"
+
+before_script:
+  - make install-linter
+
+script:
+  - make lint
+  - make test

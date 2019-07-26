@@ -5,15 +5,13 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
+	"github.com/pkg/errors"
+	"time"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
-	"log"
 	"strings"
-	"time"
 )
-
-//go:generate protoc --go_out=. ./message.proto
 
 const (
 	// ContentTypeTextPlain means that the message contains plain text.
@@ -67,26 +65,6 @@ const (
 	MessageRead Flags = 1 << iota
 )
 
-// StatusMessage is any Status Protocol message.
-type StatusMessage struct {
-	Message   interface{}
-	ID        []byte           `json:"-"`
-	SigPubKey *ecdsa.PublicKey `json:"-"`
-}
-
-func (m *StatusMessage) MarshalJSON() ([]byte, error) {
-	type MessageAlias StatusMessage
-	item := struct {
-		*MessageAlias
-		ID string `json:"id"`
-	}{
-		MessageAlias: (*MessageAlias)(m),
-		ID:           "0x" + hex.EncodeToString(m.ID),
-	}
-
-	return json.Marshal(item)
-}
-
 // Message is a chat message sent by an user.
 type Message struct {
 	Text      string        `json:"text"` // TODO: why is this duplicated?
@@ -99,6 +77,8 @@ type Message struct {
 	Flags     Flags            `json:"-"`
 	ID        []byte           `json:"-"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
+	ChatID    string           `json:"-"`
+	Public    bool             `json:"-"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -112,10 +92,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(item)
-}
-
-func (m Message) Unread() bool {
-	return !m.Flags.Has(MessageRead)
 }
 
 // createTextMessage creates a Message.
@@ -144,59 +120,18 @@ func CreatePrivateTextMessage(data []byte, lastClock int64, chatID string) Messa
 	return createTextMessage(data, lastClock, chatID, MessageTypePrivate)
 }
 
-func unwrapMessage(data []byte) (*StatusProtocolMessage, error) {
-	var message StatusProtocolMessage
-	err := proto.Unmarshal(data, &message)
-	if err != nil {
-		return nil, err
-	}
-	return &message, nil
-}
+func decodeTransitMessage(originalPayload []byte) (interface{}, error) {
+	payload := make([]byte, len(originalPayload))
+	copy(payload, originalPayload)
+	// This modifies the payload
+	buf := bytes.NewBuffer(payload)
 
-func decodeTransitMessage(data []byte) (interface{}, error) {
-	buf := bytes.NewBuffer(data)
 	decoder := NewMessageDecoder(buf)
 	value, err := decoder.Decode()
 	if err != nil {
 		return nil, err
 	}
 	return value, nil
-}
-
-// DecodeMessage decodes a raw payload to StatusMessage struct.
-func DecodeMessage(transportPublicKey *ecdsa.PublicKey, data []byte) (message StatusMessage, err error) {
-	transitMessage := data
-
-	// Getting a signature from transport message should happen only if
-	// the signature was not defined in the payload itself.
-	message.SigPubKey = transportPublicKey
-
-	statusProtocolMessage, err := unwrapMessage(data)
-	if err == nil {
-		// Wrapped message, extract transit and signature
-		transitMessage = statusProtocolMessage.Payload
-		if statusProtocolMessage.Signature != nil {
-			recoveredKey, err := crypto.SigToPub(
-				crypto.Keccak256(transitMessage),
-				statusProtocolMessage.Signature,
-			)
-			if err != nil {
-				return message, err
-			}
-
-			message.SigPubKey = recoveredKey
-		}
-	}
-
-	message.ID = MessageID(message.SigPubKey, transitMessage)
-	value, err := decodeTransitMessage(transitMessage)
-	if err != nil {
-		log.Printf("[message::DecodeMessage] could not decode message: %#x", message.ID)
-		return message, err
-	}
-	message.Message = value
-
-	return message, nil
 }
 
 // EncodeMessage encodes a Message using Transit serialization.
