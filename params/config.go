@@ -409,6 +409,15 @@ type ShhextConfig struct {
 	// WhisperCacheDir is a folder where whisper filters may persist messages before delivering them
 	// to a client.
 	WhisperCacheDir string
+
+	// DisableGenericDiscoveryTopic indicates whether we should be listening on the old discovery
+	DisableGenericDiscoveryTopic bool
+
+	// SendV1Messages indicates whether we should be sending v1-compatible only messages
+	SendV1Messages bool
+
+	// DatasyncEnabled indicates whether we should enable dataasync
+	DataSyncEnabled bool
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found

@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package statusproto;
-
-message StatusProtocolMessage {
-  bytes signature = 1;
-  bytes payload = 2;
-}
