@@ -167,6 +167,34 @@ func (a *WhisperServiceTransport) LeavePrivate(publicKey *ecdsa.PublicKey) error
 	return a.chats.Remove(chats...)
 }
 
+type ChatMessages struct {
+	Messages []*whisper.ReceivedMessage
+	Public   bool
+	ChatID   string
+}
+
+func (a *WhisperServiceTransport) RetrieveAllMessages() ([]ChatMessages, error) {
+	chatMessages := make(map[string]ChatMessages)
+
+	for _, chat := range a.chats.Chats() {
+		f := a.shh.GetFilter(chat.FilterID)
+		if f == nil {
+			return nil, errors.New("failed to return a filter")
+		}
+
+		messages := chatMessages[chat.ChatID]
+		messages.ChatID = chat.ChatID
+		messages.Public = chat.IsPublic()
+		messages.Messages = append(messages.Messages, f.Retrieve()...)
+	}
+
+	var result []ChatMessages
+	for _, messages := range chatMessages {
+		result = append(result, messages)
+	}
+	return result, nil
+}
+
 func (a *WhisperServiceTransport) RetrievePublicMessages(chatID string) ([]*whisper.ReceivedMessage, error) {
 	chat, err := a.chats.LoadPublic(chatID)
 	if err != nil {
@@ -183,7 +211,7 @@ func (a *WhisperServiceTransport) RetrievePublicMessages(chatID string) ([]*whis
 
 func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]*whisper.ReceivedMessage, error) {
 	chats := a.chats.ChatsByPublicKey(publicKey)
-	discoveryChats, err := a.chats.LoadDiscovery()
+	discoveryChats, err := a.chats.Init(nil, nil, true)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +223,7 @@ func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.Publi
 		if f == nil {
 			return nil, errors.New("failed to return a filter")
 		}
+
 		result = append(result, f.Retrieve()...)
 	}
 
@@ -211,6 +240,7 @@ func (a *WhisperServiceTransport) RetrieveRawAll() (map[filter.Chat][]*whisper.R
 		if f == nil {
 			return nil, errors.New("failed to return a filter")
 		}
+
 		result[*chat] = append(result[*chat], f.Retrieve()...)
 	}
 

@@ -3,6 +3,6 @@ syntax = "proto3";
 package statusproto;
 
 message StatusProtocolMessage {
-  bytes signature = 1;
-  bytes payload = 2;
+  bytes signature = 4001;
+  bytes payload = 4002;
 }
