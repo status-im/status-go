@@ -176,17 +176,17 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		os.Remove(v4Path)
 	}
 
+	options, err := buildMessengerOptions(s.config, sessionsDatabasePath, transportDatabasePath)
+	if err != nil {
+		return err
+	}
+
 	selectedKeyID := s.w.SelectedKeyPairID()
 	identity, err := s.w.GetPrivateKey(selectedKeyID)
 	if err != nil {
 		return err
 	}
 
-	// Create a custom zap.Logger which will forward logs from status-protocol-go to status-go logger.
-	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
-	if err != nil {
-		return err
-	}
 	messenger, err := protocol.NewMessenger(
 		identity,
 		&server{server: s.server},
@@ -194,12 +194,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		dataDir,
 		encKey,
 		s.config.InstallationID,
-		protocol.WithDatabaseFilePaths(
-			sessionsDatabasePath,
-			transportDatabasePath,
-		),
-		protocol.WithGenericDiscoveryTopicSupport(),
-		protocol.WithCustomLogger(zapLogger),
+		options...,
 	)
 	if err != nil {
 		return err
@@ -393,6 +388,35 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 			return
 		}
 	}
+}
+
+func buildMessengerOptions(config params.ShhextConfig, sessionsDatabasePath string, transportDatabasePath string) ([]protocol.Option, error) {
+	// Create a custom zap.Logger which will forward logs from status-protocol-go to status-go logger.
+	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
+	if err != nil {
+		return nil, err
+	}
+
+	options := []protocol.Option{
+		protocol.WithCustomLogger(zapLogger),
+		protocol.WithDatabaseFilePaths(
+			sessionsDatabasePath,
+			transportDatabasePath,
+		),
+	}
+
+	if !config.DisableGenericDiscoveryTopic {
+		options = append(options, protocol.WithGenericDiscoveryTopicSupport())
+	}
+
+	if config.DataSyncEnabled {
+		options = append(options, protocol.WithDatasync())
+	}
+
+	if config.SendV1Messages {
+		options = append(options, protocol.WithSendV1Messages())
+	}
+	return options, nil
 }
 
 func (s *Service) afterPost(hash []byte, newMessage whisper.NewMessage) hexutil.Bytes {
