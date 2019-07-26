@@ -74,10 +74,10 @@ func MultiAccountDeriveAddresses(paramsJSON *C.char) *C.char {
 	return C.CString(string(out))
 }
 
-// MultiAccountStoreDerived derive accounts from the specified key and store them encrypted with the specified password.
-//export MultiAccountStoreDerived
-func MultiAccountStoreDerived(paramsJSON *C.char) *C.char {
-	var p mobile.MultiAccountStoreDerivedParams
+// MultiAccountStoreDerivedAccounts derive accounts from the specified key and store them encrypted with the specified password.
+//export MultiAccountStoreDerivedAccounts
+func MultiAccountStoreDerivedAccounts(paramsJSON *C.char) *C.char {
+	var p mobile.MultiAccountStoreDerivedAccountsParams
 
 	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
 		return makeJSONResponse(err)
@@ -118,6 +118,28 @@ func MultiAccountImportPrivateKey(paramsJSON *C.char) *C.char {
 	return C.CString(string(out))
 }
 
+// MultiAccountImportMnemonic imports an account derived from the mnemonic phrase and the Bip39Passphrase storing it.
+//export MultiAccountImportMnemonic
+func MultiAccountImportMnemonic(paramsJSON *C.char) *C.char {
+	var p mobile.MultiAccountImportMnemonicParams
+
+	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportMnemonic(p.MnemonicPhrase, p.Bip39Passphrase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(out))
+}
+
 // MultiAccountStoreAccount stores the select account.
 //export MultiAccountStoreAccount
 func MultiAccountStoreAccount(paramsJSON *C.char) *C.char {
@@ -138,4 +160,33 @@ func MultiAccountStoreAccount(paramsJSON *C.char) *C.char {
 	}
 
 	return C.CString(string(out))
+}
+
+// MultiAccountLoadAccount loads in memory the account specified by address unlocking it with password.
+//export MultiAccountLoadAccount
+func MultiAccountLoadAccount(paramsJSON *C.char) *C.char {
+	var p mobile.MultiAccountLoadAccountParams
+
+	if err := json.Unmarshal([]byte(C.GoString(paramsJSON)), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().LoadAccount(p.Address, p.Password)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(out))
+}
+
+// MultiAccountReset remove all the multi-account keys from memory.
+//export MultiAccountReset
+func MultiAccountReset() *C.char {
+	statusBackend.AccountManager().AccountsGenerator().Reset()
+	return makeJSONResponse(nil)
 }

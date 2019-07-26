@@ -23,8 +23,8 @@ type MultiAccountDeriveAddressesParams struct {
 	Paths     []string `json:"paths"`
 }
 
-// MultiAccountStoreDerivedParams are the params sent to MultiAccountStoreDerived.
-type MultiAccountStoreDerivedParams struct {
+// MultiAccountStoreDerivedAccountsParams are the params sent to MultiAccountStoreDerivedAccounts.
+type MultiAccountStoreDerivedAccountsParams struct {
 	MultiAccountDeriveAddressesParams
 	Password string `json:"password"`
 }
@@ -38,6 +38,18 @@ type MultiAccountStoreAccountParams struct {
 // MultiAccountImportPrivateKeyParams are the params sent to MultiAccountImportPrivateKey.
 type MultiAccountImportPrivateKeyParams struct {
 	PrivateKey string `json:"privateKey"`
+}
+
+// MultiAccountLoadAccountParams are the params sent to MultiAccountLoadAccount.
+type MultiAccountLoadAccountParams struct {
+	Address  string `json:"address"`
+	Password string `json:"password"`
+}
+
+// MultiAccountImportMnemonicParams are the params sent to MultiAccountImportMnemonic.
+type MultiAccountImportMnemonicParams struct {
+	MnemonicPhrase  string `json:"mnemonicPhrase"`
+	Bip39Passphrase string `json:"Bip39Passphrase"`
 }
 
 // MultiAccountGenerate generates account in memory without storing them.
@@ -103,9 +115,9 @@ func MultiAccountDeriveAddresses(paramsJSON string) string {
 	return string(out)
 }
 
-// MultiAccountStoreDerived derive accounts from the specified key and store them encrypted with the specified password.
-func MultiAccountStoreDerived(paramsJSON string) string {
-	var p MultiAccountStoreDerivedParams
+// MultiAccountStoreDerivedAccounts derive accounts from the specified key and store them encrypted with the specified password.
+func MultiAccountStoreDerivedAccounts(paramsJSON string) string {
+	var p MultiAccountStoreDerivedAccountsParams
 
 	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
 		return makeJSONResponse(err)
@@ -145,6 +157,27 @@ func MultiAccountImportPrivateKey(paramsJSON string) string {
 	return string(out)
 }
 
+// MultiAccountImportMnemonic imports an account derived from the mnemonic phrase and the Bip39Passphrase storing it.
+func MultiAccountImportMnemonic(paramsJSON string) string {
+	var p MultiAccountImportMnemonicParams
+
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().ImportMnemonic(p.MnemonicPhrase, p.Bip39Passphrase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
 // MultiAccountStoreAccount stores the select account.
 func MultiAccountStoreAccount(paramsJSON string) string {
 	var p MultiAccountStoreAccountParams
@@ -164,4 +197,31 @@ func MultiAccountStoreAccount(paramsJSON string) string {
 	}
 
 	return string(out)
+}
+
+// MultiAccountLoadAccount loads in memory the account specified by address unlocking it with password.
+func MultiAccountLoadAccount(paramsJSON string) string {
+	var p MultiAccountLoadAccountParams
+
+	if err := json.Unmarshal([]byte(paramsJSON), &p); err != nil {
+		return makeJSONResponse(err)
+	}
+
+	resp, err := statusBackend.AccountManager().AccountsGenerator().LoadAccount(p.Address, p.Password)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	out, err := json.Marshal(resp)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(out)
+}
+
+// MultiAccountReset remove all the multi-account keys from memory.
+func MultiAccountReset() string {
+	statusBackend.AccountManager().AccountsGenerator().Reset()
+	return makeJSONResponse(nil)
 }
