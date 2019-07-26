@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
@@ -225,26 +226,6 @@ func CreateAccount(password *C.char) *C.char {
 	return C.CString(string(outBytes))
 }
 
-//CreateChildAccount creates sub-account
-//export CreateChildAccount
-func CreateChildAccount(parentAddress, password *C.char) *C.char {
-	address, pubKey, err := statusBackend.AccountManager().CreateChildAccount(C.GoString(parentAddress), C.GoString(password))
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := AccountInfo{
-		Address: address,
-		PubKey:  pubKey,
-		Error:   errString,
-	}
-	outBytes, _ := json.Marshal(out)
-	return C.CString(string(outBytes))
-}
-
 //RecoverAccount re-creates master key using given details
 //export RecoverAccount
 func RecoverAccount(password, mnemonic *C.char) *C.char {
@@ -346,8 +327,13 @@ func VerifyAccountPassword(keyStoreDir, address, password *C.char) *C.char {
 //Login loads a key file (for a given address), tries to decrypt it using the password, to verify ownership
 // if verified, purges all the previous identities from Whisper, and injects verified key as shh identity
 //export Login
-func Login(address, password *C.char) *C.char {
-	err := statusBackend.SelectAccount(C.GoString(address), C.GoString(address), C.GoString(password))
+func Login(loginParamsJSON *C.char) *C.char {
+	params, err := account.ParseLoginParams(C.GoString(loginParamsJSON))
+	if err != nil {
+		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
+	}
+
+	err = statusBackend.SelectAccount(params)
 	return makeJSONResponse(err)
 }
 
@@ -473,7 +459,7 @@ func HashMessage(message *C.char) *C.char {
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
 //export SignTypedData
-func SignTypedData(data, password *C.char) *C.char {
+func SignTypedData(data, address, password *C.char) *C.char {
 	var typed typeddata.TypedData
 	err := json.Unmarshal([]byte(C.GoString(data)), &typed)
 	if err != nil {
@@ -482,7 +468,7 @@ func SignTypedData(data, password *C.char) *C.char {
 	if err := typed.Validate(); err != nil {
 		return C.CString(prepareJSONResponseWithCode(nil, err, codeFailedParseParams))
 	}
-	result, err := statusBackend.SignTypedData(typed, C.GoString(password))
+	result, err := statusBackend.SignTypedData(typed, C.GoString(address), C.GoString(password))
 	return C.CString(prepareJSONResponse(result.String(), err))
 }
 

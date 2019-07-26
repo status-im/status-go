@@ -1,7 +1,9 @@
 package account
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -13,6 +15,54 @@ var (
 	ErrInvalidAccountAddressOrKey  = errors.New("cannot parse address or key to valid account address")
 	ErrInvalidMnemonicPhraseLength = errors.New("invalid mnemonic phrase length; valid lengths are 12, 15, 18, 21, and 24")
 )
+
+type LoginParams struct {
+	ChatAddress    common.Address   `json:"chatAddress"`
+	Password       string           `json:"password"`
+	MainAccount    common.Address   `json:"mainAccount"`
+	WatchAddresses []common.Address `json:"watchAddresses"`
+}
+
+type ErrZeroAddress struct {
+	field string
+}
+
+func (e *ErrZeroAddress) Error() string {
+	return fmt.Sprintf("%s contains an empty address", e.field)
+}
+
+func newErrZeroAddress(field string) *ErrZeroAddress {
+	return &ErrZeroAddress{
+		field: field,
+	}
+}
+
+func ParseLoginParams(paramsJSON string) (LoginParams, error) {
+	var (
+		params      LoginParams
+		zeroAddress common.Address
+	)
+
+	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
+		return params, err
+	}
+
+	if params.ChatAddress == zeroAddress {
+		return params, newErrZeroAddress("ChatAddress")
+	}
+
+	if params.MainAccount == zeroAddress {
+		return params, newErrZeroAddress("MainAccount")
+	}
+
+	for _, address := range params.WatchAddresses {
+		if address == zeroAddress {
+			return params, newErrZeroAddress("WatchAddresses")
+		}
+	}
+
+	return params, nil
+}
 
 // Info contains wallet and chat addresses and public keys of an account.
 type Info struct {

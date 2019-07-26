@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
@@ -229,25 +230,6 @@ func CreateAccount(password string) string {
 	return string(outBytes)
 }
 
-// CreateChildAccount creates sub-account.
-func CreateChildAccount(parentAddress, password string) string {
-	address, pubKey, err := statusBackend.AccountManager().CreateChildAccount(parentAddress, password)
-
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
-
-	out := AccountInfo{
-		Address: address,
-		PubKey:  pubKey,
-		Error:   errString,
-	}
-	outBytes, _ := json.Marshal(out)
-	return string(outBytes)
-}
-
 // RecoverAccount re-creates master key using given details.
 func RecoverAccount(password, mnemonic string) string {
 	info, err := statusBackend.AccountManager().RecoverAccount(password, mnemonic)
@@ -344,8 +326,13 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 // Login loads a key file (for a given address), tries to decrypt it using the password,
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity.
-func Login(address, password string) string {
-	err := statusBackend.SelectAccount(address, address, password)
+func Login(loginParamsJSON string) string {
+	params, err := account.ParseLoginParams(loginParamsJSON)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+
+	err = statusBackend.SelectAccount(params)
 	return makeJSONResponse(err)
 }
 
@@ -377,7 +364,7 @@ func SignMessage(rpcParams string) string {
 // SignTypedData unmarshall data into TypedData, validate it and signs with selected account,
 // if password matches selected account.
 //export SignTypedData
-func SignTypedData(data, password string) string {
+func SignTypedData(data, address, password string) string {
 	var typed typeddata.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
 	if err != nil {
@@ -386,7 +373,7 @@ func SignTypedData(data, password string) string {
 	if err := typed.Validate(); err != nil {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
-	result, err := statusBackend.SignTypedData(typed, password)
+	result, err := statusBackend.SignTypedData(typed, address, password)
 	return prepareJSONResponse(result.String(), err)
 }
 

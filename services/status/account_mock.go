@@ -91,17 +91,17 @@ func (mr *MockAccountManagerMockRecorder) AddressToDecryptedAccount(arg0, arg1 i
 }
 
 // SelectAccount mocks base method
-func (m *MockAccountManager) SelectAccount(walletAddress, chatAddress, password string) error {
+func (m *MockAccountManager) SelectAccount(arg0 account.LoginParams) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SelectAccount", walletAddress, chatAddress, password)
+	ret := m.ctrl.Call(m, "SelectAccount", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SelectAccount indicates an expected call of SelectAccount
-func (mr *MockAccountManagerMockRecorder) SelectAccount(walletAddress, chatAddress, password interface{}) *gomock.Call {
+func (mr *MockAccountManagerMockRecorder) SelectAccount(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelectAccount", reflect.TypeOf((*MockAccountManager)(nil).SelectAccount), walletAddress, chatAddress, password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SelectAccount", reflect.TypeOf((*MockAccountManager)(nil).SelectAccount), arg0)
 }
 
 // CreateAccount mocks base method
