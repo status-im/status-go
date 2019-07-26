@@ -183,7 +183,7 @@ func (a *WhisperServiceTransport) RetrievePublicMessages(chatID string) ([]*whis
 
 func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]*whisper.ReceivedMessage, error) {
 	chats := a.chats.ChatsByPublicKey(publicKey)
-	discoveryChats, err := a.chats.LoadDiscovery()
+	discoveryChats, err := a.chats.Init(nil, nil, true)
 	if err != nil {
 		return nil, err
 	}

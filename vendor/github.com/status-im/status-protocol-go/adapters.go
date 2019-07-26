@@ -19,6 +19,11 @@ import (
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
 	transport "github.com/status-im/status-protocol-go/transport/whisper"
 	protocol "github.com/status-im/status-protocol-go/v1"
+
+	"github.com/status-im/status-protocol-go/datasync"
+	datasyncpeer "github.com/status-im/status-protocol-go/datasync/peer"
+	datasyncproto "github.com/vacp2p/mvds/protobuf"
+	datasynctransport "github.com/vacp2p/mvds/transport"
 )
 
 // Whisper message properties.
@@ -34,6 +39,7 @@ type whisperAdapter struct {
 	privateKey *ecdsa.PrivateKey
 	transport  *transport.WhisperServiceTransport
 	protocol   *encryption.Protocol
+	datasync   *datasync.DataSync
 	logger     *zap.Logger
 
 	featureFlags featureFlags
@@ -43,6 +49,7 @@ func newWhisperAdapter(
 	pk *ecdsa.PrivateKey,
 	t *transport.WhisperServiceTransport,
 	p *encryption.Protocol,
+	d *datasync.DataSync,
 	featureFlags featureFlags,
 	logger *zap.Logger,
 ) *whisperAdapter {
@@ -50,13 +57,22 @@ func newWhisperAdapter(
 		logger = zap.NewNop()
 	}
 
-	return &whisperAdapter{
+	adapter := &whisperAdapter{
 		privateKey:   pk,
 		transport:    t,
 		protocol:     p,
+		datasync:     d,
 		featureFlags: featureFlags,
 		logger:       logger.With(zap.Namespace("whisperAdapter")),
 	}
+
+	if featureFlags.datasync {
+		// We pass our encryption/transport handling to the datasync
+		// so it's correctly encrypted.
+		d.Init(adapter.encryptAndSend)
+	}
+
+	return adapter
 }
 
 func (a *whisperAdapter) JoinPublic(chatID string) error {
@@ -93,19 +109,26 @@ func (a *whisperAdapter) RetrievePublicMessages(chatID string) ([]*protocol.Mess
 
 		hlogger.Debug("received a public message")
 
-		statusMessage, err := a.decodeMessage(shhMessage)
+		err := a.handleEncryptionMessage(context.Background(), shhMessage)
 		if err != nil {
-			hlogger.Error("failed to decode message", zap.Error(err))
+			hlogger.Debug("failed to handle an encryption message", zap.Error(err))
+		}
+
+		statusMessages, err := a.decodeMessages(shhMessage)
+		if err != nil {
+			hlogger.Info("failed to decode messages", zap.Error(err))
 			continue
 		}
 
-		switch m := statusMessage.Message.(type) {
-		case protocol.Message:
-			m.ID = statusMessage.ID
-			m.SigPubKey = statusMessage.SigPubKey
-			decodedMessages = append(decodedMessages, &m)
-		default:
-			hlogger.Error("skipped a public message of unsupported type")
+		for _, statusMessage := range statusMessages {
+			switch m := statusMessage.Message.(type) {
+			case protocol.Message:
+				m.ID = statusMessage.ID
+				m.SigPubKey = statusMessage.SigPubKey
+				decodedMessages = append(decodedMessages, &m)
+			default:
+				hlogger.Error("skipped a public message of unsupported type")
+			}
 		}
 	}
 	return decodedMessages, nil
@@ -129,37 +152,39 @@ func (a *whisperAdapter) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]
 
 		hlogger.Debug("received a private message")
 
-		err := a.decryptMessage(context.Background(), shhMessage)
+		err := a.handleEncryptionMessage(context.Background(), shhMessage)
 		if err != nil {
-			hlogger.Error("failed to decrypt a message", zap.Error(err))
+			hlogger.Error("failed to handle an encryption message", zap.Error(err))
 		}
 
-		statusMessage, err := a.decodeMessage(shhMessage)
+		statusMessages, err := a.decodeMessages(shhMessage)
 		if err != nil {
-			hlogger.Error("failed to decode a message", zap.Error(err))
+			hlogger.Error("failed to decode messages", zap.Error(err))
 			continue
 		}
 
-		switch m := statusMessage.Message.(type) {
-		case protocol.Message:
-			m.ID = statusMessage.ID
-			m.SigPubKey = statusMessage.SigPubKey
-			decodedMessages = append(decodedMessages, &m)
-		case protocol.PairMessage:
-			fromOurDevice := isPubKeyEqual(statusMessage.SigPubKey, &a.privateKey.PublicKey)
-			if !fromOurDevice {
-				hlogger.Debug("received PairMessage from not our device, skipping")
-				break
-			}
+		for _, statusMessage := range statusMessages {
+			switch m := statusMessage.Message.(type) {
+			case protocol.Message:
+				m.ID = statusMessage.ID
+				m.SigPubKey = statusMessage.SigPubKey
+				decodedMessages = append(decodedMessages, &m)
+			case protocol.PairMessage:
+				fromOurDevice := isPubKeyEqual(statusMessage.SigPubKey, &a.privateKey.PublicKey)
+				if !fromOurDevice {
+					hlogger.Debug("received PairMessage from not our device, skipping")
+					break
+				}
 
-			metadata := &multidevice.InstallationMetadata{
-				Name:       m.Name,
-				FCMToken:   m.FCMToken,
-				DeviceType: m.DeviceType,
-			}
-			err := a.protocol.SetInstallationMetadata(&a.privateKey.PublicKey, m.InstallationID, metadata)
-			if err != nil {
-				return nil, err
+				metadata := &multidevice.InstallationMetadata{
+					Name:       m.Name,
+					FCMToken:   m.FCMToken,
+					DeviceType: m.DeviceType,
+				}
+				err := a.protocol.SetInstallationMetadata(&a.privateKey.PublicKey, m.InstallationID, metadata)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -179,9 +204,9 @@ func (a *whisperAdapter) RetrieveRawAll() (map[filter.Chat][]*whisper.Message, e
 	for chat, messages := range chatWithMessages {
 		for _, message := range messages {
 			shhMessage := whisper.ToWhisperMessage(message)
-			err := a.decryptMessage(context.Background(), shhMessage)
+			err := a.handleEncryptionMessage(context.Background(), shhMessage)
 			if err != nil {
-				logger.Warn("failed to decrypt a message", zap.Error(err), zap.Binary("messageID", shhMessage.Hash))
+				logger.Warn("failed to handle an encryption message", zap.Error(err), zap.Binary("messageID", shhMessage.Hash))
 			}
 			result[chat] = append(result[chat], shhMessage)
 		}
@@ -203,9 +228,9 @@ func (a *whisperAdapter) RetrieveRaw(filterID string) ([]*whisper.Message, error
 
 	for _, message := range messages {
 		shhMessage := whisper.ToWhisperMessage(message)
-		err := a.decryptMessage(context.Background(), shhMessage)
+		err := a.handleEncryptionMessage(context.Background(), shhMessage)
 		if err != nil {
-			logger.Warn("failed to decrypt a message", zap.Error(err), zap.Binary("messageID", shhMessage.Hash))
+			logger.Warn("failed to handle an encryption message", zap.Error(err), zap.Binary("messageID", shhMessage.Hash))
 		}
 		result = append(result, shhMessage)
 	}
@@ -213,12 +238,7 @@ func (a *whisperAdapter) RetrieveRaw(filterID string) ([]*whisper.Message, error
 	return result, nil
 }
 
-func (a *whisperAdapter) decodeMessage(message *whisper.Message) (*protocol.StatusMessage, error) {
-
-	publicKey, err := crypto.UnmarshalPubkey(message.Sig)
-	if err != nil {
-		return nil, err
-	}
+func (a *whisperAdapter) decodeMessage(publicKey *ecdsa.PublicKey, message *whisper.Message) (*protocol.StatusMessage, error) {
 
 	decoded, err := protocol.DecodeMessage(publicKey, message.Payload)
 	if err != nil {
@@ -228,7 +248,70 @@ func (a *whisperAdapter) decodeMessage(message *whisper.Message) (*protocol.Stat
 	return &decoded, nil
 }
 
-func (a *whisperAdapter) decryptMessage(ctx context.Context, message *whisper.Message) error {
+func (a *whisperAdapter) addDatasyncPacket(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto.Payload) {
+	packet := datasynctransport.Packet{
+		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
+		Payload: datasyncMessage,
+	}
+	a.datasync.AddPacket(packet)
+}
+
+// decodeMessages expects an unencrypted whisper message as it's argument.
+// 1) Check if it's a datasync message
+// 2) If it's a datasync message it will handle each transmitted message separately
+// 3) if it's not a datasync message a single message will be handled
+// Fingerprinting datasync messages is a bit tricky, as they might unmarshal fine
+// because they are wrapped messages, so we need to check whether anything is
+// poulated in the fields.
+func (a *whisperAdapter) decodeMessages(message *whisper.Message) ([]*protocol.StatusMessage, error) {
+	var decodedMessages []*protocol.StatusMessage
+
+	logger := a.logger.With(zap.String("site", "decodeMessages"))
+	hlogger := logger.With(zap.Binary("hash", message.Hash))
+
+	publicKey, err := crypto.UnmarshalPubkey(message.Sig)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try first with datasync
+	datasyncMessage, err := protocol.UnwrapDatasync(message.Payload)
+
+	// If it failed to decode is not a protobuf message, if it successfully decoded but body is empty, is likedly a protobuf wrapped message
+	if err != nil || !datasyncMessage.IsValid() {
+		hlogger.Debug("Handling non-datasync message")
+		// Not a datasync message
+		decodedMessage, err := a.decodeMessage(publicKey, message)
+		if err != nil {
+			return nil, err
+		}
+
+		decodedMessages = append(decodedMessages, decodedMessage)
+
+	} else {
+		hlogger.Debug("Handling datasync message")
+		// datasync message
+		for _, message := range datasyncMessage.Messages {
+			decodedMessage, err := protocol.DecodeMessage(publicKey, message.Body)
+			if err != nil {
+				hlogger.Error("failed to decode messages", zap.Error(err))
+				// Log and continue
+				continue
+			}
+			// Addpacket to datasync if enabled
+
+			decodedMessages = append(decodedMessages, &decodedMessage)
+		}
+		if a.featureFlags.datasync {
+			a.addDatasyncPacket(publicKey, datasyncMessage)
+		}
+
+	}
+
+	return decodedMessages, nil
+}
+
+func (a *whisperAdapter) handleEncryptionMessage(ctx context.Context, message *whisper.Message) error {
 	publicKey, err := crypto.UnmarshalPubkey(message.Sig)
 	if err != nil {
 		return errors.Wrap(err, "failed to get signature")
@@ -306,12 +389,19 @@ func (a *whisperAdapter) SendPublic(ctx context.Context, chatName, chatID string
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to encode message")
 	}
+	wrappedMessage, err := a.wrapMessageV1(encodedMessage)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap message")
+	}
 
-	newMessage := whisper.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   encodedMessage,
-		PowTarget: whisperPoW,
-		PowTime:   whisperPoWTime,
+	messageSpec, err := a.protocol.BuildPublicMessage(a.privateKey, wrappedMessage)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build public message")
+	}
+
+	newMessage, err := a.messageSpecToWhisper(messageSpec)
+	if err != nil {
+		return nil, err
 	}
 
 	_, err = a.transport.SendPublic(ctx, newMessage, chatName)
@@ -319,18 +409,27 @@ func (a *whisperAdapter) SendPublic(ctx context.Context, chatName, chatID string
 		return nil, err
 	}
 
-	return protocol.MessageID(&a.privateKey.PublicKey, encodedMessage), nil
+	return protocol.MessageID(&a.privateKey.PublicKey, wrappedMessage), nil
 }
 
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.
 // DEPRECATED
 func (a *whisperAdapter) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, whisper.NewMessage, error) {
-	newMessage := whisper.NewMessage{
+
+	var newMessage whisper.NewMessage
+
+	wrappedMessage, err := a.wrapMessageV1(data)
+	if err != nil {
+		return nil, newMessage, errors.Wrap(err, "failed to wrap message")
+	}
+
+	newMessage = whisper.NewMessage{
 		TTL:       whisperTTL,
-		Payload:   data,
+		Payload:   wrappedMessage,
 		PowTarget: whisperPoW,
 		PowTime:   whisperPoWTime,
 	}
+
 	hash, err := a.transport.SendPublic(ctx, newMessage, chatName)
 	return hash, newMessage, err
 }
@@ -344,20 +443,25 @@ func (a *whisperAdapter) SendContactCode(ctx context.Context, messageSpec *encry
 	return a.transport.SendPublic(ctx, newMessage, filter.ContactCodeTopic(&a.privateKey.PublicKey))
 }
 
+func (a *whisperAdapter) wrapMessageV1(encodedMessage []byte) ([]byte, error) {
+	if a.featureFlags.sendV1Messages {
+		wrappedMessage, err := protocol.WrapMessageV1(encodedMessage, a.privateKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap message")
+		}
+
+		return wrappedMessage, nil
+
+	}
+
+	return encodedMessage, nil
+}
+
 func (a *whisperAdapter) encodeMessage(message protocol.Message) ([]byte, error) {
 	encodedMessage, err := protocol.EncodeMessage(message)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to encode message")
 	}
-
-	if a.featureFlags.sendV1Messages {
-		encodedMessage, err = protocol.WrapMessageV1(encodedMessage, a.privateKey)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap message")
-		}
-
-	}
-
 	return encodedMessage, nil
 }
 
@@ -388,16 +492,43 @@ func (a *whisperAdapter) SendPrivate(
 		return nil, nil, errors.Wrap(err, "failed to encode message")
 	}
 
-	messageSpec, err := a.protocol.BuildDirectMessage(a.privateKey, publicKey, encodedMessage)
+	wrappedMessage, err := a.wrapMessageV1(encodedMessage)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to encrypt message")
+		return nil, nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	_, err = a.sendMessageSpec(ctx, publicKey, messageSpec)
-	if err != nil {
-		return nil, nil, err
+	if a.featureFlags.datasync {
+		if err := a.sendWithDataSync(publicKey, wrappedMessage); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to send message with datasync")
+		}
+	} else {
+		err = a.encryptAndSend(ctx, publicKey, wrappedMessage)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
-	return protocol.MessageID(&a.privateKey.PublicKey, encodedMessage), &message, nil
+
+	return protocol.MessageID(&a.privateKey.PublicKey, wrappedMessage), &message, nil
+}
+
+func (a *whisperAdapter) sendWithDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
+	groupID := datasync.ToOneToOneGroupID(&a.privateKey.PublicKey, publicKey)
+	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
+	exist, err := a.datasync.IsPeerInGroup(groupID, peerID)
+	if err != nil {
+		return errors.Wrap(err, "peer not in the group")
+	}
+	if !exist {
+		if err := a.datasync.AddPeer(groupID, peerID); err != nil {
+			return errors.Wrap(err, "failed to add peer")
+		}
+	}
+	_, err = a.datasync.AppendMessage(groupID, message)
+	if err != nil {
+		return errors.Wrap(err, "failed to append message to datasync")
+	}
+
+	return nil
 }
 
 // SendPrivateRaw takes encoded data, encrypts it and sends through the wire.
@@ -415,7 +546,12 @@ func (a *whisperAdapter) SendPrivateRaw(
 
 	var newMessage whisper.NewMessage
 
-	messageSpec, err := a.protocol.BuildDirectMessage(a.privateKey, publicKey, data)
+	wrappedMessage, err := a.wrapMessageV1(data)
+	if err != nil {
+		return nil, newMessage, errors.Wrap(err, "failed to wrap message")
+	}
+
+	messageSpec, err := a.protocol.BuildDirectMessage(a.privateKey, publicKey, wrappedMessage)
 	if err != nil {
 		return nil, newMessage, errors.Wrap(err, "failed to encrypt message")
 	}
@@ -423,6 +559,13 @@ func (a *whisperAdapter) SendPrivateRaw(
 	newMessage, err = a.messageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, newMessage, errors.Wrap(err, "failed to convert ProtocolMessageSpec to whisper.NewMessage")
+	}
+
+	if a.featureFlags.datasync {
+		if err := a.sendWithDataSync(publicKey, wrappedMessage); err != nil {
+			return nil, newMessage, errors.Wrap(err, "failed to send message with datasync")
+		}
+		return nil, newMessage, err
 	}
 
 	hash, err := a.sendMessageSpec(ctx, publicKey, messageSpec)
@@ -450,6 +593,18 @@ func (a *whisperAdapter) sendMessageSpec(ctx context.Context, publicKey *ecdsa.P
 		logger.Debug("sending using discovery topic")
 		return a.transport.SendPrivateOnDiscovery(ctx, newMessage, publicKey)
 	}
+}
+
+func (a *whisperAdapter) encryptAndSend(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte) error {
+	messageSpec, err := a.protocol.BuildDirectMessage(a.privateKey, publicKey, encodedMessage)
+	if err != nil {
+		return errors.Wrap(err, "failed to encrypt message")
+	}
+	_, err = a.sendMessageSpec(ctx, publicKey, messageSpec)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *whisperAdapter) messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (whisper.NewMessage, error) {

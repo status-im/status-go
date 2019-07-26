@@ -1,3 +1,8 @@
 run:
+  concurrency: 4
   modules-download-mode: vendor
   deadline: 5m
+  skip:
+    - migrations.go
+    - .*_mock.go
+    - vendor/

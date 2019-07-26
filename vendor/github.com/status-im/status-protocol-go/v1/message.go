@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
+	datasyncprotobuf "github.com/vacp2p/mvds/protobuf"
 	"log"
 	"strings"
 	"time"
@@ -161,6 +162,11 @@ func decodeTransitMessage(data []byte) (interface{}, error) {
 		return nil, err
 	}
 	return value, nil
+}
+
+func UnwrapDatasync(payload []byte) (datasyncPayload datasyncprotobuf.Payload, err error) {
+	err = proto.Unmarshal(payload, &datasyncPayload)
+	return
 }
 
 // DecodeMessage decodes a raw payload to StatusMessage struct.
