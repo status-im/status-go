@@ -115,10 +115,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	require.NoError(t, err)
 }
 
-var (
-	errKeyStore   = errors.New("Can't return a key store")
-	errAccManager = errors.New("Can't return an account manager")
-)
+var errKeyStore = errors.New("Can't return a key store")
 
 func TestManagerTestSuite(t *testing.T) {
 	gethServiceProvider := newMockGethServiceProvider(t)
