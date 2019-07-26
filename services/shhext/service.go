@@ -187,6 +187,26 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 	if err != nil {
 		return err
 	}
+	options := []protocol.Option{
+		protocol.WithCustomLogger(zapLogger),
+		protocol.WithDatabaseFilePaths(
+			sessionsDatabasePath,
+			transportDatabasePath,
+		),
+	}
+
+	if !s.config.DisableGenericDiscoveryTopic {
+		options = append(options, protocol.WithGenericDiscoveryTopicSupport())
+	}
+
+	if s.config.DataSyncEnabled {
+		options = append(options, protocol.WithDatasync())
+	}
+
+	if s.config.SendV1Messages {
+		options = append(options, protocol.WithSendV1Messages())
+	}
+
 	messenger, err := protocol.NewMessenger(
 		identity,
 		&server{server: s.server},
@@ -194,12 +214,7 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		dataDir,
 		encKey,
 		s.config.InstallationID,
-		protocol.WithDatabaseFilePaths(
-			sessionsDatabasePath,
-			transportDatabasePath,
-		),
-		protocol.WithGenericDiscoveryTopicSupport(),
-		protocol.WithCustomLogger(zapLogger),
+		options...,
 	)
 	if err != nil {
 		return err

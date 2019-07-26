@@ -58,6 +58,10 @@ type Chat struct {
 	Listen bool `json:"listen"`
 }
 
+func (c *Chat) IsPublic() bool {
+	return !c.OneToOne
+}
+
 type ChatsManager struct {
 	whisper     *whisper.Whisper
 	persistence *sqlitePersistence
@@ -278,6 +282,7 @@ func (s *ChatsManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) 
 		Topic:    filter.Topic,
 		Identity: publicKeyToStr(publicKey),
 		Listen:   listen,
+		OneToOne: true,
 	}
 
 	s.chats[chatID] = chat
@@ -310,6 +315,7 @@ func (s *ChatsManager) LoadNegotiated(secret NegotiatedSecret) (*Chat, error) {
 		Identity:   publicKeyToStr(secret.PublicKey),
 		Negotiated: true,
 		Listen:     true,
+		OneToOne:   true,
 	}
 
 	s.chats[chat.ChatID] = chat
@@ -354,6 +360,7 @@ func (s *ChatsManager) LoadDiscovery() ([]*Chat, error) {
 		Identity:  identityStr,
 		Discovery: true,
 		Listen:    true,
+		OneToOne:  true,
 	}
 
 	discoveryResponse, err = s.addAsymmetric(personalDiscoveryChat.ChatID, true)
@@ -373,6 +380,7 @@ func (s *ChatsManager) LoadDiscovery() ([]*Chat, error) {
 			Identity:  identityStr,
 			Discovery: true,
 			Listen:    true,
+			OneToOne:  true,
 		}
 
 		discoveryResponse, err = s.addAsymmetric(discoveryChat.ChatID, true)
@@ -411,6 +419,7 @@ func (s *ChatsManager) LoadPublic(chatID string) (*Chat, error) {
 		SymKeyID: filterAndTopic.SymKeyID,
 		Topic:    filterAndTopic.Topic,
 		Listen:   true,
+		OneToOne: false,
 	}
 
 	s.chats[chatID] = chat
