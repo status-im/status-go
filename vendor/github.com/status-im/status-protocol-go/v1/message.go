@@ -8,6 +8,7 @@ import (
 	"errors"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
+	datasyncprotobuf "github.com/vacp2p/mvds/protobuf"
 	"log"
 	"strings"
 	"time"
@@ -69,9 +70,10 @@ const (
 
 // StatusMessage is any Status Protocol message.
 type StatusMessage struct {
-	Message   interface{}
-	ID        []byte           `json:"-"`
-	SigPubKey *ecdsa.PublicKey `json:"-"`
+	Message           interface{}
+	RawTransitPayload []byte           `json:"-"`
+	ID                []byte           `json:"-"`
+	SigPubKey         *ecdsa.PublicKey `json:"-"`
 }
 
 func (m *StatusMessage) MarshalJSON() ([]byte, error) {
@@ -99,6 +101,8 @@ type Message struct {
 	Flags     Flags            `json:"-"`
 	ID        []byte           `json:"-"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
+	ChatID    string           `json:"-"`
+	Public    bool             `json:"-"`
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -163,6 +167,11 @@ func decodeTransitMessage(data []byte) (interface{}, error) {
 	return value, nil
 }
 
+func UnwrapDatasync(payload []byte) (datasyncPayload datasyncprotobuf.Payload, err error) {
+	err = proto.Unmarshal(payload, &datasyncPayload)
+	return
+}
+
 // DecodeMessage decodes a raw payload to StatusMessage struct.
 func DecodeMessage(transportPublicKey *ecdsa.PublicKey, data []byte) (message StatusMessage, err error) {
 	transitMessage := data
@@ -188,7 +197,12 @@ func DecodeMessage(transportPublicKey *ecdsa.PublicKey, data []byte) (message St
 		}
 	}
 
+	// Copy payload to message
+	message.RawTransitPayload = make([]byte, len(transitMessage))
+	copy(message.RawTransitPayload, transitMessage)
+
 	message.ID = MessageID(message.SigPubKey, transitMessage)
+	// This modifies transitMessage
 	value, err := decodeTransitMessage(transitMessage)
 	if err != nil {
 		log.Printf("[message::DecodeMessage] could not decode message: %#x", message.ID)
