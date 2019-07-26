@@ -264,7 +264,7 @@ func (m *Manager) Logout() {
 
 	m.accountsGenerator.Reset()
 	m.mainAccountAddress = zeroAddress
-	m.watchAddresses = make([]common.Address, 0)
+	m.watchAddresses = nil
 	m.selectedChatAccount = nil
 }
 
@@ -335,11 +335,6 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-
-	_, err := m.geth.AccountManager()
-	if err != nil {
-		return nil, err
-	}
 
 	addresses := make([]gethcommon.Address, 0)
 	if m.mainAccountAddress != zeroAddress {

@@ -385,11 +385,6 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NoError(err)
 	s.NotNil(accs)
 
-	// Can't get an account manager
-	s.gethServiceProvider.EXPECT().AccountManager().Return(nil, errAccManager)
-	_, err = s.accManager.Accounts()
-	s.Equal(errAccManager, err)
-
 	// Selected main account address is zero address but doesn't fail
 	s.accManager.mainAccountAddress = common.Address{}
 	s.gethServiceProvider.EXPECT().AccountManager().Return(s.gethAccManager, nil)

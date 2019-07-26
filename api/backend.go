@@ -619,7 +619,9 @@ func (b *StatusBackend) startWallet(password string) error {
 		return err
 	}
 
-	allAddresses := append(watchAddresses, mainAccountAddress)
+	allAddresses := make([]string, len(watchAddresses)+1)
+	allAddresses[0] = mainAccountAddress
+	copy(allAddresses[1:], watchAddresses)
 
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", mainAccountAddress))
 	return wallet.StartReactor(path, password,
