@@ -44,10 +44,12 @@ func TestBrowsersOrderedNewestFirst(t *testing.T) {
 			Timestamp: 50,
 		},
 		{
-			ID:        "3",
-			Name:      "third",
-			Dapp:      true,
-			Timestamp: 100,
+			ID:           "3",
+			Name:         "third",
+			Dapp:         true,
+			Timestamp:    100,
+			HistoryIndex: 0,
+			History:      []string{"zero"},
 		},
 	}
 	for i := 0; i < len(browsers); i++ {

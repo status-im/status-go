@@ -35,7 +35,7 @@ type Browser struct {
 	Name         string   `json:"name"`
 	Timestamp    uint64   `json:"timestamp"`
 	Dapp         bool     `json:"dapp?"`
-	HistoryIndex int      `json:"history-index,omitempty"`
+	HistoryIndex int      `json:"history-index"`
 	History      []string `json:"history,omitempty"`
 }
 
