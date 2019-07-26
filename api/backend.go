@@ -619,7 +619,7 @@ func (b *StatusBackend) startWallet(password string) error {
 		return err
 	}
 
-	allAddresses := make([]string, len(watchAddresses)+1)
+	allAddresses := make([]common.Address, len(watchAddresses)+1)
 	allAddresses[0] = mainAccountAddress
 	copy(allAddresses[1:], watchAddresses)
 
