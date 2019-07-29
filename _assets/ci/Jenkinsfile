@@ -108,9 +108,11 @@ pipeline {
         }
       } }
     } // stage(Release)
-    
-    stage('Cleanup') { steps { dir(env.STATUS_PATH) {
-      sh 'make clean-release'
-    } } } // stage(Cleanup)
   } // stages
+
+  post {
+    always { dir(env.STATUS_PATH) {
+      sh 'make clean-release'
+    } }
+  }
 }

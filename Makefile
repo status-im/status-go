@@ -184,7 +184,13 @@ prepare-release: clean-release
 clean-release:
 	rm -rf $(RELEASE_DIR)
 
-release:
+check-existing-release:
+	@git ls-remote --exit-code origin "v$(RELEASE_TAG)" >/dev/null && \
+		echo "$(YELLOW)Release tag already exists: v$(RELEASE_TAG)$(RESET)"; \
+		echo "Remove the tag/release if you want to re-create it."; \
+		exit 1
+
+release: check-existing-release
 	@read -p "Are you sure you want to create a new GitHub $(RELEASE_TYPE) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
 	if [ $$REPLY = "y" ]; then \
 		latest_tag=$$(git describe --tags `git rev-list --tags --max-count=1`); \
