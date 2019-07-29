@@ -67,5 +67,9 @@ pipeline {
   post {
     success { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(true) } }
     failure { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(false) } }
+    always { dir(env.STATUS_PATH) {
+      sh 'make clean'
+      sh "rm -fr ${dest}"
+    } }
   } // post
 } // pipeline
