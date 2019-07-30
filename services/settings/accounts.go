@@ -15,10 +15,10 @@ type AccountsAPI struct {
 	db *settings.Database
 }
 
-func (api *AccountsAPI) SaveSubAccounts(ctx context.Context, accounts []settings.SubAccount) error {
-	return api.db.SaveSubAccounts(accounts)
+func (api *AccountsAPI) SaveAccounts(ctx context.Context, accounts []settings.Account) error {
+	return api.db.SaveAccounts(accounts)
 }
 
-func (api *AccountsAPI) GetSubAccounts(ctx context.Context) ([]settings.SubAccount, error) {
-	return api.db.GetSubAccounts()
+func (api *AccountsAPI) GetAccounts(ctx context.Context) ([]settings.Account, error) {
+	return api.db.GetAccounts()
 }

@@ -52,9 +52,9 @@ func TestBlob(t *testing.T) {
 func TestSaveSubAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	accounts := []SubAccount{
-		{Address: common.Address{0x01}, Main: true, Wallet: true},
-		{Address: common.Address{0x02}, Watch: true},
+	accounts := []Account{
+		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+		{Address: common.Address{0x02}},
 	}
-	require.NoError(t, db.SaveSubAccounts(accounts))
+	require.NoError(t, db.SaveAccounts(accounts))
 }

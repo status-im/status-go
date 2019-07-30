@@ -5,12 +5,15 @@ value BLOB
 
 CREATE TABLE IF NOT EXISTS accounts (
 address VARCHAR PRIMARY KEY,
-main BOOLEAN,
 wallet BOOLEAN,
 chat BOOLEAN,
-watch BOOLEAN
+type TEXT,
+storage TEXT,
+pubkey BLOB,
+path TEXT,
+name TEXT,
+color TEXT
 ) WITHOUT ROWID;
 
-CREATE UNIQUE INDEX unique_main_address ON accounts (main) WHERE (main);
 CREATE UNIQUE INDEX unique_wallet_address ON accounts (wallet) WHERE (wallet);
 CREATE UNIQUE INDEX unique_chat_address ON accounts (chat) WHERE (chat);
