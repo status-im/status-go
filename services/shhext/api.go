@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -22,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 
+	statusproto "github.com/status-im/status-protocol-go"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
 	"github.com/status-im/status-protocol-go/transport/whisper/filter"
 )
@@ -457,7 +459,10 @@ func (api *PublicAPI) Post(ctx context.Context, newMessage whisper.NewMessage) (
 // It's important to call PublicAPI.afterSend() so that the client receives a signal
 // with confirmation that the message left the device.
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (hexutil.Bytes, error) {
-	hash, newMessage, err := api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	chat := statusproto.Chat{
+		Name: msg.Chat,
+	}
+	hash, newMessage, err := api.service.messenger.SendRaw(ctx, chat, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +474,15 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessa
 // It's important to call PublicAPI.afterSend() so that the client receives a signal
 // with confirmation that the message left the device.
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (hexutil.Bytes, error) {
-	hash, newMessage, err := api.service.messenger.SendRaw(ctx, msg, msg.Payload)
+	publicKey, err := crypto.UnmarshalPubkey(msg.PubKey)
+	if err != nil {
+		return nil, err
+	}
+	chat := statusproto.Chat{
+		PublicKey: publicKey,
+	}
+
+	hash, newMessage, err := api.service.messenger.SendRaw(ctx, chat, msg.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -586,6 +599,26 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 
 func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
 	return api.service.messenger.LoadFilters(chats)
+}
+
+func (api *PublicAPI) SaveChat(parent context.Context, chat statusproto.Chat) error {
+	return api.service.messenger.SaveChat(chat)
+}
+
+func (api *PublicAPI) Chats(parent context.Context, to, from int) ([]*statusproto.Chat, error) {
+	return api.service.messenger.Chats(to, from)
+}
+
+func (api *PublicAPI) DeleteChat(parent context.Context, chatID string, chatType statusproto.ChatType) error {
+	return api.service.messenger.DeleteChat(chatID, chatType)
+}
+
+func (api *PublicAPI) SaveContact(parent context.Context, contact statusproto.Contact) error {
+	return api.service.messenger.SaveContact(contact)
+}
+
+func (api *PublicAPI) Contacts(parent context.Context) ([]*statusproto.Contact, error) {
+	return api.service.messenger.Contacts()
 }
 
 func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {

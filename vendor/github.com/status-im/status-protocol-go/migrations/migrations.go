@@ -2,6 +2,10 @@
 // sources:
 // 000001_init.down.db.sql (82B)
 // 000001_init.up.db.sql (840B)
+// 000002_add_chats.down.db.sql (74B)
+// 000002_add_chats.up.db.sql (541B)
+// 000003_add_contacts.down.db.sql (21B)
+// 000003_add_contacts.up.db.sql (251B)
 // doc.go (377B)
 
 package migrations
@@ -86,7 +90,7 @@ func _000001_initDownDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.down.db.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1564400388, 0)}
+	info := bindataFileInfo{name: "000001_init.down.db.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1564484687, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe8, 0x5f, 0xe0, 0x6, 0xfc, 0xed, 0xb7, 0xff, 0xb5, 0xf3, 0x33, 0x45, 0x1, 0x5b, 0x84, 0x80, 0x74, 0x60, 0x81, 0xa6, 0x8b, 0xb4, 0xd4, 0xad, 0x10, 0xa8, 0xb3, 0x61, 0x6f, 0xc5, 0x2f, 0xaa}}
 	return a, nil
 }
@@ -106,8 +110,88 @@ func _000001_initUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 840, mode: os.FileMode(0644), modTime: time.Unix(1564400388, 0)}
+	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 840, mode: os.FileMode(0644), modTime: time.Unix(1564484687, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe7, 0x27, 0x96, 0x3b, 0x72, 0x81, 0x7d, 0xba, 0xa4, 0xfb, 0xf7, 0x4, 0xd, 0x6f, 0xc8, 0x30, 0xfe, 0x47, 0xe0, 0x9, 0xf, 0x43, 0x13, 0x6, 0x55, 0xfc, 0xee, 0x15, 0x69, 0x99, 0x53, 0x3f}}
+	return a, nil
+}
+
+var __000002_add_chatsDownDbSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\xc8\x4d\xcd\x4d\x4a\x2d\x2a\xce\xc8\x2c\x88\x2f\x2d\x48\x49\x2c\x49\x2d\xb6\xe6\x42\x92\x4e\xce\x48\x2c\x89\x87\xaa\xc1\x90\x28\xb6\xe6\x02\x04\x00\x00\xff\xff\xde\x59\xf6\x29\x4a\x00\x00\x00")
+
+func _000002_add_chatsDownDbSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__000002_add_chatsDownDbSql,
+		"000002_add_chats.down.db.sql",
+	)
+}
+
+func _000002_add_chatsDownDbSql() (*asset, error) {
+	bytes, err := _000002_add_chatsDownDbSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "000002_add_chats.down.db.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1564587343, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd3, 0xa7, 0xf0, 0x94, 0x7a, 0x9, 0xdc, 0x6c, 0x7b, 0xdc, 0x12, 0x30, 0x55, 0x31, 0x17, 0xf2, 0xcc, 0x6e, 0xfd, 0xbb, 0x70, 0xb9, 0xd8, 0x9f, 0x81, 0x83, 0xdc, 0x1d, 0x1c, 0x3a, 0x8d, 0xce}}
+	return a, nil
+}
+
+var __000002_add_chatsUpDbSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x91\x4f\x4b\x03\x31\x10\xc5\xef\xf3\x29\x06\x3c\x54\x61\x0f\x7a\x10\x85\x9e\xb2\xdb\x14\x17\xe3\xa6\xa4\xa9\xd8\x53\x48\xb3\x83\x5d\xba\xff\x68\xb2\x95\x7e\x7b\x69\x5d\xda\xea\x2a\x78\x4c\xde\xef\xbd\x49\xe6\x25\x8a\x33\xcd\x51\xb3\x58\x70\x4c\xa7\x98\x49\x8d\xfc\x2d\x9d\xeb\x39\xba\xb5\x0d\x1e\xaf\xa1\xc8\xf1\x95\xa9\xe4\x89\x29\x9c\xa9\xf4\x85\xa9\x25\x3e\xf3\x25\xca\x0c\x13\x99\x4d\x45\x9a\x68\x54\x7c\x26\x58\xc2\x23\xa8\x6d\x45\x27\xfa\x90\x95\x2d\x84\x88\xc0\x35\x65\xb3\x1d\xdc\xe3\x84\x4f\xd9\x42\x68\x1c\x5d\xd9\xbb\xc7\x87\xfc\x7e\x14\x41\xd8\xb7\x84\x69\xa6\x2f\xcc\xd6\x85\x62\x47\x18\x4b\x29\x38\xcb\x86\x6e\xad\x16\x3c\x82\x50\x54\xe4\x83\xad\xda\x1f\xee\x9c\x4a\x0a\x94\x1b\x1b\x8c\x2b\x1b\xb7\x31\x3b\x5b\x76\xdf\x47\x9c\x92\x6e\x23\x68\xbb\x55\x59\x38\xb3\xa1\x3d\xc6\x42\xc6\x11\x74\xf5\xae\xa0\x0f\xca\x4d\x45\xde\xdb\x77\x32\xae\xe9\xea\xf0\xa7\xbf\xb4\xfe\x7f\x83\x8e\xe0\x39\xb3\x0e\x54\x07\x73\xfc\x7d\xbf\xa6\xdf\x91\xb3\x5a\x51\xb5\xa2\xad\xef\x9f\xd9\x9f\xd6\x45\x6b\xba\x36\xb7\x81\xbe\x04\xb8\x19\x03\xc0\x44\xc9\x59\x5f\xf1\x90\x1b\x5f\xca\x87\xce\x4d\xcf\x8c\xe1\x33\x00\x00\xff\xff\xf3\xb4\xa4\xad\x1d\x02\x00\x00")
+
+func _000002_add_chatsUpDbSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__000002_add_chatsUpDbSql,
+		"000002_add_chats.up.db.sql",
+	)
+}
+
+func _000002_add_chatsUpDbSql() (*asset, error) {
+	bytes, err := _000002_add_chatsUpDbSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "000002_add_chats.up.db.sql", size: 541, mode: os.FileMode(0644), modTime: time.Unix(1564587387, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd, 0x7f, 0x3a, 0xd7, 0xf6, 0x8b, 0x6e, 0x4d, 0xce, 0x7d, 0x63, 0x1d, 0x30, 0xa2, 0xc1, 0xb, 0xa0, 0x35, 0x2e, 0xfa, 0xef, 0xf0, 0x39, 0xf7, 0x22, 0xdd, 0x31, 0x11, 0xb1, 0xff, 0xbf, 0xb3}}
+	return a, nil
+}
+
+var __000003_add_contactsDownDbSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\x2b\x49\x4c\x2e\x29\xb6\xe6\x02\x04\x00\x00\xff\xff\x66\x64\xd9\xdd\x15\x00\x00\x00")
+
+func _000003_add_contactsDownDbSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__000003_add_contactsDownDbSql,
+		"000003_add_contacts.down.db.sql",
+	)
+}
+
+func _000003_add_contactsDownDbSql() (*asset, error) {
+	bytes, err := _000003_add_contactsDownDbSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "000003_add_contacts.down.db.sql", size: 21, mode: os.FileMode(0644), modTime: time.Unix(1564721146, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfc, 0x7e, 0xb, 0xec, 0x72, 0xcd, 0x21, 0x3e, 0xa2, 0x38, 0xe0, 0x95, 0x7e, 0xce, 0x4a, 0x17, 0xc8, 0xd0, 0x1c, 0xfa, 0xa3, 0x23, 0x5, 0xab, 0x89, 0xf9, 0xfc, 0x63, 0x7, 0x28, 0xe9, 0x93}}
+	return a, nil
+}
+
+var __000003_add_contactsUpDbSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x64\xcd\xc1\x4a\xc4\x30\x14\x85\xe1\x7d\x9e\xe2\x2c\x15\x5c\xb8\x77\x95\xc6\x3b\x50\x8c\xc9\x10\x32\xe0\xac\x42\x6c\xa2\x06\xa7\x4d\x69\x6e\x05\xdf\x5e\x8a\xa0\x0c\xdd\x7e\xe7\x87\xa3\x1c\x49\x4f\xf0\xb2\xd3\x84\xa1\x4e\x1c\x07\x6e\xb8\x11\x40\x49\xf0\xf4\xe2\x71\x74\xfd\xb3\x74\x67\x3c\xd1\x19\xd6\x40\x59\x73\xd0\xbd\xf2\x70\x74\xd4\x52\xd1\x9d\x00\x62\x4a\x4b\x6e\xed\xb7\x37\xd6\xc3\x9c\xb4\xde\x86\x29\x8e\x79\xaf\xf3\x47\xe5\xba\xe7\x4b\x6c\x1c\xd6\x39\x45\xce\x09\xbd\xf9\x1f\xf1\x48\x07\x79\xd2\x1e\xf7\x5b\xd6\xbe\x1b\xe7\x31\x70\x7c\x6f\xe8\xb4\xed\x36\x4b\xf9\xab\x0c\x39\x94\xe9\xad\xfe\x19\x2f\xe5\x75\xe5\x1c\xb8\x06\x8e\x97\xcf\xeb\x3f\x71\xfb\x20\x7e\x02\x00\x00\xff\xff\xc3\x2e\x5b\xed\xfb\x00\x00\x00")
+
+func _000003_add_contactsUpDbSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__000003_add_contactsUpDbSql,
+		"000003_add_contacts.up.db.sql",
+	)
+}
+
+func _000003_add_contactsUpDbSql() (*asset, error) {
+	bytes, err := _000003_add_contactsUpDbSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "000003_add_contacts.up.db.sql", size: 251, mode: os.FileMode(0644), modTime: time.Unix(1564721109, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0x19, 0x9f, 0x5c, 0x9d, 0xa1, 0xe5, 0x99, 0xbe, 0x47, 0xce, 0xa5, 0xd3, 0x51, 0x2f, 0x9b, 0x1d, 0xd9, 0x3f, 0x7a, 0xbf, 0xf, 0x76, 0x6b, 0x4f, 0x82, 0xbd, 0x13, 0x9d, 0x25, 0xdd, 0x60}}
 	return a, nil
 }
 
@@ -126,7 +210,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1564400388, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1564484687, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xef, 0xaf, 0xdf, 0xcf, 0x65, 0xae, 0x19, 0xfc, 0x9d, 0x29, 0xc1, 0x91, 0xaf, 0xb5, 0xd5, 0xb1, 0x56, 0xf3, 0xee, 0xa8, 0xba, 0x13, 0x65, 0xdb, 0xab, 0xcf, 0x4e, 0xac, 0x92, 0xe9, 0x60, 0xf1}}
 	return a, nil
 }
@@ -226,6 +310,14 @@ var _bindata = map[string]func() (*asset, error){
 
 	"000001_init.up.db.sql": _000001_initUpDbSql,
 
+	"000002_add_chats.down.db.sql": _000002_add_chatsDownDbSql,
+
+	"000002_add_chats.up.db.sql": _000002_add_chatsUpDbSql,
+
+	"000003_add_contacts.down.db.sql": _000003_add_contactsDownDbSql,
+
+	"000003_add_contacts.up.db.sql": _000003_add_contactsUpDbSql,
+
 	"doc.go": docGo,
 }
 
@@ -270,9 +362,13 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"000001_init.down.db.sql": &bintree{_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql":   &bintree{_000001_initUpDbSql, map[string]*bintree{}},
-	"doc.go":                  &bintree{docGo, map[string]*bintree{}},
+	"000001_init.down.db.sql":         &bintree{_000001_initDownDbSql, map[string]*bintree{}},
+	"000001_init.up.db.sql":           &bintree{_000001_initUpDbSql, map[string]*bintree{}},
+	"000002_add_chats.down.db.sql":    &bintree{_000002_add_chatsDownDbSql, map[string]*bintree{}},
+	"000002_add_chats.up.db.sql":      &bintree{_000002_add_chatsUpDbSql, map[string]*bintree{}},
+	"000003_add_contacts.down.db.sql": &bintree{_000003_add_contactsDownDbSql, map[string]*bintree{}},
+	"000003_add_contacts.up.db.sql":   &bintree{_000003_add_contactsUpDbSql, map[string]*bintree{}},
+	"doc.go":                          &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

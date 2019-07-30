@@ -235,7 +235,6 @@ func (a *whisperAdapter) handleMessages(shhMessage *whisper.Message, application
 	statusMessages, err := statusMessage.HandleDatasync(a.datasync)
 	if err != nil {
 		hlogger.Debug("failed to handle datasync message", zap.Error(err))
-
 	}
 
 	for _, statusMessage := range statusMessages {
