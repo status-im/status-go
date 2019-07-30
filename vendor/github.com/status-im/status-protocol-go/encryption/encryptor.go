@@ -2,6 +2,7 @@ package encryption
 
 import (
 	"crypto/ecdsa"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -14,9 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-protocol-go/crypto"
-	migrations "github.com/status-im/status-protocol-go/encryption/internal/sqlite"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
-	"github.com/status-im/status-protocol-go/sqlite"
 )
 
 var (
@@ -80,23 +79,13 @@ func defaultEncryptorConfig(installationID string, logger *zap.Logger) encryptor
 }
 
 // newEncryptor creates a new EncryptionService instance.
-func newEncryptor(dbPath, dbKey string, config encryptorConfig) (*encryptor, error) {
-	db, err := sqlite.Open(dbPath, dbKey, sqlite.MigrationConfig{
-		AssetNames: migrations.AssetNames(),
-		AssetGetter: func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
+func newEncryptor(db *sql.DB, config encryptorConfig) *encryptor {
 	return &encryptor{
 		persistence: newSQLitePersistence(db),
 		config:      config,
 		messageIDs:  make(map[string]*confirmationData),
 		logger:      config.Logger.With(zap.Namespace("encryptor")),
-	}, nil
+	}
 }
 
 func (s *encryptor) keyFromActiveX3DH(theirIdentityKey []byte, theirSignedPreKey []byte, myIdentityKey *ecdsa.PrivateKey) ([]byte, *ecdsa.PublicKey, error) {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
+
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
@@ -30,17 +32,17 @@ type MigrationConfig struct {
 
 // Open opens or initializes a new database for a given file path.
 // MigrationConfig is optional but if provided migrations are applied automatically.
-func Open(path, key string, mc MigrationConfig) (*sql.DB, error) {
+func Open(path, key string, mc ...MigrationConfig) (*sql.DB, error) {
 	return open(path, key, reducedKdfIterationsNumber, mc)
 }
 
 // OpenWithIter allows to open a new database with a custom number of kdf iterations.
 // Higher kdf iterations number makes it slower to open the database.
-func OpenWithIter(path, key string, kdfIter int, mc MigrationConfig) (*sql.DB, error) {
+func OpenWithIter(path, key string, kdfIter int, mc ...MigrationConfig) (*sql.DB, error) {
 	return open(path, key, kdfIter, mc)
 }
 
-func open(path string, key string, kdfIter int, mc MigrationConfig) (*sql.DB, error) {
+func open(path string, key string, kdfIter int, configs []MigrationConfig) (*sql.DB, error) {
 	_, err := os.OpenFile(path, os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
@@ -70,17 +72,13 @@ func open(path string, key string, kdfIter int, mc MigrationConfig) (*sql.DB, er
 		return nil, err
 	}
 
-	// Migrate db
-	if len(mc.AssetNames) == 0 {
-		if err := db.Ping(); err != nil {
+	// Apply all provided migrations.
+	for _, mc := range configs {
+		if err := ApplyMigrations(db, mc.AssetNames, mc.AssetGetter); err != nil {
 			return nil, err
 		}
-		return db, nil
 	}
 
-	if err = ApplyMigrations(db, mc.AssetNames, mc.AssetGetter); err != nil {
-		return nil, err
-	}
 	return db, nil
 }
 
@@ -95,25 +93,26 @@ func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name stri
 
 	source, err := bindata.WithInstance(resources)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create migration source")
 	}
 
 	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create driver")
 	}
 
 	m, err := migrate.NewWithInstance(
 		"go-bindata",
 		source,
 		"sqlcipher",
-		driver)
+		driver,
+	)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create migration instance")
 	}
 
 	if err = m.Up(); err != migrate.ErrNoChange {
-		return err
+		return errors.Wrap(err, "failed to migrate")
 	}
 
 	return nil

@@ -21,24 +21,9 @@ var (
 	ErrMsgAlreadyExist = errors.New("message with given ID already exist")
 )
 
-// persistence is an interface for all db operations.
-type persistence interface {
-	Close() error
-	Messages(chatID string, from, to time.Time) ([]*protocol.Message, error)
-	NewMessages(chatID string, rowid int64) ([]*protocol.Message, error)
-	UnreadMessages(chatID string) ([]*protocol.Message, error)
-	SaveMessages(chatID string, messages []*protocol.Message) (int64, error)
-	LastMessageClock(chatID string) (int64, error)
-}
-
 // sqlitePersistence wrapper around sql db with operations common for a client.
 type sqlitePersistence struct {
 	db *sql.DB
-}
-
-// Close closes internal sqlite database.
-func (db sqlitePersistence) Close() error {
-	return db.db.Close()
 }
 
 func (db sqlitePersistence) LastMessageClock(chatID string) (int64, error) {
