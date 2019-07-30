@@ -317,7 +317,8 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.1.4
+# github.com/status-im/status-protocol-go v0.0.0-20190701094942-baa579640f175976472cdf47e0b97d2a5881409d
+github.com/status-im/status-protocol-go/zaputil
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/sqlite

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	protocol "github.com/status-im/status-protocol-go"
+	"github.com/status-im/status-protocol-go/zaputil"
 )
 
 type gethLoggerCore struct {
@@ -123,7 +123,7 @@ var registerOnce sync.Once
 // NewZapLoggerWithAdapter returns a logger forwarding all logs with level info and above.
 func NewZapLoggerWithAdapter(logger log.Logger) (*zap.Logger, error) {
 	registerOnce.Do(func() {
-		if err := protocol.RegisterJSONHexEncoder(); err != nil {
+		if err := zaputil.RegisterJSONHexEncoder(); err != nil {
 			panic(err)
 		}
 	})
