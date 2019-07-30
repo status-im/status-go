@@ -332,7 +332,6 @@ func StartNode(configJSON *C.char) *C.char {
 	}
 
 	api.RunAsync(func() error { return statusBackend.StartNode(config) })
-
 	return makeJSONResponse(nil)
 }
 
