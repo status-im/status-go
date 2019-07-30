@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
 )
@@ -46,4 +47,14 @@ func TestBlob(t *testing.T) {
 	rst, err := db.GetBlob(tag)
 	require.NoError(t, err)
 	require.Equal(t, expected, rst)
+}
+
+func TestSaveSubAccounts(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	accounts := []SubAccount{
+		{Address: common.Address{0x01}, Main: true, Wallet: true},
+		{Address: common.Address{0x02}, Watch: true},
+	}
+	require.NoError(t, db.SaveSubAccounts(accounts))
 }

@@ -34,6 +34,11 @@ func (s *Service) APIs() []rpc.API {
 			Version:   "0.1.0",
 			Service:   NewAPI(s.db),
 		},
+		{
+			Namespace: "accounts",
+			Version:   "0.1.0",
+			Service:   NewAccountsAPI(s.db),
+		},
 	}
 }
 
