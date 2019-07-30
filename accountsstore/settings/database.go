@@ -4,16 +4,21 @@ import (
 	"database/sql"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/accountsstore/settings/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
 
-type SubAccount struct {
-	Address common.Address `json:"address"`
-	Main    bool           `json:"main"`
-	Wallet  bool           `json:"wallet"`
-	Chat    bool           `json:"chat"`
-	Watch   bool           `json:"watch"`
+type Account struct {
+	Address   common.Address `json:"address"`
+	Wallet    bool           `json:"wallet"`
+	Chat      bool           `json:"chat"`
+	Type      string         `json:"type"`
+	Storage   string         `json:"storage"`
+	Path      string         `json:"path"`
+	PublicKey hexutil.Bytes  `json:"publicKey"`
+	Name      string         `json:"name"`
+	Color     string         `json:"color"`
 }
 
 // Database sql wrapper for operations with browser objects.
@@ -52,15 +57,17 @@ func (db *Database) GetBlob(typ string) (rst []byte, err error) {
 	return rst, db.db.QueryRow("SELECT value FROM settings WHERE type = ?", typ).Scan(&rst)
 }
 
-func (db *Database) GetSubAccounts() ([]SubAccount, error) {
-	rows, err := db.db.Query("SELECT address, main, wallet, chat, watch FROM accounts")
+func (db *Database) GetAccounts() ([]Account, error) {
+	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, color FROM accounts")
 	if err != nil {
 		return nil, err
 	}
-	accounts := []SubAccount{}
+	accounts := []Account{}
 	for rows.Next() {
-		acc := SubAccount{}
-		err := rows.Scan(&acc.Address, &acc.Main, &acc.Wallet, &acc.Chat, &acc.Watch)
+		acc := Account{}
+		err := rows.Scan(
+			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
+			&acc.PublicKey, &acc.Path, &acc.Name, &acc.Color)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +76,7 @@ func (db *Database) GetSubAccounts() ([]SubAccount, error) {
 	return accounts, nil
 }
 
-func (db *Database) SaveSubAccounts(accounts []SubAccount) (err error) {
+func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
@@ -85,13 +92,13 @@ func (db *Database) SaveSubAccounts(accounts []SubAccount) (err error) {
 		}
 		_ = tx.Rollback()
 	}()
-	insert, err = tx.Prepare("INSERT INTO accounts (address, main, wallet, chat, watch) VALUES (?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT INTO accounts (address, wallet, chat, type, storage, pubkey, path, name, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	for i := range accounts {
 		acc := &accounts[i]
-		_, err = insert.Exec(acc.Address, acc.Main, acc.Wallet, acc.Chat, acc.Watch)
+		_, err = insert.Exec(acc.Address, acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Color)
 		if err != nil {
 			return
 		}
@@ -104,29 +111,7 @@ func (db *Database) GetWalletAddress() (rst common.Address, err error) {
 	return
 }
 
-func (db *Database) GetMainAddress() (rst common.Address, err error) {
-	err = db.db.QueryRow("SELECT address FROM accounts WHERE main = true").Scan(&rst)
-	return
-}
-
 func (db *Database) GetChatAddress() (rst common.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE chat = true").Scan(&rst)
 	return
-}
-
-func (db *Database) GetWatchAddresses() ([]common.Address, error) {
-	rows, err := db.db.Query("SELECT address FROM accounts WHERE watch = true")
-	if err != nil {
-		return nil, err
-	}
-	rst := []common.Address{}
-	for rows.Next() {
-		addr := common.Address{}
-		err := rows.Scan(&addr)
-		if err != nil {
-			return nil, err
-		}
-		rst = append(rst, addr)
-	}
-	return rst, nil
 }
