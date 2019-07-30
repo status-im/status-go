@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/accountsstore/settings/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
@@ -114,4 +114,20 @@ func (db *Database) GetWalletAddress() (rst common.Address, err error) {
 func (db *Database) GetChatAddress() (rst common.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE chat = true").Scan(&rst)
 	return
+}
+
+func (db *Database) GetAddresses() (rst []common.Address, err error) {
+	rows, err := db.db.Query("SELECT address FROM accounts")
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		addr := common.Address{}
+		err = rows.Scan(&addr)
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, addr)
+	}
+	return rst, nil
 }
