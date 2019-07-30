@@ -181,8 +181,8 @@ func (b *StatusBackend) ensureSettingsDBOpened(account accountsstore.Account, pa
 	return err
 }
 
-func (b *StatusBackend) StartNodeWithAccount(account accountsstore.Account, password string) error {
-	err := b.ensureSettingsDBOpened(account, password)
+func (b *StatusBackend) StartNodeWithAccount(acc accountsstore.Account, password string) error {
+	err := b.ensureSettingsDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -197,11 +197,29 @@ func (b *StatusBackend) StartNodeWithAccount(account accountsstore.Account, pass
 	if err != nil {
 		return err
 	}
-	err = b.SelectAccount(account.Address.Hex(), account.Address.Hex(), password)
+	chatAddr, err := b.settingsDB.GetChatAddress()
 	if err != nil {
 		return err
 	}
-	return b.accounts.UpdateAccountTimestamp(account.Address, time.Now().Unix())
+	walletAddr, err := b.settingsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+	watchAddrs, err := b.settingsDB.GetAddresses()
+	if err != nil {
+		return err
+	}
+	login := account.LoginParams{
+		Password:       password,
+		ChatAddress:    chatAddr,
+		WatchAddresses: watchAddrs,
+		MainAccount:    walletAddr,
+	}
+	err = b.SelectAccount(login)
+	if err != nil {
+		return err
+	}
+	return b.accounts.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
 }
 
 // StartNodeWithAccountAndConfig is used after account and config was generated.
