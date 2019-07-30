@@ -110,7 +110,7 @@ func (s *Service) InitProtocolWithEncyptionKey(address string, encKey string) er
 	return s.initProtocol(address, encKey, "")
 }
 
-func (s *Service) initProtocol(address, encKey, password string) error {
+func (s *Service) initProtocol(address, encKey, password string) error { // nolint: gocyclo
 	if !s.config.PFSEnabled {
 		return nil
 	}
@@ -162,21 +162,30 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		return err
 	}
 
-	// Because status-protocol-go split a single database file into multiple ones,
-	// in order to keep the backward compatibility, we just copy existing database
-	// into multiple locations. The tables and schemas did not change so it will work.
+	// In one of the versions, we split the database file into multiple ones.
+	// Later, we discovered that it really hurts the performance so we consolidated
+	// it again but in a better way keeping migrations in separate packages.
 	sessionsDatabasePath := filepath.Join(dataDir, fmt.Sprintf("%s.sessions.v4.sql", s.config.InstallationID))
-	transportDatabasePath := filepath.Join(dataDir, fmt.Sprintf("%s.transport.v4.sql", s.config.InstallationID))
-	if _, err := os.Stat(v4Path); err == nil {
-		if err := copyFile(v4Path, sessionsDatabasePath); err != nil {
-			return fmt.Errorf("failed to copy a file from %s to %s: %v", v4Path, sessionsDatabasePath, err)
+	sessionsStat, sessionsStatErr := os.Stat(sessionsDatabasePath)
+	v4PathStat, v4PathStatErr := os.Stat(v4Path)
+
+	if sessionsStatErr == nil && os.IsNotExist(v4PathStatErr) {
+		// This is a clear situation where we have the sessions.v4.sql file and v4Path does not exist.
+		// In the previous migration, we removed v4Path when it is successfully copied into the sessions sql file.
+		if err := os.Rename(sessionsDatabasePath, v4Path); err != nil {
+			return err
 		}
-		// TODO: investigate why copying v4Path to transportDatabasePath does not work and WhisperTransportService
-		// returns an error.
-		os.Remove(v4Path)
+	} else if sessionsStatErr == nil && v4PathStatErr == nil {
+		// Both files exist so probably the migration to split databases failed.
+		if sessionsStat.ModTime().After(v4PathStat.ModTime()) {
+			// Sessions sql file is newer.
+			if err := os.Rename(sessionsDatabasePath, v4Path); err != nil {
+				return err
+			}
+		}
 	}
 
-	options, err := buildMessengerOptions(s.config, sessionsDatabasePath, transportDatabasePath)
+	options, err := buildMessengerOptions(s.config, v4Path, encKey)
 	if err != nil {
 		return err
 	}
@@ -191,8 +200,6 @@ func (s *Service) initProtocol(address, encKey, password string) error {
 		identity,
 		&server{server: s.server},
 		s.w,
-		dataDir,
-		encKey,
 		s.config.InstallationID,
 		options...,
 	)
@@ -398,7 +405,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 	}
 }
 
-func buildMessengerOptions(config params.ShhextConfig, sessionsDatabasePath string, transportDatabasePath string) ([]protocol.Option, error) {
+func buildMessengerOptions(config params.ShhextConfig, dbPath, dbKey string) ([]protocol.Option, error) {
 	// Create a custom zap.Logger which will forward logs from status-protocol-go to status-go logger.
 	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
 	if err != nil {
@@ -407,10 +414,7 @@ func buildMessengerOptions(config params.ShhextConfig, sessionsDatabasePath stri
 
 	options := []protocol.Option{
 		protocol.WithCustomLogger(zapLogger),
-		protocol.WithDatabaseFilePaths(
-			sessionsDatabasePath,
-			transportDatabasePath,
-		),
+		protocol.WithDatabaseConfig(dbPath, dbKey),
 	}
 
 	if !config.DisableGenericDiscoveryTopic {

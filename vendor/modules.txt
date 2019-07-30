@@ -317,7 +317,7 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.1.3
+# github.com/status-im/status-protocol-go v0.1.4
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/sqlite
@@ -325,13 +325,13 @@ github.com/status-im/status-protocol-go/transport/whisper/filter
 github.com/status-im/status-protocol-go/datasync
 github.com/status-im/status-protocol-go/datasync/peer
 github.com/status-im/status-protocol-go/encryption
+github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/sharedsecret
-github.com/status-im/status-protocol-go/internal/sqlite
+github.com/status-im/status-protocol-go/migrations
 github.com/status-im/status-protocol-go/transport/whisper
+github.com/status-im/status-protocol-go/transport/whisper/migrations
 github.com/status-im/status-protocol-go/v1
-github.com/status-im/status-protocol-go/transport/whisper/internal/sqlite
 github.com/status-im/status-protocol-go/crypto
-github.com/status-im/status-protocol-go/encryption/internal/sqlite
 github.com/status-im/status-protocol-go/encryption/publisher
 github.com/status-im/status-protocol-go/applicationmetadata
 # github.com/status-im/whisper v1.4.14

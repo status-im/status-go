@@ -252,7 +252,7 @@ func TestAfterPostIsCalled(t *testing.T) {
 	identity, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	tmpDir, err := ioutil.TempDir("", "test-after-post")
+	dbPath, err := ioutil.TempFile("", "test-after-post.sql")
 	require.NoError(t, err)
 
 	service := New(w, nil, nil, params.ShhextConfig{})
@@ -260,9 +260,8 @@ func TestAfterPostIsCalled(t *testing.T) {
 		identity,
 		nil,
 		w,
-		tmpDir,
-		"encKey",
 		"installation1",
+		protocol.WithDatabaseConfig(dbPath.Name(), "encKey"),
 	)
 	require.NoError(t, err)
 
