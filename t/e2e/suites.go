@@ -51,7 +51,7 @@ func (s *StatusNodeTestSuite) StartTestNode(opts ...TestNodeOption) {
 	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 
 	s.False(s.StatusNode.IsRunning())
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 	s.True(s.StatusNode.IsRunning())
 }
 
@@ -90,7 +90,7 @@ func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 	for i := range opts {
 		opts[i](nodeConfig)
 	}
-
+	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 	// import account keys
 	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
 

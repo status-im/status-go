@@ -49,7 +49,7 @@ func (s *RPCTestSuite) TestCallRPC() {
 			nodeConfig.UpstreamConfig.URL = networkURL
 		}
 
-		s.NoError(s.StatusNode.Start(nodeConfig))
+		s.NoError(s.StatusNode.Start(nodeConfig, nil))
 
 		rpcClient := s.StatusNode.RPCClient()
 		s.NotNil(rpcClient)
@@ -127,7 +127,7 @@ func (s *RPCTestSuite) TestCallRawResult() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 
 	client := s.StatusNode.RPCPrivateClient()
 	s.NotNil(client)
@@ -145,7 +145,7 @@ func (s *RPCTestSuite) TestCallRawResultGetTransactionReceipt() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 
 	client := s.StatusNode.RPCClient()
 	s.NotNil(client)

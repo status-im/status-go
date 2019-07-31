@@ -232,7 +232,6 @@ mock-install: ##@other Install mocking tools
 mock: ##@other Regenerate mocks
 	mockgen -package=fcm          -destination=notifications/push/fcm/client_mock.go -source=notifications/push/fcm/client.go
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
-	mockgen -package=account      -destination=account/accounts_mock.go              -source=account/accounts.go
 	mockgen -package=status       -destination=services/status/account_mock.go       -source=services/status/service.go
 	mockgen -package=peer         -destination=services/peer/discoverer_mock.go      -source=services/peer/service.go
 

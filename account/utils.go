@@ -42,7 +42,6 @@ func ParseLoginParams(paramsJSON string) (LoginParams, error) {
 		params      LoginParams
 		zeroAddress common.Address
 	)
-
 	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
 		return params, err
 	}
@@ -60,7 +59,6 @@ func ParseLoginParams(paramsJSON string) (LoginParams, error) {
 			return params, newErrZeroAddress("WatchAddresses")
 		}
 	}
-
 	return params, nil
 }
 

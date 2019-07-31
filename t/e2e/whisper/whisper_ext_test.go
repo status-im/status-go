@@ -35,7 +35,7 @@ func (s *WhisperExtensionSuite) SetupTest() {
 		cfg, err := utils.MakeTestNodeConfigWithDataDir(fmt.Sprintf("test-shhext-%d", i), dir, 777)
 		s.Require().NoError(err)
 		s.nodes[i] = node.New()
-		s.Require().NoError(s.nodes[i].Start(cfg))
+		s.Require().NoError(s.nodes[i].Start(cfg, nil))
 	}
 }
 
