@@ -94,6 +94,7 @@ func init() {
 	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
 	"LogLevel": "INFO",
 	"NoDiscovery": true,
+	"APIModules": "web3,eth",
 	"LightEthConfig": {
 		"Enabled": true
 	},
@@ -570,8 +571,40 @@ type jsonrpcAnyResponse struct {
 }
 
 func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
-	createAccountAndLogin(t, feed)
-	return testSendTransaction(t)
+	loginResponse := APIResponse{}
+	rawResponse := SaveAccountAndLogin(buildAccountData("test", TestConfig.Account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON))
+	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
+	require.Empty(t, loginResponse.Error)
+	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))
+	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
+
+	args, err := json.Marshal(transactions.SendTxArgs{
+		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
+		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
+	})
+	if err != nil {
+		t.Errorf("failed to marshal errors: %v", err)
+		return false
+	}
+	rawResult := SendTransaction(C.CString(string(args)), C.CString(TestConfig.Account1.Password))
+
+	var result jsonrpcAnyResponse
+	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
+		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
+		return false
+	}
+	if result.Error.Message != "" {
+		t.Errorf("failed to send transaction: %v", result.Error)
+		return false
+	}
+	hash := gethcommon.BytesToHash(result.Result)
+	if reflect.DeepEqual(hash, gethcommon.Hash{}) {
+		t.Errorf("response hash empty: %s", hash.Hex())
+		return false
+	}
+
+	return true
 }
 
 func testSendTransaction(t *testing.T) bool {
