@@ -9,8 +9,8 @@
 
 package main
 
-import "C"
 import (
+	"C"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -31,9 +31,14 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/signal"
+
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
 	"github.com/stretchr/testify/require"
+)
+import (
+	"errors"
+	"github.com/status-im/status-go/t/utils"
 )
 
 const initJS = `
@@ -47,12 +52,11 @@ var (
 	nodeConfigJSON string
 )
 
-func buildLoginParamsJSON(chatAddress, password string) *C.char {
+func buildAccountData(name, chatAddress string) *C.char {
 	return C.CString(fmt.Sprintf(`{
-		"chatAddress": "%s",
-		"password": "%s",
-		"mainAccount": "%s"
-	}`, chatAddress, password, chatAddress))
+		"name": "%s",
+		"address": "%s"
+	}`, name, chatAddress))
 }
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
@@ -88,20 +92,8 @@ func init() {
 }
 
 // nolint: deadcode
-func testExportedAPI(t *testing.T, done chan struct{}) {
-	<-startTestNode(t)
-	defer func() {
-		done <- struct{}{}
-	}()
-
-	// prepare accounts
-	testKeyDir := filepath.Join(testChainDir, "keystore")
-	if err := ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
-		panic(err)
-	}
-	if err := ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
-		panic(err)
-	}
+func testExportedAPI(t *testing.T) {
+	//startTestNode(t, false)
 
 	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
 	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
@@ -112,31 +104,31 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		fn   func(t *testing.T) bool
 	}{
 		{
-			"stop/resume node",
+			"StopResumeNode",
 			testStopResumeNode,
 		},
 		{
-			"call RPC on in-proc handler",
+			"RPCInProc",
 			testCallRPC,
 		},
 		{
-			"call private API using RPC",
+			"RPCPrivateAPI",
 			testCallRPCWithPrivateAPI,
 		},
 		{
-			"call private API using private RPC client",
+			"RPCPrivateClient",
 			testCallPrivateRPCWithPrivateAPI,
 		},
 		{
-			"verify account password",
+			"VerifyAccountPassword",
 			testVerifyAccountPassword,
 		},
 		{
-			"recover account",
+			"RecoverAccount",
 			testRecoverAccount,
 		},
 		{
-			"account select/login",
+			"AccountSelectLogin",
 			testAccountSelect,
 		},
 		{
@@ -177,12 +169,10 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Logf("=== RUN   %s", test.name)
-		if ok := test.fn(t); !ok {
-			t.Logf("=== FAILED   %s", test.name)
-			break
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.True(t, tc.fn(t))
+		})
 	}
 }
 
@@ -249,105 +239,63 @@ func testResetChainData(t *testing.T) bool {
 }
 
 func testStopResumeNode(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might have gotten populated during previous tests)
-	if err := statusBackend.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
-	whisperService, err := statusBackend.StatusNode().WhisperService()
-	if err != nil {
-		t.Errorf("whisper service not running: %v", err)
-	}
-
 	// create an account
 	account1, _, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
-	if err != nil {
-		t.Errorf("could not create account: %v", err)
-		return false
-	}
+	require.NoError(t, err)
 	t.Logf("account created: {address: %s, key: %s}", account1.WalletAddress, account1.WalletPubKey)
-
-	// make sure that identity is not (yet injected)
-	if whisperService.HasKeyPair(account1.ChatPubKey) {
-		t.Error("identity already present in whisper")
-	}
 
 	// select account
 	loginResponse := APIResponse{}
-	rawResponse := Login(buildLoginParamsJSON(account1.WalletAddress, TestConfig.Account1.Password))
+	rawResponse := Login(buildAccountData("test", account1.WalletAddress), C.CString(TestConfig.Account1.Password))
+	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
+	require.Empty(t, loginResponse.Error)
 
-	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
-		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
+	require.NoError(t, utils.Eventually(func() error {
+		if statusBackend.IsNodeRunning() {
+			return nil
+		}
+		return errors.New("node is not ready")
+	}, 5*time.Second, 300*time.Millisecond))
 
-	if loginResponse.Error != "" {
-		t.Errorf("could not select account: %v", err)
-		return false
-	}
-	if !whisperService.HasKeyPair(account1.ChatPubKey) {
-		t.Errorf("identity not injected into whisper: %v", err)
-	}
+	whisperService, err := statusBackend.StatusNode().WhisperService()
+	require.NoError(t, err)
+
+	require.True(t, whisperService.HasKeyPair(account1.ChatPubKey))
 
 	// stop and resume node, then make sure that selected account is still selected
 	// nolint: dupl
-	stopNodeFn := func() bool {
+	stopNodeFn := func() {
 		response := APIResponse{}
 		// FIXME(tiabc): Implement https://github.com/status-im/status-go/issues/254 to avoid
 		// 9-sec timeout below after stopping the node.
 		rawResponse = StopNode()
-
-		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
-			t.Errorf("cannot decode StopNode response (%s): %v", C.GoString(rawResponse), err)
-			return false
-		}
-		if response.Error != "" {
-			t.Errorf("unexpected error: %s", response.Error)
-			return false
-		}
-
-		return true
+		require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &response))
+		require.Empty(t, response.Error)
 	}
 
 	// nolint: dupl
-	resumeNodeFn := func() bool {
+	resumeNodeFn := func() {
 		response := APIResponse{}
 		// FIXME(tiabc): Implement https://github.com/status-im/status-go/issues/254 to avoid
 		// 10-sec timeout below after resuming the node.
 		rawResponse = StartNode(C.CString(nodeConfigJSON))
 
-		if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &response); err != nil {
-			t.Errorf("cannot decode StartNode response (%s): %v", C.GoString(rawResponse), err)
-			return false
-		}
-		if response.Error != "" {
-			t.Errorf("unexpected error: %s", response.Error)
-			return false
-		}
-
-		return true
+		require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &response))
+		require.Empty(t, response.Error)
 	}
 
-	if !stopNodeFn() {
-		return false
-	}
+	stopNodeFn()
 
 	time.Sleep(9 * time.Second) // allow to stop
 
-	if !resumeNodeFn() {
-		return false
-	}
+	resumeNodeFn()
 
 	time.Sleep(10 * time.Second) // allow to start (instead of using blocking version of start, of filter event)
 
 	// now, verify that we still have account logged in
 	whisperService, err = statusBackend.StatusNode().WhisperService()
-	if err != nil {
-		t.Errorf("whisper service not running: %v", err)
-	}
-	if !whisperService.HasKeyPair(account1.ChatPubKey) {
-		t.Errorf("identity evicted from whisper on node restart: %v", err)
-	}
+	require.NoError(t, err)
+	require.True(t, whisperService.HasKeyPair(account1.ChatPubKey))
 
 	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
 	testSendTransaction(t)
@@ -554,7 +502,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 
 	// try selecting with wrong password
 	loginResponse := APIResponse{}
-	rawResponse := Login(buildLoginParamsJSON(accountInfo1.WalletAddress, "wrongPassword"))
+	rawResponse := Login(buildAccountData("test", accountInfo1.WalletAddress), C.CString("wrongPassword"))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -567,7 +515,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	loginResponse = APIResponse{}
-	rawResponse = Login(buildLoginParamsJSON(accountInfo1.WalletAddress, TestConfig.Account1.Password))
+	rawResponse = Login(buildAccountData("test", accountInfo1.WalletAddress), C.CString(TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -588,7 +536,7 @@ func testAccountSelect(t *testing.T) bool { //nolint: gocyclo
 	}
 
 	loginResponse = APIResponse{}
-	rawResponse = Login(buildLoginParamsJSON(accountInfo2.WalletAddress, TestConfig.Account1.Password))
+	rawResponse = Login(buildAccountData("test", accountInfo2.WalletAddress), C.CString(TestConfig.Account1.Password))
 
 	if err = json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse); err != nil {
 		t.Errorf("cannot decode RecoverAccount response (%s): %v", C.GoString(rawResponse), err)
@@ -829,24 +777,15 @@ func testFailedTransaction(t *testing.T) bool {
 
 }
 
-func startTestNode(t *testing.T) <-chan struct{} {
+func startTestNode(t *testing.T, sync bool) {
 	testDir := filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
-
-	syncRequired := false
-	if _, err := os.Stat(testDir); os.IsNotExist(err) {
-		syncRequired = true
-	}
 
 	// inject test accounts
 	testKeyDir := filepath.Join(testDir, "keystore")
-	if err := ImportTestAccount(testKeyDir, GetAccount1PKFile()); err != nil {
-		panic(err)
-	}
-	if err := ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
-		panic(err)
-	}
+	require.NoError(t, ImportTestAccount(testKeyDir, GetAccount1PKFile()))
+	require.NoError(t, ImportTestAccount(testKeyDir, GetAccount2PKFile()))
 
-	waitForNodeStart := make(chan struct{}, 1)
+	waitReady := make(chan struct{})
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
 		t.Log(jsonEvent)
 		var envelope signal.Envelope
@@ -865,32 +804,24 @@ func startTestNode(t *testing.T) <-chan struct{} {
 			t.Log("Node started, but we wait till it be ready")
 		}
 		if envelope.Type == signal.EventNodeReady {
-			// sync
-			if syncRequired {
+			if sync {
 				t.Logf("Sync is required")
 				EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
-			} else {
-				time.Sleep(5 * time.Second)
 			}
-
-			// now we can proceed with tests
-			waitForNodeStart <- struct{}{}
+			waitReady <- struct{}{}
 		}
 	})
 
-	go func() {
-		response := StartNode(C.CString(nodeConfigJSON))
-		responseErr := APIResponse{}
-
-		if err := json.Unmarshal([]byte(C.GoString(response)), &responseErr); err != nil {
-			panic(err)
-		}
-		if responseErr.Error != "" {
-			panic("cannot start node: " + responseErr.Error)
-		}
-	}()
-
-	return waitForNodeStart
+	response := StartNode(C.CString(nodeConfigJSON))
+	responseErr := APIResponse{}
+	require.NoError(t, json.Unmarshal([]byte(C.GoString(response)), &responseErr))
+	require.Empty(t, responseErr.Error)
+	select {
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "failed to start a node in 5 seconds")
+	case <-waitReady:
+		return
+	}
 }
 
 //nolint: deadcode
