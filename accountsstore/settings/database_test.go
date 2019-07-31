@@ -1,12 +1,14 @@
 package settings
 
 import (
+	"database/sql"
 	"encoding/json"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +51,46 @@ func TestBlob(t *testing.T) {
 	require.Equal(t, expected, rst)
 }
 
-func TestSaveSubAccounts(t *testing.T) {
+func TestSaveAccounts(t *testing.T) {
+	type testCase struct {
+		description string
+		accounts    []Account
+		err         error
+	}
+	for _, tc := range []testCase{
+		{
+			description: "NoError",
+			accounts: []Account{
+				{Address: common.Address{0x01}, Chat: true, Wallet: true},
+				{Address: common.Address{0x02}},
+			},
+		},
+		{
+			description: "UniqueChat",
+			accounts: []Account{
+				{Address: common.Address{0x01}, Chat: true},
+				{Address: common.Address{0x02}, Chat: true},
+			},
+			err: ErrChatNotUnique,
+		},
+		{
+			description: "UniqueWallet",
+			accounts: []Account{
+				{Address: common.Address{0x01}, Wallet: true},
+				{Address: common.Address{0x02}, Wallet: true},
+			},
+			err: ErrWalletNotUnique,
+		},
+	} {
+		t.Run(tc.description, func(t *testing.T) {
+			db, stop := setupTestDB(t)
+			defer stop()
+			require.Equal(t, tc.err, db.SaveAccounts(tc.accounts))
+		})
+	}
+}
+
+func TestUpdateAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []Account{
@@ -57,4 +98,61 @@ func TestSaveSubAccounts(t *testing.T) {
 		{Address: common.Address{0x02}},
 	}
 	require.NoError(t, db.SaveAccounts(accounts))
+	accounts[0].Chat = false
+	accounts[1].Chat = true
+	require.NoError(t, db.SaveAccounts(accounts))
+	rst, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, accounts, rst)
+}
+
+func TestGetAddresses(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	accounts := []Account{
+		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+		{Address: common.Address{0x02}},
+	}
+	require.NoError(t, db.SaveAccounts(accounts))
+	addresses, err := db.GetAddresses()
+	require.NoError(t, err)
+	require.Equal(t, []common.Address{{0x01}, {0x02}}, addresses)
+}
+
+func TestGetWalletAddress(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	address := common.Address{0x01}
+	_, err := db.GetWalletAddress()
+	require.Equal(t, err, sql.ErrNoRows)
+	require.NoError(t, db.SaveAccounts([]Account{{Address: address, Wallet: true}}))
+	wallet, err := db.GetWalletAddress()
+	require.NoError(t, err)
+	require.Equal(t, address, wallet)
+}
+
+func TestGetChatAddress(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	address := common.Address{0x01}
+	_, err := db.GetChatAddress()
+	require.Equal(t, err, sql.ErrNoRows)
+	require.NoError(t, db.SaveAccounts([]Account{{Address: address, Chat: true}}))
+	chat, err := db.GetChatAddress()
+	require.NoError(t, err)
+	require.Equal(t, address, chat)
+}
+
+func TestGetAccounts(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	accounts := []Account{
+		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+		{Address: common.Address{0x02}, PublicKey: hexutil.Bytes{0x01, 0x02}},
+		{Address: common.Address{0x03}, PublicKey: hexutil.Bytes{0x02, 0x03}},
+	}
+	require.NoError(t, db.SaveAccounts(accounts))
+	rst, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, accounts, rst)
 }
