@@ -90,6 +90,7 @@ func (s *APITestSuite) TestRaceConditions() {
 		if rnd.Intn(100) > 75 { // introduce random delays
 			time.Sleep(500 * time.Millisecond)
 		}
+		s.NoError(s.backend.AccountManager().InitKeystore(randConfig.KeyStoreDir))
 		go randFunc(randConfig)
 	}
 
@@ -124,6 +125,7 @@ func (s *APITestSuite) TestEventsNodeStartStop() {
 
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
+	s.NoError(s.backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 	s.Require().NoError(s.backend.StartNode(nodeConfig))
 	s.NoError(s.backend.StopNode())
 	s.verifyEnvelopes(envelopes, signal.EventNodeStarted, signal.EventNodeReady, signal.EventNodeStopped)
@@ -168,12 +170,13 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	defer func() { s.NoError(db.Close()) }()
 
 	// start node outside the manager (on the same port), so that manager node.Start() method fails
-	outsideNode, err := node.MakeNode(nodeConfig, db)
+	outsideNode, err := node.MakeNode(nodeConfig, nil, db)
 	s.NoError(err)
 	err = outsideNode.Start()
 	s.NoError(err)
 
 	// now try starting using node manager, it should fail (error is irrelevant as it is implementation detail)
+	s.NoError(s.backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 	s.Error(<-api.RunAsync(func() error { return s.backend.StartNode(nodeConfig) }))
 
 	select {

@@ -67,8 +67,7 @@ func (s *AccountsTestSuite) TestImportSingleExtendedKey() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
-	s.NoError(err)
+	keyStore := s.Backend.AccountManager().GetKeystore()
 	s.NotNil(keyStore)
 
 	// create a master extended key
@@ -95,8 +94,7 @@ func (s *AccountsTestSuite) TestImportAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
-	s.NoError(err)
+	keyStore := s.Backend.AccountManager().GetKeystore()
 	s.NotNil(keyStore)
 
 	// create a private key
@@ -119,8 +117,8 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	s.StartTestBackend()
 	defer s.StopTestBackend()
 
-	keyStore, err := s.Backend.StatusNode().AccountKeyStore()
-	s.NoError(err)
+	keyStore := s.Backend.AccountManager().GetKeystore()
+	s.NotNil(keyStore)
 
 	// create an acc
 	accountInfo, mnemonic, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)

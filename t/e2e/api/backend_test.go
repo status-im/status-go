@@ -25,7 +25,7 @@ func (s *APIBackendTestSuite) TestNetworkSwitching() {
 	// Get test node configuration.
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
-
+	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 	s.False(s.Backend.IsNodeRunning())
 	s.Require().NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
@@ -87,6 +87,7 @@ func (s *APIBackendTestSuite) TestRestartNode() {
 	// get config
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
+	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 
 	s.False(s.Backend.IsNodeRunning())
 	require.NoError(s.Backend.StartNode(nodeConfig))
