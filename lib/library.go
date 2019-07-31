@@ -365,13 +365,14 @@ func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var conf *params.NodeConfig
-	err = json.Unmarshal([]byte(confJSON), conf)
+	conf := params.NodeConfig{}
+	err = json.Unmarshal([]byte(confJSON), &conf)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		return statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), conf)
+		err := statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), &conf)
+		return err
 	})
 	return makeJSONResponse(nil)
 }
