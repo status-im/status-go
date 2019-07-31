@@ -219,7 +219,12 @@ func (b *StatusBackend) StartNodeWithAccount(acc accountsstore.Account, password
 	if err != nil {
 		return err
 	}
-	return b.accounts.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	err = b.accounts.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+	signal.SendLoggedIn()
+	return nil
 }
 
 // StartNodeWithAccountAndConfig is used after account and config was generated.
@@ -238,6 +243,11 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account accountsstore.Acco
 	if err != nil {
 		return err
 	}
+	// FIXME(dshulyak) where should i get this data?
+	err = b.settingsDB.SaveAccounts([]settings.Account{{Chat: true, Wallet: true, Address: account.Address}})
+	if err != nil {
+		return err
+	}
 	return b.StartNodeWithAccount(account, password)
 }
 
@@ -247,10 +257,15 @@ func (b *StatusBackend) saveNodeConfig(config *params.NodeConfig) error {
 	return b.settingsDB.SaveConfig(settings.NodeConfigTag, config)
 }
 
-func (b *StatusBackend) loadNodeConfig() (conf *params.NodeConfig, err error) {
+func (b *StatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return conf, b.settingsDB.GetConfig(settings.NodeConfigTag, conf)
+	conf := params.NodeConfig{}
+	err := b.settingsDB.GetConfig(settings.NodeConfigTag, &conf)
+	if err != nil {
+		return nil, err
+	}
+	return &conf, nil
 }
 
 func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
@@ -686,7 +701,9 @@ func (b *StatusBackend) cleanupServices() error {
 
 func (b *StatusBackend) stopSettingsDB() error {
 	if b.settingsDB != nil {
-		return b.settingsDB.Close()
+		err := b.settingsDB.Close()
+		b.settingsDB = nil
+		return err
 	}
 	return nil
 }
