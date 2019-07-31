@@ -55,6 +55,7 @@ func (s *DevNodeSuite) SetupTest() {
 	config.WalletConfig.Enabled = true
 	config.UpstreamConfig.URL = s.miner.IPCEndpoint()
 	s.backend = api.NewStatusBackend()
+	s.Require().NoError(s.backend.AccountManager().InitKeystore(config.KeyStoreDir))
 	s.Require().NoError(s.backend.StartNode(config))
 	s.Remote, err = s.miner.Attach()
 	s.Require().NoError(err)

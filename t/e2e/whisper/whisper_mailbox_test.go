@@ -708,7 +708,10 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 	backend := api.NewStatusBackend()
 	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	nodeConfig.DataDir = datadir
+	nodeConfig.KeyStoreDir = filepath.Join(datadir, "keystore")
 	s.Require().NoError(err)
+	s.Require().NoError(backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
+
 	s.Require().False(backend.IsNodeRunning())
 
 	nodeConfig.WhisperConfig.LightClient = true
@@ -748,6 +751,7 @@ func (s *WhisperMailboxSuite) startMailboxBackendWithCallback(
 	s.Require().NoError(err)
 
 	mailboxBackend := api.NewStatusBackend()
+	s.Require().NoError(mailboxBackend.AccountManager().InitKeystore(mailboxConfig.KeyStoreDir))
 	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
 
 	mailboxConfig.LightEthConfig.Enabled = false

@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
@@ -23,10 +24,15 @@ const (
 func TestSubscriptionEthWithParamsDict(t *testing.T) {
 	// a simple test to check the parameter parsing for eth_* filter subscriptions
 	backend := NewStatusBackend()
+	// initNodeAndLogin can fail and terminate the test, in that case stopNode must be executed anyway.
+	defer func() {
+		err := backend.StopNode()
+		if err != node.ErrNoRunningNode {
+			require.NoError(t, err)
+		}
+	}()
 
 	initNodeAndLogin(t, backend)
-
-	defer func() { require.NoError(t, backend.StopNode()) }()
 
 	createSubscription(t, backend, fmt.Sprintf(`"eth_newFilter", [
 	{
@@ -40,10 +46,14 @@ func TestSubscriptionEthWithParamsDict(t *testing.T) {
 func TestSubscriptionPendingTransaction(t *testing.T) {
 	backend := NewStatusBackend()
 	backend.allowAllRPC = true
+	defer func() {
+		err := backend.StopNode()
+		if err != node.ErrNoRunningNode {
+			require.NoError(t, err)
+		}
+	}()
 
 	account, _ := initNodeAndLogin(t, backend)
-
-	defer func() { require.NoError(t, backend.StopNode()) }()
 
 	signals := make(chan string)
 	defer func() {
@@ -88,10 +98,14 @@ func TestSubscriptionPendingTransaction(t *testing.T) {
 
 func TestSubscriptionWhisperEnvelopes(t *testing.T) {
 	backend := NewStatusBackend()
+	defer func() {
+		err := backend.StopNode()
+		if err != node.ErrNoRunningNode {
+			require.NoError(t, err)
+		}
+	}()
 
 	initNodeAndLogin(t, backend)
-
-	defer func() { require.NoError(t, backend.StopNode()) }()
 
 	signals := make(chan string)
 	defer func() {
@@ -222,9 +236,9 @@ func initNodeAndLogin(t *testing.T, backend *StatusBackend) (string, string) {
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 
+	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
 	err = backend.StartNode(config)
 	require.NoError(t, err)
-
 	info, _, err := backend.AccountManager().CreateAccount(password)
 	require.NoError(t, err)
 

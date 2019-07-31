@@ -73,6 +73,7 @@ func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debu
 
 	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
+	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 
 	nodeConfig.IPCEnabled = false
 	nodeConfig.EnableStatusService = statusServiceEnabled
