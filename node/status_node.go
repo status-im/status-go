@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
@@ -105,17 +104,19 @@ func (n *StatusNode) Server() *p2p.Server {
 
 // Start starts current StatusNode, failing if it's already started.
 // It accepts a list of services that should be added to the node.
-func (n *StatusNode) Start(config *params.NodeConfig, services ...node.ServiceConstructor) error {
+func (n *StatusNode) Start(config *params.NodeConfig, accs *accounts.Manager, services ...node.ServiceConstructor) error {
 	return n.StartWithOptions(config, StartOptions{
-		Services:       services,
-		StartDiscovery: true,
+		Services:        services,
+		StartDiscovery:  true,
+		AccountsManager: accs,
 	})
 }
 
 // StartOptions allows to control some parameters of Start() method.
 type StartOptions struct {
-	Services       []node.ServiceConstructor
-	StartDiscovery bool
+	Services        []node.ServiceConstructor
+	StartDiscovery  bool
+	AccountsManager *accounts.Manager
 }
 
 // StartWithOptions starts current StatusNode, failing if it's already started.
@@ -133,12 +134,12 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 
 	db, err := db.Create(config.DataDir, params.StatusDatabase)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create database at %s: %v", config.DataDir, err)
 	}
 
 	n.db = db
 
-	err = n.startWithDB(config, db, options.Services)
+	err = n.startWithDB(config, options.AccountsManager, db, options.Services)
 
 	// continue only if there was no error when starting node with a db
 	if err == nil && options.StartDiscovery && n.discoveryEnabled() {
@@ -156,8 +157,8 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	return nil
 }
 
-func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, services []node.ServiceConstructor) error {
-	if err := n.createNode(config, db); err != nil {
+func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB, services []node.ServiceConstructor) error {
+	if err := n.createNode(config, accs, db); err != nil {
 		return err
 	}
 	n.config = config
@@ -173,8 +174,8 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, db *leveldb.DB, serv
 	return nil
 }
 
-func (n *StatusNode) createNode(config *params.NodeConfig, db *leveldb.DB) (err error) {
-	n.gethNode, err = MakeNode(config, db)
+func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) (err error) {
+	n.gethNode, err = MakeNode(config, accs, db)
 	return err
 }
 
@@ -636,29 +637,6 @@ func (n *StatusNode) AccountManager() (*accounts.Manager, error) {
 	}
 
 	return n.gethNode.AccountManager(), nil
-}
-
-// AccountKeyStore exposes reference to accounts key store
-func (n *StatusNode) AccountKeyStore() (*keystore.KeyStore, error) {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if n.gethNode == nil {
-		return nil, ErrNoGethNode
-	}
-
-	accountManager := n.gethNode.AccountManager()
-	backends := accountManager.Backends(keystore.KeyStoreType)
-	if len(backends) == 0 {
-		return nil, ErrAccountKeyStoreMissing
-	}
-
-	keyStore, ok := backends[0].(*keystore.KeyStore)
-	if !ok {
-		return nil, ErrAccountKeyStoreMissing
-	}
-
-	return keyStore, nil
 }
 
 // RPCClient exposes reference to RPC client connected to the running node.

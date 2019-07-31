@@ -376,6 +376,13 @@ func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
 	return makeJSONResponse(nil)
 }
 
+// InitKeystore initialize keystore before doing any operations with keys.
+//export InitKeystore
+func InitKeystore(keydir *C.char) *C.char {
+	err := statusBackend.AccountManager().InitKeystore(C.GoString(keydir))
+	return makeJSONResponse(err)
+}
+
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
 // It purges all the previous identities from Whisper, and injects the key as shh identity.
 //export LoginWithKeycard

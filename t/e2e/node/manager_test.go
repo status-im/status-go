@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -72,20 +71,6 @@ func (s *ManagerTestSuite) TestReferencesWithoutStartedNode() {
 			node.ErrNoRunningNode,
 		},
 		{
-			"non-null manager, no running node, get AccountManager",
-			func() (interface{}, error) {
-				return s.StatusNode.AccountManager()
-			},
-			node.ErrNoGethNode,
-		},
-		{
-			"non-null manager, no running node, get AccountKeyStore",
-			func() (interface{}, error) {
-				return s.StatusNode.AccountKeyStore()
-			},
-			node.ErrNoGethNode,
-		},
-		{
 			"non-null manager, no running node, get RPC Client",
 			func() (interface{}, error) {
 				return s.StatusNode.RPCClient(), nil
@@ -149,13 +134,6 @@ func (s *ManagerTestSuite) TestReferencesWithStartedNode() {
 			&accounts.Manager{},
 		},
 		{
-			"node is running, get AccountKeyStore",
-			func() (interface{}, error) {
-				return s.StatusNode.AccountKeyStore()
-			},
-			&keystore.KeyStore{},
-		},
-		{
 			"node is running, get RPC Client",
 			func() (interface{}, error) {
 				return s.StatusNode.RPCClient(), nil
@@ -183,12 +161,12 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 
 	// start node
 	s.False(s.StatusNode.IsRunning())
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 	// wait till node is started
 	s.True(s.StatusNode.IsRunning())
 
 	// try starting another node (w/o stopping the previously started node)
-	s.Equal(node.ErrNodeRunning, s.StatusNode.Start(nodeConfig))
+	s.Equal(node.ErrNodeRunning, s.StatusNode.Start(nodeConfig, nil))
 
 	// now stop node
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163
@@ -196,7 +174,7 @@ func (s *ManagerTestSuite) TestNodeStartStop() {
 	s.False(s.StatusNode.IsRunning())
 
 	// start new node with exactly the same config
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 	s.True(s.StatusNode.IsRunning())
 
 	// finally stop the node
@@ -209,7 +187,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
 	s.NoError(err)
 	s.False(s.StatusNode.IsRunning())
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 	// wait till node is started
 	s.Require().True(s.StatusNode.IsRunning())
 
@@ -225,7 +203,7 @@ func (s *ManagerTestSuite) TestNetworkSwitching() {
 	// start new node with completely different config
 	nodeConfig, err = MakeTestNodeConfig(params.RinkebyNetworkID)
 	s.NoError(err)
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 	s.True(s.StatusNode.IsRunning())
 
 	// make sure we are on another network indeed
@@ -251,7 +229,7 @@ func (s *ManagerTestSuite) TestStartWithUpstreamEnabled() {
 	nodeConfig.UpstreamConfig.Enabled = true
 	nodeConfig.UpstreamConfig.URL = networkURL
 
-	s.NoError(s.StatusNode.Start(nodeConfig))
+	s.NoError(s.StatusNode.Start(nodeConfig, nil))
 	s.True(s.StatusNode.IsRunning())
 
 	time.Sleep(100 * time.Millisecond) //https://github.com/status-im/status-go/issues/429#issuecomment-339663163

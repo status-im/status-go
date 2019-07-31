@@ -339,7 +339,11 @@ func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
 }
 
 func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusBackend.StatusNode().AccountKeyStore()
+	keyStore := statusBackend.AccountManager().GetKeystore()
+	if keyStore == nil {
+		t.Errorf("keystore is nil")
+		return false
+	}
 
 	// create an account
 	accountInfo, mnemonic, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
@@ -782,6 +786,7 @@ func startTestNode(t *testing.T, sync bool) {
 
 	// inject test accounts
 	testKeyDir := filepath.Join(testDir, "keystore")
+	_ = InitKeystore(C.CString(testKeyDir))
 	require.NoError(t, ImportTestAccount(testKeyDir, GetAccount1PKFile()))
 	require.NoError(t, ImportTestAccount(testKeyDir, GetAccount2PKFile()))
 
