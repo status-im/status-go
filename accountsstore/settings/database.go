@@ -2,11 +2,24 @@ package settings
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/accountsstore/settings/migrations"
 	"github.com/status-im/status-go/sqlite"
+)
+
+const (
+	uniqueChatConstraint   = "UNIQUE constraint failed: accounts.chat"
+	uniqueWalletConstraint = "UNIQUE constraint failed: accounts.wallet"
+)
+
+var (
+	// ErrWalletNotUnique returned if another account has `wallet` field set to true.
+	ErrWalletNotUnique = errors.New("another account is set to be default wallet. disable it before using new")
+	// ErrChatNotUnique returned if another account has `chat` field set to true.
+	ErrChatNotUnique = errors.New("another account is set to be default chat. disable it before using new")
 )
 
 type Account struct {
@@ -63,13 +76,18 @@ func (db *Database) GetAccounts() ([]Account, error) {
 		return nil, err
 	}
 	accounts := []Account{}
+	pubkey := []byte{}
 	for rows.Next() {
 		acc := Account{}
 		err := rows.Scan(
 			&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
-			&acc.PublicKey, &acc.Path, &acc.Name, &acc.Color)
+			&pubkey, &acc.Path, &acc.Name, &acc.Color)
 		if err != nil {
 			return nil, err
+		}
+		if lth := len(pubkey); lth > 0 {
+			acc.PublicKey = make(hexutil.Bytes, lth)
+			copy(acc.PublicKey, pubkey)
 		}
 		accounts = append(accounts, acc)
 	}
@@ -80,6 +98,7 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
+		update *sql.Stmt
 	)
 	tx, err = db.db.Begin()
 	if err != nil {
@@ -92,14 +111,30 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 		}
 		_ = tx.Rollback()
 	}()
-	insert, err = tx.Prepare("INSERT INTO accounts (address, wallet, chat, type, storage, pubkey, path, name, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	// NOTE(dshulyak) replace all record values using address (primary key)
+	// can't use `insert or replace` because of the additional constraints (wallet and chat)
+	insert, err = tx.Prepare("INSERT OR IGNORE INTO accounts (address) VALUES (?)")
+	if err != nil {
+		return err
+	}
+	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?, color = ? WHERE address = ?")
 	if err != nil {
 		return err
 	}
 	for i := range accounts {
 		acc := &accounts[i]
-		_, err = insert.Exec(acc.Address, acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Color)
+		_, err = insert.Exec(acc.Address)
 		if err != nil {
+			return
+		}
+		_, err = update.Exec(acc.Wallet, acc.Chat, acc.Type, acc.Storage, acc.PublicKey, acc.Path, acc.Name, acc.Color, acc.Address)
+		if err != nil {
+			switch err.Error() {
+			case uniqueChatConstraint:
+				err = ErrChatNotUnique
+			case uniqueWalletConstraint:
+				err = ErrWalletNotUnique
+			}
 			return
 		}
 	}
@@ -107,12 +142,12 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 }
 
 func (db *Database) GetWalletAddress() (rst common.Address, err error) {
-	err = db.db.QueryRow("SELECT address FROM accounts WHERE wallet = true").Scan(&rst)
+	err = db.db.QueryRow("SELECT address FROM accounts WHERE wallet = 1").Scan(&rst)
 	return
 }
 
 func (db *Database) GetChatAddress() (rst common.Address, err error) {
-	err = db.db.QueryRow("SELECT address FROM accounts WHERE chat = true").Scan(&rst)
+	err = db.db.QueryRow("SELECT address FROM accounts WHERE chat = 1").Scan(&rst)
 	return
 }
 
