@@ -102,6 +102,7 @@ func testExportedAPI(t *testing.T, done chan struct{}) {
 	if err := ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
+	_ = InitKeystore(C.CString(testKeyDir))
 
 	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
 	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
@@ -391,7 +392,11 @@ func testCallPrivateRPCWithPrivateAPI(t *testing.T) bool {
 }
 
 func testRecoverAccount(t *testing.T) bool { //nolint: gocyclo
-	keyStore, _ := statusBackend.StatusNode().AccountKeyStore()
+	keyStore := statusBackend.AccountManager().GetKeystore()
+	if keyStore == nil {
+		t.Errorf("keystore is nil")
+		return false
+	}
 
 	// create an account
 	accountInfo, mnemonic, err := statusBackend.AccountManager().CreateAccount(TestConfig.Account1.Password)
@@ -845,6 +850,7 @@ func startTestNode(t *testing.T) <-chan struct{} {
 	if err := ImportTestAccount(testKeyDir, GetAccount2PKFile()); err != nil {
 		panic(err)
 	}
+	_ = InitKeystore(C.CString(testKeyDir))
 
 	waitForNodeStart := make(chan struct{}, 1)
 	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {

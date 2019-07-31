@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -57,7 +58,7 @@ var (
 var logger = log.New("package", "status-go/node")
 
 // MakeNode creates a geth node entity
-func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
+func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) (*node.Node, error) {
 	// If DataDir is empty, it means we want to create an ephemeral node
 	// keeping data only in memory.
 	if config.DataDir != "" {
@@ -82,17 +83,17 @@ func MakeNode(config *params.NodeConfig, db *leveldb.DB) (*node.Node, error) {
 		return nil, fmt.Errorf(ErrNodeMakeFailureFormat, err.Error())
 	}
 
-	err = activateServices(stack, config, db)
+	err = activateServices(stack, config, accs, db)
 	if err != nil {
 		return nil, err
 	}
 	return stack, nil
 }
 
-func activateServices(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) error {
+func activateServices(stack *node.Node, config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) error {
 	// start Ethereum service if we are not expected to use an upstream server
 	if !config.UpstreamConfig.Enabled {
-		if err := activateLightEthService(stack, config); err != nil {
+		if err := activateLightEthService(stack, accs, config); err != nil {
 			return fmt.Errorf("%v: %v", ErrLightEthRegistrationFailure, err)
 		}
 	} else {
@@ -107,7 +108,7 @@ func activateServices(stack *node.Node, config *params.NodeConfig, db *leveldb.D
 		// Usually, they are provided by an ETH or a LES service, but when using
 		// upstream, we don't start any of these, so we need to start our own
 		// implementation.
-		if err := activatePersonalService(stack, config); err != nil {
+		if err := activatePersonalService(stack, accs, config); err != nil {
 			return fmt.Errorf("%v: %v", ErrPersonalServiceRegistrationFailure, err)
 		}
 	}
@@ -248,7 +249,7 @@ func defaultStatusChainGenesisBlock() (*core.Genesis, error) {
 }
 
 // activateLightEthService configures and registers the eth.Ethereum service with a given node.
-func activateLightEthService(stack *node.Node, config *params.NodeConfig) error {
+func activateLightEthService(stack *node.Node, accs *accounts.Manager, config *params.NodeConfig) error {
 	if !config.LightEthConfig.Enabled {
 		logger.Info("LES protocol is disabled")
 		return nil
@@ -269,13 +270,18 @@ func activateLightEthService(stack *node.Node, config *params.NodeConfig) error 
 		MinTrustedFraction: config.LightEthConfig.MinTrustedFraction,
 	}
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return les.New(ctx, &ethConf)
+		// NOTE(dshulyak) here we set our instance of the accounts manager.
+		// without sharing same instance selected account won't be visible for personal_* methods.
+		nctx := &node.ServiceContext{}
+		*nctx = *ctx
+		nctx.AccountManager = accs
+		return les.New(nctx, &ethConf)
 	})
 }
 
-func activatePersonalService(stack *node.Node, config *params.NodeConfig) error {
+func activatePersonalService(stack *node.Node, accs *accounts.Manager, config *params.NodeConfig) error {
 	return stack.Register(func(*node.ServiceContext) (node.Service, error) {
-		svc := personal.New(stack.AccountManager())
+		svc := personal.New(accs)
 		return svc, nil
 	})
 }
