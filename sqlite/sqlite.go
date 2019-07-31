@@ -8,6 +8,12 @@ import (
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 )
 
+// The reduced number of kdf iterations (for performance reasons) which is
+// currently used for derivation of the database key
+// https://github.com/status-im/status-go/pull/1343
+// https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
+const kdfIterationsNumber = 3200
+
 func openDB(path, key string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -23,6 +29,10 @@ func openDB(path, key string) (*sql.DB, error) {
 	keyString := fmt.Sprintf("PRAGMA key = '%s'", key)
 	if _, err = db.Exec(keyString); err != nil {
 		return nil, errors.New("failed to set key pragma")
+	}
+
+	if _, err = db.Exec(fmt.Sprintf("PRAGMA kdf_iter = '%d'", kdfIterationsNumber)); err != nil {
+		return nil, err
 	}
 
 	// readers do not block writers and faster i/o operations
