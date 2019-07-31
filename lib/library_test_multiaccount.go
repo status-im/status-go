@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account/generator"
 )
 
@@ -50,12 +51,7 @@ func checkMultiAccountResponse(t *testing.T, respJSON *C.char, resp interface{})
 	}
 }
 
-func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might have gotten populated during previous tests)
-	if err := statusBackend.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
+func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	params := C.CString(`{
 		"n": 2,
 		"mnemonicPhraseLength": 24,
@@ -90,7 +86,6 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 			return false
 		}
 	}
-
 	password := "multi-account-test-password"
 
 	// store 2 derived child accounts from the first account.
@@ -115,9 +110,7 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 			return false
 		}
 	}
-
 	rawResp = MultiAccountReset()
-
 	// try again deriving addresses.
 	// it should fail because reset should remove all the accounts from memory.
 	for _, loadedID := range loadedIDs {
@@ -126,16 +119,10 @@ func testMultiAccountGenerateDeriveStoreLoadReset(t *testing.T) bool { //nolint:
 			return false
 		}
 	}
-
 	return true
 }
 
-func testMultiAccountImportMnemonicAndDerive(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might have gotten populated during previous tests)
-	if err := statusBackend.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
+func testMultiAccountImportMnemonicAndDerive(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	mnemonicPhrase := "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 	bip39Passphrase := "TREZOR"
 	params := mobile.MultiAccountImportMnemonicParams{
@@ -210,7 +197,6 @@ func testMultiAccountDeriveAddresses(t *testing.T, accountID string, paths []str
 
 		addresses[path] = info.Address
 	}
-
 	return addresses, true
 }
 
@@ -247,7 +233,8 @@ func testMultiAccountStoreDerived(t *testing.T, accountID string, password strin
 	}
 
 	// for each stored account, check that we can decrypt it with the password we used.
-	dir := statusBackend.StatusNode().Config().DataDir
+	// FIXME pass it somehow
+	dir := keystoreDir
 	for _, address := range addresses {
 		_, err = statusBackend.AccountManager().VerifyAccountPassword(dir, address, password)
 		if err != nil {
@@ -259,12 +246,7 @@ func testMultiAccountStoreDerived(t *testing.T, accountID string, password strin
 	return addresses, true
 }
 
-func testMultiAccountGenerateAndDerive(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might have gotten populated during previous tests)
-	if err := statusBackend.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
+func testMultiAccountGenerateAndDerive(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	paths := []string{"m/0", "m/1"}
 	params := mobile.MultiAccountGenerateAndDeriveAddressesParams{
 		MultiAccountGenerateParams: mobile.MultiAccountGenerateParams{
@@ -303,12 +285,7 @@ func testMultiAccountGenerateAndDerive(t *testing.T) bool { //nolint: gocyclo
 	return true
 }
 
-func testMultiAccountImportStore(t *testing.T) bool { //nolint: gocyclo
-	// to make sure that we start with empty account (which might have gotten populated during previous tests)
-	if err := statusBackend.Logout(); err != nil {
-		t.Fatal(err)
-	}
-
+func testMultiAccountImportStore(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	key, err := crypto.GenerateKey()
 	if err != nil {
 		t.Errorf("failed generating key")
@@ -350,7 +327,7 @@ func testMultiAccountImportStore(t *testing.T) bool { //nolint: gocyclo
 	// check the response doesn't have errors
 	checkMultiAccountResponse(t, rawResp, &storeResp)
 
-	dir := statusBackend.StatusNode().Config().DataDir
+	dir := keystoreDir
 	_, err = statusBackend.AccountManager().VerifyAccountPassword(dir, storeResp.Address, password)
 	if err != nil {
 		t.Errorf("failed to verify password on stored derived account")
