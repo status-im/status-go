@@ -70,7 +70,7 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
 
 	statusNode := node.New()
-	accountManager := account.NewManager()
+	accountManager := account.NewManager(statusNode)
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
@@ -149,17 +149,12 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
 
-	manager := b.accountManager.GetManager()
-	if manager == nil {
-		return errors.New("ethereum accounts.Manager is nil")
-	}
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
 		Services: services,
 		// The peers discovery protocols are started manually after
 		// `node.ready` signal is sent.
 		// It was discussed in https://github.com/status-im/status-go/pull/1333.
-		StartDiscovery:  false,
-		AccountsManager: manager,
+		StartDiscovery: false,
 	}); err != nil {
 		return
 	}
@@ -627,6 +622,7 @@ func (b *StatusBackend) startWallet(password string) error {
 	allAddresses := make([]common.Address, len(watchAddresses)+1)
 	allAddresses[0] = mainAccountAddress
 	copy(allAddresses[1:], watchAddresses)
+
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", mainAccountAddress))
 	return wallet.StartReactor(path, password,
 		b.statusNode.RPCClient().Ethclient(),

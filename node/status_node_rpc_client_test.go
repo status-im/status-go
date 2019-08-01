@@ -58,7 +58,7 @@ func createAndStartStatusNode(config *params.NodeConfig) (*node.StatusNode, erro
 		},
 	}
 	statusNode := node.New()
-	return statusNode, statusNode.Start(config, nil, services...)
+	return statusNode, statusNode.Start(config, services...)
 }
 
 func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {

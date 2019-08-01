@@ -40,7 +40,7 @@ func (s *WhisperTestSuite) TestWhisperFilterRace() {
 	whisperService, err := s.Backend.StatusNode().WhisperService()
 	s.NoError(err)
 
-	accountManager := s.Backend.AccountManager()
+	accountManager := account.NewManager(s.Backend.StatusNode())
 	s.NotNil(accountManager)
 
 	whisperAPI := whisper.NewPublicWhisperAPI(whisperService)
