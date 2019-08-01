@@ -30,16 +30,21 @@ var (
 	ErrInvalidMasterKeyCreated        = errors.New("can not create master extended key")
 	ErrOnboardingNotStarted           = errors.New("onboarding must be started before choosing an account")
 	ErrOnboardingAccountNotFound      = errors.New("cannot find onboarding account with the given id")
-	ErrAccountKeyStoreMissing         = errors.New("account key store is not set")
 )
 
 var zeroAddress = common.Address{}
 
+// GethServiceProvider provides required geth services.
+type GethServiceProvider interface {
+	AccountManager() (*accounts.Manager, error)
+	AccountKeyStore() (*keystore.KeyStore, error)
+}
+
 // Manager represents account manager interface.
 type Manager struct {
-	mu       sync.RWMutex
-	keystore *keystore.KeyStore
-	manager  *accounts.Manager
+	geth GethServiceProvider
+
+	mu sync.RWMutex
 
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
@@ -50,43 +55,15 @@ type Manager struct {
 }
 
 // NewManager returns new node account manager.
-func NewManager() *Manager {
-	m := &Manager{}
-	m.accountsGenerator = generator.New(m)
-	return m
-}
-
-// InitKeystore sets key manager and key store.
-func (m *Manager) InitKeystore(keydir string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	manager, err := makeAccountManager(keydir)
-	if err != nil {
-		return err
+func NewManager(geth GethServiceProvider) *Manager {
+	manager := &Manager{
+		geth: geth,
 	}
-	m.manager = manager
-	backends := manager.Backends(keystore.KeyStoreType)
-	if len(backends) == 0 {
-		return ErrAccountKeyStoreMissing
-	}
-	keyStore, ok := backends[0].(*keystore.KeyStore)
-	if !ok {
-		return ErrAccountKeyStoreMissing
-	}
-	m.keystore = keyStore
-	return nil
-}
 
-func (m *Manager) GetKeystore() *keystore.KeyStore {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.keystore
-}
+	accountsGenerator := generator.New(manager)
+	manager.accountsGenerator = accountsGenerator
 
-func (m *Manager) GetManager() *accounts.Manager {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.manager
+	return manager
 }
 
 // AccountsGenerator returns accountsGenerator.
@@ -293,22 +270,24 @@ func (m *Manager) Logout() {
 
 // ImportAccount imports the account specified with privateKey.
 func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error) {
-	if m.keystore == nil {
-		return common.Address{}, ErrAccountKeyStoreMissing
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return common.Address{}, err
 	}
 
-	account, err := m.keystore.ImportECDSA(privateKey, password)
+	account, err := keyStore.ImportECDSA(privateKey, password)
 
 	return account.Address, err
 }
 
 func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	if m.keystore == nil {
-		return "", "", ErrAccountKeyStoreMissing
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return "", "", err
 	}
 
 	// imports extended key, create key file (if necessary)
-	account, err := m.keystore.ImportSingleExtendedKey(extKey, password)
+	account, err := keyStore.ImportSingleExtendedKey(extKey, password)
 	if err != nil {
 		return "", "", err
 	}
@@ -316,7 +295,7 @@ func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password 
 	address = account.Address.Hex()
 
 	// obtain public key to return
-	account, key, err := m.keystore.AccountDecryptedKey(account, password)
+	account, key, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -329,19 +308,20 @@ func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password 
 // importExtendedKey processes incoming extended key, extracts required info and creates corresponding account key.
 // Once account key is formed, that key is put (if not already) into keystore i.e. key is *encoded* into key file.
 func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
-	if m.keystore == nil {
-		return "", "", ErrAccountKeyStoreMissing
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return "", "", err
 	}
 
 	// imports extended key, create key file (if necessary)
-	account, err := m.keystore.ImportExtendedKeyForPurpose(keyPurpose, extKey, password)
+	account, err := keyStore.ImportExtendedKeyForPurpose(keyPurpose, extKey, password)
 	if err != nil {
 		return "", "", err
 	}
 	address = account.Address.Hex()
 
 	// obtain public key to return
-	account, key, err := m.keystore.AccountDecryptedKey(account, password)
+	account, key, err := keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		return address, "", err
 	}
@@ -355,6 +335,7 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 func (m *Manager) Accounts() ([]gethcommon.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
 	addresses := make([]gethcommon.Address, 0)
 	if m.mainAccountAddress != zeroAddress {
 		addresses = append(addresses, m.mainAccountAddress)
@@ -416,8 +397,9 @@ func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, str
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
 func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
-	if m.keystore == nil {
-		return accounts.Account{}, nil, ErrAccountKeyStoreMissing
+	keyStore, err := m.geth.AccountKeyStore()
+	if err != nil {
+		return accounts.Account{}, nil, err
 	}
 
 	account, err := ParseAccountString(address)
@@ -426,7 +408,7 @@ func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.
 	}
 
 	var key *keystore.Key
-	account, key, err = m.keystore.AccountDecryptedKey(account, password)
+	account, key, err = keyStore.AccountDecryptedKey(account, password)
 	if err != nil {
 		err = fmt.Errorf("%s: %s", ErrAccountToKeyMappingFailure, err)
 	}

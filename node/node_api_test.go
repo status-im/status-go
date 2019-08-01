@@ -3,7 +3,6 @@ package node
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/params"
@@ -18,7 +17,7 @@ func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {
 		},
 	}
 	node := New()
-	require.NoError(t, node.Start(&config, &accounts.Manager{}))
+	require.NoError(t, node.Start(&config))
 	defer func() {
 		require.NoError(t, node.Stop())
 	}()
@@ -40,7 +39,7 @@ func TestWhisperLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 		},
 	}
 	node := New()
-	require.NoError(t, node.Start(&config, &accounts.Manager{}))
+	require.NoError(t, node.Start(&config))
 	defer func() {
 		require.NoError(t, node.Stop())
 	}()

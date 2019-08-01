@@ -4,7 +4,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
@@ -24,7 +23,7 @@ func TestMakeNodeDefaultConfig(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 
-	_, err = MakeNode(config, &accounts.Manager{}, db)
+	_, err = MakeNode(config, db)
 	require.NoError(t, err)
 }
 
@@ -41,7 +40,7 @@ func TestMakeNodeWellFormedBootnodes(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 
-	_, err = MakeNode(config, &accounts.Manager{}, db)
+	_, err = MakeNode(config, db)
 	require.NoError(t, err)
 }
 
@@ -59,7 +58,7 @@ func TestMakeNodeMalformedBootnodes(t *testing.T) {
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
 	require.NoError(t, err)
 
-	_, err = MakeNode(config, &accounts.Manager{}, db)
+	_, err = MakeNode(config, db)
 	require.NoError(t, err)
 }
 
