@@ -337,13 +337,13 @@ func SaveAccountAndLogin(accountData, password, configJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	var conf *params.NodeConfig
-	err = json.Unmarshal([]byte(configJSON), conf)
+	var conf params.NodeConfig
+	err = json.Unmarshal([]byte(configJSON), &conf)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		return statusBackend.StartNodeWithAccountAndConfig(account, password, conf)
+		return statusBackend.StartNodeWithAccountAndConfig(account, password, &conf)
 	})
 	return makeJSONResponse(nil)
 }
