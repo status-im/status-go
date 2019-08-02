@@ -64,7 +64,7 @@ type StatusBackend struct {
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
-	accounts        *multiaccounts.Database
+	multiaccountsDB *multiaccounts.Database
 	accountManager  *account.Manager
 	transactor      *transactions.Transactor
 	newNotification fcm.NotificationConstructor
@@ -138,33 +138,33 @@ func (b *StatusBackend) UpdateRootDataDir(datadir string) {
 func (b *StatusBackend) OpenAccounts() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.accounts != nil {
+	if b.multiaccountsDB != nil {
 		return nil
 	}
 	db, err := multiaccounts.InitializeDB(filepath.Join(b.rootDataDir, "accounts.sql"))
 	if err != nil {
 		return err
 	}
-	b.accounts = db
+	b.multiaccountsDB = db
 	return nil
 }
 
 func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.accounts == nil {
+	if b.multiaccountsDB == nil {
 		return nil, errors.New("accoutns db wasn't initialized")
 	}
-	return b.accounts.GetAccounts()
+	return b.multiaccountsDB.GetAccounts()
 }
 
 func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.accounts == nil {
+	if b.multiaccountsDB == nil {
 		return errors.New("accoutns db wasn't initialized")
 	}
-	return b.accounts.SaveAccount(account)
+	return b.multiaccountsDB.SaveAccount(account)
 }
 
 func (b *StatusBackend) ensureAccountsDBOpened(account multiaccounts.Account, password string) (err error) {
@@ -219,7 +219,7 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
-	err = b.accounts.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
 	if err != nil {
 		return err
 	}
@@ -280,9 +280,9 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) accountsService() gethnode.ServiceConstructor {
+func (b *StatusBackend) accountsService(login common.Address) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return accountssvc.NewService(b.accountsDB), nil
+		return accountssvc.NewService(b.accountsDB, b.multiaccountsDB, login), nil
 	}
 }
 
@@ -297,11 +297,15 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err := config.Validate(); err != nil {
 		return err
 	}
+	login, err := b.accountManager.MainAccountAddress()
+	if err != nil {
+		return err
+	}
 
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
-	services = appendIf(b.accountsDB != nil, services, b.accountsService())
+	services = appendIf(b.accountsDB != nil, services, b.accountsService(login))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
