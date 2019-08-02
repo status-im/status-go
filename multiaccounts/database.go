@@ -13,6 +13,7 @@ type Account struct {
 	Name      string         `json:"name"`
 	Address   common.Address `json:"address"`
 	Timestamp int64          `json:"timestamp"`
+	PhotoPath string         `json:"photo-path"`
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -37,7 +38,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, name, loginTimestamp from accounts ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT address, name, loginTimestamp, photoPath from accounts ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	inthelper := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
-		err = rows.Scan(&acc.Address, &acc.Name, &inthelper)
+		err = rows.Scan(&acc.Address, &acc.Name, &inthelper, &acc.PhotoPath)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +57,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT INTO accounts (address, name) VALUES (?, ?)", account.Address, account.Name)
+	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name, photoPath) VALUES (?, ?, ?)", account.Address, account.Name, account.PhotoPath)
 	return err
 }
 

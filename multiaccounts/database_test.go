@@ -31,6 +31,19 @@ func TestAccounts(t *testing.T) {
 	require.Equal(t, expected, accounts[0])
 }
 
+func TestAccountsReplace(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	expected := Account{Address: common.Address{0x01}}
+	require.NoError(t, db.SaveAccount(expected))
+	expected.PhotoPath = "chars"
+	require.NoError(t, db.SaveAccount(expected))
+	rst, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Len(t, rst, 1)
+	require.Equal(t, expected, rst[0])
+}
+
 func TestLoginUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
