@@ -19,18 +19,18 @@ import (
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/accountsstore"
-	"github.com/status-im/status-go/accountsstore/settings"
 	"github.com/status-im/status-go/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
-	settingssvc "github.com/status-im/status-go/services/settings"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
@@ -60,11 +60,11 @@ type StatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
 	rootDataDir     string
-	settingsDB      *settings.Database
+	accountsDB      *accounts.Database
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
-	accounts        *accountsstore.Database
+	accounts        *multiaccounts.Database
 	accountManager  *account.Manager
 	transactor      *transactions.Transactor
 	newNotification fcm.NotificationConstructor
@@ -141,7 +141,7 @@ func (b *StatusBackend) OpenAccounts() error {
 	if b.accounts != nil {
 		return nil
 	}
-	db, err := accountsstore.InitializeDB(filepath.Join(b.rootDataDir, "accounts.sql"))
+	db, err := multiaccounts.InitializeDB(filepath.Join(b.rootDataDir, "accounts.sql"))
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (b *StatusBackend) OpenAccounts() error {
 	return nil
 }
 
-func (b *StatusBackend) GetAccounts() ([]accountsstore.Account, error) {
+func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.accounts == nil {
@@ -158,7 +158,7 @@ func (b *StatusBackend) GetAccounts() ([]accountsstore.Account, error) {
 	return b.accounts.GetAccounts()
 }
 
-func (b *StatusBackend) SaveAccount(account accountsstore.Account) error {
+func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.accounts == nil {
@@ -167,22 +167,22 @@ func (b *StatusBackend) SaveAccount(account accountsstore.Account) error {
 	return b.accounts.SaveAccount(account)
 }
 
-func (b *StatusBackend) ensureSettingsDBOpened(account accountsstore.Account, password string) (err error) {
+func (b *StatusBackend) ensureAccountsDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.settingsDB != nil {
+	if b.accountsDB != nil {
 		return nil
 	}
 	if len(b.rootDataDir) == 0 {
 		return errors.New("root datadir wasn't provided")
 	}
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("settings-%x.sql", account.Address))
-	b.settingsDB, err = settings.InitializeDB(path, password)
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("accounts-%x.sql", account.Address))
+	b.accountsDB, err = accounts.InitializeDB(path, password)
 	return err
 }
 
-func (b *StatusBackend) StartNodeWithAccount(acc accountsstore.Account, password string) error {
-	err := b.ensureSettingsDBOpened(acc, password)
+func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
+	err := b.ensureAccountsDBOpened(acc, password)
 	if err != nil {
 		return err
 	}
@@ -197,15 +197,15 @@ func (b *StatusBackend) StartNodeWithAccount(acc accountsstore.Account, password
 	if err != nil {
 		return err
 	}
-	chatAddr, err := b.settingsDB.GetChatAddress()
+	chatAddr, err := b.accountsDB.GetChatAddress()
 	if err != nil {
 		return err
 	}
-	walletAddr, err := b.settingsDB.GetWalletAddress()
+	walletAddr, err := b.accountsDB.GetWalletAddress()
 	if err != nil {
 		return err
 	}
-	watchAddrs, err := b.settingsDB.GetAddresses()
+	watchAddrs, err := b.accountsDB.GetAddresses()
 	if err != nil {
 		return err
 	}
@@ -230,12 +230,12 @@ func (b *StatusBackend) StartNodeWithAccount(acc accountsstore.Account, password
 // StartNodeWithAccountAndConfig is used after account and config was generated.
 // In current setup account name and config is generated on the client side. Once/if it will be generated on
 // status-go side this flow can be simplified.
-func (b *StatusBackend) StartNodeWithAccountAndConfig(account accountsstore.Account, password string, conf *params.NodeConfig) error {
+func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, conf *params.NodeConfig) error {
 	err := b.SaveAccount(account)
 	if err != nil {
 		return err
 	}
-	err = b.ensureSettingsDBOpened(account, password)
+	err = b.ensureAccountsDBOpened(account, password)
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account accountsstore.Acco
 		return err
 	}
 	// FIXME(dshulyak) where should i get this data?
-	err = b.settingsDB.SaveAccounts([]settings.Account{{Chat: true, Wallet: true, Address: account.Address}})
+	err = b.accountsDB.SaveAccounts([]accounts.Account{{Chat: true, Wallet: true, Address: account.Address}})
 	if err != nil {
 		return err
 	}
@@ -254,14 +254,14 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account accountsstore.Acco
 func (b *StatusBackend) saveNodeConfig(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.settingsDB.SaveConfig(settings.NodeConfigTag, config)
+	return b.accountsDB.SaveConfig(accounts.NodeConfigTag, config)
 }
 
 func (b *StatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	conf := params.NodeConfig{}
-	err := b.settingsDB.GetConfig(settings.NodeConfigTag, &conf)
+	err := b.accountsDB.GetConfig(accounts.NodeConfigTag, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -280,9 +280,9 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) settingsService() gethnode.ServiceConstructor {
+func (b *StatusBackend) accountsService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return settingssvc.NewService(b.settingsDB), nil
+		return accountssvc.NewService(b.accountsDB), nil
 	}
 }
 
@@ -301,7 +301,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
-	services = appendIf(b.settingsDB != nil, services, b.settingsService())
+	services = appendIf(b.accountsDB != nil, services, b.accountsService())
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
@@ -647,7 +647,7 @@ func (b *StatusBackend) Logout() error {
 	if err != nil {
 		return err
 	}
-	err = b.stopSettingsDB()
+	err = b.stopAccountsDB()
 	if err != nil {
 		return err
 	}
@@ -699,10 +699,10 @@ func (b *StatusBackend) cleanupServices() error {
 	return nil
 }
 
-func (b *StatusBackend) stopSettingsDB() error {
-	if b.settingsDB != nil {
-		err := b.settingsDB.Close()
-		b.settingsDB = nil
+func (b *StatusBackend) stopAccountsDB() error {
+	if b.accountsDB != nil {
+		err := b.accountsDB.Close()
+		b.accountsDB = nil
 		return err
 	}
 	return nil

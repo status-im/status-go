@@ -1,19 +1,19 @@
-package settings
+package accounts
 
 import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/status-im/status-go/accountsstore/settings"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 // NewService initializes service instance.
-func NewService(db *settings.Database) *Service {
+func NewService(db *accounts.Database) *Service {
 	return &Service{db}
 }
 
 // Service is a browsers service.
 type Service struct {
-	db *settings.Database
+	db *accounts.Database
 }
 
 // Start a service.

@@ -1,4 +1,4 @@
-package settings
+package accounts
 
 import (
 	"database/sql"

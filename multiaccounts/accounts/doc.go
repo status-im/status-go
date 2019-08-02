@@ -1,4 +1,4 @@
-package settings
+package accounts
 
 const (
 	// NodeConfigTag tag for a node configuration.
