@@ -40,7 +40,9 @@ func TestLoginUpdate(t *testing.T) {
 		require.NoError(t, db.SaveAccount(acc))
 	}
 	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].Address, 100))
-	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].Address, 10))
+	require.NoError(t, db.UpdateAccountTimestamp(accounts[1].Address, 10))
+	accounts[0].Timestamp = 100
+	accounts[1].Timestamp = 10
 	rst, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Equal(t, accounts, rst)
