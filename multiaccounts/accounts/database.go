@@ -1,4 +1,4 @@
-package settings
+package accounts
 
 import (
 	"database/sql"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/status-im/status-go/accountsstore/settings/migrations"
+	"github.com/status-im/status-go/multiaccounts/accounts/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
 

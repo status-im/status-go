@@ -10,9 +10,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/accountsstore"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
@@ -321,7 +321,7 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity.
 func Login(accountData, password string) string {
-	var account accountsstore.Account
+	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -332,7 +332,7 @@ func Login(accountData, password string) string {
 
 // SaveAccountAndLogin saves account in status-go database..
 func SaveAccountAndLogin(accountData, password, configJSON string) string {
-	var account accountsstore.Account
+	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
 		return makeJSONResponse(err)
