@@ -10,8 +10,9 @@ import (
 
 // Account stores public information about account.
 type Account struct {
-	Name    string         `json:"name"`
-	Address common.Address `json:"address"`
+	Name      string         `json:"name"`
+	Address   common.Address `json:"address"`
+	Timestamp int64          `json:"timestamp"`
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -36,17 +37,19 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, name from accounts ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT address, name, loginTimestamp from accounts ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
 	rst := []Account{}
+	inthelper := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
-		err = rows.Scan(&acc.Address, &acc.Name)
+		err = rows.Scan(&acc.Address, &acc.Name, &inthelper)
 		if err != nil {
 			return nil, err
 		}
+		acc.Timestamp = inthelper.Int64
 		rst = append(rst, acc)
 	}
 	return rst, nil
