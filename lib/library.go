@@ -15,6 +15,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
