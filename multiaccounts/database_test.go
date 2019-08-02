@@ -1,4 +1,4 @@
-package accountsstore
+package multiaccounts
 
 import (
 	"io/ioutil"

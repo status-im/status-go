@@ -12,7 +12,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/accountsstore"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
@@ -347,7 +346,7 @@ func StopNode() *C.char {
 //export Login
 func Login(accountData, password *C.char) *C.char {
 	data, pass := C.GoString(accountData), C.GoString(password)
-	var account accountsstore.Account
+	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(data), &account)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -360,7 +359,7 @@ func Login(accountData, password *C.char) *C.char {
 //export SaveAccountAndLogin
 func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
 	data, confJSON := C.GoString(accountData), C.GoString(configJSON)
-	var account accountsstore.Account
+	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(data), &account)
 	if err != nil {
 		return makeJSONResponse(err)
