@@ -31,13 +31,13 @@ func TestAccounts(t *testing.T) {
 	require.Equal(t, expected, accounts[0])
 }
 
-func TestAccountsReplace(t *testing.T) {
+func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	expected := Account{Address: common.Address{0x01}}
 	require.NoError(t, db.SaveAccount(expected))
 	expected.PhotoPath = "chars"
-	require.NoError(t, db.SaveAccount(expected))
+	require.NoError(t, db.UpdateAccount(expected))
 	rst, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Len(t, rst, 1)
