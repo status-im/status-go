@@ -327,6 +327,13 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 	}
 	pubKey = hexutil.Encode(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
+	if password == "" {
+		err := keyStore.Delete(account, password)
+		if err != nil {
+			return address, "", err
+		}
+	}
+
 	return
 }
 
