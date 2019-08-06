@@ -44,59 +44,6 @@ func (db sqlitePersistence) LastMessageClock(chatID string) (int64, error) {
 	return last.Int64, nil
 }
 
-func (db sqlitePersistence) SaveMessages(chatID string, messages []*protocol.Message) (last int64, err error) {
-	var (
-		tx   *sql.Tx
-		stmt *sql.Stmt
-	)
-	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return
-	}
-	stmt, err = tx.Prepare(`INSERT INTO user_messages(
-id, chat_id, content_type, message_type, text, clock, timestamp, content_chat_id, content_text, public_key, flags)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	var rst sql.Result
-
-	for _, msg := range messages {
-		pkey := []byte{}
-		if msg.SigPubKey != nil {
-			pkey, err = marshalECDSAPub(msg.SigPubKey)
-		}
-		rst, err = stmt.Exec(
-			msg.ID, chatID, msg.ContentT, msg.MessageT, msg.Text,
-			msg.Clock, msg.Timestamp, msg.Content.ChatID, msg.Content.Text,
-			pkey, msg.Flags)
-		if err != nil {
-			if err.Error() == uniqueIDContstraint {
-				// skip duplicated messages
-				err = nil
-				continue
-			}
-			return
-		}
-
-		last, err = rst.LastInsertId()
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
 func formatChatID(chatID string, chatType ChatType) string {
 	return fmt.Sprintf("%s-%d", chatID, chatType)
 }
@@ -476,6 +423,59 @@ func (db sqlitePersistence) UnreadMessages(chatID string) ([]*protocol.Message, 
 	}
 
 	return result, nil
+}
+
+func (db sqlitePersistence) SaveMessages(chatID string, messages []*protocol.Message) (last int64, err error) {
+	var (
+		tx   *sql.Tx
+		stmt *sql.Stmt
+	)
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	stmt, err = tx.Prepare(`INSERT INTO user_messages(
+id, chat_id, content_type, message_type, text, clock, timestamp, content_chat_id, content_text, public_key, flags)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	var rst sql.Result
+
+	for _, msg := range messages {
+		pkey := []byte{}
+		if msg.SigPubKey != nil {
+			pkey, err = marshalECDSAPub(msg.SigPubKey)
+		}
+		rst, err = stmt.Exec(
+			msg.ID, chatID, msg.ContentT, msg.MessageT, msg.Text,
+			msg.Clock, msg.Timestamp, msg.Content.ChatID, msg.Content.Text,
+			pkey, msg.Flags)
+		if err != nil {
+			if err.Error() == uniqueIDContstraint {
+				// skip duplicated messages
+				err = nil
+				continue
+			}
+			return
+		}
+
+		last, err = rst.LastInsertId()
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func marshalECDSAPub(pub *ecdsa.PublicKey) (rst []byte, err error) {

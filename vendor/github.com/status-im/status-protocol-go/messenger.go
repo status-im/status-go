@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"go.uber.org/zap"
 
 	"github.com/pkg/errors"
@@ -607,4 +609,62 @@ func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 		}
 	}
 	return nil
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) MessageByID(id string) (*Message, error) {
+	return m.persistence.MessageByID(id)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) MessageExists(id string) (bool, error) {
+	return m.persistence.MessageExists(id)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*Message, string, error) {
+	return m.persistence.MessageByChatID(chatID, cursor, limit)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) MessagesFrom(from string) ([]*Message, error) {
+	publicKeyBytes, err := hexutil.Decode(from)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode from argument")
+	}
+	return m.persistence.MessagesFrom(publicKeyBytes)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) UnseenMessageIDs() ([]string, error) {
+	ids, err := m.persistence.UnseenMessageIDs()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0, len(ids))
+	for _, id := range ids {
+		result = append(result, hexutil.Encode(id))
+	}
+	return result, nil
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) SaveMessage(message *Message) error {
+	return m.persistence.SaveMessage(message)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) DeleteMessage(id string) error {
+	return m.persistence.DeleteMessage(id)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) MarkMessagesSeen(ids ...string) error {
+	return m.persistence.MarkMessagesSeen(ids...)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
+	return m.persistence.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }

@@ -5,12 +5,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/pkg/errors"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
-	"strings"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -144,7 +144,8 @@ func EncodeMessage(value Message) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// MessageID calculates the messageID, by appending the sha3-256 to the pubkey bytes
+// MessageID calculates the messageID from author's compressed public key
+// and not encrypted but encoded payload.
 func MessageID(author *ecdsa.PublicKey, data []byte) []byte {
 	keyBytes := crypto.FromECDSAPub(author)
 	return crypto.Keccak256(append(keyBytes, data...))

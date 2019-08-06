@@ -271,6 +271,7 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash common.Hash, err error) {
 			m.envelopes[envelopeID] = EnvelopePosted
 			m.messages[envelopeID] = message
 			m.attempts[envelopeID] = attempt + 1
+			m.identifiers[envelopeID] = identifiers
 		} else {
 			m.logger.Debug("envelope expired", zap.String("hash", hash.String()))
 			if m.handler != nil {

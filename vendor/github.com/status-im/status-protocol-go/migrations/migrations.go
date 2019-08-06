@@ -6,6 +6,8 @@
 // 000002_add_chats.up.db.sql (541B)
 // 000003_add_contacts.down.db.sql (21B)
 // 000003_add_contacts.up.db.sql (251B)
+// 000004_user_messages_compatibility.down.sql (33B)
+// 000004_user_messages_compatibility.up.sql (945B)
 // doc.go (377B)
 
 package migrations
@@ -130,7 +132,7 @@ func _000002_add_chatsDownDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_chats.down.db.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1564587343, 0)}
+	info := bindataFileInfo{name: "000002_add_chats.down.db.sql", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1565597460, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd3, 0xa7, 0xf0, 0x94, 0x7a, 0x9, 0xdc, 0x6c, 0x7b, 0xdc, 0x12, 0x30, 0x55, 0x31, 0x17, 0xf2, 0xcc, 0x6e, 0xfd, 0xbb, 0x70, 0xb9, 0xd8, 0x9f, 0x81, 0x83, 0xdc, 0x1d, 0x1c, 0x3a, 0x8d, 0xce}}
 	return a, nil
 }
@@ -150,7 +152,7 @@ func _000002_add_chatsUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_chats.up.db.sql", size: 541, mode: os.FileMode(0644), modTime: time.Unix(1564587387, 0)}
+	info := bindataFileInfo{name: "000002_add_chats.up.db.sql", size: 541, mode: os.FileMode(0644), modTime: time.Unix(1565597460, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd, 0x7f, 0x3a, 0xd7, 0xf6, 0x8b, 0x6e, 0x4d, 0xce, 0x7d, 0x63, 0x1d, 0x30, 0xa2, 0xc1, 0xb, 0xa0, 0x35, 0x2e, 0xfa, 0xef, 0xf0, 0x39, 0xf7, 0x22, 0xdd, 0x31, 0x11, 0xb1, 0xff, 0xbf, 0xb3}}
 	return a, nil
 }
@@ -170,7 +172,7 @@ func _000003_add_contactsDownDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000003_add_contacts.down.db.sql", size: 21, mode: os.FileMode(0644), modTime: time.Unix(1564721146, 0)}
+	info := bindataFileInfo{name: "000003_add_contacts.down.db.sql", size: 21, mode: os.FileMode(0644), modTime: time.Unix(1565597570, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xfc, 0x7e, 0xb, 0xec, 0x72, 0xcd, 0x21, 0x3e, 0xa2, 0x38, 0xe0, 0x95, 0x7e, 0xce, 0x4a, 0x17, 0xc8, 0xd0, 0x1c, 0xfa, 0xa3, 0x23, 0x5, 0xab, 0x89, 0xf9, 0xfc, 0x63, 0x7, 0x28, 0xe9, 0x93}}
 	return a, nil
 }
@@ -190,8 +192,48 @@ func _000003_add_contactsUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000003_add_contacts.up.db.sql", size: 251, mode: os.FileMode(0644), modTime: time.Unix(1564721109, 0)}
+	info := bindataFileInfo{name: "000003_add_contacts.up.db.sql", size: 251, mode: os.FileMode(0644), modTime: time.Unix(1565597570, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0x19, 0x9f, 0x5c, 0x9d, 0xa1, 0xe5, 0x99, 0xbe, 0x47, 0xce, 0xa5, 0xd3, 0x51, 0x2f, 0x9b, 0x1d, 0xd9, 0x3f, 0x7a, 0xbf, 0xf, 0x76, 0x6b, 0x4f, 0x82, 0xbd, 0x13, 0x9d, 0x25, 0xdd, 0x60}}
+	return a, nil
+}
+
+var __000004_user_messages_compatibilityDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x8e\xcf\x49\x4d\x4f\x4c\xae\xb4\xe6\x02\x04\x00\x00\xff\xff\x25\xef\xa4\x66\x21\x00\x00\x00")
+
+func _000004_user_messages_compatibilityDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__000004_user_messages_compatibilityDownSql,
+		"000004_user_messages_compatibility.down.sql",
+	)
+}
+
+func _000004_user_messages_compatibilityDownSql() (*asset, error) {
+	bytes, err := _000004_user_messages_compatibilityDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "000004_user_messages_compatibility.down.sql", size: 33, mode: os.FileMode(0644), modTime: time.Unix(1565597680, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb9, 0xaf, 0x48, 0x80, 0x3d, 0x54, 0x5e, 0x53, 0xee, 0x98, 0x26, 0xbb, 0x99, 0x6a, 0xd8, 0x37, 0x94, 0xf2, 0xf, 0x82, 0xfa, 0xb7, 0x6a, 0x68, 0xcd, 0x8b, 0xe2, 0xc4, 0x6, 0x25, 0xdc, 0x6}}
+	return a, nil
+}
+
+var __000004_user_messages_compatibilityUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\x92\x41\x6f\x9b\x4e\x10\xc5\xef\xfe\x14\x73\xb3\x2d\x99\xbf\x72\x88\x72\xc9\x09\x3b\xeb\x7f\x51\x29\x44\x18\x57\xc9\x69\xb5\x86\x29\xac\x0a\xbb\x68\x67\x28\x45\xca\x87\xaf\x08\x38\x0a\xae\x7d\x2a\x07\x0e\xfb\x7b\xb3\xf3\xf6\xcd\x78\x1e\x04\xbc\x24\xd0\x75\x63\x1d\x2b\xc3\xc0\xa5\x1a\x7e\x9a\x80\xd5\xa9\x42\x28\x15\x81\xb3\x9d\xce\x41\x11\x74\x08\x0e\xab\x1e\xac\x01\xcd\x0b\xcf\x83\xae\x44\x33\x14\x57\x58\xa3\x61\x6d\x0a\xd0\xe6\x87\x36\x9a\xd1\xa3\xcc\xd9\xaa\xfa\x6f\xb1\x4b\x84\x9f\x0a\x48\xfd\x6d\x28\x20\xd8\x43\x14\xa7\x20\x5e\x82\x43\x7a\x80\x96\xd0\xc9\x1a\x89\x54\x81\x24\x2b\x2c\x54\xd6\xc3\x6a\x01\x00\xa0\x73\xf8\xee\x27\xbb\x2f\x7e\x02\xcf\x49\xf0\xcd\x4f\x5e\xe1\xab\x78\x85\x38\x82\x5d\x1c\xed\xc3\x60\x97\x42\x22\x9e\x43\x7f\x27\x36\xef\x7a\xa7\x3a\xd9\xa8\xbe\xb2\x2a\x97\xa5\xa2\xf2\xa3\x7a\x68\x17\x1d\xc3\x70\x94\x75\xa5\xa6\x06\x9d\x64\x5d\x23\xb1\xaa\x1b\x08\xa2\x54\xfc\x2f\x2e\x75\x64\x5b\x97\x21\x6c\xc3\x78\x7b\x41\x72\x24\xd6\x46\xb1\xb6\xe6\x1d\x8f\xa7\x99\x35\x8c\x86\x6f\x74\x9d\xa8\xe4\xbe\xc1\x1b\x92\x21\x0a\xa3\xea\x0f\x3c\x9e\xce\x6c\x5e\x5e\x5a\x2a\x96\x9f\x62\x9a\x53\x87\xec\x7a\x99\xd9\xd6\xf0\xac\x16\x9e\xc4\xde\x3f\x86\x29\xdc\x8d\xba\x29\xfd\x99\xb5\x39\x21\x56\xdc\xd2\x9c\x65\x95\xcd\x7e\xca\x5f\xaa\x6a\xf1\x8a\x33\x2a\x6d\x07\xdb\x38\x0e\x85\x1f\xfd\xdd\x38\x4d\x8e\xd3\xcc\x08\xd1\xdc\xd6\xed\xfd\xf0\x30\x09\x6d\xcb\x85\xd5\xa6\xb8\xf0\xb2\x58\x3f\x2e\xce\xeb\x15\x44\x4f\xe2\x05\x74\xfe\x5b\x4e\xa3\x8b\xa3\xab\xeb\xb5\x1a\xf1\xfa\xf1\x4a\x21\x2a\x97\x95\xf2\xd4\xcb\x73\xb4\x71\x04\xd7\x2f\x19\xed\xb7\x27\x62\xb7\x5a\xde\xfd\xe3\xb7\x84\xb7\xb7\xcf\x89\x6e\xc0\x7b\xb8\xdf\xc0\xc3\xfd\x7a\x00\x3a\xdf\x9c\x47\x3d\xbc\xf7\x4f\x00\x00\x00\xff\xff\x6b\xae\x37\x6d\xb1\x03\x00\x00")
+
+func _000004_user_messages_compatibilityUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__000004_user_messages_compatibilityUpSql,
+		"000004_user_messages_compatibility.up.sql",
+	)
+}
+
+func _000004_user_messages_compatibilityUpSql() (*asset, error) {
+	bytes, err := _000004_user_messages_compatibilityUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "000004_user_messages_compatibility.up.sql", size: 945, mode: os.FileMode(0644), modTime: time.Unix(1565597764, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x18, 0x87, 0x4e, 0x97, 0xf9, 0x2f, 0x18, 0x2, 0x34, 0x53, 0x24, 0x23, 0x2a, 0x6c, 0xe1, 0xba, 0x34, 0x44, 0x72, 0x24, 0x14, 0xf0, 0x3a, 0x2e, 0x56, 0x77, 0xd0, 0xfe, 0x5f, 0x45, 0x63}}
 	return a, nil
 }
 
@@ -318,6 +360,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"000003_add_contacts.up.db.sql": _000003_add_contactsUpDbSql,
 
+	"000004_user_messages_compatibility.down.sql": _000004_user_messages_compatibilityDownSql,
+
+	"000004_user_messages_compatibility.up.sql": _000004_user_messages_compatibilityUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -362,13 +408,15 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"000001_init.down.db.sql":         &bintree{_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql":           &bintree{_000001_initUpDbSql, map[string]*bintree{}},
-	"000002_add_chats.down.db.sql":    &bintree{_000002_add_chatsDownDbSql, map[string]*bintree{}},
-	"000002_add_chats.up.db.sql":      &bintree{_000002_add_chatsUpDbSql, map[string]*bintree{}},
-	"000003_add_contacts.down.db.sql": &bintree{_000003_add_contactsDownDbSql, map[string]*bintree{}},
-	"000003_add_contacts.up.db.sql":   &bintree{_000003_add_contactsUpDbSql, map[string]*bintree{}},
-	"doc.go":                          &bintree{docGo, map[string]*bintree{}},
+	"000001_init.down.db.sql":                     &bintree{_000001_initDownDbSql, map[string]*bintree{}},
+	"000001_init.up.db.sql":                       &bintree{_000001_initUpDbSql, map[string]*bintree{}},
+	"000002_add_chats.down.db.sql":                &bintree{_000002_add_chatsDownDbSql, map[string]*bintree{}},
+	"000002_add_chats.up.db.sql":                  &bintree{_000002_add_chatsUpDbSql, map[string]*bintree{}},
+	"000003_add_contacts.down.db.sql":             &bintree{_000003_add_contactsDownDbSql, map[string]*bintree{}},
+	"000003_add_contacts.up.db.sql":               &bintree{_000003_add_contactsUpDbSql, map[string]*bintree{}},
+	"000004_user_messages_compatibility.down.sql": &bintree{_000004_user_messages_compatibilityDownSql, map[string]*bintree{}},
+	"000004_user_messages_compatibility.up.sql":   &bintree{_000004_user_messages_compatibilityUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
