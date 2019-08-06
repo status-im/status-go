@@ -372,7 +372,6 @@ func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
 	}
 	api.RunAsync(func() error {
 		err := statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), &conf)
-		fmt.Println(err)
 		return err
 	})
 	return makeJSONResponse(nil)
