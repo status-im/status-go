@@ -193,10 +193,6 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
-	err = b.StartNode(conf)
-	if err != nil {
-		return err
-	}
 	chatAddr, err := b.accountsDB.GetChatAddress()
 	if err != nil {
 		return err
@@ -214,6 +210,18 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 		ChatAddress:    chatAddr,
 		WatchAddresses: watchAddrs,
 		MainAccount:    walletAddr,
+	}
+
+	b.AccountManager().RemoveOnboarding()
+
+	err = b.accountManager.SelectAccount(login)
+	if err != nil {
+		return err
+	}
+
+	err = b.StartNode(conf)
+	if err != nil {
+		return err
 	}
 	err = b.SelectAccount(login)
 	if err != nil {
