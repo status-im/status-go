@@ -19,8 +19,6 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"go.uber.org/zap"
-
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
 )
 
 const (
@@ -76,7 +74,7 @@ type WhisperServiceTransport struct {
 	shh         *whisper.Whisper
 	shhAPI      *whisper.PublicWhisperAPI // only PublicWhisperAPI implements logic to send messages
 	keysManager *whisperServiceKeysManager
-	chats       *filter.ChatsManager
+	chats       *filtersManager
 	logger      *zap.Logger
 
 	mailservers             []string
@@ -92,7 +90,7 @@ func NewWhisperServiceTransport(
 	mailservers []string,
 	logger *zap.Logger,
 ) (*WhisperServiceTransport, error) {
-	chats, err := filter.New(db, shh, privateKey, logger)
+	chats, err := newFiltersManager(db, shh, privateKey, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -113,12 +111,12 @@ func NewWhisperServiceTransport(
 }
 
 // DEPRECATED
-func (a *WhisperServiceTransport) LoadFilters(chats []*filter.Chat, genericDiscoveryTopicEnabled bool) ([]*filter.Chat, error) {
+func (a *WhisperServiceTransport) LoadFilters(chats []*Filter, genericDiscoveryTopicEnabled bool) ([]*Filter, error) {
 	return a.chats.InitWithChats(chats, genericDiscoveryTopicEnabled)
 }
 
 // DEPRECATED
-func (a *WhisperServiceTransport) RemoveFilters(chats []*filter.Chat) error {
+func (a *WhisperServiceTransport) RemoveFilters(chats []*Filter) error {
 	return a.chats.Remove(chats...)
 }
 
@@ -126,7 +124,7 @@ func (a *WhisperServiceTransport) Reset() error {
 	return a.chats.Reset()
 }
 
-func (a *WhisperServiceTransport) ProcessNegotiatedSecret(secret filter.NegotiatedSecret) error {
+func (a *WhisperServiceTransport) ProcessNegotiatedSecret(secret NegotiatedSecret) error {
 	_, err := a.chats.LoadNegotiated(secret)
 	return err
 }
@@ -218,8 +216,8 @@ func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.Publi
 }
 
 // DEPRECATED
-func (a *WhisperServiceTransport) RetrieveRawAll() (map[filter.Chat][]*whisper.ReceivedMessage, error) {
-	result := make(map[filter.Chat][]*whisper.ReceivedMessage)
+func (a *WhisperServiceTransport) RetrieveRawAll() (map[Filter][]*whisper.ReceivedMessage, error) {
+	result := make(map[Filter][]*whisper.ReceivedMessage)
 
 	allChats := a.chats.Chats()
 	for _, chat := range allChats {
@@ -244,7 +242,7 @@ func (a *WhisperServiceTransport) RetrieveRaw(filterID string) ([]*whisper.Recei
 }
 
 // SendPublic sends a new message using the Whisper service.
-// For public chats, chat name is used as an ID as well as
+// For public filters, chat name is used as an ID as well as
 // a topic.
 func (a *WhisperServiceTransport) SendPublic(ctx context.Context, newMessage whisper.NewMessage, chatName string) ([]byte, error) {
 	if err := a.addSig(&newMessage); err != nil {
@@ -267,7 +265,7 @@ func (a *WhisperServiceTransport) SendPrivateWithSharedSecret(ctx context.Contex
 		return nil, err
 	}
 
-	chat, err := a.chats.LoadNegotiated(filter.NegotiatedSecret{
+	chat, err := a.chats.LoadNegotiated(NegotiatedSecret{
 		PublicKey: publicKey,
 		Key:       secret,
 	})
@@ -310,7 +308,7 @@ func (a *WhisperServiceTransport) SendPrivateOnDiscovery(ctx context.Context, ne
 	// and idempotent.
 
 	newMessage.Topic = whisper.BytesToTopic(
-		filter.ToTopic(filter.DiscoveryTopic),
+		ToTopic(discoveryTopic),
 	)
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 

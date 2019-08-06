@@ -25,7 +25,7 @@ import (
 
 	statusproto "github.com/status-im/status-protocol-go"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
+	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
 )
 
 const (
@@ -597,7 +597,7 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
+func (api *PublicAPI) LoadFilters(parent context.Context, chats []*statustransp.Filter) ([]*statustransp.Filter, error) {
 	return api.service.messenger.LoadFilters(chats)
 }
 
@@ -621,7 +621,7 @@ func (api *PublicAPI) Contacts(parent context.Context) ([]*statusproto.Contact, 
 	return api.service.messenger.Contacts()
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*statustransp.Filter) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -643,6 +643,30 @@ func (api *PublicAPI) GetOurInstallations() ([]*multidevice.Installation, error)
 // SetInstallationMetadata sets the metadata for our own installation
 func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
+}
+
+func (api *PublicAPI) MessageByChatID(chatID, cursor string, limit int) ([]*statusproto.Message, string, error) {
+	return api.service.messenger.MessageByChatID(chatID, cursor, limit)
+}
+
+func (api *PublicAPI) MessagesFrom(from string) ([]*statusproto.Message, error) {
+	return api.service.messenger.MessagesFrom(from)
+}
+
+func (api *PublicAPI) SaveMessage(message *statusproto.Message) error {
+	return api.service.messenger.SaveMessage(message)
+}
+
+func (api *PublicAPI) DeleteMessage(id string) error {
+	return api.service.messenger.DeleteMessage(id)
+}
+
+func (api *PublicAPI) MarkMessagesSeen(ids ...string) error {
+	return api.service.messenger.MarkMessagesSeen(ids...)
+}
+
+func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
+	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }
 
 // -----

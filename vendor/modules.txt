@@ -317,19 +317,18 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.0.0-20190701094942-baa579640f175976472cdf47e0b97d2a5881409d
+# github.com/status-im/status-protocol-go v0.1.5-0.20190806153350-870c93e5ab47
 github.com/status-im/status-protocol-go/zaputil
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/sqlite
-github.com/status-im/status-protocol-go/transport/whisper/filter
+github.com/status-im/status-protocol-go/transport/whisper
 github.com/status-im/status-protocol-go/datasync
 github.com/status-im/status-protocol-go/datasync/peer
 github.com/status-im/status-protocol-go/encryption
 github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/sharedsecret
 github.com/status-im/status-protocol-go/migrations
-github.com/status-im/status-protocol-go/transport/whisper
 github.com/status-im/status-protocol-go/transport/whisper/migrations
 github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/crypto

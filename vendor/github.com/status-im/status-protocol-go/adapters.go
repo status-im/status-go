@@ -7,12 +7,10 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-protocol-go/encryption/sharedsecret"
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/status-im/status-protocol-go/encryption/sharedsecret"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-protocol-go/encryption"
@@ -186,14 +184,14 @@ func (a *whisperAdapter) handleRetrievedMessages(messages []*whisper.ReceivedMes
 }
 
 // DEPRECATED
-func (a *whisperAdapter) RetrieveRawAll() (map[filter.Chat][]*protocol.StatusMessage, error) {
+func (a *whisperAdapter) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMessage, error) {
 	chatWithMessages, err := a.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
 	}
 
 	logger := a.logger.With(zap.String("site", "RetrieveRawAll"))
-	result := make(map[filter.Chat][]*protocol.StatusMessage)
+	result := make(map[transport.Filter][]*protocol.StatusMessage)
 
 	for chat, messages := range chatWithMessages {
 		for _, message := range messages {
@@ -367,7 +365,7 @@ func (a *whisperAdapter) SendContactCode(ctx context.Context, messageSpec *encry
 		return nil, err
 	}
 
-	return a.transport.SendPublic(ctx, newMessage, filter.ContactCodeTopic(&a.privateKey.PublicKey))
+	return a.transport.SendPublic(ctx, newMessage, transport.ContactCodeTopic(&a.privateKey.PublicKey))
 }
 
 func (a *whisperAdapter) tryWrapMessageV1(encodedMessage []byte) ([]byte, error) {
@@ -556,7 +554,7 @@ func (a *whisperAdapter) handleSharedSecrets(secrets []*sharedsecret.Secret) err
 	for _, secret := range secrets {
 		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
 
-		fSecret := filter.NegotiatedSecret{
+		fSecret := transport.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		}

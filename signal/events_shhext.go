@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/services/shhext/dedup"
 	whisper "github.com/status-im/whisper/whisperv6"
 
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
+	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
 )
 
 const (
@@ -135,7 +135,7 @@ type EnodeDiscoveredSignal struct {
 type Messages struct {
 	Error    error                      `json:"error"`
 	Messages []dedup.DeduplicateMessage `json:"messages"`
-	Chat     filter.Chat                `json:"chat"`
+	Chat     statustransp.Filter        `json:"chat"` // not a mistake, it's called chat in status-react
 }
 
 // SendEnodeDiscovered tiggered when an enode is discovered.
