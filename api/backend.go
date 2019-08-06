@@ -211,14 +211,6 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 		WatchAddresses: watchAddrs,
 		MainAccount:    walletAddr,
 	}
-
-	b.AccountManager().RemoveOnboarding()
-
-	err = b.accountManager.SelectAccount(login)
-	if err != nil {
-		return err
-	}
-
 	err = b.StartNode(conf)
 	if err != nil {
 		return err
@@ -288,9 +280,9 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) accountsService(login common.Address) gethnode.ServiceConstructor {
+func (b *StatusBackend) accountsService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return accountssvc.NewService(b.accountsDB, b.multiaccountsDB, login), nil
+		return accountssvc.NewService(b.accountsDB, b.multiaccountsDB, b.AccountManager()), nil
 	}
 }
 
@@ -305,15 +297,10 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err := config.Validate(); err != nil {
 		return err
 	}
-	login, err := b.accountManager.MainAccountAddress()
-	if err != nil {
-		return err
-	}
-
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
-	services = appendIf(b.accountsDB != nil, services, b.accountsService(login))
+	services = appendIf(b.accountsDB != nil, services, b.accountsService())
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
