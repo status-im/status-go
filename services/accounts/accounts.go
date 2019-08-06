@@ -6,19 +6,19 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
-func NewAccountsAPI(db *accounts.Database) *AccountsAPI {
-	return &AccountsAPI{db}
+func NewAccountsAPI(db *accounts.Database) *API {
+	return &API{db}
 }
 
-// AccountsAPI is class with methods available over RPC.
-type AccountsAPI struct {
+// API is class with methods available over RPC.
+type API struct {
 	db *accounts.Database
 }
 
-func (api *AccountsAPI) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
+func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
 	return api.db.SaveAccounts(accounts)
 }
 
-func (api *AccountsAPI) GetAccounts(ctx context.Context) ([]accounts.Account, error) {
+func (api *API) GetAccounts(ctx context.Context) ([]accounts.Account, error) {
 	return api.db.GetAccounts()
 }

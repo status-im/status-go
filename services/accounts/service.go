@@ -36,7 +36,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "settings",
 			Version:   "0.1.0",
-			Service:   NewAPI(s.db),
+			Service:   NewSettingsAPI(s.db),
 		},
 		{
 			Namespace: "accounts",
