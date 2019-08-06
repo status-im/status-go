@@ -264,29 +264,6 @@ func testVerifyAccountPassword(t *testing.T, feed *event.Feed) bool {
 	return true
 }
 
-//@TODO(adam): quarantined this test until it uses a different directory.
-//nolint: deadcode
-func testResetChainData(t *testing.T) bool {
-	t.Skip()
-
-	resetChainDataResponse := APIResponse{}
-	rawResponse := ResetChainData()
-
-	if err := json.Unmarshal([]byte(C.GoString(rawResponse)), &resetChainDataResponse); err != nil {
-		t.Errorf("cannot decode ResetChainData response (%s): %v", C.GoString(rawResponse), err)
-		return false
-	}
-	if resetChainDataResponse.Error != "" {
-		t.Errorf("unexpected error: %s", resetChainDataResponse.Error)
-		return false
-	}
-
-	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
-	testSendTransaction(t)
-
-	return true
-}
-
 func testStopResumeNode(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	account1 := createAccountAndLogin(t, feed)
 	whisperService, err := statusBackend.StatusNode().WhisperService()
@@ -310,10 +287,6 @@ func testStopResumeNode(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	whisperService, err = statusBackend.StatusNode().WhisperService()
 	require.NoError(t, err)
 	require.True(t, whisperService.HasKeyPair(account1.ChatPubKey))
-
-	// additionally, let's complete transaction (just to make sure that node lives through pause/resume w/o issues)
-	testSendTransaction(t)
-
 	return true
 }
 
@@ -576,38 +549,6 @@ func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))
-	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
-
-	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
-		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
-		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
-	})
-	if err != nil {
-		t.Errorf("failed to marshal errors: %v", err)
-		return false
-	}
-	rawResult := SendTransaction(C.CString(string(args)), C.CString(TestConfig.Account1.Password))
-
-	var result jsonrpcAnyResponse
-	if err := json.Unmarshal([]byte(C.GoString(rawResult)), &result); err != nil {
-		t.Errorf("failed to unmarshal rawResult '%s': %v", C.GoString(rawResult), err)
-		return false
-	}
-	if result.Error.Message != "" {
-		t.Errorf("failed to send transaction: %v", result.Error)
-		return false
-	}
-	hash := gethcommon.BytesToHash(result.Result)
-	if reflect.DeepEqual(hash, gethcommon.Hash{}) {
-		t.Errorf("response hash empty: %s", hash.Hex())
-		return false
-	}
-
-	return true
-}
-
-func testSendTransaction(t *testing.T) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	args, err := json.Marshal(transactions.SendTxArgs{

@@ -57,7 +57,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT INTO accounts (address, name, photoPath) VALUES (?, ?, ?)", account.Address, account.Name, account.PhotoPath)
+	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name, photoPath) VALUES (?, ?, ?)", account.Address, account.Name, account.PhotoPath)
 	return err
 }
 
