@@ -38,6 +38,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 )
+import "github.com/status-im/status-go/multiaccounts/accounts"
 
 const initJS = `
 	var _status_catalog = {
@@ -56,6 +57,18 @@ func buildAccountData(name, chatAddress string) *C.char {
 		"name": "%s",
 		"address": "%s"
 	}`, name, chatAddress))
+}
+
+func buildSubAccountData(chatAddress string) *C.char {
+	accs := []accounts.Account{
+		{
+			Wallet:  true,
+			Chat:    true,
+			Address: gethcommon.HexToAddress(chatAddress),
+		},
+	}
+	data, _ := json.Marshal(accs)
+	return C.CString(string(data))
 }
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
@@ -116,7 +129,7 @@ func createAccountAndLogin(t *testing.T, feed *event.Feed) account.Info {
 
 	// select account
 	loginResponse := APIResponse{}
-	rawResponse := SaveAccountAndLogin(buildAccountData("test", account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON))
+	rawResponse := SaveAccountAndLogin(buildAccountData("test", account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON), buildSubAccountData(account1.WalletAddress))
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))
@@ -437,7 +450,7 @@ func testRecoverAccount(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	}
 
 	loginResponse := APIResponse{}
-	rawResponse = SaveAccountAndLogin(buildAccountData("test", walletAddressCheck), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON))
+	rawResponse = SaveAccountAndLogin(buildAccountData("test", walletAddressCheck), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON), buildSubAccountData(walletAddressCheck))
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))
@@ -545,7 +558,7 @@ type jsonrpcAnyResponse struct {
 
 func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 	loginResponse := APIResponse{}
-	rawResponse := SaveAccountAndLogin(buildAccountData("test", TestConfig.Account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON))
+	rawResponse := SaveAccountAndLogin(buildAccountData("test", TestConfig.Account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON), buildSubAccountData(TestConfig.Account1.WalletAddress))
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))

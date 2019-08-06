@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
@@ -358,8 +359,8 @@ func Login(accountData, password *C.char) *C.char {
 
 // SaveAccountAndLogin saves account in status-go database..
 //export SaveAccountAndLogin
-func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
-	data, confJSON := C.GoString(accountData), C.GoString(configJSON)
+func SaveAccountAndLogin(accountData, password, configJSON, subaccountData *C.char) *C.char {
+	data, confJSON, subData := C.GoString(accountData), C.GoString(configJSON), C.GoString(subaccountData)
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(data), &account)
 	if err != nil {
@@ -370,9 +371,13 @@ func SaveAccountAndLogin(accountData, password, configJSON *C.char) *C.char {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	var subaccs []accounts.Account
+	err = json.Unmarshal([]byte(subData), &subaccs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	api.RunAsync(func() error {
-		err := statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), &conf)
-		return err
+		return statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), &conf, subaccs)
 	})
 	return makeJSONResponse(nil)
 }
