@@ -633,6 +633,30 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
+func (api *PublicAPI) MessageByChatID(chatID, cursor string, limit int) ([]*statusproto.Message, string, error) {
+	return api.service.messenger.MessageByChatID(chatID, cursor, limit)
+}
+
+func (api *PublicAPI) MessagesFrom(from string) ([]*statusproto.Message, error) {
+	return api.service.messenger.MessagesFrom(from)
+}
+
+func (api *PublicAPI) SaveMessage(message *statusproto.Message) error {
+	return api.service.messenger.SaveMessage(message)
+}
+
+func (api *PublicAPI) DeleteMessage(id string) error {
+	return api.service.messenger.DeleteMessage(id)
+}
+
+func (api *PublicAPI) MarkMessagesSeen(ids ...string) error {
+	return api.service.messenger.MarkMessagesSeen(ids...)
+}
+
+func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
+	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
+}
+
 // -----
 // HELPER
 // -----
