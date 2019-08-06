@@ -1,23 +1,23 @@
 package accounts
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 // NewService initializes service instance.
-func NewService(db *accounts.Database, mdb *multiaccounts.Database, login common.Address) *Service {
-	return &Service{db, mdb, login}
+func NewService(db *accounts.Database, mdb *multiaccounts.Database, manager *account.Manager) *Service {
+	return &Service{db, mdb, manager}
 }
 
 // Service is a browsers service.
 type Service struct {
-	db    *accounts.Database
-	mdb   *multiaccounts.Database
-	login common.Address
+	db      *accounts.Database
+	mdb     *multiaccounts.Database
+	manager *account.Manager
 }
 
 // Start a service.
@@ -46,7 +46,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "multiaccounts",
 			Version:   "0.1.0",
-			Service:   NewMultiAccountsAPI(s.mdb, s.login),
+			Service:   NewMultiAccountsAPI(s.mdb, s.manager),
 		},
 	}
 }
