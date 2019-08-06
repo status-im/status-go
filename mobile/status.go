@@ -326,7 +326,16 @@ func Login(accountData, password string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	api.RunAsync(func() error { return statusBackend.StartNodeWithAccount(account, password) })
+	api.RunAsync(func() error {
+		log.Debug("start a node with account", "address", account.Address)
+		err := statusBackend.StartNodeWithAccount(account, password)
+		if err != nil {
+			log.Error("failed to start a node", "address", account.Address, "error", err)
+			return err
+		}
+		log.Debug("started a node with", "address", account.Address)
+		return nil
+	})
 	return makeJSONResponse(nil)
 }
 
@@ -343,7 +352,14 @@ func SaveAccountAndLogin(accountData, password, configJSON string) string {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		return statusBackend.StartNodeWithAccountAndConfig(account, password, &conf)
+		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf)
+		if err != nil {
+			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			return err
+		}
+		log.Debug("started a node, and saved account", "address", account.Address)
+		return nil
 	})
 	return makeJSONResponse(nil)
 }
