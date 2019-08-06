@@ -230,7 +230,7 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 // StartNodeWithAccountAndConfig is used after account and config was generated.
 // In current setup account name and config is generated on the client side. Once/if it will be generated on
 // status-go side this flow can be simplified.
-func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, conf *params.NodeConfig) error {
+func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account) error {
 	err := b.SaveAccount(account)
 	if err != nil {
 		return err
@@ -243,8 +243,7 @@ func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Acco
 	if err != nil {
 		return err
 	}
-	// FIXME(dshulyak) where should i get this data?
-	err = b.accountsDB.SaveAccounts([]accounts.Account{{Chat: true, Wallet: true, Address: account.Address}})
+	err = b.accountsDB.SaveAccounts(subaccs)
 	if err != nil {
 		return err
 	}

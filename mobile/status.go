@@ -13,6 +13,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
@@ -340,7 +341,7 @@ func Login(accountData, password string) string {
 }
 
 // SaveAccountAndLogin saves account in status-go database..
-func SaveAccountAndLogin(accountData, password, configJSON string) string {
+func SaveAccountAndLogin(accountData, password, configJSON, subaccountData string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
@@ -351,9 +352,14 @@ func SaveAccountAndLogin(accountData, password, configJSON string) string {
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	var subaccs []accounts.Account
+	err = json.Unmarshal([]byte(subaccountData), &subaccs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
-		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf)
+		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf, subaccs)
 		if err != nil {
 			log.Error("failed to start node and save account", "address", account.Address, "error", err)
 			return err
