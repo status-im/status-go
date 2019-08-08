@@ -22,11 +22,11 @@ func (api *SettingsAPI) SaveConfig(ctx context.Context, typ string, conf json.Ra
 }
 
 func (api *SettingsAPI) GetConfig(ctx context.Context, typ string) (json.RawMessage, error) {
-	rst, err := api.db.GetBlob(typ)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(rst), nil
+	return api.db.GetConfigBlob(typ)
+}
+
+func (api *SettingsAPI) GetConfigs(ctx context.Context, types []string) (map[string]json.RawMessage, error) {
+	return api.db.GetConfigBlobs(types)
 }
 
 func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, conf *params.NodeConfig) error {
