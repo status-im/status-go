@@ -305,9 +305,9 @@ func (b *StatusBackend) permissionsService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) walletService() gethnode.ServiceConstructor {
+func (b *StatusBackend) walletService(network uint64) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return wallet.NewService(wallet.NewDB(b.appDB)), nil
+		return wallet.NewService(wallet.NewDB(b.appDB, network)), nil
 	}
 }
 
@@ -328,7 +328,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService())
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
-	services = appendIf(config.WalletConfig.Enabled, services, b.walletService())
+	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {

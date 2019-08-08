@@ -51,6 +51,14 @@ func (q *transfersQuery) FilterEnd(end *big.Int) *transfersQuery {
 	return q
 }
 
+func (q *transfersQuery) FilterNetwork(network uint64) *transfersQuery {
+	q.andOrWhere()
+	q.added = true
+	q.buf.WriteString(" blocks.network_id = ?")
+	q.args = append(q.args, network)
+	return q
+}
+
 func (q *transfersQuery) FilterAddress(address common.Address) *transfersQuery {
 	q.andOrWhere()
 	q.added = true
