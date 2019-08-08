@@ -39,7 +39,7 @@ func TestConfig(t *testing.T) {
 	require.Equal(t, conf, rst)
 }
 
-func TestBlob(t *testing.T) {
+func TestConfigBlob(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	tag := "random-param"
@@ -47,7 +47,25 @@ func TestBlob(t *testing.T) {
 	require.NoError(t, db.SaveConfig(tag, param))
 	expected, err := json.Marshal(param)
 	require.NoError(t, err)
-	rst, err := db.GetBlob(tag)
+	rst, err := db.GetConfigBlob(tag)
+	require.NoError(t, err)
+	require.Equal(t, json.RawMessage(expected), rst)
+}
+
+func TestGetConfigBlobs(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	expected := map[string]json.RawMessage{
+		"tag1": json.RawMessage("1"),
+		"tag2": json.RawMessage("2"),
+		"tag3": json.RawMessage("3"),
+	}
+	types := make([]string, 0, len(expected))
+	for k, v := range expected {
+		require.NoError(t, db.SaveConfig(k, v))
+		types = append(types, k)
+	}
+	rst, err := db.GetConfigBlobs(types)
 	require.NoError(t, err)
 	require.Equal(t, expected, rst)
 }

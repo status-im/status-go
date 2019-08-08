@@ -2,7 +2,10 @@ package accounts
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -56,8 +59,35 @@ func (db *Database) GetConfig(typ string, value interface{}) error {
 	return db.db.QueryRow("SELECT value FROM settings WHERE type = ?", typ).Scan(&sqlite.JSONBlob{value})
 }
 
-func (db *Database) GetBlob(typ string) (rst []byte, err error) {
+func (db *Database) GetConfigBlob(typ string) (rst json.RawMessage, err error) {
 	return rst, db.db.QueryRow("SELECT value FROM settings WHERE type = ?", typ).Scan(&rst)
+}
+
+func (db *Database) GetConfigBlobs(types []string) (map[string]json.RawMessage, error) {
+	// it expands number of bind vars to the number of types. sql interface doesn't allow to bypass it without modifying driver.
+	// expansion can be hidden in a function that modifies string but better to make it explicitly.
+	query := fmt.Sprintf("SELECT type, value FROM settings WHERE type IN (?%s)", strings.Repeat(",?", len(types)-1)) // nolint: gosec
+	args := make([]interface{}, len(types))
+	for i := range types {
+		args[i] = types[i]
+	}
+	rows, err := db.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	rst := make(map[string]json.RawMessage, len(types))
+	for rows.Next() {
+		var (
+			buf = json.RawMessage{}
+			typ string
+		)
+		err = rows.Scan(&typ, &buf)
+		if err != nil {
+			return nil, err
+		}
+		rst[typ] = buf
+	}
+	return rst, nil
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
