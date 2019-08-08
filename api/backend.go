@@ -312,7 +312,7 @@ func (b *StatusBackend) permissionsService() gethnode.ServiceConstructor {
 
 func (b *StatusBackend) walletService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return wallet.NewService(wallet.NewDB(b.appDB)), nil
+		return wallet.NewService(wallet.NewDB(b.appDB, b.statusNode.Config().NetworkID)), nil
 	}
 }
 

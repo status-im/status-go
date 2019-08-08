@@ -17,7 +17,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
 	require.NoError(t, err)
-	return NewDB(db), func() {
+	return NewDB(db, 1777), func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}

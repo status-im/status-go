@@ -44,7 +44,8 @@ FOREIGN KEY(dapp_name) REFERENCES dapps(name) ON DELETE CASCADE
 
 
 CREATE TABLE IF NOT EXISTS transfers (
-hash VARCHAR UNIQUE,
+network_id UNSIGNED BIGINT NOT NULL,
+hash VARCHAR NOT NULL,
 address VARCHAR NOT NULL,
 blk_hash VARCHAR NOT NULL,
 tx BLOB,
@@ -52,21 +53,25 @@ sender VARCHAR NOT NULL,
 receipt BLOB,
 log BLOB,
 type VARCHAR NOT NULL,
-FOREIGN KEY(blk_hash) REFERENCES blocks(hash) ON DELETE CASCADE,
-CONSTRAINT unique_transfer_on_hash_address UNIQUE (hash,address)
+FOREIGN KEY(network_id,blk_hash) REFERENCES blocks(network_id,hash) ON DELETE CASCADE,
+CONSTRAINT unique_transfer_per_address_per_network UNIQUE (hash,address,network_id)
 );
 
 CREATE TABLE IF NOT EXISTS blocks (
-hash VARCHAR PRIMARY KEY,
-number BIGINT UNIQUE NOT NULL,
+network_id UNSIGNED BIGINT NOT NULL,
+hash VARCHAR NOT NULL,
+number BIGINT NOT NULL,
 timestamp UNSIGNED BIGINT NOT NULL,
-head BOOL DEFAULT FALSE
-) WITHOUT ROWID;
+head BOOL DEFAULT FALSE,
+CONSTRAINT unique_block_per_network UNIQUE (network_id,hash)
+CONSTRAINT unique_block_number_per_network UNIQUE (network_id,number)
+);
 
 CREATE TABLE IF NOT EXISTS accounts_to_blocks (
+network_id UNSIGNED BIGINT NOT NULL,
 address VARCHAR NOT NULL,
 blk_number BIGINT NOT NULL,
 sync INT,
-FOREIGN KEY(blk_number) REFERENCES blocks(number) ON DELETE CASCADE,
-CONSTRAINT unique_mapping_on_address_block_number UNIQUE (address,blk_number)
+FOREIGN KEY(network_id,blk_number) REFERENCES blocks(network_id,number) ON DELETE CASCADE,
+CONSTRAINT unique_mapping_for_account_to_block_per_network UNIQUE (address,blk_number,network_id)
 );
