@@ -1,4 +1,4 @@
-package filter
+package whisper
 
 import (
 	"database/sql"

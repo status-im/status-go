@@ -25,7 +25,7 @@ import (
 
 	statusproto "github.com/status-im/status-protocol-go"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
+	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
 )
 
 const (
@@ -447,11 +447,7 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
 // It's important to call PublicAPI.afterSend() so that the client receives a signal
 // with confirmation that the message left the device.
 func (api *PublicAPI) Post(ctx context.Context, newMessage whisper.NewMessage) (hexutil.Bytes, error) {
-	hash, err := api.publicAPI.Post(ctx, newMessage)
-	if err != nil {
-		return nil, err
-	}
-	return api.service.afterPost(hash, newMessage), nil
+	return api.publicAPI.Post(ctx, newMessage)
 }
 
 // SendPublicMessage sends a public chat message to the underlying transport.
@@ -462,11 +458,7 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessa
 	chat := statusproto.Chat{
 		Name: msg.Chat,
 	}
-	hash, newMessage, err := api.service.messenger.SendRaw(ctx, chat, msg.Payload)
-	if err != nil {
-		return nil, err
-	}
-	return api.service.afterPost(hash, newMessage), nil
+	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
@@ -482,11 +474,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessa
 		PublicKey: publicKey,
 	}
 
-	hash, newMessage, err := api.service.messenger.SendRaw(ctx, chat, msg.Payload)
-	if err != nil {
-		return nil, err
-	}
-	return api.service.afterPost(hash, newMessage), nil
+	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []whisper.TopicType) (hash common.Hash, err error) {
@@ -597,7 +585,7 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-func (api *PublicAPI) LoadFilters(parent context.Context, chats []*filter.Chat) ([]*filter.Chat, error) {
+func (api *PublicAPI) LoadFilters(parent context.Context, chats []*statustransp.Filter) ([]*statustransp.Filter, error) {
 	return api.service.messenger.LoadFilters(chats)
 }
 
@@ -621,7 +609,7 @@ func (api *PublicAPI) Contacts(parent context.Context) ([]*statusproto.Contact, 
 	return api.service.messenger.Contacts()
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*filter.Chat) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*statustransp.Filter) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 

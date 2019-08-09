@@ -8,8 +8,10 @@ require (
 	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/ethereum/go-ethereum v1.8.27
-	github.com/golang-migrate/migrate/v4 v4.5.0 // indirect
+	github.com/go-playground/locales v0.12.1 // indirect
+	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/golang/mock v1.2.0
+	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/libp2p/go-libp2p-core v0.0.3
 	github.com/multiformats/go-multiaddr v0.0.4
@@ -19,13 +21,14 @@ require (
 	github.com/status-im/doubleratchet v2.0.0+incompatible
 	github.com/status-im/migrate/v4 v4.3.1-status
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.0.0-20190701094942-baa579640f175976472cdf47e0b97d2a5881409d
+	github.com/status-im/status-protocol-go v0.0.0-20190701094942-e1f4f17bafc4ac757933fb6a801fe9fed68b6c4d
 	github.com/status-im/whisper v1.4.14
 	github.com/stretchr/testify v1.3.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/text v0.3.2
+	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )

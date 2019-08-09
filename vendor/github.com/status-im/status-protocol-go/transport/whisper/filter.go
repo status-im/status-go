@@ -1,4 +1,4 @@
-package filter
+package whisper
 
 import (
 	"crypto/ecdsa"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DiscoveryTopic = "contact-discovery"
+	discoveryTopic = "contact-discovery"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 	minPow      = 0.0
 )
 
-type Filter struct {
+type whisperFilter struct {
 	FilterID string
 	Topic    whisper.TopicType
 	SymKeyID string
@@ -36,16 +36,16 @@ type NegotiatedSecret struct {
 }
 
 // TODO: revise fields encoding/decoding. Some are encoded using hexutil and some using encoding/hex.
-type Chat struct {
+type Filter struct {
 	// ChatID is the identifier of the chat
 	ChatID string `json:"chatId"`
 	// FilterID the whisper filter id generated
 	FilterID string `json:"filterId"`
-	// SymKeyID is the symmetric key id used for symmetric chats
+	// SymKeyID is the symmetric key id used for symmetric filters
 	SymKeyID string `json:"symKeyId"`
 	// OneToOne tells us if we need to use asymmetric encryption for this chat
 	OneToOne bool `json:"oneToOne"`
-	// Identity is the public key of the other recipient for non-public chats.
+	// Identity is the public key of the other recipient for non-public filters.
 	// It's encoded using encoding/hex.
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
@@ -58,25 +58,25 @@ type Chat struct {
 	Listen bool `json:"listen"`
 }
 
-func (c *Chat) IsPublic() bool {
+func (c *Filter) IsPublic() bool {
 	return !c.OneToOne
 }
 
-type ChatsManager struct {
+type filtersManager struct {
 	whisper     *whisper.Whisper
 	persistence *sqlitePersistence
 	privateKey  *ecdsa.PrivateKey
-	keys        map[string][]byte // a cache of symmetric keys derived from passwords
+	keys        map[string][]byte // a cache of symmetric manager derived from passwords
 	logger      *zap.Logger
 
 	genericDiscoveryTopicEnabled bool
 
-	mutex sync.Mutex
-	chats map[string]*Chat
+	mutex   sync.Mutex
+	filters map[string]*Filter
 }
 
-// New returns a new ChatsManager service
-func New(db *sql.DB, w *whisper.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*ChatsManager, error) {
+// newFiltersManager returns a new filtersManager.
+func newFiltersManager(db *sql.DB, w *whisper.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -88,21 +88,21 @@ func New(db *sql.DB, w *whisper.Whisper, privateKey *ecdsa.PrivateKey, logger *z
 		return nil, err
 	}
 
-	return &ChatsManager{
+	return &filtersManager{
 		privateKey:  privateKey,
 		whisper:     w,
 		persistence: persistence,
 		keys:        keys,
-		chats:       make(map[string]*Chat),
-		logger:      logger.With(zap.Namespace("ChatsManager")),
+		filters:     make(map[string]*Filter),
+		logger:      logger.With(zap.Namespace("filtersManager")),
 	}, nil
 }
 
-func (s *ChatsManager) Init(
+func (s *filtersManager) Init(
 	chatIDs []string,
 	publicKeys []*ecdsa.PublicKey,
 	genericDiscoveryTopicEnabled bool,
-) ([]*Chat, error) {
+) ([]*Filter, error) {
 	logger := s.logger.With(zap.String("site", "Init"))
 
 	logger.Info("initializing")
@@ -127,7 +127,7 @@ func (s *ChatsManager) Init(
 		return nil, err
 	}
 
-	// Add public, one-to-one and negotiated chats.
+	// Add public, one-to-one and negotiated filters.
 	for _, chatID := range chatIDs {
 		_, err := s.LoadPublic(chatID)
 		if err != nil {
@@ -145,15 +145,15 @@ func (s *ChatsManager) Init(
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	var allChats []*Chat
-	for _, chat := range s.chats {
+	var allChats []*Filter
+	for _, chat := range s.filters {
 		allChats = append(allChats, chat)
 	}
 	return allChats, nil
 }
 
 // DEPRECATED
-func (s *ChatsManager) InitWithChats(chats []*Chat, genericDiscoveryTopicEnabled bool) ([]*Chat, error) {
+func (s *filtersManager) InitWithChats(chats []*Filter, genericDiscoveryTopicEnabled bool) ([]*Filter, error) {
 	var (
 		chatIDs    []string
 		publicKeys []*ecdsa.PublicKey
@@ -174,11 +174,11 @@ func (s *ChatsManager) InitWithChats(chats []*Chat, genericDiscoveryTopicEnabled
 	return s.Init(chatIDs, publicKeys, genericDiscoveryTopicEnabled)
 }
 
-func (s *ChatsManager) Reset() error {
-	var chats []*Chat
+func (s *filtersManager) Reset() error {
+	var chats []*Filter
 
 	s.mutex.Lock()
-	for _, chat := range s.chats {
+	for _, chat := range s.filters {
 		chats = append(chats, chat)
 	}
 	s.mutex.Unlock()
@@ -186,11 +186,11 @@ func (s *ChatsManager) Reset() error {
 	return s.Remove(chats...)
 }
 
-func (s *ChatsManager) Chats() (result []*Chat) {
+func (s *filtersManager) Chats() (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	for _, chat := range s.chats {
+	for _, chat := range s.filters {
 		result = append(result, chat)
 	}
 
@@ -198,16 +198,16 @@ func (s *ChatsManager) Chats() (result []*Chat) {
 }
 
 // ChatByID returns a chat by id.
-func (s *ChatsManager) ChatByID(chatID string) *Chat {
+func (s *filtersManager) ChatByID(chatID string) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.chats[chatID]
+	return s.filters[chatID]
 }
 
-func (s *ChatsManager) ChatByFilterID(filterID string) *Chat {
+func (s *filtersManager) ChatByFilterID(filterID string) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	for _, chat := range s.chats {
+	for _, chat := range s.filters {
 		if chat.FilterID == filterID {
 			return chat
 		}
@@ -215,13 +215,13 @@ func (s *ChatsManager) ChatByFilterID(filterID string) *Chat {
 	return nil
 }
 
-func (s *ChatsManager) ChatsByPublicKey(publicKey *ecdsa.PublicKey) (result []*Chat) {
+func (s *filtersManager) ChatsByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	identityStr := publicKeyToStr(publicKey)
 
-	for _, chat := range s.chats {
+	for _, chat := range s.filters {
 		if chat.Identity == identityStr {
 			result = append(result, chat)
 		}
@@ -231,7 +231,7 @@ func (s *ChatsManager) ChatsByPublicKey(publicKey *ecdsa.PublicKey) (result []*C
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (s *ChatsManager) Remove(chats ...*Chat) error {
+func (s *filtersManager) Remove(chats ...*Filter) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -242,28 +242,28 @@ func (s *ChatsManager) Remove(chats ...*Chat) error {
 		if chat.SymKeyID != "" {
 			s.whisper.DeleteSymKey(chat.SymKeyID)
 		}
-		delete(s.chats, chat.ChatID)
+		delete(s.filters, chat.ChatID)
 	}
 
 	return nil
 }
 
 // LoadPartitioned creates a filter for a partitioned topic.
-func (s *ChatsManager) LoadPartitioned(publicKey *ecdsa.PublicKey) (*Chat, error) {
+func (s *filtersManager) LoadPartitioned(publicKey *ecdsa.PublicKey) (*Filter, error) {
 	return s.loadPartitioned(publicKey, false)
 }
 
-func (s *ChatsManager) loadMyPartitioned() (*Chat, error) {
+func (s *filtersManager) loadMyPartitioned() (*Filter, error) {
 	return s.loadPartitioned(&s.privateKey.PublicKey, true)
 }
 
-func (s *ChatsManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) (*Chat, error) {
+func (s *filtersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	chatID := partitionedTopic(publicKey)
-	if _, ok := s.chats[chatID]; ok {
-		return s.chats[chatID], nil
+	if _, ok := s.filters[chatID]; ok {
+		return s.filters[chatID], nil
 	}
 
 	// We set up a filter so we can publish,
@@ -273,7 +273,7 @@ func (s *ChatsManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) 
 		return nil, err
 	}
 
-	chat := &Chat{
+	chat := &Filter{
 		ChatID:   chatID,
 		FilterID: filter.FilterID,
 		Topic:    filter.Topic,
@@ -282,20 +282,20 @@ func (s *ChatsManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) 
 		OneToOne: true,
 	}
 
-	s.chats[chatID] = chat
+	s.filters[chatID] = chat
 
 	return chat, nil
 }
 
 // LoadNegotiated loads a negotiated secret as a filter.
-func (s *ChatsManager) LoadNegotiated(secret NegotiatedSecret) (*Chat, error) {
+func (s *filtersManager) LoadNegotiated(secret NegotiatedSecret) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	chatID := negotiatedTopic(secret.PublicKey)
 
-	if _, ok := s.chats[chatID]; ok {
-		return s.chats[chatID], nil
+	if _, ok := s.filters[chatID]; ok {
+		return s.filters[chatID], nil
 	}
 
 	keyString := hex.EncodeToString(secret.Key)
@@ -304,7 +304,7 @@ func (s *ChatsManager) LoadNegotiated(secret NegotiatedSecret) (*Chat, error) {
 		return nil, err
 	}
 
-	chat := &Chat{
+	chat := &Filter{
 		ChatID:     chatID,
 		Topic:      filter.Topic,
 		SymKeyID:   filter.SymKeyID,
@@ -315,31 +315,31 @@ func (s *ChatsManager) LoadNegotiated(secret NegotiatedSecret) (*Chat, error) {
 		OneToOne:   true,
 	}
 
-	s.chats[chat.ChatID] = chat
+	s.filters[chat.ChatID] = chat
 
 	return chat, nil
 }
 
 // LoadDiscovery adds 1-2 discovery filters: one for generic discovery topic (if enabled)
 // and one for the personal discovery topic.
-func (s *ChatsManager) LoadDiscovery() ([]*Chat, error) {
+func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	personalDiscoveryTopic := personalDiscoveryTopic(&s.privateKey.PublicKey)
 
-	// Check if chats are already loaded.
-	var result []*Chat
+	// Check if filters are already loaded.
+	var result []*Filter
 
 	expectedTopicCount := 1
 
 	if s.genericDiscoveryTopicEnabled {
 		expectedTopicCount = 2
-		if chat, ok := s.chats[DiscoveryTopic]; ok {
+		if chat, ok := s.filters[discoveryTopic]; ok {
 			result = append(result, chat)
 		}
 	}
-	if chat, ok := s.chats[personalDiscoveryTopic]; ok {
+	if chat, ok := s.filters[personalDiscoveryTopic]; ok {
 		result = append(result, chat)
 	}
 
@@ -347,12 +347,12 @@ func (s *ChatsManager) LoadDiscovery() ([]*Chat, error) {
 		return result, nil
 	}
 
-	var discoveryResponse *Filter
+	var discoveryResponse *whisperFilter
 	var err error
 	identityStr := publicKeyToStr(&s.privateKey.PublicKey)
 
 	// Load personal discovery
-	personalDiscoveryChat := &Chat{
+	personalDiscoveryChat := &Filter{
 		ChatID:    personalDiscoveryTopic,
 		Identity:  identityStr,
 		Discovery: true,
@@ -368,12 +368,12 @@ func (s *ChatsManager) LoadDiscovery() ([]*Chat, error) {
 	personalDiscoveryChat.Topic = discoveryResponse.Topic
 	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
 
-	s.chats[personalDiscoveryChat.ChatID] = personalDiscoveryChat
+	s.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
 
 	if s.genericDiscoveryTopicEnabled {
 		// Load generic discovery topic.
-		discoveryChat := &Chat{
-			ChatID:    DiscoveryTopic,
+		discoveryChat := &Filter{
+			ChatID:    discoveryTopic,
 			Identity:  identityStr,
 			Discovery: true,
 			Listen:    true,
@@ -388,20 +388,20 @@ func (s *ChatsManager) LoadDiscovery() ([]*Chat, error) {
 		discoveryChat.Topic = discoveryResponse.Topic
 		discoveryChat.FilterID = discoveryResponse.FilterID
 
-		s.chats[discoveryChat.ChatID] = discoveryChat
+		s.filters[discoveryChat.ChatID] = discoveryChat
 
-		return []*Chat{discoveryChat, personalDiscoveryChat}, nil
+		return []*Filter{discoveryChat, personalDiscoveryChat}, nil
 	}
 
-	return []*Chat{personalDiscoveryChat}, nil
+	return []*Filter{personalDiscoveryChat}, nil
 }
 
 // LoadPublic adds a filter for a public chat.
-func (s *ChatsManager) LoadPublic(chatID string) (*Chat, error) {
+func (s *filtersManager) LoadPublic(chatID string) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if chat, ok := s.chats[chatID]; ok {
+	if chat, ok := s.filters[chatID]; ok {
 		return chat, nil
 	}
 
@@ -410,7 +410,7 @@ func (s *ChatsManager) LoadPublic(chatID string) (*Chat, error) {
 		return nil, err
 	}
 
-	chat := &Chat{
+	chat := &Filter{
 		ChatID:   chatID,
 		FilterID: filterAndTopic.FilterID,
 		SymKeyID: filterAndTopic.SymKeyID,
@@ -419,20 +419,20 @@ func (s *ChatsManager) LoadPublic(chatID string) (*Chat, error) {
 		OneToOne: false,
 	}
 
-	s.chats[chatID] = chat
+	s.filters[chatID] = chat
 
 	return chat, nil
 }
 
 // LoadContactCode creates a filter for the advertise topic for a given public key.
-func (s *ChatsManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Chat, error) {
+func (s *filtersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	chatID := contactCodeTopic(pubKey)
 
-	if _, ok := s.chats[chatID]; ok {
-		return s.chats[chatID], nil
+	if _, ok := s.filters[chatID]; ok {
+		return s.filters[chatID], nil
 	}
 
 	contactCodeFilter, err := s.addSymmetric(chatID)
@@ -440,7 +440,7 @@ func (s *ChatsManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Chat, error) {
 		return nil, err
 	}
 
-	chat := &Chat{
+	chat := &Filter{
 		ChatID:   chatID,
 		FilterID: contactCodeFilter.FilterID,
 		Topic:    contactCodeFilter.Topic,
@@ -449,12 +449,12 @@ func (s *ChatsManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Chat, error) {
 		Listen:   true,
 	}
 
-	s.chats[chatID] = chat
+	s.filters[chatID] = chat
 	return chat, nil
 }
 
 // addSymmetric adds a symmetric key filter
-func (s *ChatsManager) addSymmetric(chatID string) (*Filter, error) {
+func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 	var symKeyID string
 	var err error
 
@@ -496,7 +496,7 @@ func (s *ChatsManager) addSymmetric(chatID string) (*Filter, error) {
 		return nil, err
 	}
 
-	return &Filter{
+	return &whisperFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
 		Topic:    whisper.BytesToTopic(topic),
@@ -505,7 +505,7 @@ func (s *ChatsManager) addSymmetric(chatID string) (*Filter, error) {
 
 // addAsymmetricFilter adds a filter with our private key
 // and set minPow according to the listen parameter.
-func (s *ChatsManager) addAsymmetric(chatID string, listen bool) (*Filter, error) {
+func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilter, error) {
 	var (
 		err error
 		pow = 1.0 // use PoW high enough to discard all messages for the filter
@@ -530,22 +530,22 @@ func (s *ChatsManager) addAsymmetric(chatID string, listen bool) (*Filter, error
 	if err != nil {
 		return nil, err
 	}
-	return &Filter{FilterID: id, Topic: whisper.BytesToTopic(topic)}, nil
+	return &whisperFilter{FilterID: id, Topic: whisper.BytesToTopic(topic)}, nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity
-func (s *ChatsManager) GetNegotiated(identity *ecdsa.PublicKey) *Chat {
+func (s *filtersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.chats[negotiatedTopic(identity)]
+	return s.filters[negotiatedTopic(identity)]
 }
 
-// toTopic converts a string to a whisper topic.
 func toTopic(s string) []byte {
 	return crypto.Keccak256([]byte(s))[:whisper.TopicLength]
 }
 
+// ToTopic converts a string to a whisper topic.
 func ToTopic(s string) []byte {
 	return toTopic(s)
 }
@@ -572,12 +572,6 @@ func partitionedTopic(publicKey *ecdsa.PublicKey) string {
 	partition := big.NewInt(0)
 	partition.Mod(publicKey.X, nPartitions)
 	return "contact-discovery-" + strconv.FormatInt(partition.Int64(), 10)
-}
-
-// PublicKeyToPartitionedTopicBytes returns the bytes of the partitioned topic
-// associated with the given public key
-func PublicKeyToPartitionedTopicBytes(publicKey *ecdsa.PublicKey) []byte {
-	return toTopic(partitionedTopic(publicKey))
 }
 
 func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {

@@ -317,19 +317,18 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.0.0-20190701094942-baa579640f175976472cdf47e0b97d2a5881409d
+# github.com/status-im/status-protocol-go v0.0.0-20190701094942-e1f4f17bafc4ac757933fb6a801fe9fed68b6c4d
 github.com/status-im/status-protocol-go/zaputil
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/sqlite
-github.com/status-im/status-protocol-go/transport/whisper/filter
+github.com/status-im/status-protocol-go/transport/whisper
 github.com/status-im/status-protocol-go/datasync
 github.com/status-im/status-protocol-go/datasync/peer
 github.com/status-im/status-protocol-go/encryption
 github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/sharedsecret
 github.com/status-im/status-protocol-go/migrations
-github.com/status-im/status-protocol-go/transport/whisper
 github.com/status-im/status-protocol-go/transport/whisper/migrations
 github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/crypto
@@ -357,9 +356,9 @@ github.com/syndtr/goleveldb/leveldb/table
 # github.com/vacp2p/mvds v0.0.19
 github.com/vacp2p/mvds/node
 github.com/vacp2p/mvds/peers
+github.com/vacp2p/mvds/protobuf
 github.com/vacp2p/mvds/state
 github.com/vacp2p/mvds/store
-github.com/vacp2p/mvds/protobuf
 github.com/vacp2p/mvds/transport
 # github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 github.com/whyrusleeping/go-logging

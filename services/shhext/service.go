@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/logutils"
 	"os"
 	"path/filepath"
@@ -24,8 +23,10 @@ import (
 	"github.com/status-im/status-go/signal"
 
 	protocol "github.com/status-im/status-protocol-go"
+	protocolwhisper "github.com/status-im/status-protocol-go/transport/whisper"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -38,8 +39,8 @@ const (
 
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
-	EnvelopeSent(common.Hash)
-	EnvelopeExpired(common.Hash, error)
+	EnvelopeSent([][]byte)
+	EnvelopeExpired([][]byte, error)
 	MailServerRequestCompleted(common.Hash, common.Hash, []byte, error)
 	MailServerRequestExpired(common.Hash)
 }
@@ -52,7 +53,6 @@ type Service struct {
 	storage          db.TransactionalStorage
 	w                *whisper.Whisper
 	config           params.ShhextConfig
-	envelopesMonitor *EnvelopesMonitor
 	mailMonitor      *MailRequestMonitor
 	requestsRegistry *RequestsRegistry
 	historyUpdates   *HistoryUpdateReactor
@@ -84,12 +84,10 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 		cache:            map[common.Hash]EnvelopeState{},
 		requestsRegistry: requestsRegistry,
 	}
-	envelopesMonitor := NewEnvelopesMonitor(w, handler, config.MailServerConfirmations, ps, config.MaxMessageDeliveryAttempts)
 	return &Service{
 		storage:          db.NewLevelDBStorage(ldb),
 		w:                w,
 		config:           config,
-		envelopesMonitor: envelopesMonitor,
 		mailMonitor:      mailMonitor,
 		requestsRegistry: requestsRegistry,
 		historyUpdates:   historyUpdates,
@@ -185,10 +183,22 @@ func (s *Service) initProtocol(address, encKey, password string) error { // noli
 		}
 	}
 
-	options, err := buildMessengerOptions(s.config, v4Path, encKey)
+	// Create a custom zap.Logger which will forward logs from status-protocol-go to status-go logger.
+	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
 	if err != nil {
 		return err
 	}
+
+	envelopesMonitorConfig := &protocolwhisper.EnvelopesMonitorConfig{
+		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
+		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
+		IsMailserver: func(peer enode.ID) bool {
+			return s.peerStore.Exist(peer)
+		},
+		EnvelopeEventsHandler: EnvelopeSignalHandler{},
+		Logger:                zapLogger,
+	}
+	options := buildMessengerOptions(s.config, v4Path, encKey, envelopesMonitorConfig, zapLogger)
 
 	selectedKeyID := s.w.SelectedKeyPairID()
 	identity, err := s.w.GetPrivateKey(selectedKeyID)
@@ -198,7 +208,6 @@ func (s *Service) initProtocol(address, encKey, password string) error { // noli
 
 	messenger, err := protocol.NewMessenger(
 		identity,
-		&server{server: s.server},
 		s.w,
 		s.config.InstallationID,
 		options...,
@@ -323,7 +332,6 @@ func (s *Service) Start(server *p2p.Server) error {
 		s.lastUsedMonitor = mailservers.NewLastUsedConnectionMonitor(s.peerStore, s.cache, s.w)
 		s.lastUsedMonitor.Start()
 	}
-	s.envelopesMonitor.Start()
 	s.mailMonitor.Start()
 	s.nodeID = server.PrivateKey
 	s.server = server
@@ -340,7 +348,6 @@ func (s *Service) Stop() error {
 		s.lastUsedMonitor.Stop()
 	}
 	s.requestsRegistry.Clear()
-	s.envelopesMonitor.Stop()
 	s.mailMonitor.Stop()
 
 	if s.cancelMessenger != nil {
@@ -405,16 +412,12 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 	}
 }
 
-func buildMessengerOptions(config params.ShhextConfig, dbPath, dbKey string) ([]protocol.Option, error) {
-	// Create a custom zap.Logger which will forward logs from status-protocol-go to status-go logger.
-	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
-	if err != nil {
-		return nil, err
-	}
+func buildMessengerOptions(config params.ShhextConfig, dbPath, dbKey string, envelopesMonitorConfig *protocolwhisper.EnvelopesMonitorConfig, logger *zap.Logger) []protocol.Option {
 
 	options := []protocol.Option{
-		protocol.WithCustomLogger(zapLogger),
+		protocol.WithCustomLogger(logger),
 		protocol.WithDatabaseConfig(dbPath, dbKey),
+		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 	}
 
 	if !config.DisableGenericDiscoveryTopic {
@@ -428,11 +431,5 @@ func buildMessengerOptions(config params.ShhextConfig, dbPath, dbKey string) ([]
 	if config.SendV1Messages {
 		options = append(options, protocol.WithSendV1Messages())
 	}
-	return options, nil
-}
-
-func (s *Service) afterPost(hash []byte, newMessage whisper.NewMessage) hexutil.Bytes {
-	s.envelopesMonitor.Add(common.BytesToHash(hash), newMessage)
-	mID := messageID(newMessage)
-	return mID[:]
+	return options
 }

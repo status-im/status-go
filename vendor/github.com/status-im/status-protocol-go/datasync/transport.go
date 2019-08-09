@@ -15,7 +15,7 @@ var errNotInitialized = errors.New("Datasync transport not initialized")
 
 type DataSyncNodeTransport struct {
 	packets  chan transport.Packet
-	dispatch func(context.Context, *ecdsa.PublicKey, []byte) error
+	dispatch func(context.Context, *ecdsa.PublicKey, []byte, *protobuf.Payload) error
 }
 
 func NewDataSyncNodeTransport() *DataSyncNodeTransport {
@@ -24,7 +24,7 @@ func NewDataSyncNodeTransport() *DataSyncNodeTransport {
 	}
 }
 
-func (t *DataSyncNodeTransport) Init(dispatch func(context.Context, *ecdsa.PublicKey, []byte) error) {
+func (t *DataSyncNodeTransport) Init(dispatch func(context.Context, *ecdsa.PublicKey, []byte, *protobuf.Payload) error) {
 	t.dispatch = dispatch
 }
 
@@ -51,7 +51,7 @@ func (t *DataSyncNodeTransport) Send(_ state.PeerID, peer state.PeerID, payload 
 		return err
 	}
 
-	return t.dispatch(context.TODO(), publicKey, data)
+	return t.dispatch(context.TODO(), publicKey, data, &payload)
 }
 
 // CalculateSendTime calculates the next epoch
