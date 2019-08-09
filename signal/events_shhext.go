@@ -4,10 +4,11 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/shhext/dedup"
 	whisper "github.com/status-im/whisper/whisperv6"
 
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
+	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
 )
 
 const (
@@ -45,8 +46,9 @@ const (
 
 // EnvelopeSignal includes hash of the envelope.
 type EnvelopeSignal struct {
-	Hash    common.Hash `json:"hash"`
-	Message string      `json:"message"`
+	IDs     []hexutil.Bytes `json:"ids"`
+	Hash    common.Hash     `json:"hash"`
+	Message string          `json:"message"`
 }
 
 // MailServerResponseSignal holds the data received in the response from the mailserver.
@@ -93,17 +95,29 @@ type NewMessagesSignal struct {
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
-func SendEnvelopeSent(hash common.Hash) {
-	send(EventEnvelopeSent, EnvelopeSignal{Hash: hash})
+func SendEnvelopeSent(identifiers [][]byte) {
+	var hexIdentifiers []hexutil.Bytes
+	for _, i := range identifiers {
+		hexIdentifiers = append(hexIdentifiers, i)
+	}
+
+	send(EventEnvelopeSent, EnvelopeSignal{
+		IDs: hexIdentifiers,
+	})
 }
 
 // SendEnvelopeExpired triggered when envelope delivered at least to 1 peer.
-func SendEnvelopeExpired(hash common.Hash, err error) {
+func SendEnvelopeExpired(identifiers [][]byte, err error) {
 	var message string
 	if err != nil {
 		message = err.Error()
 	}
-	send(EventEnvelopeExpired, EnvelopeSignal{Hash: hash, Message: message})
+	var hexIdentifiers []hexutil.Bytes
+	for _, i := range identifiers {
+		hexIdentifiers = append(hexIdentifiers, i)
+	}
+
+	send(EventEnvelopeExpired, EnvelopeSignal{IDs: hexIdentifiers, Message: message})
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
@@ -135,7 +149,7 @@ type EnodeDiscoveredSignal struct {
 type Messages struct {
 	Error    error                      `json:"error"`
 	Messages []dedup.DeduplicateMessage `json:"messages"`
-	Chat     filter.Chat                `json:"chat"`
+	Chat     statustransp.Filter        `json:"chat"` // not a mistake, it's called chat in status-react
 }
 
 // SendEnodeDiscovered tiggered when an enode is discovered.

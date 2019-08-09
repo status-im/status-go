@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-protocol-go/encryption/sharedsecret"
 	"github.com/status-im/status-protocol-go/sqlite"
 	transport "github.com/status-im/status-protocol-go/transport/whisper"
-	"github.com/status-im/status-protocol-go/transport/whisper/filter"
 	protocol "github.com/status-im/status-protocol-go/v1"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncpeers "github.com/vacp2p/mvds/peers"
@@ -76,6 +75,9 @@ type config struct {
 	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	// DEPRECATED: no need to expose it
 	onSendContactCodeHandler func(*encryption.ProtocolMessageSpec)
+
+	// Config for the envelopes monitor
+	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 
 	messagesPersistenceEnabled bool
 	featureFlags               featureFlags
@@ -153,9 +155,15 @@ func WithDatasync() func(c *config) error {
 	}
 }
 
+func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
+	return func(c *config) error {
+		c.envelopesMonitorConfig = emc
+		return nil
+	}
+}
+
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	server transport.Server,
 	shh *whisper.Whisper,
 	installationID string,
 	opts ...Option,
@@ -237,11 +245,11 @@ func NewMessenger(
 
 	// Initialize transport layer.
 	t, err := transport.NewWhisperServiceTransport(
-		server,
 		shh,
 		identity,
 		database,
 		nil,
+		c.envelopesMonitorConfig,
 		logger,
 	)
 	if err != nil {
@@ -290,6 +298,7 @@ func NewMessenger(
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328
 			func() error { _ = logger.Sync; return nil },
+			func() error { adapter.Stop(); return nil },
 		},
 		logger: logger,
 	}
@@ -443,13 +452,13 @@ func (m *Messenger) Send(ctx context.Context, chat Chat, data []byte) ([]byte, e
 
 // SendRaw takes encoded data, encrypts it and sends through the wire.
 // DEPRECATED
-func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte, whisper.NewMessage, error) {
+func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte, error) {
 	if chat.PublicKey != nil {
 		return m.adapter.SendPrivateRaw(ctx, chat.PublicKey, data)
 	} else if chat.Name != "" {
 		return m.adapter.SendPublicRaw(ctx, chat.Name, data)
 	}
-	return nil, whisper.NewMessage{}, errors.New("chat is neither public nor private")
+	return nil, errors.New("chat is neither public nor private")
 }
 
 type RetrieveConfig struct {
@@ -576,17 +585,17 @@ func (m *Messenger) retrieveSaved(ctx context.Context, chatID string, c Retrieve
 }
 
 // DEPRECATED
-func (m *Messenger) RetrieveRawAll() (map[filter.Chat][]*protocol.StatusMessage, error) {
+func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMessage, error) {
 	return m.adapter.RetrieveRawAll()
 }
 
 // DEPRECATED
-func (m *Messenger) LoadFilters(chats []*filter.Chat) ([]*filter.Chat, error) {
+func (m *Messenger) LoadFilters(chats []*transport.Filter) ([]*transport.Filter, error) {
 	return m.adapter.transport.LoadFilters(chats, m.featureFlags.genericDiscoveryTopicEnabled)
 }
 
 // DEPRECATED
-func (m *Messenger) RemoveFilters(chats []*filter.Chat) error {
+func (m *Messenger) RemoveFilters(chats []*transport.Filter) error {
 	return m.adapter.transport.RemoveFilters(chats)
 }
 

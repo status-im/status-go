@@ -144,9 +144,9 @@ func EncodeMessage(value Message) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// MessageID calculates the messageID, by appending the sha3-256 to the compress pubkey
+// MessageID calculates the messageID, by appending the sha3-256 to the pubkey bytes
 func MessageID(author *ecdsa.PublicKey, data []byte) []byte {
-	keyBytes := crypto.CompressPubkey(author)
+	keyBytes := crypto.FromECDSAPub(author)
 	return crypto.Keccak256(append(keyBytes, data...))
 }
 

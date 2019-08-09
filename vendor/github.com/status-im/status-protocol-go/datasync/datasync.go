@@ -45,8 +45,6 @@ func (d *DataSync) Handle(sender *ecdsa.PublicKey, payload []byte) [][]byte {
 		logger.Debug("handling datasync message")
 		// datasync message
 		for _, message := range datasyncMessage.Messages {
-			//copiedMessage := statusMessage.Copy()
-			//copiedMessage.DataSyncLayerInfo.Payload = message.Body
 			payloads = append(payloads, message.Body)
 		}
 		if d.sendingEnabled {
