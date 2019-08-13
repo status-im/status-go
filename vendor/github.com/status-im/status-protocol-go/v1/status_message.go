@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"log"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
@@ -27,7 +28,7 @@ type StatusMessage struct {
 	DecryptedPayload []byte
 
 	// ID is the canonical ID of the message
-	ID []byte
+	ID hexutil.Bytes
 	// Hash is the transport layer hash
 	Hash []byte
 

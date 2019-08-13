@@ -235,23 +235,44 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 				log.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
+			var messageIDs []string
+
+			for _, messages := range chatWithMessages {
+				for _, message := range messages {
+					messageIDs = append(messageIDs, message.ID.String())
+				}
+			}
+
+			existingMessages, err := s.messenger.MessagesExist(messageIDs)
+			if err != nil {
+				log.Error("failed to check existing messages", "err", err)
+				continue
+			}
 
 			var signalMessages []*signal.Messages
 
 			for chat, messages := range chatWithMessages {
-				var retrievedMessages []*whisper.Message
-				for _, message := range messages {
-					whisperMessage := message.TransportMessage
-					whisperMessage.Payload = message.DecryptedPayload
-					retrievedMessages = append(retrievedMessages, whisperMessage)
-				}
 
 				signalMessage := &signal.Messages{
 					Chat:     chat,
 					Error:    nil, // TODO: what is it needed for?
-					Messages: s.deduplicator.Deduplicate(retrievedMessages),
+					Messages: s.deduplicator.Deduplicate(messages),
 				}
-				signalMessages = append(signalMessages, signalMessage)
+
+				var newMessages []dedup.DeduplicateMessage
+
+				// Filter out already saved messages
+				for _, message := range signalMessage.Messages {
+					if !existingMessages[message.Metadata.MessageID.String()] {
+						newMessages = append(newMessages, message)
+					}
+				}
+
+				signalMessage.Messages = newMessages
+
+				if len(newMessages) != 0 {
+					signalMessages = append(signalMessages, signalMessage)
+				}
 			}
 
 			log.Debug("retrieve messages loop", "messages", len(signalMessages))

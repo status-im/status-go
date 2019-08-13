@@ -43,7 +43,7 @@ func BenchmarkDeduplicate30000MessagesADay(b *testing.B) {
 	d := NewDeduplicator(dummyKeyPairProvider{}, db)
 
 	b.Log("generating messages")
-	messagesOld := generateMessages(100000)
+	messagesOld := generateStatusMessages(100000)
 	b.Log("generation is done")
 
 	// pre-fill deduplicator
@@ -62,8 +62,12 @@ func BenchmarkDeduplicate30000MessagesADay(b *testing.B) {
 		}
 		messages := messagesOld[start:(start + length)]
 		start += length
-		d.Deduplicate(messages)
-		assert.NoError(b, d.AddMessages(messages))
+		dedupMessages := d.Deduplicate(messages)
+		ids := make([][]byte, len(dedupMessages))
+		for i, m := range dedupMessages {
+			ids[i] = m.Metadata.DedupID
+		}
+		assert.NoError(b, d.AddMessagesByID(ids))
 	}
 }
 
@@ -92,34 +96,48 @@ func (s *DeduplicatorTestSuite) TearDownTest() {
 
 func (s *DeduplicatorTestSuite) TestDeduplicateSingleFilter() {
 	s.d.keyPairProvider = dummyKeyPairProvider{"acc1"}
-	messages1 := generateMessages(10)
-	messages2 := generateMessages(12)
+	messages1 := generateStatusMessages(10)
+	messages2 := generateStatusMessages(12)
 
 	result := s.d.Deduplicate(messages1)
 	s.Equal(len(messages1), len(result))
-	s.NoError(s.d.AddMessages(messages1))
+
+	ids := make([][]byte, len(result))
+	for i, m := range result {
+		ids[i] = m.Metadata.DedupID
+	}
+	s.NoError(s.d.AddMessagesByID(ids))
 
 	result = s.d.Deduplicate(messages1)
 	s.Equal(0, len(result))
 
 	result = s.d.Deduplicate(messages2)
 	s.Equal(len(messages2), len(result))
-	s.NoError(s.d.AddMessages(messages2))
 
-	messages3 := append(messages2, generateMessages(11)...)
+	ids = make([][]byte, len(result))
+	for i, m := range result {
+		ids[i] = m.Metadata.DedupID
+	}
+	s.NoError(s.d.AddMessagesByID(ids))
+
+	messages3 := append(messages2, generateStatusMessages(11)...)
 
 	result = s.d.Deduplicate(messages3)
 	s.Equal(11, len(result))
 }
 
 func (s *DeduplicatorTestSuite) TestDeduplicateMultipleFilters() {
-	messages1 := generateMessages(10)
+	messages1 := generateStatusMessages(10)
 
 	s.d.keyPairProvider = dummyKeyPairProvider{"acc1"}
 	result := s.d.Deduplicate(messages1)
 	s.Equal(len(messages1), len(result))
+	ids := make([][]byte, len(result))
+	for i, m := range result {
+		ids[i] = m.Metadata.DedupID
+	}
 
-	s.NoError(s.d.AddMessages(messages1))
+	s.NoError(s.d.AddMessagesByID(ids))
 
 	result = s.d.Deduplicate(messages1)
 	s.Equal(0, len(result))

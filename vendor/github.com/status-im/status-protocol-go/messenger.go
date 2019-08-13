@@ -6,8 +6,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"go.uber.org/zap"
 
 	"github.com/pkg/errors"
@@ -402,12 +400,16 @@ func (m *Messenger) Chats(from, to int) ([]*Chat, error) {
 	return m.persistence.Chats(from, to)
 }
 
-func (m *Messenger) DeleteChat(chatID string, chatType ChatType) error {
-	return m.persistence.DeleteChat(chatID, chatType)
+func (m *Messenger) DeleteChat(chatID string) error {
+	return m.persistence.DeleteChat(chatID)
 }
 
 func (m *Messenger) SaveContact(contact Contact) error {
-	return m.persistence.SaveContact(contact)
+	return m.persistence.SaveContact(contact, nil)
+}
+
+func (m *Messenger) BlockContact(contact Contact) ([]*Chat, error) {
+	return m.persistence.BlockContact(contact)
 }
 
 func (m *Messenger) Contacts() ([]*Contact, error) {
@@ -617,8 +619,8 @@ func (m *Messenger) MessageByID(id string) (*Message, error) {
 }
 
 // DEPRECATED: required by status-react.
-func (m *Messenger) MessageExists(id string) (bool, error) {
-	return m.persistence.MessageExists(id)
+func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
+	return m.persistence.MessagesExist(ids)
 }
 
 // DEPRECATED: required by status-react.
@@ -627,36 +629,18 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*Messag
 }
 
 // DEPRECATED: required by status-react.
-func (m *Messenger) MessagesFrom(from string) ([]*Message, error) {
-	publicKeyBytes, err := hexutil.Decode(from)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode from argument")
-	}
-	return m.persistence.MessagesFrom(publicKeyBytes)
-}
-
-// DEPRECATED: required by status-react.
-func (m *Messenger) UnseenMessageIDs() ([]string, error) {
-	ids, err := m.persistence.UnseenMessageIDs()
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]string, 0, len(ids))
-	for _, id := range ids {
-		result = append(result, hexutil.Encode(id))
-	}
-	return result, nil
-}
-
-// DEPRECATED: required by status-react.
-func (m *Messenger) SaveMessage(message *Message) error {
-	return m.persistence.SaveMessage(message)
+func (m *Messenger) SaveMessages(messages []*Message) error {
+	return m.persistence.SaveMessagesLegacy(messages)
 }
 
 // DEPRECATED: required by status-react.
 func (m *Messenger) DeleteMessage(id string) error {
 	return m.persistence.DeleteMessage(id)
+}
+
+// DEPRECATED: required by status-react.
+func (m *Messenger) DeleteMessagesByChatID(id string) error {
+	return m.persistence.DeleteMessagesByChatID(id)
 }
 
 // DEPRECATED: required by status-react.

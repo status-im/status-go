@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"encoding/hex"
-	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -44,14 +43,8 @@ func (db sqlitePersistence) LastMessageClock(chatID string) (int64, error) {
 	return last.Int64, nil
 }
 
-func formatChatID(chatID string, chatType ChatType) string {
-	return fmt.Sprintf("%s-%d", chatID, chatType)
-}
-
 func (db sqlitePersistence) SaveChat(chat Chat) error {
 	var err error
-	// We build the db chatID using the type, so that we have no clashes
-	chatID := formatChatID(chat.ID, chat.ChatType)
 
 	pkey := []byte{}
 	// For one to one chatID is an encoded public key
@@ -93,7 +86,7 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 	defer stmt.Close()
 
 	_, err = stmt.Exec(
-		chatID,
+		chat.ID,
 		chat.Name,
 		chat.Color,
 		chat.Active,
@@ -115,15 +108,35 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 	return err
 }
 
-func (db sqlitePersistence) DeleteChat(chatID string, chatType ChatType) error {
-	dbChatID := formatChatID(chatID, chatType)
-	_, err := db.db.Exec("DELETE FROM chats WHERE id = ?", dbChatID)
+func (db sqlitePersistence) DeleteChat(chatID string) error {
+	_, err := db.db.Exec("DELETE FROM chats WHERE id = ?", chatID)
 	return err
 }
 
 func (db sqlitePersistence) Chats(from, to int) ([]*Chat, error) {
+	return db.chats(from, to, nil)
+}
 
-	rows, err := db.db.Query(`SELECT
+func (db sqlitePersistence) chats(from, to int, tx *sql.Tx) ([]*Chat, error) {
+	var err error
+
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
+	rows, err := tx.Query(`SELECT
 	id,
 	name,
 	color,
@@ -148,6 +161,9 @@ func (db sqlitePersistence) Chats(from, to int) ([]*Chat, error) {
 	var response []*Chat
 
 	for rows.Next() {
+		var lastMessageContentType sql.NullString
+		var lastMessageContent sql.NullString
+
 		chat := &Chat{}
 		encodedMembers := []byte{}
 		encodedMembershipUpdates := []byte{}
@@ -163,17 +179,16 @@ func (db sqlitePersistence) Chats(from, to int) ([]*Chat, error) {
 			&pkey,
 			&chat.UnviewedMessagesCount,
 			&chat.LastClockValue,
-			&chat.LastMessageContentType,
-			&chat.LastMessageContent,
+			&lastMessageContentType,
+			&lastMessageContent,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 		)
 		if err != nil {
 			return nil, err
 		}
-
-		// Restore the backward compatible ID
-		chat.ID = chat.ID[:len(chat.ID)-2]
+		chat.LastMessageContent = lastMessageContent.String
+		chat.LastMessageContentType = lastMessageContentType.String
 
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
@@ -254,7 +269,25 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SaveContact(contact Contact) error {
+func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
+	var err error
+
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
 	// Encode device info
 	var encodedDeviceInfo bytes.Buffer
 	deviceInfoEncoder := gob.NewEncoder(&encodedDeviceInfo)
@@ -272,7 +305,7 @@ func (db sqlitePersistence) SaveContact(contact Contact) error {
 	}
 
 	// Insert record
-	stmt, err := db.db.Prepare(`INSERT INTO contacts(
+	stmt, err := tx.Prepare(`INSERT INTO contacts(
 	  id,
 	  address,
 	  name,
