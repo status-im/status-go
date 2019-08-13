@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -287,9 +288,9 @@ func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) accountsService() gethnode.ServiceConstructor {
+func (b *StatusBackend) accountsService(accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, b.accountManager), nil
+		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, b.accountManager, accountsFeed), nil
 	}
 }
 
@@ -305,9 +306,9 @@ func (b *StatusBackend) permissionsService() gethnode.ServiceConstructor {
 	}
 }
 
-func (b *StatusBackend) walletService(network uint64) gethnode.ServiceConstructor {
+func (b *StatusBackend) walletService(network uint64, accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return wallet.NewService(wallet.NewDB(b.appDB, network)), nil
+		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed), nil
 	}
 }
 
@@ -322,13 +323,14 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err := config.Validate(); err != nil {
 		return err
 	}
+	accountsFeed := &event.Feed{}
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
-	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService())
+	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
-	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID))
+	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID, accountsFeed))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {

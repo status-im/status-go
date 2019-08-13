@@ -50,30 +50,28 @@ type reactorClient interface {
 }
 
 // NewReactor creates instance of the Reactor.
-func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, accounts []common.Address, chain *big.Int) *Reactor {
+func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, chain *big.Int) *Reactor {
 	return &Reactor{
-		db:       db,
-		client:   client,
-		feed:     feed,
-		accounts: accounts,
-		chain:    chain,
+		db:     db,
+		client: client,
+		feed:   feed,
+		chain:  chain,
 	}
 }
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	client   *ethclient.Client
-	db       *Database
-	feed     *event.Feed
-	accounts []common.Address
-	chain    *big.Int
+	client *ethclient.Client
+	db     *Database
+	feed   *event.Feed
+	chain  *big.Int
 
 	mu    sync.Mutex
 	group *Group
 }
 
 // Start runs reactor loop in background.
-func (r *Reactor) Start() error {
+func (r *Reactor) Start(accounts []common.Address) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.group != nil {
@@ -81,20 +79,17 @@ func (r *Reactor) Start() error {
 	}
 	r.group = NewGroup(context.Background())
 	signer := types.NewEIP155Signer(r.chain)
-	// TODO(dshulyak) to support adding accounts in runtime implement keyed group
-	// and export private api to start downloaders from accounts
-	// private api should have access only to reactor
 	ctl := &controlCommand{
 		db:       r.db,
 		chain:    r.chain,
 		client:   r.client,
-		accounts: r.accounts,
+		accounts: accounts,
 		eth: &ETHTransferDownloader{
 			client:   r.client,
-			accounts: r.accounts,
+			accounts: accounts,
 			signer:   signer,
 		},
-		erc20:       NewERC20TransfersDownloader(r.client, r.accounts, signer),
+		erc20:       NewERC20TransfersDownloader(r.client, accounts, signer),
 		feed:        r.feed,
 		safetyDepth: reorgSafetyDepth,
 	}
