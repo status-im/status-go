@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/crypto/sha3"
+
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 )
 
@@ -14,7 +16,8 @@ import (
 // https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
 const kdfIterationsNumber = 3200
 
-func openDB(path, key string) (*sql.DB, error) {
+// OpenDBWithKey opens encrypted database passing key as PRAGMA key.
+func OpenDBWithKey(path, key string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		return nil, err
@@ -50,7 +53,8 @@ func openDB(path, key string) (*sql.DB, error) {
 	return db, nil
 }
 
-// OpenDB opens not-encrypted database.
-func OpenDB(path, key string) (*sql.DB, error) {
-	return openDB(path, key)
+// OpenDB opens encrypted database using password.
+func OpenDB(path, password string) (*sql.DB, error) {
+	passhash := sha3.Sum256([]byte(password))
+	return OpenDBWithKey(path, string(passhash[:]))
 }
