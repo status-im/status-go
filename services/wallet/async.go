@@ -15,6 +15,10 @@ type FiniteCommand struct {
 }
 
 func (c FiniteCommand) Run(ctx context.Context) error {
+	err := c.Runable(ctx)
+	if err == nil {
+		return nil
+	}
 	ticker := time.NewTicker(c.Interval)
 	for {
 		select {
@@ -36,6 +40,7 @@ type InfiniteCommand struct {
 }
 
 func (c InfiniteCommand) Run(ctx context.Context) error {
+	_ = c.Runable(ctx)
 	ticker := time.NewTicker(c.Interval)
 	for {
 		select {

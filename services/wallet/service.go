@@ -3,7 +3,6 @@ package wallet
 import (
 	"context"
 	"math/big"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -106,11 +105,10 @@ func WatchAccountsChanges(ctx context.Context, feed *event.Feed, initial []commo
 	accounts := make(chan []accounts.Account, 1) // it may block if the rate of updates will be significantly higher
 	sub := feed.Subscribe(accounts)
 	defer sub.Unsubscribe()
-	prev := make([]common.Address, len(initial))
-	copy(initial, prev)
-	sort.Slice(prev, func(i, j int) bool {
-		return prev[i].Big().Cmp(prev[j].Big()) == -1
-	})
+	listen := make(map[common.Address]struct{}, len(initial))
+	for _, address := range initial {
+		listen[address] = struct{}{}
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -120,34 +118,33 @@ func WatchAccountsChanges(ctx context.Context, feed *event.Feed, initial []commo
 				log.Error("accounts watcher subscription failed", "error", err)
 			}
 		case n := <-accounts:
-			addrs := make([]common.Address, len(n))
-			for i, acc := range n {
-				addrs[i] = acc.Address
+			log.Debug("wallet received updated list of accoutns", "accounts", n)
+			restart := false
+			for _, acc := range n {
+				_, exist := listen[acc.Address]
+				if !exist {
+					listen[acc.Address] = struct{}{}
+					restart = true
+				}
 			}
-			sort.Slice(addrs, func(i, j int) bool {
-				return addrs[i].Big().Cmp(addrs[j].Big()) == -1
-			})
-			if sortedSliceEqual(prev, addrs) {
+			if !restart {
 				continue
 			}
+			listenList := mapToList(listen)
+			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
 			reactor.Stop()
-			err := reactor.Start(addrs) // error is raised only if reactor is already running
+			err := reactor.Start(listenList) // error is raised only if reactor is already running
 			if err != nil {
-				log.Error("failed to restart reactor with new accounts. application will fallback to initial list", "addresses", addrs, "error", err)
+				log.Error("failed to restart reactor with new accounts", "error", err)
 			}
-			prev = addrs
 		}
 	}
 }
 
-func sortedSliceEqual(first, second []common.Address) bool {
-	if len(first) != len(second) {
-		return false
+func mapToList(m map[common.Address]struct{}) []common.Address {
+	rst := make([]common.Address, 0, len(m))
+	for address := range m {
+		rst = append(rst, address)
 	}
-	for i := range first {
-		if first[i] != second[i] {
-			return false
-		}
-	}
-	return true
+	return rst
 }
