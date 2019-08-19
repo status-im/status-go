@@ -211,8 +211,8 @@ release: check-existing-release
 xgo-install:
 	go get -u github.com/karalabe/xgo
 
-gomobile-install:
-	go get -u golang.org/x/mobile/cmd/gomobile
+gomobile-install: xtools-install
+	go get golang.org/x/mobile/cmd/gomobile
 
 release-install:
 	go get -u github.com/c4milo/github-release
@@ -220,6 +220,10 @@ release-install:
 gen-install:
 	go get -u github.com/kevinburke/go-bindata/go-bindata@v3.13.0
 	go get -u github.com/golang/protobuf/protoc-gen-go@v1.3.1
+
+xtools-install:
+	# special fix for gomobile issues
+	go get golang.org/x/tools/go/packages
 
 modvendor-install:
 	# a tool to vendor non-go files

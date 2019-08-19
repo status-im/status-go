@@ -42,7 +42,7 @@ pipeline {
       println("Git Branch: ${lib.gitBranch()}")
       println("Git Commit: ${lib.gitCommit()}")
       /* save and create a dir for artifacts */
-      dest = "${env.WORKSPACE}/pkg"
+      dest = "${env.WORKSPACE}/out"
       sh "mkdir -p ${dest}"
       /* for easier reuse */
       artifact = "status-go-desktop-${lib.suffix()}.zip"
@@ -57,11 +57,11 @@ pipeline {
     } } }
 
     stage('Archive') { steps {
-      archiveArtifacts("pkg/${artifact}")
+      archiveArtifacts("out/${artifact}")
     } }
 
     stage('Upload') { steps { script {
-      env.PKG_URL = lib.uploadArtifact("pkg/${artifact}")
+      env.PKG_URL = lib.uploadArtifact("out/${artifact}")
     } } }
   } // stages
   post {
