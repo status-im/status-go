@@ -83,7 +83,7 @@ def copyArts(build) {
    **/
   copyArtifacts(
     projectName: build.fullProjectName,
-    target: 'pkg',
+    target: 'out',
     flatten: true,
     selector: specific("${build.number}")
   )
