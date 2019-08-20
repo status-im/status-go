@@ -31,7 +31,7 @@ pipeline {
     GOPATH      = "${env.WORKSPACE}"
     PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* This will override the var in Makefile */
-    RELEASE_DIR = "${env.WORKSPACE}/pkg"
+    RELEASE_DIR = "${env.WORKSPACE}/out"
   }
 
   stages {

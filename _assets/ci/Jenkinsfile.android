@@ -27,6 +27,10 @@ pipeline {
   }
 
   environment {
+    /* fix for gomobile complaining about missing packages */
+    CGO_ENABLED      = "1"
+    GO111MODULE      = "off"
+    /* Other stuff */
     BUILD_PLATFORM   = 'android'
     STATUS_PATH      = "${env.WORKSPACE}/src/github.com/status-im/status-go"
     CI_DIR           = "${env.STATUS_PATH}/_assets/ci"
@@ -47,7 +51,7 @@ pipeline {
       println("Git Branch: ${lib.gitBranch()}")
       println("Git Commit: ${lib.gitCommit()}")
       /* save and create a dir for artifacts */
-      dest = "${env.WORKSPACE}/pkg"
+      dest = "${env.WORKSPACE}/out"
       sh "mkdir -p ${dest}"
       /* for easier reuse */
       artifact = "status-go-android-${lib.suffix()}.aar"
@@ -63,11 +67,11 @@ pipeline {
     } } }
 
     stage('Archive') { steps {
-      archiveArtifacts("pkg/${artifact}")
+      archiveArtifacts("out/${artifact}")
     } }
 
     stage('Upload') { steps { script {
-      env.PKG_URL = lib.uploadArtifact("pkg/${artifact}")
+      env.PKG_URL = lib.uploadArtifact("out/${artifact}")
     } } }
   } // stages
   post {
