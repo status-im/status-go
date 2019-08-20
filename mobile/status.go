@@ -10,10 +10,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
-	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/services/personal"
@@ -28,6 +28,24 @@ var statusBackend = api.NewStatusBackend()
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/mobile")
 
+// OpenAccounts opens database and returns accounts list.
+func OpenAccounts(datadir string) string {
+	statusBackend.UpdateRootDataDir(datadir)
+	err := statusBackend.OpenAccounts()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	accs, err := statusBackend.GetAccounts()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	data, err := json.Marshal(accs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return string(data)
+}
+
 // GenerateConfig for status node.
 func GenerateConfig(datadir string, networkID int) string {
 	config, err := params.NewNodeConfig(datadir, uint64(networkID))
@@ -41,28 +59,6 @@ func GenerateConfig(datadir string, networkID int) string {
 	}
 
 	return string(outBytes)
-}
-
-// StartNode starts the Ethereum Status node.
-func StartNode(configJSON string) string {
-	config, err := params.NewConfigFromJSON(configJSON)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	if err := logutils.OverrideRootLogWithConfig(config, false); err != nil {
-		return makeJSONResponse(err)
-	}
-
-	api.RunAsync(func() error { return statusBackend.StartNode(config) })
-
-	return makeJSONResponse(nil)
-}
-
-// StopNode stops the Ethereum Status node.
-func StopNode() string {
-	api.RunAsync(statusBackend.StopNode)
-	return makeJSONResponse(nil)
 }
 
 // ExtractGroupMembershipSignatures extract public keys from tuples of content/signature.
@@ -209,7 +205,6 @@ func CallPrivateRPC(inputJSON string) string {
 // just modified to handle the function arg passing.
 func CreateAccount(password string) string {
 	info, mnemonic, err := statusBackend.AccountManager().CreateAccount(password)
-
 	errString := ""
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -326,13 +321,58 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 // Login loads a key file (for a given address), tries to decrypt it using the password,
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity.
-func Login(loginParamsJSON string) string {
-	params, err := account.ParseLoginParams(loginParamsJSON)
+func Login(accountData, password string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
-		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+		return makeJSONResponse(err)
 	}
+	api.RunAsync(func() error {
+		log.Debug("start a node with account", "address", account.Address)
+		err := statusBackend.StartNodeWithAccount(account, password)
+		if err != nil {
+			log.Error("failed to start a node", "address", account.Address, "error", err)
+			return err
+		}
+		log.Debug("started a node with", "address", account.Address)
+		return nil
+	})
+	return makeJSONResponse(nil)
+}
 
-	err = statusBackend.SelectAccount(params)
+// SaveAccountAndLogin saves account in status-go database..
+func SaveAccountAndLogin(accountData, password, configJSON, subaccountData string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var conf params.NodeConfig
+	err = json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var subaccs []accounts.Account
+	err = json.Unmarshal([]byte(subaccountData), &subaccs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	api.RunAsync(func() error {
+		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf, subaccs)
+		if err != nil {
+			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			return err
+		}
+		log.Debug("started a node, and saved account", "address", account.Address)
+		return nil
+	})
+	return makeJSONResponse(nil)
+}
+
+// InitKeystore initialize keystore before doing any operations with keys.
+func InitKeystore(keydir string) string {
+	err := statusBackend.AccountManager().InitKeystore(keydir)
 	return makeJSONResponse(err)
 }
 
@@ -346,7 +386,11 @@ func LoginWithKeycard(chatKeyData, encryptionKeyData string) string {
 // Logout is equivalent to clearing whisper identities.
 func Logout() string {
 	err := statusBackend.Logout()
-	return makeJSONResponse(err)
+	if err != nil {
+		makeJSONResponse(err)
+	}
+	api.RunAsync(statusBackend.StopNode)
+	return makeJSONResponse(nil)
 }
 
 // SignMessage unmarshals rpc params {data, address, password} and

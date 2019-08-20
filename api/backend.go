@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -19,11 +20,15 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/crypto"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/rpcfilters"
 	"github.com/status-im/status-go/services/subscriptions"
@@ -52,10 +57,14 @@ var (
 
 // StatusBackend implements Status.im service
 type StatusBackend struct {
-	mu              sync.Mutex
+	mu sync.Mutex
+	// rootDataDir is the same for all networks.
+	rootDataDir     string
+	accountsDB      *accounts.Database
 	statusNode      *node.StatusNode
 	personalAPI     *personal.PublicAPI
 	rpcFilters      *rpcfilters.Service
+	multiaccountsDB *multiaccounts.Database
 	accountManager  *account.Manager
 	transactor      *transactions.Transactor
 	newNotification fcm.NotificationConstructor
@@ -70,12 +79,11 @@ func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
 
 	statusNode := node.New()
-	accountManager := account.NewManager(statusNode)
+	accountManager := account.NewManager()
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	notificationManager := fcm.NewNotification(fcmServerKey)
 	rpcFilters := rpcfilters.New(statusNode)
-
 	return &StatusBackend{
 		statusNode:      statusNode,
 		accountManager:  accountManager,
@@ -121,6 +129,144 @@ func (b *StatusBackend) StartNode(config *params.NodeConfig) error {
 	return nil
 }
 
+func (b *StatusBackend) UpdateRootDataDir(datadir string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.rootDataDir = datadir
+}
+
+func (b *StatusBackend) OpenAccounts() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB != nil {
+		return nil
+	}
+	db, err := multiaccounts.InitializeDB(filepath.Join(b.rootDataDir, "accounts.sql"))
+	if err != nil {
+		return err
+	}
+	b.multiaccountsDB = db
+	return nil
+}
+
+func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return nil, errors.New("accoutns db wasn't initialized")
+	}
+	return b.multiaccountsDB.GetAccounts()
+}
+
+func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return errors.New("accoutns db wasn't initialized")
+	}
+	return b.multiaccountsDB.SaveAccount(account)
+}
+
+func (b *StatusBackend) ensureAccountsDBOpened(account multiaccounts.Account, password string) (err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.accountsDB != nil {
+		return nil
+	}
+	if len(b.rootDataDir) == 0 {
+		return errors.New("root datadir wasn't provided")
+	}
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("accounts-%x.sql", account.Address))
+	b.accountsDB, err = accounts.InitializeDB(path, password)
+	return err
+}
+
+func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
+	err := b.ensureAccountsDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+	conf, err := b.loadNodeConfig()
+	if err != nil {
+		return err
+	}
+	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
+		return err
+	}
+	chatAddr, err := b.accountsDB.GetChatAddress()
+	if err != nil {
+		return err
+	}
+	walletAddr, err := b.accountsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+	watchAddrs, err := b.accountsDB.GetAddresses()
+	if err != nil {
+		return err
+	}
+	login := account.LoginParams{
+		Password:       password,
+		ChatAddress:    chatAddr,
+		WatchAddresses: watchAddrs,
+		MainAccount:    walletAddr,
+	}
+	err = b.StartNode(conf)
+	if err != nil {
+		return err
+	}
+	err = b.SelectAccount(login)
+	if err != nil {
+		return err
+	}
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+	signal.SendLoggedIn()
+	return nil
+}
+
+// StartNodeWithAccountAndConfig is used after account and config was generated.
+// In current setup account name and config is generated on the client side. Once/if it will be generated on
+// status-go side this flow can be simplified.
+func (b *StatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account) error {
+	err := b.SaveAccount(account)
+	if err != nil {
+		return err
+	}
+	err = b.ensureAccountsDBOpened(account, password)
+	if err != nil {
+		return err
+	}
+	err = b.saveNodeConfig(conf)
+	if err != nil {
+		return err
+	}
+	err = b.accountsDB.SaveAccounts(subaccs)
+	if err != nil {
+		return err
+	}
+	return b.StartNodeWithAccount(account, password)
+}
+
+func (b *StatusBackend) saveNodeConfig(config *params.NodeConfig) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.accountsDB.SaveConfig(accounts.NodeConfigTag, config)
+}
+
+func (b *StatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	conf := params.NodeConfig{}
+	err := b.accountsDB.GetConfig(accounts.NodeConfigTag, &conf)
+	if err != nil {
+		return nil, err
+	}
+	return &conf, nil
+}
+
 func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
 		return rpcfilters.New(b.statusNode), nil
@@ -130,6 +276,12 @@ func (b *StatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 func (b *StatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
 		return subscriptions.New(b.statusNode), nil
+	}
+}
+
+func (b *StatusBackend) accountsService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return accountssvc.NewService(b.accountsDB, b.multiaccountsDB, b.AccountManager()), nil
 	}
 }
 
@@ -144,17 +296,22 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	if err := config.Validate(); err != nil {
 		return err
 	}
-
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
+	services = appendIf(b.accountsDB != nil, services, b.accountsService())
 
+	manager := b.accountManager.GetManager()
+	if manager == nil {
+		return errors.New("ethereum accounts.Manager is nil")
+	}
 	if err = b.statusNode.StartWithOptions(config, node.StartOptions{
 		Services: services,
 		// The peers discovery protocols are started manually after
 		// `node.ready` signal is sent.
 		// It was discussed in https://github.com/status-im/status-go/pull/1333.
-		StartDiscovery: false,
+		StartDiscovery:  false,
+		AccountsManager: manager,
 	}); err != nil {
 		return
 	}
@@ -484,6 +641,22 @@ func (b *StatusBackend) Logout() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	err := b.cleanupServices()
+	if err != nil {
+		return err
+	}
+	err = b.stopAccountsDB()
+	if err != nil {
+		return err
+	}
+
+	b.AccountManager().Logout()
+
+	return nil
+}
+
+// cleanupServices stops parts of services that doesn't managed by a node and removes injected data from services.
+func (b *StatusBackend) cleanupServices() error {
 	whisperService, err := b.statusNode.WhisperService()
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
@@ -521,9 +694,15 @@ func (b *StatusBackend) Logout() error {
 			return err
 		}
 	}
+	return nil
+}
 
-	b.AccountManager().Logout()
-
+func (b *StatusBackend) stopAccountsDB() error {
+	if b.accountsDB != nil {
+		err := b.accountsDB.Close()
+		b.accountsDB = nil
+		return err
+	}
 	return nil
 }
 
@@ -622,7 +801,6 @@ func (b *StatusBackend) startWallet(password string) error {
 	allAddresses := make([]common.Address, len(watchAddresses)+1)
 	allAddresses[0] = mainAccountAddress
 	copy(allAddresses[1:], watchAddresses)
-
 	path := path.Join(b.statusNode.Config().DataDir, fmt.Sprintf("wallet-%x.sql", mainAccountAddress))
 	return wallet.StartReactor(path, password,
 		b.statusNode.RPCClient().Ethclient(),

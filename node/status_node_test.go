@@ -36,13 +36,8 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, n.Config())
 	require.Nil(t, n.RPCClient())
 	require.Equal(t, 0, n.PeerCount())
-	_, err = n.AccountManager()
-	require.EqualError(t, err, ErrNoGethNode.Error())
-	_, err = n.AccountKeyStore()
-	require.EqualError(t, err, ErrNoGethNode.Error())
-
 	// start node
-	require.NoError(t, n.Start(config))
+	require.NoError(t, n.Start(config, nil))
 
 	// checks after node is started
 	require.True(t, n.IsRunning())
@@ -53,11 +48,8 @@ func TestStatusNodeStart(t *testing.T) {
 	accountManager, err := n.AccountManager()
 	require.Nil(t, err)
 	require.NotNil(t, accountManager)
-	keyStore, err := n.AccountKeyStore()
-	require.Nil(t, err)
-	require.NotNil(t, keyStore)
 	// try to start already started node
-	require.EqualError(t, n.Start(config), ErrNodeRunning.Error())
+	require.EqualError(t, n.Start(config, nil), ErrNodeRunning.Error())
 
 	// stop node
 	require.NoError(t, n.Stop())
@@ -68,10 +60,6 @@ func TestStatusNodeStart(t *testing.T) {
 	require.Nil(t, n.GethNode())
 	require.Nil(t, n.RPCClient())
 	require.Equal(t, 0, n.PeerCount())
-	_, err = n.AccountManager()
-	require.EqualError(t, err, ErrNoGethNode.Error())
-	_, err = n.AccountKeyStore()
-	require.EqualError(t, err, ErrNoGethNode.Error())
 }
 
 func TestStatusNodeWithDataDir(t *testing.T) {
@@ -94,7 +82,7 @@ func TestStatusNodeWithDataDir(t *testing.T) {
 	}
 	n := New()
 
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	require.NoError(t, n.Stop())
 }
 
@@ -140,7 +128,7 @@ func TestStatusNodeServiceGetters(t *testing.T) {
 			require.Nil(t, instance)
 
 			// start node
-			require.NoError(t, n.Start(&config))
+			require.NoError(t, n.Start(&config, nil))
 
 			// checks after node is started
 			instance, err = service.getter()
@@ -184,7 +172,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	config := params.NodeConfig{
 		MaxPeers: math.MaxInt32,
 	}
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	defer func() { require.NoError(t, n.Stop()) }()
 
 	errCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*5)
@@ -226,7 +214,7 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 			StaticNodes: []string{peerURL},
 		},
 	}
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	defer func() { require.NoError(t, n.Stop()) }()
 
 	// checks after node is started
@@ -286,7 +274,7 @@ func TestStatusNodeRendezvousDiscovery(t *testing.T) {
 		AdvertiseAddr: "127.0.0.1",
 	}
 	n := New()
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	require.NotNil(t, n.discovery)
 	require.True(t, n.discovery.Running())
 	require.IsType(t, &discovery.Rendezvous{}, n.discovery)
@@ -320,7 +308,7 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 		ListenAddr:  "127.0.0.1:0",
 	}
 	n := New()
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	node, err := n.discoverNode()
 	require.NoError(t, err)
 	require.Equal(t, net.ParseIP("127.0.0.1").To4(), node.IP())
@@ -331,7 +319,7 @@ func TestStatusNodeDiscoverNode(t *testing.T) {
 		ListenAddr:    "127.0.0.1:0",
 	}
 	n = New()
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	node, err = n.discoverNode()
 	require.NoError(t, err)
 	require.Equal(t, net.ParseIP("127.0.0.2").To4(), node.IP())
@@ -357,7 +345,7 @@ func TestChaosModeCheckRPCClientsUpstreamURL(t *testing.T) {
 		},
 	}
 	n := New()
-	require.NoError(t, n.Start(&config))
+	require.NoError(t, n.Start(&config, nil))
 	defer func() { require.NoError(t, n.Stop()) }()
 	require.NotNil(t, n.RPCClient())
 
