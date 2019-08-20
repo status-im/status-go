@@ -63,7 +63,7 @@ func (m *Sqlite) ensureVersionTable() error {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (version uint64,dirty bool);
   CREATE UNIQUE INDEX IF NOT EXISTS version_unique ON %s (version);
-  `, DefaultMigrationsTable, DefaultMigrationsTable)
+  `, m.config.MigrationsTable, m.config.MigrationsTable)
 
 	if _, err := m.db.Exec(query); err != nil {
 		return err

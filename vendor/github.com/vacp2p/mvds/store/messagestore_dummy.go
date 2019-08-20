@@ -13,8 +13,8 @@ type DummyStore struct {
 	ms map[state.MessageID]*protobuf.Message
 }
 
-func NewDummyStore() DummyStore {
-	return DummyStore{ms: make(map[state.MessageID]*protobuf.Message)}
+func NewDummyStore() *DummyStore {
+	return &DummyStore{ms: make(map[state.MessageID]*protobuf.Message)}
 }
 
 func (ds *DummyStore) Has(id state.MessageID) (bool, error) {

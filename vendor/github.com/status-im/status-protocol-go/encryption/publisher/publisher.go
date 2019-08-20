@@ -2,7 +2,6 @@ package publisher
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -24,19 +23,19 @@ var (
 )
 
 type Publisher struct {
-	persistence *sqlitePersistence
+	persistence *persistence
 	logger      *zap.Logger
 	notifyCh    chan struct{}
 	quit        chan struct{}
 }
 
-func New(db *sql.DB, logger *zap.Logger) *Publisher {
+func New(logger *zap.Logger) *Publisher {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
 	return &Publisher{
-		persistence: newSQLitePersistence(db),
+		persistence: newPersistence(),
 		logger:      logger.With(zap.Namespace("Publisher")),
 	}
 }
@@ -93,10 +92,7 @@ func (p *Publisher) tickerLoop() {
 }
 
 func (p *Publisher) notify() error {
-	lastPublished, err := p.persistence.lastPublished()
-	if err != nil {
-		return err
-	}
+	lastPublished := p.persistence.getLastPublished()
 
 	now := time.Now().Unix()
 
@@ -106,15 +102,13 @@ func (p *Publisher) notify() error {
 
 	p.notifyCh <- struct{}{}
 
-	return p.persistence.setLastPublished(now)
+	p.persistence.setLastPublished(now)
+	return nil
 }
 
 func (p *Publisher) ShouldAdvertiseBundle(publicKey *ecdsa.PublicKey, now int64) (bool, error) {
 	identity := crypto.CompressPubkey(publicKey)
-	lastAcked, err := p.persistence.lastAck(identity)
-	if err != nil {
-		return false, err
-	}
+	lastAcked := p.persistence.lastAck(identity)
 	return now-lastAcked < deviceNotFoundAckInterval, nil
 }
 

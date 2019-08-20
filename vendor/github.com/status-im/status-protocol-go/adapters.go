@@ -590,8 +590,9 @@ func (a *whisperAdapter) messageSpecToWhisper(spec *encryption.ProtocolMessageSp
 	return newMessage, nil
 }
 
-func (a *whisperAdapter) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
+func (a *whisperAdapter) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*transport.Filter, error) {
 	logger := a.logger.With(zap.String("site", "handleSharedSecrets"))
+	var filters []*transport.Filter
 	for _, secret := range secrets {
 		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
 
@@ -599,11 +600,13 @@ func (a *whisperAdapter) handleSharedSecrets(secrets []*sharedsecret.Secret) err
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		}
-		if err := a.transport.ProcessNegotiatedSecret(fSecret); err != nil {
-			return err
+		filter, err := a.transport.ProcessNegotiatedSecret(fSecret)
+		if err != nil {
+			return nil, err
 		}
+		filters = append(filters, filter)
 	}
-	return nil
+	return filters, nil
 }
 
 func (a *whisperAdapter) Stop() {

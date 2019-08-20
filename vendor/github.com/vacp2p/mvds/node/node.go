@@ -1,10 +1,11 @@
-// Package Node contains node logic.
+// Package node contains node logic.
 package node
 
 // @todo this is a very rough implementation that needs cleanup
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"sync/atomic"
@@ -46,8 +47,63 @@ type Node struct {
 
 	ID state.PeerID
 
-	epoch int64
-	mode  Mode
+	epochPersistence *epochSQLitePersistence
+	epoch            int64
+	mode             Mode
+
+	subscription chan protobuf.Message
+}
+
+func NewPersistentNode(
+	db *sql.DB,
+	st transport.Transport,
+	id state.PeerID,
+	mode Mode,
+	nextEpoch CalculateNextEpoch,
+) (*Node, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	node := Node{
+		ID:               id,
+		ctx:              ctx,
+		cancel:           cancel,
+		store:            store.NewPersistentMessageStore(db),
+		transport:        st,
+		peers:            peers.NewSQLitePersistence(db),
+		syncState:        state.NewPersistentSyncState(db),
+		payloads:         newPayloads(),
+		epochPersistence: newEpochSQLitePersistence(db),
+		nextEpoch:        nextEpoch,
+		mode:             mode,
+	}
+	if currentEpoch, err := node.epochPersistence.Get(id); err != nil {
+		return nil, err
+	} else {
+		node.epoch = currentEpoch
+	}
+	return &node, nil
+}
+
+func NewEphemeralNode(
+	id state.PeerID,
+	t transport.Transport,
+	nextEpoch CalculateNextEpoch,
+	currentEpoch int64,
+	mode Mode,
+) *Node {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Node{
+		ID:        id,
+		ctx:       ctx,
+		cancel:    cancel,
+		store:     store.NewDummyStore(),
+		transport: t,
+		syncState: state.NewSyncState(),
+		peers:     peers.NewMemoryPersistence(),
+		payloads:  newPayloads(),
+		nextEpoch: nextEpoch,
+		epoch:     currentEpoch,
+		mode:      mode,
+	}
 }
 
 // NewNode returns a new node.
@@ -62,7 +118,6 @@ func NewNode(
 	pp peers.Persistence,
 ) *Node {
 	ctx, cancel := context.WithCancel(context.Background())
-
 	return &Node{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -76,6 +131,10 @@ func NewNode(
 		epoch:     currentEpoch,
 		mode:      mode,
 	}
+}
+
+func (n *Node) CurrentEpoch() int64 {
+	return atomic.LoadInt64(&n.epoch)
 }
 
 // Start listens for new messages received by the node and sends out those required every epoch.
@@ -107,6 +166,12 @@ func (n *Node) Start(duration time.Duration) {
 					log.Printf("Error sending messages: %+v\n", err)
 				}
 				atomic.AddInt64(&n.epoch, 1)
+				// When a persistent node is used, the epoch needs to be saved.
+				if n.epochPersistence != nil {
+					if err := n.epochPersistence.Set(n.ID, n.epoch); err != nil {
+						log.Printf("Failed to persisten epoch: %v", err)
+					}
+				}
 			}
 		}
 	}()
@@ -115,7 +180,22 @@ func (n *Node) Start(duration time.Duration) {
 // Stop message reading and epoch processing
 func (n *Node) Stop() {
 	log.Print("Stopping node")
+	n.Unsubscribe()
 	n.cancel()
+}
+
+// Subscribe subscribes to incoming messages.
+func (n *Node) Subscribe() chan protobuf.Message {
+	n.subscription = make(chan protobuf.Message)
+	return n.subscription
+}
+
+// Unsubscribe closes the listening channels
+func (n *Node) Unsubscribe() {
+	if n.subscription != nil {
+		close(n.subscription)
+	}
+	n.subscription = nil
 }
 
 // AppendMessage sends a message to a given group.
@@ -359,12 +439,17 @@ func (n *Node) onMessage(sender state.PeerID, msg protobuf.Message) error {
 	if err != nil {
 		return err
 	}
+
 	for _, peer := range peers {
 		if peer == sender {
 			continue
 		}
 
 		n.insertSyncState(&groupID, id, peer, state.OFFER)
+	}
+
+	if n.subscription != nil {
+		n.subscription <- msg
 	}
 
 	return nil

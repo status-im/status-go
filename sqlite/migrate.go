@@ -15,7 +15,9 @@ func Migrate(db *sql.DB, resources *bindata.AssetSource) error {
 		return err
 	}
 
-	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{})
+	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{
+		MigrationsTable: "status_go_" + sqlcipher.DefaultMigrationsTable,
+	})
 	if err != nil {
 		return err
 	}

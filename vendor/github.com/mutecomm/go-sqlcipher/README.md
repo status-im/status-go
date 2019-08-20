@@ -11,6 +11,8 @@ conforming to the built-in database/sql interface. It is based on:
 
 SQLite itself is part of SQLCipher.
 
+go-sqlcipher currently only supports the SQLCipher 3.x releases.
+
 
 ### Installation
 

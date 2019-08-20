@@ -24,6 +24,6 @@ type State struct {
 type SyncState interface {
 	Add(newState State) error
 	Remove(id MessageID, peer PeerID) error
-	All() ([]State, error)
+	All(epoch int64) ([]State, error)
 	Map(epoch int64, process func(State) State) error
 }

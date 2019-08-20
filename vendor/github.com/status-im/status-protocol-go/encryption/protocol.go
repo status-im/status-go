@@ -121,7 +121,7 @@ func NewWithEncryptorConfig(
 			ProtocolVersion:  protocolVersion,
 			InstallationID:   installationID,
 		}),
-		publisher:                publisher.New(db, logger),
+		publisher:                publisher.New(logger),
 		onAddedBundlesHandler:    addedBundlesHandler,
 		onNewSharedSecretHandler: onNewSharedSecretHandler,
 		onSendContactCodeHandler: onSendContactCodeHandler,

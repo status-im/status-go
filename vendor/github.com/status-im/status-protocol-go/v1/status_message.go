@@ -125,8 +125,9 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 		return err
 	}
 	m.ApplicationMetadataLayerSigPubKey = recoveredKey
+	// Calculate ID using the wrapped record
+	m.ID = MessageID(recoveredKey, m.DecryptedPayload)
 	m.DecryptedPayload = message.Payload
-	m.ID = MessageID(m.SigPubKey(), m.DecryptedPayload)
 	return nil
 
 }
