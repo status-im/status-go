@@ -235,23 +235,50 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 				log.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
+			var messageIDs []string
+
+			for _, messages := range chatWithMessages {
+				for _, message := range messages {
+					messageIDs = append(messageIDs, message.ID.String())
+				}
+			}
+
+			existingMessages, err := s.messenger.MessagesExist(messageIDs)
+			if err != nil {
+				log.Error("failed to check existing messages", "err", err)
+				continue
+			}
 
 			var signalMessages []*signal.Messages
 
 			for chat, messages := range chatWithMessages {
-				var retrievedMessages []*whisper.Message
-				for _, message := range messages {
-					whisperMessage := message.TransportMessage
-					whisperMessage.Payload = message.DecryptedPayload
-					retrievedMessages = append(retrievedMessages, whisperMessage)
-				}
 
-				signalMessage := &signal.Messages{
-					Chat:     chat,
-					Error:    nil, // TODO: what is it needed for?
-					Messages: s.deduplicator.Deduplicate(retrievedMessages),
+				var dedupMessages []*dedup.DeduplicateMessage
+				// Filter out already saved messages
+				for _, message := range messages {
+					if !existingMessages[message.ID.String()] {
+						dedupMessage := &dedup.DeduplicateMessage{
+							Metadata: dedup.Metadata{
+								MessageID:    message.ID,
+								EncryptionID: message.Hash,
+							},
+							Message: message.TransportMessage,
+						}
+						dedupMessage.Message.Payload = message.DecryptedPayload
+						dedupMessages = append(dedupMessages, dedupMessage)
+					}
 				}
-				signalMessages = append(signalMessages, signalMessage)
+				dedupMessages = s.deduplicator.Deduplicate(dedupMessages)
+
+				if len(dedupMessages) != 0 {
+					signalMessage := &signal.Messages{
+						Chat:     chat,
+						Error:    nil, // TODO: what is it needed for?
+						Messages: dedupMessages,
+					}
+
+					signalMessages = append(signalMessages, signalMessage)
+				}
 			}
 
 			log.Debug("retrieve messages loop", "messages", len(signalMessages))

@@ -1,6 +1,7 @@
 package statusproto
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -14,7 +15,6 @@ var (
 
 func (db sqlitePersistence) tableUserMessagesLegacyAllFields() string {
 	return `id,
-    		raw_payload_hash,
     		whisper_timestamp,
     		source,
     		destination,
@@ -29,7 +29,30 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllFields() string {
     		clock_value,
     		show,
     		seen,
-    		outgoing_status`
+    		outgoing_status,
+		reply_to`
+}
+
+func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsJoin() string {
+	return `m1.id,
+    		m1.whisper_timestamp,
+    		m1.source,
+    		m1.destination,
+    		m1.content,
+    		m1.content_type,
+    		m1.username,
+    		m1.timestamp,
+    		m1.chat_id,
+    		m1.retry_count,
+    		m1.message_type,
+    		m1.message_status,
+    		m1.clock_value,
+    		m1.show,
+    		m1.seen,
+    		m1.outgoing_status,
+		m1.reply_to,
+		m2.source,
+		m2.content`
 }
 
 func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsCount() int {
@@ -41,9 +64,10 @@ type scanner interface {
 }
 
 func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, message *Message, others ...interface{}) error {
+	var quotedContent sql.NullString
+	var quotedFrom sql.NullString
 	args := []interface{}{
 		&message.ID,
-		&message.RawPayloadHash,
 		&message.WhisperTimestamp,
 		&message.From, // source in table
 		&message.To,   // destination in table
@@ -59,14 +83,27 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 		&message.Show,
 		&message.Seen,
 		&message.OutgoingStatus,
+		&message.ReplyTo,
+		&quotedFrom,
+		&quotedContent,
 	}
-	return row.Scan(append(args, others...)...)
+	err := row.Scan(append(args, others...)...)
+	if err != nil {
+		return err
+	}
+
+	if quotedContent.Valid {
+		message.QuotedMessage = &QuotedMessage{
+			From:    quotedFrom.String,
+			Content: quotedContent.String,
+		}
+	}
+	return nil
 }
 
 func (db sqlitePersistence) tableUserMessagesLegacyAllValues(message *Message) []interface{} {
 	return []interface{}{
 		message.ID,
-		message.RawPayloadHash,
 		message.WhisperTimestamp,
 		message.From, // source in table
 		message.To,   // destination in table
@@ -82,21 +119,26 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllValues(message *Message) [
 		message.Show,
 		message.Seen,
 		message.OutgoingStatus,
+		message.ReplyTo,
 	}
 }
 
 func (db sqlitePersistence) MessageByID(id string) (*Message, error) {
 	var message Message
 
-	allFields := db.tableUserMessagesLegacyAllFields()
+	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
 	row := db.db.QueryRow(
 		fmt.Sprintf(`
 			SELECT
 				%s
 			FROM
-				user_messages_legacy
+				user_messages_legacy m1
+			LEFT JOIN
+				user_messages_legacy m2
+			ON
+			m1.reply_to = m2.id
 			WHERE
-				id = ?
+				m1.id = ?
 		`, allFields),
 		id,
 	)
@@ -111,17 +153,35 @@ func (db sqlitePersistence) MessageByID(id string) (*Message, error) {
 	}
 }
 
-func (db sqlitePersistence) MessageExists(id string) (bool, error) {
-	var result bool
-	err := db.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM user_messages_legacy WHERE id = ?)`, id).Scan(&result)
-	switch err {
-	case sql.ErrNoRows:
-		return false, errRecordNotFound
-	case nil:
+func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error) {
+	result := make(map[string]bool)
+	if len(ids) == 0 {
 		return result, nil
-	default:
-		return false, err
 	}
+
+	idsArgs := make([]interface{}, 0, len(ids))
+	for _, id := range ids {
+		idsArgs = append(idsArgs, id)
+	}
+
+	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+	query := fmt.Sprintf(`SELECT id FROM user_messages_legacy WHERE id IN (%s)`, inVector)
+	rows, err := db.db.Query(query, idsArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		err := rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		result[id] = true
+	}
+
+	return result, nil
 }
 
 // MessageByChatID returns all messages for a given chatID in descending order.
@@ -132,7 +192,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?"
 	}
-	allFields := db.tableUserMessagesLegacyAllFields()
+	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
 	args := []interface{}{chatID}
 	if currCursor != "" {
 		args = append(args, currCursor)
@@ -144,11 +204,15 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 		fmt.Sprintf(`
 			SELECT
 				%s,
-				substr('0000000000000000000000000000000000000000000000000000000000000000' || clock_value, -64, 64) || id as cursor
+				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
 			FROM
-				user_messages_legacy
+				user_messages_legacy m1
+			LEFT JOIN
+				user_messages_legacy m2
+			ON
+			m1.reply_to = m2.id
 			WHERE
-				chat_id = ? %s
+				m1.chat_id = ? %s
 			ORDER BY cursor DESC
 			LIMIT ?
 		`, allFields, cursorWhere),
@@ -183,66 +247,52 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
-func (db sqlitePersistence) MessagesFrom(from []byte) ([]*Message, error) {
-	allFields := db.tableUserMessagesLegacyAllFields()
-	rows, err := db.db.Query(
-		fmt.Sprintf(`
-			SELECT
-				%s
-			FROM
-				user_messages_legacy
-			WHERE
-				source = ?
-		`, allFields),
-		from,
+func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) error {
+	var (
+		tx   *sql.Tx
+		stmt *sql.Stmt
+		err  error
 	)
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
 
-	var result []*Message
-	for rows.Next() {
-		var message Message
-		if err := db.tableUserMessagesLegacyScanAllFields(rows, &message); err != nil {
-			return nil, err
 		}
-		result = append(result, &message)
-	}
-	return result, nil
-}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
 
-func (db sqlitePersistence) UnseenMessageIDs() ([][]byte, error) {
-	rows, err := db.db.Query(`SELECT id FROM user_messages_legacy WHERE seen = 0`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result [][]byte
-	for rows.Next() {
-		var id []byte
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		result = append(result, id)
-	}
-	return result, nil
-}
-
-func (db sqlitePersistence) SaveMessage(m *Message) error {
 	allFields := db.tableUserMessagesLegacyAllFields()
 	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
+
 	query := fmt.Sprintf(`INSERT INTO user_messages_legacy(%s) VALUES (%s)`, allFields, valuesVector)
-	_, err := db.db.Exec(
-		query,
-		db.tableUserMessagesLegacyAllValues(m)...,
-	)
+
+	stmt, err = tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	for _, msg := range messages {
+		_, err := stmt.Exec(db.tableUserMessagesLegacyAllValues(msg)...)
+		if err != nil {
+			return err
+		}
+	}
 	return err
 }
 
 func (db sqlitePersistence) DeleteMessage(id string) error {
 	_, err := db.db.Exec(`DELETE FROM user_messages_legacy WHERE id = ?`, id)
+	return err
+}
+
+func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
+	_, err := db.db.Exec(`DELETE FROM user_messages_legacy WHERE chat_id = ?`, id)
 	return err
 }
 
@@ -270,4 +320,62 @@ func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingSt
 		WHERE id = ?
 	`, newOutgoingStatus, id)
 	return err
+}
+
+// BlockContact updates a contact, deletes all the messages and 1-to-1 chat, updates the unread messages count and returns a map with the new count
+func (db sqlitePersistence) BlockContact(contact Contact) ([]*Chat, error) {
+	var (
+		tx  *sql.Tx
+		err error
+	)
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	// Delete messages
+	_, err = tx.Exec(
+		`DELETE
+		 FROM user_messages_legacy
+		 WHERE source = ?`,
+		contact.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update contact
+	err = db.SaveContact(contact, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete one-to-one chat
+	_, err = tx.Exec("DELETE FROM chats WHERE id = ?", contact.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Recalculate denormalized fields
+	_, err = tx.Exec(`
+	UPDATE chats
+	SET
+	unviewed_message_count = (SELECT COUNT(1) FROM user_messages_legacy WHERE seen = 0 AND chat_id = chats.id),
+	last_message_content = (SELECT content from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
+	last_message_content_type = (SELECT content_type from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1)`)
+	if err != nil {
+		return nil, err
+	}
+
+	// return the updated chats
+	return db.chats(0, -1, tx)
 }

@@ -15,6 +15,18 @@ func generateMessages(count int) []*whisper.Message {
 	return result
 }
 
+func generateDedupMessages(count int) []*DeduplicateMessage {
+	result := []*DeduplicateMessage{}
+	for ; count > 0; count-- {
+		content := mustGenerateRandomBytes()
+		result = append(result, &DeduplicateMessage{
+			Metadata: Metadata{},
+			Message:  &whisper.Message{Payload: content},
+		})
+	}
+	return result
+}
+
 func mustGenerateRandomBytes() []byte {
 	c := 2048
 	b := make([]byte, c)

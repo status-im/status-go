@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -122,8 +121,9 @@ func (s *encryptor) ConfirmMessageProcessed(messageID []byte) error {
 	id := confirmationIDString(messageID)
 	confirmationData, ok := s.messageIDs[id]
 	if !ok {
-		s.logger.Debug("could not confirm message", zap.String("messageID", id))
-		return fmt.Errorf("message with ID %#x not found", messageID)
+		s.logger.Debug("could not confirm message or message already confirmed", zap.String("messageID", id))
+		// We are ok with this, means no key material is stored (public message, or already confirmed)
+		return nil
 	}
 
 	// Load session from store first
@@ -135,6 +135,9 @@ func (s *encryptor) ConfirmMessageProcessed(messageID []byte) error {
 	if err := session.DeleteMk(confirmationData.header.DH, confirmationData.header.N); err != nil {
 		return err
 	}
+
+	// Clean up
+	delete(s.messageIDs, id)
 
 	return nil
 }

@@ -450,8 +450,8 @@ github.com/status-im/migrate/v4 v4.3.1-status h1:tJwsEYLgbFkvlTSMk89APwRDfpr4yG8
 github.com/status-im/migrate/v4 v4.3.1-status/go.mod h1:r8HggRBZ/k7TRwByq/Hp3P/ubFppIna0nvyavVK0pjA=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
-github.com/status-im/status-protocol-go v0.0.0-20190701094942-c2b7b022b722d7bebe1c6d6f05cdead79f1b57bd h1:ZGCzGQ41kPy5oNpHColf3ZTNN9DXWZATgJoV2cQZaC4=
-github.com/status-im/status-protocol-go v0.0.0-20190701094942-c2b7b022b722d7bebe1c6d6f05cdead79f1b57bd/go.mod h1:thrQ4V0ZUmLZPDf74xVzub1gxgSNFaSTeTQdxtRJnTU=
+github.com/status-im/status-protocol-go v0.0.0-20190701094942-9f0db157bf5a1ac9b52c47bbea37fc7dbe14e8fe h1:QqpJe7fgZk8nKWfjUiYi9SCoN3Ozveyn60b8xWq3rik=
+github.com/status-im/status-protocol-go v0.0.0-20190701094942-9f0db157bf5a1ac9b52c47bbea37fc7dbe14e8fe/go.mod h1:thrQ4V0ZUmLZPDf74xVzub1gxgSNFaSTeTQdxtRJnTU=
 github.com/status-im/whisper v1.4.14 h1:9VHqx4+PUYfhDnYYtDxHkg/3cfVvkHjPNciY4LO83yc=
 github.com/status-im/whisper v1.4.14/go.mod h1:WS6z39YJQ8WJa9s+DmTuEM/s2nVF6Iz3B1SZYw5cYf0=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

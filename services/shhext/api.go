@@ -9,14 +9,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/status-im/status-go/services/shhext/dedup"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/status-go/services/shhext/dedup"
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
@@ -400,46 +399,24 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 	}
 }
 
-// GetNewFilterMessages is a prototype method with deduplication.
-func (api *PublicAPI) GetNewFilterMessages(filterID string) ([]dedup.DeduplicateMessage, error) {
-	messages, err := api.publicAPI.GetFilterMessages(filterID)
-	if err != nil {
-		return nil, err
-	}
-	return api.service.deduplicator.Deduplicate(messages), nil
-}
-
-// ConfirmMessagesProcessed is a method to confirm that messages was consumed by
-// the client side.
-func (api *PublicAPI) ConfirmMessagesProcessed(messages []*whisper.Message) (err error) {
-	tx := api.service.storage.NewTx()
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-		}
-	}()
-	ctx := NewContextFromService(context.Background(), api.service, tx)
-	for _, msg := range messages {
-		if msg.P2P {
-			err = api.service.historyUpdates.UpdateTopicHistory(ctx, msg.Topic, time.Unix(int64(msg.Timestamp), 0))
-			if err != nil {
-				return err
-			}
-		}
-	}
-	err = api.service.deduplicator.AddMessages(messages)
-	return err
-}
-
 // ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
 // the client side.
 // TODO: this is broken now as it requires dedup ID while a message hash should be used.
-func (api *PublicAPI) ConfirmMessagesProcessedByID(messageIDs [][]byte) error {
-	/*if err := api.service.ConfirmMessagesProcessed(messageIDs); err != nil {
-		return err
-	}*/
+func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*dedup.Metadata) error {
+	confirmationCount := len(messageConfirmations)
+	dedupIDs := make([][]byte, confirmationCount)
+	encryptionIDs := make([][]byte, confirmationCount)
 
-	return api.service.deduplicator.AddMessageByID(messageIDs)
+	for i, confirmation := range messageConfirmations {
+		dedupIDs[i] = confirmation.DedupID
+		encryptionIDs[i] = confirmation.EncryptionID
+	}
+
+	if err := api.service.ConfirmMessagesProcessed(encryptionIDs); err != nil {
+		return err
+	}
+
+	return api.service.deduplicator.AddMessageByID(dedupIDs)
 }
 
 // Post is used to send one-to-one for those who did not enabled device-to-device sync,
@@ -590,6 +567,7 @@ func (api *PublicAPI) LoadFilters(parent context.Context, chats []*statustransp.
 }
 
 func (api *PublicAPI) SaveChat(parent context.Context, chat statusproto.Chat) error {
+	api.log.Info("saving chat", "chat", chat)
 	return api.service.messenger.SaveChat(chat)
 }
 
@@ -597,12 +575,17 @@ func (api *PublicAPI) Chats(parent context.Context, to, from int) ([]*statusprot
 	return api.service.messenger.Chats(to, from)
 }
 
-func (api *PublicAPI) DeleteChat(parent context.Context, chatID string, chatType statusproto.ChatType) error {
-	return api.service.messenger.DeleteChat(chatID, chatType)
+func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
+	return api.service.messenger.DeleteChat(chatID)
 }
 
 func (api *PublicAPI) SaveContact(parent context.Context, contact statusproto.Contact) error {
 	return api.service.messenger.SaveContact(contact)
+}
+
+func (api *PublicAPI) BlockContact(parent context.Context, contact statusproto.Contact) ([]*statusproto.Chat, error) {
+	api.log.Info("blocking contact", "contact", contact.ID)
+	return api.service.messenger.BlockContact(contact)
 }
 
 func (api *PublicAPI) Contacts(parent context.Context) ([]*statusproto.Contact, error) {
@@ -633,23 +616,36 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
-func (api *PublicAPI) MessageByChatID(chatID, cursor string, limit int) ([]*statusproto.Message, string, error) {
-	return api.service.messenger.MessageByChatID(chatID, cursor, limit)
+type ApplicationMessagesResponse struct {
+	Messages []*statusproto.Message `json:"messages"`
+	Cursor   string                 `json:"cursor"`
 }
 
-func (api *PublicAPI) MessagesFrom(from string) ([]*statusproto.Message, error) {
-	return api.service.messenger.MessagesFrom(from)
+func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
+	messages, cursor, err := api.service.messenger.MessageByChatID(chatID, cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ApplicationMessagesResponse{
+		Messages: messages,
+		Cursor:   cursor,
+	}, nil
 }
 
-func (api *PublicAPI) SaveMessage(message *statusproto.Message) error {
-	return api.service.messenger.SaveMessage(message)
+func (api *PublicAPI) SaveMessages(messages []*statusproto.Message) error {
+	return api.service.messenger.SaveMessages(messages)
 }
 
 func (api *PublicAPI) DeleteMessage(id string) error {
 	return api.service.messenger.DeleteMessage(id)
 }
 
-func (api *PublicAPI) MarkMessagesSeen(ids ...string) error {
+func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
+	return api.service.messenger.DeleteMessagesByChatID(id)
+}
+
+func (api *PublicAPI) MarkMessagesSeen(ids []string) error {
 	return api.service.messenger.MarkMessagesSeen(ids...)
 }
 

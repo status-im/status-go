@@ -405,6 +405,8 @@ func (p *Protocol) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey) (*Bundle, 
 
 // ConfirmMessageProcessed confirms and deletes message keys for the given messages
 func (p *Protocol) ConfirmMessageProcessed(messageID []byte) error {
+	logger := p.logger.With(zap.String("site", "ConfirmMessageProcessed"))
+	logger.Debug("confirming message", zap.Binary("message-id", messageID))
 	return p.encryptor.ConfirmMessageProcessed(messageID)
 }
 
@@ -417,7 +419,7 @@ func (p *Protocol) HandleMessage(
 ) ([]byte, error) {
 	logger := p.logger.With(zap.String("site", "HandleMessage"))
 
-	logger.Debug("received a protocol message", zap.Binary("sender-public-key", crypto.FromECDSAPub(theirPublicKey)))
+	logger.Debug("received a protocol message", zap.Binary("sender-public-key", crypto.FromECDSAPub(theirPublicKey)), zap.Binary("message-id", messageID))
 
 	if p.encryptor == nil {
 		return nil, errors.New("encryption service not initialized")
