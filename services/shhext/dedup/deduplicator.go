@@ -4,7 +4,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	protocol "github.com/status-im/status-protocol-go/v1"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -44,27 +43,17 @@ func NewDeduplicator(keyPairProvider keyPairProvider, db *leveldb.DB) *Deduplica
 // Deduplicate receives a list of whisper messages and
 // returns the list of the messages that weren't filtered previously for the
 // specified filter.
-func (d *Deduplicator) Deduplicate(messages []*protocol.StatusMessage) []DeduplicateMessage {
-
-	result := make([]DeduplicateMessage, 0)
+func (d *Deduplicator) Deduplicate(messages []*DeduplicateMessage) []*DeduplicateMessage {
+	result := make([]*DeduplicateMessage, 0)
 	selectedKeyPairID := d.keyPairProvider.SelectedKeyPairID()
 
 	for _, message := range messages {
-		whisperMessage := message.TransportMessage
-		whisperMessage.Payload = message.DecryptedPayload
-
-		if has, err := d.cache.Has(selectedKeyPairID, whisperMessage); !has {
+		if has, err := d.cache.Has(selectedKeyPairID, message.Message); !has {
 			if err != nil {
 				d.log.Error("error while deduplicating messages: search cache failed", "err", err)
 			}
-			result = append(result, DeduplicateMessage{
-				Metadata: Metadata{
-					DedupID:      d.cache.KeyToday(selectedKeyPairID, whisperMessage),
-					EncryptionID: whisperMessage.Hash,
-					MessageID:    message.ID,
-				},
-				Message: whisperMessage,
-			})
+			message.Metadata.DedupID = d.cache.KeyToday(selectedKeyPairID, message.Message)
+			result = append(result, message)
 		}
 	}
 

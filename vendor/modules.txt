@@ -317,13 +317,12 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.0.0-20190701094942-1257400f69963eea5a1e06b6cfde1e6df4bec225
+# github.com/status-im/status-protocol-go v0.0.0-20190701094942-9f0db157bf5a1ac9b52c47bbea37fc7dbe14e8fe
 github.com/status-im/status-protocol-go/zaputil
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/sqlite
 github.com/status-im/status-protocol-go/transport/whisper
-github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/datasync
 github.com/status-im/status-protocol-go/datasync/peer
 github.com/status-im/status-protocol-go/encryption
@@ -331,9 +330,10 @@ github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/sharedsecret
 github.com/status-im/status-protocol-go/migrations
 github.com/status-im/status-protocol-go/transport/whisper/migrations
-github.com/status-im/status-protocol-go/applicationmetadata
+github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/crypto
 github.com/status-im/status-protocol-go/encryption/publisher
+github.com/status-im/status-protocol-go/applicationmetadata
 # github.com/status-im/whisper v1.4.14
 github.com/status-im/whisper/whisperv6
 # github.com/stretchr/testify v1.3.0

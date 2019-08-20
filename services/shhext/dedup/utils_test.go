@@ -3,7 +3,6 @@ package dedup
 import (
 	"crypto/rand"
 
-	protocol "github.com/status-im/status-protocol-go/v1"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -16,13 +15,13 @@ func generateMessages(count int) []*whisper.Message {
 	return result
 }
 
-func generateStatusMessages(count int) []*protocol.StatusMessage {
-	result := []*protocol.StatusMessage{}
+func generateDedupMessages(count int) []*DeduplicateMessage {
+	result := []*DeduplicateMessage{}
 	for ; count > 0; count-- {
 		content := mustGenerateRandomBytes()
-		result = append(result, &protocol.StatusMessage{
-			DecryptedPayload: content,
-			TransportMessage: &whisper.Message{},
+		result = append(result, &DeduplicateMessage{
+			Metadata: Metadata{},
+			Message:  &whisper.Message{Payload: content},
 		})
 	}
 	return result

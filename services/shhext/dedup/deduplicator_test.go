@@ -43,7 +43,7 @@ func BenchmarkDeduplicate30000MessagesADay(b *testing.B) {
 	d := NewDeduplicator(dummyKeyPairProvider{}, db)
 
 	b.Log("generating messages")
-	messagesOld := generateStatusMessages(100000)
+	messagesOld := generateDedupMessages(100000)
 	b.Log("generation is done")
 
 	// pre-fill deduplicator
@@ -96,8 +96,8 @@ func (s *DeduplicatorTestSuite) TearDownTest() {
 
 func (s *DeduplicatorTestSuite) TestDeduplicateSingleFilter() {
 	s.d.keyPairProvider = dummyKeyPairProvider{"acc1"}
-	messages1 := generateStatusMessages(10)
-	messages2 := generateStatusMessages(12)
+	messages1 := generateDedupMessages(10)
+	messages2 := generateDedupMessages(12)
 
 	result := s.d.Deduplicate(messages1)
 	s.Equal(len(messages1), len(result))
@@ -120,14 +120,14 @@ func (s *DeduplicatorTestSuite) TestDeduplicateSingleFilter() {
 	}
 	s.NoError(s.d.AddMessagesByID(ids))
 
-	messages3 := append(messages2, generateStatusMessages(11)...)
+	messages3 := append(messages2, generateDedupMessages(11)...)
 
 	result = s.d.Deduplicate(messages3)
 	s.Equal(11, len(result))
 }
 
 func (s *DeduplicatorTestSuite) TestDeduplicateMultipleFilters() {
-	messages1 := generateStatusMessages(10)
+	messages1 := generateDedupMessages(10)
 
 	s.d.keyPairProvider = dummyKeyPairProvider{"acc1"}
 	result := s.d.Deduplicate(messages1)

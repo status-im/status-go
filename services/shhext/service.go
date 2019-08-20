@@ -253,24 +253,30 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 
 			for chat, messages := range chatWithMessages {
 
-				signalMessage := &signal.Messages{
-					Chat:     chat,
-					Error:    nil, // TODO: what is it needed for?
-					Messages: s.deduplicator.Deduplicate(messages),
-				}
-
-				var newMessages []dedup.DeduplicateMessage
-
+				var dedupMessages []*dedup.DeduplicateMessage
 				// Filter out already saved messages
-				for _, message := range signalMessage.Messages {
-					if !existingMessages[message.Metadata.MessageID.String()] {
-						newMessages = append(newMessages, message)
+				for _, message := range messages {
+					if !existingMessages[message.ID.String()] {
+						dedupMessage := &dedup.DeduplicateMessage{
+							Metadata: dedup.Metadata{
+								MessageID:    message.ID,
+								EncryptionID: message.Hash,
+							},
+							Message: message.TransportMessage,
+						}
+						dedupMessage.Message.Payload = message.DecryptedPayload
+						dedupMessages = append(dedupMessages, dedupMessage)
 					}
 				}
+				dedupMessages = s.deduplicator.Deduplicate(dedupMessages)
 
-				signalMessage.Messages = newMessages
+				if len(dedupMessages) != 0 {
+					signalMessage := &signal.Messages{
+						Chat:     chat,
+						Error:    nil, // TODO: what is it needed for?
+						Messages: dedupMessages,
+					}
 
-				if len(newMessages) != 0 {
 					signalMessages = append(signalMessages, signalMessage)
 				}
 			}

@@ -257,15 +257,6 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) error {
 	if err != nil {
 		return err
 	}
-	allFields := db.tableUserMessagesLegacyAllFields()
-	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
-
-	query := fmt.Sprintf(`INSERT INTO user_messages_legacy(%s) VALUES (%s)`, allFields, valuesVector)
-
-	stmt, err = tx.Prepare(query)
-	if err != nil {
-		return err
-	}
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -275,6 +266,16 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) error {
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
+
+	allFields := db.tableUserMessagesLegacyAllFields()
+	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
+
+	query := fmt.Sprintf(`INSERT INTO user_messages_legacy(%s) VALUES (%s)`, allFields, valuesVector)
+
+	stmt, err = tx.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	for _, msg := range messages {
 		_, err := stmt.Exec(db.tableUserMessagesLegacyAllValues(msg)...)
