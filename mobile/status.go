@@ -389,8 +389,7 @@ func Logout() string {
 	if err != nil {
 		makeJSONResponse(err)
 	}
-	api.RunAsync(statusBackend.StopNode)
-	return makeJSONResponse(nil)
+	return makeJSONResponse(statusBackend.StopNode())
 }
 
 // SignMessage unmarshals rpc params {data, address, password} and
