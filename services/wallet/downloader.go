@@ -101,36 +101,32 @@ func (d *ETHTransferDownloader) GetTransfersByNumber(ctx context.Context, number
 
 func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *types.Block, accounts []common.Address) (rst []Transfer, err error) {
 	for _, tx := range blk.Transactions() {
-		var address *common.Address
-		from, err := types.Sender(d.signer, tx)
-		if err != nil {
-			return nil, err
-		}
-		if any(from, accounts) {
-			address = &from
-		} else if tx.To() != nil && any(*tx.To(), accounts) {
-			address = tx.To()
-		}
-		if address != nil {
-			receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
+		for _, address := range accounts {
+			from, err := types.Sender(d.signer, tx)
 			if err != nil {
 				return nil, err
 			}
-			if isTokenTransfer(receipt.Logs) {
-				log.Debug("eth downloader found token transfer", "hash", tx.Hash())
-				continue
-			}
-			rst = append(rst, Transfer{
-				Type:        ethTransfer,
-				ID:          tx.Hash(),
-				Address:     *address,
-				BlockNumber: blk.Number(),
-				BlockHash:   blk.Hash(),
-				Timestamp:   blk.Time(),
-				Transaction: tx,
-				From:        from,
-				Receipt:     receipt})
+			if from == address || (tx.To() != nil && *tx.To() == address) {
+				receipt, err := d.client.TransactionReceipt(ctx, tx.Hash())
+				if err != nil {
+					return nil, err
+				}
+				if isTokenTransfer(receipt.Logs) {
+					log.Debug("eth downloader found token transfer", "hash", tx.Hash())
+					continue
+				}
+				rst = append(rst, Transfer{
+					Type:        ethTransfer,
+					ID:          tx.Hash(),
+					Address:     address,
+					BlockNumber: blk.Number(),
+					BlockHash:   blk.Hash(),
+					Timestamp:   blk.Time(),
+					Transaction: tx,
+					From:        from,
+					Receipt:     receipt})
 
+			}
 		}
 	}
 	// TODO(dshulyak) test that balance difference was covered by transactions
@@ -309,15 +305,6 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, f
 	}
 	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", len(transfers), "took", time.Since(start))
 	return transfers, nil
-}
-
-func any(address common.Address, compare []common.Address) bool {
-	for _, c := range compare {
-		if c == address {
-			return true
-		}
-	}
-	return false
 }
 
 func isTokenTransfer(logs []*types.Log) bool {

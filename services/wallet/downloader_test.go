@@ -24,10 +24,10 @@ func TestETHTransfers(t *testing.T) {
 type ETHTransferSuite struct {
 	suite.Suite
 
-	ethclient *ethclient.Client
-	identity  *ecdsa.PrivateKey
-	faucet    *ecdsa.PrivateKey
-	signer    types.Signer
+	ethclient           *ethclient.Client
+	identity, secondary *ecdsa.PrivateKey
+	faucet              *ecdsa.PrivateKey
+	signer              types.Signer
 
 	downloader *ETHTransferDownloader
 }
@@ -37,6 +37,8 @@ func (s *ETHTransferSuite) SetupTest() {
 	s.identity, err = crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.faucet, err = crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.secondary, err = crypto.GenerateKey()
 	s.Require().NoError(err)
 
 	node, err := miner.NewDevNode(crypto.PubkeyToAddress(s.faucet.PublicKey))
@@ -48,22 +50,33 @@ func (s *ETHTransferSuite) SetupTest() {
 	s.ethclient = ethclient.NewClient(client)
 	s.signer = types.NewEIP155Signer(big.NewInt(1337))
 	s.downloader = &ETHTransferDownloader{
-		signer:   s.signer,
-		client:   s.ethclient,
-		accounts: []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)},
+		signer: s.signer,
+		client: s.ethclient,
+		accounts: []common.Address{
+			crypto.PubkeyToAddress(s.identity.PublicKey),
+			crypto.PubkeyToAddress(s.secondary.PublicKey)},
 	}
+}
+
+// signAndMineTx signs transaction with provided key and waits for it to be mined.
+// uses configured faucet key if pkey is nil.
+func (s *ETHTransferSuite) signAndMineTx(tx *types.Transaction, pkey *ecdsa.PrivateKey) {
+	if pkey == nil {
+		pkey = s.faucet
+	}
+	tx, err := types.SignTx(tx, s.signer, pkey)
+	s.Require().NoError(err)
+	s.Require().NoError(s.ethclient.SendTransaction(context.Background(), tx))
+	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = bind.WaitMined(timeout, s.ethclient, tx)
+	s.Require().NoError(err)
 }
 
 func (s *ETHTransferSuite) TestNoBalance() {
 	ctx := context.TODO()
 	tx := types.NewTransaction(0, common.Address{1}, big.NewInt(1e18), 1e6, big.NewInt(10), nil)
-	tx, err := types.SignTx(tx, s.signer, s.faucet)
-	s.Require().NoError(err)
-	s.Require().NoError(s.ethclient.SendTransaction(ctx, tx))
-	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = bind.WaitMined(timeout, s.ethclient, tx)
-	s.Require().NoError(err)
+	s.signAndMineTx(tx, nil)
 
 	header, err := s.ethclient.HeaderByNumber(ctx, nil)
 	s.Require().NoError(err)
@@ -117,6 +130,20 @@ func (s *ETHTransferSuite) TestBalanceUpdatedOnOutbound() {
 	transfers, err := s.downloader.GetTransfers(ctx, toDBHeader(header))
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 1)
+}
+
+func (s *ETHTransferSuite) TestMultipleReferences() {
+	tx := types.NewTransaction(0, crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
+	s.signAndMineTx(tx, nil)
+	tx = types.NewTransaction(0, crypto.PubkeyToAddress(s.secondary.PublicKey), big.NewInt(1e17), 1e6, big.NewInt(10), nil)
+	s.signAndMineTx(tx, s.identity)
+
+	header, err := s.ethclient.HeaderByNumber(context.Background(), nil)
+	s.Require().NoError(err)
+	s.Require().Equal(big.NewInt(2), header.Number)
+	transfers, err := s.downloader.GetTransfers(context.Background(), toDBHeader(header))
+	s.Require().NoError(err)
+	s.Require().Len(transfers, 2)
 }
 
 func TestERC20Transfers(t *testing.T) {
