@@ -20,13 +20,13 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
-	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -132,7 +132,14 @@ func (s *ShhExtSuite) SetupTest() {
 		db, err := leveldb.Open(storage.NewMemStorage(), nil)
 		s.Require().NoError(err)
 		s.services[i] = New(s.whisper[i], nil, db, config)
-		s.Require().NoError(s.services[i].InitProtocolWithPassword(fmt.Sprintf("%d", i), "password"))
+
+		tmpdir, err := ioutil.TempDir("", "test-shhext-service")
+		s.Require().NoError(err)
+
+		sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/%d", tmpdir, i), "password")
+		s.Require().NoError(err)
+
+		s.Require().NoError(s.services[i].InitProtocol(sqlDB))
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -163,12 +170,13 @@ func (s *ShhExtSuite) TestInitProtocol() {
 
 	service := New(shh, nil, db, config)
 
-	err = service.InitProtocolWithPassword("example-address", "`090///\nhtaa\rhta9x8923)$$'23")
-	s.NoError(err)
+	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
+	s.Require().NoError(err)
 
-	digest := sha3.Sum256([]byte("`090///\nhtaa\rhta9x8923)$$'23"))
-	encKey := fmt.Sprintf("%x", digest)
-	err = service.InitProtocolWithEncyptionKey("example-address", encKey)
+	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
+	s.Require().NoError(err)
+
+	err = service.InitProtocol(sqlDB)
 	s.NoError(err)
 }
 
@@ -307,7 +315,14 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		PFSEnabled:            true,
 	}
 	service := New(shh, mock, nil, config)
-	s.Require().NoError(service.InitProtocolWithPassword("abc", "password"))
+
+	tmpdir, err := ioutil.TempDir("", "test-shhext-service-request-messages")
+	s.Require().NoError(err)
+
+	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
+	s.Require().NoError(err)
+
+	s.Require().NoError(service.InitProtocol(sqlDB))
 	s.Require().NoError(service.Start(aNode.Server()))
 	api := NewPublicAPI(service)
 
@@ -525,7 +540,14 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	s.localContext = NewContextFromService(context.Background(), s.localService, s.localService.storage)
 	localPkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	s.Require().NoError(s.localService.InitProtocolWithPassword("local-service", "password"))
+
+	tmpdir, err := ioutil.TempDir("", "test-shhext-service")
+	s.Require().NoError(err)
+
+	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
+	s.Require().NoError(err)
+
+	s.Require().NoError(s.localService.InitProtocol(sqlDB))
 	s.Require().NoError(s.localService.Start(&p2p.Server{Config: p2p.Config{PrivateKey: localPkey}}))
 	s.localAPI = NewPublicAPI(s.localService)
 
@@ -535,7 +557,7 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	s.remoteMailserver = &mailserver.WMailServer{}
 	remote.RegisterServer(s.remoteMailserver)
 	password := "test"
-	tmpdir, err := ioutil.TempDir("", "tracking-history-tests-")
+	tmpdir, err = ioutil.TempDir("", "tracking-history-tests-")
 	s.Require().NoError(err)
 	s.Require().NoError(s.remoteMailserver.Init(remote, &params.WhisperConfig{
 		DataDir:            tmpdir,

@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/sqlcipher"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+	mvdsmigrations "github.com/vacp2p/mvds/persistenceutil"
 )
 
 // The default number of kdf iterations in sqlcipher (from version 3.0.0)
@@ -32,17 +33,17 @@ type MigrationConfig struct {
 
 // Open opens or initializes a new database for a given file path.
 // MigrationConfig is optional but if provided migrations are applied automatically.
-func Open(path, key string, mc ...MigrationConfig) (*sql.DB, error) {
-	return open(path, key, reducedKdfIterationsNumber, mc)
+func Open(path, key string) (*sql.DB, error) {
+	return open(path, key, reducedKdfIterationsNumber)
 }
 
 // OpenWithIter allows to open a new database with a custom number of kdf iterations.
 // Higher kdf iterations number makes it slower to open the database.
-func OpenWithIter(path, key string, kdfIter int, mc ...MigrationConfig) (*sql.DB, error) {
-	return open(path, key, kdfIter, mc)
+func OpenWithIter(path, key string, kdfIter int) (*sql.DB, error) {
+	return open(path, key, kdfIter)
 }
 
-func open(path string, key string, kdfIter int, configs []MigrationConfig) (*sql.DB, error) {
+func open(path string, key string, kdfIter int) (*sql.DB, error) {
 	_, err := os.OpenFile(path, os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
@@ -72,11 +73,8 @@ func open(path string, key string, kdfIter int, configs []MigrationConfig) (*sql
 		return nil, err
 	}
 
-	// Apply all provided migrations.
-	for _, mc := range configs {
-		if err := ApplyMigrations(db, mc.AssetNames, mc.AssetGetter); err != nil {
-			return nil, err
-		}
+	if err := Migrate(db); err != nil {
+		return nil, err
 	}
 
 	return db, nil
@@ -96,7 +94,9 @@ func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name stri
 		return errors.Wrap(err, "failed to create migration source")
 	}
 
-	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{})
+	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{
+		MigrationsTable: "status_protocol_go_" + sqlcipher.DefaultMigrationsTable,
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create driver")
 	}
@@ -115,5 +115,23 @@ func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name stri
 		return errors.Wrap(err, "failed to migrate")
 	}
 
+	return nil
+}
+
+func Migrate(database *sql.DB) error {
+	// Apply migrations for all components.
+	err := mvdsmigrations.Migrate(database)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply mvds migrations")
+	}
+
+	migrationNames, migrationGetter, err := prepareMigrations(defaultMigrations)
+	if err != nil {
+		return errors.Wrap(err, "failed to prepare status-protocol-go migrations")
+	}
+	err = ApplyMigrations(database, migrationNames, migrationGetter)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply status-protocol-go migrations")
+	}
 	return nil
 }

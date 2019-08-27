@@ -782,7 +782,7 @@ func (b *StatusBackend) SelectAccount(loginParams account.LoginParams) error {
 			return err
 		}
 
-		if err := st.InitProtocolWithPassword(loginParams.ChatAddress.String(), loginParams.Password); err != nil {
+		if err := st.InitProtocol(b.appDB); err != nil {
 			return err
 		}
 	}
@@ -871,7 +871,7 @@ func (b *StatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) e
 			return err
 		}
 
-		if err := st.InitProtocolWithEncyptionKey(chatAccount.Address.Hex(), encryptionKeyHex); err != nil {
+		if err := st.InitProtocol(b.appDB); err != nil {
 			return err
 		}
 	}

@@ -84,8 +84,7 @@ func (p *payloads) MapAndClear(f func(state.PeerID, protobuf.Payload) error) err
 }
 
 func (p *payloads) get(peer state.PeerID) protobuf.Payload {
-	payload, _ := p.payloads[peer]
-	return payload
+	return p.payloads[peer]
 }
 
 func (p *payloads) set(peer state.PeerID, payload protobuf.Payload) {

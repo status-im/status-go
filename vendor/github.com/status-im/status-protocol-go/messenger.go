@@ -20,9 +20,6 @@ import (
 	transport "github.com/status-im/status-protocol-go/transport/whisper"
 	protocol "github.com/status-im/status-protocol-go/v1"
 	datasyncnode "github.com/vacp2p/mvds/node"
-	datasyncpeers "github.com/vacp2p/mvds/peers"
-	datasyncstate "github.com/vacp2p/mvds/state"
-	datasyncstore "github.com/vacp2p/mvds/store"
 )
 
 var (
@@ -71,8 +68,10 @@ type dbConfig struct {
 
 type config struct {
 	onNewInstallationsHandler func([]*multidevice.Installation)
-	// DEPRECATED: no need to expose it
-	onNewSharedSecretHandler func([]*sharedsecret.Secret)
+	// This needs to be exposed until we move here mailserver logic
+	// as otherwise the client is not notified of a new filter and
+	// won't be pulling messages from mailservers until it reloads the chats/filters
+	onNegotiatedFilters func([]*transport.Filter)
 	// DEPRECATED: no need to expose it
 	onSendContactCodeHandler func(*encryption.ProtocolMessageSpec)
 
@@ -99,9 +98,9 @@ func WithOnNewInstallationsHandler(h func([]*multidevice.Installation)) Option {
 	}
 }
 
-func WithOnNewSharedSecret(h func([]*sharedsecret.Secret)) Option {
+func WithOnNegotiatedFilters(h func([]*transport.Filter)) Option {
 	return func(c *config) error {
-		c.onNewSharedSecretHandler = h
+		c.onNegotiatedFilters = h
 		return nil
 	}
 }
@@ -198,12 +197,15 @@ func NewMessenger(
 			}
 		}
 	}
-	if c.onNewSharedSecretHandler == nil {
-		c.onNewSharedSecretHandler = func(secrets []*sharedsecret.Secret) {
-			if err := messenger.handleSharedSecrets(secrets); err != nil {
-				slogger := logger.With(zap.String("site", "onNewSharedSecretHandler"))
-				slogger.Warn("failed to process secrets", zap.Error(err))
-			}
+	onNewSharedSecretHandler := func(secrets []*sharedsecret.Secret) {
+		filters, err := messenger.handleSharedSecrets(secrets)
+		if err != nil {
+			slogger := logger.With(zap.String("site", "onNewSharedSecretHandler"))
+			slogger.Warn("failed to process secrets", zap.Error(err))
+		}
+
+		if c.onNegotiatedFilters != nil {
+			c.onNegotiatedFilters(filters)
 		}
 	}
 	if c.onSendContactCodeHandler == nil {
@@ -234,11 +236,7 @@ func NewMessenger(
 	}
 
 	// Apply migrations for all components.
-	migrationNames, migrationGetter, err := prepareMigrations(defaultMigrations)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to prepare migrations")
-	}
-	err = sqlite.ApplyMigrations(database, migrationNames, migrationGetter)
+	err := sqlite.Migrate(database)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migrations")
 	}
@@ -261,24 +259,24 @@ func NewMessenger(
 		database,
 		installationID,
 		c.onNewInstallationsHandler,
-		c.onNewSharedSecretHandler,
+		onNewSharedSecretHandler,
 		c.onSendContactCodeHandler,
 		logger,
 	)
 
 	// Initialize data sync.
 	dataSyncTransport := datasync.NewDataSyncNodeTransport()
-	dataSyncStore := datasyncstore.NewDummyStore()
-	dataSyncNode := datasyncnode.NewNode(
-		&dataSyncStore,
+	dataSyncNode, err := datasyncnode.NewPersistentNode(
+		database,
 		dataSyncTransport,
-		datasyncstate.NewSyncState(), // @todo sqlite syncstate
-		datasync.CalculateSendTime,
-		0,
 		datasyncpeer.PublicKeyToPeerID(identity.PublicKey),
 		datasyncnode.BATCH,
-		datasyncpeers.NewMemoryPersistence(),
+		datasync.CalculateSendTime,
 	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create a persistent datasync node")
+	}
+
 	datasync := datasync.New(dataSyncNode, dataSyncTransport, c.featureFlags.datasync, logger)
 
 	adapter := newWhisperAdapter(identity, t, encryptionProtocol, datasync, c.featureFlags, logger)
@@ -334,7 +332,7 @@ func (m *Messenger) Shutdown() (err error) {
 	return
 }
 
-func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
+func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*transport.Filter, error) {
 	return m.adapter.handleSharedSecrets(secrets)
 }
 

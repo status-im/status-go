@@ -117,9 +117,12 @@ func (a *WhisperServiceTransport) Reset() error {
 	return a.chats.Reset()
 }
 
-func (a *WhisperServiceTransport) ProcessNegotiatedSecret(secret NegotiatedSecret) error {
-	_, err := a.chats.LoadNegotiated(secret)
-	return err
+func (a *WhisperServiceTransport) ProcessNegotiatedSecret(secret NegotiatedSecret) (*Filter, error) {
+	filter, err := a.chats.LoadNegotiated(secret)
+	if err != nil {
+		return nil, err
+	}
+	return filter, nil
 }
 
 func (a *WhisperServiceTransport) JoinPublic(chatID string) error {

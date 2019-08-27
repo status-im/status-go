@@ -39,7 +39,7 @@ func (s *memorySyncState) Remove(id MessageID, peer PeerID) error {
 	return nil
 }
 
-func (s *memorySyncState) All() ([]State, error) {
+func (s *memorySyncState) All(_ int64) ([]State, error) {
 	s.Lock()
 	defer s.Unlock()
 	return s.state, nil

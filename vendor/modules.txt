@@ -40,11 +40,11 @@ github.com/ethereum/go-ethereum/metrics
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/crypto/ecies
 github.com/ethereum/go-ethereum/p2p/enr
+github.com/ethereum/go-ethereum/event
 github.com/ethereum/go-ethereum/rlp
 github.com/ethereum/go-ethereum/accounts/abi
 github.com/ethereum/go-ethereum/accounts/abi/bind
 github.com/ethereum/go-ethereum/core/types
-github.com/ethereum/go-ethereum/event
 github.com/ethereum/go-ethereum/core
 github.com/ethereum/go-ethereum/eth
 github.com/ethereum/go-ethereum/eth/downloader
@@ -103,8 +103,8 @@ github.com/go-stack/stack
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/io
 # github.com/golang-migrate/migrate/v4 v4.5.0
-github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4/source
+github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4
 # github.com/golang/mock v1.2.0
 github.com/golang/mock/gomock
@@ -275,7 +275,7 @@ github.com/multiformats/go-multibase
 github.com/multiformats/go-multihash
 # github.com/multiformats/go-multistream v0.1.0
 github.com/multiformats/go-multistream
-# github.com/mutecomm/go-sqlcipher v0.0.0-20170920224653-f799951b4ab2
+# github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 github.com/mutecomm/go-sqlcipher
 # github.com/opentracing/opentracing-go v1.0.2
 github.com/opentracing/opentracing-go
@@ -308,20 +308,19 @@ github.com/spaolacci/murmur3
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/migrate/v4 v4.3.1-status
+# github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed
+github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/migrate/v4
 github.com/status-im/migrate/v4/database/postgres
-github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/migrate/v4/database/sqlcipher
 # github.com/status-im/rendezvous v1.3.0
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.0.0-20190701094942-9f0db157bf5a1ac9b52c47bbea37fc7dbe14e8fe
+# github.com/status-im/status-protocol-go v0.0.0-20190701094942-1dd03f74d712ac9b965b718963dc86ca9c3540fb
 github.com/status-im/status-protocol-go/zaputil
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
-github.com/status-im/status-protocol-go/sqlite
 github.com/status-im/status-protocol-go/transport/whisper
 github.com/status-im/status-protocol-go/datasync
 github.com/status-im/status-protocol-go/datasync/peer
@@ -329,6 +328,7 @@ github.com/status-im/status-protocol-go/encryption
 github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/sharedsecret
 github.com/status-im/status-protocol-go/migrations
+github.com/status-im/status-protocol-go/sqlite
 github.com/status-im/status-protocol-go/transport/whisper/migrations
 github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/crypto
@@ -336,7 +336,7 @@ github.com/status-im/status-protocol-go/encryption/publisher
 github.com/status-im/status-protocol-go/applicationmetadata
 # github.com/status-im/whisper v1.4.14
 github.com/status-im/whisper/whisperv6
-# github.com/stretchr/testify v1.3.0
+# github.com/stretchr/testify v1.3.1-0.20190712000136-221dbe5ed467
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
 github.com/stretchr/testify/assert
@@ -353,13 +353,18 @@ github.com/syndtr/goleveldb/leveldb/filter
 github.com/syndtr/goleveldb/leveldb/journal
 github.com/syndtr/goleveldb/leveldb/memdb
 github.com/syndtr/goleveldb/leveldb/table
-# github.com/vacp2p/mvds v0.0.19
+# github.com/vacp2p/mvds v0.0.0-20190705123435-a8dc37599bf99958b0ea19431c9bb7a47bd7fa8f
 github.com/vacp2p/mvds/node
-github.com/vacp2p/mvds/peers
 github.com/vacp2p/mvds/protobuf
 github.com/vacp2p/mvds/state
-github.com/vacp2p/mvds/store
 github.com/vacp2p/mvds/transport
+github.com/vacp2p/mvds/persistenceutil
+github.com/vacp2p/mvds/peers
+github.com/vacp2p/mvds/store
+github.com/vacp2p/mvds/node/migrations
+github.com/vacp2p/mvds/peers/migrations
+github.com/vacp2p/mvds/state/migrations
+github.com/vacp2p/mvds/store/migrations
 # github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 github.com/whyrusleeping/go-logging
 # github.com/whyrusleeping/go-notifier v0.0.0-20170827234753-097c5d47330f
@@ -436,3 +441,5 @@ gopkg.in/natefinch/npipe.v2
 gopkg.in/olebedev/go-duktape.v3
 # gopkg.in/urfave/cli.v1 v1.20.0
 gopkg.in/urfave/cli.v1
+# gopkg.in/yaml.v2 v2.2.2
+gopkg.in/yaml.v2
