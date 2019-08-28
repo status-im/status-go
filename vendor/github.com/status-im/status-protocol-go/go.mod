@@ -20,9 +20,7 @@ require (
 	github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed
 	github.com/status-im/whisper v1.4.14
 	github.com/stretchr/testify v1.3.1-0.20190712000136-221dbe5ed467
-	github.com/vacp2p/mvds v0.0.0-20190705123435-a8dc37599bf99958b0ea19431c9bb7a47bd7fa8f
-	go.uber.org/atomic v1.4.0 // indirect
-	go.uber.org/multierr v1.1.0 // indirect
+	github.com/vacp2p/mvds v0.0.0-20190705123435-943ab5e228078f6389dffe00946c0d0a5b495a5c
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect

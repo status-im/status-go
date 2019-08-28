@@ -113,11 +113,11 @@ func (db sqlitePersistence) DeleteChat(chatID string) error {
 	return err
 }
 
-func (db sqlitePersistence) Chats(from, to int) ([]*Chat, error) {
-	return db.chats(from, to, nil)
+func (db sqlitePersistence) Chats() ([]*Chat, error) {
+	return db.chats(nil)
 }
 
-func (db sqlitePersistence) chats(from, to int, tx *sql.Tx) ([]*Chat, error) {
+func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 	var err error
 
 	if tx == nil {
@@ -137,22 +137,22 @@ func (db sqlitePersistence) chats(from, to int, tx *sql.Tx) ([]*Chat, error) {
 	}
 
 	rows, err := tx.Query(`SELECT
-	id,
-	name,
-	color,
-	active,
-	type,
-	timestamp,
-	deleted_at_clock_value,
-	public_key,
-	unviewed_message_count,
-	last_clock_value,
-	last_message_content_type,
-	last_message_content,
-	members,
-	membership_updates
+		id,
+		name,
+		color,
+		active,
+		type,
+		timestamp,
+		deleted_at_clock_value,
+		public_key,
+		unviewed_message_count,
+		last_clock_value,
+		last_message_content_type,
+		last_message_content,
+		members,
+		membership_updates
 	FROM chats
-	ORDER BY chats.timestamp DESC LIMIT ? OFFSET ?`, to, from)
+	ORDER BY chats.timestamp DESC`)
 	if err != nil {
 		return nil, err
 	}
