@@ -212,7 +212,8 @@ xgo-install:
 	go get -u github.com/karalabe/xgo
 
 gomobile-install: xtools-install
-	go get golang.org/x/mobile/cmd/gomobile
+	go get -d golang.org/x/mobile/cmd/gomobile
+	cd $(GOPATH)/src/golang.org/x/mobile && git checkout 30c70e3810e97d051f18b66d59ae242540c0c391 && go install ./cmd/gomobile
 
 release-install:
 	go get -u github.com/c4milo/github-release
