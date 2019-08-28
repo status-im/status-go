@@ -222,12 +222,16 @@ func (m *Manager) SelectAccount(loginParams LoginParams) error {
 	if err != nil {
 		return err
 	}
-
 	m.watchAddresses = loginParams.WatchAddresses
 	m.mainAccountAddress = loginParams.MainAccount
 	m.selectedChatAccount = selectedChatAccount
-
 	return nil
+}
+
+func (m *Manager) SetAccountAddresses(main common.Address, secondary ...common.Address) {
+	m.watchAddresses = []common.Address{main}
+	m.watchAddresses = append(m.watchAddresses, secondary...)
+	m.mainAccountAddress = main
 }
 
 // SetChatAccount initializes selectedChatAccount with privKey

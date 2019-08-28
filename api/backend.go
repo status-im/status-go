@@ -189,6 +189,54 @@ func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, passwor
 	return nil
 }
 
+func (b *StatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, conf *params.NodeConfig, password string, keyHex string) error {
+	err := b.SaveAccount(acc)
+	if err != nil {
+		return err
+	}
+	err = b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+	err = b.saveNodeConfig(conf)
+	if err != nil {
+		return err
+	}
+	return b.StartNodeWithKey(acc, password, keyHex)
+}
+
+// StartNodeWithKey instead of loading addresses from database this method derives address from key
+// and uses it in application.
+func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+	err := b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+	conf, err := b.loadNodeConfig()
+	if err != nil {
+		return err
+	}
+	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
+		return err
+	}
+
+	chatKey, err := ethcrypto.HexToECDSA(keyHex)
+	if err != nil {
+		return err
+	}
+	err = b.StartNode(conf)
+	if err != nil {
+		return err
+	}
+	b.accountManager.SetChatAccount(chatKey)
+	chatAcc, err := b.accountManager.SelectedChatAccount()
+	if err != nil {
+		return err
+	}
+	b.accountManager.SetAccountAddresses(chatAcc.Address)
+	return b.injectAccountIntoServices()
+}
+
 func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
@@ -753,6 +801,10 @@ func (b *StatusBackend) SelectAccount(loginParams account.LoginParams) error {
 		return err
 	}
 
+	return b.injectAccountIntoServices()
+}
+
+func (b *StatusBackend) injectAccountIntoServices() error {
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
@@ -779,10 +831,10 @@ func (b *StatusBackend) SelectAccount(loginParams account.LoginParams) error {
 			return err
 		}
 	}
-	return b.startWallet(loginParams.Password)
+	return b.startWallet()
 }
 
-func (b *StatusBackend) startWallet(password string) error {
+func (b *StatusBackend) startWallet() error {
 	if !b.statusNode.Config().WalletConfig.Enabled {
 		return nil
 	}
