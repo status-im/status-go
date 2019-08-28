@@ -1,5 +1,18 @@
 package statusproto
 
+import (
+	"crypto/ecdsa"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+)
+
+const (
+	contactBlocked         = "contact/blocked"
+	contactAdded           = "contact/added"
+	contactRequestReceived = "contact/request-received"
+)
+
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact
 type ContactDeviceInfo struct {
 	// The installation id of the device
@@ -13,7 +26,7 @@ type ContactDeviceInfo struct {
 // Contact has information about a "Contact". A contact is not necessarily one
 // that we added or added us, that's based on SystemTags.
 type Contact struct {
-	// ID of the contact
+	// ID of the contact. It's a hex-encoded public key (prefixed with 0x).
 	ID string `json:"id"`
 	// Ethereum address of the contact
 	Address string `json:"address"`
@@ -30,4 +43,34 @@ type Contact struct {
 
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
 	TributeToTalk string              `json:"tributeToTalk"`
+}
+
+func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
+	b, err := hexutil.Decode(c.ID)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.UnmarshalPubkey(b)
+}
+
+func (c Contact) IsAdded() bool {
+	return existsInStringSlice(c.SystemTags, contactAdded)
+}
+
+func (c Contact) HasBeenAdded() bool {
+	return existsInStringSlice(c.SystemTags, contactRequestReceived)
+}
+
+func (c Contact) IsBlocked() bool {
+	return existsInStringSlice(c.SystemTags, contactBlocked)
+}
+
+// existsInStringSlice checks if a string is in a set.
+func existsInStringSlice(set []string, find string) bool {
+	for _, s := range set {
+		if s == find {
+			return true
+		}
+	}
+	return false
 }
