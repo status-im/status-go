@@ -1,6 +1,7 @@
 package wallet
 
 import (
+	"context"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -9,15 +10,17 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 // NewService initializes service instance.
-func NewService(db *Database) *Service {
+func NewService(db *Database, accountsFeed *event.Feed) *Service {
 	feed := &event.Feed{}
 	return &Service{
-		db:      db,
-		feed:    feed,
-		signals: &SignalsTransmitter{publisher: feed},
+		db:           db,
+		feed:         feed,
+		signals:      &SignalsTransmitter{publisher: feed},
+		accountsFeed: accountsFeed,
 	}
 }
 
@@ -28,22 +31,29 @@ type Service struct {
 	reactor *Reactor
 	signals *SignalsTransmitter
 	client  *ethclient.Client
+
+	group        *Group
+	accountsFeed *event.Feed
 }
 
 // Start signals transmitter.
 func (s *Service) Start(*p2p.Server) error {
+	s.group = NewGroup(context.Background())
 	return s.signals.Start()
 }
 
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
 func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
-	reactor := NewReactor(s.db, s.feed, client, accounts, chain)
-	err := reactor.Start()
+	reactor := NewReactor(s.db, s.feed, client, chain)
+	err := reactor.Start(accounts)
 	if err != nil {
 		return err
 	}
 	s.reactor = reactor
 	s.client = client
+	s.group.Add(func(ctx context.Context) error {
+		return WatchAccountsChanges(ctx, s.accountsFeed, accounts, reactor)
+	})
 	return nil
 }
 
@@ -53,6 +63,8 @@ func (s *Service) StopReactor() error {
 		return nil
 	}
 	s.reactor.Stop()
+	s.group.Stop()
+	s.group.Wait()
 	return nil
 }
 
@@ -61,6 +73,11 @@ func (s *Service) Stop() error {
 	log.Info("wallet will be stopped")
 	err := s.StopReactor()
 	s.signals.Stop()
+	if s.group != nil {
+		s.group.Stop()
+		s.group.Wait()
+		s.group = nil
+	}
 	log.Info("wallet stopped")
 	return err
 }
@@ -80,4 +97,54 @@ func (s *Service) APIs() []rpc.API {
 // Protocols returns list of p2p protocols.
 func (s *Service) Protocols() []p2p.Protocol {
 	return nil
+}
+
+// WatchAccountsChanges subsribes to a feed and watches for changes in accounts list. If there are new or removed accounts
+// reactor will be restarted.
+func WatchAccountsChanges(ctx context.Context, feed *event.Feed, initial []common.Address, reactor *Reactor) error {
+	accounts := make(chan []accounts.Account, 1) // it may block if the rate of updates will be significantly higher
+	sub := feed.Subscribe(accounts)
+	defer sub.Unsubscribe()
+	listen := make(map[common.Address]struct{}, len(initial))
+	for _, address := range initial {
+		listen[address] = struct{}{}
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-sub.Err():
+			if err != nil {
+				log.Error("accounts watcher subscription failed", "error", err)
+			}
+		case n := <-accounts:
+			log.Debug("wallet received updated list of accoutns", "accounts", n)
+			restart := false
+			for _, acc := range n {
+				_, exist := listen[acc.Address]
+				if !exist {
+					listen[acc.Address] = struct{}{}
+					restart = true
+				}
+			}
+			if !restart {
+				continue
+			}
+			listenList := mapToList(listen)
+			log.Debug("list of accounts was changed from a previous version. reactor will be restarted", "new", listenList)
+			reactor.Stop()
+			err := reactor.Start(listenList) // error is raised only if reactor is already running
+			if err != nil {
+				log.Error("failed to restart reactor with new accounts", "error", err)
+			}
+		}
+	}
+}
+
+func mapToList(m map[common.Address]struct{}) []common.Address {
+	rst := make([]common.Address, 0, len(m))
+	for address := range m {
+		rst = append(rst, address)
+	}
+	return rst
 }

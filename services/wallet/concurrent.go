@@ -47,6 +47,9 @@ type TransferDownloader interface {
 
 func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, downloader TransferDownloader, account common.Address, low, high *big.Int) {
 	c.Add(func(ctx context.Context) error {
+		if low.Cmp(high) >= 0 {
+			return nil
+		}
 		log.Debug("eth transfers comparing blocks", "low", low, "high", high)
 		lb, err := client.BalanceAt(ctx, account, low)
 		if err != nil {
