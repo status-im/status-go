@@ -38,7 +38,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 )
-import "github.com/status-im/status-go/multiaccounts/accounts"
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+)
 
 const initJS = `
 	var _status_catalog = {
@@ -594,21 +597,11 @@ func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 }
 
 func testSendTransactionInvalidPassword(t *testing.T, feed *event.Feed) bool {
-	createAccountAndLogin(t, feed)
+	acc := createAccountAndLogin(t, feed)
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
-	// log into account from which transactions will be sent
-	if err := statusBackend.SelectAccount(buildLoginParams(
-		TestConfig.Account1.WalletAddress,
-		TestConfig.Account1.ChatAddress,
-		TestConfig.Account1.Password,
-	)); err != nil {
-		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account1.WalletAddress, err)
-		return false
-	}
-
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
+		From:  common.HexToAddress(acc.WalletAddress),
 		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
@@ -635,14 +628,8 @@ func testFailedTransaction(t *testing.T, feed *event.Feed) bool {
 	createAccountAndLogin(t, feed)
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
-	// log into wrong account in order to get selectedAccount error
-	if err := statusBackend.SelectAccount(buildLoginParams(TestConfig.Account2.WalletAddress, TestConfig.Account2.ChatAddress, TestConfig.Account2.Password)); err != nil {
-		t.Errorf("cannot select account: %v. Error %q", TestConfig.Account2.WalletAddress, err)
-		return false
-	}
-
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
+		From:  *account.ToAddress(TestConfig.Account1.WalletAddress),
 		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
@@ -658,8 +645,8 @@ func testFailedTransaction(t *testing.T, feed *event.Feed) bool {
 		return false
 	}
 
-	if result.Error.Message != transactions.ErrInvalidTxSender.Error() {
-		t.Errorf("expected error to be ErrInvalidTxSender, got %s", result.Error.Message)
+	if result.Error.Message != transactions.ErrAccountDoesntExist.Error() {
+		t.Errorf("expected error to be ErrAccountDoesntExist, got %s", result.Error.Message)
 		return false
 	}
 

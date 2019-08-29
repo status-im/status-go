@@ -6,6 +6,8 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
@@ -98,6 +100,28 @@ func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 	s.False(s.Backend.IsNodeRunning())
 	s.Require().NoError(s.Backend.StartNode(nodeConfig))
 	s.True(s.Backend.IsNodeRunning())
+}
+
+func (s *BackendTestSuite) StartTestBackendWithAccount(account multiaccounts.Account, password string, subaccs []accounts.Account, opts ...TestNodeOption) {
+	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	s.Require().NoError(err)
+
+	// Apply any options altering node config.
+	for i := range opts {
+		opts[i](nodeConfig)
+	}
+	// accounts must be imported before keystore is initialized
+	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
+	s.Backend.UpdateRootDataDir(nodeConfig.DataDir)
+	s.NoError(s.Backend.OpenAccounts())
+	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
+
+	s.Require().NoError(s.Backend.StartNodeWithAccountAndConfig(account, password, nodeConfig, subaccs))
+}
+
+func (s *BackendTestSuite) LogoutAndStop() {
+	s.NoError(s.Backend.Logout())
+	s.StopTestBackend()
 }
 
 // StopTestBackend stops the node.

@@ -4,7 +4,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -12,11 +15,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/transactions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -477,4 +483,57 @@ func TestHashTypedData(t *testing.T) {
 	hash, err := backend.HashTypedData(typed)
 	require.NoError(t, err)
 	assert.NotEqual(t, common.Hash{}, hash)
+}
+
+func TestBackendGetVerifiedAccount(t *testing.T) {
+	password := "test"
+	tmpdir, err := ioutil.TempDir("", "verified-account-test-")
+	require.NoError(t, err)
+	defer os.Remove(tmpdir)
+	backend := NewStatusBackend()
+	backend.UpdateRootDataDir(tmpdir)
+	require.NoError(t, backend.accountManager.InitKeystore(filepath.Join(tmpdir, "keystore")))
+	require.NoError(t, backend.ensureAppDBOpened(multiaccounts.Account{Address: common.Address{1, 1, 1}}, password))
+	config, err := params.NewNodeConfig(tmpdir, 178733)
+	require.NoError(t, err)
+	// this is for StatusNode().Config() call inside of the getVerifiedWalletAccount
+	require.NoError(t, backend.StartNode(config))
+	defer func() {
+		require.NoError(t, backend.StopNode())
+	}()
+
+	t.Run("AccountDoesntExist", func(t *testing.T) {
+		pkey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		address := crypto.PubkeyToAddress(pkey.PublicKey)
+		key, err := backend.getVerifiedWalletAccount(address.String(), password)
+		require.EqualError(t, err, transactions.ErrAccountDoesntExist.Error())
+		require.Nil(t, key)
+	})
+
+	t.Run("PasswordDoesntMatch", func(t *testing.T) {
+		pkey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		address := crypto.PubkeyToAddress(pkey.PublicKey)
+		db := accounts.NewDB(backend.appDB)
+		_, err = backend.accountManager.ImportAccount(pkey, password)
+		require.NoError(t, err)
+		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
+		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
+		require.EqualError(t, err, "could not decrypt key with given passphrase")
+		require.Nil(t, key)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		pkey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		address := crypto.PubkeyToAddress(pkey.PublicKey)
+		db := accounts.NewDB(backend.appDB)
+		_, err = backend.accountManager.ImportAccount(pkey, password)
+		require.NoError(t, err)
+		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
+		key, err := backend.getVerifiedWalletAccount(address.String(), password)
+		require.NoError(t, err)
+		require.Equal(t, address, key.Address)
+	})
 }
