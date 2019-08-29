@@ -377,5 +377,5 @@ func (db sqlitePersistence) BlockContact(contact Contact) ([]*Chat, error) {
 	}
 
 	// return the updated chats
-	return db.chats(0, -1, tx)
+	return db.chats(tx)
 }

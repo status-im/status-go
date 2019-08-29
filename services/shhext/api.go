@@ -571,8 +571,8 @@ func (api *PublicAPI) SaveChat(parent context.Context, chat statusproto.Chat) er
 	return api.service.messenger.SaveChat(chat)
 }
 
-func (api *PublicAPI) Chats(parent context.Context, to, from int) ([]*statusproto.Chat, error) {
-	return api.service.messenger.Chats(to, from)
+func (api *PublicAPI) Chats(parent context.Context) ([]*statusproto.Chat, error) {
+	return api.service.messenger.Chats()
 }
 
 func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {

@@ -6,10 +6,12 @@ package node
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/vacp2p/mvds/peers"
 	"github.com/vacp2p/mvds/protobuf"
@@ -31,6 +33,8 @@ type CalculateNextEpoch func(count uint64, epoch int64) int64
 
 // Node represents an MVDS node, it runs all the logic like sending and receiving protocol messages.
 type Node struct {
+	// This needs to be declared first: https://github.com/golang/go/issues/9959
+	epoch  int64
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -48,10 +52,11 @@ type Node struct {
 	ID state.PeerID
 
 	epochPersistence *epochSQLitePersistence
-	epoch            int64
 	mode             Mode
 
 	subscription chan protobuf.Message
+
+	logger *zap.Logger
 }
 
 func NewPersistentNode(
@@ -60,8 +65,13 @@ func NewPersistentNode(
 	id state.PeerID,
 	mode Mode,
 	nextEpoch CalculateNextEpoch,
+	logger *zap.Logger,
 ) (*Node, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	node := Node{
 		ID:               id,
 		ctx:              ctx,
@@ -73,6 +83,7 @@ func NewPersistentNode(
 		payloads:         newPayloads(),
 		epochPersistence: newEpochSQLitePersistence(db),
 		nextEpoch:        nextEpoch,
+		logger:           logger.With(zap.Namespace("mvds")),
 		mode:             mode,
 	}
 	if currentEpoch, err := node.epochPersistence.Get(id); err != nil {
@@ -89,8 +100,13 @@ func NewEphemeralNode(
 	nextEpoch CalculateNextEpoch,
 	currentEpoch int64,
 	mode Mode,
+	logger *zap.Logger,
 ) *Node {
 	ctx, cancel := context.WithCancel(context.Background())
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return &Node{
 		ID:        id,
 		ctx:       ctx,
@@ -102,6 +118,7 @@ func NewEphemeralNode(
 		payloads:  newPayloads(),
 		nextEpoch: nextEpoch,
 		epoch:     currentEpoch,
+		logger:    logger.With(zap.Namespace("mvds")),
 		mode:      mode,
 	}
 }
@@ -116,8 +133,13 @@ func NewNode(
 	id state.PeerID,
 	mode Mode,
 	pp peers.Persistence,
+	logger *zap.Logger,
 ) *Node {
 	ctx, cancel := context.WithCancel(context.Background())
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return &Node{
 		ctx:       ctx,
 		cancel:    cancel,
@@ -129,6 +151,7 @@ func NewNode(
 		nextEpoch: nextEpoch,
 		ID:        id,
 		epoch:     currentEpoch,
+		logger:    logger.With(zap.Namespace("mvds")),
 		mode:      mode,
 	}
 }
@@ -143,7 +166,7 @@ func (n *Node) Start(duration time.Duration) {
 		for {
 			select {
 			case <-n.ctx.Done():
-				log.Print("Watch stopped")
+				n.logger.Info("Watch stopped")
 				return
 			default:
 				p := n.transport.Watch()
@@ -156,20 +179,20 @@ func (n *Node) Start(duration time.Duration) {
 		for {
 			select {
 			case <-n.ctx.Done():
-				log.Print("Epoch processing stopped")
+				n.logger.Info("Epoch processing stopped")
 				return
 			default:
-				log.Printf("Node: %x Epoch: %d", n.ID[:4], n.epoch)
+				n.logger.Debug("Epoch processing", zap.String("node", hex.EncodeToString(n.ID[:4])), zap.Int64("epoch", n.epoch))
 				time.Sleep(duration)
 				err := n.sendMessages()
 				if err != nil {
-					log.Printf("Error sending messages: %+v\n", err)
+					n.logger.Error("Error sending messages.", zap.Error(err))
 				}
 				atomic.AddInt64(&n.epoch, 1)
 				// When a persistent node is used, the epoch needs to be saved.
 				if n.epochPersistence != nil {
 					if err := n.epochPersistence.Set(n.ID, n.epoch); err != nil {
-						log.Printf("Failed to persisten epoch: %v", err)
+						n.logger.Error("Failed to persisten epoch", zap.Error(err))
 					}
 				}
 			}
@@ -179,7 +202,7 @@ func (n *Node) Start(duration time.Duration) {
 
 // Stop message reading and epoch processing
 func (n *Node) Stop() {
-	log.Print("Stopping node")
+	n.logger.Info("Stopping node")
 	n.Unsubscribe()
 	n.cancel()
 }
@@ -227,7 +250,10 @@ func (n *Node) AppendMessage(groupID state.GroupID, data []byte) (state.MessageI
 		n.insertSyncState(&groupID, id, p, t)
 	}
 
-	log.Printf("[%x] node %x sending %x\n", groupID[:4], n.ID[:4], id[:4])
+	n.logger.Debug("Sending message",
+		zap.String("node", hex.EncodeToString(n.ID[:4])),
+		zap.String("groupID", hex.EncodeToString(groupID[:4])),
+		zap.String("id", hex.EncodeToString(id[:4])))
 	// @todo think about a way to insta trigger send messages when send was selected, we don't wanna wait for ticks here
 
 	return id, nil
@@ -275,7 +301,12 @@ func (n *Node) sendMessages() error {
 			n.payloads.AddOffers(p, m[:])
 		case state.REQUEST:
 			n.payloads.AddRequests(p, m[:])
-			log.Printf("sending REQUEST (%x -> %x): %x\n", n.ID[:4], p[:4], m[:4])
+			n.logger.Debug("sending REQUEST",
+				zap.String("from", hex.EncodeToString(n.ID[:4])),
+				zap.String("to", hex.EncodeToString(p[:4])),
+				zap.String("messageID", hex.EncodeToString(m[:4])),
+			)
+
 		case state.MESSAGE:
 			g := *s.GroupID
 			//  TODO: Handle errors
@@ -290,26 +321,36 @@ func (n *Node) sendMessages() error {
 
 			msg, err := n.store.Get(m)
 			if err != nil {
-				log.Printf("failed to retreive message %x %s", m[:4], err.Error())
+				n.logger.Error("Failed to retreive message",
+					zap.String("messageID", hex.EncodeToString(m[:4])),
+					zap.Error(err),
+				)
+
 				return s
 			}
 
 			n.payloads.AddMessages(p, msg)
-			log.Printf("[%x] sending MESSAGE (%x -> %x): %x\n", g[:4], n.ID[:4], p[:4], m[:4])
+			n.logger.Debug("sending MESSAGE",
+				zap.String("groupID", hex.EncodeToString(g[:4])),
+				zap.String("from", hex.EncodeToString(n.ID[:4])),
+				zap.String("to", hex.EncodeToString(p[:4])),
+				zap.String("messageID", hex.EncodeToString(m[:4])),
+			)
+
 		}
 
 		return n.updateSendEpoch(s)
 	})
 
 	if err != nil {
-		log.Printf("error while mapping sync state: %s", err.Error())
+		n.logger.Error("error while mapping sync state", zap.Error(err))
 		return err
 	}
 
 	return n.payloads.MapAndClear(func(peer state.PeerID, payload protobuf.Payload) error {
 		err := n.transport.Send(n.ID, peer, payload)
 		if err != nil {
-			log.Printf("error sending message: %s", err.Error())
+			n.logger.Error("error sending message", zap.Error(err))
 			return err
 		}
 		return nil
@@ -320,13 +361,13 @@ func (n *Node) sendMessages() error {
 func (n *Node) onPayload(sender state.PeerID, payload protobuf.Payload) {
 	// Acks, Requests and Offers are all arrays of bytes as protobuf doesn't allow type aliases otherwise arrays of messageIDs would be nicer.
 	if err := n.onAck(sender, payload.Acks); err != nil {
-		log.Printf("error processing acks: %s", err.Error())
+		n.logger.Error("error processing acks", zap.Error(err))
 	}
 	if err := n.onRequest(sender, payload.Requests); err != nil {
-		log.Printf("error processing requests: %s", err.Error())
+		n.logger.Error("error processing requests", zap.Error(err))
 	}
 	if err := n.onOffer(sender, payload.Offers); err != nil {
-		log.Printf("error processing offers: %s", err.Error())
+		n.logger.Error("error processing offers", zap.Error(err))
 	}
 	messageIds := n.onMessages(sender, payload.Messages)
 	n.payloads.AddAcks(sender, messageIds)
@@ -335,7 +376,11 @@ func (n *Node) onPayload(sender state.PeerID, payload protobuf.Payload) {
 func (n *Node) onOffer(sender state.PeerID, offers [][]byte) error {
 	for _, raw := range offers {
 		id := toMessageID(raw)
-		log.Printf("OFFER (%x -> %x): %x received.\n", sender[:4], n.ID[:4], id[:4])
+		n.logger.Debug("OFFER received",
+			zap.String("from", hex.EncodeToString(sender[:4])),
+			zap.String("to", hex.EncodeToString(n.ID[:4])),
+			zap.String("messageID", hex.EncodeToString(id[:4])),
+		)
 
 		exist, err := n.store.Has(id)
 		// @todo maybe ack?
@@ -355,7 +400,11 @@ func (n *Node) onOffer(sender state.PeerID, offers [][]byte) error {
 func (n *Node) onRequest(sender state.PeerID, requests [][]byte) error {
 	for _, raw := range requests {
 		id := toMessageID(raw)
-		log.Printf("REQUEST (%x -> %x): %x received.\n", sender[:4], n.ID[:4], id[:4])
+		n.logger.Debug("REQUEST received",
+			zap.String("from", hex.EncodeToString(sender[:4])),
+			zap.String("to", hex.EncodeToString(n.ID[:4])),
+			zap.String("messageID", hex.EncodeToString(id[:4])),
+		)
 
 		message, err := n.store.Get(id)
 		if err != nil {
@@ -363,7 +412,7 @@ func (n *Node) onRequest(sender state.PeerID, requests [][]byte) error {
 		}
 
 		if message == nil {
-			log.Printf("message %x does not exist", id[:4])
+			n.logger.Error("message does not exist", zap.String("messageID", hex.EncodeToString(id[:4])))
 			continue
 		}
 
@@ -375,7 +424,10 @@ func (n *Node) onRequest(sender state.PeerID, requests [][]byte) error {
 		}
 
 		if !exist {
-			log.Printf("[%x] peer %x is not in group", groupID, sender[:4])
+			n.logger.Error("peer is not in group",
+				zap.String("groupID", hex.EncodeToString(groupID[:4])),
+				zap.String("peer", hex.EncodeToString(sender[:4])),
+			)
 			continue
 		}
 
@@ -391,11 +443,16 @@ func (n *Node) onAck(sender state.PeerID, acks [][]byte) error {
 
 		err := n.syncState.Remove(id, sender)
 		if err != nil {
-			log.Printf("error while removing sync state %s", err.Error())
+			n.logger.Error("Error while removing sync state.", zap.Error(err))
 			return err
 		}
 
-		log.Printf("ACK (%x -> %x): %x received.\n", sender[:4], n.ID[:4], id[:4])
+		n.logger.Debug("ACK received",
+			zap.String("from", hex.EncodeToString(sender[:4])),
+			zap.String("to", hex.EncodeToString(n.ID[:4])),
+			zap.String("messageID", hex.EncodeToString(id[:4])),
+		)
+
 	}
 	return nil
 }
@@ -407,12 +464,18 @@ func (n *Node) onMessages(sender state.PeerID, messages []*protobuf.Message) [][
 		groupID := toGroupID(m.GroupId)
 		err := n.onMessage(sender, *m)
 		if err != nil {
-			log.Printf("Error processing messsage: %+v\n", err)
+			n.logger.Error("Error processing message", zap.Error(err))
 			continue
 		}
 
 		id := m.ID()
-		log.Printf("[%x] sending ACK (%x -> %x): %x\n", groupID[:4], n.ID[:4], sender[:4], id[:4])
+		n.logger.Debug("sending ACK",
+			zap.String("groupID", hex.EncodeToString(groupID[:4])),
+			zap.String("from", hex.EncodeToString(n.ID[:4])),
+			zap.String("", hex.EncodeToString(sender[:4])),
+			zap.String("messageID", hex.EncodeToString(id[:4])),
+		)
+
 		a = append(a, id[:])
 	}
 
@@ -422,7 +485,11 @@ func (n *Node) onMessages(sender state.PeerID, messages []*protobuf.Message) [][
 func (n *Node) onMessage(sender state.PeerID, msg protobuf.Message) error {
 	id := msg.ID()
 	groupID := toGroupID(msg.GroupId)
-	log.Printf("MESSAGE (%x -> %x): %x received.\n", sender[:4], n.ID[:4], id[:4])
+	n.logger.Debug("MESSAGE received",
+		zap.String("from", hex.EncodeToString(sender[:4])),
+		zap.String("to", hex.EncodeToString(n.ID[:4])),
+		zap.String("messageID", hex.EncodeToString(id[:4])),
+	)
 
 	err := n.syncState.Remove(id, sender)
 	if err != nil {
@@ -466,7 +533,13 @@ func (n *Node) insertSyncState(groupID *state.GroupID, messageID state.MessageID
 
 	err := n.syncState.Add(s)
 	if err != nil {
-		log.Printf("error (%s) setting sync state group: %x id: %x peer: %x", err.Error(), groupID, messageID, peerID)
+		n.logger.Error("error setting sync states",
+			zap.Error(err),
+			zap.String("groupID", hex.EncodeToString(groupID[:4])),
+			zap.String("messageID", hex.EncodeToString(messageID[:4])),
+			zap.String("peerID", hex.EncodeToString(peerID[:4])),
+		)
+
 	}
 }
 

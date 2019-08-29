@@ -145,29 +145,29 @@ func (s *filtersManager) Init(
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	var allChats []*Filter
-	for _, chat := range s.filters {
-		allChats = append(allChats, chat)
+	var allFilters []*Filter
+	for _, f := range s.filters {
+		allFilters = append(allFilters, f)
 	}
-	return allChats, nil
+	return allFilters, nil
 }
 
 // DEPRECATED
-func (s *filtersManager) InitWithChats(chats []*Filter, genericDiscoveryTopicEnabled bool) ([]*Filter, error) {
+func (s *filtersManager) InitWithFilters(filters []*Filter, genericDiscoveryTopicEnabled bool) ([]*Filter, error) {
 	var (
 		chatIDs    []string
 		publicKeys []*ecdsa.PublicKey
 	)
 
-	for _, chat := range chats {
-		if chat.Identity != "" && chat.OneToOne {
-			publicKey, err := strToPublicKey(chat.Identity)
+	for _, filter := range filters {
+		if filter.Identity != "" && filter.OneToOne {
+			publicKey, err := strToPublicKey(filter.Identity)
 			if err != nil {
 				return nil, err
 			}
 			publicKeys = append(publicKeys, publicKey)
-		} else if chat.ChatID != "" {
-			chatIDs = append(chatIDs, chat.ChatID)
+		} else if filter.ChatID != "" {
+			chatIDs = append(chatIDs, filter.ChatID)
 		}
 	}
 
@@ -175,55 +175,55 @@ func (s *filtersManager) InitWithChats(chats []*Filter, genericDiscoveryTopicEna
 }
 
 func (s *filtersManager) Reset() error {
-	var chats []*Filter
+	var filters []*Filter
 
 	s.mutex.Lock()
-	for _, chat := range s.filters {
-		chats = append(chats, chat)
+	for _, f := range s.filters {
+		filters = append(filters, f)
 	}
 	s.mutex.Unlock()
 
-	return s.Remove(chats...)
+	return s.Remove(filters...)
 }
 
-func (s *filtersManager) Chats() (result []*Filter) {
+func (s *filtersManager) Filters() (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	for _, chat := range s.filters {
-		result = append(result, chat)
+	for _, f := range s.filters {
+		result = append(result, f)
 	}
 
 	return
 }
 
-// ChatByID returns a chat by id.
-func (s *filtersManager) ChatByID(chatID string) *Filter {
+func (s *filtersManager) Filter(chatID string) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return s.filters[chatID]
 }
 
-func (s *filtersManager) ChatByFilterID(filterID string) *Filter {
+// FilterByFilterID returns a Filter with a given Whisper filter ID.
+func (s *filtersManager) FilterByFilterID(filterID string) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	for _, chat := range s.filters {
-		if chat.FilterID == filterID {
-			return chat
+	for _, f := range s.filters {
+		if f.FilterID == filterID {
+			return f
 		}
 	}
 	return nil
 }
 
-func (s *filtersManager) ChatsByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
+func (s *filtersManager) FiltersByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	identityStr := publicKeyToStr(publicKey)
 
-	for _, chat := range s.filters {
-		if chat.Identity == identityStr {
-			result = append(result, chat)
+	for _, f := range s.filters {
+		if f.Identity == identityStr {
+			result = append(result, f)
 		}
 	}
 
@@ -231,18 +231,18 @@ func (s *filtersManager) ChatsByPublicKey(publicKey *ecdsa.PublicKey) (result []
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (s *filtersManager) Remove(chats ...*Filter) error {
+func (s *filtersManager) Remove(filters ...*Filter) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	for _, chat := range chats {
-		if err := s.whisper.Unsubscribe(chat.FilterID); err != nil {
+	for _, f := range filters {
+		if err := s.whisper.Unsubscribe(f.FilterID); err != nil {
 			return err
 		}
-		if chat.SymKeyID != "" {
-			s.whisper.DeleteSymKey(chat.SymKeyID)
+		if f.SymKeyID != "" {
+			s.whisper.DeleteSymKey(f.SymKeyID)
 		}
-		delete(s.filters, chat.ChatID)
+		delete(s.filters, f.ChatID)
 	}
 
 	return nil

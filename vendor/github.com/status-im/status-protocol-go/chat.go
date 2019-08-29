@@ -1,6 +1,11 @@
 package statusproto
 
-import "crypto/ecdsa"
+import (
+	"crypto/ecdsa"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+)
 
 type ChatPagination struct {
 	From uint
@@ -78,4 +83,12 @@ type ChatMember struct {
 	Admin bool `json:"admin"`
 	// Joined indicates if the member has joined the group chat
 	Joined bool `json:"joined"`
+}
+
+func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
+	b, err := hexutil.Decode(c.ID)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.UnmarshalPubkey(b)
 }
