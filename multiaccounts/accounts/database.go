@@ -186,3 +186,9 @@ func (db *Database) GetAddresses() (rst []common.Address, err error) {
 	}
 	return rst, nil
 }
+
+// AddressExists returns true if given address is stored in database.
+func (db *Database) AddressExists(address common.Address) (exists bool, err error) {
+	err = db.db.QueryRow("SELECT EXISTS (SELECT 1 FROM accounts WHERE address = ?)", address).Scan(&exists)
+	return exists, err
+}

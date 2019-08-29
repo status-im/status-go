@@ -1,7 +1,9 @@
 package transactions
 
 import (
+	"io/ioutil"
 	"math/big"
+	"os"
 	"reflect"
 	"testing"
 
@@ -9,6 +11,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
@@ -99,12 +103,18 @@ func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(
 func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
 
-	s.StartTestBackend()
-	defer s.StopTestBackend()
+	tmpdir, err := ioutil.TempDir("", "transactions-tests-")
+	s.Require().NoError(err)
+	defer os.Remove(tmpdir)
+
+	wallet := common.HexToAddress(TestConfig.Account1.WalletAddress)
+	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, TestConfig.Account1.Password,
+		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
+		e2e.WithDataDir(tmpdir),
+	)
+	defer s.LogoutAndStop()
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
-	err := s.Backend.SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
-	s.NoError(err)
 
 	args := transactions.SendTxArgs{
 		From: account.FromAddress(TestConfig.Account1.WalletAddress),
@@ -166,13 +176,18 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 }
 
 func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc, expectedError error, expectedErrorDescription string) {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
+	tmpdir, err := ioutil.TempDir("", "transactions-tests-")
+	s.Require().NoError(err)
+	defer os.Remove(tmpdir)
+
+	wallet := common.HexToAddress(TestConfig.Account1.WalletAddress)
+	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, TestConfig.Account1.Password,
+		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
+		e2e.WithDataDir(tmpdir),
+	)
+	defer s.LogoutAndStop()
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
-
-	err := s.Backend.AccountManager().SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
-	s.NoError(err)
 
 	// this call blocks, up until Complete Transaction is called
 	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
@@ -194,19 +209,22 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	}
 	s.NoError(err)
 	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
-	s.NoError(s.Backend.Logout())
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
+	tmpdir, err := ioutil.TempDir("", "transactions-tests-")
+	s.Require().NoError(err)
+	defer os.Remove(tmpdir)
 
-	s.StartTestBackend()
-	defer s.StopTestBackend()
+	wallet := common.HexToAddress(TestConfig.Account1.WalletAddress)
+	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, TestConfig.Account1.Password,
+		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
+		e2e.WithDataDir(tmpdir),
+	)
+	defer s.LogoutAndStop()
 
 	EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
-
-	err := s.Backend.AccountManager().SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
-	s.NoError(err)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
 		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
@@ -220,13 +238,19 @@ func (s *TransactionsTestSuite) TestSendEther() {
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	CheckTestSkipForNetworks(s.T(), params.MainNetworkID, params.StatusChainNetworkID)
 
+	tmpdir, err := ioutil.TempDir("", "transactions-tests-")
+	s.Require().NoError(err)
+	defer os.Remove(tmpdir)
 	addr, err := GetRemoteURL()
 	s.NoError(err)
-	s.StartTestBackend(e2e.WithUpstream(addr))
-	defer s.StopTestBackend()
 
-	err = s.Backend.SelectAccount(buildLoginParams(TestConfig.Account1.WalletAddress, TestConfig.Account1.ChatAddress, TestConfig.Account1.Password))
-	s.NoError(err)
+	wallet := common.HexToAddress(TestConfig.Account1.WalletAddress)
+	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, TestConfig.Account1.Password,
+		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
+		e2e.WithUpstream(addr),
+		e2e.WithDataDir(tmpdir),
+	)
+	defer s.LogoutAndStop()
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
 		From:     account.FromAddress(TestConfig.Account1.WalletAddress),

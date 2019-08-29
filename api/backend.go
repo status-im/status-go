@@ -557,25 +557,16 @@ func (b *StatusBackend) HashTypedData(typed typeddata.TypedData) (common.Hash, e
 func (b *StatusBackend) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	config := b.StatusNode().Config()
 
-	var validAddress bool
-
-	addresses := b.accountManager.WatchAddresses()
-	mainAccountAddress, err := b.accountManager.MainAccountAddress()
+	db := accounts.NewDB(b.appDB)
+	exists, err := db.AddressExists(common.HexToAddress(address))
 	if err != nil {
+		b.log.Error("failed to query db for a given address", "address", address, "error", err)
 		return nil, err
 	}
 
-	addresses = append(addresses, mainAccountAddress)
-	for _, a := range addresses {
-		if a.String() == address {
-			validAddress = true
-			break
-		}
-	}
-
-	if !validAddress {
+	if !exists {
 		b.log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
-		return nil, transactions.ErrInvalidTxSender
+		return nil, transactions.ErrAccountDoesntExist
 	}
 
 	key, err := b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)

@@ -175,3 +175,25 @@ func TestGetAccounts(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, accounts, rst)
 }
+
+func TestAddressExists(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	accounts := []Account{
+		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+	}
+	require.NoError(t, db.SaveAccounts(accounts))
+
+	exists, err := db.AddressExists(accounts[0].Address)
+	require.NoError(t, err)
+	require.True(t, exists)
+}
+
+func TestAddressDoesntExist(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	exists, err := db.AddressExists(common.Address{1, 1, 1})
+	require.NoError(t, err)
+	require.False(t, exists)
+}
