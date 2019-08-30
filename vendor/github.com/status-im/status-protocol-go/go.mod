@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7 // indirect
+	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/golang/protobuf v1.3.2
@@ -20,7 +21,7 @@ require (
 	github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed
 	github.com/status-im/whisper v1.4.14
 	github.com/stretchr/testify v1.3.1-0.20190712000136-221dbe5ed467
-	github.com/vacp2p/mvds v0.0.0-20190705123435-943ab5e228078f6389dffe00946c0d0a5b495a5c
+	github.com/vacp2p/mvds v0.0.21
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect

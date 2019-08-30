@@ -317,7 +317,7 @@ github.com/status-im/migrate/v4/database/sqlcipher
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.0.0-20190701094942-822d18916e417b768a13f85601a7b10e02236655
+# github.com/status-im/status-protocol-go v0.0.0-20190701094942-8a6d5a6b49ee40f22ffac18377835e4a0fd7032e
 github.com/status-im/status-protocol-go/zaputil
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/encryption/multidevice
@@ -353,7 +353,7 @@ github.com/syndtr/goleveldb/leveldb/filter
 github.com/syndtr/goleveldb/leveldb/journal
 github.com/syndtr/goleveldb/leveldb/memdb
 github.com/syndtr/goleveldb/leveldb/table
-# github.com/vacp2p/mvds v0.0.0-20190705123435-943ab5e228078f6389dffe00946c0d0a5b495a5c
+# github.com/vacp2p/mvds v0.0.21
 github.com/vacp2p/mvds/node
 github.com/vacp2p/mvds/protobuf
 github.com/vacp2p/mvds/state

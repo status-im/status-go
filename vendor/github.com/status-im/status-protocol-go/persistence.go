@@ -78,8 +78,8 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, members, membership_updates)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, last_message_timestamp, members, membership_updates)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -98,6 +98,7 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 		chat.LastClockValue,
 		chat.LastMessageContentType,
 		chat.LastMessageContent,
+		chat.LastMessageTimestamp,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 	)
@@ -149,6 +150,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		last_clock_value,
 		last_message_content_type,
 		last_message_content,
+		last_message_timestamp,
 		members,
 		membership_updates
 	FROM chats
@@ -163,6 +165,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 	for rows.Next() {
 		var lastMessageContentType sql.NullString
 		var lastMessageContent sql.NullString
+		var lastMessageTimestamp sql.NullInt64
 
 		chat := &Chat{}
 		encodedMembers := []byte{}
@@ -181,6 +184,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 			&chat.LastClockValue,
 			&lastMessageContentType,
 			&lastMessageContent,
+			&lastMessageTimestamp,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 		)
@@ -189,6 +193,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		}
 		chat.LastMessageContent = lastMessageContent.String
 		chat.LastMessageContentType = lastMessageContentType.String
+		chat.LastMessageTimestamp = lastMessageTimestamp.Int64
 
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
@@ -335,19 +340,30 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 }
 
 // Messages returns messages for a given contact, in a given period. Ordered by a timestamp.
-func (db sqlitePersistence) Messages(chatID string, from, to time.Time) (result []*protocol.Message, err error) {
+func (db sqlitePersistence) Messages(from, to time.Time) (result []*protocol.Message, err error) {
 	rows, err := db.db.Query(`SELECT
-id, content_type, message_type, text, clock, timestamp, content_chat_id, content_text, public_key, flags
-FROM user_messages WHERE chat_id = ? AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp`,
-		chatID, protocol.TimestampInMsFromTime(from), protocol.TimestampInMsFromTime(to))
+			id, 
+			content_type, 
+			message_type, 
+			text, 
+			clock, 
+			timestamp, 
+			content_chat_id, 
+			content_text, 
+			public_key, 
+			flags
+		FROM user_messages 
+		WHERE timestamp >= ? AND timestamp <= ? 
+		ORDER BY timestamp`,
+		protocol.TimestampInMsFromTime(from),
+		protocol.TimestampInMsFromTime(to),
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var (
-		rst = []*protocol.Message{}
-	)
+	var rst []*protocol.Message
 	for rows.Next() {
 		msg := protocol.Message{
 			Content: protocol.Content{},
@@ -458,7 +474,7 @@ func (db sqlitePersistence) UnreadMessages(chatID string) ([]*protocol.Message, 
 	return result, nil
 }
 
-func (db sqlitePersistence) SaveMessages(chatID string, messages []*protocol.Message) (last int64, err error) {
+func (db sqlitePersistence) SaveMessages(messages []*protocol.Message) (last int64, err error) {
 	var (
 		tx   *sql.Tx
 		stmt *sql.Stmt
@@ -491,7 +507,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 			pkey, err = marshalECDSAPub(msg.SigPubKey)
 		}
 		rst, err = stmt.Exec(
-			msg.ID, chatID, msg.ContentT, msg.MessageT, msg.Text,
+			msg.ID, msg.ChatID, msg.ContentT, msg.MessageT, msg.Text,
 			msg.Clock, msg.Timestamp, msg.Content.ChatID, msg.Content.Text,
 			pkey, msg.Flags)
 		if err != nil {

@@ -167,7 +167,11 @@ func (a *WhisperServiceTransport) LeavePublic(chatID string) error {
 }
 
 func (a *WhisperServiceTransport) JoinPrivate(publicKey *ecdsa.PublicKey) error {
-	_, err := a.filters.LoadContactCode(publicKey)
+	_, err := a.filters.LoadDiscovery()
+	if err != nil {
+		return err
+	}
+	_, err = a.filters.LoadContactCode(publicKey)
 	return err
 }
 
@@ -191,10 +195,11 @@ func (a *WhisperServiceTransport) RetrieveAllMessages() ([]ChatMessages, error) 
 			return nil, errors.New("failed to return a filter")
 		}
 
-		messages := chatMessages[filter.ChatID]
-		messages.ChatID = filter.ChatID
-		messages.Public = filter.IsPublic()
-		messages.Messages = append(messages.Messages, f.Retrieve()...)
+		ch := chatMessages[filter.ChatID]
+		ch.ChatID = filter.ChatID
+		ch.Public = filter.IsPublic()
+		ch.Messages = append(ch.Messages, f.Retrieve()...)
+		chatMessages[filter.ChatID] = ch
 	}
 
 	var result []ChatMessages
@@ -354,10 +359,11 @@ func (a *WhisperServiceTransport) Track(identifiers [][]byte, hash []byte, newMe
 	}
 }
 
-func (a *WhisperServiceTransport) Stop() {
+func (a *WhisperServiceTransport) Stop() error {
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Stop()
 	}
+	return nil
 }
 
 // MessagesRequest is a RequestMessages() request payload.
