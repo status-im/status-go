@@ -123,6 +123,11 @@ func main() {
 	}
 
 	backend := api.NewStatusBackend()
+	err = backend.AccountManager().InitKeystore(config.KeyStoreDir)
+	if err != nil {
+		logger.Error("Failed to init keystore", "error", err)
+		return
+	}
 	err = backend.StartNode(config)
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
