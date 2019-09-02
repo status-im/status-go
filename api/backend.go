@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/services/mailservers"
 	"math/big"
 	"path/filepath"
 	"sync"
@@ -354,6 +355,12 @@ func (b *StatusBackend) permissionsService() gethnode.ServiceConstructor {
 	}
 }
 
+func (b *StatusBackend) mailserversService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return mailservers.NewService(mailservers.NewDB(b.appDB)), nil
+	}
+}
+
 func (b *StatusBackend) walletService(network uint64, accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
 		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed), nil
@@ -378,6 +385,7 @@ func (b *StatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
+	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID, accountsFeed))
 
 	manager := b.accountManager.GetManager()

@@ -75,3 +75,11 @@ sync INT,
 FOREIGN KEY(network_id,blk_number) REFERENCES blocks(network_id,number) ON DELETE CASCADE,
 CONSTRAINT unique_mapping_for_account_to_block_per_network UNIQUE (address,blk_number,network_id)
 );
+
+CREATE TABLE IF NOT EXISTS mailservers (
+    id VARCHAR PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    address VARCHAR NOT NULL,
+    password VARCHAR,
+    fleet VARCHAR NOT NULL
+);
