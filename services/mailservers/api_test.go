@@ -2,11 +2,12 @@ package mailservers
 
 import (
 	"context"
-	"github.com/status-im/status-go/appdatabase"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/status-im/status-go/appdatabase"
+	"github.com/stretchr/testify/require"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -20,7 +21,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	}
 }
 
-func TestAddAndGetMailserver(t *testing.T) {
+func TestAddGetDeleteMailserver(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
 	api := &API{db: db}
@@ -38,4 +39,14 @@ func TestAddAndGetMailserver(t *testing.T) {
 	mailservers, err := api.GetMailservers(context.Background())
 	require.NoError(t, err)
 	require.EqualValues(t, []Mailserver{testMailserver}, mailservers)
+
+	err = api.DeleteMailserver(context.Background(), testMailserver.ID)
+	require.NoError(t, err)
+	// Verify it was deleted.
+	mailservers, err = api.GetMailservers(context.Background())
+	require.NoError(t, err)
+	require.Len(t, mailservers, 0)
+	// Delete non-existing mailserver.
+	err = api.DeleteMailserver(context.Background(), "other-id")
+	require.NoError(t, err)
 }
