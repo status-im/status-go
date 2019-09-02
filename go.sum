@@ -53,6 +53,8 @@ github.com/btcsuite/snappy-go v0.0.0-20151229074030-0bdef8d06723/go.mod h1:8woku
 github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792 h1:R8vQdOQdZ9Y3SkEwmHoWBmX1DNXhXZqlTpq6s4tyJGc=
 github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792/go.mod h1:ghJtEyQwv5/p4Mg4C0fgbePVuGr935/5ddU9Z3TmDRY=
 github.com/btcsuite/winsvc v1.0.0/go.mod h1:jsenWakMcC0zFBFurPLEAyrnc/teJEM1O46fmI40EZs=
+github.com/cenkalti/backoff/v3 v3.0.0 h1:ske+9nBpD9qZsTBoF41nW5L+AIuFBKMeze18XQ3eG1c=
+github.com/cenkalti/backoff/v3 v3.0.0/go.mod h1:cIeZDE3IrqwwJl6VUwCN6trj1oXrTS4rc0ij+ULvLYs=
 github.com/cespare/cp v0.1.0 h1:SE+dxFebS7Iik5LK0tsi1k9ZCxEaFX4AjQmoyA+1dJk=
 github.com/cespare/cp v0.1.0/go.mod h1:SOGHArjBr4JWaSDEVpWpo/hNg6RoKrls6Oh40hiwW+s=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
@@ -450,8 +452,8 @@ github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf0
 github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed/go.mod h1:r8HggRBZ/k7TRwByq/Hp3P/ubFppIna0nvyavVK0pjA=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
-github.com/status-im/status-protocol-go v0.0.0-20190701094942-822d18916e417b768a13f85601a7b10e02236655 h1:7lJRfkt9fzt+wpL+1rgfhvFThs2yP8VJm3BHGbgfWsg=
-github.com/status-im/status-protocol-go v0.0.0-20190701094942-822d18916e417b768a13f85601a7b10e02236655/go.mod h1:zEvtd2lNRzsqo4RCLU6WlK0EKFTGEoAAuYfj+lZjHNQ=
+github.com/status-im/status-protocol-go v0.0.0-20190701094942-8a6d5a6b49ee40f22ffac18377835e4a0fd7032e h1:D17xbTZlT2Wdrylvcu+gTLryFYzOeq2QAzKgxmCmXIE=
+github.com/status-im/status-protocol-go v0.0.0-20190701094942-8a6d5a6b49ee40f22ffac18377835e4a0fd7032e/go.mod h1:9cLBinLjWaeYCMWBq4TBMf4P/bp2aFQDwzS/9uhHf6I=
 github.com/status-im/whisper v1.4.14 h1:9VHqx4+PUYfhDnYYtDxHkg/3cfVvkHjPNciY4LO83yc=
 github.com/status-im/whisper v1.4.14/go.mod h1:WS6z39YJQ8WJa9s+DmTuEM/s2nVF6Iz3B1SZYw5cYf0=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
@@ -469,8 +471,8 @@ github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpP
 github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
 github.com/uber/jaeger-client-go v0.0.0-20180607151842-f7e0d4744fa6/go.mod h1:WVhlPFC8FDjOFMMWRy2pZqQJSXxYSwNYOkTr/Z6d3Kk=
 github.com/uber/jaeger-lib v0.0.0-20180615202729-a51202d6f4a7/go.mod h1:ComeNDZlWwrWnDv8aPp0Ba6+uUTzImX/AauajbLI56U=
-github.com/vacp2p/mvds v0.0.0-20190705123435-943ab5e228078f6389dffe00946c0d0a5b495a5c h1:O7gT6vNipoBxFe19iWtDyUjIcIbkJ5MYhMXLS+RRCFs=
-github.com/vacp2p/mvds v0.0.0-20190705123435-943ab5e228078f6389dffe00946c0d0a5b495a5c/go.mod h1:pIqr2Hg4cIkTJniGPCp4ptong2jxgxx6uToVoY94+II=
+github.com/vacp2p/mvds v0.0.21 h1:YeYja8noKsHvrnOHM4pqjBvDwwy+kUzXMkX1IBYJAbU=
+github.com/vacp2p/mvds v0.0.21/go.mod h1:pIqr2Hg4cIkTJniGPCp4ptong2jxgxx6uToVoY94+II=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
 github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc h1:9lDbC6Rz4bwmou+oE6Dt4Cb2BGMur5eR/GYptkKUVHo=
 github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc/go.mod h1:bopw91TMyo8J3tvftk8xmU2kPmlrt4nScJQZU2hE5EM=
