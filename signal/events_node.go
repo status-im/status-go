@@ -26,6 +26,11 @@ type NodeCrashEvent struct {
 	Error string `json:"error"`
 }
 
+// NodeLoginEvent returns the result of the login event
+type NodeLoginEvent struct {
+	Error string `json:"error,omitempty"`
+}
+
 // SendNodeCrashed emits a signal when status node has crashed, and
 // provides error description.
 func SendNodeCrashed(err error) {
@@ -57,6 +62,10 @@ func SendChainDataRemoved() {
 	send(EventChainDataRemoved, nil)
 }
 
-func SendLoggedIn() {
-	send(EventLoggedIn, nil)
+func SendLoggedIn(err error) {
+	event := NodeLoginEvent{}
+	if err != nil {
+		event.Error = err.Error()
+	}
+	send(EventLoggedIn, event)
 }
