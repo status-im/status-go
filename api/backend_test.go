@@ -550,18 +550,17 @@ func TestLoginWithKey(t *testing.T) {
 	defer os.Remove(tmpdir)
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
-	password := "test"
 	keyhex := hex.EncodeToString(crypto.FromECDSA(pkey))
 
 	require.NoError(t, b.accountManager.InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
 
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, conf, password, keyhex))
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, conf, "test-pass", keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
-	require.NoError(t, b.StartNodeWithKey(main, password, keyhex))
+	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex))
 	defer func() {
 		assert.NoError(t, b.Logout())
 		assert.NoError(t, b.StopNode())
