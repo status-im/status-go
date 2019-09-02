@@ -537,3 +537,35 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.Equal(t, address, key.Address)
 	})
 }
+
+func TestLoginWithKey(t *testing.T) {
+	b := NewStatusBackend()
+	pkey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	main := multiaccounts.Account{
+		Address: crypto.PubkeyToAddress(pkey.PublicKey),
+	}
+	tmpdir, err := ioutil.TempDir("", "login-with-key-test-")
+	require.NoError(t, err)
+	defer os.Remove(tmpdir)
+	conf, err := params.NewNodeConfig(tmpdir, 1777)
+	require.NoError(t, err)
+	keyhex := hex.EncodeToString(crypto.FromECDSA(pkey))
+
+	require.NoError(t, b.accountManager.InitKeystore(conf.KeyStoreDir))
+	b.UpdateRootDataDir(conf.DataDir)
+	require.NoError(t, b.OpenAccounts())
+
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, conf, "test-pass", keyhex))
+	require.NoError(t, b.Logout())
+	require.NoError(t, b.StopNode())
+
+	require.NoError(t, b.StartNodeWithKey(main, "test-pass", keyhex))
+	defer func() {
+		assert.NoError(t, b.Logout())
+		assert.NoError(t, b.StopNode())
+	}()
+	extkey, err := b.accountManager.SelectedChatAccount()
+	require.NoError(t, err)
+	require.Equal(t, crypto.PubkeyToAddress(pkey.PublicKey), extkey.Address)
+}

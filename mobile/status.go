@@ -376,11 +376,50 @@ func InitKeystore(keydir string) string {
 	return makeJSONResponse(err)
 }
 
+// SaveAccountAndLoginWithKeycard saves account in status-go database..
+func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, keyHex string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var conf params.NodeConfig
+	err = json.Unmarshal([]byte(configJSON), &conf)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	api.RunAsync(func() error {
+		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		err := statusBackend.SaveAccountAndStartNodeWithKey(account, &conf, password, keyHex)
+		if err != nil {
+			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			return err
+		}
+		log.Debug("started a node, and saved account", "address", account.Address)
+		return nil
+	})
+	return makeJSONResponse(nil)
+}
+
 // LoginWithKeycard initializes an account with a chat key and encryption key used for PFS.
 // It purges all the previous identities from Whisper, and injects the key as shh identity.
-func LoginWithKeycard(chatKeyData, encryptionKeyData string) string {
-	err := statusBackend.InjectChatAccount(chatKeyData, encryptionKeyData)
-	return makeJSONResponse(err)
+func LoginWithKeycard(accountData, password, keyHex string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	api.RunAsync(func() error {
+		log.Debug("start a node with account", "address", account.Address)
+		err := statusBackend.StartNodeWithKey(account, password, keyHex)
+		if err != nil {
+			log.Error("failed to start a node", "address", account.Address, "error", err)
+			return err
+		}
+		log.Debug("started a node with", "address", account.Address)
+		return nil
+	})
+	return makeJSONResponse(nil)
 }
 
 // Logout is equivalent to clearing whisper identities.
