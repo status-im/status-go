@@ -185,10 +185,10 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 check-existing-release:
-	@git ls-remote --exit-code origin "v$(RELEASE_TAG)" >/dev/null && \
-		echo "$(YELLOW)Release tag already exists: v$(RELEASE_TAG)$(RESET)"; \
-		echo "Remove the tag/release if you want to re-create it."; \
-		exit 1
+	@git ls-remote --exit-code origin "v$(RELEASE_TAG)" >/dev/null || exit 0; \
+	echo "$(YELLOW)Release tag already exists: v$(RELEASE_TAG)$(RESET)"; \
+	echo "Remove the tag/release if you want to re-create it."; \
+	exit 1;
 
 release: check-existing-release
 	@read -p "Are you sure you want to create a new GitHub $(RELEASE_TYPE) against $(RELEASE_BRANCH) branch? (y/n): " REPLY; \
