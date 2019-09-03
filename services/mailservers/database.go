@@ -3,11 +3,19 @@ package mailservers
 import "database/sql"
 
 type Mailserver struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Address  string  `json:"address"`
-	Password *string `json:"password,omitempty"`
-	Fleet    string  `json:"fleet"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Address  string `json:"address"`
+	Password string `json:"password,omitempty"`
+	Fleet    string `json:"fleet"`
+}
+
+func (m Mailserver) nullablePassword() (val sql.NullString) {
+	if m.Password != "" {
+		val.String = m.Password
+		val.Valid = true
+	}
+	return
 }
 
 // Database sql wrapper for operations with mailserver objects.
@@ -30,7 +38,7 @@ func (d *Database) Add(mailserver Mailserver) error {
 		mailserver.ID,
 		mailserver.Name,
 		mailserver.Address,
-		mailserver.Password,
+		mailserver.nullablePassword(),
 		mailserver.Fleet,
 	)
 	return err
@@ -46,15 +54,21 @@ func (d *Database) Mailservers() ([]Mailserver, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var m Mailserver
+		var (
+			m        Mailserver
+			password sql.NullString
+		)
 		if err := rows.Scan(
 			&m.ID,
 			&m.Name,
 			&m.Address,
-			&m.Password,
+			&password,
 			&m.Fleet,
 		); err != nil {
 			return nil, err
+		}
+		if password.Valid {
+			m.Password = password.String
 		}
 		result = append(result, m)
 	}

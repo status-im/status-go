@@ -26,26 +26,30 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 	defer close()
 	api := &API{db: db}
 	testMailserver := Mailserver{
-		ID:       "abc",
-		Name:     "My Mailserver",
-		Address:  "enode://...",
-		Password: nil,
-		Fleet:    "beta",
+		ID:      "mailserver001",
+		Name:    "My Mailserver",
+		Address: "enode://...",
+		Fleet:   "beta",
 	}
+	testMailserverWithPassword := testMailserver
+	testMailserverWithPassword.ID = "mailserver002"
+	testMailserverWithPassword.Password = "test-pass"
 
 	err := api.AddMailserver(context.Background(), testMailserver)
+	require.NoError(t, err)
+	err = api.AddMailserver(context.Background(), testMailserverWithPassword)
 	require.NoError(t, err)
 
 	mailservers, err := api.GetMailservers(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, []Mailserver{testMailserver}, mailservers)
+	require.EqualValues(t, []Mailserver{testMailserver, testMailserverWithPassword}, mailservers)
 
 	err = api.DeleteMailserver(context.Background(), testMailserver.ID)
 	require.NoError(t, err)
-	// Verify it was deleted.
+	// Verify they was deleted.
 	mailservers, err = api.GetMailservers(context.Background())
 	require.NoError(t, err)
-	require.Len(t, mailservers, 0)
+	require.EqualValues(t, []Mailserver{testMailserverWithPassword}, mailservers)
 	// Delete non-existing mailserver.
 	err = api.DeleteMailserver(context.Background(), "other-id")
 	require.NoError(t, err)
