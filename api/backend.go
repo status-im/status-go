@@ -237,7 +237,7 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 	return b.injectAccountIntoServices()
 }
 
-func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
+func (b *StatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
@@ -280,8 +280,17 @@ func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
-	signal.SendLoggedIn()
 	return nil
+}
+
+func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
+	err := b.startNodeWithAccount(acc, password)
+	signal.SendLoggedIn(err)
+	if err != nil {
+		// Stop node for clean up
+		_ = b.StopNode()
+	}
+	return err
 }
 
 // StartNodeWithAccountAndConfig is used after account and config was generated.
