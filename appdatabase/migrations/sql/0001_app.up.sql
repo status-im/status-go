@@ -83,3 +83,12 @@ CREATE TABLE IF NOT EXISTS mailservers (
     password VARCHAR,
     fleet VARCHAR NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS mailserver_request_gaps (
+  gap_from UNSIGNED INTEGER NOT NULL,
+  gap_to UNSIGNED INTEGER NOT NULL,
+  id TEXT PRIMARY KEY,
+  chat_id TEXT NOT NULL
+  ) WITHOUT ROWID;
+
+CREATE INDEX mailserver_request_gaps_chat_id_idx ON mailserver_request_gaps (chat_id);
