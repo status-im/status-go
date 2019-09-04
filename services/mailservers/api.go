@@ -28,7 +28,7 @@ func (a *API) AddMailserverRequestGaps(ctx context.Context, gaps []MailserverReq
 }
 
 func (a *API) GetMailserverRequestGaps(ctx context.Context, chatID string) ([]MailserverRequestGap, error) {
-	return a.db.MailserverRequestGaps(chatID)
+	return a.db.RequestGaps(chatID)
 }
 
 func (a *API) DeleteMailserverRequestGaps(ctx context.Context, ids []string) error {
@@ -37,4 +37,16 @@ func (a *API) DeleteMailserverRequestGaps(ctx context.Context, ids []string) err
 
 func (a *API) DeleteMailserverRequestGapsByChatID(ctx context.Context, chatID string) error {
 	return a.db.DeleteGapsByChatID(chatID)
+}
+
+func (a *API) AddMailserverTopic(ctx context.Context, topic MailserverTopic) error {
+	return a.db.AddTopic(topic)
+}
+
+func (a *API) GetMailserverTopics(ctx context.Context) ([]MailserverTopic, error) {
+	return a.db.Topics()
+}
+
+func (a *API) DeleteMailserverTopic(ctx context.Context, topic string) error {
+	return a.db.DeleteTopic(topic)
 }

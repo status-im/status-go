@@ -103,3 +103,31 @@ func TestAddGetDeleteMailserverRequestGap(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, actualGaps, 0)
 }
+
+func TestAddGetDeleteMailserverTopics(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+	api := &API{db: db}
+	testTopic := MailserverTopic{
+		Topic:       "topic-001",
+		ChatIDs:     []string{"chatID01", "chatID02"},
+		LastRequest: 10,
+	}
+	err := api.AddMailserverTopic(context.Background(), testTopic)
+	require.NoError(t, err)
+
+	// Verify topics were added.
+	topics, err := api.GetMailserverTopics(context.Background())
+	require.NoError(t, err)
+	require.EqualValues(t, []MailserverTopic{testTopic}, topics)
+
+	err = api.DeleteMailserverTopic(context.Background(), testTopic.Topic)
+	require.NoError(t, err)
+	topics, err = api.GetMailserverTopics(context.Background())
+	require.NoError(t, err)
+	require.EqualValues(t, ([]MailserverTopic)(nil), topics)
+
+	// Delete non-existing topic.
+	err = api.DeleteMailserverTopic(context.Background(), "non-existing-topic")
+	require.NoError(t, err)
+}

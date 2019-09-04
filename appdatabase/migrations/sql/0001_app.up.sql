@@ -82,13 +82,19 @@ CREATE TABLE IF NOT EXISTS mailservers (
     address VARCHAR NOT NULL,
     password VARCHAR,
     fleet VARCHAR NOT NULL
-);
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS mailserver_request_gaps (
-  gap_from UNSIGNED INTEGER NOT NULL,
-  gap_to UNSIGNED INTEGER NOT NULL,
-  id TEXT PRIMARY KEY,
-  chat_id TEXT NOT NULL
-  ) WITHOUT ROWID;
+    gap_from UNSIGNED INTEGER NOT NULL,
+    gap_to UNSIGNED INTEGER NOT NULL,
+    id TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL
+) WITHOUT ROWID;
 
 CREATE INDEX mailserver_request_gaps_chat_id_idx ON mailserver_request_gaps (chat_id);
+
+CREATE TABLE IF NOT EXISTS mailserver_topics (
+    topic VARCHAR PRIMARY KEY,
+    chat_ids VARCHAR,
+    last_request INTEGER DEFAULT 1
+) WITHOUT ROWID;

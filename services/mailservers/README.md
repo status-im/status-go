@@ -24,15 +24,14 @@ Enabling service will expose three additional methods:
 #### mailservers_addMailserver
 
 Stores `Mailserver` in the database.
-All fields are specified below:
 
 ```json
 {
-  "id": "1",
-  "name": "my mailserver",
-  "address": "enode://...",
-  "password": "some-pass",
-  "fleet": "beta"
+    "id": "1",
+    "name": "my mailserver",
+    "address": "enode://...",
+    "password": "some-pass",
+    "fleet": "beta"
 }
 ```
 
@@ -79,3 +78,22 @@ Deletes all MailserverRequestGaps specified by IDs.
 #### mailservers_deleteMailserverRequestGapsByChatID
 
 Deletes all MailserverRequestGaps specified by chatID.
+
+#### mailservers_addMailserverTopic
+
+Stores `MailserverTopic` in the database.
+```json
+{
+    "topic": "topic-as-string",
+    "chat-ids": ["a", "list", "of", "chatIDs"],
+    "last-request": 1
+}
+```
+
+#### mailservers_getMailserverTopics
+
+Reads all saved mailserver topics.
+
+#### mailservers_deleteMailserverTopic
+
+Deletes a mailserver topic using `topic` as an identifier.
