@@ -7,3 +7,4 @@ DROP TABLE permissions;
 DROP TABLE transfers;
 DROP TABLE blocks;
 DROP TABLE accounts_to_blocks;
+DROP TABLE mailservers;
