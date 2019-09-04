@@ -2,6 +2,9 @@ package mailservers
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -14,6 +17,14 @@ type Mailserver struct {
 	Fleet    string `json:"fleet"`
 }
 
+func (m Mailserver) nullablePassword() (val sql.NullString) {
+	if m.Password != "" {
+		val.String = m.Password
+		val.Valid = true
+	}
+	return
+}
+
 type MailserverRequestGap struct {
 	ID     string `json:"id"`
 	ChatID string `json:"chatId"`
@@ -21,12 +32,31 @@ type MailserverRequestGap struct {
 	To     uint64 `json:"to"`
 }
 
-func (m Mailserver) nullablePassword() (val sql.NullString) {
-	if m.Password != "" {
-		val.String = m.Password
-		val.Valid = true
+type MailserverTopic struct {
+	Topic       string   `json:"topic"`
+	ChatIDs     []string `json:"chat-ids"`
+	LastRequest int      `json:"last-request"` // default is 1
+}
+
+// sqlStringSlice helps to serialize a slice of strings into a single column using JSON serialization.
+type sqlStringSlice []string
+
+// Scan implements the Scanner interface.
+func (ss *sqlStringSlice) Scan(value interface{}) error {
+	if value == nil {
+		*ss = nil
+		return nil
 	}
-	return
+	src, ok := value.([]byte)
+	if !ok {
+		return errors.New("invalid value type, expected byte slice")
+	}
+	return json.Unmarshal(src, ss)
+}
+
+// Value implements the driver Valuer interface.
+func (ss sqlStringSlice) Value() (driver.Value, error) {
+	return json.Marshal(ss)
 }
 
 // Database sql wrapper for operations with mailserver objects.
@@ -126,7 +156,7 @@ func (d *Database) AddGaps(gaps []MailserverRequestGap) error {
 	return nil
 }
 
-func (d *Database) MailserverRequestGaps(chatID string) ([]MailserverRequestGap, error) {
+func (d *Database) RequestGaps(chatID string) ([]MailserverRequestGap, error) {
 	var result []MailserverRequestGap
 
 	rows, err := d.db.Query(`SELECT id, chat_id, gap_from, gap_to FROM mailserver_request_gaps WHERE chat_id = ?`, chatID)
@@ -168,5 +198,51 @@ func (d *Database) DeleteGaps(ids []string) error {
 
 func (d *Database) DeleteGapsByChatID(chatID string) error {
 	_, err := d.db.Exec(`DELETE FROM mailserver_request_gaps WHERE chat_id = ?`, chatID)
+	return err
+}
+
+func (d *Database) AddTopic(topic MailserverTopic) error {
+	chatIDs := sqlStringSlice(topic.ChatIDs)
+	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_topics(
+			topic,
+			chat_ids,
+			last_request
+		) VALUES (?, ?, ?)`,
+		topic.Topic,
+		chatIDs,
+		topic.LastRequest,
+	)
+	return err
+}
+
+func (d *Database) Topics() ([]MailserverTopic, error) {
+	var result []MailserverTopic
+
+	rows, err := d.db.Query(`SELECT topic, chat_ids, last_request FROM mailserver_topics`)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var (
+			t       MailserverTopic
+			chatIDs sqlStringSlice
+		)
+		if err := rows.Scan(
+			&t.Topic,
+			&chatIDs,
+			&t.LastRequest,
+		); err != nil {
+			return nil, err
+		}
+		t.ChatIDs = chatIDs
+		result = append(result, t)
+	}
+
+	return result, nil
+}
+
+func (d *Database) DeleteTopic(topic string) error {
+	_, err := d.db.Exec(`DELETE FROM mailserver_topics WHERE topic = ?`, topic)
 	return err
 }
