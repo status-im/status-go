@@ -8,3 +8,5 @@ DROP TABLE transfers;
 DROP TABLE blocks;
 DROP TABLE accounts_to_blocks;
 DROP TABLE mailservers;
+DROP INDEX mailserver_request_gaps_chat_id_idx;
+DROP TABLE mailserver_request_gaps;
