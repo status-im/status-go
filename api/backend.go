@@ -226,6 +226,7 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 		return err
 	}
 	err = b.StartNode(conf)
+	signal.SendLoggedIn(err)
 	if err != nil {
 		return err
 	}
