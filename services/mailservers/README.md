@@ -97,3 +97,22 @@ Reads all saved mailserver topics.
 #### mailservers_deleteMailserverTopic
 
 Deletes a mailserver topic using `topic` as an identifier.
+
+#### mailservers_addChatRequestRange
+
+Stores `ChatRequestRange` in the database.
+```json
+{
+    "chat-id": "chat-id-001",
+    "lowest-request-from": 1567693421154,
+    "highest-request-to": 1567693576779 
+}
+```
+
+#### mailservers_getChatRequestRanges
+
+Reads all saved chat request ranges.
+
+#### mailservers_deleteChatRequestRange
+
+Deletes a chat request range by `chat-id`.

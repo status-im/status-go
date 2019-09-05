@@ -38,6 +38,12 @@ type MailserverTopic struct {
 	LastRequest int      `json:"last-request"` // default is 1
 }
 
+type ChatRequestRange struct {
+	ChatID            string `json:"chat-id"`
+	LowestRequestFrom int    `json:"lowest-request-from"`
+	HighestRequestTo  int    `json:"highest-request-to"`
+}
+
 // sqlStringSlice helps to serialize a slice of strings into a single column using JSON serialization.
 type sqlStringSlice []string
 
@@ -244,5 +250,46 @@ func (d *Database) Topics() ([]MailserverTopic, error) {
 
 func (d *Database) DeleteTopic(topic string) error {
 	_, err := d.db.Exec(`DELETE FROM mailserver_topics WHERE topic = ?`, topic)
+	return err
+}
+
+func (d *Database) AddChatRequestRange(req ChatRequestRange) error {
+	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_chat_requests_ranges(
+			chat_id,
+			lowest_request_from,
+			highest_request_to
+		) VALUES (?, ?, ?)`,
+		req.ChatID,
+		req.LowestRequestFrom,
+		req.HighestRequestTo,
+	)
+	return err
+}
+
+func (d *Database) ChatRequestRanges() ([]ChatRequestRange, error) {
+	var result []ChatRequestRange
+
+	rows, err := d.db.Query(`SELECT chat_id, lowest_request_from, highest_request_to FROM mailserver_chat_requests_ranges`)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var req ChatRequestRange
+		if err := rows.Scan(
+			&req.ChatID,
+			&req.LowestRequestFrom,
+			&req.HighestRequestTo,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, req)
+	}
+
+	return result, nil
+}
+
+func (d *Database) DeleteChatRequestRange(chatID string) error {
+	_, err := d.db.Exec(`DELETE FROM mailserver_chat_requests_ranges WHERE chat_id = ?`, chatID)
 	return err
 }

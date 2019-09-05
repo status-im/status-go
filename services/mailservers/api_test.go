@@ -131,3 +131,36 @@ func TestAddGetDeleteMailserverTopics(t *testing.T) {
 	err = api.DeleteMailserverTopic(context.Background(), "non-existing-topic")
 	require.NoError(t, err)
 }
+
+func TestAddGetDeleteChatRequestRanges(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+	api := &API{db: db}
+	chatRequestRange1 := ChatRequestRange{
+		ChatID:            "chat-id-001",
+		LowestRequestFrom: 123,
+		HighestRequestTo:  456,
+	}
+	chatRequestRange2 := chatRequestRange1
+	chatRequestRange2.ChatID = "chat-id-002"
+
+	err := api.AddChatRequestRange(context.Background(), chatRequestRange1)
+	require.NoError(t, err)
+	err = api.AddChatRequestRange(context.Background(), chatRequestRange2)
+	require.NoError(t, err)
+
+	// Verify topics were added.
+	ranges, err := api.GetChatRequestRanges(context.Background())
+	require.NoError(t, err)
+	require.EqualValues(t, []ChatRequestRange{chatRequestRange1, chatRequestRange2}, ranges)
+
+	err = api.DeleteChatRequestRange(context.Background(), chatRequestRange1.ChatID)
+	require.NoError(t, err)
+	ranges, err = api.GetChatRequestRanges(context.Background())
+	require.NoError(t, err)
+	require.EqualValues(t, []ChatRequestRange{chatRequestRange2}, ranges)
+
+	// Delete non-existing topic.
+	err = api.DeleteChatRequestRange(context.Background(), "non-existing-chat-id")
+	require.NoError(t, err)
+}
