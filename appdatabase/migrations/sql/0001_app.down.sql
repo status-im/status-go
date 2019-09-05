@@ -11,4 +11,4 @@ DROP TABLE mailservers;
 DROP TABLE mailserver_request_gaps;
 DROP INDEX mailserver_request_gaps_chat_id_idx;
 DROP TABLE mailserver_topics;
-DROP TABLE mailserver_chat_requests_ranges;
+DROP TABLE mailserver_chat_request_ranges;

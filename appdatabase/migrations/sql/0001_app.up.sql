@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS mailserver_topics (
     last_request INTEGER DEFAULT 1
 ) WITHOUT ROWID;
 
-CREATE TABLE IF NOT EXISTS mailserver_chat_requests_ranges (
+CREATE TABLE IF NOT EXISTS mailserver_chat_request_ranges (
     chat_id VARCHAR PRIMARY KEY,
     lowest_request_from INTEGER,
     highest_request_to INTEGER

@@ -254,7 +254,7 @@ func (d *Database) DeleteTopic(topic string) error {
 }
 
 func (d *Database) AddChatRequestRange(req ChatRequestRange) error {
-	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_chat_requests_ranges(
+	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_chat_request_ranges(
 			chat_id,
 			lowest_request_from,
 			highest_request_to
@@ -269,7 +269,7 @@ func (d *Database) AddChatRequestRange(req ChatRequestRange) error {
 func (d *Database) ChatRequestRanges() ([]ChatRequestRange, error) {
 	var result []ChatRequestRange
 
-	rows, err := d.db.Query(`SELECT chat_id, lowest_request_from, highest_request_to FROM mailserver_chat_requests_ranges`)
+	rows, err := d.db.Query(`SELECT chat_id, lowest_request_from, highest_request_to FROM mailserver_chat_request_ranges`)
 	if err != nil {
 		return nil, err
 	}
@@ -290,6 +290,6 @@ func (d *Database) ChatRequestRanges() ([]ChatRequestRange, error) {
 }
 
 func (d *Database) DeleteChatRequestRange(chatID string) error {
-	_, err := d.db.Exec(`DELETE FROM mailserver_chat_requests_ranges WHERE chat_id = ?`, chatID)
+	_, err := d.db.Exec(`DELETE FROM mailserver_chat_request_ranges WHERE chat_id = ?`, chatID)
 	return err
 }
