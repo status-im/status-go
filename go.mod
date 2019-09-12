@@ -10,7 +10,7 @@ require (
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
-	github.com/golang/mock v1.2.0
+	github.com/golang/mock v1.3.1
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/libp2p/go-libp2p-core v0.0.3
