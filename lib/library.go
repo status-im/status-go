@@ -23,6 +23,7 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	protocol "github.com/status-im/status-protocol-go"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
@@ -729,4 +730,20 @@ func SignHash(hexEncodedHash *C.char) *C.char {
 	}
 
 	return C.CString(hexEncodedSignature)
+}
+
+// GenerateAlias returns a 3 random name words given the pk string 0x prefixed
+//export GenerateAlias
+func GenerateAlias(pk string) *C.char {
+	// We ignore any error, empty string is considered an error
+	name, _ := protocol.GenerateAlias(pk)
+	return C.CString(name)
+}
+
+// Identicon returns the base64 identicon
+//export Identicon
+func Identicon(pk string) *C.char {
+	// We ignore any error, empty string is considered an error
+	identicon, _ := protocol.Identicon(pk)
+	return C.CString(identicon)
 }

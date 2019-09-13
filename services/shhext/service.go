@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"github.com/status-im/status-go/logutils"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -182,8 +184,28 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 				// Filter out already saved messages
 				for _, message := range messages {
 					if !existingMessages[message.ID.String()] {
+						id := fmt.Sprintf("0x%s", hex.EncodeToString(crypto.FromECDSAPub(message.SigPubKey())))
+
+						identicon, err := protocol.Identicon(id)
+						if err != nil {
+							log.Error("failed to generate identicon", "err", err)
+							continue
+
+						}
+						alias, err := protocol.GenerateAlias(id)
+						if err != nil {
+							log.Error("failed to generate identicon", "err", err)
+							continue
+
+						}
+
 						dedupMessage := &dedup.DeduplicateMessage{
 							Metadata: dedup.Metadata{
+								Author: dedup.Author{
+									PublicKey: crypto.FromECDSAPub(message.SigPubKey()),
+									Alias:     alias,
+									Identicon: identicon,
+								},
 								MessageID:    message.ID,
 								EncryptionID: message.Hash,
 							},

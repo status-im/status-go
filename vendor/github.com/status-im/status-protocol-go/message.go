@@ -46,6 +46,10 @@ type Message struct {
 	WhisperTimestamp int64 `json:"whisperTimestamp"`
 	// From is a public key of the author of the message.
 	From string `json:"from"`
+	// Random 3 words name
+	Alias string `json:"alias"`
+	// Identicon of the author
+	Identicon string `json:"identicon"`
 	// To is a public key of the recipient unless it's a public message then it's empty.
 	To hexutilSQL `json:"to,omitempty"`
 	// BEGIN: fields from protocol.Message.

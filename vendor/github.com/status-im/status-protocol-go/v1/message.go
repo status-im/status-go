@@ -78,8 +78,7 @@ type Message struct {
 	Flags     Flags            `json:"-"`
 	ID        []byte           `json:"-"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
-	ChatID    string           `json:"-"`
-	Public    bool             `json:"-"`
+	ChatID    string           `json:"-"` // reference to Chat.ID; not connected to Content.ChatID which is set by sender
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -113,12 +112,18 @@ func createTextMessage(data []byte, lastClock int64, chatID, messageType string)
 
 // CreatePublicTextMessage creates a public text Message.
 func CreatePublicTextMessage(data []byte, lastClock int64, chatID string) Message {
-	return createTextMessage(data, lastClock, chatID, MessageTypePublicGroup)
+	m := createTextMessage(data, lastClock, chatID, MessageTypePublicGroup)
+	return m
 }
 
-// CreatePrivateTextMessage creates a public text Message.
+// CreatePrivateTextMessage creates a one-to-one message.
 func CreatePrivateTextMessage(data []byte, lastClock int64, chatID string) Message {
 	return createTextMessage(data, lastClock, chatID, MessageTypePrivate)
+}
+
+// CreatePrivateGroupTextMessage creates a group message.
+func CreatePrivateGroupTextMessage(data []byte, lastClock int64, chatID string) Message {
+	return createTextMessage(data, lastClock, chatID, MessageTypePrivateGroup)
 }
 
 func decodeTransitMessage(originalPayload []byte) (interface{}, error) {

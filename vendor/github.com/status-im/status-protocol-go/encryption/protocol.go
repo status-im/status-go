@@ -157,7 +157,7 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) error {
 	return nil
 }
 
-func (p *Protocol) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage, sendSingle bool) error {
+func (p *Protocol) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessage) error {
 	logger := p.logger.With(zap.String("site", "addBundle"))
 
 	// Get a bundle
@@ -175,13 +175,7 @@ func (p *Protocol) addBundle(myIdentityKey *ecdsa.PrivateKey, msg *ProtocolMessa
 		return err
 	}
 
-	if sendSingle {
-		// DEPRECATED: This is only for backward compatibility, remove once not
-		// an issue anymore
-		msg.Bundle = bundle
-	} else {
-		msg.Bundles = []*Bundle{bundle}
-	}
+	msg.Bundles = []*Bundle{bundle}
 
 	return nil
 }
@@ -194,7 +188,7 @@ func (p *Protocol) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload [
 		PublicMessage:  payload,
 	}
 
-	err := p.addBundle(myIdentityKey, message, false)
+	err := p.addBundle(myIdentityKey, message)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +229,7 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 		DirectMessage:  directMessage,
 	}
 
-	err = p.addBundle(myIdentityKey, message, true)
+	err = p.addBundle(myIdentityKey, message)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +281,7 @@ func (p *Protocol) BuildDHMessage(myIdentityKey *ecdsa.PrivateKey, destination *
 		DirectMessage:  encryptionResponse,
 	}
 
-	err = p.addBundle(myIdentityKey, message, true)
+	err = p.addBundle(myIdentityKey, message)
 	if err != nil {
 		return nil, err
 	}
@@ -425,17 +419,6 @@ func (p *Protocol) HandleMessage(
 		return nil, errors.New("encryption service not initialized")
 	}
 
-	// Process bundle, deprecated, here for backward compatibility
-	if bundle := protocolMessage.GetBundle(); bundle != nil {
-		// Should we stop processing if the bundle cannot be verified?
-		addedBundles, err := p.ProcessPublicBundle(myIdentityKey, bundle)
-		if err != nil {
-			return nil, err
-		}
-
-		p.onAddedBundlesHandler(addedBundles)
-	}
-
 	// Process bundles
 	for _, bundle := range protocolMessage.GetBundles() {
 		// Should we stop processing if the bundle cannot be verified?
@@ -468,8 +451,7 @@ func (p *Protocol) HandleMessage(
 			return nil, err
 		}
 
-		// Handle protocol negotiation for compatible clients
-		bundles := append(protocolMessage.GetBundles(), protocolMessage.GetBundle())
+		bundles := protocolMessage.GetBundles()
 		version := getProtocolVersion(bundles, protocolMessage.GetInstallationId())
 		logger.Debug("direct message version", zap.Uint32("version", version))
 		if version >= sharedSecretNegotiationVersion {
