@@ -11,5 +11,5 @@ services:
       - '0.0.0.0:${LISTEN_PORT}:30303/tcp'
       - '0.0.0.0:${LISTEN_PORT}:30303/udp'
     volumes:
-      - '${PWD}/config.json:/config.json'
+      - '${DATA_PATH}/config.json:/config.json'
       - '${DATA_PATH}:/data'

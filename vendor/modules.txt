@@ -307,6 +307,8 @@ github.com/multiformats/go-multistream
 github.com/mutecomm/go-sqlcipher
 # github.com/olekukonko/tablewriter v0.0.0-20170128050532-febf2d34b54a
 github.com/olekukonko/tablewriter
+# github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
+github.com/okzk/sdnotify
 # github.com/opentracing/opentracing-go v1.0.2
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext

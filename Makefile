@@ -278,7 +278,7 @@ ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at on
 ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
-	rm -fr build/bin/*
+	rm -fr build/bin/* mailserver-config.json
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain
@@ -298,8 +298,11 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	@go generate ./static
 	@echo "Done"
 
-run-bootnode: ##@Easy way to run a bootnode locally with Docker Compose
+run-bootnode-docker: ##@Easy way to run a bootnode locally with Docker Compose
 	cd _assets/compose/bootnode/ && $(MAKE)
 
-run-mailserver: ##@Easy way to run a mailserver locally with Docker Compose
-	cd _assets/compose/mailserver/ && $(MAKE)
+run-mailserver-systemd: ##@Easy way to run a mailserver locally with systemd
+	@_assets/systemd/start.sh
+
+run-mailserver-docker: ##@Easy way to run a mailserver locally with Docker Compose
+	@cd _assets/compose/mailserver/ && $(MAKE)

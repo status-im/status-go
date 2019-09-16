@@ -9,7 +9,7 @@
 - [How to Contribute](CONTRIBUTING.md)
 - [How to Release](RELEASING.md)
 - [How to run a Bootnode](_assets/compose/bootnode)
-- [How to run a Mailserver](_assets/compose/mailserver)
+- [How to run a Mailserver](MAILSERVER.md)
 - [How to configure status-go](/config)
 
 # License

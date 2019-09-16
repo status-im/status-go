@@ -18,7 +18,7 @@ To simply start a container run `make`, other commands include:
 * `make stop` - Stops the container.
 * `make show` - Shows you current status of the container.
 * `make logs` - Shows you logs of the container.
-* `make config` - Creates `config.json` with your Public IP.
+* `make config` - Creates `${DATA_PATH}/config.json` with your Public IP.
 * `make enode` - Shows `enode://` address of the container.
 
 # Settings
@@ -35,6 +35,8 @@ All settings are passed through environment variables:
 * `MAIL_PASSWORD` - Basic HTTP auth password for mailserver. (Default: `status-offline-inbox`)
 * `LOG_LEVEL` - Set level of log messages to show. (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)
 
+The generated configuration file end up under `${DATA_PATH}/config.json`.
+
 # Known Issues
 
 If the discovery of your Public IP does not work please simply export the `PUBLIC_IP` env variable.
@@ -50,7 +52,7 @@ bee56564926d        status-go-mailserver   Up 6 minutes        8080/tcp, 127.0.0
 Your mailserver is listening on: 1.2.3.4:443
 Make sure that address and port are available from the internet!
 Your enode address is:
-enode://dccd2f3c1df42c23af6672df28f287893ab70a5d45668637576a759b6db10b83e83fc02598f36c80ac094fbf8621419153cfe539f56d278ab099da21800f880c@127.0.0.1:30303
+enode://dccd2f3c1df42c23af6672df28f287893ab70a5d45668637576a759b6db10b83e83fc02598f36c80ac094fbf8621419153cfe539f56d278ab099da21800f880c@1.2.3.4:30303
 ```
 
 # F.A.Q.
