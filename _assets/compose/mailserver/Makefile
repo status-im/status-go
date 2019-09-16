@@ -1,4 +1,4 @@
-GIT_ROOT = $(shell git rev-parse --show-toplevel)
+export GIT_ROOT = $(shell git rev-parse --show-toplevel)
 
 RED    := $(shell tput -Txterm setaf 1)
 GREEN  := $(shell tput -Txterm setaf 2)
@@ -45,12 +45,10 @@ logs:
 	docker-compose logs -f -t --tail=100
 
 enode:
-	@curl -s -XPOST http://localhost:$(RPC_PORT)/ \
-		-H 'Content-type: application/json' \
-		-d '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' \
-		| jq -r '.result.enode' \
-		| grep -oP '\Kenode://[^?]+'
+	@$(GIT_ROOT)/_assets/scripts/get_enode.sh
 
+config:
+	@$(GIT_ROOT)/_assets/scripts/gen_config.sh
 
 info:
 	@echo "$(GREEN)Your mailserver is listening on:$(RESET) $(BOLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RESET)"
@@ -58,22 +56,9 @@ info:
 	@echo "$(GREEN)Your enode address is:$(RESET)"
 
 show:
-	@docker ps --filter='name=$(CONTAINER_NAME)' --format="table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-config: ##@ Generate config for mailserver with current public IP.
-	@cat $(GIT_ROOT)/config/cli/fleet-$(FLEET_NAME).json \
-		| jq '.AdvertiseAddr = "$(PUBLIC_IP)"' \
-		| jq '.HTTPEnabled = true' \
-		| jq '.HTTPHost = "0.0.0.0"' \
-		| jq '.HTTPPort= $(RPC_PORT)' \
-		| jq '.APIModules = "$(API_MODULES)"' \
-		| jq '.RegisterTopics = ["$(REGISTER_TOPIC)"]' \
-		| jq '.WhisperConfig.Enabled = true' \
-		| jq '.WhisperConfig.EnableMailServer = true' \
-		| jq '.WhisperConfig.LightClient = false' \
-		| jq '.WhisperConfig.MailServerPassword = "$(MAIL_PASSWORD)"' \
-		> config.json
+	@docker ps \
+		--filter='name=$(CONTAINER_NAME)' \
+		--format="table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 clean:
-	rm -f config.json
 	docker-compose rm -s -f

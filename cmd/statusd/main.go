@@ -15,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
+	"github.com/okzk/sdnotify"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
@@ -134,6 +135,16 @@ func main() {
 		return
 	}
 
+	err = sdnotify.Ready()
+	if err == sdnotify.ErrSdNotifyNoSocket {
+		logger.Debug("sd_notify socket not available")
+	} else if err != nil {
+		logger.Warn("sd_notify READY call failed", "error", err)
+	} else {
+		// systemd aliveness notifications, affects only Linux
+		go startSystemDWatchdog()
+	}
+
 	// handle interrupt signals
 	interruptCh := haltOnInterruptSignal(backend.StatusNode())
 
@@ -168,6 +179,9 @@ func main() {
 	if gethNode != nil {
 		// wait till node has been stopped
 		gethNode.Wait()
+		if err := sdnotify.Stopping(); err != nil {
+			logger.Warn("sd_notify STOPPING call failed", "error", err)
+		}
 	}
 }
 
@@ -186,6 +200,15 @@ func setupLogging(config *params.NodeConfig) {
 	colors := !(*logWithoutColors) && terminal.IsTerminal(int(os.Stdin.Fd()))
 	if err := logutils.OverrideRootLogWithConfig(config, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
+	}
+}
+
+// loop for notifying systemd about process being alive
+func startSystemDWatchdog() {
+	for range time.Tick(30 * time.Second) {
+		if err := sdnotify.Watchdog(); err != nil {
+			logger.Warn("sd_notify WATCHDOG call failed", "error", err)
+		}
 	}
 }
 
