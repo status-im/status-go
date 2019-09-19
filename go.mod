@@ -14,7 +14,7 @@ require (
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/libp2p/go-libp2p-core v0.0.3
-	github.com/multiformats/go-multiaddr v0.0.4
+	github.com/multiformats/go-multiaddr v0.1.1
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
