@@ -7,7 +7,7 @@ require (
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
-	github.com/ethereum/go-ethereum v1.8.27
+	github.com/ethereum/go-ethereum v1.9.4
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/golang/mock v1.2.0
