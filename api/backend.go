@@ -208,7 +208,7 @@ func (b *StatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account
 
 // StartNodeWithKey instead of loading addresses from database this method derives address from key
 // and uses it in application.
-func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+func (b *StatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
 		return err
@@ -226,7 +226,6 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 		return err
 	}
 	err = b.StartNode(conf)
-	signal.SendLoggedIn(err)
 	if err != nil {
 		return err
 	}
@@ -236,7 +235,25 @@ func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password str
 		return err
 	}
 	b.accountManager.SetAccountAddresses(chatAcc.Address)
-	return b.injectAccountIntoServices()
+	err = b.injectAccountIntoServices()
+	if err != nil {
+		return err
+	}
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *StatusBackend) StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
+	err := b.startNodeWithKey(acc, password, keyHex)
+	if err != nil {
+		// Stop node for clean up
+		_ = b.StopNode()
+	}
+	signal.SendLoggedIn(err)
+	return err
 }
 
 func (b *StatusBackend) startNodeWithAccount(acc multiaccounts.Account, password string) error {
@@ -287,11 +304,11 @@ func (b *StatusBackend) startNodeWithAccount(acc multiaccounts.Account, password
 
 func (b *StatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
 	err := b.startNodeWithAccount(acc, password)
-	signal.SendLoggedIn(err)
 	if err != nil {
 		// Stop node for clean up
 		_ = b.StopNode()
 	}
+	signal.SendLoggedIn(err)
 	return err
 }
 
