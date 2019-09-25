@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/NaySoftware/go-fcm v0.0.0-20190516140123-808e978ddcd2
+	github.com/apilayer/freegeoip v3.5.0+incompatible // indirect
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
@@ -12,12 +13,14 @@ require (
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/golang/mock v1.2.0
+	github.com/howeyc/fsnotify v0.9.0 // indirect
 	github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356 // indirect
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/libp2p/go-libp2p-core v0.0.3
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
+	github.com/oschwald/maxminddb-golang v1.5.0 // indirect
 	github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a

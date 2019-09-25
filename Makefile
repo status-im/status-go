@@ -22,6 +22,10 @@ BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
+BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags '\
+	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
+	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT)'")
 
 networkid ?= StatusChain
 gotest_extraflags =
@@ -92,13 +96,13 @@ statusgo-cross: statusgo-android statusgo-ios
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	gomobile init
-	gomobile bind -target=android -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	gomobile bind -target=android -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "Building status-go for iOS..."
 	gomobile init
-	gomobile bind -v -target=ios -ldflags="-s -w" $(BUILD_FLAGS) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
+	gomobile bind -v -target=ios -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-xgo: xgo-install ##@cross-compile Build status-go for xgo targets
