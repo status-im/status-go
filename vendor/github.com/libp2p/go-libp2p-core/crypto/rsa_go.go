@@ -27,7 +27,7 @@ type RsaPublicKey struct {
 
 // GenerateRSAKeyPair generates a new rsa private and public key
 func GenerateRSAKeyPair(bits int, src io.Reader) (PrivKey, PubKey, error) {
-	if bits < 512 {
+	if bits < MinRsaKeyBits {
 		return nil, nil, ErrRsaKeyTooSmall
 	}
 	priv, err := rsa.GenerateKey(src, bits)
@@ -63,7 +63,13 @@ func (pk *RsaPublicKey) Raw() ([]byte, error) {
 
 // Equals checks whether this key is equal to another
 func (pk *RsaPublicKey) Equals(k Key) bool {
-	return KeyEqual(pk, k)
+	// make sure this is an rsa public key
+	other, ok := (k).(*RsaPublicKey)
+	if !ok {
+		return basicEquals(pk, k)
+	}
+
+	return pk.k.N.Cmp(other.k.N) == 0 && pk.k.E == other.k.E
 }
 
 // Sign returns a signature of the input data
@@ -93,7 +99,17 @@ func (sk *RsaPrivateKey) Raw() ([]byte, error) {
 
 // Equals checks whether this key is equal to another
 func (sk *RsaPrivateKey) Equals(k Key) bool {
-	return KeyEqual(sk, k)
+	// make sure this is an rsa public key
+	other, ok := (k).(*RsaPrivateKey)
+	if !ok {
+		return basicEquals(sk, k)
+	}
+
+	a := sk.sk
+	b := other.sk
+
+	// Don't care about constant time. We're only comparing the public half.
+	return a.PublicKey.N.Cmp(b.PublicKey.N) == 0 && a.PublicKey.E == b.PublicKey.E
 }
 
 // UnmarshalRsaPrivateKey returns a private key from the input x509 bytes
@@ -102,7 +118,7 @@ func UnmarshalRsaPrivateKey(b []byte) (PrivKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	if sk.N.BitLen() < 512 {
+	if sk.N.BitLen() < MinRsaKeyBits {
 		return nil, ErrRsaKeyTooSmall
 	}
 	return &RsaPrivateKey{sk: *sk}, nil
@@ -118,7 +134,7 @@ func UnmarshalRsaPublicKey(b []byte) (PubKey, error) {
 	if !ok {
 		return nil, errors.New("not actually an rsa public key")
 	}
-	if pk.N.BitLen() < 512 {
+	if pk.N.BitLen() < MinRsaKeyBits {
 		return nil, ErrRsaKeyTooSmall
 	}
 	return &RsaPublicKey{*pk}, nil

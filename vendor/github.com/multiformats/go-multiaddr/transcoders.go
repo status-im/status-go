@@ -317,3 +317,20 @@ func unixStB(s string) ([]byte, error) {
 func unixBtS(b []byte) (string, error) {
 	return string(b), nil
 }
+
+var TranscoderDns = NewTranscoderFromFunctions(dnsStB, dnsBtS, dnsVal)
+
+func dnsVal(b []byte) error {
+	if bytes.IndexByte(b, '/') >= 0 {
+		return fmt.Errorf("domain name %q contains a slash", string(b))
+	}
+	return nil
+}
+
+func dnsStB(s string) ([]byte, error) {
+	return []byte(s), nil
+}
+
+func dnsBtS(b []byte) (string, error) {
+	return string(b), nil
+}

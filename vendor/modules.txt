@@ -1,4 +1,4 @@
-# github.com/NaySoftware/go-fcm v0.0.0-20190516140123-808e978ddcd2 => github.com/status-im/go-fcm v1.0.0-status
+# github.com/NaySoftware/go-fcm v0.0.0-00010101000000-000000000000 => github.com/status-im/go-fcm v1.0.0-status
 github.com/NaySoftware/go-fcm
 # github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6
 github.com/StackExchange/wmi
@@ -9,7 +9,7 @@ github.com/allegro/bigcache/queue
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
 github.com/beevik/ntp
-# github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
+# github.com/btcsuite/btcd v0.0.0-20190824003749-130ea5bddde3
 github.com/btcsuite/btcd/btcec
 github.com/btcsuite/btcd/chaincfg
 github.com/btcsuite/btcd/chaincfg/chainhash
@@ -29,7 +29,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.0.0-20180330100440-37f05ff46ffa
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.2
+# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.2.0.20190925221900-a07f8f1e3896
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -119,14 +119,14 @@ github.com/go-playground/locales/currency
 github.com/go-playground/universal-translator
 # github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
-# github.com/gogo/protobuf v1.2.1
+# github.com/gogo/protobuf v1.3.0
 github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
 # github.com/golang-migrate/migrate/v4 v4.5.0
 github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4/source
-# github.com/golang/mock v1.2.0
+# github.com/golang/mock v1.3.1
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/proto
@@ -152,7 +152,7 @@ github.com/huin/goupnp/httpu
 github.com/huin/goupnp/scpd
 github.com/huin/goupnp/soap
 github.com/huin/goupnp/ssdp
-# github.com/ipfs/go-cid v0.0.2
+# github.com/ipfs/go-cid v0.0.3
 github.com/ipfs/go-cid
 # github.com/ipfs/go-ipfs-util v0.0.1
 github.com/ipfs/go-ipfs-util
@@ -180,9 +180,10 @@ github.com/karalabe/usb
 github.com/koron/go-ssdp
 # github.com/leodido/go-urn v1.1.0
 github.com/leodido/go-urn
-# github.com/lib/pq v1.0.0
+# github.com/lib/pq v1.2.0
 github.com/lib/pq
 github.com/lib/pq/oid
+github.com/lib/pq/scram
 # github.com/libp2p/go-addr-util v0.0.1
 github.com/libp2p/go-addr-util
 # github.com/libp2p/go-buffer-pool v0.0.2
@@ -206,11 +207,12 @@ github.com/libp2p/go-libp2p-autonat/pb
 # github.com/libp2p/go-libp2p-circuit v0.1.0
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
-# github.com/libp2p/go-libp2p-core v0.0.3
+# github.com/libp2p/go-libp2p-core v0.2.3
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/crypto
 github.com/libp2p/go-libp2p-core/crypto/pb
 github.com/libp2p/go-libp2p-core/discovery
+github.com/libp2p/go-libp2p-core/event
 github.com/libp2p/go-libp2p-core/helpers
 github.com/libp2p/go-libp2p-core/host
 github.com/libp2p/go-libp2p-core/metrics
@@ -223,6 +225,7 @@ github.com/libp2p/go-libp2p-core/protocol
 github.com/libp2p/go-libp2p-core/routing
 github.com/libp2p/go-libp2p-core/sec
 github.com/libp2p/go-libp2p-core/sec/insecure
+github.com/libp2p/go-libp2p-core/sec/insecure/pb
 github.com/libp2p/go-libp2p-core/transport
 # github.com/libp2p/go-libp2p-crypto v0.1.0
 github.com/libp2p/go-libp2p-crypto
@@ -253,10 +256,13 @@ github.com/libp2p/go-libp2p-yamux
 github.com/libp2p/go-maddr-filter
 # github.com/libp2p/go-mplex v0.1.0
 github.com/libp2p/go-mplex
-# github.com/libp2p/go-msgio v0.0.2
+# github.com/libp2p/go-msgio v0.0.4
 github.com/libp2p/go-msgio
 # github.com/libp2p/go-nat v0.0.3
 github.com/libp2p/go-nat
+# github.com/libp2p/go-openssl v0.0.2
+github.com/libp2p/go-openssl
+github.com/libp2p/go-openssl/utils
 # github.com/libp2p/go-reuseport v0.0.1
 github.com/libp2p/go-reuseport
 # github.com/libp2p/go-reuseport-transport v0.0.2
@@ -277,13 +283,13 @@ github.com/mattn/go-isatty
 github.com/mattn/go-runewidth
 # github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 github.com/minio/blake2b-simd
-# github.com/minio/sha256-simd v0.1.0
+# github.com/minio/sha256-simd v0.1.1
 github.com/minio/sha256-simd
 # github.com/mr-tron/base58 v1.1.2
 github.com/mr-tron/base58/base58
 # github.com/multiformats/go-base32 v0.0.3
 github.com/multiformats/go-base32
-# github.com/multiformats/go-multiaddr v0.0.4
+# github.com/multiformats/go-multiaddr v0.1.1
 github.com/multiformats/go-multiaddr
 # github.com/multiformats/go-multiaddr-dns v0.0.2
 github.com/multiformats/go-multiaddr-dns
@@ -293,7 +299,7 @@ github.com/multiformats/go-multiaddr-fmt
 github.com/multiformats/go-multiaddr-net
 # github.com/multiformats/go-multibase v0.0.1
 github.com/multiformats/go-multibase
-# github.com/multiformats/go-multihash v0.0.5
+# github.com/multiformats/go-multihash v0.0.8
 github.com/multiformats/go-multihash
 # github.com/multiformats/go-multistream v0.1.0
 github.com/multiformats/go-multistream
@@ -305,7 +311,7 @@ github.com/olekukonko/tablewriter
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
-# github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222
+# github.com/pborman/uuid v1.2.0
 github.com/pborman/uuid
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
@@ -321,9 +327,6 @@ github.com/rs/cors
 github.com/russolsen/transit
 # github.com/shopspring/decimal v0.0.0-20180709203117-cd690d0c9e24
 github.com/shopspring/decimal
-# github.com/spacemonkeygo/openssl v0.0.0-20181017203307-c2dcc5cca94a
-github.com/spacemonkeygo/openssl
-github.com/spacemonkeygo/openssl/utils
 # github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
@@ -334,7 +337,7 @@ github.com/status-im/doubleratchet
 github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48
 github.com/status-im/keycard-go/derivationpath
-# github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed
+# github.com/status-im/migrate/v4 v4.3.1-status
 github.com/status-im/migrate/v4
 github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
@@ -343,7 +346,7 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.0.0-20190701094942-8a6d5a6b49ee40f22ffac18377835e4a0fd7032e
+# github.com/status-im/status-protocol-go v0.2.2
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/crypto
@@ -366,7 +369,7 @@ github.com/status-im/whisper/whisperv6
 github.com/steakknife/bloomfilter
 # github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3
 github.com/steakknife/hamming
-# github.com/stretchr/testify v1.3.1-0.20190712000136-221dbe5ed467
+# github.com/stretchr/testify v1.4.0
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
@@ -408,6 +411,15 @@ github.com/whyrusleeping/mafmt
 github.com/whyrusleeping/multiaddr-filter
 # github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208
 github.com/wsddn/go-ecdh
+# go.opencensus.io v0.22.1
+go.opencensus.io/internal/tagencoding
+go.opencensus.io/metric/metricdata
+go.opencensus.io/metric/metricproducer
+go.opencensus.io/resource
+go.opencensus.io/stats
+go.opencensus.io/stats/internal
+go.opencensus.io/stats/view
+go.opencensus.io/tag
 # go.uber.org/atomic v1.4.0
 go.uber.org/atomic
 # go.uber.org/multierr v1.1.0
@@ -419,7 +431,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
+# golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 golang.org/x/crypto/blake2s
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/curve25519
@@ -442,7 +454,7 @@ golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
 # golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/syncmap
-# golang.org/x/sys v0.0.0-20190426135247-a129542de9ae
+# golang.org/x/sys v0.0.0-20190922100055-0a153f010e69
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -465,7 +477,7 @@ golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
-# gopkg.in/go-playground/validator.v9 v9.29.0
+# gopkg.in/go-playground/validator.v9 v9.29.1
 gopkg.in/go-playground/validator.v9
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2

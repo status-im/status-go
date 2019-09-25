@@ -31,12 +31,14 @@ type ErrInconsistentLen struct {
 }
 
 func (e ErrInconsistentLen) Error() string {
-	return fmt.Sprintf("multihash length inconsistent: %v", e.dm)
+	return fmt.Sprintf("multihash length inconsistent: expected %d, got %d", e.dm.Length, len(e.dm.Digest))
 }
 
 // constants
 const (
-	ID         = 0x00
+	IDENTITY = 0x00
+	// Deprecated: use IDENTITY
+	ID         = IDENTITY
 	SHA1       = 0x11
 	SHA2_256   = 0x12
 	SHA2_512   = 0x13
@@ -62,7 +64,9 @@ const (
 
 	DBL_SHA2_256 = 0x56
 
-	MURMUR3 = 0x22
+	MURMUR3_128 = 0x22
+	// Deprecated: use MURMUR3_128
+	MURMUR3 = MURMUR3_128
 
 	X11 = 0x1100
 )
@@ -89,7 +93,7 @@ func init() {
 
 // Names maps the name of a hash to the code
 var Names = map[string]uint64{
-	"id":           ID,
+	"identity":     IDENTITY,
 	"sha1":         SHA1,
 	"sha2-256":     SHA2_256,
 	"sha2-512":     SHA2_512,
@@ -99,7 +103,7 @@ var Names = map[string]uint64{
 	"sha3-384":     SHA3_384,
 	"sha3-512":     SHA3_512,
 	"dbl-sha2-256": DBL_SHA2_256,
-	"murmur3":      MURMUR3,
+	"murmur3-128":  MURMUR3_128,
 	"keccak-224":   KECCAK_224,
 	"keccak-256":   KECCAK_256,
 	"keccak-384":   KECCAK_384,
@@ -112,7 +116,7 @@ var Names = map[string]uint64{
 
 // Codes maps a hash code to it's name
 var Codes = map[uint64]string{
-	ID:           "id",
+	IDENTITY:     "identity",
 	SHA1:         "sha1",
 	SHA2_256:     "sha2-256",
 	SHA2_512:     "sha2-512",
@@ -121,7 +125,7 @@ var Codes = map[uint64]string{
 	SHA3_384:     "sha3-384",
 	SHA3_512:     "sha3-512",
 	DBL_SHA2_256: "dbl-sha2-256",
-	MURMUR3:      "murmur3",
+	MURMUR3_128:  "murmur3-128",
 	KECCAK_224:   "keccak-224",
 	KECCAK_256:   "keccak-256",
 	KECCAK_384:   "keccak-384",
@@ -134,7 +138,7 @@ var Codes = map[uint64]string{
 
 // DefaultLengths maps a hash code to it's default length
 var DefaultLengths = map[uint64]int{
-	ID:           -1,
+	IDENTITY:     -1,
 	SHA1:         20,
 	SHA2_256:     32,
 	SHA2_512:     64,
@@ -145,7 +149,7 @@ var DefaultLengths = map[uint64]int{
 	DBL_SHA2_256: 32,
 	KECCAK_224:   28,
 	KECCAK_256:   32,
-	MURMUR3:      4,
+	MURMUR3_128:  4,
 	KECCAK_384:   48,
 	KECCAK_512:   64,
 	SHAKE_128:    32,

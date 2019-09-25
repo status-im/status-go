@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -70,7 +71,7 @@ func (k *Ed25519PrivateKey) Equals(o Key) bool {
 		return false
 	}
 
-	return bytes.Equal(k.k, edk.k)
+	return subtle.ConstantTimeCompare(k.k, edk.k) == 1
 }
 
 // GetPublic returns an ed25519 public key from a private key.
@@ -131,7 +132,7 @@ func UnmarshalEd25519PrivateKey(data []byte) (PrivKey, error) {
 		// Remove the redundant public key. See issue #36.
 		redundantPk := data[ed25519.PrivateKeySize:]
 		pk := data[ed25519.PrivateKeySize-ed25519.PublicKeySize : ed25519.PrivateKeySize]
-		if !bytes.Equal(pk, redundantPk) {
+		if subtle.ConstantTimeCompare(pk, redundantPk) == 0 {
 			return nil, errors.New("expected redundant ed25519 public key to be redundant")
 		}
 

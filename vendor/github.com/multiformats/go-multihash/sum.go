@@ -167,7 +167,7 @@ func sumSHA3_224(data []byte, length int) ([]byte, error) {
 }
 
 func registerStdlibHashFuncs() {
-	RegisterHashFunc(ID, sumID)
+	RegisterHashFunc(IDENTITY, sumID)
 	RegisterHashFunc(SHA1, sumSHA1)
 	RegisterHashFunc(SHA2_512, sumSHA512)
 	RegisterHashFunc(MD5, sumMD5)
@@ -185,7 +185,7 @@ func registerNonStdlibHashFuncs() {
 	RegisterHashFunc(SHA3_384, sumSHA3_384)
 	RegisterHashFunc(SHA3_512, sumSHA3_512)
 
-	RegisterHashFunc(MURMUR3, sumMURMUR3)
+	RegisterHashFunc(MURMUR3_128, sumMURMUR3)
 
 	RegisterHashFunc(SHAKE_128, sumSHAKE128)
 	RegisterHashFunc(SHAKE_256, sumSHAKE256)

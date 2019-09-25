@@ -4,7 +4,6 @@ go 1.12
 
 require (
 	github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7 // indirect
-	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/ethereum/go-ethereum v1.8.27
 	github.com/golang/protobuf v1.3.2

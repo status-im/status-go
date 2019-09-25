@@ -47,7 +47,6 @@ type Chat struct {
 	UnviewedMessagesCount  uint   `json:"unviewedMessagesCount"`
 	LastMessageContentType string `json:"lastMessageContentType"`
 	LastMessageContent     string `json:"lastMessageContent"`
-	LastMessageTimestamp   int64  `json:"lastMessageTimestamp"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat

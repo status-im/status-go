@@ -78,8 +78,8 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, last_message_timestamp, members, membership_updates)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, members, membership_updates)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,6 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 		chat.LastClockValue,
 		chat.LastMessageContentType,
 		chat.LastMessageContent,
-		chat.LastMessageTimestamp,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 	)
@@ -150,7 +149,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		last_clock_value,
 		last_message_content_type,
 		last_message_content,
-		last_message_timestamp,
 		members,
 		membership_updates
 	FROM chats
@@ -165,7 +163,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 	for rows.Next() {
 		var lastMessageContentType sql.NullString
 		var lastMessageContent sql.NullString
-		var lastMessageTimestamp sql.NullInt64
 
 		chat := &Chat{}
 		encodedMembers := []byte{}
@@ -184,7 +181,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 			&chat.LastClockValue,
 			&lastMessageContentType,
 			&lastMessageContent,
-			&lastMessageTimestamp,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 		)
@@ -193,7 +189,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		}
 		chat.LastMessageContent = lastMessageContent.String
 		chat.LastMessageContentType = lastMessageContentType.String
-		chat.LastMessageTimestamp = lastMessageTimestamp.Int64
 
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))

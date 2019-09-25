@@ -115,14 +115,9 @@ func (ePriv *ECDSAPrivateKey) Raw() ([]byte, error) {
 	return x509.MarshalECPrivateKey(ePriv.priv)
 }
 
-// Equals compares to private keys
+// Equals compares two private keys
 func (ePriv *ECDSAPrivateKey) Equals(o Key) bool {
-	oPriv, ok := o.(*ECDSAPrivateKey)
-	if !ok {
-		return false
-	}
-
-	return ePriv.priv.D.Cmp(oPriv.priv.D) == 0
+	return basicEquals(ePriv, o)
 }
 
 // Sign returns the signature of the input data
@@ -155,19 +150,13 @@ func (ePub *ECDSAPublicKey) Type() pb.KeyType {
 }
 
 // Raw returns x509 bytes from a public key
-func (ePub ECDSAPublicKey) Raw() ([]byte, error) {
+func (ePub *ECDSAPublicKey) Raw() ([]byte, error) {
 	return x509.MarshalPKIXPublicKey(ePub.pub)
 }
 
 // Equals compares to public keys
 func (ePub *ECDSAPublicKey) Equals(o Key) bool {
-	oPub, ok := o.(*ECDSAPublicKey)
-	if !ok {
-		return false
-	}
-
-	return ePub.pub.X != nil && ePub.pub.Y != nil && oPub.pub.X != nil && oPub.pub.Y != nil &&
-		0 == ePub.pub.X.Cmp(oPub.pub.X) && 0 == ePub.pub.Y.Cmp(oPub.pub.Y)
+	return basicEquals(ePub, o)
 }
 
 // Verify compares data to a signature
