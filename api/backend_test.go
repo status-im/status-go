@@ -520,7 +520,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
-		require.EqualError(t, err, "could not decrypt key with given passphrase")
+		require.EqualError(t, err, "could not decrypt key with given password")
 		require.Nil(t, key)
 	})
 

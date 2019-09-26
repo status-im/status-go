@@ -233,6 +233,8 @@ func createSubscription(t *testing.T, backend *StatusBackend, params string) str
 }
 
 func initNodeAndLogin(t *testing.T, backend *StatusBackend) (string, string) {
+	utils.Init()
+
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 

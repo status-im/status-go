@@ -132,7 +132,7 @@ func (s *WhisperMailboxSuite) TestRequestMessageFromMailboxAsync() {
 	s.waitForEnvelopeEvents(envelopeArchivedWatcher, []string{messageHash}, whisper.EventMailServerEnvelopeArchived)
 
 	// Request messages (including the previous one, expired) from mailbox.
-	requestID := s.requestHistoricMessagesFromLast12Hours(senderWhisperService, rpcClient, mailboxNode.Server().Self().String(), MailServerKeyID, topic.String(), 0, "")
+	requestID := s.requestHistoricMessagesFromLast12Hours(senderWhisperService, rpcClient, mailboxNode.Server().Self().URLv4(), MailServerKeyID, topic.String(), 0, "")
 
 	// wait for mail server response
 	resp := s.waitForMailServerResponse(mailServerResponseWatcher, requestID)
@@ -516,7 +516,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	defer stopEmptyMailbox()
 	s.Require().True(emptyMailbox.IsNodeRunning())
 
-	emptyMailboxEnode := emptyMailbox.StatusNode().Server().Self().String()
+	emptyMailboxEnode := emptyMailbox.StatusNode().Server().Self().URLv4()
 
 	errCh := helpers.WaitForPeerAsync(emptyMailbox.StatusNode().Server(), mailboxEnode, p2p.PeerEventTypeAdd, 5*time.Second)
 	s.Require().NoError(emptyMailbox.StatusNode().AddPeer(mailboxEnode))
@@ -546,7 +546,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 		&syncMessagesResponse,
 		"shhext_syncMessages",
 		shhext.SyncMessagesRequest{
-			MailServerPeer: mailbox.StatusNode().Server().Self().String(),
+			MailServerPeer: mailbox.StatusNode().Server().Self().URLv4(),
 			From:           0,
 			To:             uint32(time.Now().Unix()),
 			Limit:          1,
@@ -565,7 +565,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 		&syncMessagesResponse,
 		"shhext_syncMessages",
 		shhext.SyncMessagesRequest{
-			MailServerPeer: mailbox.StatusNode().Server().Self().String(),
+			MailServerPeer: mailbox.StatusNode().Server().Self().URLv4(),
 			From:           0,
 			To:             uint32(time.Now().Unix()),
 			Limit:          10,

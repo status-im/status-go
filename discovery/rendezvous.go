@@ -208,11 +208,10 @@ func (r *Rendezvous) Discover(
 			} else {
 				for i := range records {
 					n, err := enrToNode(records[i])
-					log.Debug("converted enr to", "ENODE", n.String())
 					if err != nil {
 						log.Warn("error converting enr record to node", "err", err)
-
 					} else {
+						log.Debug("converted enr to", "ENODE", n.String())
 						select {
 						case found <- n:
 						case newPeriod, ok := <-period:
@@ -233,7 +232,7 @@ func (r *Rendezvous) Discover(
 func enrToNode(record enr.Record) (*discv5.Node, error) {
 	var (
 		key    enode.Secp256k1
-		ip     enr.IP
+		ip     enr.IPv4
 		tport  enr.TCP
 		uport  enr.UDP
 		nodeID discv5.NodeID

@@ -174,7 +174,7 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 
 	// try selecting with wrong password
 	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword", nil))
-	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
+	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error(), "select account is expected to throw error: wrong password used")
 
 	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, TestConfig.Account1.Password, nil))
@@ -223,7 +223,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 
 	// select account
 	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword", nil))
-	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
+	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error())
 
 	watchAddresses := []common.Address{

@@ -21,28 +21,25 @@ func TestUpdateNodeMetricsPeersCounter(t *testing.T) {
 	require.NoError(t, n.Start())
 	defer func() { require.NoError(t, n.Stop()) }()
 
-	err = updateNodeMetrics(n, p2p.PeerEventTypeAdd)
+	change, err := computeMetrics(n, p2p.PeerEventTypeAdd)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), nodePeersCounter.Count())
-	require.Equal(t, int64(10), nodeMaxPeersGauge.Value())
-
-	err = updateNodeMetrics(n, p2p.PeerEventTypeAdd)
-	require.NoError(t, err)
-	require.Equal(t, int64(2), nodePeersCounter.Count())
+	require.Equal(t, int64(1), change.Counter)
+	require.Equal(t, int64(10), change.Max)
 
 	// skip other events
-	err = updateNodeMetrics(n, p2p.PeerEventTypeMsgRecv)
+	change, err = computeMetrics(n, p2p.PeerEventTypeMsgRecv)
 	require.NoError(t, err)
-	err = updateNodeMetrics(n, p2p.PeerEventTypeMsgSend)
+	require.Equal(t, int64(0), change.Counter)
+	change, err = computeMetrics(n, p2p.PeerEventTypeMsgSend)
 	require.NoError(t, err)
-	require.Equal(t, int64(2), nodePeersCounter.Count())
+	require.Equal(t, int64(0), change.Counter)
 
-	err = updateNodeMetrics(n, p2p.PeerEventTypeDrop)
+	change, err = computeMetrics(n, p2p.PeerEventTypeDrop)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), nodePeersCounter.Count())
+	require.Equal(t, int64(-1), change.Counter)
 
 	n.Server().MaxPeers = 20
-	err = updateNodeMetrics(n, p2p.PeerEventTypeDrop)
+	change, err = computeMetrics(n, p2p.PeerEventTypeDrop)
 	require.NoError(t, err)
-	require.Equal(t, int64(20), nodeMaxPeersGauge.Value())
+	require.Equal(t, int64(20), change.Max)
 }

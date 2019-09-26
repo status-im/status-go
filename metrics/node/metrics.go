@@ -2,7 +2,6 @@ package node
 
 import (
 	"errors"
-	"flag"
 
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/node"
@@ -16,32 +15,48 @@ var (
 )
 
 func init() {
-	// When running tests, we want metrics to be enabled.
-	// Having init() in metrics_test.go does not work because
-	// this init() is executed first.
-	if flag.Lookup("test.v") != nil {
-		metrics.Enabled = true
-	}
-
 	nodePeersCounter = metrics.NewRegisteredCounter("p2p/Peers", nil)
 	nodePeersGauge = metrics.NewRegisteredGauge("p2p/PeersAbsolute", nil)
 	nodeMaxPeersGauge = metrics.NewRegisteredGauge("p2p/MaxPeers", nil)
 }
 
 func updateNodeMetrics(node *node.Node, evType p2p.PeerEventType) error {
+	change, err := computeMetrics(node, evType)
+	if err != nil {
+		return err
+	}
+
+	if change.Counter > 0 {
+		nodePeersCounter.Inc(change.Counter)
+	} else if change.Counter < 0 {
+		nodePeersCounter.Dec(change.Counter)
+	}
+
+	nodePeersGauge.Update(change.Absolute)
+	nodeMaxPeersGauge.Update(change.Max)
+
+	return nil
+}
+
+type peersChange struct {
+	Counter  int64
+	Absolute int64
+	Max      int64
+}
+
+func computeMetrics(node *node.Node, evType p2p.PeerEventType) (result peersChange, err error) {
 	server := node.Server()
 	if server == nil {
-		return errors.New("p2p server is unavailable")
+		return result, errors.New("p2p server is unavailable")
 	}
 
 	if evType == p2p.PeerEventTypeAdd {
-		nodePeersCounter.Inc(1)
+		result.Counter = 1
 	} else if evType == p2p.PeerEventTypeDrop {
-		nodePeersCounter.Dec(1)
+		result.Counter = -1
 	}
 
-	nodePeersGauge.Update(int64(server.PeerCount()))
-	nodeMaxPeersGauge.Update(int64(server.MaxPeers))
-
-	return nil
+	result.Absolute = int64(server.PeerCount())
+	result.Max = int64(server.MaxPeers)
+	return
 }

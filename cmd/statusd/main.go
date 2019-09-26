@@ -65,7 +65,10 @@ var logger = log.New("package", "status-go/cmd/statusd")
 
 func init() {
 	flag.Var(&configFiles, "c", "JSON configuration file(s). Multiple configuration files can be specified, and will be merged in occurrence order")
+}
 
+// nolint:gocyclo
+func main() {
 	colors := terminal.IsTerminal(int(os.Stdin.Fd()))
 	if err := logutils.OverrideRootLog(true, "ERROR", logutils.FileOptions{}, colors); err != nil {
 		stdlog.Fatalf("Error initializing logger: %v", err)
@@ -78,10 +81,7 @@ func init() {
 		logger.Error("Extra args in command line: %v", flag.Args())
 		os.Exit(1)
 	}
-}
 
-// nolint:gocyclo
-func main() {
 	opts := []params.Option{params.WithFleet(params.FleetBeta)}
 	if *mailserver {
 		opts = append(opts, params.WithMailserver())

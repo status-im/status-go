@@ -17,6 +17,7 @@ import (
 )
 
 func TestRPCTestSuite(t *testing.T) {
+	e2e.Init()
 	suite.Run(t, new(RPCTestSuite))
 }
 

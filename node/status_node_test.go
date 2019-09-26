@@ -161,7 +161,7 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, peer.Start())
 	defer func() { require.NoError(t, peer.Stop()) }()
-	peerURL := peer.Server().Self().String()
+	peerURL := peer.Server().Self().URLv4()
 
 	n := New()
 
@@ -200,7 +200,7 @@ func TestStatusNodeReconnectStaticPeers(t *testing.T) {
 
 	var errCh <-chan error
 
-	peerURL := peer.Server().Self().String()
+	peerURL := peer.Server().Self().URLv4()
 	n := New()
 
 	// checks before node is started

@@ -335,7 +335,7 @@ github.com/status-im/doubleratchet
 github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48
 github.com/status-im/keycard-go/derivationpath
-# github.com/status-im/migrate/v4 v4.3.1-status
+# github.com/status-im/migrate/v4 v4.3.1-status.0.20190822050738-a9d340ec8fb7
 github.com/status-im/migrate/v4
 github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
