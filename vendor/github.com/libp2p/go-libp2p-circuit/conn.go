@@ -80,12 +80,15 @@ func (c *Conn) untagHop() {
 
 // TODO: is it okay to cast c.Conn().RemotePeer() into a multiaddr? might be "user input"
 func (c *Conn) RemoteMultiaddr() ma.Multiaddr {
-	proto := ma.ProtocolWithCode(ma.P_P2P).Name
-	peerid := c.stream.Conn().RemotePeer().Pretty()
-	p2paddr := ma.StringCast(fmt.Sprintf("/%s/%s", proto, peerid))
-
-	circaddr := ma.Cast(ma.CodeToVarint(P_CIRCUIT))
-	return p2paddr.Encapsulate(circaddr)
+	// TODO: We should be able to do this directly without converting to/from a string.
+	relayAddr, err := ma.NewComponent(
+		ma.ProtocolWithCode(ma.P_P2P).Name,
+		c.stream.Conn().RemotePeer().Pretty(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	return ma.Join(c.stream.Conn().RemoteMultiaddr(), relayAddr, circuitAddr)
 }
 
 func (c *Conn) LocalMultiaddr() ma.Multiaddr {

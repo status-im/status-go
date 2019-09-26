@@ -7,10 +7,10 @@ import (
 	"time"
 
 	logging "github.com/ipfs/go-log"
-	peer "github.com/libp2p/go-libp2p-peer"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
-	pstore "github.com/libp2p/go-libp2p-peerstore"
+	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 	addr "github.com/libp2p/go-libp2p-peerstore/addr"
 )
 
@@ -132,7 +132,7 @@ func (mab *memoryAddrBook) AddAddr(p peer.ID, addr ma.Multiaddr, ttl time.Durati
 
 // AddAddrs gives memoryAddrBook addresses to use, with a given ttl
 // (time-to-live), after which the address is no longer valid.
-// If the manager has a longer TTL, the operation is a no-op for that address
+// This function never reduces the TTL or expiration of an address.
 func (mab *memoryAddrBook) AddAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Duration) {
 	// if ttl is zero, exit. nothing to do.
 	if ttl <= 0 {
@@ -154,12 +154,21 @@ func (mab *memoryAddrBook) AddAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 			log.Warningf("was passed nil multiaddr for %s", p)
 			continue
 		}
-		addrstr := string(addr.Bytes())
-		a, found := amap[addrstr]
-		if !found || exp.After(a.Expires) {
-			amap[addrstr] = &expiringAddr{Addr: addr, Expires: exp, TTL: ttl}
-
+		asBytes := addr.Bytes()
+		a, found := amap[string(asBytes)] // won't allocate.
+		if !found {
+			// not found, save and announce it.
+			amap[string(asBytes)] = &expiringAddr{Addr: addr, Expires: exp, TTL: ttl}
 			mab.subManager.BroadcastAddr(p, addr)
+		} else {
+			// Update expiration/TTL independently.
+			// We never want to reduce either.
+			if ttl > a.TTL {
+				a.TTL = ttl
+			}
+			if exp.After(a.Expires) {
+				a.Expires = exp
+			}
 		}
 	}
 }
@@ -188,14 +197,14 @@ func (mab *memoryAddrBook) SetAddrs(p peer.ID, addrs []ma.Multiaddr, ttl time.Du
 			log.Warningf("was passed nil multiaddr for %s", p)
 			continue
 		}
-		// re-set all of them for new ttl.
-		addrstr := string(addr.Bytes())
 
+		// re-set all of them for new ttl.
+		aBytes := addr.Bytes()
 		if ttl > 0 {
-			amap[addrstr] = &expiringAddr{Addr: addr, Expires: exp, TTL: ttl}
+			amap[string(aBytes)] = &expiringAddr{Addr: addr, Expires: exp, TTL: ttl}
 			mab.subManager.BroadcastAddr(p, addr)
 		} else {
-			delete(amap, addrstr)
+			delete(amap, string(aBytes))
 		}
 	}
 }

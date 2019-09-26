@@ -5,7 +5,6 @@ import (
 
 	circuit "github.com/libp2p/go-libp2p-circuit"
 	ma "github.com/multiformats/go-multiaddr"
-	dns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 
@@ -56,7 +55,7 @@ func isRelayAddr(a ma.Multiaddr) bool {
 func isDNSAddr(a ma.Multiaddr) bool {
 	if first, _ := ma.SplitFirst(a); first != nil {
 		switch first.Protocol().Code {
-		case dns.P_DNS4, dns.P_DNS6, dns.P_DNSADDR:
+		case ma.P_DNS4, ma.P_DNS6, ma.P_DNSADDR:
 			return true
 		}
 	}

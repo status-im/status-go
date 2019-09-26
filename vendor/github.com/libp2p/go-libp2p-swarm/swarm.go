@@ -20,6 +20,7 @@ import (
 	goprocessctx "github.com/jbenet/goprocess/context"
 
 	filter "github.com/libp2p/go-maddr-filter"
+	ma "github.com/multiformats/go-multiaddr"
 	mafilter "github.com/whyrusleeping/multiaddr-filter"
 )
 
@@ -58,6 +59,10 @@ type Swarm struct {
 
 	listeners struct {
 		sync.RWMutex
+
+		ifaceListenAddres []ma.Multiaddr
+		cacheEOL          time.Time
+
 		m map[transport.Listener]struct{}
 	}
 
@@ -111,6 +116,11 @@ func NewSwarm(ctx context.Context, local peer.ID, peers peerstore.Peerstore, bwc
 }
 
 func (s *Swarm) teardown() error {
+	// Wait for the context to be canceled.
+	// This allows other parts of the swarm to detect that we're shutting
+	// down.
+	<-s.ctx.Done()
+
 	// Prevents new connections and/or listeners from being added to the swarm.
 
 	s.listeners.Lock()

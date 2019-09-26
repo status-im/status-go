@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr-net"
 )
 
 // Action is an enum modelling all possible filter actions.
@@ -112,17 +111,25 @@ func (fs *Filters) RemoveLiteral(ipnet net.IPNet) (removed bool) {
 //  Instead, the highest-specific last filter should win; that way more specific filters
 //  override more general ones.
 func (fs *Filters) AddrBlocked(a ma.Multiaddr) (deny bool) {
-	maddr := ma.Split(a)
-	if len(maddr) == 0 {
-		return fs.DefaultAction == ActionDeny
-	}
-	netaddr, err := manet.ToNetAddr(maddr[0])
-	if err != nil {
-		// if we can't parse it, it's probably not blocked.
-		return fs.DefaultAction == ActionDeny
-	}
-	netip := net.ParseIP(netaddr.String())
-	if netip == nil {
+	var (
+		netip net.IP
+		found bool
+	)
+
+	ma.ForEach(a, func(c ma.Component) bool {
+		switch c.Protocol().Code {
+		case ma.P_IP6ZONE:
+			return true
+		case ma.P_IP6, ma.P_IP4:
+			found = true
+			netip = net.IP(c.RawValue())
+			return false
+		default:
+			return false
+		}
+	})
+
+	if !found {
 		return fs.DefaultAction == ActionDeny
 	}
 

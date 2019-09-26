@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	moved "github.com/libp2p/go-libp2p-core/peerstore"
-	"github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-core/peer"
+	core "github.com/libp2p/go-libp2p-core/peerstore"
 )
 
 // LatencyEWMASmooting governs the decay of the EWMA (the speed
@@ -14,7 +14,7 @@ import (
 var LatencyEWMASmoothing = 0.1
 
 // Deprecated: use github.com/libp2p/go-libp2p-core/peerstore.Metrics instead.
-type Metrics = moved.Metrics
+type Metrics = core.Metrics
 
 type metrics struct {
 	latmap map[peer.ID]time.Duration

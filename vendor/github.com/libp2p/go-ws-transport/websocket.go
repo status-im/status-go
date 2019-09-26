@@ -3,7 +3,6 @@ package websocket
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,16 +14,14 @@ import (
 
 	ws "github.com/gorilla/websocket"
 	ma "github.com/multiformats/go-multiaddr"
+	mafmt "github.com/multiformats/go-multiaddr-fmt"
 	manet "github.com/multiformats/go-multiaddr-net"
-	mafmt "github.com/whyrusleeping/mafmt"
 )
 
 // WsProtocol is the multiaddr protocol definition for this transport.
-var WsProtocol = ma.Protocol{
-	Code:  477,
-	Name:  "ws",
-	VCode: ma.CodeToVarint(477),
-}
+//
+// Deprecated: use `ma.ProtocolWithCode(ma.P_WS)
+var WsProtocol = ma.ProtocolWithCode(ma.P_WS)
 
 // WsFmt is multiaddr formatter for WsProtocol
 var WsFmt = mafmt.And(mafmt.TCP, mafmt.Base(WsProtocol.Code))
@@ -46,11 +43,6 @@ var upgrader = ws.Upgrader{
 }
 
 func init() {
-	err := ma.AddProtocol(WsProtocol)
-	if err != nil {
-		panic(fmt.Errorf("error registering websocket protocol: %s", err))
-	}
-
 	manet.RegisterNetCodec(WsCodec)
 }
 

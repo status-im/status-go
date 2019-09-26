@@ -19,6 +19,7 @@ require (
 	github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356 // indirect
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.2.0
+	github.com/libp2p/go-libp2p v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.2.3
 	github.com/multiformats/go-multiaddr v0.1.1
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f

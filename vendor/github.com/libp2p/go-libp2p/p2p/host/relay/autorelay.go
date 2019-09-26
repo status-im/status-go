@@ -12,7 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/routing"
 
 	autonat "github.com/libp2p/go-libp2p-autonat"
-	_ "github.com/libp2p/go-libp2p-circuit"
+	circuit "github.com/libp2p/go-libp2p-circuit"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	basic "github.com/libp2p/go-libp2p/p2p/host/basic"
 
@@ -194,6 +194,17 @@ func (ar *AutoRelay) tryRelay(ctx context.Context, pi peer.AddrInfo) bool {
 	}
 
 	if !ar.connect(ctx, pi) {
+		return false
+	}
+
+	ok, err := circuit.CanHop(ctx, ar.host, pi.ID)
+	if err != nil {
+		log.Debugf("error querying relay: %s", err.Error())
+		return false
+	}
+
+	if !ok {
+		// not a hop relay
 		return false
 	}
 

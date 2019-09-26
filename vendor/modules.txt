@@ -135,7 +135,7 @@ github.com/golang/protobuf/protoc-gen-go/descriptor
 github.com/golang/snappy
 # github.com/google/uuid v1.1.1
 github.com/google/uuid
-# github.com/gorilla/websocket v1.4.0
+# github.com/gorilla/websocket v1.4.1
 github.com/gorilla/websocket
 # github.com/hashicorp/errwrap v1.0.0
 github.com/hashicorp/errwrap
@@ -190,9 +190,11 @@ github.com/libp2p/go-addr-util
 github.com/libp2p/go-buffer-pool
 # github.com/libp2p/go-conn-security-multistream v0.1.0
 github.com/libp2p/go-conn-security-multistream
+# github.com/libp2p/go-eventbus v0.1.0
+github.com/libp2p/go-eventbus
 # github.com/libp2p/go-flow-metrics v0.0.1
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.1.1
+# github.com/libp2p/go-libp2p v0.4.0
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/p2p/host/basic
@@ -204,7 +206,7 @@ github.com/libp2p/go-libp2p/p2p/protocol/ping
 # github.com/libp2p/go-libp2p-autonat v0.1.0
 github.com/libp2p/go-libp2p-autonat
 github.com/libp2p/go-libp2p-autonat/pb
-# github.com/libp2p/go-libp2p-circuit v0.1.0
+# github.com/libp2p/go-libp2p-circuit v0.1.3
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
 # github.com/libp2p/go-libp2p-core v0.2.3
@@ -227,8 +229,6 @@ github.com/libp2p/go-libp2p-core/sec
 github.com/libp2p/go-libp2p-core/sec/insecure
 github.com/libp2p/go-libp2p-core/sec/insecure/pb
 github.com/libp2p/go-libp2p-core/transport
-# github.com/libp2p/go-libp2p-crypto v0.1.0
-github.com/libp2p/go-libp2p-crypto
 # github.com/libp2p/go-libp2p-discovery v0.1.0
 github.com/libp2p/go-libp2p-discovery
 # github.com/libp2p/go-libp2p-loggables v0.1.0
@@ -237,22 +237,20 @@ github.com/libp2p/go-libp2p-loggables
 github.com/libp2p/go-libp2p-mplex
 # github.com/libp2p/go-libp2p-nat v0.0.4
 github.com/libp2p/go-libp2p-nat
-# github.com/libp2p/go-libp2p-peer v0.2.0
-github.com/libp2p/go-libp2p-peer
-# github.com/libp2p/go-libp2p-peerstore v0.1.0
+# github.com/libp2p/go-libp2p-peerstore v0.1.3
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/addr
 github.com/libp2p/go-libp2p-peerstore/pstoremem
-# github.com/libp2p/go-libp2p-secio v0.1.0
+# github.com/libp2p/go-libp2p-secio v0.2.0
 github.com/libp2p/go-libp2p-secio
 github.com/libp2p/go-libp2p-secio/pb
-# github.com/libp2p/go-libp2p-swarm v0.1.0
+# github.com/libp2p/go-libp2p-swarm v0.2.2
 github.com/libp2p/go-libp2p-swarm
 # github.com/libp2p/go-libp2p-transport-upgrader v0.1.1
 github.com/libp2p/go-libp2p-transport-upgrader
 # github.com/libp2p/go-libp2p-yamux v0.2.1
 github.com/libp2p/go-libp2p-yamux
-# github.com/libp2p/go-maddr-filter v0.0.4
+# github.com/libp2p/go-maddr-filter v0.0.5
 github.com/libp2p/go-maddr-filter
 # github.com/libp2p/go-mplex v0.1.0
 github.com/libp2p/go-mplex
@@ -269,9 +267,9 @@ github.com/libp2p/go-reuseport
 github.com/libp2p/go-reuseport-transport
 # github.com/libp2p/go-stream-muxer-multistream v0.2.0
 github.com/libp2p/go-stream-muxer-multistream
-# github.com/libp2p/go-tcp-transport v0.1.0
+# github.com/libp2p/go-tcp-transport v0.1.1
 github.com/libp2p/go-tcp-transport
-# github.com/libp2p/go-ws-transport v0.1.0
+# github.com/libp2p/go-ws-transport v0.1.2
 github.com/libp2p/go-ws-transport
 # github.com/libp2p/go-yamux v1.2.3
 github.com/libp2p/go-yamux
@@ -291,11 +289,11 @@ github.com/mr-tron/base58/base58
 github.com/multiformats/go-base32
 # github.com/multiformats/go-multiaddr v0.1.1
 github.com/multiformats/go-multiaddr
-# github.com/multiformats/go-multiaddr-dns v0.0.2
+# github.com/multiformats/go-multiaddr-dns v0.1.0
 github.com/multiformats/go-multiaddr-dns
-# github.com/multiformats/go-multiaddr-fmt v0.0.1
+# github.com/multiformats/go-multiaddr-fmt v0.1.0
 github.com/multiformats/go-multiaddr-fmt
-# github.com/multiformats/go-multiaddr-net v0.0.1
+# github.com/multiformats/go-multiaddr-net v0.1.0
 github.com/multiformats/go-multiaddr-net
 # github.com/multiformats/go-multibase v0.0.1
 github.com/multiformats/go-multibase
@@ -433,7 +431,6 @@ go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
 # golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 golang.org/x/crypto/blake2s
-golang.org/x/crypto/blowfish
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/ed25519/internal/edwards25519

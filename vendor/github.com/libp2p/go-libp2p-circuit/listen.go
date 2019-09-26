@@ -50,7 +50,7 @@ func (l *RelayListener) Addr() net.Addr {
 }
 
 func (l *RelayListener) Multiaddr() ma.Multiaddr {
-	return ma.Cast(ma.CodeToVarint(P_CIRCUIT))
+	return circuitAddr
 }
 
 func (l *RelayListener) Close() error {
