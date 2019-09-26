@@ -19,7 +19,7 @@ require (
 	github.com/pborman/uuid v0.0.0-20170112150404-1b00554d8222
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v2.0.0+incompatible
-	github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed
+	github.com/status-im/migrate/v4 v4.3.1-status
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-protocol-go v0.0.0-20190926081215-cc44ddb7ce44
 	github.com/status-im/whisper v1.4.14
