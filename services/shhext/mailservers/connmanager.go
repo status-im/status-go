@@ -195,9 +195,7 @@ func (state *internalState) ReachedTarget() bool {
 func (state *internalState) replaceNodes(new map[enode.ID]*enode.Node) {
 	for nid, n := range state.currentNodes {
 		if _, exist := new[nid]; !exist {
-			if _, exist := state.connected[nid]; exist {
-				delete(state.connected, nid)
-			}
+			delete(state.connected, nid)
 			state.srv.RemovePeer(n)
 		}
 	}

@@ -9,6 +9,7 @@ run:
     - bindata.go
     - .*_mock.go
     - jail/doc.go
+    - contracts/
 
 output:
   format: colored-line-number

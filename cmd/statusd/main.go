@@ -275,7 +275,7 @@ Examples:
 
 Options:
 `
-	fmt.Fprintf(os.Stderr, usage)
+	fmt.Fprint(os.Stderr, usage)
 	flag.PrintDefaults()
 }
 
