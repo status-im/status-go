@@ -235,25 +235,22 @@ func NewMessenger(
 		}
 	}
 
-	var err error
-
 	// Configure the database.
 	database := c.db
-	if database == nil && c.dbConfig != (dbConfig{}) {
+	if c.db == nil && c.dbConfig == (dbConfig{}) {
+		return nil, errors.New("database instance or database path needs to be provided")
+	}
+	if c.db == nil {
 		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath))
+		var err error
 		database, err = sqlite.Open(c.dbConfig.dbPath, c.dbConfig.dbKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize database from the db config")
 		}
-	} else {
-		logger.Info("using in-memory database")
-		database, err = sqlite.Open(":memory:", "")
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to initialize in-memory database")
-		}
 	}
+
 	// Apply migrations for all components.
-	err = sqlite.Migrate(database)
+	err := sqlite.Migrate(database)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migrations")
 	}
