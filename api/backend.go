@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -41,6 +43,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	ens "github.com/wealdtech/go-ens/v3"
 )
 
 const (
@@ -553,6 +556,53 @@ func (b *StatusBackend) GetNodesFromContract(rpcEndpoint string, contractAddress
 	}
 
 	return response, nil
+}
+
+// VerifyENSName verifies that a registered ENS name matches the expected public key
+func (b *StatusBackend) VerifyENSName(ensName, publicKeyStr, rpcEndpoint, contractAddress string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
+	defer cancel()
+
+	pubKeyBytes, err := hex.DecodeString(publicKeyStr)
+	if err != nil {
+		return false, err
+	}
+
+	expectedPubKey, err := btcec.ParsePubKey(pubKeyBytes, btcec.S256())
+	if err != nil {
+		return false, err
+	}
+
+	ethclient, err := ethclient.DialContext(ctx, rpcEndpoint)
+	if err != nil {
+		return false, err
+	}
+
+	// Resolve ensName
+	resolver, err := ens.NewResolver(ethclient, ensName)
+	if err != nil {
+		b.log.Error("error while creating ENS name resolver", "ensName", ensName, "error", err)
+		return false, err
+	}
+	x, y, err := resolver.PubKey()
+	if err != nil {
+		b.log.Error("error while resolving public key from ENS name", "ensName", ensName, "error", err)
+		return false, err
+	}
+
+	// Assemble the bytes returned for the pubkey
+	pb := make([]byte, btcec.PubKeyBytesLenUncompressed)
+	pb[0] = byte(0x04) // uncompressed
+	copy(pb[1:33], x[:])
+	copy(pb[33:], y[:])
+	// check if (X, Y) lies on the curve and create a Pubkey if it does
+	pubKey, err := btcec.ParsePubKey(pb, btcec.S256())
+	if err != nil {
+		b.log.Error("error while parsing public key returned from ENS", "ensName", ensName, "error", err)
+		return false, err
+	}
+
+	return pubKey.IsEqual(expectedPubKey), err
 }
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.

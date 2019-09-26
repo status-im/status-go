@@ -747,3 +747,26 @@ func Identicon(pk string) *C.char {
 	identicon, _ := protocol.Identicon(pk)
 	return C.CString(identicon)
 }
+
+// VerifyENSName verifies that a registered ENS name matches the expected public key
+//export VerifyENSName
+func VerifyENSName(ensName *C.char, publicKeyStr *C.char, rpcEndpoint *C.char, contractAddress *C.char) *C.char {
+	match, err := statusBackend.VerifyENSName(
+		C.GoString(ensName),
+		C.GoString(publicKeyStr),
+		C.GoString(rpcEndpoint),
+		C.GoString(contractAddress),
+	)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Match bool `json:"match"`
+	}{Match: match})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return C.CString(string(data))
+}

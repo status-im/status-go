@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -415,6 +416,83 @@ func TestStartStopMultipleTimes(t *testing.T) {
 	require.NoError(t, backend.StopNode())
 	require.NoError(t, backend.StartNode(config))
 	require.NoError(t, backend.StopNode())
+}
+
+func TestVerifyENSName(t *testing.T) {
+	utils.Init()
+
+	backend := NewStatusBackend()
+	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
+	require.NoError(t, err)
+	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
+
+	require.NoError(t, backend.StartNode(config))
+	defer func() {
+		require.NoError(t, backend.StopNode())
+	}()
+
+	var testCases = []struct {
+		name            string
+		ensName         string
+		pubkey          string
+		match           bool
+		err             error
+		contractAddress string
+	}{
+		{
+			name:            "tc1",
+			ensName:         "pedro.stateofus.eth",
+			pubkey:          "04325367620ae20dd878dbb39f69f02c567d789dd21af8a88623dc5b529827c2812571c380a2cd8236a2851b8843d6486481166c39debf60a5d30b9099c66213e4",
+			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
+			match:           true,
+			err:             nil,
+		},
+		{
+			name:            "tc2",
+			ensName:         "jakubgs.stateofus.eth",
+			pubkey:          "04325367620ae20dd878dbb39f69f02c567d789dd21af8a88623dc5b529827c2812571c380a2cd8236a2851b8843d6486481166c39debf60a5d30b9099c66213e4",
+			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
+			match:           false,
+			err:             nil,
+		},
+		{
+			name:            "tc3",
+			ensName:         "stateofus.eth",
+			pubkey:          "04325367620ae20dd878dbb39f69f02c567d789dd21af8a88623dc5b529827c2812571c380a2cd8236a2851b8843d6486481166c39debf60a5d30b9099c66213e4",
+			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
+			match:           false,
+			err:             errors.New("no resolver"),
+		},
+		{
+			name:            "tc4",
+			ensName:         "",
+			pubkey:          "04325367620ae20dd878dbb39f69f02c567d789dd21af8a88623dc5b529827c2812571c380a2cd8236a2851b8843d6486481166c39debf60a5d30b9099c66213e4",
+			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
+			err:             errors.New("no resolver"),
+		},
+		{
+			name:            "tc5",
+			ensName:         "aaaaa",
+			pubkey:          "04325367620ae20dd878dbb39f69f02c567d789dd21af8a88623dc5b529827c2812571c380a2cd8236a2851b8843d6486481166c39debf60a5d30b9099c66213e4",
+			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
+			err:             errors.New("unregistered name"),
+		},
+		{
+			name:            "tc6",
+			ensName:         "aaaaa",
+			pubkey:          "0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
+			err:             errors.New("pubkey isn't on secp256k1 curve"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			match, err := backend.VerifyENSName(tc.ensName, tc.pubkey, params.MainnetEthereumNetworkURL, tc.contractAddress)
+			require.Equal(t, tc.err, err)
+			require.Equal(t, tc.match, match)
+		})
+	}
 }
 
 func TestSignHash(t *testing.T) {

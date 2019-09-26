@@ -96,7 +96,7 @@ func TestUpdateUpstreamURL(t *testing.T) {
 
 	err = c.UpdateUpstreamURL(updatedUpstreamTs.URL)
 	require.NoError(t, err)
-	// the upstream cleint instance should change
+	// the upstream client instance should change
 	require.NotEqual(t, originalUpstreamClient, c.upstream)
 	require.Equal(t, updatedUpstreamTs.URL, c.upstreamURL)
 }

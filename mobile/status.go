@@ -758,3 +758,26 @@ func Identicon(pk string) string {
 	identicon, _ := protocol.Identicon(pk)
 	return identicon
 }
+
+// VerifyENSName returns a list of nodes from a given contract
+//export VerifyENSName
+func VerifyENSName(ensName, publicKey, rpcEndpoint, contractAddress string) string {
+	match, err := statusBackend.VerifyENSName(
+		ensName,
+		publicKey,
+		rpcEndpoint,
+		contractAddress,
+	)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	data, err := json.Marshal(struct {
+		Match bool `json:"match"`
+	}{Match: match})
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(data)
+}
