@@ -12,7 +12,7 @@ require (
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/golang/mock v1.2.0
 	github.com/leodido/go-urn v1.1.0 // indirect
-	github.com/lib/pq v1.0.0
+	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p-core v0.0.3
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
