@@ -14,11 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// +build !ios
-
 package metrics
-
-import "github.com/elastic/gosigar"
 
 // CPUStats is the system and process CPU stats.
 type CPUStats struct {
@@ -30,13 +26,4 @@ type CPUStats struct {
 // ReadCPUStats retrieves the current CPU stats.
 func ReadCPUStats(stats *CPUStats) {
 	readCPUStats(stats)
-}
-
-func readCPUStats(stats *CPUStats) {
-	global := gosigar.Cpu{}
-	global.Get()
-
-	stats.GlobalTime = int64(global.User + global.Nice + global.Sys)
-	stats.GlobalWait = int64(global.Wait)
-	stats.LocalTime = getProcessCPUTime()
 }
