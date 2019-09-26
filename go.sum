@@ -530,8 +530,8 @@ github.com/spf13/viper v1.3.2/go.mod h1:ZiWeW+zYFKm7srdB9IoDzzZXaJaI5eL9QjNiN/DM
 github.com/src-d/envconfig v1.0.0/go.mod h1:Q9YQZ7BKITldTBnoxsE5gOeB5y66RyPXeue/R4aaNBc=
 github.com/status-im/doubleratchet v2.0.0+incompatible h1:s77lF1lDubK0RKftxN2vH8G9gwtVVp13ggWfyY4O1q4=
 github.com/status-im/doubleratchet v2.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
-github.com/status-im/go-ethereum v1.9.5-status.2.0.20190926060804-1d3347c76945 h1:m2ESzsuXWM/hQHy39wIX4RUjZpr00NVEvHcRzyB8Jto=
-github.com/status-im/go-ethereum v1.9.5-status.2.0.20190926060804-1d3347c76945/go.mod h1:Ulij8LMpMvXnbnPcmDqrpI+iXoXSjxItuY/wmbasTZU=
+github.com/status-im/go-ethereum v1.9.5-status.3 h1:ZS+4cQqd3JzHFKs6VhhAq+UiU26cDq2AxIB+0EyY1sg=
+github.com/status-im/go-ethereum v1.9.5-status.3/go.mod h1:Ulij8LMpMvXnbnPcmDqrpI+iXoXSjxItuY/wmbasTZU=
 github.com/status-im/go-fcm v1.0.0-status h1:eUNKm4ooAXdEf9/GaTYeTELna5aVMOEbzjbm2irQ0gY=
 github.com/status-im/go-fcm v1.0.0-status/go.mod h1:0JGzul9SfemcbTdw0mkzLR42j+BTNci5aQWlI0o/uk8=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
