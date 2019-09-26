@@ -224,6 +224,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	id,
 	address,
 	name,
+	alias,
+	identicon,
 	photo,
 	last_updated,
 	system_tags,
@@ -246,6 +248,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.ID,
 			&contact.Address,
 			&contact.Name,
+			&contact.Alias,
+			&contact.Identicon,
 			&contact.Photo,
 			&contact.LastUpdated,
 			&encodedSystemTags,
@@ -256,22 +260,67 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			return nil, err
 		}
 
-		// Restore device info
-		deviceInfoDecoder := gob.NewDecoder(bytes.NewBuffer(encodedDeviceInfo))
-		if err := deviceInfoDecoder.Decode(&contact.DeviceInfo); err != nil {
-			return nil, err
+		if encodedDeviceInfo != nil {
+			// Restore device info
+			deviceInfoDecoder := gob.NewDecoder(bytes.NewBuffer(encodedDeviceInfo))
+			if err := deviceInfoDecoder.Decode(&contact.DeviceInfo); err != nil {
+				return nil, err
+			}
 		}
 
-		// Restore system tags
-		systemTagsDecoder := gob.NewDecoder(bytes.NewBuffer(encodedSystemTags))
-		if err := systemTagsDecoder.Decode(&contact.SystemTags); err != nil {
-			return nil, err
+		if encodedSystemTags != nil {
+			// Restore system tags
+			systemTagsDecoder := gob.NewDecoder(bytes.NewBuffer(encodedSystemTags))
+			if err := systemTagsDecoder.Decode(&contact.SystemTags); err != nil {
+				return nil, err
+			}
 		}
 
 		response = append(response, contact)
 	}
 
 	return response, nil
+}
+
+// SetContactsGeneratedData sets a contact generated data if not existing already
+// in the database
+func (db sqlitePersistence) SetContactsGeneratedData(contacts []Contact) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	for _, contact := range contacts {
+		_, err := tx.Exec(`INSERT OR IGNORE INTO contacts(
+	  id,
+	  address,
+	  name,
+	  alias,
+	  identicon,
+	  photo,
+	  last_updated,
+	  tribute_to_talk)
+	VALUES (?, ?, "", ?, ?, "", 0, "")`,
+			contact.ID,
+			contact.Address,
+			contact.Alias,
+			contact.Identicon,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
@@ -286,7 +335,6 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 			if err == nil {
 				err = tx.Commit()
 				return
-
 			}
 			// don't shadow original error
 			_ = tx.Rollback()
@@ -314,13 +362,15 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 	  id,
 	  address,
 	  name,
+	  alias,
+	  identicon,
 	  photo,
 	  last_updated,
 	  system_tags,
 	  device_info,
 	  tribute_to_talk
 	)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -330,6 +380,8 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 		contact.ID,
 		contact.Address,
 		contact.Name,
+		contact.Alias,
+		contact.Identicon,
 		contact.Photo,
 		contact.LastUpdated,
 		encodedSystemTags.Bytes(),
@@ -342,15 +394,16 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 // Messages returns messages for a given contact, in a given period. Ordered by a timestamp.
 func (db sqlitePersistence) Messages(from, to time.Time) (result []*protocol.Message, err error) {
 	rows, err := db.db.Query(`SELECT
-			id, 
+			id,
+			chat_id,
 			content_type, 
 			message_type, 
-			text, 
-			clock, 
-			timestamp, 
-			content_chat_id, 
-			content_text, 
-			public_key, 
+			text,
+			clock,
+			timestamp,
+			content_chat_id,
+			content_text,
+			public_key,
 			flags
 		FROM user_messages 
 		WHERE timestamp >= ? AND timestamp <= ? 
@@ -370,8 +423,9 @@ func (db sqlitePersistence) Messages(from, to time.Time) (result []*protocol.Mes
 		}
 		pkey := []byte{}
 		err = rows.Scan(
-			&msg.ID, &msg.ContentT, &msg.MessageT, &msg.Text, &msg.Clock,
-			&msg.Timestamp, &msg.Content.ChatID, &msg.Content.Text, &pkey, &msg.Flags)
+			&msg.ID, &msg.ChatID, &msg.ContentT, &msg.MessageT, &msg.Text, &msg.Clock,
+			&msg.Timestamp, &msg.Content.ChatID, &msg.Content.Text, &pkey, &msg.Flags,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -384,94 +438,6 @@ func (db sqlitePersistence) Messages(from, to time.Time) (result []*protocol.Mes
 		rst = append(rst, &msg)
 	}
 	return rst, nil
-}
-
-func (db sqlitePersistence) NewMessages(chatID string, rowid int64) ([]*protocol.Message, error) {
-	rows, err := db.db.Query(`SELECT
-id, content_type, message_type, text, clock, timestamp, content_chat_id, content_text, public_key, flags
-FROM user_messages WHERE chat_id = ? AND rowid >= ? ORDER BY clock`,
-		chatID, rowid)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var (
-		rst = []*protocol.Message{}
-	)
-	for rows.Next() {
-		msg := protocol.Message{
-			Content: protocol.Content{},
-		}
-		pkey := []byte{}
-		err = rows.Scan(
-			&msg.ID, &msg.ContentT, &msg.MessageT, &msg.Text, &msg.Clock,
-			&msg.Timestamp, &msg.Content.ChatID, &msg.Content.Text, &pkey, &msg.Flags)
-		if err != nil {
-			return nil, err
-		}
-		if len(pkey) != 0 {
-			msg.SigPubKey, err = unmarshalECDSAPub(pkey)
-			if err != nil {
-				return nil, err
-			}
-		}
-		rst = append(rst, &msg)
-	}
-	return rst, nil
-}
-
-// TODO(adam): refactor all message getters in order not to
-// repeat the select fields over and over.
-func (db sqlitePersistence) UnreadMessages(chatID string) ([]*protocol.Message, error) {
-	rows, err := db.db.Query(`
-		SELECT
-			id,
-			content_type,
-			message_type,
-			text,
-			clock,
-			timestamp,
-			content_chat_id,
-			content_text,
-			public_key,
-			flags
-		FROM
-			user_messages
-		WHERE
-			chat_id = ? AND
-			flags & ? == 0
-		ORDER BY clock`,
-		chatID, protocol.MessageRead,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var result []*protocol.Message
-
-	for rows.Next() {
-		msg := protocol.Message{
-			Content: protocol.Content{},
-		}
-		pkey := []byte{}
-		err = rows.Scan(
-			&msg.ID, &msg.ContentT, &msg.MessageT, &msg.Text, &msg.Clock,
-			&msg.Timestamp, &msg.Content.ChatID, &msg.Content.Text, &pkey, &msg.Flags)
-		if err != nil {
-			return nil, err
-		}
-		if len(pkey) != 0 {
-			msg.SigPubKey, err = unmarshalECDSAPub(pkey)
-			if err != nil {
-				return nil, err
-			}
-		}
-		result = append(result, &msg)
-	}
-
-	return result, nil
 }
 
 func (db sqlitePersistence) SaveMessages(messages []*protocol.Message) (last int64, err error) {
@@ -483,21 +449,33 @@ func (db sqlitePersistence) SaveMessages(messages []*protocol.Message) (last int
 	if err != nil {
 		return
 	}
-	stmt, err = tx.Prepare(`INSERT INTO user_messages(
-id, chat_id, content_type, message_type, text, clock, timestamp, content_chat_id, content_text, public_key, flags)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	if err != nil {
-		return
-	}
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
 			return
-
 		}
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
+
+	stmt, err = tx.Prepare(`INSERT INTO 
+		user_messages(
+			id,
+			chat_id, 
+			content_type, 
+			message_type,
+			text,
+			clock,
+			timestamp,
+			content_chat_id,
+			content_text,
+			public_key,
+			flags
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return
+	}
 
 	var rst sql.Result
 
@@ -507,9 +485,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 			pkey, err = marshalECDSAPub(msg.SigPubKey)
 		}
 		rst, err = stmt.Exec(
-			msg.ID, msg.ChatID, msg.ContentT, msg.MessageT, msg.Text,
-			msg.Clock, msg.Timestamp, msg.Content.ChatID, msg.Content.Text,
-			pkey, msg.Flags)
+			msg.ID, msg.ChatID, msg.ContentT, msg.MessageT, msg.Text, msg.Clock, msg.Timestamp,
+			msg.Content.ChatID, msg.Content.Text, pkey, msg.Flags,
+		)
 		if err != nil {
 			if err.Error() == uniqueIDContstraint {
 				// skip duplicated messages

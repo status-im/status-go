@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	protocol "github.com/status-im/status-protocol-go"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
@@ -744,4 +745,16 @@ func SignHash(hexEncodedHash string) string {
 	}
 
 	return hexEncodedSignature
+}
+
+func GenerateAlias(pk string) string {
+	// We ignore any error, empty string is considered an error
+	name, _ := protocol.GenerateAlias(pk)
+	return name
+}
+
+func Identicon(pk string) string {
+	// We ignore any error, empty string is considered an error
+	identicon, _ := protocol.Identicon(pk)
+	return identicon
 }

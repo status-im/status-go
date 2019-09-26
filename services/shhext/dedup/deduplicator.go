@@ -20,10 +20,17 @@ type Deduplicator struct {
 	log             log.Logger
 }
 
+type Author struct {
+	PublicKey hexutil.Bytes `json:"publicKey"`
+	Alias     string        `json:"alias"`
+	Identicon string        `json:"identicon"`
+}
+
 type Metadata struct {
 	DedupID      []byte        `json:"dedupId"`
 	EncryptionID hexutil.Bytes `json:"encryptionId"`
 	MessageID    hexutil.Bytes `json:"messageId"`
+	Author       Author        `json:"author"`
 }
 
 type DeduplicateMessage struct {

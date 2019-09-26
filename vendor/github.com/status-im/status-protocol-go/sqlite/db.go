@@ -25,6 +25,8 @@ const defaultKdfIterationsNumber = 64000 // nolint: deadcode,varcheck,unused
 // https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
 const reducedKdfIterationsNumber = 3200
 
+const inMemoryPath = ":memory:"
+
 // MigrationConfig is a struct that allows to define bindata migrations.
 type MigrationConfig struct {
 	AssetNames  []string
@@ -37,6 +39,12 @@ func Open(path, key string) (*sql.DB, error) {
 	return open(path, key, reducedKdfIterationsNumber)
 }
 
+// OpenInMemory opens an in memory SQLite database.
+// Number of KDF iterations is reduced to 0.
+func OpenInMemory() (*sql.DB, error) {
+	return open(inMemoryPath, "", 0)
+}
+
 // OpenWithIter allows to open a new database with a custom number of kdf iterations.
 // Higher kdf iterations number makes it slower to open the database.
 func OpenWithIter(path, key string, kdfIter int) (*sql.DB, error) {
@@ -44,9 +52,11 @@ func OpenWithIter(path, key string, kdfIter int) (*sql.DB, error) {
 }
 
 func open(path string, key string, kdfIter int) (*sql.DB, error) {
-	_, err := os.OpenFile(path, os.O_CREATE, 0644)
-	if err != nil {
-		return nil, err
+	if path != inMemoryPath {
+		_, err := os.OpenFile(path, os.O_CREATE, 0644)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	db, err := sql.Open("sqlite3", path)

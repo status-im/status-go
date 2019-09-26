@@ -93,3 +93,35 @@ func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
 	}
 	return crypto.UnmarshalPubkey(b)
 }
+
+func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
+	return hexutil.Encode(crypto.FromECDSAPub(publicKey))
+}
+
+func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey) Chat {
+	return Chat{
+		ID:        oneToOneChatID(publicKey),
+		Name:      name,
+		Active:    true,
+		ChatType:  ChatTypeOneToOne,
+		PublicKey: publicKey,
+	}
+}
+
+func CreatePublicChat(name string) Chat {
+	return Chat{
+		ID:       name,
+		Name:     name,
+		Active:   true,
+		ChatType: ChatTypePublic,
+	}
+}
+
+func findChatByID(chatID string, chats []*Chat) *Chat {
+	for _, c := range chats {
+		if c.ID == chatID {
+			return c
+		}
+	}
+	return nil
+}
