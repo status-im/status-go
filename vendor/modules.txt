@@ -273,6 +273,8 @@ github.com/libp2p/go-tcp-transport
 github.com/libp2p/go-ws-transport
 # github.com/libp2p/go-yamux v1.2.3
 github.com/libp2p/go-yamux
+# github.com/lucasb-eyer/go-colorful v1.0.2
+github.com/lucasb-eyer/go-colorful
 # github.com/mattn/go-colorable v0.1.1
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.5
@@ -344,7 +346,7 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.2.2
+# github.com/status-im/status-protocol-go v0.0.0-20190926044311-1e2e007bc607
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/crypto
@@ -355,6 +357,8 @@ github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/encryption/publisher
 github.com/status-im/status-protocol-go/encryption/sharedsecret
+github.com/status-im/status-protocol-go/identity/alias
+github.com/status-im/status-protocol-go/identity/identicon
 github.com/status-im/status-protocol-go/migrations
 github.com/status-im/status-protocol-go/sqlite
 github.com/status-im/status-protocol-go/transport/whisper

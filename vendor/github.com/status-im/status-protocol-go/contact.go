@@ -31,9 +31,13 @@ type Contact struct {
 	// Ethereum address of the contact
 	Address string `json:"address"`
 	// Name of contact
-	Name string `json:"name"`
+	Name string `json:"name,omitempty"`
+	// Generated username name of the contact
+	Alias string `json:"alias,omitempty"`
+	// Identicon generated from public key
+	Identicon string `json:"identicon"`
 	// Photo is the base64 encoded photo
-	Photo string `json:"photoPath"`
+	Photo string `json:"photoPath,omitempty"`
 	// LastUpdated is the last time we received an update from the contact
 	// updates should be discarded if last updated is less than the one stored
 	LastUpdated int64 `json:"lastUpdated"`

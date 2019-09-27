@@ -52,7 +52,9 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsJoin() string {
     		m1.outgoing_status,
 		m1.reply_to,
 		m2.source,
-		m2.content`
+		m2.content,
+		c.alias,
+		c.identicon`
 }
 
 func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsCount() int {
@@ -66,6 +68,8 @@ type scanner interface {
 func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, message *Message, others ...interface{}) error {
 	var quotedContent sql.NullString
 	var quotedFrom sql.NullString
+	var alias sql.NullString
+	var identicon sql.NullString
 	args := []interface{}{
 		&message.ID,
 		&message.WhisperTimestamp,
@@ -73,7 +77,7 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 		&message.To,   // destination in table
 		&message.Content,
 		&message.ContentType,
-		&message.Username,
+		&message.Alias,
 		&message.Timestamp,
 		&message.ChatID,
 		&message.RetryCount,
@@ -86,6 +90,8 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 		&message.ReplyTo,
 		&quotedFrom,
 		&quotedContent,
+		&alias,
+		&identicon,
 	}
 	err := row.Scan(append(args, others...)...)
 	if err != nil {
@@ -98,6 +104,9 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 			Content: quotedContent.String,
 		}
 	}
+	message.Alias = alias.String
+	message.Identicon = identicon.String
+
 	return nil
 }
 
@@ -109,7 +118,7 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllValues(message *Message) [
 		message.To,   // destination in table
 		message.Content,
 		message.ContentType,
-		message.Username,
+		message.Alias,
 		message.Timestamp,
 		message.ChatID,
 		message.RetryCount,
@@ -137,6 +146,11 @@ func (db sqlitePersistence) MessageByID(id string) (*Message, error) {
 				user_messages_legacy m2
 			ON
 			m1.reply_to = m2.id
+
+			LEFT JOIN
+			        contacts c
+		        ON
+			m1.source = c.id
 			WHERE
 				m1.id = ?
 		`, allFields),
@@ -198,7 +212,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 		args = append(args, currCursor)
 	}
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
-	// concatenated with rowid. Results are sorted using this new column.
+	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
 	rows, err := db.db.Query(
 		fmt.Sprintf(`
@@ -211,6 +225,12 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 				user_messages_legacy m2
 			ON
 			m1.reply_to = m2.id
+
+			LEFT JOIN
+			      contacts c
+			ON
+
+			m1.source = c.id
 			WHERE
 				m1.chat_id = ? %s
 			ORDER BY cursor DESC
@@ -371,6 +391,7 @@ func (db sqlitePersistence) BlockContact(contact Contact) ([]*Chat, error) {
 	SET
 	unviewed_message_count = (SELECT COUNT(1) FROM user_messages_legacy WHERE seen = 0 AND chat_id = chats.id),
 	last_message_content = (SELECT content from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
+	last_message_timestamp = (SELECT timestamp from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
 	last_message_content_type = (SELECT content_type from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1)`)
 	if err != nil {
 		return nil, err

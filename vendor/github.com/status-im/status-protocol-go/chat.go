@@ -47,6 +47,7 @@ type Chat struct {
 	UnviewedMessagesCount  uint   `json:"unviewedMessagesCount"`
 	LastMessageContentType string `json:"lastMessageContentType"`
 	LastMessageContent     string `json:"lastMessageContent"`
+	LastMessageTimestamp   int64  `json:"lastMessageTimestamp"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat
@@ -91,4 +92,36 @@ func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 	return crypto.UnmarshalPubkey(b)
+}
+
+func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
+	return hexutil.Encode(crypto.FromECDSAPub(publicKey))
+}
+
+func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey) Chat {
+	return Chat{
+		ID:        oneToOneChatID(publicKey),
+		Name:      name,
+		Active:    true,
+		ChatType:  ChatTypeOneToOne,
+		PublicKey: publicKey,
+	}
+}
+
+func CreatePublicChat(name string) Chat {
+	return Chat{
+		ID:       name,
+		Name:     name,
+		Active:   true,
+		ChatType: ChatTypePublic,
+	}
+}
+
+func findChatByID(chatID string, chats []*Chat) *Chat {
+	for _, c := range chats {
+		if c.ID == chatID {
+			return c
+		}
+	}
+	return nil
 }

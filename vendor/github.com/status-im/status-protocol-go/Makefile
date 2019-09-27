@@ -41,3 +41,18 @@ install-dev:
 generate:
 	go generate ./...
 .PHONY: generate
+
+new-migration:
+	@if [ -z "$$DIR" ]; then \
+		echo 'missing DIR var'; \
+		exit 1; \
+	fi
+
+	@if [ -z "$$NAME" ]; then \
+		echo 'missing NAME var'; \
+		exit 1; \
+	fi
+
+	mkdir -p $(DIR)
+	touch $(DIR)/`date +"%s"`_$(NAME).down.sql ./$(DIR)/`date +"%s"`_$(NAME).up.sql
+.PHONY: create-migration

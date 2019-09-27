@@ -64,9 +64,6 @@ message DirectMessageProtocol {
 
 // Top-level protocol message
 message ProtocolMessage {
-  // An optional bundle is exchanged with each message
-  Bundle bundle = 1;
-
   // The device id of the sender
   string installation_id = 2;
 
