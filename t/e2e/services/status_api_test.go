@@ -9,7 +9,7 @@ import (
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/status"
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -22,12 +22,14 @@ type statusTestParams struct {
 }
 
 func TestStatusAPISuite(t *testing.T) {
+	utils.Init()
 	s := new(StatusAPISuite)
 	s.upstream = false
 	suite.Run(t, s)
 }
 
 func TestStatusAPISuiteUpstream(t *testing.T) {
+	utils.Init()
 	s := new(StatusAPISuite)
 	s.upstream = true
 	suite.Run(t, s)
@@ -39,7 +41,7 @@ type StatusAPISuite struct {
 }
 
 func (s *StatusAPISuite) TestAccessibleStatusAPIs() {
-	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+	if s.upstream && utils.GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 		return
 	}
@@ -61,8 +63,8 @@ func (s *StatusAPISuite) TestAccessibleStatusAPIs() {
 
 func (s *StatusAPISuite) TestStatusLoginSuccess() {
 	addressKeyID := s.testStatusLogin(statusTestParams{
-		Address:  TestConfig.Account1.WalletAddress,
-		Password: TestConfig.Account1.Password,
+		Address:  utils.TestConfig.Account1.WalletAddress,
+		Password: utils.TestConfig.Account1.Password,
 	})
 	s.NotEmpty(addressKeyID)
 }
@@ -70,7 +72,7 @@ func (s *StatusAPISuite) TestStatusLoginSuccess() {
 func (s *StatusAPISuite) TestStatusLoginInvalidAddress() {
 	s.testStatusLogin(statusTestParams{
 		Address:       "invalidaccount",
-		Password:      TestConfig.Account1.Password,
+		Password:      utils.TestConfig.Account1.Password,
 		ExpectedError: account.ErrAddressToAccountMappingFailure,
 	})
 }
@@ -78,7 +80,7 @@ func (s *StatusAPISuite) TestStatusLoginInvalidAddress() {
 func (s *StatusAPISuite) TestStatusLoginInvalidPassword() {
 	s.testStatusLogin(statusTestParams{
 		Address:       "invalidaccount",
-		Password:      TestConfig.Account1.Password,
+		Password:      utils.TestConfig.Account1.Password,
 		ExpectedError: account.ErrAddressToAccountMappingFailure,
 	})
 }
@@ -102,7 +104,7 @@ func (s *StatusAPISuite) TestStatusSignupSuccess() {
 
 func (s *StatusAPISuite) testStatusLogin(testParams statusTestParams) *status.LoginResponse {
 	// Test upstream if that's not StatusChain
-	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+	if s.upstream && utils.GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 		return nil
 	}
@@ -143,7 +145,7 @@ func (s *StatusAPISuite) testStatusLogin(testParams statusTestParams) *status.Lo
 
 func (s *StatusAPISuite) testStatusSignup(testParams statusTestParams) *status.SignupResponse {
 	// Test upstream if that's not StatusChain
-	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+	if s.upstream && utils.GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 		return nil
 	}

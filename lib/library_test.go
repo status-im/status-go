@@ -7,11 +7,46 @@
 package main
 
 import (
+	"os"
+	"path"
+	"path/filepath"
+	"strconv"
 	"testing"
 
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	Init()
+
+	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
+	keystoreDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()], "keystore")
+
+	nodeConfigJSON = `{
+	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
+	"DataDir": "` + testChainDir + `",
+	"KeyStoreDir": "` + filepath.Join(testChainDir, "keystore") + `",
+	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
+	"LogLevel": "INFO",
+	"NoDiscovery": true,
+	"APIModules": "web3,eth",
+	"LightEthConfig": {
+		"Enabled": true
+	},
+	"WhisperConfig": {
+		"Enabled": true,
+		"DataDir": "` + path.Join(testChainDir, "wnode") + `",
+		"EnableNTPSync": false
+	},
+	"ShhextConfig": {
+	    "BackupDisabledDataDir": "` + testChainDir + `"
+	}
+}`
+
+	os.Exit(m.Run())
+}
 
 // the actual test functions are in non-_test.go files (so that they can use cgo i.e. import "C")
 // the only intent of these wrappers is for gotest can find what tests are exposed.

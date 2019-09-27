@@ -4,18 +4,19 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
-
-	. "github.com/status-im/status-go/t/utils"
 )
 
 func TestPeerAPISuite(t *testing.T) {
+	utils.Init()
 	s := new(PeerAPISuite)
 	s.upstream = false
 	suite.Run(t, s)
 }
 
 func TestPeerAPISuiteUpstream(t *testing.T) {
+	utils.Init()
 	s := new(PeerAPISuite)
 	s.upstream = true
 	suite.Run(t, s)
@@ -27,7 +28,7 @@ type PeerAPISuite struct {
 }
 
 func (s *PeerAPISuite) TestAccessiblePeerAPIs() {
-	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+	if s.upstream && utils.GetNetworkID() == params.StatusChainNetworkID {
 		s.T().Skip()
 		return
 	}

@@ -5,16 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/status-im/status-go/services/shhext"
-
-	"os"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -24,6 +21,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -38,6 +36,7 @@ type WhisperMailboxSuite struct {
 }
 
 func TestWhisperMailboxTestSuite(t *testing.T) {
+	utils.Init()
 	suite.Run(t, new(WhisperMailboxSuite))
 }
 

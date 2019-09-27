@@ -1,4 +1,4 @@
-// +build !ios
+// +build !ios,!android
 
 package metrics
 

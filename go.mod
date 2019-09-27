@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.12
 
-replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.3
+replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
 
 replace github.com/NaySoftware/go-fcm => github.com/status-im/go-fcm v1.0.0-status
 

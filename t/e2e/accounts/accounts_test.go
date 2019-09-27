@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/extkeys"
-	e2e "github.com/status-im/status-go/t/e2e"
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/e2e"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -25,6 +25,7 @@ func buildLoginParams(mainAccountAddress, chatAddress, password string, watchAdd
 }
 
 func TestAccountsTestSuite(t *testing.T) {
+	utils.Init()
 	suite.Run(t, new(AccountsTestSuite))
 }
 
@@ -43,7 +44,7 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	s.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// create an account
-	accountInfo, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// ensure that there is still no accounts returned
@@ -52,7 +53,14 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	s.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// select account (sub-accounts will be created for this key)
-	err = s.Backend.SelectAccount(buildLoginParams(accountInfo.WalletAddress, accountInfo.ChatAddress, TestConfig.Account1.Password, nil))
+	err = s.Backend.SelectAccount(
+		buildLoginParams(
+			accountInfo.WalletAddress,
+			accountInfo.ChatAddress,
+			utils.TestConfig.Account1.Password,
+			nil,
+		),
+	)
 	s.NoError(err, "account selection failed")
 
 	// at this point main account should show up
@@ -121,13 +129,13 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	s.NotNil(keyStore)
 
 	// create an acc
-	accountInfo, mnemonic, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo, mnemonic, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s, mnemonic:%s}",
 		accountInfo.WalletAddress, accountInfo.WalletPubKey, accountInfo.ChatAddress, accountInfo.ChatPubKey, mnemonic)
 
 	// try recovering using password + mnemonic
-	accountInfoCheck, err := s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	accountInfoCheck, err := s.Backend.AccountManager().RecoverAccount(utils.TestConfig.Account1.Password, mnemonic)
 	s.NoError(err, "recover acc failed")
 
 	s.EqualValues(accountInfo, accountInfoCheck, "incorrect accound details recovered")
@@ -136,23 +144,23 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	acc, err := account.ParseAccountString(accountInfo.WalletAddress)
 	s.NoError(err, "can not get acc from address")
 
-	acc, key, err := keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
+	acc, key, err := keyStore.AccountDecryptedKey(acc, utils.TestConfig.Account1.Password)
 	s.NoError(err, "can not obtain decrypted acc key")
 	extChild2String := key.ExtendedKey.String()
 
-	s.NoError(keyStore.Delete(acc, TestConfig.Account1.Password), "cannot remove acc")
+	s.NoError(keyStore.Delete(acc, utils.TestConfig.Account1.Password), "cannot remove acc")
 
-	accountInfoCheck, err = s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	accountInfoCheck, err = s.Backend.AccountManager().RecoverAccount(utils.TestConfig.Account1.Password, mnemonic)
 	s.NoError(err, "recover acc failed (for non-cached acc)")
 	s.EqualValues(accountInfo, accountInfoCheck, "incorrect acc details recovered (for non-cached acc)")
 
 	// make sure that extended key exists and is imported ok too
-	_, key, err = keyStore.AccountDecryptedKey(acc, TestConfig.Account1.Password)
+	_, key, err = keyStore.AccountDecryptedKey(acc, utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.Equal(extChild2String, key.ExtendedKey.String(), "CKD#2 key mismatch")
 
 	// make sure that calling import several times, just returns from cache (no error is expected)
-	accountInfoCheck, err = s.Backend.AccountManager().RecoverAccount(TestConfig.Account1.Password, mnemonic)
+	accountInfoCheck, err = s.Backend.AccountManager().RecoverAccount(utils.TestConfig.Account1.Password, mnemonic)
 	s.NoError(err, "recover acc failed (for non-cached acc)")
 	s.EqualValues(accountInfo, accountInfoCheck, "incorrect acc details recovered (for non-cached acc)")
 }
@@ -162,12 +170,12 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	defer s.StopTestBackend()
 
 	// create an account
-	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s}",
 		accountInfo1.WalletAddress, accountInfo1.WalletPubKey, accountInfo1.ChatAddress, accountInfo1.ChatPubKey)
 
-	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s}",
 		accountInfo2.WalletAddress, accountInfo2.WalletPubKey, accountInfo2.ChatAddress, accountInfo2.ChatPubKey)
@@ -177,11 +185,11 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error(), "select account is expected to throw error: wrong password used")
 
-	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, TestConfig.Account1.Password, nil))
+	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, utils.TestConfig.Account1.Password, nil))
 	s.NoError(err)
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, TestConfig.Account1.Password, nil)))
+	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, nil)))
 }
 
 func (s *AccountsTestSuite) TestSetChatAccount() {
@@ -208,9 +216,9 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.StartTestBackend()
 
 	// create test accounts
-	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
-	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// make sure that no account is selected by default
@@ -230,7 +238,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 		common.HexToAddress("0x00000000000000000000000000000000000001"),
 		common.HexToAddress("0x00000000000000000000000000000000000002"),
 	}
-	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, TestConfig.Account1.Password, watchAddresses)))
+	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, watchAddresses)))
 
 	// stop node (and all of its sub-protocols)
 	nodeConfig := s.Backend.StatusNode().Config()
