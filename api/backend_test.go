@@ -482,7 +482,7 @@ func TestVerifyENSName(t *testing.T) {
 			ensName:         "aaaaa",
 			pubkey:          "0400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
 			contractAddress: "0x314159265dd8dbb310642f98f50c066173c1259b",
-			err:             errors.New("pubkey isn't on secp256k1 curve"),
+			err:             errors.New("invalid secp256k1 public key"),
 		},
 	}
 

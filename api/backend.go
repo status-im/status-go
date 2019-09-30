@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"context"
+	"crypto/elliptic"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -11,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -563,12 +564,12 @@ func (b *StatusBackend) VerifyENSName(ensName, publicKeyStr, rpcEndpoint, contra
 	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
 	defer cancel()
 
-	pubKeyBytes, err := hex.DecodeString(publicKeyStr)
+	expectedPubKeyBytes, err := hex.DecodeString(publicKeyStr)
 	if err != nil {
 		return false, err
 	}
 
-	expectedPubKey, err := btcec.ParsePubKey(pubKeyBytes, btcec.S256())
+	_, err = ethcrypto.UnmarshalPubkey(expectedPubKeyBytes)
 	if err != nil {
 		return false, err
 	}
@@ -591,18 +592,9 @@ func (b *StatusBackend) VerifyENSName(ensName, publicKeyStr, rpcEndpoint, contra
 	}
 
 	// Assemble the bytes returned for the pubkey
-	pb := make([]byte, btcec.PubKeyBytesLenUncompressed)
-	pb[0] = byte(0x04) // uncompressed
-	copy(pb[1:33], x[:])
-	copy(pb[33:], y[:])
-	// check if (X, Y) lies on the curve and create a Pubkey if it does
-	pubKey, err := btcec.ParsePubKey(pb, btcec.S256())
-	if err != nil {
-		b.log.Error("error while parsing public key returned from ENS", "ensName", ensName, "error", err)
-		return false, err
-	}
+	pubKeyBytes := elliptic.Marshal(ethcrypto.S256(), new(big.Int).SetBytes(x[:]), new(big.Int).SetBytes(y[:]))
 
-	return pubKey.IsEqual(expectedPubKey), err
+	return bytes.Equal(pubKeyBytes, expectedPubKeyBytes), err
 }
 
 // CallPrivateRPC executes public and private RPC requests on node's in-proc RPC server.
