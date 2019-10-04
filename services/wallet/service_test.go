@@ -19,6 +19,7 @@ import (
 )
 
 func TestReactorChanges(t *testing.T) {
+	utils.Init()
 	suite.Run(t, new(ReactorChangesSuite))
 }
 

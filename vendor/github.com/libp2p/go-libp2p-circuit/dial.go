@@ -20,28 +20,25 @@ func (d *RelayTransport) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (t
 }
 
 func (r *Relay) Dial(ctx context.Context, a ma.Multiaddr, p peer.ID) (*Conn, error) {
-	if !r.Matches(a) {
+	// split /a/p2p-circuit/b into (/a, /p2p-circuit/b)
+	relayaddr, destaddr := ma.SplitFunc(a, func(c ma.Component) bool {
+		return c.Protocol().Code == P_CIRCUIT
+	})
+
+	// If the address contained no /p2p-circuit part, the second part is nil.
+	if destaddr == nil {
 		return nil, fmt.Errorf("%s is not a relay address", a)
 	}
-	parts := ma.Split(a)
 
-	spl := ma.Cast(ma.CodeToVarint(P_CIRCUIT))
-
-	var relayaddr, destaddr ma.Multiaddr
-	for i, p := range parts {
-		if p.Equal(spl) {
-			relayaddr = ma.Join(parts[:i]...)
-			destaddr = ma.Join(parts[i+1:]...)
-			break
-		}
-	}
+	// Strip the /p2p-circuit prefix from the destaddr.
+	_, destaddr = ma.SplitFirst(destaddr)
 
 	dinfo := &peer.AddrInfo{ID: p, Addrs: []ma.Multiaddr{}}
-	if len(destaddr.Bytes()) > 0 {
+	if destaddr != nil {
 		dinfo.Addrs = append(dinfo.Addrs, destaddr)
 	}
 
-	if len(relayaddr.Bytes()) == 0 {
+	if relayaddr == nil {
 		// unspecific relay address, try dialing using known hop relays
 		return r.tryDialRelays(ctx, *dinfo)
 	}

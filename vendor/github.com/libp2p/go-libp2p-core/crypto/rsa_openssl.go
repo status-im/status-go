@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io"
 
-	openssl "github.com/spacemonkeygo/openssl"
+	openssl "github.com/libp2p/go-openssl"
 )
 
 // RsaPrivateKey is an rsa private key
@@ -21,7 +21,7 @@ type RsaPublicKey struct {
 
 // GenerateRSAKeyPair generates a new rsa private and public key
 func GenerateRSAKeyPair(bits int, _ io.Reader) (PrivKey, PubKey, error) {
-	if bits < 512 {
+	if bits < MinRsaKeyBits {
 		return nil, nil, ErrRsaKeyTooSmall
 	}
 

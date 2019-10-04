@@ -21,5 +21,6 @@ func makeAccountManager(keydir string) (manager *accounts.Manager, err error) {
 	if err := os.MkdirAll(keydir, 0700); err != nil {
 		return nil, err
 	}
-	return accounts.NewManager(keystore.NewKeyStore(keydir, keystore.LightScryptN, keystore.LightScryptP)), nil
+	config := accounts.Config{InsecureUnlockAllowed: false}
+	return accounts.NewManager(&config, keystore.NewKeyStore(keydir, keystore.LightScryptN, keystore.LightScryptP)), nil
 }

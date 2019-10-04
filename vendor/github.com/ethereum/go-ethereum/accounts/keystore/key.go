@@ -53,7 +53,6 @@ type Key struct {
 	// SubAccountIndex is DEPRECATED
 	// It was use in Status to keep track of the number of sub-account created
 	// before having multi-account support.
-	// next index to be used for sub-account child derivation
 	SubAccountIndex uint32
 }
 

@@ -1,10 +1,25 @@
 package crypto
 
 import (
-	"errors"
+	"fmt"
+	"os"
 )
 
+// WeakRsaKeyEnv is an environment variable which, when set, lowers the
+// minimum required bits of RSA keys to 512. This should be used exclusively in
+// test situations.
+const WeakRsaKeyEnv = "LIBP2P_ALLOW_WEAK_RSA_KEYS"
+
+var MinRsaKeyBits = 2048
+
 // ErrRsaKeyTooSmall is returned when trying to generate or parse an RSA key
-// that's smaller than 512 bits. Keys need to be larger enough to sign a 256bit
-// hash so this is a reasonable absolute minimum.
-var ErrRsaKeyTooSmall = errors.New("rsa keys must be >= 512 bits to be useful")
+// that's smaller than MinRsaKeyBits bits. In test
+var ErrRsaKeyTooSmall error
+
+func init() {
+	if _, ok := os.LookupEnv(WeakRsaKeyEnv); ok {
+		MinRsaKeyBits = 512
+	}
+
+	ErrRsaKeyTooSmall = fmt.Errorf("rsa keys must be >= %d bits to be useful", MinRsaKeyBits)
+}

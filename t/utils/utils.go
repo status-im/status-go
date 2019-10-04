@@ -58,7 +58,7 @@ var (
 	syncTimeout = 50 * time.Minute
 )
 
-func init() {
+func Init() {
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)

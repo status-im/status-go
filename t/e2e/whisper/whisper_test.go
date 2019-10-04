@@ -179,7 +179,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 
 	// select account with wrong password
 	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword"))
-	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase")
+	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error())
 
 	// select account with right password

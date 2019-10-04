@@ -249,27 +249,27 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 }
 
 func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
-	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().URLv4(), p2p.PeerEventTypeAdd, time.Second)
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	s.Require().NoError(<-waitErr)
 	client, err := s.nodes[0].Attach()
 	s.NoError(err)
 	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().String(),
+		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
 		Topics:         []whisper.TopicType{{1}},
 	}))
 	s.EqualError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().String(),
+		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
 		Topics:         []whisper.TopicType{{1}},
 	}), "another request with the same topics was sent less than 3s ago. Please wait for a bit longer, or set `force` to true in request parameters")
 	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().String(),
+		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
 		Topics:         []whisper.TopicType{{2}},
 	}))
 }
 
 func (s *ShhExtSuite) TestFailedRequestUnregistered() {
-	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	waitErr := helpers.WaitForPeerAsync(s.nodes[0].Server(), s.nodes[1].Server().Self().URLv4(), p2p.PeerEventTypeAdd, time.Second)
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	s.Require().NoError(<-waitErr)
 	client, err := s.nodes[0].Attach()
@@ -280,7 +280,7 @@ func (s *ShhExtSuite) TestFailedRequestUnregistered() {
 		Topics:         topics,
 	}), "Could not find peer with ID: 10841e6db5c02fc331bf36a8d2a9137a1696d9d3b6b1f872f780e02aa8ec5bba")
 	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
-		MailServerPeer: s.nodes[1].Server().Self().String(),
+		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
 		Topics:         topics,
 	}))
 }
@@ -346,7 +346,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	defer func() { s.NoError(mailNode.Stop()) }()
 
 	// add mailPeer as a peer
-	waitErr := helpers.WaitForPeerAsync(aNode.Server(), mailNode.Server().Self().String(), p2p.PeerEventTypeAdd, time.Second)
+	waitErr := helpers.WaitForPeerAsync(aNode.Server(), mailNode.Server().Self().URLv4(), p2p.PeerEventTypeAdd, time.Second)
 	aNode.Server().AddPeer(mailNode.Server().Self())
 	s.Require().NoError(<-waitErr)
 
@@ -356,7 +356,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	symKeyID, symKeyErr := shh.AddSymKeyFromPassword("some-pass")
 	s.Require().NoError(symKeyErr)
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
-		MailServerPeer: mailNode.Server().Self().String(),
+		MailServerPeer: mailNode.Server().Self().URLv4(),
 		SymKeyID:       symKeyID,
 		Force:          true,
 	})
@@ -365,7 +365,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	// Send a request without a symmetric key. In this case,
 	// a public key extracted from MailServerPeer will be used.
 	hash, err = api.RequestMessages(context.TODO(), MessagesRequest{
-		MailServerPeer: mailNode.Server().Self().String(),
+		MailServerPeer: mailNode.Server().Self().URLv4(),
 		Force:          true,
 	})
 	s.Require().NoError(err)

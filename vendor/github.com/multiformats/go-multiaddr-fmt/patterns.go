@@ -4,18 +4,18 @@ import (
 	"strings"
 
 	ma "github.com/multiformats/go-multiaddr"
-	madns "github.com/multiformats/go-multiaddr-dns"
 )
 
 // Define a dns4 format multiaddr
-var DNS4 = Base(madns.P_DNS4)
+var DNS4 = Base(ma.P_DNS4)
 
 // Define a dns6 format multiaddr
-var DNS6 = Base(madns.P_DNS6)
+var DNS6 = Base(ma.P_DNS6)
 
-// Define a dnsaddr, dns4 or dns6 format multiaddr
+// Define a dnsaddr, dns, dns4 or dns6 format multiaddr
 var DNS = Or(
-	Base(madns.P_DNSADDR),
+	Base(ma.P_DNS),
+	Base(ma.P_DNSADDR),
 	DNS4,
 	DNS6,
 )
@@ -47,8 +47,13 @@ var Unreliable = Or(UDP)
 // Now define a Reliable transport as either tcp or utp or quic
 var Reliable = Or(TCP, UTP, QUIC)
 
+// P2P can run over any reliable underlying transport protocol
+var P2P = And(Reliable, Base(ma.P_P2P))
+
 // IPFS can run over any reliable underlying transport protocol
-var IPFS = And(Reliable, Base(ma.P_IPFS))
+//
+// Deprecated: use P2P
+var IPFS = P2P
 
 // Define http over TCP or DNS or http over DNS format multiaddr
 var HTTP = Or(

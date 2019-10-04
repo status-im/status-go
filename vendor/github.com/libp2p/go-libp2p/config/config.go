@@ -44,6 +44,12 @@ type RoutingC func(host.Host) (routing.PeerRouting, error)
 // This is *not* a stable interface. Use the options defined in the root
 // package.
 type Config struct {
+	// UserAgent is the identifier this node will send to other peers when
+	// identifying itself, e.g. via the identify protocol.
+	//
+	// Set it via the UserAgent option function.
+	UserAgent string
+
 	PeerKey crypto.PrivKey
 
 	Transports         []TptC
@@ -100,13 +106,11 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		return nil, fmt.Errorf("no peerstore specified")
 	}
 
-	if !cfg.Insecure {
-		if err := cfg.Peerstore.AddPrivKey(pid, cfg.PeerKey); err != nil {
-			return nil, err
-		}
-		if err := cfg.Peerstore.AddPubKey(pid, cfg.PeerKey.GetPublic()); err != nil {
-			return nil, err
-		}
+	if err := cfg.Peerstore.AddPrivKey(pid, cfg.PeerKey); err != nil {
+		return nil, err
+	}
+	if err := cfg.Peerstore.AddPubKey(pid, cfg.PeerKey.GetPublic()); err != nil {
+		return nil, err
 	}
 
 	// TODO: Make the swarm implementation configurable.
@@ -120,6 +124,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 		AddrsFactory: cfg.AddrsFactory,
 		NATManager:   cfg.NATManager,
 		EnablePing:   !cfg.DisablePing,
+		UserAgent:    cfg.UserAgent,
 	})
 
 	if err != nil {
@@ -142,7 +147,7 @@ func (cfg *Config) NewNode(ctx context.Context) (host.Host, error) {
 	upgrader.Protector = cfg.Protector
 	upgrader.Filters = swrm.Filters
 	if cfg.Insecure {
-		upgrader.Secure = makeInsecureTransport(pid)
+		upgrader.Secure = makeInsecureTransport(pid, cfg.PeerKey)
 	} else {
 		upgrader.Secure, err = makeSecurityTransport(h, cfg.SecurityTransports)
 		if err != nil {

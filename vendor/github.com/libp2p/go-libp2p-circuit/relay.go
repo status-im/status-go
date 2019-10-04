@@ -197,8 +197,9 @@ func (r *Relay) Matches(addr ma.Multiaddr) bool {
 	return err == nil
 }
 
-func (r *Relay) CanHop(ctx context.Context, id peer.ID) (bool, error) {
-	s, err := r.host.NewStream(ctx, id, ProtoID)
+// Queries a peer for support of hop relay
+func CanHop(ctx context.Context, host host.Host, id peer.ID) (bool, error) {
+	s, err := host.NewStream(ctx, id, ProtoID)
 	if err != nil {
 		return false, err
 	}
@@ -231,6 +232,10 @@ func (r *Relay) CanHop(ctx context.Context, id peer.ID) (bool, error) {
 	}
 
 	return msg.GetCode() == pb.CircuitRelay_SUCCESS, nil
+}
+
+func (r *Relay) CanHop(ctx context.Context, id peer.ID) (bool, error) {
+	return CanHop(ctx, r.host, id)
 }
 
 func (r *Relay) handleNewStream(s network.Stream) {

@@ -17,10 +17,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/signal"
-
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
 	"github.com/stretchr/testify/require"
@@ -97,32 +94,6 @@ func waitSignal(feed *event.Feed, event string, timeout time.Duration) error {
 			return fmt.Errorf("signal %v wasn't received in %v", event, timeout)
 		}
 	}
-}
-
-func init() {
-	testChainDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
-	keystoreDir = filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()], "keystore")
-
-	nodeConfigJSON = `{
-	"NetworkId": ` + strconv.Itoa(GetNetworkID()) + `,
-	"DataDir": "` + testChainDir + `",
-	"KeyStoreDir": "` + filepath.Join(testChainDir, "keystore") + `",
-	"HTTPPort": ` + strconv.Itoa(TestConfig.Node.HTTPPort) + `,
-	"LogLevel": "INFO",
-	"NoDiscovery": true,
-	"APIModules": "web3,eth",
-	"LightEthConfig": {
-		"Enabled": true
-	},
-	"WhisperConfig": {
-		"Enabled": true,
-		"DataDir": "` + path.Join(testChainDir, "wnode") + `",
-		"EnableNTPSync": false
-	},
-	"ShhextConfig": {
-	    "BackupDisabledDataDir": "` + testChainDir + `"
-	}
-}`
 }
 
 func createAccountAndLogin(t *testing.T, feed *event.Feed) account.Info {
@@ -321,7 +292,7 @@ func testCallRPC(t *testing.T, feed *event.Feed) bool {
 
 func testCallRPCWithPrivateAPI(t *testing.T, feed *event.Feed) bool {
 	createAccountAndLogin(t, feed)
-	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"The method admin_nodeInfo does not exist/is not available"}}`
+	expected := `{"jsonrpc":"2.0","id":64,"error":{"code":-32601,"message":"the method admin_nodeInfo does not exist/is not available"}}`
 	rawResponse := CallRPC(C.CString(`{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":64}`))
 	require.Equal(t, expected, C.GoString(rawResponse))
 	return true

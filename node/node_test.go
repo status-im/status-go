@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
@@ -18,7 +18,8 @@ var enode1 = "enode://f32efef2739e5135a0f9a80600b321ba4d13393a5f1d3f5f593df85919
 var enode2 = "enode://f32efef2739e5135a0f9a80600b321ba4d13393a5f1d3f5f593df85919262f06c70bfa66d38507b9d79a91021f5e200ec20150592e72934c66248e87014c4317@1.1.1.1:30404"
 
 func TestMakeNodeDefaultConfig(t *testing.T) {
-	config, err := MakeTestNodeConfig(3)
+	utils.Init()
+	config, err := utils.MakeTestNodeConfig(3)
 	require.NoError(t, err)
 
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)
@@ -29,7 +30,8 @@ func TestMakeNodeDefaultConfig(t *testing.T) {
 }
 
 func TestMakeNodeWellFormedBootnodes(t *testing.T) {
-	config, err := MakeTestNodeConfig(3)
+	utils.Init()
+	config, err := utils.MakeTestNodeConfig(3)
 	require.NoError(t, err)
 
 	bootnodes := []string{
@@ -46,7 +48,8 @@ func TestMakeNodeWellFormedBootnodes(t *testing.T) {
 }
 
 func TestMakeNodeMalformedBootnodes(t *testing.T) {
-	config, err := MakeTestNodeConfig(3)
+	utils.Init()
+	config, err := utils.MakeTestNodeConfig(3)
 	require.NoError(t, err)
 
 	bootnodes := []string{

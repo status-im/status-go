@@ -12,7 +12,7 @@ func TestExportLogs(t *testing.T) {
 	tempf, err := ioutil.TempFile("", "test-dump-logs")
 	require.NoError(t, err)
 	logs := "first line\nsecond line\n"
-	n, err := fmt.Fprintf(tempf, logs)
+	n, err := fmt.Fprint(tempf, logs)
 	require.NoError(t, err)
 	require.Equal(t, len(logs), n)
 	response := ExportFromBaseFile(tempf.Name())

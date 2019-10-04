@@ -7,21 +7,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p/p2p/protocol/identify"
+	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
+
 	"github.com/libp2p/go-libp2p-core/connmgr"
+	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 
-	logging "github.com/ipfs/go-log"
-	goprocess "github.com/jbenet/goprocess"
-	goprocessctx "github.com/jbenet/goprocess/context"
-
+	"github.com/libp2p/go-eventbus"
 	inat "github.com/libp2p/go-libp2p-nat"
 
-	identify "github.com/libp2p/go-libp2p/p2p/protocol/identify"
-	ping "github.com/libp2p/go-libp2p/p2p/protocol/ping"
+	logging "github.com/ipfs/go-log"
+	"github.com/jbenet/goprocess"
+	goprocessctx "github.com/jbenet/goprocess/context"
+
 	ma "github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr-net"
@@ -69,6 +72,7 @@ type BasicHost struct {
 	natmgr     NATManager
 	maResolver *madns.Resolver
 	cmgr       connmgr.ConnManager
+	eventbus   event.Bus
 
 	AddrsFactory AddrsFactory
 
@@ -76,10 +80,11 @@ type BasicHost struct {
 
 	proc goprocess.Process
 
-	ctx       context.Context
-	cancel    func()
 	mx        sync.Mutex
 	lastAddrs []ma.Multiaddr
+	emitters  struct {
+		evtLocalProtocolsUpdated event.Emitter
+	}
 }
 
 var _ host.Host = (*BasicHost)(nil)
@@ -87,7 +92,6 @@ var _ host.Host = (*BasicHost)(nil)
 // HostOpts holds options that can be passed to NewHost in order to
 // customize construction of the *BasicHost.
 type HostOpts struct {
-
 	// MultistreamMuxer is essential for the *BasicHost and will use a sensible default value if omitted.
 	MultistreamMuxer *msmux.MultistreamMuxer
 
@@ -95,10 +99,6 @@ type HostOpts struct {
 	// If 0 or omitted, it will use DefaultNegotiationTimeout.
 	// If below 0, timeouts on streams will be deactivated.
 	NegotiationTimeout time.Duration
-
-	// IdentifyService holds an implementation of the /ipfs/id/ protocol.
-	// If omitted, a new *identify.IDService will be used.
-	IdentifyService *identify.IDService
 
 	// AddrsFactory holds a function which can be used to override or filter the result of Addrs.
 	// If omitted, there's no override or filtering, and the results of Addrs and AllAddrs are the same.
@@ -117,26 +117,35 @@ type HostOpts struct {
 
 	// EnablePing indicates whether to instantiate the ping service
 	EnablePing bool
+
+	// UserAgent sets the user-agent for the host. Defaults to ClientVersion.
+	UserAgent string
 }
 
 // NewHost constructs a new *BasicHost and activates it by attaching its stream and connection handlers to the given inet.Network.
 func NewHost(ctx context.Context, net network.Network, opts *HostOpts) (*BasicHost, error) {
-	bgctx, cancel := context.WithCancel(ctx)
-
 	h := &BasicHost{
 		network:      net,
 		mux:          msmux.NewMultistreamMuxer(),
 		negtimeout:   DefaultNegotiationTimeout,
 		AddrsFactory: DefaultAddrsFactory,
 		maResolver:   madns.DefaultResolver,
-		ctx:          bgctx,
-		cancel:       cancel,
+		eventbus:     eventbus.NewBus(),
+	}
+
+	var err error
+	if h.emitters.evtLocalProtocolsUpdated, err = h.eventbus.Emitter(&event.EvtLocalProtocolsUpdated{}); err != nil {
+		return nil, err
 	}
 
 	h.proc = goprocessctx.WithContextAndTeardown(ctx, func() error {
 		if h.natmgr != nil {
 			h.natmgr.Close()
 		}
+		if h.cmgr != nil {
+			h.cmgr.Close()
+		}
+		_ = h.emitters.evtLocalProtocolsUpdated.Close()
 		return h.Network().Close()
 	})
 
@@ -144,12 +153,12 @@ func NewHost(ctx context.Context, net network.Network, opts *HostOpts) (*BasicHo
 		h.mux = opts.MultistreamMuxer
 	}
 
-	if opts.IdentifyService != nil {
-		h.ids = opts.IdentifyService
-	} else {
-		// we can't set this as a default above because it depends on the *BasicHost.
-		h.ids = identify.NewIDService(bgctx, h)
-	}
+	// we can't set this as a default above because it depends on the *BasicHost.
+	h.ids = identify.NewIDService(
+		goprocessctx.WithProcessClosing(ctx, h.proc),
+		h,
+		identify.UserAgent(opts.UserAgent),
+	)
 
 	if uint64(opts.NegotiationTimeout) != 0 {
 		h.negtimeout = opts.NegotiationTimeout
@@ -203,7 +212,7 @@ func New(net network.Network, opts ...interface{}) *BasicHost {
 				hostopts.NATManager = NewNATManager
 			}
 		case AddrsFactory:
-			hostopts.AddrsFactory = AddrsFactory(o)
+			hostopts.AddrsFactory = o
 		case connmgr.ConnManager:
 			hostopts.ConnManager = o
 		case *madns.Resolver:
@@ -223,7 +232,7 @@ func New(net network.Network, opts ...interface{}) *BasicHost {
 
 // Start starts background tasks in the host
 func (h *BasicHost) Start() {
-	go h.background()
+	h.proc.Go(h.background)
 }
 
 // newConnHandler is the remote-opened conn handler for inet.Network
@@ -248,7 +257,7 @@ func (h *BasicHost) newStreamHandler(s network.Stream) {
 	}
 
 	lzc, protoID, handle, err := h.Mux().NegotiateLazy(s)
-	took := time.Now().Sub(before)
+	took := time.Since(before)
 	if err != nil {
 		if err == io.EOF {
 			logf := log.Debugf
@@ -300,7 +309,7 @@ func (h *BasicHost) PushIdentify() {
 	}
 }
 
-func (h *BasicHost) background() {
+func (h *BasicHost) background(p goprocess.Process) {
 	// periodically schedules an IdentifyPush to update our peers for changes
 	// in our address set (if needed)
 	ticker := time.NewTicker(1 * time.Minute)
@@ -318,7 +327,7 @@ func (h *BasicHost) background() {
 		case <-ticker.C:
 			h.PushIdentify()
 
-		case <-h.ctx.Done():
+		case <-p.Closing():
 			return
 		}
 	}
@@ -369,6 +378,10 @@ func (h *BasicHost) IDService() *identify.IDService {
 	return h.ids
 }
 
+func (h *BasicHost) EventBus() event.Bus {
+	return h.eventbus
+}
+
 // SetStreamHandler sets the protocol handler on the Host's Mux.
 // This is equivalent to:
 //   host.Mux().SetHandler(proto, handler)
@@ -379,6 +392,9 @@ func (h *BasicHost) SetStreamHandler(pid protocol.ID, handler network.StreamHand
 		is.SetProtocol(protocol.ID(p))
 		handler(is)
 		return nil
+	})
+	h.emitters.evtLocalProtocolsUpdated.Emit(event.EvtLocalProtocolsUpdated{
+		Added: []protocol.ID{pid},
 	})
 }
 
@@ -391,11 +407,17 @@ func (h *BasicHost) SetStreamHandlerMatch(pid protocol.ID, m func(string) bool, 
 		handler(is)
 		return nil
 	})
+	h.emitters.evtLocalProtocolsUpdated.Emit(event.EvtLocalProtocolsUpdated{
+		Added: []protocol.ID{pid},
+	})
 }
 
 // RemoveStreamHandler returns ..
 func (h *BasicHost) RemoveStreamHandler(pid protocol.ID) {
 	h.Mux().RemoveHandler(string(pid))
+	h.emitters.evtLocalProtocolsUpdated.Emit(event.EvtLocalProtocolsUpdated{
+		Removed: []protocol.ID{pid},
+	})
 }
 
 // NewStream opens a new stream to given peer p, and writes a p2p/protocol
@@ -724,8 +746,13 @@ func (h *BasicHost) AllAddrs() []ma.Multiaddr {
 
 // Close shuts down the Host's services (network, etc).
 func (h *BasicHost) Close() error {
-	h.cancel()
-	h.cmgr.Close()
+	// You're thinking of adding some teardown logic here, right? Well
+	// don't! Add any process teardown logic to the teardown function in the
+	// constructor.
+	//
+	// This:
+	// 1. May be called multiple times.
+	// 2. May _never_ be called if the host is stopped by the context.
 	return h.proc.Close()
 }
 

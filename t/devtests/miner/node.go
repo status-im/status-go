@@ -56,8 +56,6 @@ func NewDevNode(faucet common.Address) (*node.Node, error) {
 	extra = append(extra, acc.Address[:]...)
 	extra = append(extra, make([]byte, 65)...) // extraSeal
 	ethcfg.Genesis.ExtraData = extra
-	ethcfg.MinerGasPrice = big.NewInt(1)
-	ethcfg.Etherbase = acc.Address
 
 	return stack, stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		return eth.New(ctx, &ethcfg)

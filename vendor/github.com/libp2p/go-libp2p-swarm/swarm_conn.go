@@ -122,7 +122,7 @@ func (c *Conn) start() {
 
 func (c *Conn) String() string {
 	return fmt.Sprintf(
-		"<swarm.Conn[%s] %s (%s) <-> %s (%s)>",
+		"<swarm.Conn[%T] %s (%s) <-> %s (%s)>",
 		c.conn.Transport(),
 		c.conn.LocalMultiaddr(),
 		c.conn.LocalPeer().Pretty(),

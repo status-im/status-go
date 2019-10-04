@@ -51,8 +51,7 @@ const nonceSize = 16
 type secureSession struct {
 	msgio.ReadWriteCloser
 
-	insecure  net.Conn
-	insecureM msgio.ReadWriter
+	insecure net.Conn
 
 	localKey   ci.PrivKey
 	localPeer  peer.ID
@@ -89,7 +88,6 @@ func newSecureSession(ctx context.Context, local peer.ID, key ci.PrivKey, insecu
 	}
 
 	s.insecure = insecure
-	s.insecureM = msgio.NewReadWriter(insecure)
 	s.remotePeer = remotePeer
 
 	handshakeCtx, cancel := context.WithTimeout(ctx, HandshakeTimeout) // remove
@@ -127,15 +125,19 @@ func (s *secureSession) runHandshake(ctx context.Context) error {
 	var err error
 	select {
 	case <-ctx.Done():
+		err = ctx.Err()
+
 		// State unknown. We *have* to close this.
 		s.insecure.Close()
-		err = ctx.Err()
+		// Wait for the handshake to return.
+		<-result
 	case err = <-result:
 	}
 	return err
 }
 
 func (s *secureSession) runHandshakeSync() error {
+	insecureM := msgio.NewReadWriter(s.insecure)
 	// =============================================================================
 	// step 1. Propose -- propose cipher suite + send pubkeys + nonce
 
@@ -170,11 +172,11 @@ func (s *secureSession) runHandshakeSync() error {
 	}
 
 	// Send Propose packet and Receive their Propose packet
-	proposeInBytes, err := readWriteMsg(s.insecureM, proposeOutBytes)
+	proposeInBytes, err := readWriteMsg(insecureM, proposeOutBytes)
 	if err != nil {
 		return err
 	}
-	defer s.insecureM.ReleaseMsg(proposeInBytes)
+	defer insecureM.ReleaseMsg(proposeInBytes)
 
 	// Parse their propose packet
 	proposeIn := new(pb.Propose)
@@ -281,11 +283,11 @@ func (s *secureSession) runHandshakeSync() error {
 	}
 
 	// Send Exchange packet and receive their Exchange packet
-	exchangeInBytes, err := readWriteMsg(s.insecureM, exchangeOutBytes)
+	exchangeInBytes, err := readWriteMsg(insecureM, exchangeOutBytes)
 	if err != nil {
 		return err
 	}
-	defer s.insecureM.ReleaseMsg(exchangeInBytes)
+	defer insecureM.ReleaseMsg(exchangeInBytes)
 
 	// Parse their Exchange packet.
 	exchangeIn := new(pb.Exchange)

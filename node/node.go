@@ -246,10 +246,6 @@ func activateLightEthService(stack *node.Node, accs *accounts.Manager, config *p
 	ethConf.SyncMode = downloader.LightSync
 	ethConf.NetworkId = config.NetworkID
 	ethConf.DatabaseCache = config.LightEthConfig.DatabaseCache
-	ethConf.ULC = &eth.ULCConfig{
-		TrustedServers:     config.LightEthConfig.TrustedNodes,
-		MinTrustedFraction: config.LightEthConfig.MinTrustedFraction,
-	}
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		// NOTE(dshulyak) here we set our instance of the accounts manager.
 		// without sharing same instance selected account won't be visible for personal_* methods.

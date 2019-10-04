@@ -85,7 +85,7 @@ func TestNodeRPCClientCallOnlyPublicAPIs(t *testing.T) {
 
 	// call private API with public RPC client
 	err = client.Call(&result, "pri_someMethod")
-	require.EqualError(t, err, "The method pri_someMethod does not exist/is not available")
+	require.EqualError(t, err, "the method pri_someMethod does not exist/is not available")
 }
 
 func TestNodeRPCClientCallWhitelistedPrivateService(t *testing.T) {

@@ -18,6 +18,7 @@ import (
 )
 
 func TestManagerTestSuite(t *testing.T) {
+	e2e.Init()
 	suite.Run(t, new(ManagerTestSuite))
 }
 

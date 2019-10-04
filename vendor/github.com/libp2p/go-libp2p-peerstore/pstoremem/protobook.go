@@ -3,14 +3,9 @@ package pstoremem
 import (
 	"sync"
 
-	peer "github.com/libp2p/go-libp2p-peer"
+	peer "github.com/libp2p/go-libp2p-core/peer"
 
-	pstore "github.com/libp2p/go-libp2p-peerstore"
-)
-
-const (
-	maxInternedProtocols    = 512
-	maxInternedProtocolSize = 256
+	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 )
 
 type protoSegment struct {
@@ -35,7 +30,7 @@ var _ pstore.ProtoBook = (*memoryProtoBook)(nil)
 
 func NewProtoBook() pstore.ProtoBook {
 	return &memoryProtoBook{
-		interned: make(map[string]string, maxInternedProtocols),
+		interned: make(map[string]string, 256),
 		segments: func() (ret protoSegments) {
 			for i := range ret {
 				ret[i] = &protoSegment{
@@ -48,10 +43,6 @@ func NewProtoBook() pstore.ProtoBook {
 }
 
 func (pb *memoryProtoBook) internProtocol(proto string) string {
-	if len(proto) > maxInternedProtocolSize {
-		return proto
-	}
-
 	// check if it is interned with the read lock
 	pb.lk.RLock()
 	interned, ok := pb.interned[proto]
@@ -69,11 +60,6 @@ func (pb *memoryProtoBook) internProtocol(proto string) string {
 	interned, ok = pb.interned[proto]
 	if ok {
 		return interned
-	}
-
-	// if we've filled the table, throw it away and start over
-	if len(pb.interned) >= maxInternedProtocols {
-		pb.interned = make(map[string]string, maxInternedProtocols)
 	}
 
 	pb.interned[proto] = proto
@@ -124,6 +110,23 @@ func (pb *memoryProtoBook) GetProtocols(p peer.ID) ([]string, error) {
 	}
 
 	return out, nil
+}
+
+func (pb *memoryProtoBook) RemoveProtocols(p peer.ID, protos ...string) error {
+	s := pb.segments.get(p)
+	s.Lock()
+	defer s.Unlock()
+
+	protomap, ok := s.protocols[p]
+	if !ok {
+		// nothing to remove.
+		return nil
+	}
+
+	for _, proto := range protos {
+		delete(protomap, pb.internProtocol(proto))
+	}
+	return nil
 }
 
 func (pb *memoryProtoBook) SupportsProtocols(p peer.ID, protos ...string) ([]string, error) {

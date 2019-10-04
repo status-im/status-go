@@ -182,6 +182,7 @@ func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailoverEthV5() {
 }
 
 func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailoverRendezvous() {
+	s.T().Skip("Skipping due to being flaky")
 	s.setupRendezvous()
 	s.singleTopicDiscoveryWithFailover()
 }

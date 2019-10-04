@@ -10,13 +10,14 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
-	. "github.com/status-im/status-go/t/utils"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
 )
 
 func TestAPI(t *testing.T) {
+	utils.Init()
 	suite.Run(t, new(APITestSuite))
 }
 
@@ -45,10 +46,10 @@ func (s *APITestSuite) TestRaceConditions() {
 	progress := make(chan struct{}, cnt)
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	nodeConfig1, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig1, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
 
-	nodeConfig2, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig2, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
 
 	nodeConfigs := []*params.NodeConfig{nodeConfig1, nodeConfig2}
@@ -123,7 +124,7 @@ func (s *APITestSuite) TestEventsNodeStartStop() {
 		envelopes <- envelope
 	})
 
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
 	s.NoError(s.backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 	s.Require().NoError(s.backend.StartNode(nodeConfig))
@@ -162,7 +163,7 @@ func (s *APITestSuite) TestNodeStartCrash() {
 	})
 	defer signal.ResetDefaultNodeNotificationHandler()
 
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
 
 	db, err := leveldb.Open(storage.NewMemStorage(), nil)

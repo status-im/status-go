@@ -28,6 +28,8 @@ import (
 )
 
 func TestBackendStartNodeConcurrently(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -61,6 +63,8 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 }
 
 func TestBackendRestartNodeConcurrently(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -87,6 +91,8 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 // TODO(adam): add concurrent tests for ResetChainData()
 
 func TestBackendGettersConcurrently(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -139,6 +145,8 @@ func TestBackendGettersConcurrently(t *testing.T) {
 }
 
 func TestBackendAccountsConcurrently(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -199,6 +207,8 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 }
 
 func TestBackendInjectChatAccount(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -273,6 +283,8 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 }
 
 func TestBackendCallRPCConcurrently(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -347,6 +359,8 @@ func TestAppStateChange(t *testing.T) {
 }
 
 func TestBlockedRPCMethods(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -385,6 +399,8 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 // TODO(adam): add concurrent tests for: SendTransaction
 
 func TestStartStopMultipleTimes(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -402,6 +418,8 @@ func TestStartStopMultipleTimes(t *testing.T) {
 }
 
 func TestSignHash(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -440,6 +458,8 @@ func TestSignHash(t *testing.T) {
 }
 
 func TestHashTypedData(t *testing.T) {
+	utils.Init()
+
 	backend := NewStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
@@ -486,6 +506,8 @@ func TestHashTypedData(t *testing.T) {
 }
 
 func TestBackendGetVerifiedAccount(t *testing.T) {
+	utils.Init()
+
 	password := "test"
 	tmpdir, err := ioutil.TempDir("", "verified-account-test-")
 	require.NoError(t, err)
@@ -520,7 +542,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
-		require.EqualError(t, err, "could not decrypt key with given passphrase")
+		require.EqualError(t, err, "could not decrypt key with given password")
 		require.Nil(t, key)
 	})
 
@@ -539,6 +561,8 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 }
 
 func TestLoginWithKey(t *testing.T) {
+	utils.Init()
+
 	b := NewStatusBackend()
 	pkey, err := crypto.GenerateKey()
 	require.NoError(t, err)

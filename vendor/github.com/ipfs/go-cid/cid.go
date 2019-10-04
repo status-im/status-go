@@ -62,6 +62,7 @@ const (
 
 	DagProtobuf = 0x70
 	DagCBOR     = 0x71
+	Libp2pKey   = 0x72
 
 	GitRaw = 0x78
 
@@ -90,6 +91,7 @@ var Codecs = map[string]uint64{
 	"raw":                  Raw,
 	"protobuf":             DagProtobuf,
 	"cbor":                 DagCBOR,
+	"libp2p-key":           Libp2pKey,
 	"git-raw":              GitRaw,
 	"eth-block":            EthBlock,
 	"eth-block-list":       EthBlockList,

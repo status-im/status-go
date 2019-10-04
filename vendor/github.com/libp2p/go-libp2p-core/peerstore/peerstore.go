@@ -158,5 +158,6 @@ type ProtoBook interface {
 	GetProtocols(peer.ID) ([]string, error)
 	AddProtocols(peer.ID, ...string) error
 	SetProtocols(peer.ID, ...string) error
+	RemoveProtocols(peer.ID, ...string) error
 	SupportsProtocols(peer.ID, ...string) ([]string, error)
 }

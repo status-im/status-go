@@ -12,6 +12,7 @@ import (
 )
 
 func TestAPIBackendTestSuite(t *testing.T) {
+	Init() // from t/utils
 	suite.Run(t, new(APIBackendTestSuite))
 }
 

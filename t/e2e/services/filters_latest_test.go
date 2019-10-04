@@ -7,22 +7,23 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
-
-	. "github.com/status-im/status-go/t/utils"
 )
 
 func TestFiltersAPISuite(t *testing.T) {
+	utils.Init()
 	s := new(FiltersAPISuite)
 	s.upstream = false
 	suite.Run(t, s)
 }
 
 func TestFiltersAPISuiteUpstream(t *testing.T) {
+	utils.Init()
 	s := new(FiltersAPISuite)
 	s.upstream = true
 
-	if s.upstream && GetNetworkID() == params.StatusChainNetworkID {
+	if s.upstream && utils.GetNetworkID() == params.StatusChainNetworkID {
 		t.Skip()
 		return
 	}
@@ -50,8 +51,7 @@ func (s *FiltersAPISuite) TestFilters() {
 	filterID := s.filterIDFromRPCResponse(response)
 
 	// we don't check new blocks on private network, because no one mines them
-	if GetNetworkID() != params.StatusChainNetworkID {
-
+	if utils.GetNetworkID() != params.StatusChainNetworkID {
 		timeout := time.After(time.Minute)
 		newBlocksChannel := s.getFirstFilterChange(filterID)
 
@@ -61,7 +61,6 @@ func (s *FiltersAPISuite) TestFilters() {
 		case <-timeout:
 			s.Fail("timeout while waiting for filter results")
 		}
-
 	}
 
 	basicCall = fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_uninstallFilter","params":["%s"],"id":67}`, filterID)

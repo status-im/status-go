@@ -92,7 +92,7 @@ func (id ID) ExtractPublicKey() (ic.PubKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	if decoded.Code != mh.ID {
+	if decoded.Code != mh.IDENTITY {
 		return nil, ErrNoPublicKey
 	}
 	pk, err := ic.UnmarshalPublicKey(decoded.Digest)

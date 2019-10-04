@@ -9,10 +9,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/status-im/status-go/t/utils"
+
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	. "github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -28,10 +29,11 @@ func TestVerifyAccountPassword(t *testing.T) {
 	defer os.RemoveAll(emptyKeyStoreDir) //nolint: errcheck
 
 	// import account keys
-	require.NoError(t, ImportTestAccount(keyStoreDir, GetAccount1PKFile()))
-	require.NoError(t, ImportTestAccount(keyStoreDir, GetAccount2PKFile()))
+	utils.Init()
+	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
+	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount2PKFile()))
 
-	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(TestConfig.Account1.WalletAddress))
+	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(utils.TestConfig.Account1.WalletAddress))
 
 	testCases := []struct {
 		name          string
@@ -43,37 +45,37 @@ func TestVerifyAccountPassword(t *testing.T) {
 		{
 			"correct address, correct password (decrypt should succeed)",
 			keyStoreDir,
-			TestConfig.Account1.WalletAddress,
-			TestConfig.Account1.Password,
+			utils.TestConfig.Account1.WalletAddress,
+			utils.TestConfig.Account1.Password,
 			nil,
 		},
 		{
 			"correct address, correct password, non-existent key store",
 			filepath.Join(keyStoreDir, "non-existent-folder"),
-			TestConfig.Account1.WalletAddress,
-			TestConfig.Account1.Password,
+			utils.TestConfig.Account1.WalletAddress,
+			utils.TestConfig.Account1.Password,
 			fmt.Errorf("cannot traverse key store folder: lstat %s/non-existent-folder: no such file or directory", keyStoreDir),
 		},
 		{
 			"correct address, correct password, empty key store (pk is not there)",
 			emptyKeyStoreDir,
-			TestConfig.Account1.WalletAddress,
-			TestConfig.Account1.Password,
+			utils.TestConfig.Account1.WalletAddress,
+			utils.TestConfig.Account1.Password,
 			fmt.Errorf("cannot locate account for address: %s", account1Address.Hex()),
 		},
 		{
 			"wrong address, correct password",
 			keyStoreDir,
 			"0x79791d3e8f2daa1f7fec29649d152c0ada3cc535",
-			TestConfig.Account1.Password,
+			utils.TestConfig.Account1.Password,
 			fmt.Errorf("cannot locate account for address: %s", "0x79791d3E8F2dAa1F7FeC29649d152c0aDA3cc535"),
 		},
 		{
 			"correct address, wrong password",
 			keyStoreDir,
-			TestConfig.Account1.WalletAddress,
+			utils.TestConfig.Account1.WalletAddress,
 			"wrong password", // wrong password
-			errors.New("could not decrypt key with given passphrase"),
+			errors.New("could not decrypt key with given password"),
 		},
 	}
 	for _, testCase := range testCases {
@@ -101,13 +103,14 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
 
 	// Import keys and make sure one was created before EIP55 introduction.
-	err = ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
+	utils.Init()
+	err = utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
 	accManager := NewManager()
 
-	address := gethcommon.HexToAddress(TestConfig.Account3.WalletAddress)
-	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), TestConfig.Account3.Password)
+	address := gethcommon.HexToAddress(utils.TestConfig.Account3.WalletAddress)
+	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
 	require.NoError(t, err)
 }
 
@@ -226,7 +229,7 @@ func (s *ManagerTestSuite) TestSelectAccountWrongAddress() {
 }
 
 func (s *ManagerTestSuite) TestSelectAccountWrongPassword() {
-	s.testSelectAccount(common.HexToAddress(s.testAccount.chatAddress), common.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"))
+	s.testSelectAccount(common.HexToAddress(s.testAccount.chatAddress), common.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password"))
 }
 
 func (s *ManagerTestSuite) testSelectAccount(chat, wallet common.Address, password string, expErr error) {
@@ -314,7 +317,7 @@ func (s *ManagerTestSuite) TestAddressToDecryptedAccountWrongAddress() {
 }
 
 func (s *ManagerTestSuite) TestAddressToDecryptedAccountWrongPassword() {
-	s.testAddressToDecryptedAccount(s.walletAddress, "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given passphrase"))
+	s.testAddressToDecryptedAccount(s.walletAddress, "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password"))
 }
 
 func (s *ManagerTestSuite) testAddressToDecryptedAccount(wallet, password string, expErr error) {

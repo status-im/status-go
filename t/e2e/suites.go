@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/signal"
-	. "github.com/status-im/status-go/t/utils" //nolint: golint
+	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
 	"github.com/stretchr/testify/suite"
 )
@@ -24,9 +24,10 @@ type StatusNodeTestSuite struct {
 // All general log messages in this package should be routed through this logger.
 var logger = log.New("package", "status-go/t/e2e")
 
-func init() {
-	for id := range TestNetworkNames {
-		nodeConfig, err := MakeTestNodeConfig(id)
+func Init() {
+	utils.Init()
+	for id := range utils.TestNetworkNames {
+		nodeConfig, err := utils.MakeTestNodeConfig(id)
 		if err != nil {
 			panic(err)
 		}
@@ -41,7 +42,7 @@ func init() {
 // StartTestNode initiazes a StatusNode instances with configuration retrieved
 // from the test config.
 func (s *StatusNodeTestSuite) StartTestNode(opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
 
 	// Apply any options altering node config.
@@ -85,7 +86,7 @@ func (s *BackendTestSuite) TearDownTest() {
 
 // StartTestBackend imports some keys and starts a node.
 func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.Require().NoError(err)
 
 	// Apply any options altering node config.
@@ -103,7 +104,7 @@ func (s *BackendTestSuite) StartTestBackend(opts ...TestNodeOption) {
 }
 
 func (s *BackendTestSuite) StartTestBackendWithAccount(account multiaccounts.Account, password string, subaccs []accounts.Account, opts ...TestNodeOption) {
-	nodeConfig, err := MakeTestNodeConfig(GetNetworkID())
+	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.Require().NoError(err)
 
 	// Apply any options altering node config.
@@ -155,10 +156,10 @@ func (s *BackendTestSuite) Transactor() *transactions.Transactor {
 func importTestAccounts(keyStoreDir string) (err error) {
 	logger.Debug("Import accounts to", "dir", keyStoreDir)
 
-	err = ImportTestAccount(keyStoreDir, GetAccount1PKFile())
+	err = utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile())
 	if err != nil {
 		return
 	}
 
-	return ImportTestAccount(keyStoreDir, GetAccount2PKFile())
+	return utils.ImportTestAccount(keyStoreDir, utils.GetAccount2PKFile())
 }

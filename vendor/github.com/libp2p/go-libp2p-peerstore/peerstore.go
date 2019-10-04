@@ -4,23 +4,24 @@ import (
 	"fmt"
 	"io"
 
-	peer "github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-core/peer"
+	pstore "github.com/libp2p/go-libp2p-core/peerstore"
 )
 
-var _ Peerstore = (*peerstore)(nil)
+var _ pstore.Peerstore = (*peerstore)(nil)
 
 type peerstore struct {
-	Metrics
+	pstore.Metrics
 
-	KeyBook
-	AddrBook
-	ProtoBook
-	PeerMetadata
+	pstore.KeyBook
+	pstore.AddrBook
+	pstore.ProtoBook
+	pstore.PeerMetadata
 }
 
 // NewPeerstore creates a data structure that stores peer data, backed by the
 // supplied implementations of KeyBook, AddrBook and PeerMetadata.
-func NewPeerstore(kb KeyBook, ab AddrBook, pb ProtoBook, md PeerMetadata) Peerstore {
+func NewPeerstore(kb pstore.KeyBook, ab pstore.AddrBook, pb pstore.ProtoBook, md pstore.PeerMetadata) pstore.Peerstore {
 	return &peerstore{
 		KeyBook:      kb,
 		AddrBook:     ab,
@@ -67,22 +68,22 @@ func (ps *peerstore) Peers() peer.IDSlice {
 	return pps
 }
 
-func (ps *peerstore) PeerInfo(p peer.ID) PeerInfo {
-	return PeerInfo{
+func (ps *peerstore) PeerInfo(p peer.ID) peer.AddrInfo {
+	return peer.AddrInfo{
 		ID:    p,
 		Addrs: ps.AddrBook.Addrs(p),
 	}
 }
 
-func PeerInfos(ps Peerstore, peers peer.IDSlice) []PeerInfo {
-	pi := make([]PeerInfo, len(peers))
+func PeerInfos(ps pstore.Peerstore, peers peer.IDSlice) []peer.AddrInfo {
+	pi := make([]peer.AddrInfo, len(peers))
 	for i, p := range peers {
 		pi[i] = ps.PeerInfo(p)
 	}
 	return pi
 }
 
-func PeerInfoIDs(pis []PeerInfo) peer.IDSlice {
+func PeerInfoIDs(pis []peer.AddrInfo) peer.IDSlice {
 	ps := make(peer.IDSlice, len(pis))
 	for i, pi := range pis {
 		ps[i] = pi.ID
