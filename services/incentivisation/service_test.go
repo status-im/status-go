@@ -9,10 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -34,8 +34,8 @@ type Vote struct {
 }
 
 type MockWhisper struct {
-	sentMessages   []whisper.NewMessage
-	filterMessages []*whisper.Message
+	sentMessages   []whispertypes.NewMessage
+	filterMessages []*whispertypes.Message
 }
 
 func BuildMockContract() *MockContract {
@@ -99,14 +99,14 @@ func (c *MockContract) GetInactiveNode(opts *bind.CallOpts, index *big.Int) ([]b
 	return c.inactiveNodes[index.Int64()], 0, 0, 0, 0, nil
 }
 
-func (w *MockWhisper) Post(ctx context.Context, req whisper.NewMessage) (hexutil.Bytes, error) {
+func (w *MockWhisper) Post(ctx context.Context, req whispertypes.NewMessage) ([]byte, error) {
 	w.sentMessages = append(w.sentMessages, req)
 	return nil, nil
 }
-func (w *MockWhisper) NewMessageFilter(req whisper.Criteria) (string, error) {
+func (w *MockWhisper) NewMessageFilter(req whispertypes.Criteria) (string, error) {
 	return "", nil
 }
-func (w *MockWhisper) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
+func (w *MockWhisper) AddPrivateKey(ctx context.Context, privateKey statusproto.HexBytes) (string, error) {
 	return "", nil
 }
 func (w *MockWhisper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
@@ -115,7 +115,7 @@ func (w *MockWhisper) DeleteKeyPair(ctx context.Context, key string) (bool, erro
 func (w *MockWhisper) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
 	return "", nil
 }
-func (w *MockWhisper) GetFilterMessages(id string) ([]*whisper.Message, error) {
+func (w *MockWhisper) GetFilterMessages(id string) ([]*whispertypes.Message, error) {
 	return w.filterMessages, nil
 }
 
@@ -164,7 +164,7 @@ func (s *IncentivisationSuite) TestPerform() {
 
 	now := time.Now().Unix()
 	// Add some envelopes
-	s.mockWhisper.filterMessages = []*whisper.Message{
+	s.mockWhisper.filterMessages = []*whispertypes.Message{
 		{
 			// We strip the first byte when processing
 			Sig:       append(nodeOne, nodeOne[0]),

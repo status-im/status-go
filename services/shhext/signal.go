@@ -1,8 +1,8 @@
 package shhext
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/signal"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 // EnvelopeSignalHandler sends signals when envelope is sent or expired.
@@ -19,12 +19,12 @@ func (h EnvelopeSignalHandler) EnvelopeExpired(identifiers [][]byte, err error) 
 }
 
 // MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte, err error) {
+func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID statusproto.Hash, lastEnvelopeHash statusproto.Hash, cursor []byte, err error) {
 	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
 }
 
 // MailServerRequestExpired triggered when the mailserver request expires
-func (h EnvelopeSignalHandler) MailServerRequestExpired(hash common.Hash) {
+func (h EnvelopeSignalHandler) MailServerRequestExpired(hash statusproto.Hash) {
 	signal.SendMailServerRequestExpired(hash)
 }
 

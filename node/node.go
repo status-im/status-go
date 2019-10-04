@@ -32,6 +32,8 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
+	"github.com/status-im/status-protocol-go/transport/whisper/gethbridge"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -356,7 +358,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		if err := ctx.Service(&whisper); err != nil {
 			return nil, err
 		}
-		return shhext.New(whisper, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+		return shhext.New(gethbridge.NewGethWhisperWrapper(whisper), shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
 	})
 }
 
@@ -375,7 +377,7 @@ func activateIncentivisationService(stack *node.Node, config *params.NodeConfig)
 	logger.Info("activating incentivisation")
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var w *whisper.Whisper
+		var w whispertypes.Whisper
 		if err := ctx.Service(&w); err != nil {
 			return nil, err
 		}
@@ -399,7 +401,7 @@ func activateIncentivisationService(stack *node.Node, config *params.NodeConfig)
 			return nil, err
 		}
 
-		return incentivisation.New(privateKey, whisper.NewPublicWhisperAPI(w), incentivisationConfig, contract), nil
+		return incentivisation.New(privateKey, w.PublicWhisperAPI(), incentivisationConfig, contract), nil
 	})
 }
 

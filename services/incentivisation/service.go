@@ -8,6 +8,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"net"
+	"sort"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -15,12 +19,11 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"math/big"
-	"net"
-	"sort"
 
-	whisper "github.com/status-im/whisper/whisperv6"
 	"time"
+
+	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 )
 
 const (
@@ -51,15 +54,6 @@ func (n *Enode) PublicKeyString() string {
 	return hex.EncodeToString(n.PublicKey)
 }
 
-type Whisper interface {
-	Post(ctx context.Context, req whisper.NewMessage) (hexutil.Bytes, error)
-	NewMessageFilter(req whisper.Criteria) (string, error)
-	AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error)
-	DeleteKeyPair(ctx context.Context, key string) (bool, error)
-	GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error)
-	GetFilterMessages(id string) ([]*whisper.Message, error)
-}
-
 type ServiceConfig struct {
 	RPCEndpoint     string
 	ContractAddress string
@@ -68,7 +62,7 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	w               Whisper
+	w               whispertypes.PublicWhisperAPI
 	whisperKeyID    string
 	whisperSymKeyID string
 	whisperFilterID string
@@ -87,7 +81,7 @@ type Service struct {
 }
 
 // New returns a new incentivization Service
-func New(prv *ecdsa.PrivateKey, w Whisper, config *ServiceConfig, contract Contract) *Service {
+func New(prv *ecdsa.PrivateKey, w whispertypes.PublicWhisperAPI, config *ServiceConfig, contract Contract) *Service {
 	logger := log.New("package", "status-go/incentivisation/service")
 	return &Service{
 		w:            w,
@@ -307,9 +301,9 @@ func (s *Service) Start(server *p2p.Server) error {
 	}
 	s.whisperSymKeyID = whisperSymKeyID
 
-	criteria := whisper.Criteria{
+	criteria := whispertypes.Criteria{
 		SymKeyID: whisperSymKeyID,
-		Topics:   []whisper.TopicType{toWhisperTopic(defaultTopic)},
+		Topics:   []whispertypes.TopicType{toWhisperTopic(defaultTopic)},
 	}
 	filterID, err := s.w.NewMessageFilter(criteria)
 	if err != nil {
@@ -437,7 +431,7 @@ func (s *Service) addressString() string {
 
 // postPing publishes a whisper message
 func (s *Service) postPing() (hexutil.Bytes, error) {
-	msg := defaultWhisperMessage()
+	msg := statustransp.DefaultWhisperMessage()
 
 	msg.Topic = toWhisperTopic(defaultTopic)
 
@@ -484,18 +478,8 @@ func ip2Long(ip string) (uint32, error) {
 	return long, nil
 }
 
-func toWhisperTopic(s string) whisper.TopicType {
-	return whisper.BytesToTopic(crypto.Keccak256([]byte(s)))
-}
-
-func defaultWhisperMessage() whisper.NewMessage {
-	msg := whisper.NewMessage{}
-
-	msg.TTL = 10
-	msg.PowTarget = 0.002
-	msg.PowTime = 1
-
-	return msg
+func toWhisperTopic(s string) whispertypes.TopicType {
+	return whispertypes.BytesToTopic(crypto.Keccak256([]byte(s)))
 }
 
 func int2ip(nn uint32) net.IP {

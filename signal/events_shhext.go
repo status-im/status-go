@@ -3,12 +3,12 @@ package signal
 import (
 	"encoding/hex"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/shhext/dedup"
-	whisper "github.com/status-im/whisper/whisperv6"
 
 	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -46,17 +46,17 @@ const (
 
 // EnvelopeSignal includes hash of the envelope.
 type EnvelopeSignal struct {
-	IDs     []hexutil.Bytes `json:"ids"`
-	Hash    common.Hash     `json:"hash"`
-	Message string          `json:"message"`
+	IDs     []hexutil.Bytes  `json:"ids"`
+	Hash    statusproto.Hash `json:"hash"`
+	Message string           `json:"message"`
 }
 
 // MailServerResponseSignal holds the data received in the response from the mailserver.
 type MailServerResponseSignal struct {
-	RequestID        common.Hash `json:"requestID"`
-	LastEnvelopeHash common.Hash `json:"lastEnvelopeHash"`
-	Cursor           string      `json:"cursor"`
-	ErrorMsg         string      `json:"errorMessage"`
+	RequestID        statusproto.Hash `json:"requestID"`
+	LastEnvelopeHash statusproto.Hash `json:"lastEnvelopeHash"`
+	Cursor           string           `json:"cursor"`
+	ErrorMsg         string           `json:"errorMessage"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -82,7 +82,7 @@ type Filter struct {
 	// Identity is the public key of the other recipient for non-public chats
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic whisper.TopicType `json:"topic"`
+	Topic whispertypes.TopicType `json:"topic"`
 }
 
 type WhisperFilterAddedSignal struct {
@@ -121,7 +121,7 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash common.Hash, cursor []byte, err error) {
+func SendMailServerRequestCompleted(requestID statusproto.Hash, lastEnvelopeHash statusproto.Hash, cursor []byte, err error) {
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()
@@ -136,7 +136,7 @@ func SendMailServerRequestCompleted(requestID common.Hash, lastEnvelopeHash comm
 }
 
 // SendMailServerRequestExpired triggered when mail server request expires
-func SendMailServerRequestExpired(hash common.Hash) {
+func SendMailServerRequestExpired(hash statusproto.Hash) {
 	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 

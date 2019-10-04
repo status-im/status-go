@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
+	whisper "github.com/status-im/whisper/whisperv6"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/mailserver"
 
-	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,26 +103,26 @@ func TestMakeMessagesRequestPayload(t *testing.T) {
 
 func TestTopicsToBloom(t *testing.T) {
 	t1 := stringToTopic("t1")
-	b1 := whisper.TopicToBloom(t1)
+	b1 := whispertypes.TopicToBloom(t1)
 	t2 := stringToTopic("t2")
-	b2 := whisper.TopicToBloom(t2)
+	b2 := whispertypes.TopicToBloom(t2)
 	t3 := stringToTopic("t3")
-	b3 := whisper.TopicToBloom(t3)
+	b3 := whispertypes.TopicToBloom(t3)
 
 	reqBloom := topicsToBloom(t1)
-	assert.True(t, whisper.BloomFilterMatch(reqBloom, b1))
-	assert.False(t, whisper.BloomFilterMatch(reqBloom, b2))
-	assert.False(t, whisper.BloomFilterMatch(reqBloom, b3))
+	assert.True(t, whispertypes.BloomFilterMatch(reqBloom, b1))
+	assert.False(t, whispertypes.BloomFilterMatch(reqBloom, b2))
+	assert.False(t, whispertypes.BloomFilterMatch(reqBloom, b3))
 
 	reqBloom = topicsToBloom(t1, t2)
-	assert.True(t, whisper.BloomFilterMatch(reqBloom, b1))
-	assert.True(t, whisper.BloomFilterMatch(reqBloom, b2))
-	assert.False(t, whisper.BloomFilterMatch(reqBloom, b3))
+	assert.True(t, whispertypes.BloomFilterMatch(reqBloom, b1))
+	assert.True(t, whispertypes.BloomFilterMatch(reqBloom, b2))
+	assert.False(t, whispertypes.BloomFilterMatch(reqBloom, b3))
 
 	reqBloom = topicsToBloom(t1, t2, t3)
-	assert.True(t, whisper.BloomFilterMatch(reqBloom, b1))
-	assert.True(t, whisper.BloomFilterMatch(reqBloom, b2))
-	assert.True(t, whisper.BloomFilterMatch(reqBloom, b3))
+	assert.True(t, whispertypes.BloomFilterMatch(reqBloom, b1))
+	assert.True(t, whispertypes.BloomFilterMatch(reqBloom, b2))
+	assert.True(t, whispertypes.BloomFilterMatch(reqBloom, b3))
 }
 
 func TestCreateBloomFilter(t *testing.T) {
@@ -130,36 +133,36 @@ func TestCreateBloomFilter(t *testing.T) {
 	bloom := createBloomFilter(req)
 	assert.Equal(t, topicsToBloom(t1), bloom)
 
-	req = MessagesRequest{Topics: []whisper.TopicType{t1, t2}}
+	req = MessagesRequest{Topics: []whispertypes.TopicType{t1, t2}}
 	bloom = createBloomFilter(req)
 	assert.Equal(t, topicsToBloom(t1, t2), bloom)
 }
 
-func stringToTopic(s string) whisper.TopicType {
-	return whisper.BytesToTopic([]byte(s))
+func stringToTopic(s string) whispertypes.TopicType {
+	return whispertypes.BytesToTopic([]byte(s))
 }
 
 func TestCreateSyncMailRequest(t *testing.T) {
 	testCases := []struct {
 		Name   string
 		Req    SyncMessagesRequest
-		Verify func(*testing.T, whisper.SyncMailRequest)
+		Verify func(*testing.T, whispertypes.SyncMailRequest)
 		Error  string
 	}{
 		{
 			Name: "no topics",
 			Req:  SyncMessagesRequest{},
-			Verify: func(t *testing.T, r whisper.SyncMailRequest) {
-				require.Equal(t, whisper.MakeFullNodeBloom(), r.Bloom)
+			Verify: func(t *testing.T, r whispertypes.SyncMailRequest) {
+				require.Equal(t, whispertypes.MakeFullNodeBloom(), r.Bloom)
 			},
 		},
 		{
 			Name: "some topics",
 			Req: SyncMessagesRequest{
-				Topics: []whisper.TopicType{{0x01, 0xff, 0xff, 0xff}},
+				Topics: []whispertypes.TopicType{{0x01, 0xff, 0xff, 0xff}},
 			},
-			Verify: func(t *testing.T, r whisper.SyncMailRequest) {
-				expectedBloom := whisper.TopicToBloom(whisper.TopicType{0x01, 0xff, 0xff, 0xff})
+			Verify: func(t *testing.T, r whispertypes.SyncMailRequest) {
+				expectedBloom := whispertypes.TopicToBloom(whispertypes.TopicType{0x01, 0xff, 0xff, 0xff})
 				require.Equal(t, expectedBloom, r.Bloom)
 			},
 		},
@@ -168,7 +171,7 @@ func TestCreateSyncMailRequest(t *testing.T) {
 			Req: SyncMessagesRequest{
 				Cursor: hex.EncodeToString([]byte{0x01, 0x02, 0x03}),
 			},
-			Verify: func(t *testing.T, r whisper.SyncMailRequest) {
+			Verify: func(t *testing.T, r whispertypes.SyncMailRequest) {
 				require.Equal(t, []byte{0x01, 0x02, 0x03}, r.Cursor)
 			},
 		},
@@ -223,9 +226,9 @@ func TestSyncMessagesErrors(t *testing.T) {
 
 func TestExpiredOrCompleted(t *testing.T) {
 	timeout := time.Millisecond
-	events := make(chan whisper.EnvelopeEvent)
+	events := make(chan whispertypes.EnvelopeEvent)
 	errors := make(chan error, 1)
-	hash := common.Hash{1}
+	hash := statusproto.Hash{1}
 	go func() {
 		_, err := waitForExpiredOrCompleted(hash, events, timeout)
 		errors <- err

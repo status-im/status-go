@@ -3,9 +3,9 @@ package shhext
 import (
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 // EnvelopeState in local tracker
@@ -24,11 +24,11 @@ const (
 
 // MailRequestMonitor is responsible for monitoring history request to mailservers.
 type MailRequestMonitor struct {
-	w       *whisper.Whisper
+	w       whispertypes.Whisper
 	handler EnvelopeEventsHandler
 
 	mu    sync.Mutex
-	cache map[common.Hash]EnvelopeState
+	cache map[statusproto.Hash]EnvelopeState
 
 	requestsRegistry *RequestsRegistry
 
@@ -52,7 +52,7 @@ func (m *MailRequestMonitor) Stop() {
 	m.wg.Wait()
 }
 
-func (m *MailRequestMonitor) GetState(hash common.Hash) EnvelopeState {
+func (m *MailRequestMonitor) GetState(hash statusproto.Hash) EnvelopeState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	state, exist := m.cache[hash]
@@ -64,7 +64,7 @@ func (m *MailRequestMonitor) GetState(hash common.Hash) EnvelopeState {
 
 // handleEnvelopeEvents processes whisper envelope events
 func (m *MailRequestMonitor) handleEnvelopeEvents() {
-	events := make(chan whisper.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	events := make(chan whispertypes.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	sub := m.w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 	for {
@@ -79,11 +79,11 @@ func (m *MailRequestMonitor) handleEnvelopeEvents() {
 
 // handleEvent based on type of the event either triggers
 // confirmation handler or removes hash from MailRequestMonitor
-func (m *MailRequestMonitor) handleEvent(event whisper.EnvelopeEvent) {
-	handlers := map[whisper.EventType]func(whisper.EnvelopeEvent){
-		whisper.EventMailServerRequestSent:      m.handleRequestSent,
-		whisper.EventMailServerRequestCompleted: m.handleEventMailServerRequestCompleted,
-		whisper.EventMailServerRequestExpired:   m.handleEventMailServerRequestExpired,
+func (m *MailRequestMonitor) handleEvent(event whispertypes.EnvelopeEvent) {
+	handlers := map[whispertypes.EventType]func(whispertypes.EnvelopeEvent){
+		whispertypes.EventMailServerRequestSent:      m.handleRequestSent,
+		whispertypes.EventMailServerRequestCompleted: m.handleEventMailServerRequestCompleted,
+		whispertypes.EventMailServerRequestExpired:   m.handleEventMailServerRequestExpired,
 	}
 
 	if handler, ok := handlers[event.Event]; ok {
@@ -91,13 +91,13 @@ func (m *MailRequestMonitor) handleEvent(event whisper.EnvelopeEvent) {
 	}
 }
 
-func (m *MailRequestMonitor) handleRequestSent(event whisper.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleRequestSent(event whispertypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cache[event.Hash] = MailServerRequestSent
 }
 
-func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event whisper.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event whispertypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requestsRegistry.Unregister(event.Hash)
@@ -108,13 +108,13 @@ func (m *MailRequestMonitor) handleEventMailServerRequestCompleted(event whisper
 	log.Debug("mailserver response received", "hash", event.Hash)
 	delete(m.cache, event.Hash)
 	if m.handler != nil {
-		if resp, ok := event.Data.(*whisper.MailServerResponse); ok {
+		if resp, ok := event.Data.(*whispertypes.MailServerResponse); ok {
 			m.handler.MailServerRequestCompleted(event.Hash, resp.LastEnvelopeHash, resp.Cursor, resp.Error)
 		}
 	}
 }
 
-func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event whisper.EnvelopeEvent) {
+func (m *MailRequestMonitor) handleEventMailServerRequestExpired(event whispertypes.EnvelopeEvent) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.requestsRegistry.Unregister(event.Hash)

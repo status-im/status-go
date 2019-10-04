@@ -6,12 +6,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/status-im/status-go/logutils"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/logutils"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
@@ -27,7 +27,8 @@ import (
 
 	protocol "github.com/status-im/status-protocol-go"
 	protocolwhisper "github.com/status-im/status-protocol-go/transport/whisper"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 )
@@ -43,8 +44,8 @@ const (
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(common.Hash, common.Hash, []byte, error)
-	MailServerRequestExpired(common.Hash)
+	MailServerRequestCompleted(statusproto.Hash, statusproto.Hash, []byte, error)
+	MailServerRequestExpired(statusproto.Hash)
 }
 
 // Service is a service that provides some additional Whisper API.
@@ -53,7 +54,7 @@ type Service struct {
 	cancelMessenger chan struct{}
 
 	storage          db.TransactionalStorage
-	w                *whisper.Whisper
+	w                whispertypes.Whisper
 	config           params.ShhextConfig
 	mailMonitor      *MailRequestMonitor
 	requestsRegistry *RequestsRegistry
@@ -71,7 +72,7 @@ type Service struct {
 var _ node.Service = (*Service)(nil)
 
 // New returns a new Service.
-func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
+func New(w whispertypes.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
 	cache := mailservers.NewCache(ldb)
 	ps := mailservers.NewPeerStore(cache)
 	delay := defaultRequestsDelay
@@ -83,7 +84,7 @@ func New(w *whisper.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, con
 	mailMonitor := &MailRequestMonitor{
 		w:                w,
 		handler:          handler,
-		cache:            map[common.Hash]EnvelopeState{},
+		cache:            map[statusproto.Hash]EnvelopeState{},
 		requestsRegistry: requestsRegistry,
 	}
 	return &Service{
@@ -119,7 +120,7 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 	envelopesMonitorConfig := &protocolwhisper.EnvelopesMonitorConfig{
 		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
 		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
-		IsMailserver: func(peer enode.ID) bool {
+		IsMailserver: func(peer whispertypes.EnodeID) bool {
 			return s.peerStore.Exist(peer)
 		},
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
@@ -343,7 +344,7 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisper.SyncMailRequest) (resp whisper.SyncEventResponse, err error) {
+func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whispertypes.SyncMailRequest) (resp whispertypes.SyncEventResponse, err error) {
 	err = s.w.SyncMessages(mailServerID, r)
 	if err != nil {
 		return
@@ -351,7 +352,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 
 	// Wait for the response which is received asynchronously as a p2p packet.
 	// This packet handler will send an event which contains the response payload.
-	events := make(chan whisper.EnvelopeEvent, 1024)
+	events := make(chan whispertypes.EnvelopeEvent, 1024)
 	sub := s.w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 
@@ -365,7 +366,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 	for {
 		select {
 		case event := <-events:
-			if event.Event != whisper.EventMailServerSyncFinished {
+			if event.Event != whispertypes.EventMailServerSyncFinished {
 				continue
 			}
 
@@ -373,7 +374,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 
 			var ok bool
 
-			resp, ok = event.Data.(whisper.SyncEventResponse)
+			resp, ok = event.Data.(whispertypes.SyncEventResponse)
 			if !ok {
 				err = fmt.Errorf("did not understand the response event data")
 				return

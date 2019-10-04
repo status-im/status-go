@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +16,7 @@ func createInMemStore(t *testing.T) HistoryStore {
 }
 
 func TestGetNewHistory(t *testing.T) {
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	duration := time.Hour
 	store := createInMemStore(t)
 	th, err := store.GetHistory(topic, duration)
@@ -26,7 +26,7 @@ func TestGetNewHistory(t *testing.T) {
 }
 
 func TestGetExistingHistory(t *testing.T) {
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	duration := time.Hour
 	store := createInMemStore(t)
 	th, err := store.GetHistory(topic, duration)
@@ -43,13 +43,13 @@ func TestGetExistingHistory(t *testing.T) {
 
 func TestNewHistoryRequest(t *testing.T) {
 	store := createInMemStore(t)
-	id := common.Hash{1}
+	id := statusproto.Hash{1}
 	req, err := store.GetRequest(id)
 	require.Error(t, err)
 	req = store.NewRequest()
 	req.ID = id
 
-	th, err := store.GetHistory(whisper.TopicType{1}, time.Hour)
+	th, err := store.GetHistory(whispertypes.TopicType{1}, time.Hour)
 	require.NoError(t, err)
 	req.AddHistory(th)
 	require.NoError(t, req.Save())
@@ -61,8 +61,8 @@ func TestNewHistoryRequest(t *testing.T) {
 
 func TestGetAllRequests(t *testing.T) {
 	store := createInMemStore(t)
-	idOne := common.Hash{1}
-	idTwo := common.Hash{2}
+	idOne := statusproto.Hash{1}
+	idTwo := statusproto.Hash{2}
 
 	req := store.NewRequest()
 	req.ID = idOne

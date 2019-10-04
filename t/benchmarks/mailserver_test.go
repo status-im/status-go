@@ -10,6 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-protocol-go/transport/whisper/gethbridge"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 )
@@ -41,7 +43,7 @@ func testMailserverPeer(t *testing.T) {
 		BackupDisabledDataDir: os.TempDir(),
 		InstallationID:        "1",
 	}
-	mailService := shhext.New(shhService, nil, nil, config)
+	mailService := shhext.New(gethbridge.NewGethWhisperWrapper(shhService), nil, nil, config)
 	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// create node with services
@@ -88,7 +90,7 @@ func testMailserverPeer(t *testing.T) {
 	requestID, err := shhextAPI.RequestMessages(context.TODO(), shhext.MessagesRequest{
 		MailServerPeer: *peerURL,
 		SymKeyID:       symKeyID,
-		Topic:          topic,
+		Topic:          whispertypes.TopicType(topic),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, requestID)

@@ -1,11 +1,11 @@
 package whisper
 
 import (
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 )
 
 type RequestOptions struct {
-	Topics   []whisper.TopicType
+	Topics   []whispertypes.TopicType
 	Password string
 	Limit    int
 	From     int64 // in seconds
@@ -16,8 +16,8 @@ const (
 	defaultPowTime = 1
 )
 
-func DefaultWhisperMessage() whisper.NewMessage {
-	msg := whisper.NewMessage{}
+func DefaultWhisperMessage() whispertypes.NewMessage {
+	msg := whispertypes.NewMessage{}
 
 	msg.TTL = 10
 	msg.PowTarget = 0.002

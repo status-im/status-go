@@ -30,10 +30,8 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/status-im/migrate/v4 v4.3.1-status.0.20190822050738-a9d340ec8fb7
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.2.3-0.20190926081215-cc44ddb7ce44
-	github.com/status-im/whisper v1.4.14
-	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 // indirect
-	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
+	github.com/status-im/status-protocol-go v0.2.3-0.20191009073015-e7ecec99a52b
+	github.com/status-im/whisper v1.5.1
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -26,7 +26,7 @@ type DB interface {
 }
 
 // TopicHistoryKey defines bytes that are used as unique key for TopicHistory.
-// first 4 bytes are whisper.TopicType bytes
+// first 4 bytes are whispertypes.TopicType bytes
 // next 8 bytes are time.Duration encoded in big endian notation.
 type TopicHistoryKey [12]byte
 
@@ -36,7 +36,7 @@ func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err e
 	if (key == TopicHistoryKey{}) {
 		return th, ErrEmptyKey
 	}
-	topic := whisper.TopicType{}
+	topic := whispertypes.TopicType{}
 	copy(topic[:], key[:4])
 	duration := binary.BigEndian.Uint64(key[4:])
 	th = TopicHistory{db: db, Topic: topic, Duration: time.Duration(duration)}
@@ -47,7 +47,7 @@ func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err e
 type TopicHistory struct {
 	db DB
 	// whisper topic
-	Topic whisper.TopicType
+	Topic whispertypes.TopicType
 
 	Duration time.Duration
 	// Timestamp that was used for the first request with this topic.
@@ -57,7 +57,7 @@ type TopicHistory struct {
 	Current time.Time
 	End     time.Time
 
-	RequestID common.Hash
+	RequestID statusproto.Hash
 }
 
 // Key returns unique identifier for this TopicHistory.
@@ -115,7 +115,7 @@ func (t TopicHistory) SameRange(other TopicHistory) bool {
 
 // Pending returns true if this topic was requested from a mail server.
 func (t TopicHistory) Pending() bool {
-	return t.RequestID != common.Hash{}
+	return t.RequestID != statusproto.Hash{}
 }
 
 // HistoryRequest is kept in the database while request is in the progress.
@@ -127,7 +127,7 @@ type HistoryRequest struct {
 	histories []TopicHistory
 
 	// Generated ID
-	ID common.Hash
+	ID statusproto.Hash
 	// List of the topics
 	TopicHistoryKeys []TopicHistoryKey
 }
@@ -167,8 +167,8 @@ func (req HistoryRequest) Save() error {
 }
 
 // Replace saves request with new ID and all data attached to the old one.
-func (req HistoryRequest) Replace(id common.Hash) error {
-	if (req.ID != common.Hash{}) {
+func (req HistoryRequest) Replace(id statusproto.Hash) error {
+	if (req.ID != statusproto.Hash{}) {
 		if err := req.Delete(); err != nil {
 			return err
 		}

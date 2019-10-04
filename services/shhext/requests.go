@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 
 type requestMeta struct {
 	timestamp time.Time
-	lastUID   common.Hash
+	lastUID   statusproto.Hash
 }
 
 // NewRequestsRegistry creates instance of the RequestsRegistry and returns pointer to it.
@@ -33,13 +33,13 @@ func NewRequestsRegistry(delay time.Duration) *RequestsRegistry {
 type RequestsRegistry struct {
 	mu           sync.Mutex
 	delay        time.Duration
-	uidToTopics  map[common.Hash]common.Hash
-	byTopicsHash map[common.Hash]requestMeta
+	uidToTopics  map[statusproto.Hash]statusproto.Hash
+	byTopicsHash map[statusproto.Hash]requestMeta
 }
 
 // Register request with given topics. If request with same topics was made in less then configured delay then error
 // will be returned.
-func (r *RequestsRegistry) Register(uid common.Hash, topics []whisper.TopicType) error {
+func (r *RequestsRegistry) Register(uid statusproto.Hash, topics []whispertypes.TopicType) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	topicsHash := topicsToHash(topics)
@@ -58,7 +58,7 @@ func (r *RequestsRegistry) Register(uid common.Hash, topics []whisper.TopicType)
 }
 
 // Has returns true if given uid is stored in registry.
-func (r *RequestsRegistry) Has(uid common.Hash) bool {
+func (r *RequestsRegistry) Has(uid statusproto.Hash) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	_, exist := r.uidToTopics[uid]
@@ -66,7 +66,7 @@ func (r *RequestsRegistry) Has(uid common.Hash) bool {
 }
 
 // Unregister removes request with given UID from registry.
-func (r *RequestsRegistry) Unregister(uid common.Hash) {
+func (r *RequestsRegistry) Unregister(uid statusproto.Hash) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	topicsHash, exist := r.uidToTopics[uid]
@@ -85,15 +85,15 @@ func (r *RequestsRegistry) Unregister(uid common.Hash) {
 func (r *RequestsRegistry) Clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.uidToTopics = map[common.Hash]common.Hash{}
-	r.byTopicsHash = map[common.Hash]requestMeta{}
+	r.uidToTopics = map[statusproto.Hash]statusproto.Hash{}
+	r.byTopicsHash = map[statusproto.Hash]requestMeta{}
 }
 
 // topicsToHash returns non-cryptographic hash of the topics.
-func topicsToHash(topics []whisper.TopicType) common.Hash {
+func topicsToHash(topics []whispertypes.TopicType) statusproto.Hash {
 	hash := fnv.New32()
 	for i := range topics {
 		_, _ = hash.Write(topics[i][:]) // never returns error per documentation
 	}
-	return common.BytesToHash(hash.Sum(nil))
+	return statusproto.BytesToHash(hash.Sum(nil))
 }

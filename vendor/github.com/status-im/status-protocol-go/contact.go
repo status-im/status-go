@@ -3,8 +3,8 @@ package statusproto
 import (
 	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -50,7 +50,7 @@ type Contact struct {
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
-	b, err := hexutil.Decode(c.ID)
+	b, err := statusproto.DecodeHex(c.ID)
 	if err != nil {
 		return nil, err
 	}
