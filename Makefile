@@ -37,7 +37,7 @@ STATUSD_PRUNE_IMAGE_NAME ?= statusteam/statusd-prune
 DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
-DOCKER_TEST_IMAGE = golang:1.10
+DOCKER_TEST_IMAGE = golang:1.13
 
 XGO_NAME ?= status-go
 XGO_TARGETS ?= linux/amd64,windows/amd64,darwin/amd64
