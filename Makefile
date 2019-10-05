@@ -39,9 +39,6 @@ DOCKER_IMAGE_CUSTOM_TAG ?= $(RELEASE_TAG)
 DOCKER_TEST_WORKDIR = /go/src/github.com/status-im/status-go/
 DOCKER_TEST_IMAGE = golang:1.10
 
-XGO_NAME ?= status-go
-XGO_TARGETS ?= linux/amd64,windows/amd64,darwin/amd64
-
 # This is a code for automatic help generator.
 # It supports ANSI colors and categories.
 # To add new item into help output, simply add comments
@@ -104,15 +101,6 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	gomobile init
 	gomobile bind -v -target=ios -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/Statusgo.framework github.com/status-im/status-go/mobile
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
-
-statusgo-xgo: xgo-install ##@cross-compile Build status-go for xgo targets
-	$(GOPATH)/bin/xgo -v \
-		-out=$(XGO_NAME) \
-		-dest=$(GOBIN) \
-		-targets=$(XGO_TARGETS) \
-		-tags '$(BUILD_TAGS)' \
-		$(BUILD_FLAGS) ./cmd/statusd
-	@echo "Linux cross compilation done."
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
 	@echo "Building static library..."
@@ -211,9 +199,6 @@ release: check-existing-release
 	else \
 	    echo "Aborting." && exit 1; \
 	fi
-
-xgo-install:
-	go get -u github.com/karalabe/xgo
 
 gomobile-install: xtools-install
 	go get golang.org/x/mobile/cmd/gomobile

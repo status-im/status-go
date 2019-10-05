@@ -64,16 +64,13 @@ pipeline {
         stage('Docker') { steps { script {
           dock = lib.buildBranch('status-go/platforms/docker')
         } } }
-        stage('XGO') { steps { script {
-          xgo = lib.buildBranch('status-go/platforms/xgo')
-        } } }
       } // parallel
     } // stage(Build)
 
     stage('Archive') {
       steps { script {
         sh("rm -fr ${env.RELEASE_DIR}/*")
-        [ios, android, linux, xgo].each { platformBuild ->
+        [ios, android, linux].each { platformBuild ->
           lib.copyArts(platformBuild)
         }
         dir(env.RELEASE_DIR) {
