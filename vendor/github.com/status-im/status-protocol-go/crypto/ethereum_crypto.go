@@ -27,32 +27,26 @@ func (c EthereumCrypto) GenerateDH() (dr.DHPair, error) {
 		return nil, err
 	}
 
-	var publicKey [32]byte
-	copy(publicKey[:], crypto.CompressPubkey(&keys.PublicKey)[:32])
-
-	var privateKey [32]byte
-	copy(privateKey[:], crypto.FromECDSA(keys))
-
 	return DHPair{
-		PrvKey: privateKey,
-		PubKey: publicKey,
+		PubKey: crypto.CompressPubkey(&keys.PublicKey),
+		PrvKey: crypto.FromECDSA(keys),
 	}, nil
 
 }
 
 // See the Crypto interface.
-func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
+func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) (dr.Key, error) {
 	tmpKey := dhPair.PrivateKey()
-	privateKey, err := crypto.ToECDSA(tmpKey[:])
-	eciesPrivate := ecies.ImportECDSA(privateKey)
-	var a [32]byte
+	privateKey, err := crypto.ToECDSA(tmpKey)
 	if err != nil {
-		return a
+		return nil, err
 	}
 
-	publicKey, err := crypto.DecompressPubkey(dhPub[:])
+	eciesPrivate := ecies.ImportECDSA(privateKey)
+
+	publicKey, err := crypto.DecompressPubkey(dhPub)
 	if err != nil {
-		return a
+		return nil, err
 	}
 	eciesPublic := ecies.ImportECDSAPublic(publicKey)
 
@@ -61,48 +55,52 @@ func (c EthereumCrypto) DH(dhPair dr.DHPair, dhPub dr.Key) dr.Key {
 		16,
 		16,
 	)
-
 	if err != nil {
-		return a
+		return nil, err
 	}
 
-	copy(a[:], key)
-	return a
-
+	return key, nil
 }
 
 // See the Crypto interface.
-func (c EthereumCrypto) KdfRK(rk, dhOut dr.Key) (rootKey, chainKey, headerKey dr.Key) {
+func (c EthereumCrypto) KdfRK(rk, dhOut dr.Key) (dr.Key, dr.Key, dr.Key) {
 	var (
 		// We can use a non-secret constant as the last argument
-		r   = hkdf.New(sha256.New, dhOut[:], rk[:], []byte("rsZUpEuXUqqwXBvSy3EcievAh4cMj6QL"))
+		r   = hkdf.New(sha256.New, dhOut, rk, []byte("rsZUpEuXUqqwXBvSy3EcievAh4cMj6QL"))
 		buf = make([]byte, 96)
 	)
+
+	rootKey := make(dr.Key, 32)
+	chainKey := make(dr.Key, 32)
+	headerKey := make(dr.Key, 32)
 
 	// The only error here is an entropy limit which won't be reached for such a short buffer.
 	_, _ = io.ReadFull(r, buf)
 
-	copy(rootKey[:], buf[:32])
-	copy(chainKey[:], buf[32:64])
-	copy(headerKey[:], buf[64:96])
-	return
+	copy(rootKey, buf[:32])
+	copy(chainKey, buf[32:64])
+	copy(headerKey, buf[64:96])
+	return rootKey, chainKey, headerKey
 }
 
 // See the Crypto interface.
-func (c EthereumCrypto) KdfCK(ck dr.Key) (chainKey dr.Key, msgKey dr.Key) {
+func (c EthereumCrypto) KdfCK(ck dr.Key) (dr.Key, dr.Key) {
 	const (
 		ckInput = 15
 		mkInput = 16
 	)
 
-	h := hmac.New(sha256.New, ck[:])
+	chainKey := make(dr.Key, 32)
+	msgKey := make(dr.Key, 32)
+
+	h := hmac.New(sha256.New, ck)
 
 	_, _ = h.Write([]byte{ckInput})
-	copy(chainKey[:], h.Sum(nil))
+	copy(chainKey, h.Sum(nil))
 	h.Reset()
 
 	_, _ = h.Write([]byte{mkInput})
-	copy(msgKey[:], h.Sum(nil))
+	copy(msgKey, h.Sum(nil))
 
 	return chainKey, msgKey
 }
@@ -110,19 +108,21 @@ func (c EthereumCrypto) KdfCK(ck dr.Key) (chainKey dr.Key, msgKey dr.Key) {
 // Encrypt uses a slightly different approach than in the algorithm specification:
 // it uses AES-256-CTR instead of AES-256-CBC for security, ciphertext length and implementation
 // complexity considerations.
-func (c EthereumCrypto) Encrypt(mk dr.Key, plaintext, ad []byte) []byte {
+func (c EthereumCrypto) Encrypt(mk dr.Key, plaintext, ad []byte) ([]byte, error) {
 	encKey, authKey, iv := c.deriveEncKeys(mk)
 
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
 	copy(ciphertext, iv[:])
 
-	var (
-		block, _ = aes.NewCipher(encKey[:]) // No error will occur here as encKey is guaranteed to be 32 bytes.
-		stream   = cipher.NewCTR(block, iv[:])
-	)
+	block, err := aes.NewCipher(encKey)
+	if err != nil {
+		return nil, err
+	}
+
+	stream := cipher.NewCTR(block, iv[:])
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
 
-	return append(ciphertext, c.computeSignature(authKey[:], ciphertext, ad)...)
+	return append(ciphertext, c.computeSignature(authKey, ciphertext, ad)...), nil
 }
 
 // See the Crypto interface.
@@ -136,37 +136,44 @@ func (c EthereumCrypto) Decrypt(mk dr.Key, authCiphertext, ad []byte) ([]byte, e
 	// Check the signature.
 	encKey, authKey, _ := c.deriveEncKeys(mk)
 
-	if s := c.computeSignature(authKey[:], ciphertext, ad); !bytes.Equal(s, signature) {
+	if s := c.computeSignature(authKey, ciphertext, ad); !bytes.Equal(s, signature) {
 		return nil, fmt.Errorf("invalid signature")
 	}
 
 	// Decrypt.
-	var (
-		block, _  = aes.NewCipher(encKey[:]) // No error will occur here as encKey is guaranteed to be 32 bytes.
-		stream    = cipher.NewCTR(block, ciphertext[:aes.BlockSize])
-		plaintext = make([]byte, len(ciphertext[aes.BlockSize:]))
-	)
+	block, err := aes.NewCipher(encKey)
+	if err != nil {
+		return nil, err
+	}
+
+	stream := cipher.NewCTR(block, ciphertext[:aes.BlockSize])
+	plaintext := make([]byte, len(ciphertext[aes.BlockSize:]))
+
 	stream.XORKeyStream(plaintext, ciphertext[aes.BlockSize:])
 
 	return plaintext, nil
 }
 
 // deriveEncKeys derive keys for message encryption and decryption. Returns (encKey, authKey, iv, err).
-func (c EthereumCrypto) deriveEncKeys(mk dr.Key) (encKey dr.Key, authKey dr.Key, iv [16]byte) {
+func (c EthereumCrypto) deriveEncKeys(mk dr.Key) (dr.Key, dr.Key, [16]byte) {
 	// First, derive encryption and authentication key out of mk.
 	salt := make([]byte, 32)
 	var (
-		r   = hkdf.New(sha256.New, mk[:], salt, []byte("pcwSByyx2CRdryCffXJwy7xgVZWtW5Sh"))
+		r   = hkdf.New(sha256.New, mk, salt, []byte("pcwSByyx2CRdryCffXJwy7xgVZWtW5Sh"))
 		buf = make([]byte, 80)
 	)
+
+	encKey := make(dr.Key, 32)
+	authKey := make(dr.Key, 32)
+	var iv [16]byte
 
 	// The only error here is an entropy limit which won't be reached for such a short buffer.
 	_, _ = io.ReadFull(r, buf)
 
-	copy(encKey[:], buf[0:32])
-	copy(authKey[:], buf[32:64])
+	copy(encKey, buf[0:32])
+	copy(authKey, buf[32:64])
 	copy(iv[:], buf[64:80])
-	return
+	return encKey, authKey, iv
 }
 
 func (c EthereumCrypto) computeSignature(authKey, ciphertext, associatedData []byte) []byte {

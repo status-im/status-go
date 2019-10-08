@@ -2,8 +2,12 @@ package statusproto
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-protocol-go/identity/alias"
+	"github.com/status-im/status-protocol-go/identity/identicon"
 	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
@@ -30,8 +34,12 @@ type Contact struct {
 	ID string `json:"id"`
 	// Ethereum address of the contact
 	Address string `json:"address"`
-	// Name of contact
+	// ENS name of contact
 	Name string `json:"name,omitempty"`
+	// EnsVerified whether we verified the name of the contact
+	ENSVerified bool `json:"ensVerified"`
+	// EnsVerifiedAt the time we last verified the name
+	ENSVerifiedAt int64 `json:"ensVerifiedAt"`
 	// Generated username name of the contact
 	Alias string `json:"alias,omitempty"`
 	// Identicon generated from public key
@@ -77,4 +85,24 @@ func existsInStringSlice(set []string, find string) bool {
 		}
 	}
 	return false
+}
+
+func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
+	address := strings.ToLower(crypto.PubkeyToAddress(*publicKey).Hex())
+
+	id := "0x" + hex.EncodeToString(crypto.FromECDSAPub(publicKey))
+
+	identicon, err := identicon.GenerateBase64(id)
+	if err != nil {
+		return nil, err
+	}
+
+	contact := &Contact{
+		ID:        id,
+		Address:   address[2:],
+		Alias:     alias.GenerateFromPublicKey(publicKey),
+		Identicon: identicon,
+	}
+
+	return contact, nil
 }

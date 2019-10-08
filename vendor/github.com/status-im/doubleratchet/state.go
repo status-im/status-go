@@ -85,7 +85,7 @@ func (s *State) applyOptions(opts []option) error {
 }
 
 func newState(sharedKey Key, opts ...option) (State, error) {
-	if sharedKey == [32]byte{} {
+	if sharedKey == nil {
 		return State{}, fmt.Errorf("sharedKey mustn't be empty")
 	}
 
@@ -103,13 +103,24 @@ func (s *State) dhRatchet(m MessageHeader) error {
 	s.DHr = m.DH
 	s.HKs = s.NHKs
 	s.HKr = s.NHKr
-	s.RecvCh, s.NHKr = s.RootCh.step(s.Crypto.DH(s.DHs, s.DHr))
-	var err error
+
+	recvSecret, err := s.Crypto.DH(s.DHs, s.DHr)
+	if err != nil {
+		return fmt.Errorf("failed to generate dh recieve ratchet secret: %s", err)
+	}
+	s.RecvCh, s.NHKr = s.RootCh.step(recvSecret)
+
 	s.DHs, err = s.Crypto.GenerateDH()
 	if err != nil {
 		return fmt.Errorf("failed to generate dh pair: %s", err)
 	}
-	s.SendCh, s.NHKs = s.RootCh.step(s.Crypto.DH(s.DHs, s.DHr))
+
+	sendSecret, err := s.Crypto.DH(s.DHs, s.DHr)
+	if err != nil {
+		return fmt.Errorf("failed to generate dh send ratchet secret: %s", err)
+	}
+	s.SendCh, s.NHKs = s.RootCh.step(sendSecret)
+
 	return nil
 }
 

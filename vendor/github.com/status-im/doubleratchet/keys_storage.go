@@ -2,6 +2,7 @@ package doubleratchet
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 )
 
@@ -26,20 +27,21 @@ type KeysStorage interface {
 	Count(k Key) (uint, error)
 
 	// All returns all the keys
-	All() (map[Key]map[uint]Key, error)
+	All() (map[string]map[uint]Key, error)
 }
 
 // KeysStorageInMemory is an in-memory message keys storage.
 type KeysStorageInMemory struct {
-	keys map[Key]map[uint]InMemoryKey
+	keys map[string]map[uint]InMemoryKey
 }
 
 // Get returns a message key by the given key and message number.
 func (s *KeysStorageInMemory) Get(pubKey Key, msgNum uint) (Key, bool, error) {
+	index := fmt.Sprintf("%x", pubKey)
 	if s.keys == nil {
 		return Key{}, false, nil
 	}
-	msgs, ok := s.keys[pubKey]
+	msgs, ok := s.keys[index]
 	if !ok {
 		return Key{}, false, nil
 	}
@@ -58,13 +60,15 @@ type InMemoryKey struct {
 
 // Put saves the given mk under the specified key and msgNum.
 func (s *KeysStorageInMemory) Put(sessionID []byte, pubKey Key, msgNum uint, mk Key, seqNum uint) error {
+	index := fmt.Sprintf("%x", pubKey)
+
 	if s.keys == nil {
-		s.keys = make(map[Key]map[uint]InMemoryKey)
+		s.keys = make(map[string]map[uint]InMemoryKey)
 	}
-	if _, ok := s.keys[pubKey]; !ok {
-		s.keys[pubKey] = make(map[uint]InMemoryKey)
+	if _, ok := s.keys[index]; !ok {
+		s.keys[index] = make(map[uint]InMemoryKey)
 	}
-	s.keys[pubKey][msgNum] = InMemoryKey{
+	s.keys[index][msgNum] = InMemoryKey{
 		sessionID:  sessionID,
 		messageKey: mk,
 		seqNum:     seqNum,
@@ -74,18 +78,20 @@ func (s *KeysStorageInMemory) Put(sessionID []byte, pubKey Key, msgNum uint, mk 
 
 // DeleteMk ensures there's no message key under the specified key and msgNum.
 func (s *KeysStorageInMemory) DeleteMk(pubKey Key, msgNum uint) error {
+	index := fmt.Sprintf("%x", pubKey)
+
 	if s.keys == nil {
 		return nil
 	}
-	if _, ok := s.keys[pubKey]; !ok {
+	if _, ok := s.keys[index]; !ok {
 		return nil
 	}
-	if _, ok := s.keys[pubKey][msgNum]; !ok {
+	if _, ok := s.keys[index][msgNum]; !ok {
 		return nil
 	}
-	delete(s.keys[pubKey], msgNum)
-	if len(s.keys[pubKey]) == 0 {
-		delete(s.keys, pubKey)
+	delete(s.keys[index], msgNum)
+	if len(s.keys[index]) == 0 {
+		delete(s.keys, index)
 	}
 	return nil
 }
@@ -143,15 +149,16 @@ func (s *KeysStorageInMemory) DeleteOldMks(sessionID []byte, deleteUntilSeqKey u
 
 // Count returns number of message keys stored under the specified key.
 func (s *KeysStorageInMemory) Count(pubKey Key) (uint, error) {
+	index := fmt.Sprintf("%x", pubKey)
 	if s.keys == nil {
 		return 0, nil
 	}
-	return uint(len(s.keys[pubKey])), nil
+	return uint(len(s.keys[index])), nil
 }
 
 // All returns all the keys
-func (s *KeysStorageInMemory) All() (map[Key]map[uint]Key, error) {
-	response := make(map[Key]map[uint]Key)
+func (s *KeysStorageInMemory) All() (map[string]map[uint]Key, error) {
+	response := make(map[string]map[uint]Key)
 
 	for pubKey, keys := range s.keys {
 		response[pubKey] = make(map[uint]Key)

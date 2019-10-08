@@ -1,8 +1,6 @@
 # github.com/NaySoftware/go-fcm v0.0.0-00010101000000-000000000000 => github.com/status-im/go-fcm v1.0.0-status
 github.com/NaySoftware/go-fcm
-# github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6
-github.com/StackExchange/wmi
-# github.com/allegro/bigcache v1.1.0
+# github.com/allegro/bigcache v1.2.0
 github.com/allegro/bigcache
 github.com/allegro/bigcache/queue
 # github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7
@@ -24,9 +22,9 @@ github.com/coreos/go-semver/semver
 github.com/davecgh/go-spew/spew
 # github.com/deckarep/golang-set v1.7.1
 github.com/deckarep/golang-set
-# github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712
+# github.com/edsrzf/mmap-go v1.0.0
 github.com/edsrzf/mmap-go
-# github.com/elastic/gosigar v0.0.0-20180330100440-37f05ff46ffa
+# github.com/elastic/gosigar v0.10.4
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
 # github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
@@ -104,14 +102,11 @@ github.com/ethereum/go-ethereum/rpc
 github.com/ethereum/go-ethereum/signer/core
 github.com/ethereum/go-ethereum/signer/storage
 github.com/ethereum/go-ethereum/trie
-# github.com/fjl/memsize v0.0.0-20180418122429-ca190fb6ffbc
+# github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 github.com/fjl/memsize
 github.com/fjl/memsize/memsizeui
 # github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff
 github.com/gballet/go-libpcsclite
-# github.com/go-ole/go-ole v1.2.1
-github.com/go-ole/go-ole
-github.com/go-ole/go-ole/oleutil
 # github.com/go-playground/locales v0.12.1
 github.com/go-playground/locales
 github.com/go-playground/locales/currency
@@ -278,9 +273,9 @@ github.com/libp2p/go-yamux
 github.com/lucasb-eyer/go-colorful
 # github.com/mattn/go-colorable v0.1.1
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.5
+# github.com/mattn/go-isatty v0.0.7
 github.com/mattn/go-isatty
-# github.com/mattn/go-runewidth v0.0.3
+# github.com/mattn/go-runewidth v0.0.4
 github.com/mattn/go-runewidth
 # github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1
 github.com/minio/blake2b-simd
@@ -308,9 +303,9 @@ github.com/multiformats/go-multistream
 github.com/mutecomm/go-sqlcipher
 # github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 github.com/okzk/sdnotify
-# github.com/olekukonko/tablewriter v0.0.0-20170128050532-febf2d34b54a
+# github.com/olekukonko/tablewriter v0.0.1
 github.com/olekukonko/tablewriter
-# github.com/opentracing/opentracing-go v1.0.2
+# github.com/opentracing/opentracing-go v1.1.0
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
 github.com/opentracing/opentracing-go/log
@@ -322,7 +317,7 @@ github.com/pkg/errors
 github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/tsdb v0.10.0
 github.com/prometheus/tsdb/fileutil
-# github.com/rjeczalik/notify v0.9.1
+# github.com/rjeczalik/notify v0.9.2
 github.com/rjeczalik/notify
 # github.com/rs/cors v1.6.0
 github.com/rs/cors
@@ -334,7 +329,7 @@ github.com/shopspring/decimal
 github.com/spacemonkeygo/spacelog
 # github.com/spaolacci/murmur3 v1.1.0
 github.com/spaolacci/murmur3
-# github.com/status-im/doubleratchet v2.0.0+incompatible
+# github.com/status-im/doubleratchet v3.0.0+incompatible
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
@@ -350,7 +345,7 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.4.1-0.20191014103017-1f15a058b66c
+# github.com/status-im/status-protocol-go v0.4.3
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/bridge/geth
@@ -362,6 +357,7 @@ github.com/status-im/status-protocol-go/encryption/migrations
 github.com/status-im/status-protocol-go/encryption/multidevice
 github.com/status-im/status-protocol-go/encryption/publisher
 github.com/status-im/status-protocol-go/encryption/sharedsecret
+github.com/status-im/status-protocol-go/ens
 github.com/status-im/status-protocol-go/identity/alias
 github.com/status-im/status-protocol-go/identity/identicon
 github.com/status-im/status-protocol-go/migrations
@@ -398,7 +394,7 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/tyler-smith/go-bip39 v1.0.2
 github.com/tyler-smith/go-bip39
 github.com/tyler-smith/go-bip39/wordlists
-# github.com/vacp2p/mvds v0.0.23-0.20191014101555-026e462c829d
+# github.com/vacp2p/mvds v0.0.23
 github.com/vacp2p/mvds/node
 github.com/vacp2p/mvds/node/migrations
 github.com/vacp2p/mvds/peers
@@ -410,6 +406,22 @@ github.com/vacp2p/mvds/state/migrations
 github.com/vacp2p/mvds/store
 github.com/vacp2p/mvds/store/migrations
 github.com/vacp2p/mvds/transport
+# github.com/wealdtech/go-ens/v3 v3.0.7
+github.com/wealdtech/go-ens/v3
+github.com/wealdtech/go-ens/v3/contracts/auctionregistrar
+github.com/wealdtech/go-ens/v3/contracts/baseregistrar
+github.com/wealdtech/go-ens/v3/contracts/deed
+github.com/wealdtech/go-ens/v3/contracts/dnsregistrar
+github.com/wealdtech/go-ens/v3/contracts/dnsresolver
+github.com/wealdtech/go-ens/v3/contracts/dnssecoracle
+github.com/wealdtech/go-ens/v3/contracts/ethcontroller
+github.com/wealdtech/go-ens/v3/contracts/registry
+github.com/wealdtech/go-ens/v3/contracts/resolver
+github.com/wealdtech/go-ens/v3/contracts/reverseregistrar
+github.com/wealdtech/go-ens/v3/contracts/reverseresolver
+github.com/wealdtech/go-ens/v3/util
+# github.com/wealdtech/go-multicodec v1.2.0
+github.com/wealdtech/go-multicodec
 # github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 github.com/whyrusleeping/go-logging
 # github.com/whyrusleeping/go-notifier v0.0.0-20170827234753-097c5d47330f
@@ -457,6 +469,7 @@ golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
+golang.org/x/net/idna
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
@@ -483,7 +496,9 @@ golang.org/x/text/internal/tag
 golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
+golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
+golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # gopkg.in/go-playground/validator.v9 v9.29.1
 gopkg.in/go-playground/validator.v9
@@ -491,7 +506,7 @@ gopkg.in/go-playground/validator.v9
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 gopkg.in/natefinch/npipe.v2
-# gopkg.in/olebedev/go-duktape.v3 v3.0.0-20180302121509-abf0ba0be5d5
+# gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff
 gopkg.in/olebedev/go-duktape.v3
 # gopkg.in/urfave/cli.v1 v1.20.0
 gopkg.in/urfave/cli.v1

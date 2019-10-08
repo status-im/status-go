@@ -9,11 +9,11 @@ type Crypto interface {
 
 	// DH returns the output from the Diffie-Hellman calculation between
 	// the private key from the DH key pair dhPair and the DH public key dbPub.
-	DH(dhPair DHPair, dhPub Key) Key
+	DH(dhPair DHPair, dhPub Key) (Key, error)
 
 	// Encrypt returns an AEAD encryption of plaintext with message key mk. The associated_data
 	// is authenticated but is not included in the ciphertext. The AEAD nonce may be set to a constant.
-	Encrypt(mk Key, plaintext, ad []byte) (authCiphertext []byte)
+	Encrypt(mk Key, plaintext, ad []byte) (authCiphertext []byte, err error)
 
 	// Decrypt returns the AEAD decryption of ciphertext with message key mk.
 	Decrypt(mk Key, ciphertext, ad []byte) (plaintext []byte, err error)
@@ -27,8 +27,8 @@ type DHPair interface {
 	PublicKey() Key
 }
 
-// Key is any 32-byte key. It's created for the possibility of pretty hex output.
-type Key [32]byte
+// Key is any byte representation of a key.
+type Key []byte
 
 // Stringer interface compliance.
 func (k Key) String() string {

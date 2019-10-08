@@ -47,6 +47,7 @@ type Chat struct {
 	LastMessageContentType string `json:"lastMessageContentType"`
 	LastMessageContent     string `json:"lastMessageContent"`
 	LastMessageTimestamp   int64  `json:"lastMessageTimestamp"`
+	LastMessageClockValue  int64  `json:"lastMessageClockValue"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat
