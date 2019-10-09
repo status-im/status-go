@@ -17,6 +17,7 @@ import (
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
+	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
@@ -55,7 +56,8 @@ var (
 	)
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
-	metrics = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
+	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
+	metricsPort    = flag.Int("metrics-port", 9305, "Port for the Prometheus /metrics endpoint")
 
 	syncAndExit = flag.Int("sync-and-exit", -1, "Timeout in minutes for blockchain sync and exit, zero means no timeout unless sync is finished")
 )
@@ -137,17 +139,18 @@ func main() {
 	// handle interrupt signals
 	interruptCh := haltOnInterruptSignal(backend.StatusNode())
 
-	// Check if profiling shall be enabled.
-	if *pprofEnabled {
-		profiling.NewProfiler(*pprofPort).Go()
-	}
-
 	// Start collecting metrics. Metrics can be enabled by providing `-metrics` flag
 	// or setting `gethmetrics.Enabled` to true during compilation time:
 	// https://github.com/status-im/go-ethereum/pull/76.
-	if *metrics || gethmetrics.Enabled {
+	if *metricsEnabled || gethmetrics.Enabled {
 		go startCollectingNodeMetrics(interruptCh, backend.StatusNode())
 		go gethmetrics.CollectProcessMetrics(3 * time.Second)
+		go metrics.NewMetricsServer(*metricsPort, gethmetrics.DefaultRegistry).Listen()
+	}
+
+	// Check if profiling shall be enabled.
+	if *pprofEnabled {
+		profiling.NewProfiler(*pprofPort).Go()
 	}
 
 	// Sync blockchain and stop.
