@@ -3,8 +3,8 @@ package dedup
 import (
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -21,21 +21,21 @@ type Deduplicator struct {
 }
 
 type Author struct {
-	PublicKey hexutil.Bytes `json:"publicKey"`
-	Alias     string        `json:"alias"`
-	Identicon string        `json:"identicon"`
+	PublicKey statusproto.HexBytes `json:"publicKey"`
+	Alias     string               `json:"alias"`
+	Identicon string               `json:"identicon"`
 }
 
 type Metadata struct {
-	DedupID      []byte        `json:"dedupId"`
-	EncryptionID hexutil.Bytes `json:"encryptionId"`
-	MessageID    hexutil.Bytes `json:"messageId"`
-	Author       Author        `json:"author"`
+	DedupID      []byte               `json:"dedupId"`
+	EncryptionID statusproto.HexBytes `json:"encryptionId"`
+	MessageID    statusproto.HexBytes `json:"messageId"`
+	Author       Author               `json:"author"`
 }
 
 type DeduplicateMessage struct {
-	Message  *whisper.Message `json:"message"`
-	Metadata Metadata         `json:"metadata"`
+	Message  *whispertypes.Message `json:"message"`
+	Metadata Metadata              `json:"metadata"`
 }
 
 // NewDeduplicator creates a new deduplicator

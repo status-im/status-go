@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	whisper "github.com/status-im/whisper/whisperv6"
 
 	"github.com/status-im/status-go/params"
+	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 )
 

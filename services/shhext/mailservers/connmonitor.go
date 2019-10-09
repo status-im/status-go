@@ -5,12 +5,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.
-func NewLastUsedConnectionMonitor(ps *PeerStore, cache *Cache, whisper EnvelopeEventSubscbriber) *LastUsedConnectionMonitor {
+func NewLastUsedConnectionMonitor(ps *PeerStore, cache *Cache, whisper EnvelopeEventSubscriber) *LastUsedConnectionMonitor {
 	return &LastUsedConnectionMonitor{
 		ps:      ps,
 		cache:   cache,
@@ -23,7 +22,7 @@ type LastUsedConnectionMonitor struct {
 	ps    *PeerStore
 	cache *Cache
 
-	whisper EnvelopeEventSubscbriber
+	whisper EnvelopeEventSubscriber
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -34,7 +33,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
 	go func() {
-		events := make(chan whisper.EnvelopeEvent, whisperEventsBuffer)
+		events := make(chan whispertypes.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.whisper.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()
 		defer mon.wg.Done()
@@ -50,7 +49,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 				if node == nil {
 					continue
 				}
-				if ev.Event == whisper.EventMailServerRequestCompleted {
+				if ev.Event == whispertypes.EventMailServerRequestCompleted {
 					err := mon.updateRecord(ev.Peer)
 					if err != nil {
 						log.Error("unable to update storage", "peer", ev.Peer, "error", err)
@@ -61,7 +60,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	}()
 }
 
-func (mon *LastUsedConnectionMonitor) updateRecord(nodeID enode.ID) error {
+func (mon *LastUsedConnectionMonitor) updateRecord(nodeID whispertypes.EnodeID) error {
 	node := mon.ps.Get(nodeID)
 	if node == nil {
 		return nil

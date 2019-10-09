@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/t/utils"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,8 +25,8 @@ func TestUsedConnectionPersisted(t *testing.T) {
 
 	// Send a confirmation that we received history from one of the peers.
 	select {
-	case whisperMock.input <- whisper.EnvelopeEvent{
-		Event: whisper.EventMailServerRequestCompleted, Peer: nodes[0].ID()}:
+	case whisperMock.input <- whispertypes.EnvelopeEvent{
+		Event: whispertypes.EventMailServerRequestCompleted, Peer: whispertypes.EnodeID(nodes[0].ID())}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'completed' event")
 	}
@@ -47,15 +47,15 @@ func TestUsedConnectionPersisted(t *testing.T) {
 			}
 		}
 		if !used {
-			return fmt.Errorf("record %s is not marked as used", nodes[0].ID())
+			return fmt.Errorf("record %s is not marked as used", whispertypes.EnodeID(nodes[0].ID()))
 		}
 		return nil
 	}, time.Second, 100*time.Millisecond))
 
 	// Use different peer, first will be marked as unused.
 	select {
-	case whisperMock.input <- whisper.EnvelopeEvent{
-		Event: whisper.EventMailServerRequestCompleted, Peer: nodes[1].ID()}:
+	case whisperMock.input <- whispertypes.EnvelopeEvent{
+		Event: whispertypes.EventMailServerRequestCompleted, Peer: whispertypes.EnodeID(nodes[1].ID())}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'completed' event")
 	}

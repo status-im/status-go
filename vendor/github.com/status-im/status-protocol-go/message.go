@@ -3,18 +3,18 @@ package statusproto
 import (
 	"database/sql/driver"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
-type hexutilSQL hexutil.Bytes
+type hexutilSQL statusproto.HexBytes
 
 func (h hexutilSQL) Value() (driver.Value, error) {
 	return []byte(h), nil
 }
 
 func (h hexutilSQL) String() string {
-	return hexutil.Encode(h)
+	return statusproto.EncodeHex(h)
 }
 
 func (h *hexutilSQL) Scan(value interface{}) error {

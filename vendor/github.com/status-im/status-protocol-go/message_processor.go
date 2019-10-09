@@ -14,8 +14,8 @@ import (
 	"github.com/status-im/status-protocol-go/encryption"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
 	transport "github.com/status-im/status-protocol-go/transport/whisper"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	protocol "github.com/status-im/status-protocol-go/v1"
-	whisper "github.com/status-im/whisper/whisperv6"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	"go.uber.org/zap"
@@ -155,7 +155,7 @@ func (p *messageProcessor) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		p.transport.Track([][]byte{messageID}, hash, *newMessage)
+		p.transport.Track([][]byte{messageID}, hash, newMessage)
 	}
 
 	return messageID, nil
@@ -187,7 +187,7 @@ func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data [
 		return nil, err
 	}
 
-	hash, err := p.transport.SendPublic(ctx, &newMessage, chatID)
+	hash, err := p.transport.SendPublic(ctx, newMessage, chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -201,21 +201,21 @@ func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data [
 
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.
 func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, error) {
-	var newMessage whisper.NewMessage
+	var newMessage *whispertypes.NewMessage
 
 	wrappedMessage, err := p.tryWrapMessageV1(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	newMessage = whisper.NewMessage{
+	newMessage = &whispertypes.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   wrappedMessage,
 		PowTarget: whisperPoW,
 		PowTime:   whisperPoWTime,
 	}
 
-	hash, err := p.transport.SendPublic(ctx, &newMessage, chatName)
+	hash, err := p.transport.SendPublic(ctx, newMessage, chatName)
 	if err != nil {
 		return nil, err
 	}
@@ -230,12 +230,10 @@ func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, d
 // Process processes received Whisper messages through all the layers
 // and returns decoded user messages.
 // It also handled all non-user messages like PairMessage.
-func (p *messageProcessor) Process(message *whisper.ReceivedMessage) ([]*protocol.Message, error) {
+func (p *messageProcessor) Process(shhMessage *whispertypes.Message) ([]*protocol.Message, error) {
 	logger := p.logger.With(zap.String("site", "Process"))
 
 	var decodedMessages []*protocol.Message
-
-	shhMessage := whisper.ToWhisperMessage(message)
 
 	hlogger := logger.With(zap.Binary("hash", shhMessage.Hash))
 	hlogger.Debug("handling a received message")
@@ -283,7 +281,7 @@ func (p *messageProcessor) processPairMessage(m protocol.PairMessage) error {
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (p *messageProcessor) handleMessages(shhMessage *whisper.Message, applicationLayer bool) ([]*protocol.StatusMessage, error) {
+func (p *messageProcessor) handleMessages(shhMessage *whispertypes.Message, applicationLayer bool) ([]*protocol.StatusMessage, error) {
 	logger := p.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.Binary("hash", shhMessage.Hash))
 	var statusMessage protocol.StatusMessage
@@ -423,13 +421,13 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 		return err
 	}
 
-	p.transport.Track(messageIDs, hash, *newMessage)
+	p.transport.Track(messageIDs, hash, newMessage)
 
 	return nil
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec) ([]byte, *whisper.NewMessage, error) {
+func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec) ([]byte, *whispertypes.NewMessage, error) {
 	newMessage, err := messageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, nil, err
@@ -442,33 +440,33 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 	switch {
 	case messageSpec.SharedSecret != nil:
 		logger.Debug("sending using shared secret")
-		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, &newMessage, publicKey, messageSpec.SharedSecret)
+		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret)
 	case messageSpec.PartitionedTopicMode() == encryption.PartitionTopicV1:
 		logger.Debug("sending partitioned topic")
-		hash, err = p.transport.SendPrivateWithPartitioned(ctx, &newMessage, publicKey)
+		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 	case !p.featureFlags.genericDiscoveryTopicEnabled:
 		logger.Debug("sending partitioned topic (generic discovery topic disabled)")
-		hash, err = p.transport.SendPrivateWithPartitioned(ctx, &newMessage, publicKey)
+		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 	default:
 		logger.Debug("sending using discovery topic")
-		hash, err = p.transport.SendPrivateOnDiscovery(ctx, &newMessage, publicKey)
+		hash, err = p.transport.SendPrivateOnDiscovery(ctx, newMessage, publicKey)
 	}
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return hash, &newMessage, nil
+	return hash, newMessage, nil
 }
 
-func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (whisper.NewMessage, error) {
-	var newMessage whisper.NewMessage
+func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*whispertypes.NewMessage, error) {
+	var newMessage *whispertypes.NewMessage
 
 	payload, err := proto.Marshal(spec.Message)
 	if err != nil {
 		return newMessage, err
 	}
 
-	newMessage = whisper.NewMessage{
+	newMessage = &whispertypes.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
 		PowTarget: whisperPoW,

@@ -31,7 +31,7 @@ func renderBase64(id Identicon) (string, error) {
 }
 
 func setBackgroundWhite(img *image.RGBA) {
-	draw.Draw(img, img.Bounds(), &image.Uniform{color.White}, image.ZP, draw.Src)
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.White}, image.Point{}, draw.Src)
 }
 
 func drawRect(rgba *image.RGBA, i int, c color.Color) {
@@ -45,7 +45,7 @@ func drawRect(rgba *image.RGBA, i int, c color.Color) {
 		10+(i/maxRow)*sizeSquare+sizeSquare,
 	)
 
-	draw.Draw(rgba, r, &image.Uniform{c}, image.ZP, draw.Src)
+	draw.Draw(rgba, r, &image.Uniform{C: c}, image.Point{}, draw.Src)
 }
 
 // GenerateBase64 generates an identicon in base64 png format given a string

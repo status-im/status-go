@@ -3,8 +3,8 @@ package db
 import (
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
@@ -24,7 +24,7 @@ type HistoryStore struct {
 
 // GetHistory creates history instance and loads history from database.
 // Returns instance populated with topic and duration if history is not found in database.
-func (h HistoryStore) GetHistory(topic whisper.TopicType, duration time.Duration) (TopicHistory, error) {
+func (h HistoryStore) GetHistory(topic whispertypes.TopicType, duration time.Duration) (TopicHistory, error) {
 	thist := h.NewHistory(topic, duration)
 	err := thist.Load()
 	if err != nil && err != errors.ErrNotFound {
@@ -39,12 +39,12 @@ func (h HistoryStore) NewRequest() HistoryRequest {
 }
 
 // NewHistory creates TopicHistory object with required values.
-func (h HistoryStore) NewHistory(topic whisper.TopicType, duration time.Duration) TopicHistory {
+func (h HistoryStore) NewHistory(topic whispertypes.TopicType, duration time.Duration) TopicHistory {
 	return TopicHistory{db: h.topicDB, Duration: duration, Topic: topic}
 }
 
 // GetRequest loads HistoryRequest from database.
-func (h HistoryStore) GetRequest(id common.Hash) (HistoryRequest, error) {
+func (h HistoryStore) GetRequest(id statusproto.Hash) (HistoryRequest, error) {
 	req := HistoryRequest{requestDB: h.requestDB, topicDB: h.topicDB, ID: id}
 	err := req.Load()
 	if err != nil {
@@ -74,7 +74,7 @@ func (h HistoryStore) GetAllRequests() ([]HistoryRequest, error) {
 // GetHistoriesByTopic returns all histories with a given topic.
 // This is needed when we will have multiple range per single topic.
 // TODO explain
-func (h HistoryStore) GetHistoriesByTopic(topic whisper.TopicType) ([]TopicHistory, error) {
+func (h HistoryStore) GetHistoriesByTopic(topic whispertypes.TopicType) ([]TopicHistory, error) {
 	rst := []TopicHistory{}
 	iter := h.topicDB.NewIterator(h.topicDB.Range(topic[:], nil))
 	for iter.Next() {

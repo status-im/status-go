@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -22,9 +21,12 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-protocol-go/transport/whisper/gethbridge"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ssh/terminal"
+
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 )
 
 const (
@@ -105,11 +107,12 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	defer func() { _ = clientBackend.StopNode() }()
 
 	clientNode := clientBackend.StatusNode()
-	clientWhisperService, err := clientNode.WhisperService()
+	clientGethWhisperService, err := clientNode.WhisperService()
 	if err != nil {
 		logger.Error("Could not retrieve Whisper service", "error", err)
 		os.Exit(1)
 	}
+	clientWhisperService := gethbridge.NewGethWhisperWrapper(clientGethWhisperService)
 	clientShhExtService, err := clientNode.ShhExtService()
 	if err != nil {
 		logger.Error("Could not retrieve shhext service", "error", err)
@@ -139,7 +142,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	}
 
 	mailboxPeer := mailserverNode.ID().Bytes()
-	err = clientWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
+	err = clientGethWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
 	if err != nil {
 		logger.Error("Failed to allow P2P messages from mailserver peer", "error", err, mailserverNode.String())
 		os.Exit(1)
@@ -155,12 +158,12 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	}
 
 	// watch for envelopes to be available in filters in the client
-	envelopeAvailableWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	envelopeAvailableWatcher := make(chan whispertypes.EnvelopeEvent, 1024)
 	sub := clientWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
 	defer sub.Unsubscribe()
 
 	// watch for mailserver responses in the client
-	mailServerResponseWatcher := make(chan whisper.EnvelopeEvent, 1024)
+	mailServerResponseWatcher := make(chan whispertypes.EnvelopeEvent, 1024)
 	sub = clientWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
 	defer sub.Unsubscribe()
 
@@ -179,7 +182,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 		logger.Error("Error requesting historic messages from mailserver", "error", err)
 		os.Exit(2)
 	}
-	requestID := common.BytesToHash(requestIDBytes)
+	requestID := statusproto.BytesToHash(requestIDBytes)
 
 	// wait for mailserver request sent event
 	err = waitForMailServerRequestSent(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
@@ -196,7 +199,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	}
 
 	// wait for last envelope sent by the mailserver to be available for filters
-	err = waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whisper.EventEnvelopeAvailable)
+	err = waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whispertypes.EventEnvelopeAvailable)
 	if err != nil {
 		logger.Error("Error waiting for envelopes to be available to client filter", "error", err)
 		os.Exit(4)
@@ -300,32 +303,32 @@ func startClientNode() (*api.StatusBackend, error) {
 	return clientBackend, err
 }
 
-func joinPublicChat(w *whisper.Whisper, rpcClient *rpc.Client, name string) (string, whisper.TopicType, string, error) {
+func joinPublicChat(w whispertypes.Whisper, rpcClient *rpc.Client, name string) (string, whispertypes.TopicType, string, error) {
 	keyID, err := w.AddSymKeyFromPassword(name)
 	if err != nil {
-		return "", whisper.TopicType{}, "", err
+		return "", whispertypes.TopicType{}, "", err
 	}
 
 	h := sha3.NewLegacyKeccak256()
 	_, err = h.Write([]byte(name))
 	if err != nil {
-		return "", whisper.TopicType{}, "", err
+		return "", whispertypes.TopicType{}, "", err
 	}
 	fullTopic := h.Sum(nil)
-	topic := whisper.BytesToTopic(fullTopic)
+	topic := whispertypes.BytesToTopic(fullTopic)
 
-	whisperAPI := whisper.NewPublicWhisperAPI(w)
-	filterID, err := whisperAPI.NewMessageFilter(whisper.Criteria{SymKeyID: keyID, Topics: []whisper.TopicType{topic}})
+	whisperAPI := w.PublicWhisperAPI()
+	filterID, err := whisperAPI.NewMessageFilter(whispertypes.Criteria{SymKeyID: keyID, Topics: []whispertypes.TopicType{topic}})
 
 	return keyID, topic, filterID, err
 }
 
-func waitForMailServerRequestSent(events chan whisper.EnvelopeEvent, requestID common.Hash, timeout time.Duration) error {
+func waitForMailServerRequestSent(events chan whispertypes.EnvelopeEvent, requestID statusproto.Hash, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	for {
 		select {
 		case event := <-events:
-			if event.Hash == requestID && event.Event == whisper.EventMailServerRequestSent {
+			if event.Hash == requestID && event.Event == whispertypes.EventMailServerRequestSent {
 				timeoutTimer.Stop()
 				return nil
 			}
@@ -335,7 +338,7 @@ func waitForMailServerRequestSent(events chan whisper.EnvelopeEvent, requestID c
 	}
 }
 
-func waitForMailServerResponse(events chan whisper.EnvelopeEvent, requestID common.Hash, timeout time.Duration) (*whisper.MailServerResponse, error) {
+func waitForMailServerResponse(events chan whispertypes.EnvelopeEvent, requestID statusproto.Hash, timeout time.Duration) (*whispertypes.MailServerResponse, error) {
 	timeoutTimer := time.NewTimer(timeout)
 	for {
 		select {
@@ -353,25 +356,25 @@ func waitForMailServerResponse(events chan whisper.EnvelopeEvent, requestID comm
 	}
 }
 
-func decodeMailServerResponse(event whisper.EnvelopeEvent) (*whisper.MailServerResponse, error) {
+func decodeMailServerResponse(event whispertypes.EnvelopeEvent) (*whispertypes.MailServerResponse, error) {
 	switch event.Event {
-	case whisper.EventMailServerRequestSent:
+	case whispertypes.EventMailServerRequestSent:
 		return nil, nil
-	case whisper.EventMailServerRequestCompleted:
-		resp, ok := event.Data.(*whisper.MailServerResponse)
+	case whispertypes.EventMailServerRequestCompleted:
+		resp, ok := event.Data.(*whispertypes.MailServerResponse)
 		if !ok {
 			return nil, errors.New("failed to convert event to a *MailServerResponse")
 		}
 
 		return resp, nil
-	case whisper.EventMailServerRequestExpired:
+	case whispertypes.EventMailServerRequestExpired:
 		return nil, errors.New("no messages available from mailserver")
 	default:
 		return nil, fmt.Errorf("unexpected event type: %v", event.Event)
 	}
 }
 
-func waitForEnvelopeEvents(events chan whisper.EnvelopeEvent, hashes []string, event whisper.EventType) error {
+func waitForEnvelopeEvents(events chan whispertypes.EnvelopeEvent, hashes []string, event whispertypes.EventType) error {
 	check := make(map[string]struct{})
 	for _, hash := range hashes {
 		check[hash] = struct{}{}

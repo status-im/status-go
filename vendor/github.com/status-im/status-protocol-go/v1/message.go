@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -152,7 +152,7 @@ func EncodeMessage(value Message) ([]byte, error) {
 
 // MessageID calculates the messageID from author's compressed public key
 // and not encrypted but encoded payload.
-func MessageID(author *ecdsa.PublicKey, data []byte) hexutil.Bytes {
+func MessageID(author *ecdsa.PublicKey, data []byte) statusproto.HexBytes {
 	keyBytes := crypto.FromECDSAPub(author)
 	return crypto.Keccak256(append(keyBytes, data...))
 }

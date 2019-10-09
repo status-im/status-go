@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +28,7 @@ func TestGetFirstConnected(t *testing.T) {
 	require.NoError(t, store.Update(nodes))
 	node, err := GetFirstConnected(provider, store)
 	require.NoError(t, err)
-	require.Contains(t, nodesMap, node.ID())
+	require.Contains(t, nodesMap, whispertypes.EnodeID(node.ID()))
 }
 
 type trackingNodeNotifee struct {

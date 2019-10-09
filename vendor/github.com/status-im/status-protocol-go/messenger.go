@@ -9,10 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	whisper "github.com/status-im/whisper/whisperv6"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-protocol-go/encryption"
@@ -22,6 +20,8 @@ import (
 	"github.com/status-im/status-protocol-go/identity/identicon"
 	"github.com/status-im/status-protocol-go/sqlite"
 	transport "github.com/status-im/status-protocol-go/transport/whisper"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	protocol "github.com/status-im/status-protocol-go/v1"
 )
 
@@ -169,7 +169,7 @@ func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	shh *whisper.Whisper,
+	shh whispertypes.Whisper,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
@@ -228,7 +228,7 @@ func NewMessenger(
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			chatName := transport.ContactCodeTopic(&messenger.identity.PublicKey)
-			_, err = messenger.transport.SendPublic(ctx, &newMessage, chatName)
+			_, err = messenger.transport.SendPublic(ctx, newMessage, chatName)
 			if err != nil {
 				slogger.Warn("failed to send a contact code", zap.Error(err))
 			}
@@ -404,7 +404,7 @@ func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*tran
 	var result []*transport.Filter
 	for _, secret := range secrets {
 		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
-		fSecret := transport.NegotiatedSecret{
+		fSecret := whispertypes.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		}
@@ -627,7 +627,7 @@ func (m *Messenger) retrieveLatest(ctx context.Context) ([]*protocol.Message, er
 		return nil, errors.Wrap(err, "failed to retrieve messages")
 	}
 
-	logger := m.logger.With(zap.String("site", "RetrieveAll"))
+	logger := m.logger.With(zap.String("site", "retrieveLatest"))
 	logger.Debug("retrieved messages", zap.Int("count", len(latest)))
 
 	var result []*protocol.Message
@@ -670,8 +670,7 @@ func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMes
 	result := make(map[transport.Filter][]*protocol.StatusMessage)
 
 	for chat, messages := range chatWithMessages {
-		for _, message := range messages {
-			shhMessage := whisper.ToWhisperMessage(message)
+		for _, shhMessage := range messages {
 			// TODO: fix this to use an exported method.
 			statusMessages, err := m.processor.handleMessages(shhMessage, false)
 			if err != nil {
@@ -889,7 +888,7 @@ func (p *postProcessor) matchMessage(message *protocol.Message, chats []*Chat) (
 	case message.MessageT == protocol.MessageTypePrivate:
 		// It's an incoming private message. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
-		chatID := hexutil.Encode(crypto.FromECDSAPub(message.SigPubKey))
+		chatID := statusproto.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
 		chat := findChatByID(chatID, chats)
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
@@ -905,7 +904,7 @@ func (p *postProcessor) matchMessage(message *protocol.Message, chats []*Chat) (
 		// It needs to be verified if the signature public key belongs to the chat.
 		chatID := message.Content.ChatID
 		chat := findChatByID(chatID, chats)
-		sigPubKeyHex := hexutil.Encode(crypto.FromECDSAPub(message.SigPubKey))
+		sigPubKeyHex := statusproto.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
 		for _, member := range chat.Members {
 			if member.ID == sigPubKeyHex {
 				return chat, nil

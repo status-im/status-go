@@ -4,12 +4,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -28,9 +28,9 @@ type PeerEventsSubscriber interface {
 	SubscribeEvents(chan *p2p.PeerEvent) event.Subscription
 }
 
-// EnvelopeEventSubscbriber interface to subscribe for whisper.EnvelopeEvent's.
-type EnvelopeEventSubscbriber interface {
-	SubscribeEnvelopeEvents(chan<- whisper.EnvelopeEvent) event.Subscription
+// EnvelopeEventSubscriber interface to subscribe for whispertypes.EnvelopeEvent's.
+type EnvelopeEventSubscriber interface {
+	SubscribeEnvelopeEvents(chan<- whispertypes.EnvelopeEvent) whispertypes.Subscription
 }
 
 type p2pServer interface {
@@ -39,7 +39,7 @@ type p2pServer interface {
 }
 
 // NewConnectionManager creates an instance of ConnectionManager.
-func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscbriber, target, maxFailures int, timeout time.Duration) *ConnectionManager {
+func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscriber, target, maxFailures int, timeout time.Duration) *ConnectionManager {
 	return &ConnectionManager{
 		server:           server,
 		whisper:          whisper,
@@ -56,7 +56,7 @@ type ConnectionManager struct {
 	quit chan struct{}
 
 	server  p2pServer
-	whisper EnvelopeEventSubscbriber
+	whisper EnvelopeEventSubscriber
 
 	notifications    chan []*enode.Node
 	connectedTarget  int
@@ -85,10 +85,10 @@ func (ps *ConnectionManager) Start() {
 		state := newInternalState(ps.server, ps.connectedTarget, ps.timeoutWaitAdded)
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
-		whisperEvents := make(chan whisper.EnvelopeEvent, whisperEventsBuffer)
+		whisperEvents := make(chan whispertypes.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
-		requests := map[common.Hash]struct{}{}
-		failuresPerServer := map[enode.ID]int{}
+		requests := map[statusproto.Hash]struct{}{}
+		failuresPerServer := map[whispertypes.EnodeID]int{}
 
 		defer sub.Unsubscribe()
 		defer whisperSub.Unsubscribe()
@@ -110,13 +110,13 @@ func (ps *ConnectionManager) Start() {
 			case ev := <-whisperEvents:
 				// TODO treat failed requests the same way as expired
 				switch ev.Event {
-				case whisper.EventMailServerRequestSent:
+				case whispertypes.EventMailServerRequestSent:
 					requests[ev.Hash] = struct{}{}
-				case whisper.EventMailServerRequestCompleted:
+				case whispertypes.EventMailServerRequestCompleted:
 					// reset failures count on first success
 					failuresPerServer[ev.Peer] = 0
 					delete(requests, ev.Hash)
-				case whisper.EventMailServerRequestExpired:
+				case whispertypes.EventMailServerRequestExpired:
 					_, exist := requests[ev.Hash]
 					if !exist {
 						continue
@@ -148,9 +148,9 @@ func (ps *ConnectionManager) Stop() {
 }
 
 func (state *internalState) processReplacement(newNodes []*enode.Node, events <-chan *p2p.PeerEvent) {
-	replacement := map[enode.ID]*enode.Node{}
+	replacement := map[whispertypes.EnodeID]*enode.Node{}
 	for _, n := range newNodes {
-		replacement[n.ID()] = n
+		replacement[whispertypes.EnodeID(n.ID())] = n
 	}
 	state.replaceNodes(replacement)
 	if state.ReachedTarget() {
@@ -170,8 +170,8 @@ func newInternalState(srv PeerAdderRemover, target int, timeout time.Duration) *
 	return &internalState{
 		options:      options{target: target, timeout: timeout},
 		srv:          srv,
-		connected:    map[enode.ID]struct{}{},
-		currentNodes: map[enode.ID]*enode.Node{},
+		connected:    map[whispertypes.EnodeID]struct{}{},
+		currentNodes: map[whispertypes.EnodeID]*enode.Node{},
 	}
 }
 
@@ -184,15 +184,15 @@ type internalState struct {
 	options
 	srv PeerAdderRemover
 
-	connected    map[enode.ID]struct{}
-	currentNodes map[enode.ID]*enode.Node
+	connected    map[whispertypes.EnodeID]struct{}
+	currentNodes map[whispertypes.EnodeID]*enode.Node
 }
 
 func (state *internalState) ReachedTarget() bool {
 	return len(state.connected) >= state.target
 }
 
-func (state *internalState) replaceNodes(new map[enode.ID]*enode.Node) {
+func (state *internalState) replaceNodes(new map[whispertypes.EnodeID]*enode.Node) {
 	for nid, n := range state.currentNodes {
 		if _, exist := new[nid]; !exist {
 			delete(state.connected, nid)
@@ -207,7 +207,7 @@ func (state *internalState) replaceNodes(new map[enode.ID]*enode.Node) {
 	state.currentNodes = new
 }
 
-func (state *internalState) nodeAdded(peer enode.ID) {
+func (state *internalState) nodeAdded(peer whispertypes.EnodeID) {
 	n, exist := state.currentNodes[peer]
 	if !exist {
 		return
@@ -215,11 +215,11 @@ func (state *internalState) nodeAdded(peer enode.ID) {
 	if state.ReachedTarget() {
 		state.srv.RemovePeer(n)
 	} else {
-		state.connected[n.ID()] = struct{}{}
+		state.connected[whispertypes.EnodeID(n.ID())] = struct{}{}
 	}
 }
 
-func (state *internalState) nodeDisconnected(peer enode.ID) {
+func (state *internalState) nodeDisconnected(peer whispertypes.EnodeID) {
 	n, exist := state.currentNodes[peer] // unrelated event
 	if !exist {
 		return
@@ -248,10 +248,10 @@ func processPeerEvent(state *internalState, ev *p2p.PeerEvent) {
 	switch ev.Type {
 	case p2p.PeerEventTypeAdd:
 		log.Debug("connected to a mailserver", "address", ev.Peer)
-		state.nodeAdded(ev.Peer)
+		state.nodeAdded(whispertypes.EnodeID(ev.Peer))
 	case p2p.PeerEventTypeDrop:
 		log.Debug("mailserver disconnected", "address", ev.Peer)
-		state.nodeDisconnected(ev.Peer)
+		state.nodeDisconnected(whispertypes.EnodeID(ev.Peer))
 	}
 }
 

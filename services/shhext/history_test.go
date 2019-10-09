@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,7 +51,7 @@ func TestRenewRequest(t *testing.T) {
 
 func TestCreateTopicOptionsFromRequest(t *testing.T) {
 	req := db.HistoryRequest{}
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	now := time.Now()
 	req.AddHistory(db.TopicHistory{Topic: topic, Current: now, End: now})
 	options := CreateTopicOptionsFromRequest(req)
@@ -65,8 +65,8 @@ func TestCreateTopicOptionsFromRequest(t *testing.T) {
 
 func TestTopicOptionsToBloom(t *testing.T) {
 	options := TopicOptions{
-		{Topic: whisper.TopicType{1}, Range: Range{Start: 1, End: 10}},
-		{Topic: whisper.TopicType{2}, Range: Range{Start: 3, End: 12}},
+		{Topic: whispertypes.TopicType{1}, Range: Range{Start: 1, End: 10}},
+		{Topic: whispertypes.TopicType{2}, Range: Range{Start: 3, End: 12}},
 	}
 	bloom := options.ToBloomFilterOption()
 	require.Equal(t, uint64(3), bloom.Range.Start, "Start must be the latest Start across all options")
@@ -105,9 +105,9 @@ func TestCreateRequestsEmptyState(t *testing.T) {
 	ctx := newTestContext(t)
 	reactor := NewHistoryUpdateReactor()
 	requests, err := reactor.CreateRequests(ctx, []TopicRequest{
-		{Topic: whisper.TopicType{1}, Duration: time.Hour},
-		{Topic: whisper.TopicType{2}, Duration: time.Hour},
-		{Topic: whisper.TopicType{3}, Duration: 10 * time.Hour},
+		{Topic: whispertypes.TopicType{1}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{2}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{3}, Duration: 10 * time.Hour},
 	})
 	require.NoError(t, err)
 	require.Len(t, requests, 2)
@@ -128,15 +128,15 @@ func TestCreateRequestsWithExistingRequest(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
 	req := store.NewRequest()
-	req.ID = common.Hash{1}
-	th := store.NewHistory(whisper.TopicType{1}, time.Hour)
+	req.ID = statusproto.Hash{1}
+	th := store.NewHistory(whispertypes.TopicType{1}, time.Hour)
 	req.AddHistory(th)
 	require.NoError(t, req.Save())
 	reactor := NewHistoryUpdateReactor()
 	requests, err := reactor.CreateRequests(ctx, []TopicRequest{
-		{Topic: whisper.TopicType{1}, Duration: time.Hour},
-		{Topic: whisper.TopicType{2}, Duration: time.Hour},
-		{Topic: whisper.TopicType{3}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{1}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{2}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{3}, Duration: time.Hour},
 	})
 	require.NoError(t, err)
 	require.Len(t, requests, 2)
@@ -157,13 +157,13 @@ func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
 	reactor := NewHistoryUpdateReactor()
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	requests, err := reactor.CreateRequests(ctx, []TopicRequest{
 		{Topic: topic, Duration: time.Hour},
 	})
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
-	requests[0].ID = common.Hash{1}
+	requests[0].ID = statusproto.Hash{1}
 	require.NoError(t, requests[0].Save())
 
 	// duration changed. request wasn't finished
@@ -175,7 +175,7 @@ func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
 	longest := 0
 	for i := range requests {
 		r := &requests[i]
-		r.ID = common.Hash{byte(i)}
+		r.ID = statusproto.Hash{byte(i)}
 		require.NoError(t, r.Save())
 		require.Len(t, r.Histories(), 1)
 		if r.Histories()[0].Duration == 10*time.Hour {
@@ -203,11 +203,11 @@ func TestRequestFinishedUpdate(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
 	req := store.NewRequest()
-	req.ID = common.Hash{1}
+	req.ID = statusproto.Hash{1}
 	now := ctx.Time()
-	thOne := store.NewHistory(whisper.TopicType{1}, time.Hour)
+	thOne := store.NewHistory(whispertypes.TopicType{1}, time.Hour)
 	thOne.End = now
-	thTwo := store.NewHistory(whisper.TopicType{2}, time.Hour)
+	thTwo := store.NewHistory(whispertypes.TopicType{2}, time.Hour)
 	thTwo.End = now
 	req.AddHistory(thOne)
 	req.AddHistory(thTwo)
@@ -228,12 +228,12 @@ func TestRequestFinishedUpdate(t *testing.T) {
 func TestTopicHistoryUpdate(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
-	reqID := common.Hash{1}
+	reqID := statusproto.Hash{1}
 	request := store.NewRequest()
 	request.ID = reqID
 	now := time.Now()
 	require.NoError(t, request.Save())
-	th := store.NewHistory(whisper.TopicType{1}, time.Hour)
+	th := store.NewHistory(whispertypes.TopicType{1}, time.Hour)
 	th.RequestID = request.ID
 	th.End = now
 	require.NoError(t, th.Save())
@@ -251,12 +251,12 @@ func TestTopicHistoryUpdate(t *testing.T) {
 
 func TestGroupHistoriesByRequestTimestamp(t *testing.T) {
 	requests := GroupHistoriesByRequestTimespan(createInMemStore(t), []db.TopicHistory{
-		{Topic: whisper.TopicType{1}, Duration: time.Hour},
-		{Topic: whisper.TopicType{2}, Duration: time.Hour},
-		{Topic: whisper.TopicType{3}, Duration: 2 * time.Hour},
-		{Topic: whisper.TopicType{4}, Duration: 2 * time.Hour},
-		{Topic: whisper.TopicType{5}, Duration: 3 * time.Hour},
-		{Topic: whisper.TopicType{6}, Duration: 3 * time.Hour},
+		{Topic: whispertypes.TopicType{1}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{2}, Duration: time.Hour},
+		{Topic: whispertypes.TopicType{3}, Duration: 2 * time.Hour},
+		{Topic: whispertypes.TopicType{4}, Duration: 2 * time.Hour},
+		{Topic: whispertypes.TopicType{5}, Duration: 3 * time.Hour},
+		{Topic: whispertypes.TopicType{6}, Duration: 3 * time.Hour},
 	})
 	require.Len(t, requests, 3)
 	for _, req := range requests {
@@ -267,7 +267,7 @@ func TestGroupHistoriesByRequestTimestamp(t *testing.T) {
 // initial creation of the history index. no other histories in store
 func TestAdjustHistoryWithNoOtherHistories(t *testing.T) {
 	store := createInMemStore(t)
-	th := store.NewHistory(whisper.TopicType{1}, time.Hour)
+	th := store.NewHistory(whispertypes.TopicType{1}, time.Hour)
 	adjusted, err := adjustRequestedHistories(store, []db.TopicHistory{th})
 	require.NoError(t, err)
 	require.Len(t, adjusted, 1)
@@ -281,7 +281,7 @@ func TestAdjustHistoryWithNoOtherHistories(t *testing.T) {
 // that covers all of them e.g. {Duration: 4h}
 func TestAdjustHistoryWithExistingLowerRanges(t *testing.T) {
 	store := createInMemStore(t)
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	histories := make([]db.TopicHistory, 3)
 	i := 0
 	for i = range histories {
@@ -309,7 +309,7 @@ func TestAdjustHistoryWithExistingLowerRanges(t *testing.T) {
 // We see that there is no reason to keep all indexes and we can squash them.
 func TestAdjustHistoriesWithExistingCoveredLowerRanges(t *testing.T) {
 	store := createInMemStore(t)
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	histories := make([]db.TopicHistory, 3)
 	i := 0
 	now := time.Now()
@@ -332,7 +332,7 @@ func TestAdjustHistoriesWithExistingCoveredLowerRanges(t *testing.T) {
 
 func TestAdjustHistoryReplaceTopicWithHigherDuration(t *testing.T) {
 	store := createInMemStore(t)
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	hour := store.NewHistory(topic, time.Hour)
 	require.NoError(t, hour.Save())
 	minute := store.NewHistory(topic, time.Minute)
@@ -346,9 +346,9 @@ func TestAdjustHistoryReplaceTopicWithHigherDuration(t *testing.T) {
 // it will be discarded and we will use existing index
 func TestAdjustHistoryRemoveTopicIfPendingWithHigherDuration(t *testing.T) {
 	store := createInMemStore(t)
-	topic := whisper.TopicType{1}
+	topic := whispertypes.TopicType{1}
 	hour := store.NewHistory(topic, time.Hour)
-	hour.RequestID = common.Hash{1}
+	hour.RequestID = statusproto.Hash{1}
 	require.NoError(t, hour.Save())
 	minute := store.NewHistory(topic, time.Minute)
 	adjusted, err := adjustRequestedHistories(store, []db.TopicHistory{minute})

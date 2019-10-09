@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -36,7 +36,7 @@ type HistoryUpdateReactor struct {
 
 // UpdateFinishedRequest removes successfully finished request and updates every topic
 // attached to the request.
-func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id common.Hash) error {
+func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id statusproto.Hash) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
 	req, err := ctx.HistoryStore().GetRequest(id)
@@ -45,7 +45,7 @@ func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id commo
 	}
 	for i := range req.Histories() {
 		th := &req.Histories()[i]
-		th.RequestID = common.Hash{}
+		th.RequestID = statusproto.Hash{}
 		th.Current = th.End
 		th.End = time.Time{}
 		if err := th.Save(); err != nil {
@@ -56,7 +56,7 @@ func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id commo
 }
 
 // UpdateTopicHistory updates Current timestamp for the TopicHistory with a given timestamp.
-func (reactor *HistoryUpdateReactor) UpdateTopicHistory(ctx Context, topic whisper.TopicType, timestamp time.Time) error {
+func (reactor *HistoryUpdateReactor) UpdateTopicHistory(ctx Context, topic whispertypes.TopicType, timestamp time.Time) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
 	histories, err := ctx.HistoryStore().GetHistoriesByTopic(topic)
@@ -87,7 +87,7 @@ func (reactor *HistoryUpdateReactor) UpdateTopicHistory(ctx Context, topic whisp
 
 // TopicRequest defines what user has to provide.
 type TopicRequest struct {
-	Topic    whisper.TopicType
+	Topic    whispertypes.TopicType
 	Duration time.Duration
 }
 
@@ -96,14 +96,14 @@ type TopicRequest struct {
 func (reactor *HistoryUpdateReactor) CreateRequests(ctx Context, topicRequests []TopicRequest) ([]db.HistoryRequest, error) {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
-	seen := map[whisper.TopicType]struct{}{}
+	seen := map[whispertypes.TopicType]struct{}{}
 	for i := range topicRequests {
 		if _, exist := seen[topicRequests[i].Topic]; exist {
 			return nil, errors.New("only one duration per topic is allowed")
 		}
 		seen[topicRequests[i].Topic] = struct{}{}
 	}
-	histories := map[whisper.TopicType]db.TopicHistory{}
+	histories := map[whispertypes.TopicType]db.TopicHistory{}
 	for i := range topicRequests {
 		th, err := ctx.HistoryStore().GetHistory(topicRequests[i].Topic, topicRequests[i].Duration)
 		if err != nil {
@@ -250,7 +250,7 @@ func CreateTopicOptionsFromRequest(req db.HistoryRequest) TopicOptions {
 	return rst
 }
 
-func mapToList(topics map[whisper.TopicType]db.TopicHistory) []db.TopicHistory {
+func mapToList(topics map[whispertypes.TopicType]db.TopicHistory) []db.TopicHistory {
 	rst := make([]db.TopicHistory, 0, len(topics))
 	for key := range topics {
 		rst = append(rst, topics[key])
@@ -289,7 +289,7 @@ type Range struct {
 
 // TopicOption request for a single topic.
 type TopicOption struct {
-	Topic whisper.TopicType
+	Topic whispertypes.TopicType
 	Range Range
 }
 
@@ -298,7 +298,7 @@ type TopicOptions []TopicOption
 
 // ToBloomFilterOption creates bloom filter request from a list of topics.
 func (options TopicOptions) ToBloomFilterOption() BloomFilterOption {
-	topics := make([]whisper.TopicType, len(options))
+	topics := make([]whispertypes.TopicType, len(options))
 	var start, end uint64
 	for i := range options {
 		opt := options[i]
@@ -318,8 +318,8 @@ func (options TopicOptions) ToBloomFilterOption() BloomFilterOption {
 }
 
 // Topics returns list of whisper TopicType attached to each TopicOption.
-func (options TopicOptions) Topics() []whisper.TopicType {
-	rst := make([]whisper.TopicType, len(options))
+func (options TopicOptions) Topics() []whispertypes.TopicType {
+	rst := make([]whispertypes.TopicType, len(options))
 	for i := range options {
 		rst[i] = options[i].Topic
 	}

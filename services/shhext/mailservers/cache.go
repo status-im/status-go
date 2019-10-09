@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/db"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -67,8 +68,8 @@ func (c *Cache) Replace(nodes []*enode.Node) error {
 		if err != nil {
 			return err
 		}
-		if _, exist := newNodes[record.ID()]; exist {
-			delete(newNodes, record.ID())
+		if _, exist := newNodes[whispertypes.EnodeID(record.ID())]; exist {
+			delete(newNodes, whispertypes.EnodeID(record.ID()))
 		} else {
 			batch.Delete(iter.Key())
 		}
@@ -124,10 +125,10 @@ func unmarshalKeyValue(key, value []byte) (record PeerRecord, err error) {
 	return record, err
 }
 
-func nodesToMap(nodes []*enode.Node) map[enode.ID]*enode.Node {
-	rst := map[enode.ID]*enode.Node{}
+func nodesToMap(nodes []*enode.Node) map[whispertypes.EnodeID]*enode.Node {
+	rst := map[whispertypes.EnodeID]*enode.Node{}
 	for _, n := range nodes {
-		rst[n.ID()] = n
+		rst[whispertypes.EnodeID(n.ID())] = n
 	}
 	return rst
 }

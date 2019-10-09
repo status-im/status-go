@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -65,7 +66,7 @@ const (
 	signatureFlag = byte(4)
 
 	TopicLength     = 4  // in bytes
-	signatureLength = 65 // in bytes
+	signatureLength = crypto.SignatureLength // in bytes
 	aesKeyLength    = 32 // in bytes
 	aesNonceLength  = 12 // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
 	keyIDSize       = 32 // in bytes
