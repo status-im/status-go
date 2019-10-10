@@ -348,7 +348,7 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.2.3-0.20191009073015-e7ecec99a52b
+# github.com/status-im/status-protocol-go v0.2.3-0.20191010161351-fd48aa752717
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/crypto

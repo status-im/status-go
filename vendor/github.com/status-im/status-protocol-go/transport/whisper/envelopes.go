@@ -141,8 +141,7 @@ func (m *EnvelopesMonitor) handleEnvelopeEvents() {
 	for {
 		select {
 		case <-m.quit:
-			return
-		case <-sub.Err():
+			close(events)
 			return
 		case event := <-events:
 			m.handleEvent(event)
