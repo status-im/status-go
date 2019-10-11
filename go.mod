@@ -9,7 +9,7 @@ replace github.com/NaySoftware/go-fcm => github.com/status-im/go-fcm v1.0.0-stat
 require (
 	github.com/NaySoftware/go-fcm v0.0.0-00010101000000-000000000000
 	github.com/beevik/ntp v0.2.0
-	github.com/btcsuite/btcd v0.0.0-20190824003749-130ea5bddde3
+	github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
@@ -31,7 +31,7 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/status-im/migrate/v4 v4.3.1-status.0.20190822050738-a9d340ec8fb7
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.2.3-0.20191010161351-fd48aa752717
+	github.com/status-im/status-protocol-go v0.3.1-0.20191011130145-17cb8c53c3e1
 	github.com/status-im/whisper v1.5.1
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0

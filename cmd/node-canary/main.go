@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-protocol-go/transport/whisper/gethbridge"
+	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
 	statusproto "github.com/status-im/status-protocol-go/types"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ssh/terminal"
