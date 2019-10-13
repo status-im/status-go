@@ -31,7 +31,7 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/status-im/migrate/v4 v4.3.1-status.0.20190822050738-a9d340ec8fb7
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.3.1-0.20191011130145-17cb8c53c3e1
+	github.com/status-im/status-protocol-go v0.3.1
 	github.com/status-im/whisper v1.5.1
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
