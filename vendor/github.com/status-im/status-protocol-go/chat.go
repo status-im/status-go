@@ -2,10 +2,13 @@ package statusproto
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha1"
+	"encoding/hex"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/google/uuid"
 	statusproto "github.com/status-im/status-protocol-go/types"
+	protocol "github.com/status-im/status-protocol-go/v1"
 )
 
 type ChatType int
@@ -52,6 +55,55 @@ type Chat struct {
 	MembershipUpdates []ChatMembershipUpdate `json:"membershipUpdates"`
 }
 
+func (c *Chat) MembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
+	publicKeys := make([]string, len(c.Members))
+	for idx, item := range c.Members {
+		publicKeys[idx] = item.ID
+	}
+	return stringSliceToPublicKeys(publicKeys, true)
+}
+
+func (c *Chat) updateChatFromProtocolGroup(g *protocol.Group) {
+	// ID
+	c.ID = g.ChatID()
+
+	// Name
+	c.Name = g.Name()
+
+	// Members
+	members := g.Members()
+	admins := g.Admins()
+	joined := g.Joined()
+	chatMembers := make([]ChatMember, 0, len(members))
+	for _, m := range members {
+		chatMember := ChatMember{
+			ID: m,
+		}
+		chatMember.Admin = stringSliceContains(admins, m)
+		chatMember.Joined = stringSliceContains(joined, m)
+		chatMembers = append(chatMembers, chatMember)
+	}
+	c.Members = chatMembers
+
+	// MembershipUpdates
+	updates := g.Updates()
+	membershipUpdates := make([]ChatMembershipUpdate, 0, len(updates))
+	for _, update := range updates {
+		membershipUpdate := ChatMembershipUpdate{
+			Type:       update.Type,
+			Name:       update.Name,
+			ClockValue: uint64(update.ClockValue), // TODO: get rid of type casting
+			Signature:  update.Signature,
+			From:       update.From,
+			Member:     update.Member,
+			Members:    update.Members,
+		}
+		membershipUpdate.setID()
+		membershipUpdates = append(membershipUpdates, membershipUpdate)
+	}
+	c.MembershipUpdates = membershipUpdates
+}
+
 // ChatMembershipUpdate represent an event on membership of the chat
 type ChatMembershipUpdate struct {
 	// Unique identifier for the event
@@ -70,6 +122,11 @@ type ChatMembershipUpdate struct {
 	Member string `json:"member,omitempty"`
 	// Target of the event for multi-target events
 	Members []string `json:"members,omitempty"`
+}
+
+func (u *ChatMembershipUpdate) setID() {
+	sum := sha1.Sum([]byte(u.Signature))
+	u.ID = hex.EncodeToString(sum[:])
 }
 
 // ChatMember represents a member who participates in a group chat
@@ -113,14 +170,8 @@ func CreatePublicChat(name string) Chat {
 	}
 }
 
-func groupChatID(creator *ecdsa.PublicKey) string {
-	return uuid.New().String() + statusproto.EncodeHex(crypto.FromECDSAPub(creator))
-}
-
-func CreateGroupChat(name string, creator *ecdsa.PublicKey) Chat {
+func createGroupChat() Chat {
 	return Chat{
-		ID:       groupChatID(creator),
-		Name:     name,
 		Active:   true,
 		ChatType: ChatTypePrivateGroupChat,
 	}
@@ -133,4 +184,36 @@ func findChatByID(chatID string, chats []*Chat) *Chat {
 		}
 	}
 	return nil
+}
+
+func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey, error) {
+	result := make([]*ecdsa.PublicKey, len(slice))
+	for idx, item := range slice {
+		var (
+			b   []byte
+			err error
+		)
+		if prefixed {
+			b, err = hexutil.Decode(item)
+		} else {
+			b, err = hex.DecodeString(item)
+		}
+		if err != nil {
+			return nil, err
+		}
+		result[idx], err = crypto.UnmarshalPubkey(b)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+func stringSliceContains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

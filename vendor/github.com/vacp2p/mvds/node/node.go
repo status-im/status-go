@@ -492,7 +492,7 @@ func (n *Node) onMessage(sender state.PeerID, msg protobuf.Message) error {
 	)
 
 	err := n.syncState.Remove(id, sender)
-	if err != nil {
+	if err != nil && err != state.ErrStateNotFound {
 		return err
 	}
 

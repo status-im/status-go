@@ -77,7 +77,6 @@ func (messageValueEncoder) Encode(e transit.Encoder, value reflect.Value, asStri
 
 			element := map[interface{}]interface{}{
 				transit.Keyword("chat-id"):   update.ChatID,
-				transit.Keyword("from"):      update.From,
 				transit.Keyword("events"):    events,
 				transit.Keyword("signature"): update.Signature,
 			}

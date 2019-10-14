@@ -122,9 +122,10 @@ github.com/go-stack/stack
 # github.com/gogo/protobuf v1.3.0
 github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
-# github.com/golang-migrate/migrate/v4 v4.5.0
+# github.com/golang-migrate/migrate/v4 v4.6.2
 github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
+github.com/golang-migrate/migrate/v4/internal/url
 github.com/golang-migrate/migrate/v4/source
 # github.com/golang/mock v1.3.1
 github.com/golang/mock/gomock
@@ -339,16 +340,17 @@ github.com/status-im/doubleratchet
 github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48
 github.com/status-im/keycard-go/derivationpath
-# github.com/status-im/migrate/v4 v4.3.1-status.0.20190822050738-a9d340ec8fb7
+# github.com/status-im/migrate/v4 v4.6.2-status.2
 github.com/status-im/migrate/v4
 github.com/status-im/migrate/v4/database/postgres
 github.com/status-im/migrate/v4/database/sqlcipher
+github.com/status-im/migrate/v4/internal/url
 github.com/status-im/migrate/v4/source/go_bindata
 # github.com/status-im/rendezvous v1.3.0
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.3.1
+# github.com/status-im/status-protocol-go v0.4.1-0.20191014103017-1f15a058b66c
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/bridge/geth
@@ -396,7 +398,7 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/tyler-smith/go-bip39 v1.0.2
 github.com/tyler-smith/go-bip39
 github.com/tyler-smith/go-bip39/wordlists
-# github.com/vacp2p/mvds v0.0.21
+# github.com/vacp2p/mvds v0.0.23-0.20191014101555-026e462c829d
 github.com/vacp2p/mvds/node
 github.com/vacp2p/mvds/node/migrations
 github.com/vacp2p/mvds/peers
