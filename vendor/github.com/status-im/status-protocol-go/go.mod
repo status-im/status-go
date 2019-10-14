@@ -16,10 +16,10 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v2.0.0+incompatible
-	github.com/status-im/migrate/v4 v4.0.0-20190821140204-a9d340ec8fb76af4afda06acf01740d45d2661ed
+	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/whisper v1.5.1
 	github.com/stretchr/testify v1.3.1-0.20190712000136-221dbe5ed467
-	github.com/vacp2p/mvds v0.0.21
+	github.com/vacp2p/mvds v0.0.23-0.20191014101555-026e462c829d
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect

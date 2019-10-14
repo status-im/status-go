@@ -1,6 +1,6 @@
 module github.com/status-im/status-go
 
-go 1.12
+go 1.13
 
 replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
 
@@ -29,9 +29,9 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v2.0.0+incompatible
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
-	github.com/status-im/migrate/v4 v4.3.1-status.0.20190822050738-a9d340ec8fb7
+	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.3.1
+	github.com/status-im/status-protocol-go v0.4.2
 	github.com/status-im/whisper v1.5.1
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0

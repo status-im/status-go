@@ -163,10 +163,6 @@ func membershipUpdateMessageHandler(d transit.Decoder, value interface{}) (inter
 				if !ok {
 					break
 				}
-				update.From, ok = value[transit.Keyword("from")].(string)
-				if !ok {
-					break
-				}
 				update.Signature, ok = value[transit.Keyword("signature")].(string)
 				if !ok {
 					break

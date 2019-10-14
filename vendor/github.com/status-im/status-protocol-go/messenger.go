@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -284,6 +286,7 @@ func NewMessenger(
 		database,
 		encryptionProtocol,
 		t,
+		newPersistentMessageHandler(&sqlitePersistence{db: database}),
 		logger,
 		c.featureFlags,
 	)
@@ -454,12 +457,20 @@ func (m *Messenger) Mailservers() ([]string, error) {
 }
 
 func (m *Messenger) Join(chat Chat) error {
-	if chat.PublicKey != nil {
+	switch chat.ChatType {
+	case ChatTypeOneToOne:
 		return m.transport.JoinPrivate(chat.PublicKey)
-	} else if chat.Name != "" {
+	case ChatTypePrivateGroupChat:
+		members, err := chat.MembersAsPublicKeys()
+		if err != nil {
+			return err
+		}
+		return m.transport.JoinGroup(members)
+	case ChatTypePublic:
 		return m.transport.JoinPublic(chat.Name)
+	default:
+		return errors.New("chat is neither public nor private")
 	}
-	return errors.New("chat is neither public nor private")
 }
 
 func (m *Messenger) Leave(chat Chat) error {
@@ -469,6 +480,94 @@ func (m *Messenger) Leave(chat Chat) error {
 		return m.transport.LeavePublic(chat.Name)
 	}
 	return errors.New("chat is neither public nor private")
+}
+
+// TODO: consider moving to a ChatManager ???
+func (m *Messenger) CreateGroupChat(name string) (*Chat, error) {
+	chat := createGroupChat()
+	group, err := protocol.NewGroupWithCreator(name, m.identity)
+	if err != nil {
+		return nil, err
+	}
+	chat.updateChatFromProtocolGroup(group)
+	return &chat, nil
+}
+
+func (m *Messenger) AddMembersToChat(ctx context.Context, chat *Chat, members []*ecdsa.PublicKey) error {
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		return err
+	}
+	encodedMembers := make([]string, len(members))
+	for idx, member := range members {
+		encodedMembers[idx] = hexutil.Encode(crypto.FromECDSAPub(member))
+	}
+	event := protocol.NewMembersAddedEvent(encodedMembers, group.NextClockValue())
+	err = group.ProcessEvent(&m.identity.PublicKey, event)
+	if err != nil {
+		return err
+	}
+	if err := m.propagateMembershipUpdates(ctx, group); err != nil {
+		return err
+	}
+	chat.updateChatFromProtocolGroup(group)
+	return m.SaveChat(*chat)
+}
+
+func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chat *Chat) error {
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		return err
+	}
+	event := protocol.NewMemberJoinedEvent(
+		statusproto.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+		group.NextClockValue(),
+	)
+	err = group.ProcessEvent(&m.identity.PublicKey, event)
+	if err != nil {
+		return err
+	}
+	if err := m.propagateMembershipUpdates(ctx, group); err != nil {
+		return err
+	}
+	chat.updateChatFromProtocolGroup(group)
+	return m.SaveChat(*chat)
+}
+
+func (m *Messenger) propagateMembershipUpdates(ctx context.Context, group *protocol.Group) error {
+	events := make([]protocol.MembershipUpdateEvent, len(group.Updates()))
+	for idx, event := range group.Updates() {
+		events[idx] = event.MembershipUpdateEvent
+	}
+	update := protocol.MembershipUpdate{
+		ChatID: group.ChatID(),
+		Events: events,
+	}
+	if err := update.Sign(m.identity); err != nil {
+		return err
+	}
+	recipients, err := stringSliceToPublicKeys(group.Members(), true)
+	if err != nil {
+		return err
+	}
+	// Filter out my key from the recipients
+	n := 0
+	for _, recipient := range recipients {
+		if !isPubKeyEqual(recipient, &m.identity.PublicKey) {
+			recipients[n] = recipient
+			n++
+		}
+	}
+	recipients = recipients[:n]
+	// Finally send membership updates to all recipients.
+	_, err = m.processor.SendMembershipUpdate(
+		ctx,
+		recipients,
+		group.ChatID(),
+		[]protocol.MembershipUpdate{update},
+		group.NextClockValue(),
+	)
+	return err
 }
 
 func (m *Messenger) SaveChat(chat Chat) error {
@@ -522,7 +621,7 @@ func (m *Messenger) Contacts() ([]*Contact, error) {
 	return m.persistence.Contacts()
 }
 
-func (m *Messenger) Send(ctx context.Context, chatID string, data []byte) ([]byte, error) {
+func (m *Messenger) Send(ctx context.Context, chatID string, data []byte) ([][]byte, error) {
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chatID))
 
 	// A valid added chat is required.
@@ -538,7 +637,8 @@ func (m *Messenger) Send(ctx context.Context, chatID string, data []byte) ([]byt
 
 	logger.Debug("last message clock received", zap.Int64("clock", clock))
 
-	if chat.PublicKey != nil {
+	switch chat.ChatType {
+	case ChatTypeOneToOne:
 		logger.Debug("sending private message", zap.Binary("publicKey", crypto.FromECDSAPub(chat.PublicKey)))
 
 		id, message, err := m.processor.SendPrivate(ctx, chat.PublicKey, chat.ID, data, clock)
@@ -546,27 +646,64 @@ func (m *Messenger) Send(ctx context.Context, chatID string, data []byte) ([]byt
 			return nil, err
 		}
 
-		// Save our message because it won't be received from the transport layer.
-		message.ID = id // a Message need ID to be properly stored in the db
-		message.SigPubKey = &m.identity.PublicKey
-		message.ChatID = chatID
+		if err := m.cacheOwnMessage(chatID, id, message); err != nil {
+			return nil, err
+		}
 
-		if m.messagesPersistenceEnabled {
-			_, err = m.persistence.SaveMessages([]*protocol.Message{message})
-			if err != nil {
+		return [][]byte{id}, nil
+	case ChatTypePublic:
+		logger.Debug("sending public message", zap.String("chatName", chat.Name))
+		id, err := m.processor.SendPublic(ctx, chat.ID, data, clock)
+		if err != nil {
+			return nil, err
+		}
+		return [][]byte{id}, nil
+	case ChatTypePrivateGroupChat:
+		logger.Debug("sending group message", zap.String("chatName", chat.Name))
+		recipients, err := chat.MembersAsPublicKeys()
+		if err != nil {
+			return nil, err
+		}
+		// Filter me out of recipients.
+		n := 0
+		for _, item := range recipients {
+			if !isPubKeyEqual(item, &m.identity.PublicKey) {
+				recipients[n] = item
+				n++
+			}
+		}
+		ids, messages, err := m.processor.SendGroup(ctx, recipients[:n], chat.ID, data, clock)
+		if err != nil {
+			return nil, err
+		}
+		for idx, message := range messages {
+			if err := m.cacheOwnMessage(chatID, ids[idx], message); err != nil {
 				return nil, err
 			}
 		}
-
-		// Cache it to be returned in Retrieve().
-		m.ownMessages = append(m.ownMessages, message)
-
-		return id, nil
-	} else if chat.Name != "" {
-		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		return m.processor.SendPublic(ctx, chat.ID, data, clock)
+		return ids, nil
+	default:
+		return nil, errors.New("chat is neither public nor private")
 	}
-	return nil, errors.New("chat is neither public nor private")
+}
+
+func (m *Messenger) cacheOwnMessage(chatID string, id []byte, message *protocol.Message) error {
+	// Save our message because it won't be received from the transport layer.
+	message.ID = id // a Message need ID to be properly stored in the db
+	message.SigPubKey = &m.identity.PublicKey
+	message.ChatID = chatID
+
+	if m.messagesPersistenceEnabled {
+		_, err := m.persistence.SaveMessages([]*protocol.Message{message})
+		if err != nil {
+			return err
+		}
+	}
+
+	// Cache it to be returned in Retrieve().
+	m.ownMessages = append(m.ownMessages, message)
+
+	return nil
 }
 
 // SendRaw takes encoded data, encrypts it and sends through the wire.

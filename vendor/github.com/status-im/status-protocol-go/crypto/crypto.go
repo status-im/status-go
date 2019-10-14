@@ -78,6 +78,7 @@ func VerifySignatures(signaturePairs [][3]string) error {
 }
 
 // ExtractSignatures extract from tuples of signatures content a public key
+// DEPRECATED: use ExtractSignature
 func ExtractSignatures(signaturePairs [][2]string) ([]string, error) {
 	response := make([]string, len(signaturePairs))
 	for i, signaturePair := range signaturePairs {
@@ -100,6 +101,12 @@ func ExtractSignatures(signaturePairs [][2]string) ([]string, error) {
 	}
 
 	return response, nil
+}
+
+// ExtractSignature returns a public key for a given data and signature.
+func ExtractSignature(data, signature []byte) (*ecdsa.PublicKey, error) {
+	dataHash := crypto.Keccak256(data)
+	return crypto.SigToPub(dataHash, signature)
 }
 
 func EncryptSymmetric(key, plaintext []byte) ([]byte, error) {

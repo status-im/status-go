@@ -81,6 +81,9 @@ type WhisperServiceTransport struct {
 }
 
 // NewWhisperServiceTransport returns a new WhisperServiceTransport.
+// TODO: leaving a chat should verify that for a given public key
+//       there are no other chats. It may happen that we leave a private chat
+//       but still have a public chat for a given public key.
 func NewWhisperServiceTransport(
 	shh whispertypes.Whisper,
 	privateKey *ecdsa.PrivateKey,
@@ -183,6 +186,30 @@ func (a *WhisperServiceTransport) JoinPrivate(publicKey *ecdsa.PublicKey) error 
 func (a *WhisperServiceTransport) LeavePrivate(publicKey *ecdsa.PublicKey) error {
 	filters := a.filters.FiltersByPublicKey(publicKey)
 	return a.filters.Remove(filters...)
+}
+
+func (a *WhisperServiceTransport) JoinGroup(publicKeys []*ecdsa.PublicKey) error {
+	_, err := a.filters.LoadDiscovery()
+	if err != nil {
+		return err
+	}
+	for _, pk := range publicKeys {
+		_, err = a.filters.LoadContactCode(pk)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *WhisperServiceTransport) LeaveGroup(publicKeys []*ecdsa.PublicKey) error {
+	for _, publicKey := range publicKeys {
+		filters := a.filters.FiltersByPublicKey(publicKey)
+		if err := a.filters.Remove(filters...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type Message struct {
