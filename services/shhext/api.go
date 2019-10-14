@@ -21,9 +21,9 @@ import (
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	statusproto "github.com/status-im/status-protocol-go"
+	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
 	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
-	"github.com/status-im/status-protocol-go/transport/whisper/gethbridge"
 	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	statusproto_types "github.com/status-im/status-protocol-go/types"
 )

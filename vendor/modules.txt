@@ -9,7 +9,7 @@ github.com/allegro/bigcache/queue
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
 github.com/beevik/ntp
-# github.com/btcsuite/btcd v0.0.0-20190824003749-130ea5bddde3
+# github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
 github.com/btcsuite/btcd/btcec
 github.com/btcsuite/btcd/chaincfg
 github.com/btcsuite/btcd/chaincfg/chainhash
@@ -348,9 +348,10 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.2.3-0.20191010161351-fd48aa752717
+# github.com/status-im/status-protocol-go v0.3.1
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
+github.com/status-im/status-protocol-go/bridge/geth
 github.com/status-im/status-protocol-go/crypto
 github.com/status-im/status-protocol-go/datasync
 github.com/status-im/status-protocol-go/datasync/peer
@@ -364,7 +365,6 @@ github.com/status-im/status-protocol-go/identity/identicon
 github.com/status-im/status-protocol-go/migrations
 github.com/status-im/status-protocol-go/sqlite
 github.com/status-im/status-protocol-go/transport/whisper
-github.com/status-im/status-protocol-go/transport/whisper/gethbridge
 github.com/status-im/status-protocol-go/transport/whisper/migrations
 github.com/status-im/status-protocol-go/transport/whisper/types
 github.com/status-im/status-protocol-go/types

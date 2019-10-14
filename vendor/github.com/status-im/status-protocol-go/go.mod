@@ -1,6 +1,6 @@
 module github.com/status-im/status-protocol-go
 
-go 1.12
+go 1.13
 
 require (
 	github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7 // indirect
