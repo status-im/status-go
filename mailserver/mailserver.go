@@ -242,7 +242,8 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		requestValidationErrorsCounter.Inc(1)
 		log.Error("[mailserver:DeliverMail] request failed validaton",
 			"peerID", peerID,
-			"requestID", requestID)
+			"requestID", requestID,
+			"err", err)
 		s.trySendHistoricMessageErrorResponse(peer, request, err)
 		return
 	}
