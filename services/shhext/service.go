@@ -213,6 +213,7 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 							Message: message.TransportMessage,
 						}
 						dedupMessage.Message.Payload = message.DecryptedPayload
+						dedupMessage.Payload = string(message.DecryptedPayload)
 						dedupMessages = append(dedupMessages, dedupMessage)
 					}
 				}
