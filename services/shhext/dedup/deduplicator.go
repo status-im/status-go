@@ -36,6 +36,7 @@ type Metadata struct {
 type DeduplicateMessage struct {
 	Message  *whispertypes.Message `json:"message"`
 	Metadata Metadata              `json:"metadata"`
+	Payload  string                `json:"payload"`
 }
 
 // NewDeduplicator creates a new deduplicator
