@@ -182,7 +182,7 @@ func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
-		archivedErrorsCounter.Inc(1)
+		archivedErrorsCounter.Inc()
 		return err
 	}
 
@@ -202,12 +202,12 @@ func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
 	)
 
 	if err != nil {
-		archivedErrorsCounter.Inc(1)
+		archivedErrorsCounter.Inc()
 		return err
 	}
 
-	archivedMeter.Mark(1)
-	archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
+	archivedEnvelopesCounter.Inc()
+	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + len(env.Data)))
 
 	return nil
 }
