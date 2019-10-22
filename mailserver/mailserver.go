@@ -570,6 +570,7 @@ func (s *WMailServer) processRequestInBundles(
 		"cursor", nextCursor)
 
 	// Publish
+batchLoop:
 	for _, batch := range batches {
 		select {
 		case output <- batch:
@@ -580,11 +581,11 @@ func (s *WMailServer) processRequestInBundles(
 		case <-cancel:
 			log.Info("[mailserver:processRequestInBundles] failed to push all batches",
 				"requestID", requestID)
-			break
+			break batchLoop
 		case <-time.After(timeout):
 			log.Error("[mailserver:processRequestInBundles] timed out pushing a batch",
 				"requestID", requestID)
-			break
+			break batchLoop
 		}
 	}
 
