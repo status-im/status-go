@@ -17,7 +17,8 @@ ExecStart=${GIT_ROOT}/build/bin/statusd \\
     -log "${LOG_LEVEL}" \\
     -log-without-color \\
     -dir "${DATA_PATH}" \\
-    -c "./config.json"
+    -c "./config.json" \\
+    -metrics
 
 [Install]
 WantedBy=default.target

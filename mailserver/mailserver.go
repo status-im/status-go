@@ -31,6 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/params"
 	whisper "github.com/status-im/whisper/whisperv6"
+
+	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -182,14 +184,13 @@ func (s *WMailServer) Archive(env *whisper.Envelope) {
 
 // DeliverMail sends mail to specified whisper peer.
 func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
+	timer := prom.NewTimer(mailDeliveryDuration)
+	defer timer.ObserveDuration()
 
-	startMethod := time.Now()
-	defer deliverMailTimer.UpdateSince(startMethod)
-
-	requestsMeter.Mark(1)
+	deliveryAttemptsCounter.Inc()
 
 	if peer == nil {
-		requestErrorsCounter.Inc(1)
+		deliveryFailuresCounter.WithLabelValues("no_peer_set").Inc()
 		log.Error("[mailserver:DeliverMail] peer is nil")
 		return
 	}
@@ -202,7 +203,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		"requestID", requestID)
 
 	if s.exceedsPeerRequests(peer.ID()) {
-		requestErrorsCounter.Inc(1)
+		deliveryFailuresCounter.WithLabelValues("peer_req_limit").Inc()
 		log.Error("[mailserver:DeliverMail] peer exceeded the limit",
 			"peerID", peerID,
 			"requestID", requestID)
@@ -239,7 +240,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	}
 
 	if err != nil {
-		requestValidationErrorsCounter.Inc(1)
+		deliveryFailuresCounter.WithLabelValues("validation").Inc()
 		log.Error("[mailserver:DeliverMail] request failed validaton",
 			"peerID", peerID,
 			"requestID", requestID,
@@ -260,7 +261,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 	)
 
 	if batch {
-		requestsBatchedCounter.Inc(1)
+		requestsBatchedCounter.Inc()
 	}
 
 	iter, err := s.createIterator(lower, upper, cursor, bloom, limit)
@@ -295,7 +296,6 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 			"counter", counter)
 	}()
 
-	start := time.Now()
 	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
 		iter,
 		bloom,
@@ -305,11 +305,10 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		bundles,
 		cancelProcessing,
 	)
-	requestProcessTimer.UpdateSince(start)
 
 	// Wait for the goroutine to finish the work. It may return an error.
 	if err := <-errCh; err != nil {
-		processRequestErrorsCounter.Inc(1)
+		deliveryFailuresCounter.WithLabelValues("process").Inc()
 		log.Error("[mailserver:DeliverMail] error while processing",
 			"err", err,
 			"peerID", peerID,
@@ -320,7 +319,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 
 	// Processing of the request could be finished earlier due to iterator error.
 	if err := iter.Error(); err != nil {
-		processRequestErrorsCounter.Inc(1)
+		deliveryFailuresCounter.WithLabelValues("iterator").Inc()
 		log.Error("[mailserver:DeliverMail] iterator failed",
 			"err", err,
 			"peerID", peerID,
@@ -336,7 +335,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		"next", nextPageCursor)
 
 	if err := s.sendHistoricMessageResponse(peer, request, lastEnvelopeHash, nextPageCursor); err != nil {
-		historicResponseErrorsCounter.Inc(1)
+		deliveryFailuresCounter.WithLabelValues("historic_msg_resp").Inc()
 		log.Error("[mailserver:DeliverMail] error sending historic message response",
 			"err", err,
 			"peerID", peerID,
@@ -352,21 +351,23 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 
 	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000))
 
-	syncRequestsMeter.Mark(1)
+	syncAttemptsCounter.Inc()
 
 	// Check rate limiting for a requesting peer.
 	if s.exceedsPeerRequests(peer.ID()) {
-		requestErrorsCounter.Inc(1)
+		syncFailuresCounter.WithLabelValues("req_per_sec_limit").Inc()
 		log.Error("Peer exceeded request per seconds limit", "peerID", peerIDString(peer))
 		return fmt.Errorf("requests per seconds limit exceeded")
 	}
 
 	if err := request.Validate(); err != nil {
+		syncFailuresCounter.WithLabelValues("req_invalid").Inc()
 		return fmt.Errorf("request is invalid: %v", err)
 	}
 
 	iter, err := s.createIterator(request.Lower, request.Upper, request.Cursor, nil, 0)
 	if err != nil {
+		syncFailuresCounter.WithLabelValues("iterator").Inc()
 		return err
 	}
 	defer iter.Release()
@@ -387,7 +388,6 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		close(errCh)
 	}()
 
-	start := time.Now()
 	nextCursor, _ := s.processRequestInBundles(
 		iter,
 		request.Bloom,
@@ -397,10 +397,10 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		bundles,
 		cancelProcessing,
 	)
-	requestProcessTimer.UpdateSince(start)
 
 	// Wait for the goroutine to finish the work. It may return an error.
 	if err := <-errCh; err != nil {
+		syncFailuresCounter.WithLabelValues("routine").Inc()
 		_ = s.w.SendSyncResponse(
 			peer,
 			whisper.SyncResponse{Error: "failed to send a response"},
@@ -410,6 +410,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 
 	// Processing of the request could be finished earlier due to iterator error.
 	if err := iter.Error(); err != nil {
+		syncFailuresCounter.WithLabelValues("iterator").Inc()
 		_ = s.w.SendSyncResponse(
 			peer,
 			whisper.SyncResponse{Error: "failed to process all envelopes"},
@@ -423,6 +424,7 @@ func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailReque
 		Cursor: nextCursor,
 		Final:  true,
 	}); err != nil {
+		syncFailuresCounter.WithLabelValues("response_send").Inc()
 		return fmt.Errorf("failed to send the final sync response: %v", err)
 	}
 
@@ -480,6 +482,9 @@ func (s *WMailServer) processRequestInBundles(
 	output chan<- []rlp.RawValue,
 	cancel <-chan struct{},
 ) ([]byte, common.Hash) {
+	timer := prom.NewTimer(requestsInBundlesDuration)
+	defer timer.ObserveDuration()
+
 	var (
 		bundle                 []rlp.RawValue
 		bundleSize             uint32
@@ -588,8 +593,8 @@ func (s *WMailServer) processRequestInBundles(
 		}
 	}
 
-	sentEnvelopesMeter.Mark(int64(processedEnvelopes))
-	sentEnvelopesSizeMeter.Mark(processedEnvelopesSize)
+	envelopesCounter.Inc()
+	sentEnvelopeBatchSizeMeter.Observe(float64(processedEnvelopesSize))
 
 	log.Info("[mailserver:processRequestInBundles] envelopes published",
 		"requestID", requestID)
@@ -599,8 +604,8 @@ func (s *WMailServer) processRequestInBundles(
 }
 
 func (s *WMailServer) sendRawEnvelopes(peer *whisper.Peer, envelopes []rlp.RawValue, batch bool) error {
-	start := time.Now()
-	defer requestProcessNetTimer.UpdateSince(start)
+	timer := prom.NewTimer(sendRawEnvelopeDuration)
+	defer timer.ObserveDuration()
 
 	if batch {
 		return s.w.SendRawP2PDirect(peer, envelopes...)

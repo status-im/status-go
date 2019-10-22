@@ -142,16 +142,16 @@ func (db *LevelDB) SaveEnvelope(env *whisper.Envelope) error {
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
-		archivedErrorsCounter.Inc(1)
+		archivedErrorsCounter.Inc()
 		return err
 	}
 
 	if err = db.ldb.Put(key.Bytes(), rawEnvelope, nil); err != nil {
 		log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
-		archivedErrorsCounter.Inc(1)
+		archivedErrorsCounter.Inc()
 	}
-	archivedMeter.Mark(1)
-	archivedSizeMeter.Mark(int64(whisper.EnvelopeHeaderLength + len(env.Data)))
+	archivedEnvelopesCounter.Inc()
+	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + len(env.Data)))
 	return err
 }
 
