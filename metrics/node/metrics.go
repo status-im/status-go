@@ -26,11 +26,8 @@ func updateNodeMetrics(node *node.Node, evType p2p.PeerEventType) error {
 		return err
 	}
 
-	if change.Counter > 0 {
-		nodePeersCounter.Inc(change.Counter)
-	} else if change.Counter < 0 {
-		nodePeersCounter.Dec(change.Counter)
-	}
+	// Counter is 1 or -1 based on evType
+	nodePeersCounter.Inc(change.Counter)
 
 	nodePeersGauge.Update(change.Absolute)
 	nodeMaxPeersGauge.Update(change.Max)
