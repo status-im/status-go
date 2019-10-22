@@ -37,8 +37,8 @@ const (
 var logger = log.New("package", "status-go/cmd/node-canary")
 
 var (
-	staticEnodeAddr     = flag.String("staticnode", "", "static node enode address to test (e.g. enode://3f04db09bedc8d85a198de94c84da73aa7782fafc61b28c525ec5cca5a6cc16be7ebbb5cd001780f71d8408d35a2f6326faa1e524d9d8875294172ebec988743@172.16.238.10:30303)")
-	mailserverEnodeAddr = flag.String("mailserver", "", "mailserver enode address to test (e.g. enode://1da276e34126e93babf24ec88aac1a7602b4cbb2e11b0961d0ab5e989ca9c261aa7f7c1c85f15550a5f1e5a5ca2305b53b9280cf5894d5ecf7d257b173136d40@167.99.209.61:30504)")
+	staticEnodeAddr     = flag.String("staticnode", "", "checks if static node talks whisper protocol (e.g. enode://abc123@1.2.3.4:30303)")
+	mailserverEnodeAddr = flag.String("mailserver", "", "queries mail server for historic messages (e.g. enode://123abc@4.3.2.1:30504)")
 	publicChannel       = flag.String("channel", "status", "The public channel name to retrieve historic messages from (used with 'mailserver' flag)")
 	timeout             = flag.Int("timeout", 10, "Timeout when connecting to node or fetching messages from mailserver, in seconds")
 	period              = flag.Int("period", 24*60*60, "How far in the past to request messages from mailserver, in seconds")
@@ -198,6 +198,12 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 		os.Exit(3)
 	}
 
+	// if last envelope is empty there are no messages to receive
+	if isEmptyEnvelope(resp.LastEnvelopeHash) {
+		logger.Warn("No messages available from mailserver")
+		return
+	}
+
 	// wait for last envelope sent by the mailserver to be available for filters
 	err = waitForEnvelopeEvents(envelopeAvailableWatcher, []string{resp.LastEnvelopeHash.String()}, whispertypes.EventEnvelopeAvailable)
 	if err != nil {
@@ -296,6 +302,10 @@ func startClientNode() (*api.StatusBackend, error) {
 		return nil, err
 	}
 	clientBackend := api.NewStatusBackend()
+	err = clientBackend.AccountManager().InitKeystore(config.KeyStoreDir)
+	if err != nil {
+		return nil, err
+	}
 	err = clientBackend.StartNode(config)
 	if err != nil {
 		return nil, err
@@ -395,4 +405,14 @@ func waitForEnvelopeEvents(events chan whispertypes.EnvelopeEvent, hashes []stri
 			return fmt.Errorf("timed out while waiting for event on envelopes. event: %s", event)
 		}
 	}
+}
+
+// helper for checking LastEnvelopeHash
+func isEmptyEnvelope(hash statusproto.Hash) bool {
+	for _, b := range hash {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
