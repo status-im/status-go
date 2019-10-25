@@ -350,7 +350,7 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.4.1-0.20191014103017-1f15a058b66c
+# github.com/status-im/status-protocol-go v0.4.2
 github.com/status-im/status-protocol-go
 github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/bridge/geth
@@ -372,7 +372,7 @@ github.com/status-im/status-protocol-go/transport/whisper/types
 github.com/status-im/status-protocol-go/types
 github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/zaputil
-# github.com/status-im/whisper v1.5.1
+# github.com/status-im/whisper v1.5.2-0.20191025180119-3d5a32f97e3f
 github.com/status-im/whisper/whisperv6
 # github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
 github.com/steakknife/bloomfilter
@@ -398,7 +398,7 @@ github.com/syndtr/goleveldb/leveldb/util
 # github.com/tyler-smith/go-bip39 v1.0.2
 github.com/tyler-smith/go-bip39
 github.com/tyler-smith/go-bip39/wordlists
-# github.com/vacp2p/mvds v0.0.23-0.20191014101555-026e462c829d
+# github.com/vacp2p/mvds v0.0.23
 github.com/vacp2p/mvds/node
 github.com/vacp2p/mvds/node/migrations
 github.com/vacp2p/mvds/peers

@@ -21,7 +21,9 @@ func invalidResponseSizeError(size int) error {
 // CreateMailServerRequestCompletedPayload creates a payload representing
 // a successful request to mailserver
 func CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash common.Hash, cursor []byte) []byte {
-	payload := append(requestID[:], lastEnvelopeHash[:]...)
+	payload := make([]byte, len(requestID))
+	copy(payload, requestID[:])
+	payload = append(payload, lastEnvelopeHash[:]...)
 	payload = append(payload, cursor...)
 	return payload
 }
@@ -29,10 +31,9 @@ func CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash common.
 // CreateMailServerRequestFailedPayload creates a payload representing
 // a failed request to a mailserver
 func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []byte {
-	payloadPrefix := []byte(mailServerFailedPayloadPrefix)
-	errorString := []byte(err.Error())
-	payload := append(payloadPrefix, requestID[:]...)
-	payload = append(payload, errorString[:]...)
+	payload := []byte(mailServerFailedPayloadPrefix)
+	payload = append(payload, requestID[:]...)
+	payload = append(payload, []byte(err.Error())...)
 	return payload
 }
 

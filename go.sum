@@ -560,12 +560,12 @@ github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T6
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
-github.com/status-im/status-protocol-go v0.4.1-0.20191014103017-1f15a058b66c h1:e0WWnear7T8mXXmU7kKMOrnxGQ95AJOjDJTp58Do0Iw=
-github.com/status-im/status-protocol-go v0.4.1-0.20191014103017-1f15a058b66c/go.mod h1:a1kbCiz4yIs2lxJEHsp5eFjdhB+5RUTN8+Uec6wWa4s=
 github.com/status-im/status-protocol-go v0.4.2 h1:HAX51q3j+WAzbyeqryJEY1O6hqzTAbYEjkppIXkcNvg=
 github.com/status-im/status-protocol-go v0.4.2/go.mod h1:WsfEnZo8dWadTbMqAoLztC/5p9SDwFeEGCmVDzSEmrQ=
 github.com/status-im/whisper v1.5.1 h1:87/XIg0Wjua7lXBGiEXgAfTOqlt2Q1dMDuxugTyZbbA=
 github.com/status-im/whisper v1.5.1/go.mod h1:emrOxzJme0k66QtbbQ2bdd3P8RCdLZ8sTD7SkwH1s2s=
+github.com/status-im/whisper v1.5.2-0.20191025180119-3d5a32f97e3f h1:1SQGk2Zc6JUFGQEGDaHanPVumQP55NcDwg53zZava+E=
+github.com/status-im/whisper v1.5.2-0.20191025180119-3d5a32f97e3f/go.mod h1:emrOxzJme0k66QtbbQ2bdd3P8RCdLZ8sTD7SkwH1s2s=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 h1:gIlAHnH1vJb5vwEjIp5kBj/eu99p/bl0Ay2goiPe5xE=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570/go.mod h1:8OR4w3TdeIHIh1g6EMY5p0gVNOovcWC+1vpc7naMuAw=
 github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 h1:njlZPzLwU639dk2kqnCPPv+wNjq7Xb6EfUxe/oX0/NM=
@@ -588,8 +588,6 @@ github.com/tyler-smith/go-bip39 v1.0.2/go.mod h1:sJ5fKU0s6JVwZjjcUEX2zFOnvq0ASQ2
 github.com/uber/jaeger-client-go v0.0.0-20180607151842-f7e0d4744fa6/go.mod h1:WVhlPFC8FDjOFMMWRy2pZqQJSXxYSwNYOkTr/Z6d3Kk=
 github.com/uber/jaeger-lib v0.0.0-20180615202729-a51202d6f4a7/go.mod h1:ComeNDZlWwrWnDv8aPp0Ba6+uUTzImX/AauajbLI56U=
 github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljTbGfSG7qAOspJ7OScBnGdDN/yBr0sguwnwf0=
-github.com/vacp2p/mvds v0.0.23-0.20191014101555-026e462c829d h1:kc/9/ZbwyqIKQ2phzmPpBYGx7v2olwD2P7Uj8KKd+Bw=
-github.com/vacp2p/mvds v0.0.23-0.20191014101555-026e462c829d/go.mod h1:uUmtiahU7efOVl/5w5yk9jOze5xYpDZDrSrT8TvHXjQ=
 github.com/vacp2p/mvds v0.0.23 h1:BKdn7tyGvl/J/Pwv6FlcW6Xbzm+17jv141GB1mFXyOU=
 github.com/vacp2p/mvds v0.0.23/go.mod h1:uUmtiahU7efOVl/5w5yk9jOze5xYpDZDrSrT8TvHXjQ=
 github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1/go.mod h1:8UvriyWtv5Q5EOgjHaSseUEdkQfvwFv1I/In/O2M9gc=
