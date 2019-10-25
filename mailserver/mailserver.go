@@ -195,20 +195,19 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		return
 	}
 
-	requestID := request.Hash().String()
-	requestIDBytes := request.Hash().Bytes()
+	requestID := request.Hash()
 	peerID := peerIDString(peer)
 
 	log.Info("[mailserver:DeliverMail] delivering mail",
 		"peerID", peerID,
-		"requestID", requestID)
+		"requestID", requestID.String())
 
 	if s.exceedsPeerRequests(peer.ID()) {
 		requestErrorsCounter.Inc(1)
 		log.Error("[mailserver:DeliverMail] peer exceeded the limit",
 			"peerID", peerID,
-			"requestID", requestID)
-		s.trySendHistoricMessageErrorResponse(peer, requestIDBytes, fmt.Errorf("rate limit exceeded"))
+			"requestID", requestID.String())
+		s.trySendHistoricMessageErrorResponse(peer, requestID, fmt.Errorf("rate limit exceeded"))
 		return
 	}
 
@@ -232,7 +231,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		log.Debug("[mailserver:DeliverMail] failed to decode request",
 			"err", err,
 			"peerID", peerID,
-			"requestID", requestID)
+			"requestID", requestID.String())
 		lower, upper, bloom, limit, cursor, err = s.validateRequest(peer.ID(), request)
 	}
 
@@ -244,15 +243,15 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		requestValidationErrorsCounter.Inc(1)
 		log.Error("[mailserver:DeliverMail] request failed validaton",
 			"peerID", peerID,
-			"requestID", requestID,
+			"requestID", requestID.String(),
 			"err", err)
-		s.trySendHistoricMessageErrorResponse(peer, requestIDBytes, err)
+		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
 		return
 	}
 
 	log.Info("[mailserver:DeliverMail] processing request",
 		"peerID", peerID,
-		"requestID", requestID,
+		"requestID", requestID.String(),
 		"lower", lower,
 		"upper", upper,
 		"bloom", bloom,
@@ -293,7 +292,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		close(errCh)
 		log.Info("[mailserver:DeliverMail] finished sending bundles",
 			"peerID", peerID,
-			"requestID", requestID,
+			"requestID", requestID.String(),
 			"counter", counter)
 	}()
 
@@ -303,7 +302,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		bloom,
 		int(limit),
 		processRequestTimeout,
-		requestID,
+		requestID.String(),
 		bundles,
 		cancelProcessing,
 	)
@@ -316,7 +315,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 			"err", err,
 			"peerID", peerID,
 			"requestID", requestID)
-		s.trySendHistoricMessageErrorResponse(peer, requestIDBytes, err)
+		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
 		return
 	}
 
@@ -327,7 +326,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 			"err", err,
 			"peerID", peerID,
 			"requestID", requestID)
-		s.trySendHistoricMessageErrorResponse(peer, requestIDBytes, err)
+		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
 		return
 	}
 
@@ -344,7 +343,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 			"peerID", peerID,
 			"requestID", requestID)
 		// we still want to try to report error even it it is a p2p error and it is unlikely
-		s.trySendHistoricMessageErrorResponse(peer, requestIDBytes, err)
+		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
 	}
 }
 
@@ -353,9 +352,10 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 	defer deliverMailTimer.UpdateSince(startMethod)
 
 	var (
-		requestID = r.ID
-		peerID    = peerIDString(peer)
-		err       error
+		requestIDHash = common.BytesToHash(r.ID)
+		requestIDStr  = requestIDHash.String()
+		peerID        = peerIDString(peer)
+		err           error
 	)
 
 	defer func() {
@@ -363,13 +363,13 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 			log.Error("[mailserver:DeliverMail] failed to process",
 				"err", err,
 				"peerID", peerID,
-				"requestID", requestID,
+				"requestID", requestIDStr,
 			)
-			s.trySendHistoricMessageErrorResponse(peer, []byte(requestID), err)
+			s.trySendHistoricMessageErrorResponse(peer, requestIDHash, err)
 		}
 	}()
 
-	log.Info("[mailserver:Deliver] delivering mail", "peerID", peerID, "requestID", requestID)
+	log.Info("[mailserver:Deliver] delivering mail", "peerID", peerID, "requestID", requestIDStr)
 	requestsMeter.Mark(1)
 
 	if peer == nil {
@@ -400,7 +400,7 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 
 	log.Info("[mailserver:Deliver] processing request",
 		"peerID", peerID,
-		"requestID", requestID,
+		"requestID", requestIDStr,
 		"lower", lower,
 		"upper", upper,
 		"bloom", bloom,
@@ -434,7 +434,7 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 		close(errCh)
 		log.Info("[mailserver:DeliverMail] finished sending bundles",
 			"peerID", peerID,
-			"requestID", requestID,
+			"requestID", requestIDStr,
 			"counter", counter,
 		)
 	}()
@@ -445,7 +445,7 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 		bloom,
 		int(limit),
 		processRequestTimeout,
-		requestID,
+		requestIDStr,
 		bundles,
 		cancelProcessing,
 	)
@@ -469,12 +469,12 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 
 	log.Info("[mailserver:Deliver] sending historic message response",
 		"peerID", peerID,
-		"requestID", requestID,
+		"requestID", requestIDStr,
 		"last", lastEnvelopeHash,
 		"next", nextPageCursor,
 	)
 
-	err = s.sendHistoricMessageResponse(peer, common.BytesToHash([]byte(requestID)), lastEnvelopeHash, nextPageCursor)
+	err = s.sendHistoricMessageResponse(peer, requestIDHash, lastEnvelopeHash, nextPageCursor)
 	if err != nil {
 		historicResponseErrorsCounter.Inc(1)
 		err = fmt.Errorf("failed to send response: %v", err)
@@ -757,8 +757,8 @@ func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, requestID,
 }
 
 // this method doesn't return an error because it is already in the error handling chain
-func (s *WMailServer) trySendHistoricMessageErrorResponse(peer *whisper.Peer, requestID []byte, errorToReport error) {
-	payload := whisper.CreateMailServerRequestFailedPayload(common.BytesToHash(requestID), errorToReport)
+func (s *WMailServer) trySendHistoricMessageErrorResponse(peer *whisper.Peer, requestID common.Hash, errorToReport error) {
+	payload := whisper.CreateMailServerRequestFailedPayload(requestID, errorToReport)
 
 	err := s.w.SendHistoricMessageResponse(peer, payload)
 	// if we can't report an error, probably something is wrong with p2p connection,

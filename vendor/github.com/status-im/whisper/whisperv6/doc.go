@@ -112,8 +112,9 @@ type MailServer interface {
 
 // MessagesRequest contains details of a request of historic messages.
 type MessagesRequest struct {
-	// ID of the request.
-	ID string `json:"id"`
+	// ID of the request. The current implementation requires ID to be 32-byte array,
+	// however, it's not enforced for future implementation.
+	ID []byte `json:"id"`
 
 	// From is a lower bound of time range.
 	From uint32 `json:"from"`
@@ -133,7 +134,7 @@ type MessagesRequest struct {
 }
 
 func (r MessagesRequest) Validate() error {
-	if r.ID == "" {
+	if len(r.ID) == 0 {
 		return errors.New("empty 'ID'")
 	}
 
