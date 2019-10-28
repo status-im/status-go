@@ -4,14 +4,14 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/common"
-	whisper "github.com/status-im/whisper/whisperv6"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
 	// DBKeyLength is a size of the envelope key.
-	DBKeyLength  = common.HashLength + timestampLength + whisper.TopicLength
-	CursorLength = common.HashLength + timestampLength
+	DBKeyLength  = statusproto.HashLength + timestampLength + whispertypes.TopicLength
+	CursorLength = statusproto.HashLength + timestampLength
 )
 
 var (
@@ -30,12 +30,12 @@ func (k *DBKey) Bytes() []byte {
 	return k.raw
 }
 
-func (k *DBKey) Topic() whisper.TopicType {
-	return whisper.BytesToTopic(k.raw[timestampLength+common.HashLength:])
+func (k *DBKey) Topic() whispertypes.TopicType {
+	return whispertypes.BytesToTopic(k.raw[timestampLength+statusproto.HashLength:])
 }
 
-func (k *DBKey) EnvelopeHash() common.Hash {
-	return common.BytesToHash(k.raw[timestampLength : common.HashLength+timestampLength])
+func (k *DBKey) EnvelopeHash() statusproto.Hash {
+	return statusproto.BytesToHash(k.raw[timestampLength : statusproto.HashLength+timestampLength])
 }
 
 func (k *DBKey) Cursor() []byte {
@@ -44,11 +44,11 @@ func (k *DBKey) Cursor() []byte {
 }
 
 // NewDBKey creates a new DBKey with the given values.
-func NewDBKey(timestamp uint32, topic whisper.TopicType, h common.Hash) *DBKey {
+func NewDBKey(timestamp uint32, topic whispertypes.TopicType, h statusproto.Hash) *DBKey {
 	var k DBKey
 	k.raw = make([]byte, DBKeyLength)
 	binary.BigEndian.PutUint32(k.raw, timestamp)
 	copy(k.raw[timestampLength:], h[:])
-	copy(k.raw[timestampLength+common.HashLength:], topic[:])
+	copy(k.raw[timestampLength+statusproto.HashLength:], topic[:])
 	return &k
 }

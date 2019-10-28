@@ -442,7 +442,7 @@ func (s *Service) postPing() (hexutil.Bytes, error) {
 	}
 
 	msg.Payload = payload
-	msg.Sig = s.whisperKeyID
+	msg.SigID = s.whisperKeyID
 	msg.SymKeyID = s.whisperSymKeyID
 
 	return s.w.Post(context.TODO(), msg)

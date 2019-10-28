@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/params"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	prom "github.com/prometheus/client_golang/prometheus"
@@ -197,7 +199,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		return
 	}
 
-	requestID := request.Hash()
+	requestID := statusproto.Hash(request.Hash())
 	peerID := peerIDString(peer)
 
 	log.Info("[mailserver:DeliverMail] delivering mail",
@@ -336,7 +338,7 @@ func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope)
 		"last", lastEnvelopeHash,
 		"next", nextPageCursor)
 
-	if err := s.sendHistoricMessageResponse(peer, request.Hash(), lastEnvelopeHash, nextPageCursor); err != nil {
+	if err := s.sendHistoricMessageResponse(peer, requestID, lastEnvelopeHash, nextPageCursor); err != nil {
 		deliveryFailuresCounter.WithLabelValues("historic_msg_resp").Inc()
 		log.Error("[mailserver:DeliverMail] error sending historic message response",
 			"err", err,
@@ -354,7 +356,7 @@ func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
 	deliveryAttemptsCounter.Inc()
 
 	var (
-		requestIDHash = common.BytesToHash(r.ID)
+		requestIDHash = statusproto.BytesToHash(r.ID)
 		requestIDStr  = requestIDHash.String()
 		peerID        = peerIDString(peer)
 		err           error
@@ -590,8 +592,8 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 
 func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte, bloom []byte, limit uint32) (Iterator, error) {
 	var (
-		emptyHash  common.Hash
-		emptyTopic whisper.TopicType
+		emptyHash  statusproto.Hash
+		emptyTopic whispertypes.TopicType
 		ku, kl     *DBKey
 	)
 
@@ -618,7 +620,7 @@ func (s *WMailServer) processRequestInBundles(
 	requestID string,
 	output chan<- []rlp.RawValue,
 	cancel <-chan struct{},
-) ([]byte, common.Hash) {
+) ([]byte, statusproto.Hash) {
 	timer := prom.NewTimer(requestsInBundlesDuration)
 	defer timer.ObserveDuration()
 
@@ -629,7 +631,7 @@ func (s *WMailServer) processRequestInBundles(
 		processedEnvelopes     int
 		processedEnvelopesSize int64
 		nextCursor             []byte
-		lastEnvelopeHash       common.Hash
+		lastEnvelopeHash       statusproto.Hash
 	)
 
 	log.Info("[mailserver:processRequestInBundles] processing request",
@@ -758,14 +760,14 @@ func (s *WMailServer) sendRawEnvelopes(peer *whisper.Peer, envelopes []rlp.RawVa
 	return nil
 }
 
-func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, requestID, lastEnvelopeHash common.Hash, cursor []byte) error {
-	payload := whisper.CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash, cursor)
+func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, requestID, lastEnvelopeHash statusproto.Hash, cursor []byte) error {
+	payload := whisper.CreateMailServerRequestCompletedPayload(common.Hash(requestID), common.Hash(lastEnvelopeHash), cursor)
 	return s.w.SendHistoricMessageResponse(peer, payload)
 }
 
 // this method doesn't return an error because it is already in the error handling chain
-func (s *WMailServer) trySendHistoricMessageErrorResponse(peer *whisper.Peer, requestID common.Hash, errorToReport error) {
-	payload := whisper.CreateMailServerRequestFailedPayload(requestID, errorToReport)
+func (s *WMailServer) trySendHistoricMessageErrorResponse(peer *whisper.Peer, requestID statusproto.Hash, errorToReport error) {
+	payload := whisper.CreateMailServerRequestFailedPayload(common.Hash(requestID), errorToReport)
 
 	err := s.w.SendHistoricMessageResponse(peer, payload)
 	// if we can't report an error, probably something is wrong with p2p connection,

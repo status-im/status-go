@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/status-im/status-protocol-go/crypto"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -94,7 +94,7 @@ func (u *MembershipUpdate) extractFrom() error {
 	if err != nil {
 		return errors.Wrap(err, "failed to extract signature")
 	}
-	u.From = hexutil.Encode(gethcrypto.FromECDSAPub(publicKey))
+	u.From = statusproto.EncodeHex(gethcrypto.FromECDSAPub(publicKey))
 	return nil
 }
 
@@ -282,7 +282,7 @@ type Group struct {
 }
 
 func groupChatID(creator *ecdsa.PublicKey) string {
-	return uuid.New().String() + "-" + hexutil.Encode(gethcrypto.FromECDSAPub(creator))
+	return uuid.New().String() + "-" + statusproto.EncodeHex(gethcrypto.FromECDSAPub(creator))
 }
 
 func NewGroupWithMembershipUpdates(chatID string, updates []MembershipUpdate) (*Group, error) {
@@ -396,7 +396,7 @@ func (g *Group) ProcessEvents(from *ecdsa.PublicKey, events []MembershipUpdateEv
 }
 
 func (g *Group) ProcessEvent(from *ecdsa.PublicKey, event MembershipUpdateEvent) error {
-	fromHex := hexutil.Encode(gethcrypto.FromECDSAPub(from))
+	fromHex := statusproto.EncodeHex(gethcrypto.FromECDSAPub(from))
 	if !g.validateEvent(fromHex, event) {
 		return fmt.Errorf("invalid event %#+v from %s", event, from)
 	}
@@ -523,7 +523,7 @@ func stringSliceEquals(slice1, slice2 []string) bool {
 }
 
 func publicKeyToString(publicKey *ecdsa.PublicKey) string {
-	return hexutil.Encode(gethcrypto.FromECDSAPub(publicKey))
+	return statusproto.EncodeHex(gethcrypto.FromECDSAPub(publicKey))
 }
 
 type stringSet struct {

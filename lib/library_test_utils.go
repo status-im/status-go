@@ -24,20 +24,18 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ethereum/go-ethereum/event"
-)
-import (
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
 const initJS = `
@@ -463,7 +461,7 @@ func testLoginWithKeycard(t *testing.T, feed *event.Feed) bool { //nolint: gocyc
 		t.Errorf("whisper service not running: %v", err)
 	}
 
-	chatPubKeyHex := hexutil.Encode(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
+	chatPubKeyHex := statusproto.EncodeHex(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
 	if whisperService.HasKeyPair(chatPubKeyHex) {
 		t.Error("identity already present in whisper")
 		return false

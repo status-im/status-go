@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -330,7 +329,7 @@ func (p *messageProcessor) Process(shhMessage *whispertypes.Message) ([]*protoco
 		default:
 			hlogger.Error(
 				"skipped a public message of unsupported type",
-				zap.String("type", reflect.TypeOf(m).String()),
+				zap.Any("value", statusMessage.ParsedMessage),
 			)
 		}
 	}

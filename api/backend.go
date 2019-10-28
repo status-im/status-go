@@ -40,6 +40,7 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -76,7 +77,7 @@ type StatusBackend struct {
 	allowAllRPC     bool // used only for tests, disables api method restrictions
 }
 
-// NewStatusBackend create a new NewStatusBackend instance
+// NewStatusBackend create a new StatusBackend instance
 func NewStatusBackend() *StatusBackend {
 	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
 
@@ -153,7 +154,7 @@ func (b *StatusBackend) GetAccounts() ([]multiaccounts.Account, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
-		return nil, errors.New("accoutns db wasn't initialized")
+		return nil, errors.New("accounts db wasn't initialized")
 	}
 	return b.multiaccountsDB.GetAccounts()
 }
@@ -162,7 +163,7 @@ func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.multiaccountsDB == nil {
-		return errors.New("accoutns db wasn't initialized")
+		return errors.New("accounts db wasn't initialized")
 	}
 	return b.multiaccountsDB.SaveAccount(account)
 }
@@ -1021,6 +1022,6 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not sign the hash: %v", err)
 	}
 
-	hexEncodedSignature := hexutil.Encode(signature)
+	hexEncodedSignature := statusproto.EncodeHex(signature)
 	return hexEncodedSignature, nil
 }

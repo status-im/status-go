@@ -739,7 +739,7 @@ func createBloomFilter(r MessagesRequest) []byte {
 		return topicsToBloom(r.Topics...)
 	}
 
-	return whisper.TopicToBloom(whisper.TopicType(r.Topic))
+	return whispertypes.TopicToBloom(r.Topic)
 }
 
 func topicsToBloom(topics ...whispertypes.TopicType) []byte {
@@ -749,9 +749,9 @@ func topicsToBloom(topics ...whispertypes.TopicType) []byte {
 		i.Or(i, new(big.Int).SetBytes(bloom[:]))
 	}
 
-	combined := make([]byte, whisper.BloomFilterSize)
+	combined := make([]byte, whispertypes.BloomFilterSize)
 	data := i.Bytes()
-	copy(combined[whisper.BloomFilterSize-len(data):], data[:])
+	copy(combined[whispertypes.BloomFilterSize-len(data):], data[:])
 
 	return combined
 }
