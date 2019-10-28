@@ -37,7 +37,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208 // indirect
-	go.uber.org/zap v1.10.0
+	go.uber.org/zap v1.11.0
 	golang.org/x/crypto v0.0.0-20191001141032-4663e185863a
 	golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
