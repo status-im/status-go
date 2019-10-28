@@ -90,7 +90,7 @@ func (w *gethPublicWhisperAPIWrapper) Post(ctx context.Context, req whispertypes
 	msg := whisper.NewMessage{
 		SymKeyID:   req.SymKeyID,
 		PublicKey:  req.PublicKey,
-		Sig:        req.Sig,
+		Sig:        req.SigID, // Sig is really a SigID
 		TTL:        req.TTL,
 		Topic:      whisper.TopicType(req.Topic),
 		Payload:    req.Payload,

@@ -10,7 +10,7 @@ import (
 type NewMessage struct {
 	SymKeyID   string    `json:"symKeyID"`
 	PublicKey  []byte    `json:"pubKey"`
-	Sig        string    `json:"sig"`
+	SigID      string    `json:"sig"`
 	TTL        uint32    `json:"ttl"`
 	Topic      TopicType `json:"topic"`
 	Payload    []byte    `json:"payload"`

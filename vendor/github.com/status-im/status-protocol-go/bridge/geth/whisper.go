@@ -32,8 +32,8 @@ func (w *gethWhisperWrapper) PublicWhisperAPI() whispertypes.PublicWhisperAPI {
 	return NewGethPublicWhisperAPIWrapper(whisper.NewPublicWhisperAPI(w.whisper))
 }
 
-func (w *gethWhisperWrapper) NewMessageStore() whispertypes.MessageStore {
-	return NewGethMessageStoreWrapper(w.whisper.NewMessageStore())
+func (w *gethWhisperWrapper) Poll() {
+	// noop
 }
 
 // MinPow returns the PoW value required by this node.
@@ -112,27 +112,57 @@ func (w *gethWhisperWrapper) GetSymKey(id string) ([]byte, error) {
 	return w.whisper.GetSymKey(id)
 }
 
-func (w *gethWhisperWrapper) Subscribe(f whispertypes.Filter) (string, error) {
-	return w.whisper.Subscribe(GetGethFilterFrom(f))
+func (w *gethWhisperWrapper) Subscribe(opts *whispertypes.SubscriptionOptions) (string, error) {
+	var (
+		err     error
+		keyAsym *ecdsa.PrivateKey
+		keySym  []byte
+	)
+
+	if opts.SymKeyID != "" {
+		keySym, err = w.GetSymKey(opts.SymKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+	if opts.PrivateKeyID != "" {
+		keyAsym, err = w.GetPrivateKey(opts.PrivateKeyID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	f, err := w.createFilterWrapper("", keyAsym, keySym, opts.PoW, opts.Topics)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := w.whisper.Subscribe(GetGethFilterFrom(f))
+	if err != nil {
+		return "", err
+	}
+
+	f.(*gethFilterWrapper).id = id
+	return id, nil
 }
 
 func (w *gethWhisperWrapper) GetFilter(id string) whispertypes.Filter {
-	return NewGethFilterWrapper(w.whisper.GetFilter(id))
+	return NewGethFilterWrapper(w.whisper.GetFilter(id), id)
 }
 
 func (w *gethWhisperWrapper) Unsubscribe(id string) error {
 	return w.whisper.Unsubscribe(id)
 }
 
-func (w *gethWhisperWrapper) CreateFilterWrapper(keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte, messages whispertypes.MessageStore) whispertypes.Filter {
+func (w *gethWhisperWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (whispertypes.Filter, error) {
 	return NewGethFilterWrapper(&whisper.Filter{
 		KeyAsym:  keyAsym,
 		KeySym:   keySym,
 		PoW:      pow,
 		AllowP2P: true,
 		Topics:   topics,
-		Messages: GetGethMessageStoreFrom(messages),
-	})
+		Messages: whisper.NewMemoryMessageStore(),
+	}, id), nil
 }
 
 func (w *gethWhisperWrapper) SendMessagesRequest(peerID []byte, r whispertypes.MessagesRequest) error {

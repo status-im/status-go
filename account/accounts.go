@@ -14,12 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/extkeys"
+	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 // errors
@@ -325,7 +325,7 @@ func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password 
 		return address, "", err
 	}
 
-	pubKey = hexutil.Encode(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = statusproto.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
@@ -349,7 +349,7 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 	if err != nil {
 		return address, "", err
 	}
-	pubKey = hexutil.Encode(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = statusproto.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }

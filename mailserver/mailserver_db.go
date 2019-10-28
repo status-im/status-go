@@ -10,7 +10,7 @@ import (
 type DB interface {
 	Close() error
 	// SaveEnvelope stores an envelope
-	SaveEnvelope(*whisper.Envelope) error
+	SaveEnvelope(*whisper.Envelope) error // TODO: Migrate to whispertypes.Envelope
 	// GetEnvelope returns an rlp encoded envelope from the datastore
 	GetEnvelope(*DBKey) ([]byte, error)
 	// Prune removes envelopes older than time

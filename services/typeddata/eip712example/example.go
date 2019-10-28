@@ -245,4 +245,3 @@ func (_Example *ExampleSession) Verify(v uint8, r [32]byte, s [32]byte) (*types.
 func (_Example *ExampleTransactorSession) Verify(v uint8, r [32]byte, s [32]byte) (*types.Transaction, error) {
 	return _Example.Contract.Verify(&_Example.TransactOpts, v, r, s)
 }
-

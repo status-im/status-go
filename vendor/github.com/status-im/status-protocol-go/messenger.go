@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -499,7 +497,7 @@ func (m *Messenger) AddMembersToChat(ctx context.Context, chat *Chat, members []
 	}
 	encodedMembers := make([]string, len(members))
 	for idx, member := range members {
-		encodedMembers[idx] = hexutil.Encode(crypto.FromECDSAPub(member))
+		encodedMembers[idx] = statusproto.EncodeHex(crypto.FromECDSAPub(member))
 	}
 	event := protocol.NewMembersAddedEvent(encodedMembers, group.NextClockValue())
 	err = group.ProcessEvent(&m.identity.PublicKey, event)

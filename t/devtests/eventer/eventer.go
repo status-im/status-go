@@ -363,4 +363,3 @@ func (_Eventer *EventerFilterer) WatchMessage(opts *bind.WatchOpts, sink chan<- 
 		}
 	}), nil
 }
-

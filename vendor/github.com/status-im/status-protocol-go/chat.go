@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	statusproto "github.com/status-im/status-protocol-go/types"
 	protocol "github.com/status-im/status-protocol-go/v1"
@@ -195,7 +194,7 @@ func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey,
 			err error
 		)
 		if prefixed {
-			b, err = hexutil.Decode(item)
+			b, err = statusproto.DecodeHex(item)
 		} else {
 			b, err = hex.DecodeString(item)
 		}

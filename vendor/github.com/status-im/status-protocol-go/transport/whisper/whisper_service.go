@@ -366,7 +366,7 @@ func (a *WhisperServiceTransport) addSig(newMessage *whispertypes.NewMessage) er
 	if err != nil {
 		return err
 	}
-	newMessage.Sig = sigID
+	newMessage.SigID = sigID
 	return nil
 }
 

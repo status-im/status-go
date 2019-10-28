@@ -150,7 +150,7 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 func (m *StatusMessage) HandleApplication() error {
 	value, err := decodeTransitMessage(m.DecryptedPayload)
 	if err != nil {
-		log.Printf("[message::DecodeMessage] could not decode message: %#x", m.Hash)
+		log.Printf("[message::DecodeMessage] could not decode message: %#x, err: %v", m.Hash, err.Error())
 		return err
 	}
 	m.ParsedMessage = value
