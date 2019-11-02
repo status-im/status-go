@@ -446,6 +446,26 @@ func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelo
 	return err
 }
 
+func (whisper *Whisper) SendMessagesRequest(peerID []byte, request MessagesRequest) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	p, err := whisper.getPeer(peerID)
+	if err != nil {
+		return err
+	}
+	p.trusted = true
+	if err := p2p.Send(p.ws, p2pRequestCode, request); err != nil {
+		return err
+	}
+	whisper.envelopeFeed.Send(EnvelopeEvent{
+		Peer:  p.peer.ID(),
+		Hash:  common.BytesToHash(request.ID),
+		Event: EventMailServerRequestSent,
+	})
+	return nil
+}
+
 func (whisper *Whisper) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()

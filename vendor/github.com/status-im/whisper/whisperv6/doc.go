@@ -134,8 +134,8 @@ type MessagesRequest struct {
 }
 
 func (r MessagesRequest) Validate() error {
-	if len(r.ID) == 0 {
-		return errors.New("empty 'ID'")
+	if len(r.ID) != common.HashLength {
+		return errors.New("invalid 'ID', expected a 32-byte slice")
 	}
 
 	if r.From > r.To {
