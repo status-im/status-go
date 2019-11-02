@@ -1124,6 +1124,14 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
 			if whisper.mailServer != nil {
+				// Read all data as we will try to decode it possibly twice.
+				data, err := ioutil.ReadAll(packet.Payload)
+				if err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
+				r := bytes.NewReader(data)
+				packet.Payload = r
+
 				var requestDeprecated Envelope
 				errDepReq := packet.Decode(&requestDeprecated)
 				if errDepReq == nil {
@@ -1131,6 +1139,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					continue
 				} else {
 					log.Info("failed to decode p2p request message (deprecated)", "peer", p.peer.ID(), "err", errDepReq)
+				}
+
+				// As we failed to decode the request, let's set the offset
+				// to the beginning and try decode it again.
+				if _, err := r.Seek(0, io.SeekStart); err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
 				}
 
 				var request MessagesRequest

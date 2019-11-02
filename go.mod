@@ -32,7 +32,7 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-protocol-go v0.4.2
-	github.com/status-im/whisper v1.5.2-0.20191026113552-3dbba6f0a421
+	github.com/status-im/whisper v1.5.2-0.20191102115102-900685f2eb7e
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect

@@ -372,7 +372,7 @@ github.com/status-im/status-protocol-go/transport/whisper/types
 github.com/status-im/status-protocol-go/types
 github.com/status-im/status-protocol-go/v1
 github.com/status-im/status-protocol-go/zaputil
-# github.com/status-im/whisper v1.5.2-0.20191026113552-3dbba6f0a421
+# github.com/status-im/whisper v1.5.2-0.20191102115102-900685f2eb7e
 github.com/status-im/whisper/whisperv6
 # github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
 github.com/steakknife/bloomfilter
