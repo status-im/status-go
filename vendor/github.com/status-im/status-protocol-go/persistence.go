@@ -3,14 +3,12 @@ package statusproto
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"database/sql"
 	"encoding/gob"
 	"encoding/hex"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/pkg/errors"
 
 	protocol "github.com/status-im/status-protocol-go/v1"
@@ -78,8 +76,8 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, last_message_timestamp, members, membership_updates)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, last_message_timestamp, last_message_clock_value, members, membership_updates)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -99,6 +97,7 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 		chat.LastMessageContentType,
 		chat.LastMessageContent,
 		chat.LastMessageTimestamp,
+		chat.LastMessageClockValue,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 	)
@@ -151,6 +150,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		last_message_content_type,
 		last_message_content,
 		last_message_timestamp,
+		last_message_clock_value,
 		members,
 		membership_updates
 	FROM chats
@@ -166,6 +166,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		var lastMessageContentType sql.NullString
 		var lastMessageContent sql.NullString
 		var lastMessageTimestamp sql.NullInt64
+		var lastMessageClockValue sql.NullInt64
 
 		chat := &Chat{}
 		encodedMembers := []byte{}
@@ -185,6 +186,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 			&lastMessageContentType,
 			&lastMessageContent,
 			&lastMessageTimestamp,
+			&lastMessageClockValue,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 		)
@@ -194,6 +196,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) ([]*Chat, error) {
 		chat.LastMessageContent = lastMessageContent.String
 		chat.LastMessageContentType = lastMessageContentType.String
 		chat.LastMessageTimestamp = lastMessageTimestamp.Int64
+		chat.LastMessageClockValue = lastMessageClockValue.Int64
 
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
@@ -230,6 +233,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	last_updated,
 	system_tags,
 	device_info,
+	ens_verified,
+	ens_verified_at,
 	tribute_to_talk
 	FROM contacts`)
 
@@ -254,6 +259,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.LastUpdated,
 			&encodedSystemTags,
 			&encodedDeviceInfo,
+			&contact.ENSVerified,
+			&contact.ENSVerifiedAt,
 			&contact.TributeToTalk,
 		)
 		if err != nil {
@@ -282,9 +289,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-// SetContactsGeneratedData sets a contact generated data if not existing already
-// in the database
-func (db sqlitePersistence) SetContactsGeneratedData(contacts []Contact) error {
+func (db sqlitePersistence) SetContactsENSData(contacts []Contact) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -298,6 +303,44 @@ func (db sqlitePersistence) SetContactsGeneratedData(contacts []Contact) error {
 		// don't shadow original error
 		_ = tx.Rollback()
 	}()
+
+	// Ensure contacts exists
+
+	err = db.SetContactsGeneratedData(contacts, tx)
+	if err != nil {
+		return err
+	}
+
+	// Update ens data
+	for _, contact := range contacts {
+		_, err := tx.Exec(`UPDATE contacts SET name = ?, ens_verified = ? , ens_verified_at = ? WHERE id = ?`, contact.Name, contact.ENSVerified, contact.ENSVerifiedAt, contact.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// SetContactsGeneratedData sets a contact generated data if not existing already
+// in the database
+func (db sqlitePersistence) SetContactsGeneratedData(contacts []Contact, tx *sql.Tx) error {
+	var err error
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
 
 	for _, contact := range contacts {
 		_, err := tx.Exec(`INSERT OR IGNORE INTO contacts(
@@ -368,9 +411,11 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 	  last_updated,
 	  system_tags,
 	  device_info,
+	  ens_verified,
+	  ens_verified_at,
 	  tribute_to_talk
 	)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -386,6 +431,8 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) error {
 		contact.LastUpdated,
 		encodedSystemTags.Bytes(),
 		encodedDeviceInfo.Bytes(),
+		contact.ENSVerified,
+		contact.ENSVerifiedAt,
 		contact.TributeToTalk,
 	)
 	return err
@@ -430,7 +477,7 @@ func (db sqlitePersistence) Messages(from, to time.Time) (result []*protocol.Mes
 			return nil, err
 		}
 		if len(pkey) != 0 {
-			msg.SigPubKey, err = unmarshalECDSAPub(pkey)
+			msg.SigPubKey, err = crypto.UnmarshalPubkey(pkey)
 			if err != nil {
 				return nil, err
 			}
@@ -480,9 +527,9 @@ func (db sqlitePersistence) SaveMessages(messages []*protocol.Message) (last int
 	var rst sql.Result
 
 	for _, msg := range messages {
-		pkey := []byte{}
+		var pkey []byte
 		if msg.SigPubKey != nil {
-			pkey, err = marshalECDSAPub(msg.SigPubKey)
+			pkey = crypto.FromECDSAPub(msg.SigPubKey)
 		}
 		rst, err = stmt.Exec(
 			msg.ID, msg.ChatID, msg.ContentT, msg.MessageT, msg.Text, msg.Clock, msg.Timestamp,
@@ -503,35 +550,4 @@ func (db sqlitePersistence) SaveMessages(messages []*protocol.Message) (last int
 		}
 	}
 	return
-}
-
-func marshalECDSAPub(pub *ecdsa.PublicKey) (rst []byte, err error) {
-	switch pub.Curve.(type) {
-	case *secp256k1.BitCurve:
-		rst = make([]byte, 34)
-		rst[0] = 1
-		copy(rst[1:], secp256k1.CompressPubkey(pub.X, pub.Y))
-		return rst[:], nil
-	default:
-		return nil, errors.New("unknown curve")
-	}
-}
-
-func unmarshalECDSAPub(buf []byte) (*ecdsa.PublicKey, error) {
-	pub := &ecdsa.PublicKey{}
-	if len(buf) < 1 {
-		return nil, errors.New("too small")
-	}
-	switch buf[0] {
-	case 1:
-		pub.Curve = secp256k1.S256()
-		pub.X, pub.Y = secp256k1.DecompressPubkey(buf[1:])
-		ok := pub.IsOnCurve(pub.X, pub.Y)
-		if !ok {
-			return nil, errors.New("not on curve")
-		}
-		return pub, nil
-	default:
-		return nil, errors.New("unknown curve")
-	}
 }

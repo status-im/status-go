@@ -46,7 +46,7 @@ func (mh MessageEncHeader) Decode() (MessageHeader, error) {
 	if len(mh) != 40 {
 		return MessageHeader{}, fmt.Errorf("encoded message header must be 40 bytes, %d given", len(mh))
 	}
-	var dh Key
+	var dh Key = make(Key, 32)
 	copy(dh[:], mh[8:40])
 	return MessageHeader{
 		DH: dh,

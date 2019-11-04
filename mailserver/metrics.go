@@ -1,23 +1,79 @@
 package mailserver
 
-import "github.com/ethereum/go-ethereum/metrics"
+import prom "github.com/prometheus/client_golang/prometheus"
+
+// By default the /metrics endpoint is not available.
+// It is exposed only if -metrics flag is set.
 
 var (
-	// By default go-ethereum/metrics creates dummy metrics that don't register anything.
-	// Real metrics are collected only if -metrics flag is set
-	requestProcessTimer            = metrics.NewRegisteredTimer("mailserver/requestProcessTime", nil)
-	requestProcessNetTimer         = metrics.NewRegisteredTimer("mailserver/requestProcessNetTime", nil)
-	requestsMeter                  = metrics.NewRegisteredMeter("mailserver/requests", nil)
-	requestsBatchedCounter         = metrics.NewRegisteredCounter("mailserver/requestsBatched", nil)
-	requestErrorsCounter           = metrics.NewRegisteredCounter("mailserver/requestErrors", nil)
-	sentEnvelopesMeter             = metrics.NewRegisteredMeter("mailserver/sentEnvelopes", nil)
-	sentEnvelopesSizeMeter         = metrics.NewRegisteredMeter("mailserver/sentEnvelopesSize", nil)
-	archivedMeter                  = metrics.NewRegisteredMeter("mailserver/archivedEnvelopes", nil)
-	archivedSizeMeter              = metrics.NewRegisteredMeter("mailserver/archivedEnvelopesSize", nil)
-	archivedErrorsCounter          = metrics.NewRegisteredCounter("mailserver/archiveErrors", nil)
-	requestValidationErrorsCounter = metrics.NewRegisteredCounter("mailserver/requestValidationErrors", nil)
-	processRequestErrorsCounter    = metrics.NewRegisteredCounter("mailserver/processRequestErrors", nil)
-	historicResponseErrorsCounter  = metrics.NewRegisteredCounter("mailserver/historicResponseErrors", nil)
-	syncRequestsMeter              = metrics.NewRegisteredMeter("mailserver/syncRequests", nil)
-	deliverMailTimer               = metrics.NewRegisteredTimer("mailserver/deliverMailTime", nil)
+	envelopesCounter = prom.NewCounter(prom.CounterOpts{
+		Name: "mailserver_envelopes_total",
+		Help: "Number of envelopes processed.",
+	})
+	deliveryFailuresCounter = prom.NewCounterVec(prom.CounterOpts{
+		Name: "mailserver_delivery_failures_total",
+		Help: "Number of requests that failed processing.",
+	}, []string{"type"})
+	deliveryAttemptsCounter = prom.NewCounter(prom.CounterOpts{
+		Name: "mailserver_delivery_attempts_total",
+		Help: "Number of Whisper envelopes processed.",
+	})
+	requestsBatchedCounter = prom.NewCounter(prom.CounterOpts{
+		Name: "mailserver_requests_batched_total",
+		Help: "Number of processed batched requests.",
+	})
+	requestsInBundlesDuration = prom.NewHistogram(prom.HistogramOpts{
+		Name: "mailserver_requests_bundle_process_duration_seconds",
+		Help: "The time it took to process message bundles.",
+	})
+	syncFailuresCounter = prom.NewCounterVec(prom.CounterOpts{
+		Name: "mailserver_sync_failures_total",
+		Help: "Number of failures processing a sync requests.",
+	}, []string{"type"})
+	syncAttemptsCounter = prom.NewCounter(prom.CounterOpts{
+		Name: "mailserver_sync_attempts_total",
+		Help: "Number of attempts are processing a sync requests.",
+	})
+	sendRawEnvelopeDuration = prom.NewHistogram(prom.HistogramOpts{
+		Name: "mailserver_send_raw_envelope_duration_seconds",
+		Help: "The time it took to send a Whisper envelope.",
+	})
+	sentEnvelopeBatchSizeMeter = prom.NewHistogram(prom.HistogramOpts{
+		Name:    "mailserver_sent_envelope_batch_size_bytes",
+		Help:    "Size of processed Whisper envelopes in bytes.",
+		Buckets: prom.ExponentialBuckets(1024, 4, 10),
+	})
+	archivedErrorsCounter = prom.NewCounter(prom.CounterOpts{
+		Name: "mailserver_archived_envelopes_falures_total",
+		Help: "Number of failures storing a Whisper envelope.",
+	})
+	archivedEnvelopesCounter = prom.NewCounter(prom.CounterOpts{
+		Name: "mailserver_archived_envelopes_total",
+		Help: "Number of envelopes saved.",
+	})
+	archivedEnvelopeSizeMeter = prom.NewHistogram(prom.HistogramOpts{
+		Name:    "mailserver_archived_envelope_size_bytes",
+		Help:    "Size of envelopes saved.",
+		Buckets: prom.ExponentialBuckets(1024, 2, 11),
+	})
+	mailDeliveryDuration = prom.NewHistogram(prom.HistogramOpts{
+		Name: "mailserver_delivery_duration_seconds",
+		Help: "Time it takes to deliver messages to a Whisper peer.",
+	})
 )
+
+func init() {
+	prom.MustRegister(envelopesCounter)
+	prom.MustRegister(deliveryFailuresCounter)
+	prom.MustRegister(deliveryAttemptsCounter)
+	prom.MustRegister(requestsBatchedCounter)
+	prom.MustRegister(requestsInBundlesDuration)
+	prom.MustRegister(syncFailuresCounter)
+	prom.MustRegister(syncAttemptsCounter)
+	prom.MustRegister(sendRawEnvelopeDuration)
+	prom.MustRegister(sentEnvelopeBatchSizeMeter)
+	prom.MustRegister(archivedErrorsCounter)
+	prom.MustRegister(archivedEnvelopesCounter)
+	prom.MustRegister(archivedEnvelopeSizeMeter)
+	prom.MustRegister(mailDeliveryDuration)
+}

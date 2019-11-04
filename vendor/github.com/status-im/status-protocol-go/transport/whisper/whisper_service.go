@@ -267,15 +267,24 @@ func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.Publi
 	return result, nil
 }
 
-// DEPRECATED
-// Use RetrieveAllMessages instead.
 func (a *WhisperServiceTransport) RetrieveRawAll() (map[Filter][]*whispertypes.Message, error) {
-	return nil, errors.New("not implemented")
-}
+	result := make(map[Filter][]*whispertypes.Message)
 
-// DEPRECATED
-func (a *WhisperServiceTransport) RetrieveRaw(filterID string) ([]*whispertypes.Message, error) {
-	return a.shhAPI.GetFilterMessages(filterID)
+	allFilters := a.filters.Filters()
+	for _, filter := range allFilters {
+		f := a.shh.GetFilter(filter.FilterID)
+		if f == nil {
+			return nil, errors.New("failed to return a filter")
+		}
+
+		msgs, err := a.shhAPI.GetFilterMessages(filter.FilterID)
+		if err != nil {
+			continue
+		}
+		result[*filter] = append(result[*filter], msgs...)
+	}
+
+	return result, nil
 }
 
 // SendPublic sends a new message using the Whisper service.

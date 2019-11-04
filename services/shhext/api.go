@@ -17,12 +17,14 @@ import (
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 
 	statusproto "github.com/status-im/status-protocol-go"
 	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
 	"github.com/status-im/status-protocol-go/encryption/multidevice"
+	"github.com/status-im/status-protocol-go/ens"
 	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
 	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	statusproto_types "github.com/status-im/status-protocol-go/types"
@@ -33,6 +35,9 @@ const (
 	defaultWorkTime = 5
 	// defaultRequestTimeout is the default request timeout in seconds
 	defaultRequestTimeout = 10
+
+	// ensContractAddress is the address of the ENS resolver
+	ensContractAddress = "0x314159265dd8dbb310642f98f50c066173c1259b"
 )
 
 var (
@@ -615,6 +620,11 @@ func (api *PublicAPI) GetOurInstallations() ([]*multidevice.Installation, error)
 // SetInstallationMetadata sets the metadata for our own installation
 func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
+}
+
+// VerifyENSNames takes a list of ensdetails and returns whether they match the public key specified
+func (api *PublicAPI) VerifyENSNames(details []ens.ENSDetails) (map[string]ens.ENSResponse, error) {
+	return api.service.messenger.VerifyENSNames(params.MainnetEthereumNetworkURL, ensContractAddress, details)
 }
 
 type ApplicationMessagesResponse struct {

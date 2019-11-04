@@ -471,8 +471,7 @@ func newSQLiteKeysStorage(db *sql.DB) *sqliteKeysStorage {
 
 // Get retrieves the message key for a specified public key and message number
 func (s *sqliteKeysStorage) Get(pubKey dr.Key, msgNum uint) (dr.Key, bool, error) {
-	var keyBytes []byte
-	var key [32]byte
+	var key []byte
 	stmt, err := s.db.Prepare(`SELECT message_key
 	                           FROM keys
 				   WHERE public_key = ? AND msg_num = ?
@@ -483,12 +482,11 @@ func (s *sqliteKeysStorage) Get(pubKey dr.Key, msgNum uint) (dr.Key, bool, error
 	}
 	defer stmt.Close()
 
-	err = stmt.QueryRow(pubKey[:], msgNum).Scan(&keyBytes)
+	err = stmt.QueryRow(pubKey, msgNum).Scan(&key)
 	switch err {
 	case sql.ErrNoRows:
 		return key, false, nil
 	case nil:
-		copy(key[:], keyBytes)
 		return key, true, nil
 	default:
 		return key, false, err
@@ -506,9 +504,9 @@ func (s *sqliteKeysStorage) Put(sessionID []byte, pubKey dr.Key, msgNum uint, mk
 
 	_, err = stmt.Exec(
 		sessionID,
-		pubKey[:],
+		pubKey,
 		msgNum,
-		mk[:],
+		mk,
 		seqNum,
 	)
 
@@ -561,7 +559,7 @@ func (s *sqliteKeysStorage) DeleteMk(pubKey dr.Key, msgNum uint) error {
 	defer stmt.Close()
 
 	_, err = stmt.Exec(
-		pubKey[:],
+		pubKey,
 		msgNum,
 	)
 
@@ -579,7 +577,7 @@ func (s *sqliteKeysStorage) Count(pubKey dr.Key) (uint, error) {
 	defer stmt.Close()
 
 	var count uint
-	err = stmt.QueryRow(pubKey[:]).Scan(&count)
+	err = stmt.QueryRow(pubKey).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -606,7 +604,7 @@ func (s *sqliteKeysStorage) CountAll() (uint, error) {
 }
 
 // All returns nil
-func (s *sqliteKeysStorage) All() (map[dr.Key]map[uint]dr.Key, error) {
+func (s *sqliteKeysStorage) All() (map[string]map[uint]dr.Key, error) {
 	return nil, nil
 }
 
@@ -622,7 +620,7 @@ func newSQLiteSessionStorage(db *sql.DB) *sqliteSessionStorage {
 
 // Save persists the specified double ratchet state
 func (s *sqliteSessionStorage) Save(id []byte, state *dr.State) error {
-	dhr := state.DHr[:]
+	dhr := state.DHr
 	dhs := state.DHs
 	dhsPublic := dhs.PublicKey()
 	dhsPrivate := dhs.PrivateKey()
@@ -630,12 +628,12 @@ func (s *sqliteSessionStorage) Save(id []byte, state *dr.State) error {
 	step := state.Step
 	keysCount := state.KeysCount
 
-	rootChainKey := state.RootCh.CK[:]
+	rootChainKey := state.RootCh.CK
 
-	sendChainKey := state.SendCh.CK[:]
+	sendChainKey := state.SendCh.CK
 	sendChainN := state.SendCh.N
 
-	recvChainKey := state.RecvCh.CK[:]
+	recvChainKey := state.RecvCh.CK
 	recvChainN := state.RecvCh.N
 
 	stmt, err := s.db.Prepare(`INSERT INTO sessions(id, dhr, dhs_public, dhs_private, root_chain_key, send_chain_key, send_chain_n, recv_chain_key, recv_chain_n, pn, step, keys_count)
@@ -648,8 +646,8 @@ func (s *sqliteSessionStorage) Save(id []byte, state *dr.State) error {
 	_, err = stmt.Exec(
 		id,
 		dhr,
-		dhsPublic[:],
-		dhsPrivate[:],
+		dhsPublic,
+		dhsPrivate,
 		rootChainKey,
 		sendChainKey,
 		sendChainN,
@@ -705,33 +703,27 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 	case sql.ErrNoRows:
 		return nil, nil
 	case nil:
-		state := dr.DefaultState(toKey(rootChainKey))
+		state := dr.DefaultState(rootChainKey)
 
 		state.PN = uint32(pn)
 		state.Step = step
 		state.KeysCount = keysCount
 
 		state.DHs = ecrypto.DHPair{
-			PrvKey: toKey(dhsPrivate),
-			PubKey: toKey(dhsPublic),
+			PrvKey: dhsPrivate,
+			PubKey: dhsPublic,
 		}
 
-		state.DHr = toKey(dhr)
+		state.DHr = dhr
 
-		state.SendCh.CK = toKey(sendChainKey)
+		state.SendCh.CK = sendChainKey
 		state.SendCh.N = uint32(sendChainN)
 
-		state.RecvCh.CK = toKey(recvChainKey)
+		state.RecvCh.CK = recvChainKey
 		state.RecvCh.N = uint32(recvChainN)
 
 		return &state, nil
 	default:
 		return nil, err
 	}
-}
-
-func toKey(a []byte) dr.Key {
-	var k [32]byte
-	copy(k[:], a)
-	return k
 }

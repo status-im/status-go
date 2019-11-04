@@ -349,6 +349,10 @@ func (b *StatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	// NodeConfig.Version should be taken from params.Version
+	// which is set at the compile time.
+	// What's cached is usually outdated so we overwrite it here.
+	conf.Version = params.Version
 	return &conf, nil
 }
 

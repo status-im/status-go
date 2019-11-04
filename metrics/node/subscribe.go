@@ -32,7 +32,7 @@ func SubscribeServerEvents(ctx context.Context, node *node.Node) error {
 		case event := <-ch:
 			if isAddDropPeerEvent(event.Type) {
 				if err := updateNodeMetrics(node, event.Type); err != nil {
-					log.Error("failed to update node metrics", "err", err)
+					logger.Error("failed to update node metrics", "err", err)
 				}
 			}
 		case err := <-subscription.Err():
