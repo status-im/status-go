@@ -446,6 +446,26 @@ func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelo
 	return err
 }
 
+func (whisper *Whisper) SendMessagesRequest(peerID []byte, request MessagesRequest) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	p, err := whisper.getPeer(peerID)
+	if err != nil {
+		return err
+	}
+	p.trusted = true
+	if err := p2p.Send(p.ws, p2pRequestCode, request); err != nil {
+		return err
+	}
+	whisper.envelopeFeed.Send(EnvelopeEvent{
+		Peer:  p.peer.ID(),
+		Hash:  common.BytesToHash(request.ID),
+		Event: EventMailServerRequestSent,
+	})
+	return nil
+}
+
 func (whisper *Whisper) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -1075,7 +1095,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// TODO(adam): currently, there is no feedback when a sync response
 			// is received. An idea to fix this:
 			//   1. Sending a request contains an ID,
-			//   2. Each sync reponse contains this ID,
+			//   2. Each sync response contains this ID,
 			//   3. There is a way to call whisper.SyncMessages() and wait for the response.Final to be received for that particular request ID.
 			//   4. If Cursor is not empty, another p2pSyncRequestCode should be sent.
 			if p.trusted && whisper.mailServer != nil {
@@ -1104,13 +1124,39 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
 			if whisper.mailServer != nil {
-				var request Envelope
-				if err := packet.Decode(&request); err != nil {
-					log.Warn("failed to decode p2p request message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-					return errors.New("invalid p2p request")
+				// Read all data as we will try to decode it possibly twice.
+				data, err := ioutil.ReadAll(packet.Payload)
+				if err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
+				r := bytes.NewReader(data)
+				packet.Payload = r
+
+				var requestDeprecated Envelope
+				errDepReq := packet.Decode(&requestDeprecated)
+				if errDepReq == nil {
+					whisper.mailServer.DeliverMail(p, &requestDeprecated)
+					continue
+				} else {
+					log.Info("failed to decode p2p request message (deprecated)", "peer", p.peer.ID(), "err", errDepReq)
 				}
 
-				whisper.mailServer.DeliverMail(p, &request)
+				// As we failed to decode the request, let's set the offset
+				// to the beginning and try decode it again.
+				if _, err := r.Seek(0, io.SeekStart); err != nil {
+					return fmt.Errorf("invalid direct messages: %v", err)
+				}
+
+				var request MessagesRequest
+				errReq := packet.Decode(&request)
+				if errReq == nil {
+					whisper.mailServer.Deliver(p, request)
+					continue
+				} else {
+					log.Info("failed to decode p2p request message", "peer", p.peer.ID(), "err", errReq)
+				}
+
+				return errors.New("invalid p2p request")
 			}
 		case p2pRequestCompleteCode:
 			if p.trusted {

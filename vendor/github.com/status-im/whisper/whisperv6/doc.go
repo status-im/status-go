@@ -65,12 +65,12 @@ const (
 	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
 	signatureFlag = byte(4)
 
-	TopicLength     = 4  // in bytes
+	TopicLength     = 4                      // in bytes
 	signatureLength = crypto.SignatureLength // in bytes
-	aesKeyLength    = 32 // in bytes
-	aesNonceLength  = 12 // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
-	keyIDSize       = 32 // in bytes
-	BloomFilterSize = 64 // in bytes
+	aesKeyLength    = 32                     // in bytes
+	aesNonceLength  = 12                     // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
+	keyIDSize       = 32                     // in bytes
+	BloomFilterSize = 64                     // in bytes
 	flagsLength     = 1
 
 	EnvelopeHeaderLength = 20
@@ -92,6 +92,8 @@ const (
 
 	EnvelopeTimeNotSynced uint = iota + 1
 	EnvelopeOtherError
+
+	MaxLimitInMessagesRequest = 1000
 )
 
 // MailServer represents a mail server, capable of
@@ -102,8 +104,53 @@ const (
 // in order to bypass the expiry checks.
 type MailServer interface {
 	Archive(env *Envelope)
+	// DEPRECATED
 	DeliverMail(whisperPeer *Peer, request *Envelope)
+	Deliver(whisperPeer *Peer, request MessagesRequest)
 	SyncMail(*Peer, SyncMailRequest) error
+}
+
+// MessagesRequest contains details of a request of historic messages.
+type MessagesRequest struct {
+	// ID of the request. The current implementation requires ID to be 32-byte array,
+	// however, it's not enforced for future implementation.
+	ID []byte `json:"id"`
+
+	// From is a lower bound of time range.
+	From uint32 `json:"from"`
+
+	// To is a upper bound of time range.
+	To uint32 `json:"to"`
+
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request.
+	Limit uint32 `json:"limit"`
+
+	// Cursor is used as starting point for paginated requests.
+	Cursor []byte `json:"cursor"`
+
+	// Bloom is a filter to match requested messages.
+	Bloom []byte `json:"bloom"`
+}
+
+func (r MessagesRequest) Validate() error {
+	if len(r.ID) != common.HashLength {
+		return errors.New("invalid 'ID', expected a 32-byte slice")
+	}
+
+	if r.From > r.To {
+		return errors.New("invalid 'From' value which is greater than To")
+	}
+
+	if r.Limit > MaxLimitInMessagesRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInMessagesRequest)
+	}
+
+	if len(r.Bloom) == 0 {
+		return errors.New("invalid 'Bloom' provided")
+	}
+
+	return nil
 }
 
 // SyncMailRequest contains details which envelopes should be synced

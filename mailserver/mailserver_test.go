@@ -104,14 +104,6 @@ func (s *MailserverSuite) TestInit() {
 		},
 		{
 			config: params.WhisperConfig{
-				DataDir:            "/invalid-path",
-				MailServerPassword: "pwd",
-			},
-			expectedError: errors.New("open DB: mkdir /invalid-path: permission denied"),
-			info:          "config with an unexisting DataDir",
-		},
-		{
-			config: params.WhisperConfig{
 				DataDir:            s.config.DataDir,
 				MailServerPassword: "",
 				MailServerAsymKey:  "",
