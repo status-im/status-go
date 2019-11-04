@@ -19,6 +19,7 @@ type Server struct {
 
 func NewMetricsServer(port int, r metrics.Registry) *Server {
 	mux := http.NewServeMux()
+	mux.Handle("/health", healthHandler())
 	mux.Handle("/metrics", Handler(r))
 	p := Server{
 		server: &http.Server{
@@ -27,6 +28,15 @@ func NewMetricsServer(port int, r metrics.Registry) *Server {
 		},
 	}
 	return &p
+}
+
+func healthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
+			log.Error("health handler error", "err", err)
+		}
+	})
 }
 
 func Handler(reg metrics.Registry) http.Handler {
