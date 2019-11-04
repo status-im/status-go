@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"reflect"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -99,17 +100,11 @@ func (p *messageProcessor) SendPrivate(
 	data []byte,
 	clock int64,
 ) ([]byte, *protocol.Message, error) {
-	p.logger.Debug(
-		"sending a private message",
-		zap.Binary("public-key", crypto.FromECDSAPub(recipient)),
-	)
-
 	message := protocol.CreatePrivateTextMessage(data, clock, chatID)
 	encodedMessage, err := p.encodeMessage(message)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to encode message")
 	}
-
 	messageID, err := p.sendPrivate(ctx, recipient, encodedMessage)
 	if err != nil {
 		return nil, nil, err
@@ -226,9 +221,6 @@ func (p *messageProcessor) SendMembershipUpdate(
 }
 
 func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data []byte, clock int64) ([]byte, error) {
-	logger := p.logger.With(zap.String("site", "SendPublic"))
-	logger.Debug("sending a public message", zap.String("chatID", chatID))
-
 	message := protocol.CreatePublicTextMessage(data, clock, chatID)
 
 	encodedMessage, err := p.encodeMessage(message)
@@ -336,7 +328,10 @@ func (p *messageProcessor) Process(shhMessage *whispertypes.Message) ([]*protoco
 				hlogger.Error("failed to process PairMessage", zap.Error(err))
 			}
 		default:
-			hlogger.Error("skipped a public message of unsupported type")
+			hlogger.Error(
+				"skipped a public message of unsupported type",
+				zap.String("type", reflect.TypeOf(m).String()),
+			)
 		}
 	}
 
@@ -397,7 +392,7 @@ func (p *messageProcessor) handleMessages(shhMessage *whispertypes.Message, appl
 		if applicationLayer {
 			err = statusMessage.HandleApplication()
 			if err != nil {
-				hlogger.Error("failed to handle application layer message")
+				hlogger.Error("failed to handle application layer message", zap.Error(err))
 			}
 		}
 	}
@@ -411,9 +406,8 @@ func (p *messageProcessor) handleEncryptionLayer(ctx context.Context, message *p
 
 	err := message.HandleEncryption(p.identity, publicKey, p.protocol)
 	if err == encryption.ErrDeviceNotFound {
-		handleErr := p.handleErrDeviceNotFound(ctx, publicKey)
-		if handleErr != nil {
-			logger.Error("failed to handle error", zap.Error(err), zap.NamedError("handleErr", handleErr))
+		if err := p.handleErrDeviceNotFound(ctx, publicKey); err != nil {
+			logger.Error("failed to handle ErrDeviceNotFound", zap.Error(err))
 		}
 	}
 	if err != nil {

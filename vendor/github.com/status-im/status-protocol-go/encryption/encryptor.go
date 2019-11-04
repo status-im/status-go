@@ -272,14 +272,11 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 	}
 
 	if drHeader := msg.GetDRHeader(); drHeader != nil {
-		var dh [32]byte
-		copy(dh[:], drHeader.GetKey())
-
 		drMessage := &dr.Message{
 			Header: dr.MessageHeader{
 				N:  drHeader.GetN(),
 				PN: drHeader.GetPn(),
-				DH: dh,
+				DH: drHeader.GetKey(),
 			},
 			Ciphertext: msg.GetPayload(),
 		}
@@ -324,7 +321,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 	return nil, errors.New("no key specified")
 }
 
-func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk [32]byte, keyPair crypto.DHPair) (dr.Session, error) {
+func (s *encryptor) createNewSession(drInfo *RatchetInfo, sk []byte, keyPair crypto.DHPair) (dr.Session, error) {
 	var err error
 	var session dr.Session
 
@@ -359,14 +356,10 @@ func (s *encryptor) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 	var err error
 
 	var session dr.Session
-	var sk, publicKey, privateKey [32]byte
-	copy(sk[:], drInfo.Sk)
-	copy(publicKey[:], drInfo.PublicKey[:32])
-	copy(privateKey[:], drInfo.PrivateKey[:])
 
 	keyPair := crypto.DHPair{
-		PrvKey: privateKey,
-		PubKey: publicKey,
+		PrvKey: drInfo.PrivateKey,
+		PubKey: drInfo.PublicKey,
 	}
 
 	// Load session from store first
@@ -378,7 +371,7 @@ func (s *encryptor) encryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 
 	// Create a new one
 	if session == nil {
-		session, err = s.createNewSession(drInfo, sk, keyPair)
+		session, err = s.createNewSession(drInfo, drInfo.Sk, keyPair)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -403,14 +396,10 @@ func (s *encryptor) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 	var err error
 
 	var session dr.Session
-	var sk, publicKey, privateKey [32]byte
-	copy(sk[:], drInfo.Sk)
-	copy(publicKey[:], drInfo.PublicKey[:32])
-	copy(privateKey[:], drInfo.PrivateKey[:])
 
 	keyPair := crypto.DHPair{
-		PrvKey: privateKey,
-		PubKey: publicKey,
+		PrvKey: drInfo.PrivateKey,
+		PubKey: drInfo.PublicKey,
 	}
 
 	session, err = s.getDRSession(drInfo.ID)
@@ -419,7 +408,7 @@ func (s *encryptor) decryptUsingDR(theirIdentityKey *ecdsa.PublicKey, drInfo *Ra
 	}
 
 	if session == nil {
-		session, err = s.createNewSession(drInfo, sk, keyPair)
+		session, err = s.createNewSession(drInfo, drInfo.Sk, keyPair)
 		if err != nil {
 			return nil, err
 		}

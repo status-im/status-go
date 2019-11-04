@@ -1,9 +1,9 @@
 # doubleratchet
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/tiabc/doubleratchet)](https://goreportcard.com/report/github.com/tiabc/doubleratchet)
-[![Build Status](https://travis-ci.org/tiabc/doubleratchet.svg?branch=master)](https://travis-ci.org/tiabc/doubleratchet)
-[![Coverage Status](https://coveralls.io/repos/github/tiabc/doubleratchet/badge.svg?branch=master)](https://coveralls.io/github/tiabc/doubleratchet?branch=master)
-[![GoDoc](https://godoc.org/github.com/tiabc/doubleratchet?status.svg)](https://godoc.org/github.com/tiabc/doubleratchet)
+[![Go Report Card](https://goreportcard.com/badge/github.com/status-im/doubleratchet)](https://goreportcard.com/report/github.com/status-im/doubleratchet)
+[![Build Status](https://travis-ci.org/status-im/doubleratchet.svg?branch=master)](https://travis-ci.org/status-im/doubleratchet)
+[![Coverage Status](https://coveralls.io/repos/github/status-im/doubleratchet/badge.svg?branch=master)](https://coveralls.io/github/status-im/doubleratchet?branch=master)
+[![GoDoc](https://godoc.org/github.com/status-im/doubleratchet?status.svg)](https://godoc.org/github.com/status-im/doubleratchet)
 
 [The Double Ratchet Algorithm](https://whispersystems.org/docs/specifications/doubleratchet) is used
 by two parties to exchange encrypted messages based on a shared secret key. Typically the parties
@@ -29,7 +29,6 @@ Let me know if you face any problems or have any questions or suggestions.
 1. Skipped messages from a single ratchet step are deleted after 100 ratchet steps.
 1. Both parties' sending and receiving chains are initialized with the shared key so that both
 of them could message each other from the very beginning.
-1. Both plain and encrypted header versions are implemented.
 
 ### Cryptographic primitives 
 
@@ -40,7 +39,7 @@ of them could message each other from the very beginning.
 
 ## Installation
 
-    go get github.com/tiabc/doubleratchet
+    go get github.com/status-im/doubleratchet
 
 then `cd` into the project directory and install dependencies:
 
@@ -129,97 +128,6 @@ doubleratchet.New(
     // The number of Diffie-Hellman ratchet steps skipped keys will be stored.
     WithMaxKeep(90),
 )
-```
-
-### Header encryption
-
-If you don't want anybody to see message ordering and your ratchet keys, you can utilize
-header encryption. It makes your communication even more secure in a sense that an eavesdropper
-can only see ciphertexts and nothing else. However, it adds more complexity to the implementation,
-namely:
-
-1. Parties should agree on 2 more secret keys for encrypting headers before the double ratchet
-session.
-1. When a recipient receives a message she must first associate the message with its relevant
-Double Ratchet session (assuming she has different sessions with different parties).
-How this is done is outside of the scope of this library, although [the Pond protocol](https://github.com/agl/pond) offers some
-ideas as stated in the Double Ratchet specification.
-1. Header encryption makes messages 48 bytes longer. For example, if you're sending message
-`how are you?` in a version without header encryption, it will be encrypted into
-`iv + len(pt) + signature = 16 + 12 + 32 = 60` bytes plus a header `rk + pn + n = 32 + 4 + 4 = 40` bytes
-with 100 bytes in total. In case of the header encryption modification the header will also
-be encrypted which will add 48 more bytes with the total of 148 bytes. Note that the longer
-your message, the more resulting length it takes.
-1. It does a bit more computations especially for skipped messages and will work more slowly.
-
-#### Example
-
-In order to create a header-encrypted session, parties should agree upon 3 different shared keys
-and Alice should know Bob's public key:
-
-```go
-package main
-
-import (
-	"fmt"
-	"log"
-
-	"github.com/tiabc/doubleratchet"
-)
-
-func main() {
-	// Shared keys both parties have already agreed upon before the communication.
-	var (
-		// The key for message keys derivation.
-		sk = [32]byte{
-			0xeb, 0x8, 0x10, 0x7c, 0x33, 0x54, 0x0, 0x20,
-			0xe9, 0x4f, 0x6c, 0x84, 0xe4, 0x39, 0x50, 0x5a,
-			0x2f, 0x60, 0xbe, 0x81, 0xa, 0x78, 0x8b, 0xeb,
-			0x1e, 0x2c, 0x9, 0x8d, 0x4b, 0x4d, 0xc1, 0x40,
-		}
-
-		// Header encryption keys.
-		sharedHka = [32]byte{
-			0xbd, 0x29, 0x18, 0xcb, 0x18, 0x6c, 0x26, 0x32,
-			0xd5, 0x82, 0x41, 0x2d, 0x11, 0xa4, 0x55, 0x87,
-			0x1e, 0x5b, 0xa3, 0xb5, 0x5a, 0x6d, 0xe1, 0x97,
-			0xde, 0xf7, 0x5e, 0xc3, 0xf2, 0xec, 0x1d, 0xd,
-		}
-		sharedNhkb = [32]byte{
-			0x32, 0x89, 0x3a, 0xed, 0x4b, 0xf0, 0xbf, 0xc1,
-			0xa5, 0xa9, 0x53, 0x73, 0x5b, 0xf9, 0x76, 0xce,
-			0x70, 0x8e, 0xe1, 0xa, 0xed, 0x98, 0x1d, 0xe3,
-			0xb4, 0xe9, 0xa9, 0x88, 0x54, 0x94, 0xaf, 0x23,
-		}
-	)
-
-	keyPair, err := doubleratchet.DefaultCrypto{}.GenerateDH()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Bob MUST be created with the shared secret, shared header keys and a DH key pair.
-	bob, err := doubleratchet.NewHE(sk, sharedHka, sharedNhkb, keyPair)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Alic MUST be created with the shared secret, shared header keys and Bob's public key.
-	alice, err := doubleratchet.NewHEWithRemoteKey(sk, sharedHka, sharedNhkb, keyPair.PublicKey())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Encryption and decryption is done the same way as in the basic version.
-	m := alice.RatchetEncrypt([]byte("Hi Bob!"), nil)
-
-	plaintext, err := bob.RatchetDecrypt(m, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(string(plaintext))
-}
 ```
 
 ## License
