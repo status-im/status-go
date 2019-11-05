@@ -15,10 +15,20 @@ import (
 	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
+type StatusMessageT int
+
+const (
+	MessageT StatusMessageT = iota + 1
+	MembershipUpdateMessageT
+	PairMessageT
+)
+
 // StatusMessage is any Status Protocol message.
 type StatusMessage struct {
 	// TransportMessage is the parsed message received from the transport layer, i.e the input
 	TransportMessage *whispertypes.Message
+	// MessageType is the type of application message contained
+	MessageType StatusMessageT
 	// ParsedMessage is the parsed message by the application layer, i.e the output
 	ParsedMessage interface{}
 
@@ -144,6 +154,20 @@ func (m *StatusMessage) HandleApplication() error {
 		return err
 	}
 	m.ParsedMessage = value
+	switch m.ParsedMessage.(type) {
+	case Message:
+		m.MessageType = MessageT
+	case MembershipUpdateMessage:
+		m.MessageType = MembershipUpdateMessageT
+	case PairMessage:
+		m.MessageType = PairMessageT
+		// By default we null the parsed message field, as
+		// otherwise is populated with the raw transit and we are
+		// unable to marshal in case it contains maps
+		// as they have type map[interface{}]interface{}
+	default:
+		m.ParsedMessage = nil
 
+	}
 	return nil
 }

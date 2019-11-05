@@ -1,11 +1,11 @@
 package whisper
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
@@ -301,7 +301,7 @@ func (a *WhisperServiceTransport) SendPublic(ctx context.Context, newMessage *wh
 	}
 
 	newMessage.SymKeyID = filter.SymKeyID
-	newMessage.Topic = whispertypes.TopicType(filter.Topic)
+	newMessage.Topic = filter.Topic
 
 	return a.shhAPI.Post(ctx, *newMessage)
 }
@@ -336,7 +336,7 @@ func (a *WhisperServiceTransport) SendPrivateWithPartitioned(ctx context.Context
 		return nil, err
 	}
 
-	newMessage.Topic = whispertypes.TopicType(filter.Topic)
+	newMessage.Topic = filter.Topic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return a.shhAPI.Post(ctx, *newMessage)
@@ -383,60 +383,60 @@ func (a *WhisperServiceTransport) Stop() error {
 	return nil
 }
 
-// MessagesRequest is a RequestMessages() request payload.
-type MessagesRequest struct {
-	// MailServerPeer is MailServer's enode address.
-	MailServerPeer string `json:"mailServerPeer"`
+// RequestHistoricMessages requests historic messages for all registered filters.
+func (a *WhisperServiceTransport) SendMessagesRequest(
+	ctx context.Context,
+	peerID []byte,
+	from, to uint32,
+	previousCursor []byte,
+) (cursor []byte, err error) {
+	topics := make([]whispertypes.TopicType, len(a.Filters()))
+	for _, f := range a.Filters() {
+		topics = append(topics, f.Topic)
+	}
 
-	// From is a lower bound of time range (optional).
-	// Default is 24 hours back from now.
-	From uint32 `json:"from"`
+	r := createMessagesRequest(from, to, previousCursor, topics)
+	r.SetDefaults(a.shh.GetCurrentTime())
 
-	// To is a upper bound of time range (optional).
-	// Default is now.
-	To uint32 `json:"to"`
+	events := make(chan whispertypes.EnvelopeEvent, 10)
+	sub := a.shh.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
 
-	// Limit determines the number of messages sent by the mail server
-	// for the current paginated request
-	Limit uint32 `json:"limit"`
+	err = a.shh.SendMessagesRequest(peerID, r)
+	if err != nil {
+		return
+	}
 
-	// Cursor is used as starting point for paginated requests
-	Cursor string `json:"cursor"`
-
-	// Topic is a regular Whisper topic.
-	// DEPRECATED
-	Topic whispertypes.TopicType `json:"topic"`
-
-	// Topics is a list of Whisper topics.
-	Topics []whispertypes.TopicType `json:"topics"`
-
-	// SymKeyID is an ID of a symmetric key to authenticate to MailServer.
-	// It's derived from MailServer password.
-	SymKeyID string `json:"symKeyID"`
-
-	// Timeout is the time to live of the request specified in seconds.
-	// Default is 10 seconds
-	Timeout time.Duration `json:"timeout"`
-
-	// Force ensures that requests will bypass enforced delay.
-	// TODO(adam): it's currently not handled.
-	Force bool `json:"force"`
+	resp, err := a.waitForRequestCompleted(ctx, r.ID, events)
+	if err == nil && resp != nil && resp.Error != nil {
+		err = resp.Error
+	} else if err == nil && resp != nil {
+		cursor = resp.Cursor
+	}
+	return
 }
 
-type MessagesResponse struct {
-	// Cursor from the response can be used to retrieve more messages
-	// for the previous request.
-	Cursor string `json:"cursor"`
-
-	// Error indicates that something wrong happened when sending messages
-	// to the requester.
-	Error error `json:"error"`
-}
-
-// RetryConfig specifies configuration for retries with timeout and max amount of retries.
-type RetryConfig struct {
-	BaseTimeout time.Duration
-	// StepTimeout defines duration increase per each retry.
-	StepTimeout time.Duration
-	MaxRetries  int
+func (a *WhisperServiceTransport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan whispertypes.EnvelopeEvent) (*whispertypes.MailServerResponse, error) {
+	for {
+		select {
+		case ev := <-events:
+			a.logger.Debug(
+				"waiting for request completed and received an event",
+				zap.Binary("requestID", requestID),
+				zap.Any("event", ev),
+			)
+			if !bytes.Equal(ev.Hash.Bytes(), requestID) {
+				continue
+			}
+			if ev.Event != whispertypes.EventMailServerRequestCompleted {
+				continue
+			}
+			data, ok := ev.Data.(*whispertypes.MailServerResponse)
+			if ok {
+				return data, nil
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }

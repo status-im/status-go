@@ -56,6 +56,9 @@ type Whisper interface {
 	// The whisper protocol is agnostic of the format and contents of envelope.
 	// A timeout of 0 never expires.
 	RequestHistoricMessagesWithTimeout(peerID []byte, envelope Envelope, timeout time.Duration) error
+	// SendMessagesRequest sends a MessagesRequest. This is an equivalent to RequestHistoricMessages
+	// in terms of the functionality.
+	SendMessagesRequest(peerID []byte, request MessagesRequest) error
 	// SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
 	SyncMessages(peerID []byte, req SyncMailRequest) error
 }
