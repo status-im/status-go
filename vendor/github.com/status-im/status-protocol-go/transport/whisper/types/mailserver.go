@@ -1,8 +1,50 @@
 package whispertypes
 
-import statusproto "github.com/status-im/status-protocol-go/types"
+import (
+	"time"
 
-// MailServerResponse is the response payload sent by the mailserver
+	statusproto "github.com/status-im/status-protocol-go/types"
+)
+
+const (
+	MaxLimitInMessagesRequest = 1000
+)
+
+// MessagesRequest contains details of a request of historic messages.
+type MessagesRequest struct {
+	// ID of the request. The current implementation requires ID to be 32-byte array,
+	// however, it's not enforced for future implementation.
+	ID []byte `json:"id"`
+	// From is a lower bound of time range.
+	From uint32 `json:"from"`
+	// To is a upper bound of time range.
+	To uint32 `json:"to"`
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request.
+	Limit uint32 `json:"limit"`
+	// Cursor is used as starting point for paginated requests.
+	Cursor []byte `json:"cursor"`
+	// Bloom is a filter to match requested messages.
+	Bloom []byte `json:"bloom"`
+}
+
+func (r *MessagesRequest) SetDefaults(now time.Time) {
+	// set From and To defaults
+	if r.To == 0 {
+		r.To = uint32(now.UTC().Unix())
+	}
+
+	if r.From == 0 {
+		oneDay := uint32(86400) // -24 hours
+		if r.To < oneDay {
+			r.From = 0
+		} else {
+			r.From = r.To - oneDay
+		}
+	}
+}
+
+// MailServerResponse is the response payload sent by the mailserver.
 type MailServerResponse struct {
 	LastEnvelopeHash statusproto.Hash
 	Cursor           []byte

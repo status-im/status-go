@@ -805,7 +805,7 @@ func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMes
 	for chat, messages := range chatWithMessages {
 		for _, shhMessage := range messages {
 			// TODO: fix this to use an exported method.
-			statusMessages, err := m.processor.handleMessages(shhMessage, false)
+			statusMessages, err := m.processor.handleMessages(shhMessage, true)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
@@ -815,7 +815,7 @@ func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMes
 		}
 	}
 
-	err = m.saveContacts(result)
+	err = m.updateContactsFromMessages(result)
 	if err != nil {
 		return nil, err
 	}
@@ -823,7 +823,7 @@ func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMes
 	return result, nil
 }
 
-func (m *Messenger) saveContacts(messages map[transport.Filter][]*protocol.StatusMessage) error {
+func (m *Messenger) updateContactsFromMessages(messages map[transport.Filter][]*protocol.StatusMessage) error {
 	allContactsMap := make(map[string]bool)
 	var allContacts []Contact
 	for _, chatMessages := range messages {
@@ -844,6 +844,15 @@ func (m *Messenger) saveContacts(messages map[transport.Filter][]*protocol.Statu
 		}
 	}
 	return m.persistence.SetContactsGeneratedData(allContacts, nil)
+}
+
+func (m *Messenger) RequestHistoricMessages(
+	ctx context.Context,
+	peer []byte, // should be removed after mailserver logic is ported
+	from, to uint32,
+	cursor []byte,
+) ([]byte, error) {
+	return m.transport.SendMessagesRequest(ctx, peer, from, to, cursor)
 }
 
 // DEPRECATED

@@ -135,6 +135,17 @@ func (w *gethWhisperWrapper) CreateFilterWrapper(keyAsym *ecdsa.PrivateKey, keyS
 	})
 }
 
+func (w *gethWhisperWrapper) SendMessagesRequest(peerID []byte, r whispertypes.MessagesRequest) error {
+	return w.whisper.SendMessagesRequest(peerID, whisper.MessagesRequest{
+		ID:     r.ID,
+		From:   r.From,
+		To:     r.To,
+		Limit:  r.Limit,
+		Cursor: r.Cursor,
+		Bloom:  r.Bloom,
+	})
+}
+
 // RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
 // which is known to implement MailServer interface, and is supposed to process this
 // request and respond with a number of peer-to-peer messages (possibly expired),

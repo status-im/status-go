@@ -125,6 +125,6 @@ func UnmarshalFixedText(typname string, input, out []byte) error {
 			return ErrSyntax
 		}
 	}
-	hex.Decode(out, raw)
-	return nil
+	_, err = hex.Decode(out, raw)
+	return err
 }

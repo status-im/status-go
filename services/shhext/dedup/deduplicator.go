@@ -5,6 +5,8 @@ import (
 
 	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	statusproto "github.com/status-im/status-protocol-go/types"
+	v1 "github.com/status-im/status-protocol-go/v1"
+
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -34,9 +36,11 @@ type Metadata struct {
 }
 
 type DeduplicateMessage struct {
-	Message  *whispertypes.Message `json:"message"`
-	Metadata Metadata              `json:"metadata"`
-	Payload  string                `json:"payload"`
+	Message       *whispertypes.Message `json:"message"`
+	Metadata      Metadata              `json:"metadata"`
+	Payload       string                `json:"payload"`
+	MessageType   v1.StatusMessageT     `json:"messageType"`
+	ParsedMessage interface{}           `json:"parsedMessage"`
 }
 
 // NewDeduplicator creates a new deduplicator
