@@ -13,7 +13,7 @@ import (
 
 type DataSync struct {
 	*datasyncnode.Node
-	// DataSyncNodeTransport is the implemntation of the datasync transport interface
+	// DataSyncNodeTransport is the implementation of the datasync transport interface.
 	*DataSyncNodeTransport
 	logger         *zap.Logger
 	sendingEnabled bool
@@ -21,14 +21,6 @@ type DataSync struct {
 
 func New(node *datasyncnode.Node, transport *DataSyncNodeTransport, sendingEnabled bool, logger *zap.Logger) *DataSync {
 	return &DataSync{Node: node, DataSyncNodeTransport: transport, sendingEnabled: sendingEnabled, logger: logger}
-}
-
-func (d *DataSync) Add(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto.Payload) {
-	packet := datasynctransport.Packet{
-		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
-		Payload: datasyncMessage,
-	}
-	d.DataSyncNodeTransport.AddPacket(packet)
 }
 
 func (d *DataSync) Handle(sender *ecdsa.PublicKey, payload []byte) [][]byte {
@@ -48,18 +40,26 @@ func (d *DataSync) Handle(sender *ecdsa.PublicKey, payload []byte) [][]byte {
 			payloads = append(payloads, message.Body)
 		}
 		if d.sendingEnabled {
-			d.Add(sender, datasyncMessage)
+			d.add(sender, datasyncMessage)
 		}
 	}
 
 	return payloads
 }
 
+func (d *DataSync) Stop() {
+	d.Node.Stop()
+}
+
+func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto.Payload) {
+	packet := datasynctransport.Packet{
+		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
+		Payload: datasyncMessage,
+	}
+	d.DataSyncNodeTransport.AddPacket(packet)
+}
+
 func unwrap(payload []byte) (datasyncPayload datasyncproto.Payload, err error) {
 	err = proto.Unmarshal(payload, &datasyncPayload)
 	return
-}
-
-func (d *DataSync) Stop() {
-	d.Node.Stop()
 }
