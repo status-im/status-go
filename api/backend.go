@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -173,6 +174,20 @@ func (b *StatusBackend) SaveAccount(account multiaccounts.Account) error {
 	return b.multiaccountsDB.SaveAccount(account)
 }
 
+// DeleteAccount
+func (b *StatusBackend) DeleteAccount(address common.Address) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return errors.New("accoutns db wasn't initialized")
+	}
+	return b.multiaccountsDB.DeleteAccount(address)
+}
+
+func accountDBPath(root string, address common.Address) string {
+	return filepath.Join(root, fmt.Sprintf("app-%x.sql", address))
+}
+
 func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -182,7 +197,7 @@ func (b *StatusBackend) ensureAppDBOpened(account multiaccounts.Account, passwor
 	if len(b.rootDataDir) == 0 {
 		return errors.New("root datadir wasn't provided")
 	}
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.Address))
+	path := accountDBPath(b.rootDataDir, account.Address)
 	b.appDB, err = appdatabase.InitializeDB(path, password)
 	if err != nil {
 		return err
@@ -1051,4 +1066,16 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 
 	hexEncodedSignature := hexutil.Encode(signature)
 	return hexEncodedSignature, nil
+}
+
+func (b *StatusBackend) DeleteAccountDatabase(address common.Address) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	err := b.closeAppDB()
+	if err != nil {
+		return err
+	}
+
+	path := accountDBPath(b.rootDataDir, address)
+	return os.RemoveAll(path)
 }

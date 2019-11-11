@@ -383,6 +383,24 @@ func SaveAccountAndLogin(accountData, password, configJSON, subaccountData *C.ch
 	return makeJSONResponse(nil)
 }
 
+// DeleteAccount delete account's database and delete account from multiaccount database
+//export DeleteAccount
+func DeleteAccount(addressChars *C.char) *C.char {
+	address := common.HexToAddressi(C.GoString(addressChars))
+	err := statusBackend.DeleteAccountDatabase(address) 
+	if err != nil {
+		log.Error("failed to delete account's database", "address", address, "error", err)
+		return err
+	}
+	err = statusBackend.DeleteAccount(address)
+	if err != nil {
+		log.Error("failed to delete account", "address", address, "error", err)
+		return err
+	}
+
+	return nil
+}
+
 // InitKeystore initialize keystore before doing any operations with keys.
 //export InitKeystore
 func InitKeystore(keydir *C.char) *C.char {
