@@ -8,8 +8,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/extkeys"
 	"github.com/status-im/status-go/account"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"

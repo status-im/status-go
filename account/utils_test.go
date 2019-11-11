@@ -6,8 +6,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/extkeys"
 	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

@@ -39,7 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/extkeys"
 )
 
 var (

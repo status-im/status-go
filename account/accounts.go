@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 
+	"github.com/status-im/extkeys"
 	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/extkeys"
 )
 
 // errors

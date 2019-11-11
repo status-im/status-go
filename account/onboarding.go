@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
+	"github.com/status-im/extkeys"
 	"github.com/status-im/status-go/account/generator"
-	"github.com/status-im/status-go/extkeys"
 )
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/extkeys"
 )
 
 type account struct {

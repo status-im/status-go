@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.13
 
-replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
+replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.5
 
 replace github.com/NaySoftware/go-fcm => github.com/status-im/go-fcm v1.0.0-status
 
@@ -13,8 +13,6 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 require (
 	github.com/NaySoftware/go-fcm v0.0.0-00010101000000-000000000000
 	github.com/beevik/ntp v0.2.0
-	github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
-	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
@@ -29,6 +27,7 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/prometheus/client_golang v1.2.1
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
+	github.com/status-im/extkeys v1.0.0
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-protocol-go v0.4.5-0.20191107122821-775d17008edf
@@ -37,7 +36,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.10.0
 	golang.org/x/crypto v0.0.0-20191029031824-8986dd9e96cf
-	golang.org/x/text v0.3.2
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

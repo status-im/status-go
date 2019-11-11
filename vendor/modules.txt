@@ -9,7 +9,7 @@ github.com/aristanetworks/goarista/monotime
 github.com/beevik/ntp
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
+# github.com/btcsuite/btcd v0.20.0-beta
 github.com/btcsuite/btcd/btcec
 github.com/btcsuite/btcd/chaincfg
 github.com/btcsuite/btcd/chaincfg/chainhash
@@ -31,7 +31,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.10.4
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
+# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.5
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -351,6 +351,8 @@ github.com/spacemonkeygo/spacelog
 github.com/spaolacci/murmur3
 # github.com/status-im/doubleratchet v3.0.0+incompatible
 github.com/status-im/doubleratchet
+# github.com/status-im/extkeys v1.0.0
+github.com/status-im/extkeys
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
 # github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48
