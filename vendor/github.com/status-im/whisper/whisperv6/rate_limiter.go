@@ -1,6 +1,7 @@
 package whisperv6
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -10,39 +11,63 @@ import (
 	"github.com/tsenart/tb"
 )
 
-const (
-	rateLimitPerSecIP     = 10
-	rateLimitPerSecPeerID = 3
-)
-
 type runLoop func(p *Peer, rw p2p.MsgReadWriter) error
 
-type rateLimiterHandler interface {
+type RateLimiterHandler interface {
 	ExceedPeerLimit()
 	ExceedIPLimit()
 }
 
-type metricsRateLimiterHandler struct{}
+type MetricsRateLimiterHandler struct{}
 
-func (metricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
-func (metricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
+func (MetricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
+func (MetricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
 
-type peerRateLimiter struct {
+type PeerRateLimiterConfig struct {
+	LimitPerSecIP      int64
+	LimitPerSecPeerID  int64
+	WhitelistedIPs     []string
+	WhitelistedPeerIDs []enode.ID
+}
+
+var defaultPeerRateLimiterConfig = PeerRateLimiterConfig{
+	LimitPerSecIP:      10,
+	LimitPerSecPeerID:  5,
+	WhitelistedIPs:     nil,
+	WhitelistedPeerIDs: nil,
+}
+
+type PeerRateLimiter struct {
 	peerIDThrottler *tb.Throttler
 	ipThrottler     *tb.Throttler
 
-	handler rateLimiterHandler
+	limitPerSecIP     int64
+	limitPerSecPeerID int64
+
+	whitelistedPeerIDs []enode.ID
+	whitelistedIPs     []string
+
+	handler RateLimiterHandler
 }
 
-func newPeerRateLimiter(handler rateLimiterHandler) *peerRateLimiter {
-	return &peerRateLimiter{
-		peerIDThrottler: tb.NewThrottler(time.Millisecond * 100),
-		ipThrottler:     tb.NewThrottler(time.Millisecond * 100),
-		handler:         handler,
+func NewPeerRateLimiter(handler RateLimiterHandler, cfg *PeerRateLimiterConfig) *PeerRateLimiter {
+	if cfg == nil {
+		copy := defaultPeerRateLimiterConfig
+		cfg = &copy
+	}
+
+	return &PeerRateLimiter{
+		peerIDThrottler:    tb.NewThrottler(time.Millisecond * 100),
+		ipThrottler:        tb.NewThrottler(time.Millisecond * 100),
+		limitPerSecIP:      cfg.LimitPerSecIP,
+		limitPerSecPeerID:  cfg.LimitPerSecPeerID,
+		whitelistedPeerIDs: cfg.WhitelistedPeerIDs,
+		whitelistedIPs:     cfg.WhitelistedIPs,
+		handler:            handler,
 	}
 }
 
-func (r *peerRateLimiter) Decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoop) error {
+func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoop) error {
 	in, out := p2p.MsgPipe()
 	defer in.Close()
 	defer out.Close()
@@ -56,6 +81,8 @@ func (r *peerRateLimiter) Decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				errC <- fmt.Errorf("failed to read packet: %v", err)
 				return
 			}
+
+			rateLimiterProcessed.Inc(1)
 
 			var ip string
 			if p != nil && p.peer != nil {
@@ -72,8 +99,6 @@ func (r *peerRateLimiter) Decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttlePeer(peerID); halted {
 				r.handler.ExceedPeerLimit()
 			}
-
-			// TODO: use whitelisting for cluster peers.
 
 			if err := in.WriteMsg(packet); err != nil {
 				errC <- fmt.Errorf("failed to write packet to pipe: %v", err)
@@ -106,14 +131,38 @@ func (r *peerRateLimiter) Decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 
 // throttleIP throttles a number of messages incoming from a given IP.
 // It allows 10 packets per second.
-func (r *peerRateLimiter) throttleIP(ip string) bool {
-	return r.ipThrottler.Halt(ip, 1, rateLimitPerSecIP)
+func (r *PeerRateLimiter) throttleIP(ip string) bool {
+	if stringSliceContains(r.whitelistedIPs, ip) {
+		return false
+	}
+	return r.ipThrottler.Halt(ip, 1, r.limitPerSecIP)
 }
 
 // throttlePeer throttles a number of messages incoming from a peer.
 // It allows 3 packets per second.
-func (r *peerRateLimiter) throttlePeer(peerID []byte) bool {
+func (r *PeerRateLimiter) throttlePeer(peerID []byte) bool {
 	var id enode.ID
 	copy(id[:], peerID)
-	return r.peerIDThrottler.Halt(id.String(), 1, rateLimitPerSecPeerID)
+	if enodeIDSliceContains(r.whitelistedPeerIDs, id) {
+		return false
+	}
+	return r.peerIDThrottler.Halt(id.String(), 1, r.limitPerSecPeerID)
+}
+
+func stringSliceContains(s []string, searched string) bool {
+	for _, item := range s {
+		if item == searched {
+			return true
+		}
+	}
+	return false
+}
+
+func enodeIDSliceContains(s []enode.ID, searched enode.ID) bool {
+	for _, item := range s {
+		if bytes.Equal(item.Bytes(), searched.Bytes()) {
+			return true
+		}
+	}
+	return false
 }

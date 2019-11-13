@@ -88,6 +88,9 @@ type WhisperConfig struct {
 
 	// DatabaseConfig is configuration for which datastore we use
 	DatabaseConfig DatabaseConfig
+
+	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
+	EnableRateLimiter bool
 }
 
 type DatabaseConfig struct {

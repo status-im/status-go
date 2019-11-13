@@ -105,6 +105,8 @@ type Whisper struct {
 
 	mailServer MailServer // MailServer interface
 
+	rateLimiter *PeerRateLimiter
+
 	messageStoreFabric func() MessageStore
 
 	envelopeFeed event.Feed
@@ -333,6 +335,10 @@ func (whisper *Whisper) SetMinimumPowTest(val float64) {
 //SetLightClientMode makes node light client (does not forward any messages)
 func (whisper *Whisper) SetLightClientMode(v bool) {
 	whisper.settings.Store(lightClientModeIdx, v)
+}
+
+func (whisper *Whisper) SetRateLimiter(r *PeerRateLimiter) {
+	whisper.rateLimiter = r
 }
 
 //LightClientMode indicates is this node is light client (does not forward any messages)
@@ -887,8 +893,10 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	whisperPeer.start()
 	defer whisperPeer.stop()
 
-	r := newPeerRateLimiter(&metricsRateLimiterHandler{})
-	return r.Decorate(whisperPeer, rw, whisper.runMessageLoop)
+	if whisper.rateLimiter != nil {
+		return whisper.rateLimiter.decorate(whisperPeer, rw, whisper.runMessageLoop)
+	}
+	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
 func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,

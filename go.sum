@@ -580,8 +580,8 @@ github.com/status-im/status-protocol-go v0.4.5-0.20191107122821-775d17008edf h1:
 github.com/status-im/status-protocol-go v0.4.5-0.20191107122821-775d17008edf/go.mod h1:r8TgqNOpY+fGKkBfR9PldxSSaBN0EsEEY4a3WsIh9LY=
 github.com/status-im/whisper v1.5.2 h1:26NgiKusmPic38eQdtXnaY+iaQ/LuQ3Dh0kCGYT/Uxs=
 github.com/status-im/whisper v1.5.2/go.mod h1:emrOxzJme0k66QtbbQ2bdd3P8RCdLZ8sTD7SkwH1s2s=
-github.com/status-im/whisper v1.6.0-beta.0 h1:oVb5BUhOJS7X8IWias0EFK0d7vC+uC8ugGPRnz1Oq+Q=
-github.com/status-im/whisper v1.6.0-beta.0/go.mod h1:lygchT4p9Y1/hR451OhNNqfinvy9EYEDxtXU2T/U30Q=
+github.com/status-im/whisper v1.6.0-beta.0.0.20191113210616-9a64fa413a07 h1:vBh44MfkmKRCVqAkL+T5LHgXLEwjMOlKxEyQB7VR2Zo=
+github.com/status-im/whisper v1.6.0-beta.0.0.20191113210616-9a64fa413a07/go.mod h1:lygchT4p9Y1/hR451OhNNqfinvy9EYEDxtXU2T/U30Q=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 h1:gIlAHnH1vJb5vwEjIp5kBj/eu99p/bl0Ay2goiPe5xE=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570/go.mod h1:8OR4w3TdeIHIh1g6EMY5p0gVNOovcWC+1vpc7naMuAw=
 github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 h1:njlZPzLwU639dk2kqnCPPv+wNjq7Xb6EfUxe/oX0/NM=
