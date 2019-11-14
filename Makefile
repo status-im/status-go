@@ -267,7 +267,7 @@ canary-test: node-canary
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.18.0
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.21.0
 
 lint:
 	@echo "lint"
