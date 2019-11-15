@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
-	"github.com/status-im/status-go/notifications/push/fcm"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
@@ -44,8 +43,6 @@ import (
 )
 
 const (
-	//todo(jeka): should be removed
-	fcmServerKey         = "AAAAxwa-r08:APA91bFtMIToDVKGAmVCm76iEXtA4dn9MPvLdYKIZqAlNpLJbd12EgdBI9DSDSXKdqvIAgLodepmRhGVaWvhxnXJzVpE6MoIRuKedDV3kfHSVBhWFqsyoLTwXY4xeufL9Sdzb581U-lx"
 	contractQueryTimeout = 1000 * time.Millisecond
 )
 
@@ -73,7 +70,6 @@ type StatusBackend struct {
 	multiaccountsDB *multiaccounts.Database
 	accountManager  *account.Manager
 	transactor      *transactions.Transactor
-	newNotification fcm.NotificationConstructor
 	connectionState connectionState
 	appState        appState
 	log             log.Logger
@@ -88,16 +84,14 @@ func NewStatusBackend() *StatusBackend {
 	accountManager := account.NewManager()
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
-	notificationManager := fcm.NewNotification(fcmServerKey)
 	rpcFilters := rpcfilters.New(statusNode)
 	return &StatusBackend{
-		statusNode:      statusNode,
-		accountManager:  accountManager,
-		transactor:      transactor,
-		personalAPI:     personalAPI,
-		rpcFilters:      rpcFilters,
-		newNotification: notificationManager,
-		log:             log.New("package", "status-go/api.StatusBackend"),
+		statusNode:     statusNode,
+		accountManager: accountManager,
+		transactor:     transactor,
+		personalAPI:    personalAPI,
+		rpcFilters:     rpcFilters,
+		log:            log.New("package", "status-go/api.StatusBackend"),
 	}
 }
 
@@ -896,28 +890,6 @@ func (b *StatusBackend) startWallet() error {
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,
 		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
-}
-
-// SendDataNotification sends data push notifications to users.
-// dataPayloadJSON is a JSON string that looks like this:
-// {
-//	"data": {
-//		"msg-v2": {
-//			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
-//			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
-//			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
-//		}
-//	}
-// }
-func (b *StatusBackend) SendDataNotification(dataPayloadJSON string, tokens ...string) error {
-	log.Debug("sending data push notification")
-
-	err := b.newNotification().Send(dataPayloadJSON, tokens...)
-	if err != nil {
-		b.log.Error("SendDataNotification failed", "dataPayloadJSON", dataPayloadJSON, "error", err)
-	}
-
-	return err
 }
 
 // InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.

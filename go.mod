@@ -4,14 +4,13 @@ go 1.13
 
 replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
 
-replace github.com/NaySoftware/go-fcm => github.com/status-im/go-fcm v1.0.0-status
-
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
+replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015
+
 require (
-	github.com/NaySoftware/go-fcm v0.0.0-00010101000000-000000000000
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
 	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
@@ -44,5 +43,3 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.29.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
-
-replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015
