@@ -32,7 +32,7 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-protocol-go v0.4.5-0.20191107122821-775d17008edf
-	github.com/status-im/whisper v1.6.0-beta.0.0.20191113210616-9a64fa413a07
+	github.com/status-im/whisper v1.6.0
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.10.0
