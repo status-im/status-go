@@ -811,6 +811,16 @@ func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*protocol.StatusMes
 				continue
 			}
 
+			for _, msg := range statusMessages {
+				if msg.ParsedMessage != nil {
+					if textMessage, ok := msg.ParsedMessage.(protocol.Message); ok {
+						textMessage.Content = protocol.PrepareContent(textMessage.Content)
+						msg.ParsedMessage = textMessage
+					}
+				}
+
+			}
+
 			result[chat] = append(result[chat], statusMessages...)
 		}
 	}
@@ -929,6 +939,7 @@ type postProcessor struct {
 type postProcessorConfig struct {
 	MatchChat bool // match each messages to a chat; may result in a new chat creation
 	Persist   bool // if true, all sent and received user messages will be persisted
+	Parse     bool // if true, it will parse the content
 }
 
 func newPostProcessor(m *Messenger, config postProcessorConfig) *postProcessor {
@@ -951,6 +962,9 @@ func (p *postProcessor) Run(messages []*protocol.Message) ([]*protocol.Message, 
 	if p.config.MatchChat {
 		fns = append(fns, p.matchMessages)
 	}
+	if p.config.Parse {
+		fns = append(fns, p.parseMessages)
+	}
 	if p.config.Persist {
 		fns = append(fns, p.saveMessages)
 	}
@@ -970,6 +984,14 @@ func (p *postProcessor) saveMessages(messages []*protocol.Message) ([]*protocol.
 	if err != nil {
 		return nil, err
 	}
+	return messages, nil
+}
+
+func (p *postProcessor) parseMessages(messages []*protocol.Message) ([]*protocol.Message, error) {
+	for _, m := range messages {
+		m.Content = protocol.PrepareContent(m.Content)
+	}
+
 	return messages, nil
 }
 
@@ -1106,4 +1128,9 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 // GenerateAlias name returns the generated name given a public key hex encoded prefixed with 0x
 func GenerateAlias(id string) (string, error) {
 	return alias.GenerateFromPublicKeyString(id)
+}
+
+// PrepareContent parses the content of a message and returns the parsed version
+func (m *Messenger) PrepareContent(content protocol.Content) protocol.Content {
+	return protocol.PrepareContent(content)
 }
