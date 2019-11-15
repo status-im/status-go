@@ -301,8 +301,14 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 run-bootnode-docker: ##@Easy way to run a bootnode locally with Docker Compose
 	cd _assets/compose/bootnode/ && $(MAKE)
 
-run-mailserver-systemd: ##@Easy way to run a mailserver locally with systemd
+run-mailserver-systemd: ##@Easy Run a mailserver locally with systemd
 	@_assets/systemd/start.sh
 
-run-mailserver-docker: ##@Easy way to run a mailserver locally with Docker Compose
+run-mailserver-docker: ##@Easy Run a mailserver locally with Docker Compose
 	@cd _assets/compose/mailserver/ && $(MAKE)
+
+clean-mailserver-systemd: ##@Easy Clean your systemd service for running a mailserver
+	@./_assets/systemd/clean.sh
+
+clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserver
+	@cd _assets/compose/mailserver/ && $(MAKE) clean

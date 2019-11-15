@@ -22,11 +22,9 @@ In order to manage the new `statusd` service you use `systemctl` command:
 * `systemctl --user disable statusd` - Disable the service
 * `journalctl --user-unit statusd` - Read the service logs
 
-If you want to remove the service you can just remove its definition:
-```
-systemctl --user stop statusd
-rm ~/.config/systemd/user/statusd.service
-systemctl --user daemon-reload
+If you want to remove the service you can use the `clean.sh` script:
+```bash
+_assets/systemd/clean.sh
 ```
 
 # Settings

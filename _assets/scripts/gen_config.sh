@@ -4,7 +4,7 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 
 # Settings & defaults
 RPC_PORT="${RPC_PORT:-8545}"
-API_MODULES="${API_MODULES:-eth,net,web3,admin}"
+API_MODULES="${API_MODULES:-eth,net,web3,admin,mailserver}"
 FLEET_NAME="${FLEET_NAME:-eth.beta}"
 REGISTER_TOPIC="${REGISTER_TOPIC:-whispermail}"
 MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
@@ -34,6 +34,9 @@ JQ_FILTER_ARRAY=(
 )
 
 JQ_FILTER=$(printf " | %s" "${JQ_FILTER_ARRAY[@]}")
+
+# make sure config destination exists
+mkdir -p "${DATA_PATH}"
 
 echo "Generating config at: ${CONFIG_PATH}"
 
