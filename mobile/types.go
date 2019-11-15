@@ -96,9 +96,3 @@ type NotifyResult struct {
 type SignalHandler interface {
 	HandleSignal(string)
 }
-
-// SendDataNotificationResult is a JSON returned from notify message.
-type SendDataNotificationResult struct {
-	Status bool   `json:"status"`
-	Error  string `json:"error,omitempty"`
-}

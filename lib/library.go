@@ -11,7 +11,6 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
@@ -26,9 +25,6 @@ import (
 	protocol "github.com/status-im/status-protocol-go"
 	validator "gopkg.in/go-playground/validator.v9"
 )
-
-// All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/lib")
 
 // OpenAccounts opens database and returns accounts list.
 //export OpenAccounts
@@ -577,56 +573,6 @@ func makeJSONResponse(err error) *C.char {
 	outBytes, _ := json.Marshal(out)
 
 	return C.CString(string(outBytes))
-}
-
-// SendDataNotification sends push notifications by given tokens.
-// dataPayloadJSON is a JSON string that looks like this:
-// {
-//	"data": {
-//		"msg-v2": {
-//			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
-//			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
-//			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
-//		}
-//	}
-// }
-//export SendDataNotification
-func SendDataNotification(dataPayloadJSON, tokensArray *C.char) (outCBytes *C.char) {
-	var (
-		err      error
-		outBytes []byte
-	)
-	errString := ""
-
-	defer func() {
-		out := SendDataNotificationResult{
-			Status: err == nil,
-			Error:  errString,
-		}
-
-		outBytes, err = json.Marshal(out)
-		if err != nil {
-			logger.Error("failed to marshal SendDataNotification output", "error", err)
-			outCBytes = makeJSONResponse(err)
-			return
-		}
-
-		outCBytes = C.CString(string(outBytes))
-	}()
-
-	tokens, err := ParseJSONArray(C.GoString(tokensArray))
-	if err != nil {
-		errString = err.Error()
-		return
-	}
-
-	err = statusBackend.SendDataNotification(C.GoString(dataPayloadJSON), tokens...)
-	if err != nil {
-		errString = err.Error()
-		return
-	}
-
-	return
 }
 
 // UpdateMailservers updates mail servers in status backend.
