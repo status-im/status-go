@@ -28,6 +28,7 @@ import (
 	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
 	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	statusproto_types "github.com/status-im/status-protocol-go/types"
+	statusprotomessage "github.com/status-im/status-protocol-go/v1"
 )
 
 const (
@@ -442,6 +443,10 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessa
 		Name: msg.Chat,
 	}
 	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
+}
+
+func (api *PublicAPI) PrepareContent(ctx context.Context, content statusprotomessage.Content) statusprotomessage.Content {
+	return api.service.messenger.PrepareContent(content)
 }
 
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
