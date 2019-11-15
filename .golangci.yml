@@ -51,7 +51,7 @@ linters:
     - megacheck
     - misspell
     - structcheck
-    - typecheck
+#    - typecheck
     - unconvert
     - varcheck
   fast: false
@@ -61,3 +61,4 @@ issues:
     - "composite literal uses unkeyed fields" # govet
     - "G304: Potential file inclusion via variable" # gosec
     - "G104: Errors unhandled." #gosec
+    - "lib._Ctype_char, which can be annoying to use" # golint
