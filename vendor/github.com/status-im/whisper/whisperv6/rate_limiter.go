@@ -132,6 +132,9 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 // throttleIP throttles a number of messages incoming from a given IP.
 // It allows 10 packets per second.
 func (r *PeerRateLimiter) throttleIP(ip string) bool {
+	if r.limitPerSecIP == 0 {
+		return false
+	}
 	if stringSliceContains(r.whitelistedIPs, ip) {
 		return false
 	}
@@ -141,6 +144,9 @@ func (r *PeerRateLimiter) throttleIP(ip string) bool {
 // throttlePeer throttles a number of messages incoming from a peer.
 // It allows 3 packets per second.
 func (r *PeerRateLimiter) throttlePeer(peerID []byte) bool {
+	if r.limitPerSecIP == 0 {
+		return false
+	}
 	var id enode.ID
 	copy(id[:], peerID)
 	if enodeIDSliceContains(r.whitelistedPeerIDs, id) {
