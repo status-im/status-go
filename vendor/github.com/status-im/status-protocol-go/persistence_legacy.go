@@ -267,21 +267,15 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
-func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) error {
-	var (
-		tx   *sql.Tx
-		stmt *sql.Stmt
-		err  error
-	)
-	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return err
+		return
 	}
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
 			return
-
 		}
 		// don't shadow original error
 		_ = tx.Rollback()
@@ -289,21 +283,19 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) error {
 
 	allFields := db.tableUserMessagesLegacyAllFields()
 	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
-
 	query := fmt.Sprintf(`INSERT INTO user_messages_legacy(%s) VALUES (%s)`, allFields, valuesVector)
-
-	stmt, err = tx.Prepare(query)
+	stmt, err := tx.Prepare(query)
 	if err != nil {
-		return err
+		return
 	}
 
 	for _, msg := range messages {
-		_, err := stmt.Exec(db.tableUserMessagesLegacyAllValues(msg)...)
+		_, err = stmt.Exec(db.tableUserMessagesLegacyAllValues(msg)...)
 		if err != nil {
-			return err
+			return
 		}
 	}
-	return err
+	return
 }
 
 func (db sqlitePersistence) DeleteMessage(id string) error {
@@ -343,20 +335,15 @@ func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingSt
 }
 
 // BlockContact updates a contact, deletes all the messages and 1-to-1 chat, updates the unread messages count and returns a map with the new count
-func (db sqlitePersistence) BlockContact(contact Contact) ([]*Chat, error) {
-	var (
-		tx  *sql.Tx
-		err error
-	)
-	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+func (db sqlitePersistence) BlockContact(contact Contact) (chats []*Chat, err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
 			return
-
 		}
 		// don't shadow original error
 		_ = tx.Rollback()
@@ -370,34 +357,36 @@ func (db sqlitePersistence) BlockContact(contact Contact) ([]*Chat, error) {
 		contact.ID,
 	)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// Update contact
 	err = db.SaveContact(contact, tx)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// Delete one-to-one chat
 	_, err = tx.Exec("DELETE FROM chats WHERE id = ?", contact.ID)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// Recalculate denormalized fields
 	_, err = tx.Exec(`
-	UPDATE chats
-	SET
-	unviewed_message_count = (SELECT COUNT(1) FROM user_messages_legacy WHERE seen = 0 AND chat_id = chats.id),
-	last_message_content = (SELECT content from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
-	last_message_timestamp = (SELECT timestamp from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
-	last_message_clock_value = (SELECT clock_value from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
-	last_message_content_type = (SELECT content_type from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1)`)
+		UPDATE chats
+		SET
+			unviewed_message_count = (SELECT COUNT(1) FROM user_messages_legacy WHERE seen = 0 AND chat_id = chats.id),
+			last_message_content = (SELECT content from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
+			last_message_timestamp = (SELECT timestamp from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
+			last_message_clock_value = (SELECT clock_value from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1),
+			last_message_content_type = (SELECT content_type from user_messages_legacy WHERE chat_id = chats.id ORDER BY clock_value DESC LIMIT 1)
+	`)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// return the updated chats
-	return db.chats(tx)
+	chats, err = db.chats(tx)
+	return
 }

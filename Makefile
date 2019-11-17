@@ -267,7 +267,7 @@ canary-test: node-canary
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.17.1
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | BINARY=$(GOLANGCI_BINARY) bash -s -- -d -b $(GOPATH)/bin v1.21.0
 
 lint:
 	@echo "lint"
@@ -301,8 +301,14 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 run-bootnode-docker: ##@Easy way to run a bootnode locally with Docker Compose
 	cd _assets/compose/bootnode/ && $(MAKE)
 
-run-mailserver-systemd: ##@Easy way to run a mailserver locally with systemd
+run-mailserver-systemd: ##@Easy Run a mailserver locally with systemd
 	@_assets/systemd/start.sh
 
-run-mailserver-docker: ##@Easy way to run a mailserver locally with Docker Compose
+run-mailserver-docker: ##@Easy Run a mailserver locally with Docker Compose
 	@cd _assets/compose/mailserver/ && $(MAKE)
+
+clean-mailserver-systemd: ##@Easy Clean your systemd service for running a mailserver
+	@./_assets/systemd/clean.sh
+
+clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserver
+	@cd _assets/compose/mailserver/ && $(MAKE) clean
