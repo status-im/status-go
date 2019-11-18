@@ -13,4 +13,9 @@ var (
 	envelopeErrLowPowCounter       = metrics.NewRegisteredCounter("whisper/envelopeErrLowPow", nil)
 	envelopeErrNoBloomMatchCounter = metrics.NewRegisteredCounter("whisper/envelopeErrNoBloomMatch", nil)
 	envelopeSizeMeter              = metrics.NewRegisteredMeter("whisper/envelopeSize", nil)
+
+	// rate limiter metrics
+	rateLimiterProcessed    = metrics.NewRegisteredCounter("whisper/rateLimiterProcessed", nil)
+	rateLimiterIPExceeded   = metrics.NewRegisteredCounter("whisper/rateLimiterIPExceeded", nil)
+	rateLimiterPeerExceeded = metrics.NewRegisteredCounter("whisper/rateLimiterPeerExceeded", nil)
 )

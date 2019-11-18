@@ -324,6 +324,11 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 		whisperService := whisper.New(whisperServiceConfig)
 
+		if config.WhisperConfig.EnableRateLimiter {
+			r := whisperRateLimiter(config)
+			whisperService.SetRateLimiter(r)
+		}
+
 		if config.WhisperConfig.EnableNTPSync {
 			timesource, err := whisperTimeSource(ctx)
 			if err != nil {
@@ -450,4 +455,28 @@ func whisperTimeSource(ctx *node.ServiceContext) (func() time.Time, error) {
 		return nil, err
 	}
 	return timeSource.Now, nil
+}
+
+func whisperRateLimiter(config *params.NodeConfig) *whisper.PeerRateLimiter {
+	enodes := append(
+		parseNodes(config.ClusterConfig.StaticNodes),
+		parseNodes(config.ClusterConfig.TrustedMailServers)...,
+	)
+	var (
+		ips     []string
+		peerIDs []enode.ID
+	)
+	for _, item := range enodes {
+		ips = append(ips, item.IP().String())
+		peerIDs = append(peerIDs, item.ID())
+	}
+	return whisper.NewPeerRateLimiter(
+		&whisper.MetricsRateLimiterHandler{},
+		&whisper.PeerRateLimiterConfig{
+			LimitPerSecIP:      config.WhisperConfig.RateLimitIP,
+			LimitPerSecPeerID:  config.WhisperConfig.RateLimitPeerID,
+			WhitelistedIPs:     ips,
+			WhitelistedPeerIDs: peerIDs,
+		},
+	)
 }
