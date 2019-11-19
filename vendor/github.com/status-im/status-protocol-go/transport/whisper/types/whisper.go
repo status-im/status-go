@@ -5,11 +5,29 @@ import (
 	"time"
 )
 
+const (
+	// PubKeyLength represents the length (in bytes) of an uncompressed public key
+	PubKeyLength = 512 / 8
+	// AesKeyLength represents the length (in bytes) of an private key
+	AesKeyLength = 256 / 8
+)
+
+// SubscriptionOptions represents the parameters passed to Whisper.Subscribe
+// to customize the subscription behavior
+type SubscriptionOptions struct {
+	PrivateKeyID string
+	SymKeyID     string
+	PoW          float64
+	Topics       [][]byte
+}
+
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Whisper interface {
 	PublicWhisperAPI() PublicWhisperAPI
-	NewMessageStore() MessageStore
+
+	// Poll must be run periodically on the main thread by the host application
+	Poll()
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
@@ -43,11 +61,9 @@ type Whisper interface {
 	DeleteSymKey(id string) bool
 	GetSymKey(id string) ([]byte, error)
 
-	Subscribe(f Filter) (string, error)
+	Subscribe(opts *SubscriptionOptions) (string, error)
 	GetFilter(id string) Filter
 	Unsubscribe(id string) error
-
-	CreateFilterWrapper(keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte, messages MessageStore) Filter
 
 	// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
 	// which is known to implement MailServer interface, and is supposed to process this

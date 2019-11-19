@@ -88,6 +88,17 @@ type WhisperConfig struct {
 
 	// DatabaseConfig is configuration for which datastore we use
 	DatabaseConfig DatabaseConfig
+
+	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
+	EnableRateLimiter bool
+
+	// RateLimitIP sets the limit on the number of messages per second
+	// from a given IP.
+	RateLimitIP int64
+
+	// RateLimitPeerID sets the limit on the number of messages per second
+	// from a given peer ID.
+	RateLimitPeerID int64
 }
 
 type DatabaseConfig struct {
@@ -95,7 +106,7 @@ type DatabaseConfig struct {
 }
 
 type PGConfig struct {
-	// Enabled whether we should use a posgres instance
+	// Enabled whether we should use a Postgres instance
 	Enabled bool
 	// The URI of the server
 	URI string

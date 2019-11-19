@@ -9,13 +9,14 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/postgres"
-	"github.com/status-im/migrate/v4/source/go_bindata"
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 	"github.com/status-im/status-go/mailserver/migrations"
 	"github.com/status-im/status-go/params"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statusproto "github.com/status-im/status-protocol-go/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -158,8 +159,8 @@ func (i *PostgresDB) GetEnvelope(key *DBKey) ([]byte, error) {
 }
 
 func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
-	var zero common.Hash
-	var emptyTopic whisper.TopicType
+	var zero statusproto.Hash
+	var emptyTopic whispertypes.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
 	statement := "DELETE FROM envelopes WHERE id BETWEEN $1 AND $2"
@@ -178,7 +179,8 @@ func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 }
 
 func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
-	key := NewDBKey(env.Expiry-env.TTL, env.Topic, env.Hash())
+	topic := whispertypes.TopicType(env.Topic)
+	key := NewDBKey(env.Expiry-env.TTL, topic, statusproto.Hash(env.Hash()))
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
@@ -198,7 +200,7 @@ func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
 	_, err = stmt.Exec(
 		key.Bytes(),
 		rawEnvelope,
-		topicToByte(env.Topic),
+		topicToByte(topic),
 	)
 
 	if err != nil {
@@ -212,7 +214,7 @@ func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
 	return nil
 }
 
-func topicToByte(t whisper.TopicType) []byte {
+func topicToByte(t whispertypes.TopicType) []byte {
 	return []byte{t[0], t[1], t[2], t[3]}
 }
 

@@ -30,10 +30,10 @@ import (
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/whisperbridge"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -272,11 +272,11 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 	}
 
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var whisper *whisper.Whisper
-		if err := ctx.Service(&whisper); err != nil {
+		var service *whisperbridge.WhisperService
+		if err := ctx.Service(&service); err != nil {
 			return nil, err
 		}
-		svc := status.New(whisper)
+		svc := status.New(service.Whisper)
 		return svc, nil
 	})
 }
@@ -310,43 +310,19 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 	}
 
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		whisperServiceConfig := &whisper.Config{
-			MaxMessageSize:     whisper.DefaultMaxMessageSize,
-			MinimumAcceptedPOW: params.WhisperMinimumPoW,
-		}
+		return createShhService(ctx, &config.WhisperConfig, &config.ClusterConfig)
+	})
+	if err != nil {
+		return
+	}
 
-		if config.WhisperConfig.MaxMessageSize > 0 {
-			whisperServiceConfig.MaxMessageSize = config.WhisperConfig.MaxMessageSize
+	// Register Whisper status-protocol-go bridge
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var whisper *whisper.Whisper
+		if err := ctx.Service(&whisper); err != nil {
+			return nil, err
 		}
-		if config.WhisperConfig.MinimumPoW > 0 {
-			whisperServiceConfig.MinimumAcceptedPOW = config.WhisperConfig.MinimumPoW
-		}
-
-		whisperService := whisper.New(whisperServiceConfig)
-
-		if config.WhisperConfig.EnableNTPSync {
-			timesource, err := whisperTimeSource(ctx)
-			if err != nil {
-				return nil, err
-			}
-			whisperService.SetTimeSource(timesource)
-		}
-
-		// enable mail service
-		if config.WhisperConfig.EnableMailServer {
-			if err := registerMailServer(whisperService, &config.WhisperConfig); err != nil {
-				return nil, fmt.Errorf("failed to register MailServer: %v", err)
-			}
-		}
-
-		if config.WhisperConfig.LightClient {
-			emptyBloomFilter := make([]byte, 64)
-			if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
-				return nil, err
-			}
-		}
-
-		return whisperService, nil
+		return &whisperbridge.WhisperService{Whisper: gethbridge.NewGethWhisperWrapper(whisper)}, nil
 	})
 	if err != nil {
 		return
@@ -354,12 +330,57 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var whisper *whisper.Whisper
-		if err := ctx.Service(&whisper); err != nil {
+		var service *whisperbridge.WhisperService
+		if err := ctx.Service(&service); err != nil {
 			return nil, err
 		}
-		return shhext.New(gethbridge.NewGethWhisperWrapper(whisper), shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+		return shhext.New(service.Whisper, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
 	})
+}
+
+func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperConfig, clusterConfig *params.ClusterConfig) (*whisper.Whisper, error) {
+	whisperServiceConfig := &whisper.Config{
+		MaxMessageSize:     whisper.DefaultMaxMessageSize,
+		MinimumAcceptedPOW: params.WhisperMinimumPoW,
+	}
+
+	if whisperConfig.MaxMessageSize > 0 {
+		whisperServiceConfig.MaxMessageSize = whisperConfig.MaxMessageSize
+	}
+	if whisperConfig.MinimumPoW > 0 {
+		whisperServiceConfig.MinimumAcceptedPOW = whisperConfig.MinimumPoW
+	}
+
+	whisperService := whisper.New(whisperServiceConfig)
+
+	if whisperConfig.EnableRateLimiter {
+		r := whisperRateLimiter(whisperConfig, clusterConfig)
+		whisperService.SetRateLimiter(r)
+	}
+
+	if whisperConfig.EnableNTPSync {
+		timesource, err := whisperTimeSource(ctx)
+		if err != nil {
+			return nil, err
+		}
+		whisperService.SetTimeSource(timesource)
+	}
+
+	// enable mail service
+	if whisperConfig.EnableMailServer {
+		if err := registerMailServer(whisperService, whisperConfig); err != nil {
+			return nil, fmt.Errorf("failed to register MailServer: %v", err)
+		}
+	}
+
+	if whisperConfig.LightClient {
+		emptyBloomFilter := make([]byte, 64)
+		if err := whisperService.SetBloomFilter(emptyBloomFilter); err != nil {
+			return nil, err
+		}
+	}
+
+	return whisperService, nil
 }
 
 // activateIncentivisationService configures Whisper and adds it to the given node.
@@ -377,7 +398,7 @@ func activateIncentivisationService(stack *node.Node, config *params.NodeConfig)
 	logger.Info("activating incentivisation")
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var w whispertypes.Whisper
+		var w *whisperbridge.WhisperService
 		if err := ctx.Service(&w); err != nil {
 			return nil, err
 		}
@@ -401,7 +422,7 @@ func activateIncentivisationService(stack *node.Node, config *params.NodeConfig)
 			return nil, err
 		}
 
-		return incentivisation.New(privateKey, w.PublicWhisperAPI(), incentivisationConfig, contract), nil
+		return incentivisation.New(privateKey, w.Whisper.PublicWhisperAPI(), incentivisationConfig, contract), nil
 	})
 }
 
@@ -450,4 +471,28 @@ func whisperTimeSource(ctx *node.ServiceContext) (func() time.Time, error) {
 		return nil, err
 	}
 	return timeSource.Now, nil
+}
+
+func whisperRateLimiter(whisperConfig *params.WhisperConfig, clusterConfig *params.ClusterConfig) *whisper.PeerRateLimiter {
+	enodes := append(
+		parseNodes(clusterConfig.StaticNodes),
+		parseNodes(clusterConfig.TrustedMailServers)...,
+	)
+	var (
+		ips     []string
+		peerIDs []enode.ID
+	)
+	for _, item := range enodes {
+		ips = append(ips, item.IP().String())
+		peerIDs = append(peerIDs, item.ID())
+	}
+	return whisper.NewPeerRateLimiter(
+		&whisper.MetricsRateLimiterHandler{},
+		&whisper.PeerRateLimiterConfig{
+			LimitPerSecIP:      whisperConfig.RateLimitIP,
+			LimitPerSecPeerID:  whisperConfig.RateLimitPeerID,
+			WhitelistedIPs:     ips,
+			WhitelistedPeerIDs: peerIDs,
+		},
+	)
 }

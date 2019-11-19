@@ -478,13 +478,11 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 		}
 	}
 
-	f := s.whisper.CreateFilterWrapper(
-		nil, symKey,
-		minPow,
-		topics,
-		s.whisper.NewMessageStore())
-
-	id, err := s.whisper.Subscribe(f)
+	id, err := s.whisper.Subscribe(&whispertypes.SubscriptionOptions{
+		SymKeyID: symKeyID,
+		PoW:      minPow,
+		Topics:   topics,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -511,13 +509,16 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 	topic := toTopic(chatID)
 	topics := [][]byte{topic}
 
-	f := s.whisper.CreateFilterWrapper(
-		s.privateKey, nil,
-		pow,
-		topics,
-		s.whisper.NewMessageStore())
+	privateKeyID, err := s.whisper.AddKeyPair(s.privateKey)
+	if err != nil {
+		return nil, err
+	}
 
-	id, err := s.whisper.Subscribe(f)
+	id, err := s.whisper.Subscribe(&whispertypes.SubscriptionOptions{
+		PrivateKeyID: privateKeyID,
+		PoW:          pow,
+		Topics:       topics,
+	})
 	if err != nil {
 		return nil, err
 	}

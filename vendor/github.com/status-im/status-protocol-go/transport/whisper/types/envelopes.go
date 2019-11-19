@@ -41,7 +41,9 @@ const (
 )
 
 const (
+	// EnvelopeTimeNotSynced represents the code passed to notify of a clock skew situation
 	EnvelopeTimeNotSynced uint = 1000
+	// EnvelopeOtherError represents the code passed to notify of a generic error situation
 	EnvelopeOtherError
 )
 

@@ -26,9 +26,6 @@ import (
 
 var statusBackend = api.NewStatusBackend()
 
-// All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/mobile")
-
 // OpenAccounts opens database and returns accounts list.
 func OpenAccounts(datadir string) string {
 	statusBackend.UpdateRootDataDir(datadir)
@@ -591,56 +588,6 @@ func makeJSONResponse(err error) string {
 	outBytes, _ := json.Marshal(out)
 
 	return string(outBytes)
-}
-
-// SendDataNotification sends push notifications by given tokens.
-// dataPayloadJSON is a JSON string that looks like this:
-// {
-//	"data": {
-//		"msg-v2": {
-//			"from": "0x2cea3bd5", // hash of sender (first 10 characters/4 bytes of sha3 hash)
-//			"to": "0xb1f89744", // hash of recipient (first 10 characters/4 bytes of sha3 hash)
-//			"id": "0x872653ad", // message ID hash (first 10 characters/4 bytes of sha3 hash)
-//		}
-//	}
-// }
-func SendDataNotification(dataPayloadJSON, tokensArray string) (result string) {
-	var (
-		err       error
-		errString string
-	)
-
-	defer func() {
-		out := SendDataNotificationResult{
-			Status: err == nil,
-			Error:  errString,
-		}
-
-		var resultBytes []byte
-
-		resultBytes, err = json.Marshal(out)
-		if err != nil {
-			logger.Error("failed to marshal SendDataNotification output", "error", err)
-			result = makeJSONResponse(err)
-			return
-		}
-
-		result = string(resultBytes)
-	}()
-
-	tokens, err := ParseJSONArray((tokensArray))
-	if err != nil {
-		errString = err.Error()
-		return ""
-	}
-
-	err = statusBackend.SendDataNotification(dataPayloadJSON, tokens...)
-	if err != nil {
-		errString = err.Error()
-		return ""
-	}
-
-	return ""
 }
 
 // UpdateMailservers updates mail servers in status backend.

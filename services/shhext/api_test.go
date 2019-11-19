@@ -9,9 +9,7 @@ import (
 
 	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	statusproto "github.com/status-im/status-protocol-go/types"
-	whisper "github.com/status-im/whisper/whisperv6"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/mailserver"
 
 	"github.com/stretchr/testify/assert"
@@ -64,7 +62,7 @@ func TestMessagesRequest_setDefaults(t *testing.T) {
 }
 
 func TestMakeMessagesRequestPayload(t *testing.T) {
-	var emptyTopic whisper.TopicType
+	var emptyTopic whispertypes.TopicType
 	testCases := []struct {
 		Name string
 		Req  MessagesRequest
@@ -83,7 +81,7 @@ func TestMakeMessagesRequestPayload(t *testing.T) {
 		{
 			Name: "valid cursor",
 			Req: MessagesRequest{
-				Cursor: hex.EncodeToString(mailserver.NewDBKey(123, emptyTopic, common.Hash{}).Cursor()),
+				Cursor: hex.EncodeToString(mailserver.NewDBKey(123, emptyTopic, statusproto.Hash{}).Cursor()),
 			},
 			Err: "",
 		},

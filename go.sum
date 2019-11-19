@@ -414,6 +414,9 @@ github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNx
 github.com/mattn/go-isatty v0.0.5/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hdxcsrc5s=
 github.com/mattn/go-isatty v0.0.7 h1:UvyT9uN+3r7yLEYSlJsbQGdsaB/a0DlgWP3pql6iwOc=
 github.com/mattn/go-isatty v0.0.7/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hdxcsrc5s=
+github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f h1:QTRRO+ozoYgT3CQRIzNVYJRU3DB8HRnkZv6mr4ISmMA=
+github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f/go.mod h1:2zXcozF6qYGgmsG+SeTZz3oAbFLdD3OWqnUbNvJZAlc=
+github.com/mattn/go-runewidth v0.0.3 h1:a+kO+98RDGEfo6asOGMmpodZq4FNtnGP54yps8BzLR4=
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-runewidth v0.0.4 h1:2BvfKmzob6Bmd4YsL0zygOqfdFnK7GR4QL06Do4/p7Y=
 github.com/mattn/go-runewidth v0.0.4/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
@@ -588,6 +591,8 @@ github.com/status-im/go-ethereum v1.9.5-status.5 h1:d2RJC6ltNZJM2mrAW6kDWYdzewF8
 github.com/status-im/go-ethereum v1.9.5-status.5/go.mod h1:g2+E89NWtyA+55p6XEl5Sdt7Mtez3V0T3+Y7mJNb+tI=
 github.com/status-im/go-fcm v1.0.0-status h1:eUNKm4ooAXdEf9/GaTYeTELna5aVMOEbzjbm2irQ0gY=
 github.com/status-im/go-fcm v1.0.0-status/go.mod h1:0JGzul9SfemcbTdw0mkzLR42j+BTNci5aQWlI0o/uk8=
+github.com/status-im/go-ethereum v1.9.5-status.4 h1:F5VrxH9LmTxWl4qwQjs0TI5TgG9dVuZKqGmdwHJ0cWk=
+github.com/status-im/go-ethereum v1.9.5-status.4/go.mod h1:Ulij8LMpMvXnbnPcmDqrpI+iXoXSjxItuY/wmbasTZU=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
 github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 h1:ju5UTwk5Odtm4trrY+4Ca4RMj5OyXbmVeDAVad2T0Jw=
@@ -598,12 +603,14 @@ github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T6
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
-github.com/status-im/status-protocol-go v0.5.1 h1:mCqYJrL/zWMScFjSLdboL5WANLn01Cz8bAxBwPxww7k=
-github.com/status-im/status-protocol-go v0.5.1/go.mod h1:KR/eihnrUq2dZegUOVjrA/1poSNhasA/o82VYyRgeB0=
+github.com/status-im/status-protocol-go v0.5.2 h1:C6m6N6TLzJbuJmV4u8iNzs0cj+Q1CfBWdS0LZLtGkN8=
+github.com/status-im/status-protocol-go v0.5.2/go.mod h1:L5/7fKnycEBOiLm3TuCHDUNcn0kNNhSNsYLkqbUQngg=
 github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501 h1:oa0KU5jJRNtXaM/P465MhvSFo/HM2O8qi2DDuPcd7ro=
 github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
 github.com/status-im/whisper v1.5.2 h1:26NgiKusmPic38eQdtXnaY+iaQ/LuQ3Dh0kCGYT/Uxs=
 github.com/status-im/whisper v1.5.2/go.mod h1:emrOxzJme0k66QtbbQ2bdd3P8RCdLZ8sTD7SkwH1s2s=
+github.com/status-im/whisper v1.6.1 h1:C/T1HQHZfUI2jbccf3yIe8yfkl435I3BILIKeNASJDc=
+github.com/status-im/whisper v1.6.1/go.mod h1:lygchT4p9Y1/hR451OhNNqfinvy9EYEDxtXU2T/U30Q=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 h1:gIlAHnH1vJb5vwEjIp5kBj/eu99p/bl0Ay2goiPe5xE=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570/go.mod h1:8OR4w3TdeIHIh1g6EMY5p0gVNOovcWC+1vpc7naMuAw=
 github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 h1:njlZPzLwU639dk2kqnCPPv+wNjq7Xb6EfUxe/oX0/NM=
@@ -622,6 +629,8 @@ github.com/syndtr/goleveldb v0.0.0-20181128100959-b001fa50d6b2/go.mod h1:Z4AUp2K
 github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFdE=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/tidwall/pretty v0.0.0-20180105212114-65a9db5fad51/go.mod h1:XNkn88O1ChpSDQmQeStsy+sBenx6DDtFZJxhVysOjyk=
+github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9 h1:kjbwitOGH46vD01f2s3leBfrMnePQa3NSAIlW35MvY8=
+github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9/go.mod h1:EcGP24b8DY+bWHnpfJDP7fM+o8Nmz4fYH0l2xTtNr3I=
 github.com/tyler-smith/go-bip39 v1.0.2 h1:+t3w+KwLXO6154GNJY+qUtIxLTmFjfUmpguQT1OlOT8=
 github.com/tyler-smith/go-bip39 v1.0.2/go.mod h1:sJ5fKU0s6JVwZjjcUEX2zFOnvq0ASQ2K9Zr6cf67kNs=
 github.com/uber/jaeger-client-go v0.0.0-20180607151842-f7e0d4744fa6/go.mod h1:WVhlPFC8FDjOFMMWRy2pZqQJSXxYSwNYOkTr/Z6d3Kk=

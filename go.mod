@@ -4,14 +4,13 @@ go 1.13
 
 replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.5
 
-replace github.com/NaySoftware/go-fcm => github.com/status-im/go-fcm v1.0.0-status
-
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
+replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015
+
 require (
-	github.com/NaySoftware/go-fcm v0.0.0-00010101000000-000000000000
 	github.com/beevik/ntp v0.2.0
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/go-playground/locales v0.12.1 // indirect
@@ -31,9 +30,9 @@ require (
 	github.com/status-im/extkeys v1.0.0
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.5.1
+	github.com/status-im/status-protocol-go v0.5.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
-	github.com/status-im/whisper v1.5.2
+	github.com/status-im/whisper v1.6.1
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.10.0
@@ -42,5 +41,3 @@ require (
 	gopkg.in/go-playground/validator.v9 v9.29.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
-
-replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015

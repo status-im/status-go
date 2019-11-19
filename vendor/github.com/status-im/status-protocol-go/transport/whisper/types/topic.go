@@ -7,8 +7,9 @@ import (
 
 const (
 	// TopicLength is the expected length of the topic, in bytes
-	TopicLength     = 4
-	BloomFilterSize = 64 // in bytes
+	TopicLength = 4
+	// BloomFilterSize is the expected length of a bloom filter byte array, in bytes
+	BloomFilterSize = 64
 )
 
 // TopicType represents a cryptographically secure, probabilistic partial
@@ -63,6 +64,7 @@ func TopicToBloom(topic TopicType) []byte {
 	return b
 }
 
+// BloomFilterMatch returns true if a sample matches a bloom filter
 func BloomFilterMatch(filter, sample []byte) bool {
 	if filter == nil {
 		return true
@@ -79,6 +81,7 @@ func BloomFilterMatch(filter, sample []byte) bool {
 	return true
 }
 
+// MakeFullNodeBloom returns a bloom filter which matches all topics
 func MakeFullNodeBloom() []byte {
 	bloom := make([]byte, BloomFilterSize)
 	for i := 0; i < BloomFilterSize; i++ {

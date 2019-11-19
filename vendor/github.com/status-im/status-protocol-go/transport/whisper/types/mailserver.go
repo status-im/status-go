@@ -7,6 +7,8 @@ import (
 )
 
 const (
+	// MaxLimitInMessagesRequest represents the maximum number of messages
+	// that can be requested from the mailserver
 	MaxLimitInMessagesRequest = 1000
 )
 
@@ -28,6 +30,7 @@ type MessagesRequest struct {
 	Bloom []byte `json:"bloom"`
 }
 
+// SetDefaults sets the From and To defaults
 func (r *MessagesRequest) SetDefaults(now time.Time) {
 	// set From and To defaults
 	if r.To == 0 {

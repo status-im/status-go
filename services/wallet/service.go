@@ -118,7 +118,7 @@ func WatchAccountsChanges(ctx context.Context, feed *event.Feed, initial []commo
 				log.Error("accounts watcher subscription failed", "error", err)
 			}
 		case n := <-accounts:
-			log.Debug("wallet received updated list of accoutns", "accounts", n)
+			log.Debug("wallet received updated list of accounts", "accounts", n)
 			restart := false
 			for _, acc := range n {
 				_, exist := listen[acc.Address]
