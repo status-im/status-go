@@ -104,8 +104,8 @@ func encodeMessageToTaggedValue(m Message) transit.TaggedValue {
 		Tag: messageTag,
 		Value: []interface{}{
 			m.Text,
-			m.ContentT,
-			transit.Keyword(m.MessageT),
+			m.ContentType,
+			m.MessageType,
 			m.Clock,
 			m.Timestamp,
 			map[interface{}]interface{}{

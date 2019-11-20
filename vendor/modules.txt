@@ -367,9 +367,8 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-protocol-go v0.5.2
+# github.com/status-im/status-protocol-go v0.5.3-0.20191120104010-3a024980807a
 github.com/status-im/status-protocol-go
-github.com/status-im/status-protocol-go/applicationmetadata
 github.com/status-im/status-protocol-go/bridge/geth
 github.com/status-im/status-protocol-go/crypto
 github.com/status-im/status-protocol-go/datasync
@@ -383,6 +382,7 @@ github.com/status-im/status-protocol-go/ens
 github.com/status-im/status-protocol-go/identity/alias
 github.com/status-im/status-protocol-go/identity/identicon
 github.com/status-im/status-protocol-go/migrations
+github.com/status-im/status-protocol-go/protobuf
 github.com/status-im/status-protocol-go/sqlite
 github.com/status-im/status-protocol-go/transport/whisper
 github.com/status-im/status-protocol-go/transport/whisper/migrations

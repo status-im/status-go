@@ -420,16 +420,9 @@ func buildMessengerOptions(config params.ShhextConfig, db *sql.DB, envelopesMoni
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
 	}
 
-	if !config.DisableGenericDiscoveryTopic {
-		options = append(options, protocol.WithGenericDiscoveryTopicSupport())
-	}
-
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
 
-	if config.SendV1Messages {
-		options = append(options, protocol.WithSendV1Messages())
-	}
 	return options
 }

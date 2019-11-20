@@ -10,9 +10,9 @@ import (
 
 // Content contains the chat ID and the actual text of a message.
 type Content struct {
-	ChatID     string   `json:"chat_id"`
+	ChatID     string   `json:"chatId"`
 	Text       string   `json:"text"`
-	ResponseTo string   `json:"response-to"`
+	ResponseTo string   `json:"responseTo"`
 	Name       string   `json:"name"` // the ENS name of the sender
 	ParsedText ast.Node `json:"parsedText"`
 	LineCount  int      `json:"lineCount"`

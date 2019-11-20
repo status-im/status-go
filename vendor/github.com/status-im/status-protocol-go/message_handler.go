@@ -56,7 +56,7 @@ func (h *persistentMessageHandler) chatID(chatID string) (*Chat, error) {
 		return nil, err
 	}
 	for _, ch := range chats {
-		if chat.ID == chatID {
+		if ch.ID == chatID {
 			chat = ch
 			break
 		}

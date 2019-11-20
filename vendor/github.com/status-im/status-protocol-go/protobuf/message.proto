@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package protobuf;
+
+message SyncContact {
+  // The public key of the contact to be synced
+  string public_key = 1;
+  // The profile image of the contact
+  string profile_image = 2;
+  // The ens_name of the contact
+  string ens_name = 3;
+  // The system tags for a given contact
+  repeated SystemTags system_tags = 4;
+
+  enum SystemTags {
+    ADDED_BY_US = 0;
+    BLOCKED = 1;
+    ADDED_BY_THEM = 2;
+  }
+}
+
+message SyncPublicChat {
+  // The chat_id of the chat to be synced
+  string chat_id = 1;
+}
+
+message SyncAccount {
+  // Our profile image
+  string profile_image = 1;
+  // The time we last updated the account
+  uint64 last_updated = 2;
+}
+
+message SyncInstallation {
+  // The contacts to be synced
+  repeated SyncContact contacts = 1;
+  // The public chats to be synced
+  repeated SyncPublicChat public_chats = 2;
+  // Our own account
+  repeated SyncAccount account = 3;
+}
+
+message PairInstallation {
+  // The user-set device name
+  string device_name = 1;
+  // The installation-id of the device
+  string installation_id = 2;
+  // The type of device
+  DeviceType device_type = 3;
+  enum DeviceType {
+    ANDROID = 0;
+    IOS = 1;
+    DESKTOP = 2;
+  }
+}
+
+message ContactRequest {
+  // The ens name of the contact
+  string ens_name = 1;
+  // The profile image of the contact
+  string profile_image = 2;
+}
+
+message GroupChatEvent {
+  // Lamport timestamp of the event
+  uint64 clock = 1;
+  // List of public keys of objects of the action
+  repeated string members = 2;
+  // Name of the chat for the CHAT_CREATED/NAME_CHANGED event types
+  string name = 3;
+  // The type of the event
+  EventType type = 4;
+
+  enum EventType {
+    CHAT_CREATED = 0;
+    NAME_CHANGED = 1;
+    MEMBERS_ADDED = 2;
+    MEMBER_JOINED = 3;
+    MEMBER_REMOVED = 4;
+    ADMINS_ADDED = 5;
+    ADMIN_REMOVED = 6;
+  }
+}
+
+message MembershipUpdateMessage {
+  // The chat id of the private group chat
+  string chat_id = 1;
+  // A list of updates for this group chat
+  repeated MembershipUpdate updates = 2;
+  // An optional chat message
+  ChatMessage message = 3;
+}
+
+message MembershipUpdate {
+  // Signature of the concatenated array bytes of the events
+  string signature = 1;
+  // The protobuf encoded events
+  repeated bytes events = 2;
+}
+
+message ChatMessage {
+  // Lamport timestamp of the chat message
+  uint64 clock = 1;
+  // Unix timestamps in milliseconds, currently not used as we use whisper as more reliable, but here
+  // so that we don't rely on it
+  uint64 timestamp = 2;
+  // Text of the message
+  string text = 3;
+  // Id of the message that we are replying to
+  string response_to = 4;
+  // Ens name of the sender
+  string ens_name = 5;
+  // Chat id, this field is symmetric for public-chats and private group chats,
+  // but asymmetric in case of one-to-ones, as the sender will use the chat-id
+  // of the received, while the receiver will use the chat-id of the sender.
+  // Probably should be the concatenation of sender-pk & receiver-pk in alphabetical order
+  string chat_id = 6;
+
+  // The type of message (public/one-to-one/private-group-chat)
+  MessageType message_type = 7;
+  // The type of the content of the message
+  ContentType content_type = 8;
+
+  enum MessageType {
+    ONE_TO_ONE = 0;
+    PUBLIC_GROUP = 1;
+    PRIVATE_GROUP = 3;
+    }
+  enum ContentType {
+    TEXT_PLAIN = 0;
+    STICKER = 1;
+    STATUS = 2;
+    COMMAND = 3;
+    COMMAND_REQUEST = 4;
+    EMOJI = 5;
+  }
+}
+
+message ApplicationMetadataMessage {
+  // Signature of the payload field
+  bytes signature = 1;
+  // This is the encoded protobuf of the application level message
+  bytes payload = 2;
+
+  // The type of protobuf message sent
+  MessageType message_type = 3;
+
+  enum MessageType {
+    TEXT_MESSAGE = 0;
+    CONTACT_REQUEST = 1;
+    MEMBERSHIP_UPDATE = 2;
+    PAIR_INSTALLATION = 3;
+    SYNC_INSTALLATION = 4;
+  }
+}
+
+message StatusMessage {
+  oneof payload {
+    ApplicationMetadataMessage application_metadata_message = 1;
+    // Datasync messages will contain an array of Message
+    bytes datasync_message = 2;
+  }
+}

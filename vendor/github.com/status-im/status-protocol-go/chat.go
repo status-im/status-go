@@ -43,7 +43,7 @@ type Chat struct {
 
 	// Denormalized fields
 	UnviewedMessagesCount  uint   `json:"unviewedMessagesCount"`
-	LastMessageContentType string `json:"lastMessageContentType"`
+	LastMessageContentType int32  `json:"lastMessageContentType"`
 	LastMessageContent     string `json:"lastMessageContent"`
 	LastMessageTimestamp   int64  `json:"lastMessageTimestamp"`
 	LastMessageClockValue  int64  `json:"lastMessageClockValue"`

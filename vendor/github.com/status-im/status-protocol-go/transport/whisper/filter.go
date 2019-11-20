@@ -64,8 +64,6 @@ type filtersManager struct {
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
 	logger      *zap.Logger
 
-	genericDiscoveryTopicEnabled bool
-
 	mutex   sync.Mutex
 	filters map[string]*Filter
 }
@@ -96,13 +94,10 @@ func newFiltersManager(db *sql.DB, w whispertypes.Whisper, privateKey *ecdsa.Pri
 func (s *filtersManager) Init(
 	chatIDs []string,
 	publicKeys []*ecdsa.PublicKey,
-	genericDiscoveryTopicEnabled bool,
 ) ([]*Filter, error) {
 	logger := s.logger.With(zap.String("site", "Init"))
 
 	logger.Info("initializing")
-
-	s.genericDiscoveryTopicEnabled = genericDiscoveryTopicEnabled
 
 	// Load our contact code.
 	_, err := s.LoadContactCode(&s.privateKey.PublicKey)
@@ -148,7 +143,7 @@ func (s *filtersManager) Init(
 }
 
 // DEPRECATED
-func (s *filtersManager) InitWithFilters(filters []*Filter, genericDiscoveryTopicEnabled bool) ([]*Filter, error) {
+func (s *filtersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	var (
 		chatIDs    []string
 		publicKeys []*ecdsa.PublicKey
@@ -166,7 +161,7 @@ func (s *filtersManager) InitWithFilters(filters []*Filter, genericDiscoveryTopi
 		}
 	}
 
-	return s.Init(chatIDs, publicKeys, genericDiscoveryTopicEnabled)
+	return s.Init(chatIDs, publicKeys)
 }
 
 func (s *filtersManager) Reset() error {
@@ -315,8 +310,7 @@ func (s *filtersManager) LoadNegotiated(secret whispertypes.NegotiatedSecret) (*
 	return chat, nil
 }
 
-// LoadDiscovery adds 1-2 discovery filters: one for generic discovery topic (if enabled)
-// and one for the personal discovery topic.
+// LoadDiscovery adds 1 discovery filter for the personal discovery topic.
 func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -328,12 +322,6 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 
 	expectedTopicCount := 1
 
-	if s.genericDiscoveryTopicEnabled {
-		expectedTopicCount = 2
-		if chat, ok := s.filters[discoveryTopic]; ok {
-			result = append(result, chat)
-		}
-	}
 	if chat, ok := s.filters[personalDiscoveryTopic]; ok {
 		result = append(result, chat)
 	}
@@ -364,29 +352,6 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
 
 	s.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
-
-	if s.genericDiscoveryTopicEnabled {
-		// Load generic discovery topic.
-		discoveryChat := &Filter{
-			ChatID:    discoveryTopic,
-			Identity:  identityStr,
-			Discovery: true,
-			Listen:    true,
-			OneToOne:  true,
-		}
-
-		discoveryResponse, err = s.addAsymmetric(discoveryChat.ChatID, true)
-		if err != nil {
-			return nil, err
-		}
-
-		discoveryChat.Topic = discoveryResponse.Topic
-		discoveryChat.FilterID = discoveryResponse.FilterID
-
-		s.filters[discoveryChat.ChatID] = discoveryChat
-
-		return []*Filter{discoveryChat, personalDiscoveryChat}, nil
-	}
 
 	return []*Filter{personalDiscoveryChat}, nil
 }

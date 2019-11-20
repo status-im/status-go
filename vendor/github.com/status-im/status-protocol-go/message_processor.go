@@ -133,7 +133,7 @@ func (p *messageProcessor) sendPrivate(
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
 
-	wrappedMessage, err := p.tryWrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -227,7 +227,7 @@ func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data [
 		return nil, errors.Wrap(err, "failed to encode message")
 	}
 
-	wrappedMessage, err := p.tryWrapMessageV1(encodedMessage)
+	wrappedMessage, err := p.wrapMessageV1(encodedMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -258,7 +258,7 @@ func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data [
 func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, error) {
 	var newMessage *whispertypes.NewMessage
 
-	wrappedMessage, err := p.tryWrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -451,15 +451,12 @@ func (p *messageProcessor) encodeMessage(message protocol.Message) ([]byte, erro
 	return encodedMessage, nil
 }
 
-func (p *messageProcessor) tryWrapMessageV1(encodedMessage []byte) ([]byte, error) {
-	if p.featureFlags.sendV1Messages {
-		wrappedMessage, err := protocol.WrapMessageV1(encodedMessage, p.identity)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap message")
-		}
-		return wrappedMessage, nil
+func (p *messageProcessor) wrapMessageV1(encodedMessage []byte) ([]byte, error) {
+	wrappedMessage, err := protocol.WrapMessageV1(encodedMessage, p.identity)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap message")
 	}
-	return encodedMessage, nil
+	return wrappedMessage, nil
 }
 
 func (p *messageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
@@ -520,15 +517,9 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 	case messageSpec.SharedSecret != nil:
 		logger.Debug("sending using shared secret")
 		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret)
-	case messageSpec.PartitionedTopicMode() == encryption.PartitionTopicV1:
+	default:
 		logger.Debug("sending partitioned topic")
 		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
-	case !p.featureFlags.genericDiscoveryTopicEnabled:
-		logger.Debug("sending partitioned topic (generic discovery topic disabled)")
-		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
-	default:
-		logger.Debug("sending using discovery topic")
-		hash, err = p.transport.SendPrivateOnDiscovery(ctx, newMessage, publicKey)
 	}
 	if err != nil {
 		return nil, nil, err

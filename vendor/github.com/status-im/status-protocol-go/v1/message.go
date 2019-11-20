@@ -11,19 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/status-im/status-protocol-go/protobuf"
 	statusproto "github.com/status-im/status-protocol-go/types"
-)
-
-const (
-	// ContentTypeTextPlain means that the message contains plain text.
-	ContentTypeTextPlain = "text/plain"
-)
-
-// Message types.
-const (
-	MessageTypePublicGroup  = "public-group-user-message"
-	MessageTypePrivate      = "user-message"
-	MessageTypePrivateGroup = "group-user-message"
 )
 
 var (
@@ -62,12 +51,8 @@ const (
 
 // Message is a chat message sent by an user.
 type Message struct {
-	Text      string        `json:"text"` // TODO: why is this duplicated?
-	ContentT  string        `json:"content_type"`
-	MessageT  string        `json:"message_type"`
-	Clock     int64         `json:"clock"` // lamport timestamp; see CalcMessageClock for more details
-	Timestamp TimestampInMs `json:"timestamp"`
-	Content   Content       `json:"content"`
+	protobuf.ChatMessage
+	Content Content `json:"content"`
 
 	Flags     Flags            `json:"-"`
 	ID        []byte           `json:"-"`
@@ -89,35 +74,36 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 }
 
 // createTextMessage creates a Message.
-func createTextMessage(data []byte, lastClock int64, chatID, messageType string) Message {
+func createTextMessage(data []byte, lastClock int64, chatID string, messageType protobuf.ChatMessage_MessageType) Message {
 	text := strings.TrimSpace(string(data))
 	ts := TimestampInMsFromTime(time.Now())
 	clock := CalcMessageClock(lastClock, ts)
 
-	return Message{
-		Text:      text,
-		ContentT:  ContentTypeTextPlain,
-		MessageT:  messageType,
-		Clock:     clock,
-		Timestamp: ts,
-		Content:   Content{ChatID: chatID, Text: text},
-	}
+	message := Message{}
+	message.Text = text
+	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
+	message.MessageType = messageType
+	message.Clock = uint64(clock)
+	message.Timestamp = uint64(ts)
+	message.Content = Content{ChatID: chatID, Text: text}
+	message.ChatId = chatID
+	return message
 }
 
 // CreatePublicTextMessage creates a public text Message.
 func CreatePublicTextMessage(data []byte, lastClock int64, chatID string) Message {
-	m := createTextMessage(data, lastClock, chatID, MessageTypePublicGroup)
+	m := createTextMessage(data, lastClock, chatID, protobuf.ChatMessage_PUBLIC_GROUP)
 	return m
 }
 
 // CreatePrivateTextMessage creates a one-to-one message.
 func CreatePrivateTextMessage(data []byte, lastClock int64, chatID string) Message {
-	return createTextMessage(data, lastClock, chatID, MessageTypePrivate)
+	return createTextMessage(data, lastClock, chatID, protobuf.ChatMessage_ONE_TO_ONE)
 }
 
 // CreatePrivateGroupTextMessage creates a group message.
 func CreatePrivateGroupTextMessage(data []byte, lastClock int64, chatID string) Message {
-	return createTextMessage(data, lastClock, chatID, MessageTypePrivateGroup)
+	return createTextMessage(data, lastClock, chatID, protobuf.ChatMessage_PRIVATE_GROUP)
 }
 
 func decodeTransitMessage(originalPayload []byte) (interface{}, error) {
@@ -136,12 +122,7 @@ func decodeTransitMessage(originalPayload []byte) (interface{}, error) {
 
 // EncodeMessage encodes a Message using Transit serialization.
 func EncodeMessage(value Message) ([]byte, error) {
-	var buf bytes.Buffer
-	encoder := NewMessageEncoder(&buf)
-	if err := encoder.Encode(value); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return proto.Marshal(&value)
 }
 
 // MessageID calculates the messageID from author's compressed public key
@@ -162,7 +143,7 @@ func WrapMessageV1(payload []byte, identity *ecdsa.PrivateKey) ([]byte, error) {
 		}
 	}
 
-	message := &StatusProtocolMessage{
+	message := &protobuf.ApplicationMetadataMessage{
 		Signature: signature,
 		Payload:   payload,
 	}

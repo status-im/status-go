@@ -57,15 +57,6 @@ func (m *whisperServiceKeysManager) RawSymKey(id string) ([]byte, error) {
 	return m.shh.GetSymKey(id)
 }
 
-type Option func(*WhisperServiceTransport) error
-
-func SetGenericDiscoveryTopicSupport(val bool) Option {
-	return func(t *WhisperServiceTransport) error {
-		t.genericDiscoveryTopicEnabled = val
-		return nil
-	}
-}
-
 // WhisperServiceTransport is a transport based on Whisper service.
 type WhisperServiceTransport struct {
 	shh         whispertypes.Whisper
@@ -76,8 +67,6 @@ type WhisperServiceTransport struct {
 
 	mailservers      []string
 	envelopesMonitor *EnvelopesMonitor
-
-	genericDiscoveryTopicEnabled bool
 }
 
 // NewWhisperServiceTransport returns a new WhisperServiceTransport.
@@ -91,7 +80,6 @@ func NewWhisperServiceTransport(
 	mailservers []string,
 	envelopesMonitorConfig *EnvelopesMonitorConfig,
 	logger *zap.Logger,
-	opts ...Option,
 ) (*WhisperServiceTransport, error) {
 	filtersManager, err := newFiltersManager(db, shh, privateKey, logger)
 	if err != nil {
@@ -122,17 +110,11 @@ func NewWhisperServiceTransport(
 		logger:      logger.With(zap.Namespace("WhisperServiceTransport")),
 	}
 
-	for _, opt := range opts {
-		if err := opt(t); err != nil {
-			return nil, err
-		}
-	}
-
 	return t, nil
 }
 
 func (a *WhisperServiceTransport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
-	return a.filters.Init(chatIDs, publicKeys, a.genericDiscoveryTopicEnabled)
+	return a.filters.Init(chatIDs, publicKeys)
 }
 
 func (a *WhisperServiceTransport) Filters() []*Filter {
@@ -141,7 +123,7 @@ func (a *WhisperServiceTransport) Filters() []*Filter {
 
 // DEPRECATED
 func (a *WhisperServiceTransport) LoadFilters(filters []*Filter) ([]*Filter, error) {
-	return a.filters.InitWithFilters(filters, a.genericDiscoveryTopicEnabled)
+	return a.filters.InitWithFilters(filters)
 }
 
 // DEPRECATED
@@ -248,7 +230,7 @@ func (a *WhisperServiceTransport) RetrievePublicMessages(chatID string) ([]*whis
 
 func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]*whispertypes.Message, error) {
 	chats := a.filters.FiltersByPublicKey(publicKey)
-	discoveryChats, err := a.filters.Init(nil, nil, true)
+	discoveryChats, err := a.filters.Init(nil, nil)
 	if err != nil {
 		return nil, err
 	}

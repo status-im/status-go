@@ -157,7 +157,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 
 	for rows.Next() {
 		var (
-			lastMessageContentType sql.NullString
+			lastMessageContentType sql.NullInt32
 			lastMessageContent     sql.NullString
 			lastMessageTimestamp   sql.NullInt64
 			lastMessageClockValue  sql.NullInt64
@@ -189,7 +189,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			return
 		}
 		chat.LastMessageContent = lastMessageContent.String
-		chat.LastMessageContentType = lastMessageContentType.String
+		chat.LastMessageContentType = lastMessageContentType.Int32
 		chat.LastMessageTimestamp = lastMessageTimestamp.Int64
 		chat.LastMessageClockValue = lastMessageClockValue.Int64
 
@@ -468,7 +468,7 @@ func (db sqlitePersistence) Messages(from, to time.Time) (result []*protocol.Mes
 		}
 		var pkey []byte
 		err = rows.Scan(
-			&msg.ID, &msg.ChatID, &msg.ContentT, &msg.MessageT, &msg.Text, &msg.Clock,
+			&msg.ID, &msg.ChatID, &msg.ContentType, &msg.MessageType, &msg.Text, &msg.Clock,
 			&msg.Timestamp, &msg.Content.ChatID, &msg.Content.Text, &pkey, &msg.Flags,
 		)
 		if err != nil {
@@ -526,7 +526,7 @@ func (db sqlitePersistence) SaveMessages(messages []*protocol.Message) (last int
 			pkey = crypto.FromECDSAPub(msg.SigPubKey)
 		}
 		rst, err = stmt.Exec(
-			msg.ID, msg.ChatID, msg.ContentT, msg.MessageT, msg.Text, msg.Clock, msg.Timestamp,
+			msg.ID, msg.ChatID, msg.ContentType, msg.MessageType, msg.Text, msg.Clock, msg.Timestamp,
 			msg.Content.ChatID, msg.Content.Text, pkey, msg.Flags,
 		)
 		if err != nil {

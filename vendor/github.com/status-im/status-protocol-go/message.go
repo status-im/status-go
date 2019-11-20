@@ -43,7 +43,7 @@ type Message struct {
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
 	ID string `json:"id"`
 	// WhisperTimestamp is a timestamp of a Whisper envelope.
-	WhisperTimestamp int64 `json:"whisperTimestamp"`
+	WhisperTimestamp uint64 `json:"whisperTimestamp"`
 	// From is a public key of the author of the message.
 	From string `json:"from"`
 	// Random 3 words name
@@ -53,13 +53,12 @@ type Message struct {
 	// To is a public key of the recipient unless it's a public message then it's empty.
 	To hexutilSQL `json:"to,omitempty"`
 	// BEGIN: fields from protocol.Message.
-	Content       string `json:"content"`
-	ContentType   string `json:"contentType"`
-	Timestamp     int64  `json:"timestamp"`
-	ChatID        string `json:"chatId"`
-	MessageType   string `json:"messageType,omitempty"`
-	MessageStatus string `json:"messageStatus,omitempty"`
-	ClockValue    int64  `json:"clockValue"`
+	Content     string `json:"content"`
+	ContentType int32  `json:"contentType"`
+	Timestamp   uint64 `json:"timestamp"`
+	ChatID      string `json:"chatId"`
+	MessageType int32  `json:"messageType,omitempty"`
+	ClockValue  uint64 `json:"clockValue"`
 	// END
 	Username       string `json:"username,omitempty"`
 	RetryCount     int    `json:"retryCount"`

@@ -8,9 +8,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
-	"github.com/status-im/status-protocol-go/applicationmetadata"
 	"github.com/status-im/status-protocol-go/datasync"
 	"github.com/status-im/status-protocol-go/encryption"
+	"github.com/status-im/status-protocol-go/protobuf"
 	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	statusproto "github.com/status-im/status-protocol-go/types"
 )
@@ -127,12 +127,9 @@ func (m *StatusMessage) HandleDatasync(datasync *datasync.DataSync) ([]*StatusMe
 }
 
 func (m *StatusMessage) HandleApplicationMetadata() error {
-	message, err := applicationmetadata.Unmarshal(m.DecryptedPayload)
-	// Not an applicationmetadata message, calculate ID using the previous
-	// signature
+	message, err := protobuf.Unmarshal(m.DecryptedPayload)
 	if err != nil {
-		m.ID = MessageID(m.SigPubKey(), m.DecryptedPayload)
-		return nil
+		return err
 	}
 
 	recoveredKey, err := message.RecoverKey()
@@ -148,9 +145,28 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 }
 
 func (m *StatusMessage) HandleApplication() error {
+	// Try protobuf first
+	message := &Message{}
+
+	err := proto.Unmarshal(m.DecryptedPayload, message)
+	if err != nil {
+		log.Printf("[message::DecodeMessage] could not decode protobuf message: %#x, err: %v", m.Hash, err.Error())
+	} else {
+		m.MessageType = MessageT
+		message.Content = Content{
+			Text:       message.Text,
+			Name:       message.EnsName,
+			ChatID:     message.ChatId,
+			ResponseTo: message.ResponseTo,
+		}
+		m.ParsedMessage = *message
+
+		return nil
+	}
 	value, err := decodeTransitMessage(m.DecryptedPayload)
 	if err != nil {
 		log.Printf("[message::DecodeMessage] could not decode message: %#x, err: %v", m.Hash, err.Error())
+
 		return err
 	}
 	m.ParsedMessage = value

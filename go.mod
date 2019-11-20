@@ -31,7 +31,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.5.2
+	github.com/status-im/status-protocol-go v0.5.3-0.20191120104010-3a024980807a
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/status-im/whisper v1.6.1
 	github.com/stretchr/testify v1.4.0
