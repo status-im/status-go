@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 type account struct {
@@ -14,7 +14,7 @@ type account struct {
 }
 
 func (a *account) toAccountInfo() AccountInfo {
-	publicKeyHex := statusproto.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	publicKeyHex := protocol.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{

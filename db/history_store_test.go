@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +43,7 @@ func TestGetExistingHistory(t *testing.T) {
 
 func TestNewHistoryRequest(t *testing.T) {
 	store := createInMemStore(t)
-	id := statusproto.Hash{1}
+	id := protocol.Hash{1}
 	req, err := store.GetRequest(id)
 	require.Error(t, err)
 	req = store.NewRequest()
@@ -61,8 +61,8 @@ func TestNewHistoryRequest(t *testing.T) {
 
 func TestGetAllRequests(t *testing.T) {
 	store := createInMemStore(t)
-	idOne := statusproto.Hash{1}
-	idTwo := statusproto.Hash{2}
+	idOne := protocol.Hash{1}
+	idTwo := protocol.Hash{2}
 
 	req := store.NewRequest()
 	req.ID = idOne

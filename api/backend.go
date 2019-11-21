@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
@@ -40,7 +41,6 @@ import (
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
-	statusproto "github.com/status-im/status-protocol-go/types"
 )
 
 const (
@@ -1022,6 +1022,6 @@ func (b *StatusBackend) SignHash(hexEncodedHash string) (string, error) {
 		return "", fmt.Errorf("SignHash: could not sign the hash: %v", err)
 	}
 
-	hexEncodedSignature := statusproto.EncodeHex(signature)
+	hexEncodedSignature := protocol.EncodeHex(signature)
 	return hexEncodedSignature, nil
 }

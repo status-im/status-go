@@ -33,8 +33,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/params"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 )
@@ -259,7 +259,7 @@ func (s *MailserverSuite) TestArchive() {
 	s.NoError(err)
 
 	s.server.Archive(env)
-	key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), statusproto.Hash(env.Hash()))
+	key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), protocol.Hash(env.Hash()))
 	archivedEnvelope, err := s.server.db.GetEnvelope(key)
 	s.NoError(err)
 
@@ -279,7 +279,7 @@ func (s *MailserverSuite) TestManageLimits() {
 }
 
 func (s *MailserverSuite) TestDBKey() {
-	var h statusproto.Hash
+	var h protocol.Hash
 	var emptyTopic whispertypes.TopicType
 	i := uint32(time.Now().Unix())
 	k := NewDBKey(i, emptyTopic, h)
@@ -307,7 +307,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
 		s.server.Archive(env)
-		key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), statusproto.Hash(env.Hash()))
+		key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), protocol.Hash(env.Hash()))
 		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Cursor()))
 		sentEnvelopes = append(sentEnvelopes, env)
 		sentHashes = append(sentHashes, env.Hash())
@@ -771,7 +771,7 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 
 func processRequestAndCollectHashes(
 	server *WMailServer, lower, upper uint32, cursor []byte, bloom []byte, limit int,
-) ([]common.Hash, []byte, statusproto.Hash) {
+) ([]common.Hash, []byte, protocol.Hash) {
 	iter, _ := server.createIterator(lower, upper, cursor, nil, 0)
 	defer iter.Release()
 	bundles := make(chan []rlp.RawValue, 10)

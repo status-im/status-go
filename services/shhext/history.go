@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 const (
@@ -36,7 +36,7 @@ type HistoryUpdateReactor struct {
 
 // UpdateFinishedRequest removes successfully finished request and updates every topic
 // attached to the request.
-func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id statusproto.Hash) error {
+func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id protocol.Hash) error {
 	reactor.mu.Lock()
 	defer reactor.mu.Unlock()
 	req, err := ctx.HistoryStore().GetRequest(id)
@@ -45,7 +45,7 @@ func (reactor *HistoryUpdateReactor) UpdateFinishedRequest(ctx Context, id statu
 	}
 	for i := range req.Histories() {
 		th := &req.Histories()[i]
-		th.RequestID = statusproto.Hash{}
+		th.RequestID = protocol.Hash{}
 		th.Current = th.End
 		th.End = time.Time{}
 		if err := th.Save(); err != nil {

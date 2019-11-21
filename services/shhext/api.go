@@ -21,14 +21,14 @@ import (
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	whisper "github.com/status-im/whisper/whisperv6"
 
-	statusproto "github.com/status-im/status-protocol-go"
-	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
-	"github.com/status-im/status-protocol-go/encryption/multidevice"
-	"github.com/status-im/status-protocol-go/ens"
-	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto_types "github.com/status-im/status-protocol-go/types"
-	statusprotomessage "github.com/status-im/status-protocol-go/v1"
+	protocol "github.com/status-im/status-go/protocol"
+	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/ens"
+	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	statusproto_types "github.com/status-im/status-go/protocol/types"
+	statusprotomessage "github.com/status-im/status-go/protocol/v1"
 )
 
 const (
@@ -439,7 +439,7 @@ func (api *PublicAPI) Post(ctx context.Context, newMessage whispertypes.NewMessa
 // It's important to call PublicAPI.afterSend() so that the client receives a signal
 // with confirmation that the message left the device.
 func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (statusproto_types.HexBytes, error) {
-	chat := statusproto.Chat{
+	chat := protocol.Chat{
 		Name: msg.Chat,
 	}
 	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
@@ -458,7 +458,7 @@ func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessa
 	if err != nil {
 		return nil, err
 	}
-	chat := statusproto.Chat{
+	chat := protocol.Chat{
 		PublicKey: publicKey,
 	}
 
@@ -577,12 +577,12 @@ func (api *PublicAPI) LoadFilters(parent context.Context, chats []*statustransp.
 	return api.service.messenger.LoadFilters(chats)
 }
 
-func (api *PublicAPI) SaveChat(parent context.Context, chat statusproto.Chat) error {
+func (api *PublicAPI) SaveChat(parent context.Context, chat protocol.Chat) error {
 	api.log.Info("saving chat", "chat", chat)
 	return api.service.messenger.SaveChat(chat)
 }
 
-func (api *PublicAPI) Chats(parent context.Context) ([]*statusproto.Chat, error) {
+func (api *PublicAPI) Chats(parent context.Context) ([]*protocol.Chat, error) {
 	return api.service.messenger.Chats()
 }
 
@@ -590,16 +590,16 @@ func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.DeleteChat(chatID)
 }
 
-func (api *PublicAPI) SaveContact(parent context.Context, contact statusproto.Contact) error {
+func (api *PublicAPI) SaveContact(parent context.Context, contact protocol.Contact) error {
 	return api.service.messenger.SaveContact(contact)
 }
 
-func (api *PublicAPI) BlockContact(parent context.Context, contact statusproto.Contact) ([]*statusproto.Chat, error) {
+func (api *PublicAPI) BlockContact(parent context.Context, contact protocol.Contact) ([]*protocol.Chat, error) {
 	api.log.Info("blocking contact", "contact", contact.ID)
 	return api.service.messenger.BlockContact(contact)
 }
 
-func (api *PublicAPI) Contacts(parent context.Context) ([]*statusproto.Contact, error) {
+func (api *PublicAPI) Contacts(parent context.Context) ([]*protocol.Contact, error) {
 	return api.service.messenger.Contacts()
 }
 
@@ -633,8 +633,8 @@ func (api *PublicAPI) VerifyENSNames(details []ens.ENSDetails) (map[string]ens.E
 }
 
 type ApplicationMessagesResponse struct {
-	Messages []*statusproto.Message `json:"messages"`
-	Cursor   string                 `json:"cursor"`
+	Messages []*protocol.Message `json:"messages"`
+	Cursor   string              `json:"cursor"`
 }
 
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
@@ -649,7 +649,7 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
-func (api *PublicAPI) SaveMessages(messages []*statusproto.Message) error {
+func (api *PublicAPI) SaveMessages(messages []*protocol.Message) error {
 	return api.service.messenger.SaveMessages(messages)
 }
 

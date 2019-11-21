@@ -25,10 +25,10 @@ import (
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
 
-	protocol "github.com/status-im/status-protocol-go"
-	protocolwhisper "github.com/status-im/status-protocol-go/transport/whisper"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	protocol "github.com/status-im/status-go/protocol"
+	protocolwhisper "github.com/status-im/status-go/protocol/transport/whisper"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol_types "github.com/status-im/status-go/protocol/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 )
@@ -44,8 +44,8 @@ const (
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(statusproto.Hash, statusproto.Hash, []byte, error)
-	MailServerRequestExpired(statusproto.Hash)
+	MailServerRequestCompleted(protocol_types.Hash, protocol_types.Hash, []byte, error)
+	MailServerRequestExpired(protocol_types.Hash)
 }
 
 // Service is a service that provides some additional Whisper API.
@@ -84,7 +84,7 @@ func New(w whispertypes.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB,
 	mailMonitor := &MailRequestMonitor{
 		w:                w,
 		handler:          handler,
-		cache:            map[statusproto.Hash]EnvelopeState{},
+		cache:            map[protocol_types.Hash]EnvelopeState{},
 		requestsRegistry: requestsRegistry,
 	}
 	return &Service{
@@ -111,7 +111,7 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 		return err
 	}
 
-	// Create a custom zap.Logger which will forward logs from status-protocol-go to status-go logger.
+	// Create a custom zap.Logger which will forward logs from status-go/protocol to status-go logger.
 	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
 	if err != nil {
 		return err

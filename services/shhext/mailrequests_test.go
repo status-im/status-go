@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/stretchr/testify/suite"
 )
 
 var (
-	testHash = statusproto.Hash{0x01}
+	testHash = protocol.Hash{0x01}
 )
 
 func TestMailRequestMonitorSuite(t *testing.T) {
@@ -26,7 +26,7 @@ type MailRequestMonitorSuite struct {
 
 func (s *MailRequestMonitorSuite) SetupTest() {
 	s.monitor = &MailRequestMonitor{
-		cache:            map[statusproto.Hash]EnvelopeState{},
+		cache:            map[protocol.Hash]EnvelopeState{},
 		requestsRegistry: NewRequestsRegistry(0),
 	}
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 const (
@@ -87,7 +87,7 @@ func (ps *ConnectionManager) Start() {
 		sub := ps.server.SubscribeEvents(events)
 		whisperEvents := make(chan whispertypes.EnvelopeEvent, whisperEventsBuffer)
 		whisperSub := ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
-		requests := map[statusproto.Hash]struct{}{}
+		requests := map[protocol.Hash]struct{}{}
 		failuresPerServer := map[whispertypes.EnodeID]int{}
 
 		defer sub.Unsubscribe()

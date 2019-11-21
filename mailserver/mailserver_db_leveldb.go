@@ -7,8 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/params"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -90,7 +90,7 @@ func (db *LevelDB) GetEnvelope(key *DBKey) ([]byte, error) {
 func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	defer recoverLevelDBPanics("Prune")
 
-	var zero statusproto.Hash
+	var zero protocol.Hash
 	var emptyTopic whispertypes.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
@@ -140,7 +140,7 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 func (db *LevelDB) SaveEnvelope(env *whisper.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
-	key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), statusproto.Hash(env.Hash()))
+	key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), protocol.Hash(env.Hash()))
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))

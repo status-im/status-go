@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 )
 
 // GetFirstConnected returns first connected peer that is also added to a peer store.

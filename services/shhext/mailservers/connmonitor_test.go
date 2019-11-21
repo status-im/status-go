@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 	"github.com/status-im/status-go/t/utils"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	"github.com/stretchr/testify/require"
 )
 

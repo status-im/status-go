@@ -6,9 +6,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/services/shhext/dedup"
 
-	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 const (
@@ -46,17 +46,17 @@ const (
 
 // EnvelopeSignal includes hash of the envelope.
 type EnvelopeSignal struct {
-	IDs     []hexutil.Bytes  `json:"ids"`
-	Hash    statusproto.Hash `json:"hash"`
-	Message string           `json:"message"`
+	IDs     []hexutil.Bytes `json:"ids"`
+	Hash    protocol.Hash   `json:"hash"`
+	Message string          `json:"message"`
 }
 
 // MailServerResponseSignal holds the data received in the response from the mailserver.
 type MailServerResponseSignal struct {
-	RequestID        statusproto.Hash `json:"requestID"`
-	LastEnvelopeHash statusproto.Hash `json:"lastEnvelopeHash"`
-	Cursor           string           `json:"cursor"`
-	ErrorMsg         string           `json:"errorMessage"`
+	RequestID        protocol.Hash `json:"requestID"`
+	LastEnvelopeHash protocol.Hash `json:"lastEnvelopeHash"`
+	Cursor           string        `json:"cursor"`
+	ErrorMsg         string        `json:"errorMessage"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -121,7 +121,7 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(requestID statusproto.Hash, lastEnvelopeHash statusproto.Hash, cursor []byte, err error) {
+func SendMailServerRequestCompleted(requestID protocol.Hash, lastEnvelopeHash protocol.Hash, cursor []byte, err error) {
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()
@@ -136,7 +136,7 @@ func SendMailServerRequestCompleted(requestID statusproto.Hash, lastEnvelopeHash
 }
 
 // SendMailServerRequestExpired triggered when mail server request expires
-func SendMailServerRequestExpired(hash statusproto.Hash) {
+func SendMailServerRequestExpired(hash protocol.Hash) {
 	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 

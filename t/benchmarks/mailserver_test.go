@@ -9,9 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/status-im/status-go/params"
+	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 	"github.com/status-im/status-go/services/shhext"
-	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 )
