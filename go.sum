@@ -589,10 +589,6 @@ github.com/status-im/extkeys v1.0.0 h1:2wmG5NG2FTbZzXSykaNPmdFCDBwxHoqF88CJX3MK9
 github.com/status-im/extkeys v1.0.0/go.mod h1:wNx0pnvGTgyKz/S8hBNesAHKKKI9beF+BuVLIuBJuQI=
 github.com/status-im/go-ethereum v1.9.5-status.5 h1:d2RJC6ltNZJM2mrAW6kDWYdzewF8+us4qYaIH5gvyaM=
 github.com/status-im/go-ethereum v1.9.5-status.5/go.mod h1:g2+E89NWtyA+55p6XEl5Sdt7Mtez3V0T3+Y7mJNb+tI=
-github.com/status-im/go-fcm v1.0.0-status h1:eUNKm4ooAXdEf9/GaTYeTELna5aVMOEbzjbm2irQ0gY=
-github.com/status-im/go-fcm v1.0.0-status/go.mod h1:0JGzul9SfemcbTdw0mkzLR42j+BTNci5aQWlI0o/uk8=
-github.com/status-im/go-ethereum v1.9.5-status.4 h1:F5VrxH9LmTxWl4qwQjs0TI5TgG9dVuZKqGmdwHJ0cWk=
-github.com/status-im/go-ethereum v1.9.5-status.4/go.mod h1:Ulij8LMpMvXnbnPcmDqrpI+iXoXSjxItuY/wmbasTZU=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
 github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 h1:ju5UTwk5Odtm4trrY+4Ca4RMj5OyXbmVeDAVad2T0Jw=
