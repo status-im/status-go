@@ -20,12 +20,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
+	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -47,18 +47,18 @@ func newHandlerMock(buf int) handlerMock {
 	return handlerMock{
 		confirmations:     make(chan [][]byte, buf),
 		expirations:       make(chan failureMessage, buf),
-		requestsCompleted: make(chan statusproto.Hash, buf),
-		requestsExpired:   make(chan statusproto.Hash, buf),
-		requestsFailed:    make(chan statusproto.Hash, buf),
+		requestsCompleted: make(chan protocol.Hash, buf),
+		requestsExpired:   make(chan protocol.Hash, buf),
+		requestsFailed:    make(chan protocol.Hash, buf),
 	}
 }
 
 type handlerMock struct {
 	confirmations     chan [][]byte
 	expirations       chan failureMessage
-	requestsCompleted chan statusproto.Hash
-	requestsExpired   chan statusproto.Hash
-	requestsFailed    chan statusproto.Hash
+	requestsCompleted chan protocol.Hash
+	requestsExpired   chan protocol.Hash
+	requestsFailed    chan protocol.Hash
 }
 
 func (t handlerMock) EnvelopeSent(ids [][]byte) {
@@ -69,7 +69,7 @@ func (t handlerMock) EnvelopeExpired(ids [][]byte, err error) {
 	t.expirations <- failureMessage{IDs: ids, Error: err}
 }
 
-func (t handlerMock) MailServerRequestCompleted(requestID statusproto.Hash, lastEnvelopeHash statusproto.Hash, cursor []byte, err error) {
+func (t handlerMock) MailServerRequestCompleted(requestID protocol.Hash, lastEnvelopeHash protocol.Hash, cursor []byte, err error) {
 	if err == nil {
 		t.requestsCompleted <- requestID
 	} else {
@@ -77,7 +77,7 @@ func (t handlerMock) MailServerRequestCompleted(requestID statusproto.Hash, last
 	}
 }
 
-func (t handlerMock) MailServerRequestExpired(hash statusproto.Hash) {
+func (t handlerMock) MailServerRequestExpired(hash protocol.Hash) {
 	t.requestsExpired <- hash
 }
 
@@ -632,7 +632,7 @@ func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...whispertyp
 	return filterid
 }
 
-func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []statusproto.HexBytes {
+func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []protocol.HexBytes {
 	requests, err := s.localAPI.InitiateHistoryRequests(context.Background(), InitiateHistoryRequestParams{
 		Peer:     s.remoteNode.String(),
 		SymKeyID: s.mailSymKey,

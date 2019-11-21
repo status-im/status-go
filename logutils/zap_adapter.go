@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-protocol-go/zaputil"
+	"github.com/status-im/status-go/protocol/zaputil"
 )
 
 type gethLoggerCore struct {

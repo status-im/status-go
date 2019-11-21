@@ -9,3 +9,9 @@ update_configs:
     default_assignees:
     - "adambabik"
     - "cammellos"
+  - package_manager: "go:modules"
+    directory: "/protocol"
+    update_schedule: "weekly"
+    default_assignees:
+    - "adambabik"
+    - "cammellos"

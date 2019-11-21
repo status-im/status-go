@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.

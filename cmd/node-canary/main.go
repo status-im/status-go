@@ -18,15 +18,15 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
+	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
-	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
-	statusproto "github.com/status-im/status-protocol-go/types"
 	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ssh/terminal"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 )
 
 const (
@@ -182,7 +182,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 		logger.Error("Error requesting historic messages from mailserver", "error", err)
 		os.Exit(2)
 	}
-	requestID := statusproto.BytesToHash(requestIDBytes)
+	requestID := protocol.BytesToHash(requestIDBytes)
 
 	// wait for mailserver request sent event
 	err = waitForMailServerRequestSent(mailServerResponseWatcher, requestID, time.Duration(*timeout)*time.Second)
@@ -333,7 +333,7 @@ func joinPublicChat(w whispertypes.Whisper, rpcClient *rpc.Client, name string) 
 	return keyID, topic, filterID, err
 }
 
-func waitForMailServerRequestSent(events chan whispertypes.EnvelopeEvent, requestID statusproto.Hash, timeout time.Duration) error {
+func waitForMailServerRequestSent(events chan whispertypes.EnvelopeEvent, requestID protocol.Hash, timeout time.Duration) error {
 	timeoutTimer := time.NewTimer(timeout)
 	for {
 		select {
@@ -348,7 +348,7 @@ func waitForMailServerRequestSent(events chan whispertypes.EnvelopeEvent, reques
 	}
 }
 
-func waitForMailServerResponse(events chan whispertypes.EnvelopeEvent, requestID statusproto.Hash, timeout time.Duration) (*whispertypes.MailServerResponse, error) {
+func waitForMailServerResponse(events chan whispertypes.EnvelopeEvent, requestID protocol.Hash, timeout time.Duration) (*whispertypes.MailServerResponse, error) {
 	timeoutTimer := time.NewTimer(timeout)
 	for {
 		select {
@@ -408,7 +408,7 @@ func waitForEnvelopeEvents(events chan whispertypes.EnvelopeEvent, hashes []stri
 }
 
 // helper for checking LastEnvelopeHash
-func isEmptyEnvelope(hash statusproto.Hash) bool {
+func isEmptyEnvelope(hash protocol.Hash) bool {
 	for _, b := range hash {
 		if b != 0 {
 			return false

@@ -15,8 +15,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -159,7 +159,7 @@ func (i *PostgresDB) GetEnvelope(key *DBKey) ([]byte, error) {
 }
 
 func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
-	var zero statusproto.Hash
+	var zero protocol.Hash
 	var emptyTopic whispertypes.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
@@ -180,7 +180,7 @@ func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 
 func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
 	topic := whispertypes.TopicType(env.Topic)
-	key := NewDBKey(env.Expiry-env.TTL, topic, statusproto.Hash(env.Hash()))
+	key := NewDBKey(env.Expiry-env.TTL, topic, protocol.Hash(env.Hash()))
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))

@@ -22,8 +22,8 @@ import (
 
 	"time"
 
-	statustransp "github.com/status-im/status-protocol-go/transport/whisper"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 )
 
 const (

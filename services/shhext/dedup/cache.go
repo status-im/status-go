@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/db"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"golang.org/x/crypto/sha3"

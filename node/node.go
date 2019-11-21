@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
+	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
 	"github.com/status-im/status-go/services/incentivisation"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
@@ -33,7 +34,6 @@ import (
 	"github.com/status-im/status-go/services/whisperbridge"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
-	gethbridge "github.com/status-im/status-protocol-go/bridge/geth"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -316,7 +316,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		return
 	}
 
-	// Register Whisper status-protocol-go bridge
+	// Register Whisper status-go/protocol bridge
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var whisper *whisper.Whisper
 		if err := ctx.Service(&whisper); err != nil {

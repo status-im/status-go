@@ -3,8 +3,8 @@ package db
 import (
 	"time"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 )
 
@@ -44,7 +44,7 @@ func (h HistoryStore) NewHistory(topic whispertypes.TopicType, duration time.Dur
 }
 
 // GetRequest loads HistoryRequest from database.
-func (h HistoryStore) GetRequest(id statusproto.Hash) (HistoryRequest, error) {
+func (h HistoryStore) GetRequest(id protocol.Hash) (HistoryRequest, error) {
 	req := HistoryRequest{requestDB: h.requestDB, topicDB: h.topicDB, ID: id}
 	err := req.Load()
 	if err != nil {

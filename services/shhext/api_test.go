@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 
 	"github.com/status-im/status-go/mailserver"
 
@@ -81,7 +81,7 @@ func TestMakeMessagesRequestPayload(t *testing.T) {
 		{
 			Name: "valid cursor",
 			Req: MessagesRequest{
-				Cursor: hex.EncodeToString(mailserver.NewDBKey(123, emptyTopic, statusproto.Hash{}).Cursor()),
+				Cursor: hex.EncodeToString(mailserver.NewDBKey(123, emptyTopic, protocol.Hash{}).Cursor()),
 			},
 			Err: "",
 		},
@@ -226,7 +226,7 @@ func TestExpiredOrCompleted(t *testing.T) {
 	timeout := time.Millisecond
 	events := make(chan whispertypes.EnvelopeEvent)
 	errors := make(chan error, 1)
-	hash := statusproto.Hash{1}
+	hash := protocol.Hash{1}
 	go func() {
 		_, err := waitForExpiredOrCompleted(hash, events, timeout)
 		errors <- err

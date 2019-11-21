@@ -5,7 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 )
 
 // Make sure that WhisperService implements node.Service interface.

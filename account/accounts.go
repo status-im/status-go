@@ -19,7 +19,7 @@ import (
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/extkeys"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 // errors
@@ -325,7 +325,7 @@ func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password 
 		return address, "", err
 	}
 
-	pubKey = statusproto.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = protocol.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
@@ -349,7 +349,7 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 	if err != nil {
 		return address, "", err
 	}
-	pubKey = statusproto.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = protocol.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }

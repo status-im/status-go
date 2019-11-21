@@ -8,8 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -128,7 +128,7 @@ func TestCreateRequestsWithExistingRequest(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
 	req := store.NewRequest()
-	req.ID = statusproto.Hash{1}
+	req.ID = protocol.Hash{1}
 	th := store.NewHistory(whispertypes.TopicType{1}, time.Hour)
 	req.AddHistory(th)
 	require.NoError(t, req.Save())
@@ -163,7 +163,7 @@ func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
-	requests[0].ID = statusproto.Hash{1}
+	requests[0].ID = protocol.Hash{1}
 	require.NoError(t, requests[0].Save())
 
 	// duration changed. request wasn't finished
@@ -175,7 +175,7 @@ func TestCreateMultiRequestsWithSameTopic(t *testing.T) {
 	longest := 0
 	for i := range requests {
 		r := &requests[i]
-		r.ID = statusproto.Hash{byte(i)}
+		r.ID = protocol.Hash{byte(i)}
 		require.NoError(t, r.Save())
 		require.Len(t, r.Histories(), 1)
 		if r.Histories()[0].Duration == 10*time.Hour {
@@ -203,7 +203,7 @@ func TestRequestFinishedUpdate(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
 	req := store.NewRequest()
-	req.ID = statusproto.Hash{1}
+	req.ID = protocol.Hash{1}
 	now := ctx.Time()
 	thOne := store.NewHistory(whispertypes.TopicType{1}, time.Hour)
 	thOne.End = now
@@ -228,7 +228,7 @@ func TestRequestFinishedUpdate(t *testing.T) {
 func TestTopicHistoryUpdate(t *testing.T) {
 	ctx := newTestContext(t)
 	store := ctx.HistoryStore()
-	reqID := statusproto.Hash{1}
+	reqID := protocol.Hash{1}
 	request := store.NewRequest()
 	request.ID = reqID
 	now := time.Now()
@@ -348,7 +348,7 @@ func TestAdjustHistoryRemoveTopicIfPendingWithHigherDuration(t *testing.T) {
 	store := createInMemStore(t)
 	topic := whispertypes.TopicType{1}
 	hour := store.NewHistory(topic, time.Hour)
-	hour.RequestID = statusproto.Hash{1}
+	hour.RequestID = protocol.Hash{1}
 	require.NoError(t, hour.Save())
 	minute := store.NewHistory(topic, time.Minute)
 	adjusted, err := adjustRequestedHistories(store, []db.TopicHistory{minute})

@@ -11,8 +11,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -106,7 +106,7 @@ func (w *MockWhisper) Post(ctx context.Context, req whispertypes.NewMessage) ([]
 func (w *MockWhisper) NewMessageFilter(req whispertypes.Criteria) (string, error) {
 	return "", nil
 }
-func (w *MockWhisper) AddPrivateKey(ctx context.Context, privateKey statusproto.HexBytes) (string, error) {
+func (w *MockWhisper) AddPrivateKey(ctx context.Context, privateKey protocol.HexBytes) (string, error) {
 	return "", nil
 }
 func (w *MockWhisper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {

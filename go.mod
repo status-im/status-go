@@ -10,7 +10,7 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015
 
-replace github.com/status-im/status-protocol-go => ./status-protocol
+replace github.com/status-im/status-go/protocol => ./protocol
 
 require (
 	github.com/beevik/ntp v0.2.0
@@ -33,7 +33,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-protocol-go v0.5.2
+	github.com/status-im/status-go/protocol v0.5.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/status-im/whisper v1.6.1
 	github.com/stretchr/testify v1.4.0

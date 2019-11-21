@@ -3,9 +3,9 @@ package dedup
 import (
 	"github.com/ethereum/go-ethereum/log"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
-	v1 "github.com/status-im/status-protocol-go/v1"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
+	v1 "github.com/status-im/status-go/protocol/v1"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
@@ -23,16 +23,16 @@ type Deduplicator struct {
 }
 
 type Author struct {
-	PublicKey statusproto.HexBytes `json:"publicKey"`
-	Alias     string               `json:"alias"`
-	Identicon string               `json:"identicon"`
+	PublicKey protocol.HexBytes `json:"publicKey"`
+	Alias     string            `json:"alias"`
+	Identicon string            `json:"identicon"`
 }
 
 type Metadata struct {
-	DedupID      []byte               `json:"dedupId"`
-	EncryptionID statusproto.HexBytes `json:"encryptionId"`
-	MessageID    statusproto.HexBytes `json:"messageId"`
-	Author       Author               `json:"author"`
+	DedupID      []byte            `json:"dedupId"`
+	EncryptionID protocol.HexBytes `json:"encryptionId"`
+	MessageID    protocol.HexBytes `json:"messageId"`
+	Author       Author            `json:"author"`
 }
 
 type DeduplicateMessage struct {

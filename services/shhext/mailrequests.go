@@ -4,8 +4,8 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 // EnvelopeState in local tracker
@@ -28,7 +28,7 @@ type MailRequestMonitor struct {
 	handler EnvelopeEventsHandler
 
 	mu    sync.Mutex
-	cache map[statusproto.Hash]EnvelopeState
+	cache map[protocol.Hash]EnvelopeState
 
 	requestsRegistry *RequestsRegistry
 
@@ -52,7 +52,7 @@ func (m *MailRequestMonitor) Stop() {
 	m.wg.Wait()
 }
 
-func (m *MailRequestMonitor) GetState(hash statusproto.Hash) EnvelopeState {
+func (m *MailRequestMonitor) GetState(hash protocol.Hash) EnvelopeState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	state, exist := m.cache[hash]

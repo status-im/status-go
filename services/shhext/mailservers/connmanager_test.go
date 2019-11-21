@@ -9,9 +9,9 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/status-im/status-go/t/utils"
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -273,7 +273,7 @@ func TestConnectionManagerReplace(t *testing.T) {
 	}, time.Second, 100*time.Millisecond))
 }
 
-func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whisperMock *fakeEnvelopeEvents, target, maxFailures int, hash statusproto.Hash) (*ConnectionManager, whispertypes.EnodeID) {
+func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whisperMock *fakeEnvelopeEvents, target, maxFailures int, hash protocol.Hash) (*ConnectionManager, whispertypes.EnodeID) {
 	connmanager := NewConnectionManager(server, whisperMock, target, maxFailures, 0)
 	connmanager.Start()
 	nodes := []*enode.Node{}
@@ -307,7 +307,7 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 	whisperMock := newFakeEnvelopesEvents()
 	target := 1
 	maxFailures := 1
-	hash := statusproto.Hash{1}
+	hash := protocol.Hash{1}
 	connmanager, initial := setupTestConnectionAfterExpiry(t, server, whisperMock, target, maxFailures, hash)
 	defer connmanager.Stop()
 
@@ -335,7 +335,7 @@ func TestConnectionChangedAfterSecondExpiry(t *testing.T) {
 	whisperMock := newFakeEnvelopesEvents()
 	target := 1
 	maxFailures := 2
-	hash := statusproto.Hash{1}
+	hash := protocol.Hash{1}
 	connmanager, initial := setupTestConnectionAfterExpiry(t, server, whisperMock, target, maxFailures, hash)
 	defer connmanager.Stop()
 

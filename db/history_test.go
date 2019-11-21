@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,7 +80,7 @@ func TestAddHistory(t *testing.T) {
 	require.NoError(t, err)
 
 	th := TopicHistory{db: topicdb, Topic: topic, Current: now}
-	id := statusproto.Hash{1}
+	id := protocol.Hash{1}
 
 	req := HistoryRequest{requestDB: requestdb, topicDB: topicdb, ID: id}
 	req.AddHistory(th)

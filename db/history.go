@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	whispertypes "github.com/status-im/status-protocol-go/transport/whisper/types"
-	statusproto "github.com/status-im/status-protocol-go/types"
+	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -57,7 +57,7 @@ type TopicHistory struct {
 	Current time.Time
 	End     time.Time
 
-	RequestID statusproto.Hash
+	RequestID protocol.Hash
 }
 
 // Key returns unique identifier for this TopicHistory.
@@ -115,7 +115,7 @@ func (t TopicHistory) SameRange(other TopicHistory) bool {
 
 // Pending returns true if this topic was requested from a mail server.
 func (t TopicHistory) Pending() bool {
-	return t.RequestID != statusproto.Hash{}
+	return t.RequestID != protocol.Hash{}
 }
 
 // HistoryRequest is kept in the database while request is in the progress.
@@ -127,7 +127,7 @@ type HistoryRequest struct {
 	histories []TopicHistory
 
 	// Generated ID
-	ID statusproto.Hash
+	ID protocol.Hash
 	// List of the topics
 	TopicHistoryKeys []TopicHistoryKey
 }
@@ -167,8 +167,8 @@ func (req HistoryRequest) Save() error {
 }
 
 // Replace saves request with new ID and all data attached to the old one.
-func (req HistoryRequest) Replace(id statusproto.Hash) error {
-	if (req.ID != statusproto.Hash{}) {
+func (req HistoryRequest) Replace(id protocol.Hash) error {
+	if (req.ID != protocol.Hash{}) {
 		if err := req.Delete(); err != nil {
 			return err
 		}

@@ -18,11 +18,11 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
+	protocol "github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
-	protocol "github.com/status-im/status-protocol-go"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
