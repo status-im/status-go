@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	contactBlocked         = "contact/blocked"
-	contactAdded           = "contact/added"
-	contactRequestReceived = "contact/request-received"
+	contactBlocked         = ":contact/blocked"
+	contactAdded           = ":contact/added"
+	contactRequestReceived = ":contact/request-received"
 )
 
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact

@@ -9,10 +9,7 @@ deleted_at_clock_value INT NOT NULL DEFAULT 0,
 public_key BLOB,
 unviewed_message_count INT NOT NULL DEFAULT 0,
 last_clock_value INT NOT NULL DEFAULT 0,
-last_message_content_type VARCHAR,
-last_message_content VARCHAR,
-last_message_timestamp INT,
-last_message_clock_value INT,
+last_message BLOB,
 members BLOB,
 membership_updates BLOB
 );

@@ -33,7 +33,6 @@ const (
 type MembershipUpdateMessage struct {
 	ChatID  string             `json:"chatId"` // UUID concatenated with hex-encoded public key of the creator for the chat
 	Updates []MembershipUpdate `json:"updates"`
-	Message *Message           `json:"message"` // optional message
 }
 
 // Verify makes sure that the received update message has a valid signature.

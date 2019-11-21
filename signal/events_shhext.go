@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	statusproto "github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/shhext/dedup"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -88,11 +89,6 @@ type WhisperFilterAddedSignal struct {
 	Filters []*Filter `json:"filters"`
 }
 
-// NewMessagesSignal notifies clients of new messages
-type NewMessagesSignal struct {
-	Messages []*Messages `json:"messages"`
-}
-
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
 func SendEnvelopeSent(identifiers [][]byte) {
 	var hexIdentifiers []hexutil.Bytes
@@ -172,6 +168,6 @@ func SendWhisperFilterAdded(filters []*Filter) {
 	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
 }
 
-func SendNewMessages(messages []*Messages) {
-	send(EventNewMessages, NewMessagesSignal{Messages: messages})
+func SendNewMessages(response *statusproto.MessengerResponse) {
+	send(EventNewMessages, response)
 }

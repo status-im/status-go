@@ -34,6 +34,8 @@ type MailserverRequestGap struct {
 
 type MailserverTopic struct {
 	Topic       string   `json:"topic"`
+	Discovery   bool     `json:"discovery?"`
+	Negotiated  bool     `json:"negotiated?"`
 	ChatIDs     []string `json:"chat-ids"`
 	LastRequest int      `json:"last-request"` // default is 1
 }
@@ -212,11 +214,15 @@ func (d *Database) AddTopic(topic MailserverTopic) error {
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_topics(
 			topic,
 			chat_ids,
-			last_request
-		) VALUES (?, ?, ?)`,
+			last_request,
+			discovery,
+			negotiated
+		) VALUES (?, ?, ?,?,?)`,
 		topic.Topic,
 		chatIDs,
 		topic.LastRequest,
+		topic.Discovery,
+		topic.Negotiated,
 	)
 	return err
 }
@@ -224,7 +230,7 @@ func (d *Database) AddTopic(topic MailserverTopic) error {
 func (d *Database) Topics() ([]MailserverTopic, error) {
 	var result []MailserverTopic
 
-	rows, err := d.db.Query(`SELECT topic, chat_ids, last_request FROM mailserver_topics`)
+	rows, err := d.db.Query(`SELECT topic, chat_ids, last_request,discovery,negotiated FROM mailserver_topics`)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +244,8 @@ func (d *Database) Topics() ([]MailserverTopic, error) {
 			&t.Topic,
 			&chatIDs,
 			&t.LastRequest,
+			&t.Discovery,
+			&t.Negotiated,
 		); err != nil {
 			return nil, err
 		}

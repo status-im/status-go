@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	messageType          = reflect.TypeOf(Message{})
 	pairMessageType      = reflect.TypeOf(PairMessage{})
 	membershipUpdateType = reflect.TypeOf(MembershipUpdateMessage{})
 
@@ -22,7 +21,6 @@ var (
 // More about Transit: https://github.com/cognitect/transit-format
 func NewMessageEncoder(w io.Writer) *transit.Encoder {
 	encoder := transit.NewEncoder(w, false)
-	encoder.AddHandler(messageType, defaultMessageValueEncoder)
 	encoder.AddHandler(pairMessageType, defaultMessageValueEncoder)
 	encoder.AddHandler(membershipUpdateType, defaultMessageValueEncoder)
 	return encoder
@@ -36,9 +34,6 @@ func (messageValueEncoder) IsStringable(reflect.Value) bool {
 
 func (messageValueEncoder) Encode(e transit.Encoder, value reflect.Value, asString bool) error {
 	switch message := value.Interface().(type) {
-	case Message:
-		taggedValue := encodeMessageToTaggedValue(message)
-		return e.EncodeInterface(taggedValue, false)
 	case PairMessage:
 		taggedValue := transit.TaggedValue{
 			Tag: pairMessageTag,
@@ -86,9 +81,6 @@ func (messageValueEncoder) Encode(e transit.Encoder, value reflect.Value, asStri
 			message.ChatID,
 			updatesList,
 		}
-		if message.Message != nil {
-			value = append(value, encodeMessageToTaggedValue(*message.Message))
-		}
 		taggedValue := transit.TaggedValue{
 			Tag:   membershipUpdateTag,
 			Value: value,
@@ -97,21 +89,4 @@ func (messageValueEncoder) Encode(e transit.Encoder, value reflect.Value, asStri
 	}
 
 	return errors.New("unknown message type to encode")
-}
-
-func encodeMessageToTaggedValue(m Message) transit.TaggedValue {
-	return transit.TaggedValue{
-		Tag: messageTag,
-		Value: []interface{}{
-			m.Text,
-			m.ContentT,
-			transit.Keyword(m.MessageT),
-			m.Clock,
-			m.Timestamp,
-			map[interface{}]interface{}{
-				transit.Keyword("chat-id"): m.Content.ChatID,
-				transit.Keyword("text"):    m.Content.Text,
-			},
-		},
-	}
 }

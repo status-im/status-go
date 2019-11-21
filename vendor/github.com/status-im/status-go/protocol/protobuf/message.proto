@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package protobuf;
+
+message StickerMessage {
+  string hash = 1;
+  int32 pack = 2;
+}
+
+message ChatMessage {
+  // Lamport timestamp of the chat message
+  uint64 clock = 1;
+  // Unix timestamps in milliseconds, currently not used as we use whisper as more reliable, but here
+  // so that we don't rely on it
+  uint64 timestamp = 2;
+  // Text of the message
+  string text = 3;
+  // Id of the message that we are replying to
+  string response_to = 4;
+  // Ens name of the sender
+  string ens_name = 5;
+  // Chat id, this field is symmetric for public-chats and private group chats,
+  // but asymmetric in case of one-to-ones, as the sender will use the chat-id
+  // of the received, while the receiver will use the chat-id of the sender.
+  // Probably should be the concatenation of sender-pk & receiver-pk in alphabetical order
+  string chat_id = 6;
+
+  // The type of message (public/one-to-one/private-group-chat)
+  MessageType message_type = 7;
+  // The type of the content of the message
+  ContentType content_type = 8;
+
+  oneof payload {
+    StickerMessage sticker = 9;
+  }
+
+  enum MessageType {
+    ONE_TO_ONE = 0;
+    PUBLIC_GROUP = 1;
+    PRIVATE_GROUP = 2;
+    // Only local
+    SYSTEM_MESSAGE_PRIVATE_GROUP = 3;
+    }
+  enum ContentType {
+    TEXT_PLAIN = 0;
+    STICKER = 1;
+    STATUS = 2;
+    EMOJI = 3;
+    COMMAND = 4;
+    COMMAND_REQUEST = 5;
+  }
+}
+
+message ApplicationMetadataMessage {
+  // Signature of the payload field
+  bytes signature = 1;
+  // This is the encoded protobuf of the application level message, i.e ChatMessage
+  bytes payload = 2;
+
+  // The type of protobuf message sent
+  MessageType message_type = 3;
+
+  enum MessageType {
+    TEXT_MESSAGE = 0;
+    CONTACT_REQUEST = 1;
+    MEMBERSHIP_UPDATE = 2;
+    PAIR_INSTALLATION = 3;
+    SYNC_INSTALLATION = 4;
+  }
+}

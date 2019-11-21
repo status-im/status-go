@@ -291,16 +291,16 @@ func (client *Client) Connect(name string, shareMode uint32, preferredProtocol u
 *
 * These data are passed throw the field \c sharedSegmentMsg.data.
  */
-type transmit struct {
-	hCard             uint32
-	ioSendPciProtocol uint32
-	ioSendPciLength   uint32
-	cbSendLength      uint32
-	ioRecvPciProtocol uint32
-	ioRecvPciLength   uint32
-	pcbRecvLength     uint32
-	rv                uint32
-}
+//type transmit struct {
+//hCard             uint32
+//ioSendPciProtocol uint32
+//ioSendPciLength   uint32
+//cbSendLength      uint32
+//ioRecvPciProtocol uint32
+//ioRecvPciLength   uint32
+//pcbRecvLength     uint32
+//rv                uint32
+//}
 
 // SCardIoRequest contains the info needed for performing an IO request
 type SCardIoRequest struct {
@@ -336,7 +336,7 @@ func (card *Card) Transmit(adpu []byte) ([]byte, *SCardIoRequest, error) {
 		return nil, nil, err
 	}
 	if n != len(adpu) {
-		return nil, nil, fmt.Errorf("Invalid number of bytes written: expected %d, got %d", len(adpu), n)
+		return nil, nil, fmt.Errorf("invalid number of bytes written: expected %d, got %d", len(adpu), n)
 	}
 	response := [TransmitRequestLength]byte{}
 	total := 0

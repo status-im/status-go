@@ -20,10 +20,12 @@ require (
 	github.com/beevik/ntp v0.2.0
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.5
-	github.com/go-playground/locales v0.12.1 // indirect
-	github.com/go-playground/universal-translator v0.16.0 // indirect
+	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
+	github.com/go-playground/universal-translator v0.17.0 // indirect
+	github.com/golang-migrate/migrate/v4 v4.7.0 // indirect
 	github.com/golang/mock v1.3.1
-	github.com/leodido/go-urn v1.1.0 // indirect
+	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
+	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p v0.4.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.2.3
@@ -33,7 +35,10 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.2.1
+	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
+	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
+	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a

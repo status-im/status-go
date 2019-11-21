@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -163,87 +161,14 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 	for {
 		select {
 		case <-ticker.C:
-			chatWithMessages, err := s.messenger.RetrieveRawAll()
+			response, err := s.messenger.RetrieveAll()
 			if err != nil {
 				log.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
-			var messageIDs []string
-
-			for _, messages := range chatWithMessages {
-				for _, message := range messages {
-					messageIDs = append(messageIDs, message.ID.String())
-				}
+			if !response.IsEmpty() {
+				PublisherSignalHandler{}.NewMessages(response)
 			}
-
-			existingMessages, err := s.messenger.MessagesExist(messageIDs)
-			if err != nil {
-				log.Error("failed to check existing messages", "err", err)
-				continue
-			}
-
-			var signalMessages []*signal.Messages
-
-			for chat, messages := range chatWithMessages {
-
-				var dedupMessages []*dedup.DeduplicateMessage
-				// Filter out already saved messages
-				for _, message := range messages {
-					if !existingMessages[message.ID.String()] {
-						id := fmt.Sprintf("0x%s", hex.EncodeToString(crypto.FromECDSAPub(message.SigPubKey())))
-
-						identicon, err := protocol.Identicon(id)
-						if err != nil {
-							log.Error("failed to generate identicon", "err", err)
-							continue
-
-						}
-						alias, err := protocol.GenerateAlias(id)
-						if err != nil {
-							log.Error("failed to generate identicon", "err", err)
-							continue
-
-						}
-
-						dedupMessage := &dedup.DeduplicateMessage{
-							Metadata: dedup.Metadata{
-								Author: dedup.Author{
-									PublicKey: crypto.FromECDSAPub(message.SigPubKey()),
-									Alias:     alias,
-									Identicon: identicon,
-								},
-								MessageID:    message.ID,
-								EncryptionID: message.Hash,
-							},
-							Message: message.TransportMessage,
-						}
-						dedupMessage.Message.Payload = message.DecryptedPayload
-						dedupMessage.Payload = string(message.DecryptedPayload)
-						dedupMessage.ParsedMessage = message.ParsedMessage
-						dedupMessage.MessageType = message.MessageType
-						dedupMessages = append(dedupMessages, dedupMessage)
-					}
-				}
-				dedupMessages = s.deduplicator.Deduplicate(dedupMessages)
-
-				if len(dedupMessages) != 0 {
-					signalMessage := &signal.Messages{
-						Chat:     chat,
-						Error:    nil, // TODO: what is it needed for?
-						Messages: dedupMessages,
-					}
-
-					signalMessages = append(signalMessages, signalMessage)
-				}
-			}
-
-			log.Debug("retrieve messages loop", "messages", len(signalMessages))
-
-			if len(signalMessages) == 0 {
-				continue
-			}
-
-			PublisherSignalHandler{}.NewMessages(signalMessages)
 		case <-cancel:
 			return
 		}
@@ -425,16 +350,9 @@ func buildMessengerOptions(config params.ShhextConfig, db *sql.DB, envelopesMoni
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
 	}
 
-	if !config.DisableGenericDiscoveryTopic {
-		options = append(options, protocol.WithGenericDiscoveryTopicSupport())
-	}
-
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
 
-	if config.SendV1Messages {
-		options = append(options, protocol.WithSendV1Messages())
-	}
 	return options
 }
