@@ -4,5 +4,5 @@ name TEXT NOT NULL,
 loginTimestamp BIG INT,
 photoPath TEXT,
 keycardPairing TEXT,
-keycardKeyUid TEXT
+keyUid TEXT
 ) WITHOUT ROWID;

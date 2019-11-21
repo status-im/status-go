@@ -15,7 +15,7 @@ type Account struct {
 	Timestamp      int64          `json:"timestamp"`
 	PhotoPath      string         `json:"photo-path"`
 	KeycardPairing string         `json:"keycard-pairing"`
-	KeycardKeyUID  string         `json:"keycard-key-uid"`
+	KeyUID         string         `json:"key-uid"`
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -40,7 +40,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, name, loginTimestamp, photoPath, keycardPairing, keycardKeyUid from accounts ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT address, name, loginTimestamp, photoPath, keycardPairing, keyUid from accounts ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	inthelper := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
-		err = rows.Scan(&acc.Address, &acc.Name, &inthelper, &acc.PhotoPath, &acc.KeycardPairing, &acc.KeycardKeyUID)
+		err = rows.Scan(&acc.Address, &acc.Name, &inthelper, &acc.PhotoPath, &acc.KeycardPairing, &acc.KeyUID)
 		if err != nil {
 			return nil, err
 		}
@@ -59,12 +59,12 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name, photoPath, keycardPairing, keycardKeyUid) VALUES (?, ?, ?, ?, ?)", account.Address, account.Name, account.PhotoPath, account.KeycardPairing, account.KeycardKeyUID)
+	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name, photoPath, keycardPairing, keyUid) VALUES (?, ?, ?, ?, ?)", account.Address, account.Name, account.PhotoPath, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
 func (db *Database) UpdateAccount(account Account) error {
-	_, err := db.db.Exec("UPDATE accounts SET name = ?, photoPath = ?, keycardPairing = ?, keycardKeyUid = ? WHERE address = ?", account.Name, account.PhotoPath, account.KeycardPairing, account.KeycardKeyUID, account.Address)
+	_, err := db.db.Exec("UPDATE accounts SET name = ?, photoPath = ?, keycardPairing = ?, keyUid = ? WHERE address = ?", account.Name, account.PhotoPath, account.KeycardPairing, account.KeyUID, account.Address)
 	return err
 }
 

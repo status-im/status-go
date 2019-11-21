@@ -2,10 +2,11 @@ package generator
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/extkeys"
-	protocol "github.com/status-im/status-go/protocol/types"
+	statusproto "github.com/status-im/status-go/protocol/types"
 )
 
 type account struct {
@@ -14,7 +15,7 @@ type account struct {
 }
 
 func (a *account) toAccountInfo() AccountInfo {
-	publicKeyHex := protocol.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	publicKeyHex := statusproto.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{
@@ -25,9 +26,12 @@ func (a *account) toAccountInfo() AccountInfo {
 
 func (a *account) toIdentifiedAccountInfo(id string) IdentifiedAccountInfo {
 	info := a.toAccountInfo()
+	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	keyUIDHex := statusproto.EncodeHex(keyUID[:])
 	return IdentifiedAccountInfo{
 		AccountInfo: info,
 		ID:          id,
+		KeyUID:      keyUIDHex,
 	}
 }
 
@@ -49,6 +53,12 @@ type AccountInfo struct {
 type IdentifiedAccountInfo struct {
 	AccountInfo
 	ID string `json:"id"`
+	// KeyUID is calculated as sha256 of the master public key and used for key
+	// identification. This is the only information available about the master
+	// key stored on a keycard before the card is paired.
+	// KeyUID name is chosen over KeyID in order to make it consistent with
+	// the name already used in Status and Keycard codebases.
+	KeyUID string `json:"keyUid"`
 }
 
 // GeneratedAccountInfo contains IdentifiedAccountInfo and the mnemonic of an account.
