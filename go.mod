@@ -10,6 +10,8 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015
 
+replace github.com/status-im/status-protocol-go => ./status-protocol
+
 require (
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
