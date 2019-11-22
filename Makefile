@@ -216,7 +216,8 @@ xtools-install:
 
 modvendor-install:
 	# a tool to vendor non-go files
-	go get -u github.com/goware/modvendor
+	# TODO: switch to original repo when https://github.com/goware/modvendor/pull/13 is merged
+	GO111MODULE=off go get -u github.com/adambabik/modvendor
 
 mock-install: ##@other Install mocking tools
 	go get -u github.com/golang/mock/mockgen
