@@ -7,7 +7,7 @@ github.com/aristanetworks/goarista/monotime
 github.com/beevik/ntp
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/btcsuite/btcd v0.0.0-20191011042131-c3151ef50de9
+# github.com/btcsuite/btcd v0.20.1-beta
 github.com/btcsuite/btcd/btcec
 github.com/btcsuite/btcd/chaincfg
 github.com/btcsuite/btcd/chaincfg/chainhash
@@ -29,7 +29,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.10.4
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.4
+# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.6
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -367,6 +367,8 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
+# github.com/status-im/status-go/extkeys v0.0.0-00010101000000-000000000000 => ./extkeys
+github.com/status-im/status-go/extkeys
 # github.com/status-im/status-go/protocol v0.5.2 => ./protocol
 github.com/status-im/status-go/protocol
 github.com/status-im/status-go/protocol/applicationmetadata
@@ -478,7 +480,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20191029031824-8986dd9e96cf
+# golang.org/x/crypto v0.0.0-20191119213627-4f8c1d86b1ba
 golang.org/x/crypto/blake2s
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/ed25519

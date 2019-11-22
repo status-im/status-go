@@ -1,5 +1,0 @@
-package: github.com/status-im/doubleratchet
-import:
-- package: golang.org/x/crypto
-  subpackages:
-  - curve25519
