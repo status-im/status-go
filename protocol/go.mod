@@ -26,7 +26,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	github.com/vacp2p/mvds v0.0.23
 	github.com/wealdtech/go-ens/v3 v3.0.7
-	go.uber.org/zap v1.10.0
+	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191029031824-8986dd9e96cf
 	golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
