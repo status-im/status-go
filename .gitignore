@@ -69,3 +69,6 @@ Session.vim
 
 # created for running container
 _assets/compose/bootnode/keys
+
+# avoid to vendor nested vendoor/ directories
+vendor/**/vendor
