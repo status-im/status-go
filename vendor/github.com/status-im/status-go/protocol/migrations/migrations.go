@@ -454,17 +454,17 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"000001_init.down.db.sql":                     &bintree{_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql":                       &bintree{_000001_initUpDbSql, map[string]*bintree{}},
-	"000002_add_chats.down.db.sql":                &bintree{_000002_add_chatsDownDbSql, map[string]*bintree{}},
-	"000002_add_chats.up.db.sql":                  &bintree{_000002_add_chatsUpDbSql, map[string]*bintree{}},
-	"000003_add_contacts.down.db.sql":             &bintree{_000003_add_contactsDownDbSql, map[string]*bintree{}},
-	"000003_add_contacts.up.db.sql":               &bintree{_000003_add_contactsUpDbSql, map[string]*bintree{}},
-	"000004_user_messages_compatibility.down.sql": &bintree{_000004_user_messages_compatibilityDownSql, map[string]*bintree{}},
-	"000004_user_messages_compatibility.up.sql":   &bintree{_000004_user_messages_compatibilityUpSql, map[string]*bintree{}},
-	"1567112142_user_messages.down.sql":           &bintree{_1567112142_user_messagesDownSql, map[string]*bintree{}},
-	"1567112142_user_messages.up.sql":             &bintree{_1567112142_user_messagesUpSql, map[string]*bintree{}},
-	"doc.go":                                      &bintree{docGo, map[string]*bintree{}},
+	"000001_init.down.db.sql":                     {_000001_initDownDbSql, map[string]*bintree{}},
+	"000001_init.up.db.sql":                       {_000001_initUpDbSql, map[string]*bintree{}},
+	"000002_add_chats.down.db.sql":                {_000002_add_chatsDownDbSql, map[string]*bintree{}},
+	"000002_add_chats.up.db.sql":                  {_000002_add_chatsUpDbSql, map[string]*bintree{}},
+	"000003_add_contacts.down.db.sql":             {_000003_add_contactsDownDbSql, map[string]*bintree{}},
+	"000003_add_contacts.up.db.sql":               {_000003_add_contactsUpDbSql, map[string]*bintree{}},
+	"000004_user_messages_compatibility.down.sql": {_000004_user_messages_compatibilityDownSql, map[string]*bintree{}},
+	"000004_user_messages_compatibility.up.sql":   {_000004_user_messages_compatibilityUpSql, map[string]*bintree{}},
+	"1567112142_user_messages.down.sql":           {_1567112142_user_messagesDownSql, map[string]*bintree{}},
+	"1567112142_user_messages.up.sql":             {_1567112142_user_messagesUpSql, map[string]*bintree{}},
+	"doc.go":                                      {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

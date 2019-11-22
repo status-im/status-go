@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	statusproto "github.com/status-im/status-go/protocol/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -497,7 +497,7 @@ func (m *Messenger) AddMembersToChat(ctx context.Context, chat *Chat, members []
 	}
 	encodedMembers := make([]string, len(members))
 	for idx, member := range members {
-		encodedMembers[idx] = statusproto.EncodeHex(crypto.FromECDSAPub(member))
+		encodedMembers[idx] = protocol.EncodeHex(crypto.FromECDSAPub(member))
 	}
 	event := v1protocol.NewMembersAddedEvent(encodedMembers, group.NextClockValue())
 	err = group.ProcessEvent(&m.identity.PublicKey, event)
@@ -517,7 +517,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chat *Chat) error {
 		return err
 	}
 	event := v1protocol.NewMemberJoinedEvent(
-		statusproto.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+		protocol.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 		group.NextClockValue(),
 	)
 	err = group.ProcessEvent(&m.identity.PublicKey, event)
@@ -1045,7 +1045,7 @@ func (p *postProcessor) matchMessage(message *v1protocol.Message, chats []*Chat)
 	case message.MessageT == v1protocol.MessageTypePrivate:
 		// It's an incoming private message. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
-		chatID := statusproto.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		chatID := protocol.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
 		chat := findChatByID(chatID, chats)
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
@@ -1065,7 +1065,7 @@ func (p *postProcessor) matchMessage(message *v1protocol.Message, chats []*Chat)
 			return nil, errors.New("received group chat message for non-existing chat")
 		}
 
-		sigPubKeyHex := statusproto.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		sigPubKeyHex := protocol.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
 		for _, member := range chat.Members {
 			if member.ID == sigPubKeyHex {
 				return chat, nil

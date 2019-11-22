@@ -2,7 +2,7 @@ package whispertypes
 
 import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	statusproto "github.com/status-im/status-go/protocol/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 const (
@@ -32,12 +32,12 @@ func BytesToTopic(b []byte) (t TopicType) {
 
 // String converts a topic byte array to a string representation.
 func (t *TopicType) String() string {
-	return statusproto.EncodeHex(t[:])
+	return protocol.EncodeHex(t[:])
 }
 
 // MarshalText returns the hex representation of t.
 func (t TopicType) MarshalText() ([]byte, error) {
-	return statusproto.HexBytes(t[:]).MarshalText()
+	return protocol.HexBytes(t[:]).MarshalText()
 }
 
 // UnmarshalText parses a hex representation to a topic.

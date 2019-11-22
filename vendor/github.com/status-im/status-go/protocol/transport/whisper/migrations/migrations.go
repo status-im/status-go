@@ -270,9 +270,9 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1561059285_add_whisper_keys.down.sql": &bintree{_1561059285_add_whisper_keysDownSql, map[string]*bintree{}},
-	"1561059285_add_whisper_keys.up.sql":   &bintree{_1561059285_add_whisper_keysUpSql, map[string]*bintree{}},
-	"doc.go":                               &bintree{docGo, map[string]*bintree{}},
+	"1561059285_add_whisper_keys.down.sql": {_1561059285_add_whisper_keysDownSql, map[string]*bintree{}},
+	"1561059285_add_whisper_keys.up.sql":   {_1561059285_add_whisper_keysUpSql, map[string]*bintree{}},
+	"doc.go":                               {docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
