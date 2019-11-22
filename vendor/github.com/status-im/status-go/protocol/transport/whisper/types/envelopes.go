@@ -1,11 +1,11 @@
 package whispertypes
 
-import statusproto "github.com/status-im/status-go/protocol/types"
+import protocol "github.com/status-im/status-go/protocol/types"
 
 // Envelope represents a clear-text data packet to transmit through the Whisper
 // network. Its contents may or may not be encrypted and signed.
 type Envelope interface {
-	Hash() statusproto.Hash // Cached hash of the envelope to avoid rehashing every time.
+	Hash() protocol.Hash // Cached hash of the envelope to avoid rehashing every time.
 	Bloom() []byte
 }
 
@@ -50,15 +50,15 @@ const (
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
 	Event EventType
-	Hash  statusproto.Hash
-	Batch statusproto.Hash
+	Hash  protocol.Hash
+	Batch protocol.Hash
 	Peer  EnodeID
 	Data  interface{}
 }
 
 // EnvelopeError code and optional description of the error.
 type EnvelopeError struct {
-	Hash        statusproto.Hash
+	Hash        protocol.Hash
 	Code        uint
 	Description string
 }

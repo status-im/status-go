@@ -2,7 +2,7 @@ package gethbridge
 
 import (
 	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	statusproto "github.com/status-im/status-go/protocol/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -13,7 +13,7 @@ func NewGethEnvelopeErrorWrapper(envelopeError *whisper.EnvelopeError) *whispert
 	}
 
 	return &whispertypes.EnvelopeError{
-		Hash:        statusproto.Hash(envelopeError.Hash),
+		Hash:        protocol.Hash(envelopeError.Hash),
 		Code:        mapGethErrorCode(envelopeError.Code),
 		Description: envelopeError.Description,
 	}

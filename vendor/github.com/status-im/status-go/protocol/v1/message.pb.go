@@ -68,7 +68,7 @@ func (m *StatusProtocolMessage) GetPayload() []byte {
 }
 
 func init() {
-	proto.RegisterType((*StatusProtocolMessage)(nil), "statusproto.StatusProtocolMessage")
+	proto.RegisterType((*StatusProtocolMessage)(nil), "protocol.StatusProtocolMessage")
 }
 
 func init() { proto.RegisterFile("message.proto", fileDescriptor_33c57e4bae7b9afd) }

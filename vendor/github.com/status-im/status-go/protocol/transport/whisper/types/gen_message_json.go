@@ -5,21 +5,21 @@ package whispertypes
 import (
 	"encoding/json"
 
-	statusproto "github.com/status-im/status-go/protocol/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 // MarshalJSON marshals type Message to a json string
 func (m Message) MarshalJSON() ([]byte, error) {
 	type Message struct {
-		Sig       statusproto.HexBytes `json:"sig,omitempty"`
-		TTL       uint32               `json:"ttl"`
-		Timestamp uint32               `json:"timestamp"`
-		Topic     TopicType            `json:"topic"`
-		Payload   statusproto.HexBytes `json:"payload"`
-		Padding   statusproto.HexBytes `json:"padding"`
-		PoW       float64              `json:"pow"`
-		Hash      statusproto.HexBytes `json:"hash"`
-		Dst       statusproto.HexBytes `json:"recipientPublicKey,omitempty"`
+		Sig       protocol.HexBytes `json:"sig,omitempty"`
+		TTL       uint32            `json:"ttl"`
+		Timestamp uint32            `json:"timestamp"`
+		Topic     TopicType         `json:"topic"`
+		Payload   protocol.HexBytes `json:"payload"`
+		Padding   protocol.HexBytes `json:"padding"`
+		PoW       float64           `json:"pow"`
+		Hash      protocol.HexBytes `json:"hash"`
+		Dst       protocol.HexBytes `json:"recipientPublicKey,omitempty"`
 	}
 	var enc Message
 	enc.Sig = m.Sig
@@ -37,15 +37,15 @@ func (m Message) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals type Message to a json string
 func (m *Message) UnmarshalJSON(input []byte) error {
 	type Message struct {
-		Sig       *statusproto.HexBytes `json:"sig,omitempty"`
-		TTL       *uint32               `json:"ttl"`
-		Timestamp *uint32               `json:"timestamp"`
-		Topic     *TopicType            `json:"topic"`
-		Payload   *statusproto.HexBytes `json:"payload"`
-		Padding   *statusproto.HexBytes `json:"padding"`
-		PoW       *float64              `json:"pow"`
-		Hash      *statusproto.HexBytes `json:"hash"`
-		Dst       *statusproto.HexBytes `json:"recipientPublicKey,omitempty"`
+		Sig       *protocol.HexBytes `json:"sig,omitempty"`
+		TTL       *uint32            `json:"ttl"`
+		Timestamp *uint32            `json:"timestamp"`
+		Topic     *TopicType         `json:"topic"`
+		Payload   *protocol.HexBytes `json:"payload"`
+		Padding   *protocol.HexBytes `json:"padding"`
+		PoW       *float64           `json:"pow"`
+		Hash      *protocol.HexBytes `json:"hash"`
+		Dst       *protocol.HexBytes `json:"recipientPublicKey,omitempty"`
 	}
 	var dec Message
 	if err := json.Unmarshal(input, &dec); err != nil {
