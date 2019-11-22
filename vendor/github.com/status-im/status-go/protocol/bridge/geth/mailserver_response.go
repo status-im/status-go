@@ -2,7 +2,7 @@ package gethbridge
 
 import (
 	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	statusproto "github.com/status-im/status-go/protocol/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 )
 
@@ -13,7 +13,7 @@ func NewGethMailServerResponseWrapper(mailServerResponse *whisper.MailServerResp
 	}
 
 	return &whispertypes.MailServerResponse{
-		LastEnvelopeHash: statusproto.Hash(mailServerResponse.LastEnvelopeHash),
+		LastEnvelopeHash: protocol.Hash(mailServerResponse.LastEnvelopeHash),
 		Cursor:           mailServerResponse.Cursor,
 		Error:            mailServerResponse.Error,
 	}

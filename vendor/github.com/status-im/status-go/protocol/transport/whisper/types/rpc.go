@@ -3,7 +3,7 @@ package whispertypes
 import (
 	"context"
 
-	statusproto "github.com/status-im/status-go/protocol/types"
+	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 // NewMessage represents a new whisper message that is posted through the RPC.
@@ -48,7 +48,7 @@ type Criteria struct {
 // use publicly without security implications.
 type PublicWhisperAPI interface {
 	// AddPrivateKey imports the given private key.
-	AddPrivateKey(ctx context.Context, privateKey statusproto.HexBytes) (string, error)
+	AddPrivateKey(ctx context.Context, privateKey protocol.HexBytes) (string, error)
 	// GenerateSymKeyFromPassword derives a key from the given password, stores it, and returns its ID.
 	GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error)
 	// DeleteKeyPair removes the key with the given key if it exists.
