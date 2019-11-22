@@ -2,7 +2,7 @@ module github.com/status-im/status-go/extkeys
 
 go 1.13
 
-replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.5
+replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.6
 
 require (
 	github.com/btcsuite/btcd v0.20.1-beta
