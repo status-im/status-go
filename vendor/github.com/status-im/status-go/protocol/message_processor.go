@@ -6,15 +6,15 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
@@ -256,14 +256,14 @@ func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data [
 
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.
 func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, error) {
-	var newMessage *whispertypes.NewMessage
+	var newMessage *types.NewMessage
 
 	wrappedMessage, err := p.tryWrapMessageV1(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	newMessage = &whispertypes.NewMessage{
+	newMessage = &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   wrappedMessage,
 		PowTarget: whisperPoW,
@@ -285,7 +285,7 @@ func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, d
 // Process processes received Whisper messages through all the layers
 // and returns decoded user messages.
 // It also handled all non-user messages like PairMessage.
-func (p *messageProcessor) Process(shhMessage *whispertypes.Message) ([]*v1protocol.Message, error) {
+func (p *messageProcessor) Process(shhMessage *types.Message) ([]*v1protocol.Message, error) {
 	logger := p.logger.With(zap.String("site", "Process"))
 
 	var decodedMessages []*v1protocol.Message
@@ -361,7 +361,7 @@ func (p *messageProcessor) processPairMessage(m v1protocol.PairMessage) error {
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (p *messageProcessor) handleMessages(shhMessage *whispertypes.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
+func (p *messageProcessor) handleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
 	logger := p.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.Binary("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
@@ -506,7 +506,7 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec) ([]byte, *whispertypes.NewMessage, error) {
+func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec) ([]byte, *types.NewMessage, error) {
 	newMessage, err := messageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, nil, err
@@ -537,15 +537,15 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 	return hash, newMessage, nil
 }
 
-func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*whispertypes.NewMessage, error) {
-	var newMessage *whispertypes.NewMessage
+func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
+	var newMessage *types.NewMessage
 
 	payload, err := proto.Marshal(spec.Message)
 	if err != nil {
 		return newMessage, err
 	}
 
-	newMessage = &whispertypes.NewMessage{
+	newMessage = &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
 		PowTarget: whisperPoW,

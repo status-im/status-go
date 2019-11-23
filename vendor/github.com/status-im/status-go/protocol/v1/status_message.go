@@ -4,15 +4,14 @@ import (
 	"crypto/ecdsa"
 	"log"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/applicationmetadata"
 	"github.com/status-im/status-go/protocol/datasync"
 	"github.com/status-im/status-go/protocol/encryption"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 type StatusMessageT int
@@ -26,7 +25,7 @@ const (
 // StatusMessage is any Status Protocol message.
 type StatusMessage struct {
 	// TransportMessage is the parsed message received from the transport layer, i.e the input
-	TransportMessage *whispertypes.Message
+	TransportMessage *types.Message
 	// MessageType is the type of application message contained
 	MessageType StatusMessageT
 	// ParsedMessage is the parsed message by the application layer, i.e the output
@@ -38,7 +37,7 @@ type StatusMessage struct {
 	DecryptedPayload []byte
 
 	// ID is the canonical ID of the message
-	ID protocol.HexBytes
+	ID types.HexBytes
 	// Hash is the transport layer hash
 	Hash []byte
 
@@ -49,22 +48,22 @@ type StatusMessage struct {
 }
 
 // SigPubKey returns the most important signature, from the application layer to transport
-func (s *StatusMessage) SigPubKey() *ecdsa.PublicKey {
-	if s.ApplicationMetadataLayerSigPubKey != nil {
-		return s.ApplicationMetadataLayerSigPubKey
+func (m *StatusMessage) SigPubKey() *ecdsa.PublicKey {
+	if m.ApplicationMetadataLayerSigPubKey != nil {
+		return m.ApplicationMetadataLayerSigPubKey
 	}
 
-	return s.TransportLayerSigPubKey
+	return m.TransportLayerSigPubKey
 }
 
-func (s *StatusMessage) Clone() (*StatusMessage, error) {
+func (m *StatusMessage) Clone() (*StatusMessage, error) {
 	copy := &StatusMessage{}
 
-	err := copier.Copy(&copy, s)
+	err := copier.Copy(&copy, m)
 	return copy, err
 }
 
-func (m *StatusMessage) HandleTransport(shhMessage *whispertypes.Message) error {
+func (m *StatusMessage) HandleTransport(shhMessage *types.Message) error {
 	publicKey, err := crypto.UnmarshalPubkey(shhMessage.Sig)
 	if err != nil {
 		return errors.Wrap(err, "failed to get signature")

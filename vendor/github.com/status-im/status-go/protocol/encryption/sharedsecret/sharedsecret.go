@@ -6,8 +6,8 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"go.uber.org/zap"
 )
 

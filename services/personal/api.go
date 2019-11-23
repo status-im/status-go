@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 )
@@ -52,20 +53,22 @@ func (api *PublicAPI) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // Recover is an implementation of `personal_ecRecover` or `web3.personal.ecRecover` API
-func (api *PublicAPI) Recover(rpcParams RecoverParams) (addr common.Address, err error) {
+func (api *PublicAPI) Recover(rpcParams RecoverParams) (addr types.Address, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.rpcTimeout)
 	defer cancel()
+	var gethAddr common.Address
 	err = api.rpcClient.CallContextIgnoringLocalHandlers(
 		ctx,
-		&addr,
+		&gethAddr,
 		params.PersonalRecoverMethodName,
 		rpcParams.Message, rpcParams.Signature)
+	addr = types.Address(gethAddr)
 
 	return
 }
 
 // Sign is an implementation of `personal_sign` or `web3.personal.sign` API
-func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result hexutil.Bytes, err error) {
+func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.SelectedExtKey) (result types.HexBytes, err error) {
 	if !strings.EqualFold(rpcParams.Address, verifiedAccount.Address.Hex()) {
 		err = ErrInvalidPersonalSignAccount
 		return
@@ -73,11 +76,13 @@ func (api *PublicAPI) Sign(rpcParams SignParams, verifiedAccount *account.Select
 
 	ctx, cancel := context.WithTimeout(context.Background(), api.rpcTimeout)
 	defer cancel()
+	var gethResult hexutil.Bytes
 	err = api.rpcClient.CallContextIgnoringLocalHandlers(
 		ctx,
-		&result,
+		&gethResult,
 		params.PersonalSignMethodName,
 		rpcParams.Data, rpcParams.Address, rpcParams.Password)
+	result = types.HexBytes(gethResult)
 
 	return
 }

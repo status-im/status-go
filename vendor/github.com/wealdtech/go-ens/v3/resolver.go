@@ -97,7 +97,7 @@ func PublicResolverAddress(backend bind.ContractBackend) (common.Address, error)
 	return Resolve(backend, "resolver.eth")
 }
 
-// Address returns the address of the domain
+// Address returns the Ethereum address of the domain
 func (r *Resolver) Address() (common.Address, error) {
 	nameHash, err := NameHash(r.domain)
 	if err != nil {
@@ -106,13 +106,33 @@ func (r *Resolver) Address() (common.Address, error) {
 	return r.Contract.Addr(nil, nameHash)
 }
 
-// SetAddress sets the address of the domain
+// SetAddress sets the Ethereum address of the domain
 func (r *Resolver) SetAddress(opts *bind.TransactOpts, address common.Address) (*types.Transaction, error) {
 	nameHash, err := NameHash(r.domain)
 	if err != nil {
 		return nil, err
 	}
 	return r.Contract.SetAddr(opts, nameHash, address)
+}
+
+// MultiAddress returns the address of the domain for a given coin type.
+// The coin type is as per https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+func (r *Resolver) MultiAddress(coinType uint64) ([]byte, error) {
+	nameHash, err := NameHash(r.domain)
+	if err != nil {
+		return nil, err
+	}
+	return r.Contract.Addr0(nil, nameHash, big.NewInt(int64(coinType)))
+}
+
+// SetMultiAddress sets the iaddress of the domain for a given coin type.
+// The coin type is as per https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+func (r *Resolver) SetMultiAddress(opts *bind.TransactOpts, coinType uint64, address []byte) (*types.Transaction, error) {
+	nameHash, err := NameHash(r.domain)
+	if err != nil {
+		return nil, err
+	}
+	return r.Contract.SetAddr0(opts, nameHash, big.NewInt(int64(coinType)), address)
 }
 
 // PubKey returns the public key of the domain
@@ -227,24 +247,6 @@ func (r *Resolver) Text(name string) (string, error) {
 	}
 	return r.Contract.Text(nil, nameHash, name)
 }
-
-//// SetData sets the text associated with a name
-//func (r *Resolver) SetData(opts *bind.TransactOpts, name string, value []byte) (*types.Transaction, error) {
-//	nameHash, err := NameHash(r.domain)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return r.Contract.SetData(opts, nameHash, name, value)
-//}
-//
-//// Data obtains the text associated with a name
-//func (r *Resolver) Data(name string) ([]byte, error) {
-//	nameHash, err := NameHash(r.domain)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return r.Contract.Data(nil, nameHash, name)
-//}
 
 // SetABI sets the ABI associated with a name
 func (r *Resolver) SetABI(opts *bind.TransactOpts, name string, abi string, contentType *big.Int) (*types.Transaction, error) {

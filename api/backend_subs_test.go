@@ -23,7 +23,7 @@ const (
 
 func TestSubscriptionEthWithParamsDict(t *testing.T) {
 	// a simple test to check the parameter parsing for eth_* filter subscriptions
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	// initNodeAndLogin can fail and terminate the test, in that case stopNode must be executed anyway.
 	defer func() {
 		err := backend.StopNode()
@@ -44,7 +44,7 @@ func TestSubscriptionEthWithParamsDict(t *testing.T) {
 }
 
 func TestSubscriptionPendingTransaction(t *testing.T) {
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	backend.allowAllRPC = true
 	defer func() {
 		err := backend.StopNode()
@@ -97,7 +97,7 @@ func TestSubscriptionPendingTransaction(t *testing.T) {
 }
 
 func TestSubscriptionWhisperEnvelopes(t *testing.T) {
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	defer func() {
 		err := backend.StopNode()
 		if err != node.ErrNoRunningNode {
@@ -216,7 +216,7 @@ func extractResult(t *testing.T, jsonString string) string {
 	return value.(string)
 }
 
-func createSubscription(t *testing.T, backend *StatusBackend, params string) string {
+func createSubscription(t *testing.T, backend StatusBackend, params string) string {
 	createSubFmt := `
 	{
 		"jsonrpc": "2.0",
@@ -232,7 +232,7 @@ func createSubscription(t *testing.T, backend *StatusBackend, params string) str
 	return extractResult(t, jsonResponse)
 }
 
-func initNodeAndLogin(t *testing.T, backend *StatusBackend) (string, string) {
+func initNodeAndLogin(t *testing.T, backend *GethStatusBackend) (string, string) {
 	utils.Init()
 
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)

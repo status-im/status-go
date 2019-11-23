@@ -2,7 +2,7 @@ package datasync
 
 import (
 	"crypto/ecdsa"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/vacp2p/mvds/state"
 )
 

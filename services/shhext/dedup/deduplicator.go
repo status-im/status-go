@@ -3,8 +3,7 @@ package dedup
 import (
 	"github.com/ethereum/go-ethereum/log"
 
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 	v1 "github.com/status-im/status-go/protocol/v1"
 
 	"github.com/syndtr/goleveldb/leveldb"
@@ -23,24 +22,24 @@ type Deduplicator struct {
 }
 
 type Author struct {
-	PublicKey protocol.HexBytes `json:"publicKey"`
-	Alias     string            `json:"alias"`
-	Identicon string            `json:"identicon"`
+	PublicKey types.HexBytes `json:"publicKey"`
+	Alias     string         `json:"alias"`
+	Identicon string         `json:"identicon"`
 }
 
 type Metadata struct {
-	DedupID      []byte            `json:"dedupId"`
-	EncryptionID protocol.HexBytes `json:"encryptionId"`
-	MessageID    protocol.HexBytes `json:"messageId"`
-	Author       Author            `json:"author"`
+	DedupID      []byte         `json:"dedupId"`
+	EncryptionID types.HexBytes `json:"encryptionId"`
+	MessageID    types.HexBytes `json:"messageId"`
+	Author       Author         `json:"author"`
 }
 
 type DeduplicateMessage struct {
-	Message       *whispertypes.Message `json:"message"`
-	Metadata      Metadata              `json:"metadata"`
-	Payload       string                `json:"payload"`
-	MessageType   v1.StatusMessageT     `json:"messageType"`
-	ParsedMessage interface{}           `json:"parsedMessage"`
+	Message       *types.Message    `json:"message"`
+	Metadata      Metadata          `json:"metadata"`
+	Payload       string            `json:"payload"`
+	MessageType   v1.StatusMessageT `json:"messageType"`
+	ParsedMessage interface{}       `json:"parsedMessage"`
 }
 
 // NewDeduplicator creates a new deduplicator

@@ -292,3 +292,23 @@ func (n *Name) ResolverAddress() (common.Address, error) {
 func (n *Name) SetResolverAddress(address common.Address, opts *bind.TransactOpts) (*types.Transaction, error) {
 	return n.registry.SetResolver(opts, n.Name, address)
 }
+
+// Address fetches the address of the name for a given coin type.
+// Coin types are defined at https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+func (n *Name) Address(coinType uint64) ([]byte, error) {
+	resolver, err := NewResolver(n.backend, n.Name)
+	if err != nil {
+		return nil, err
+	}
+	return resolver.MultiAddress(coinType)
+}
+
+// SetAddress sets the address of the name for a given coin type.
+// Coin types are defined at https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+func (n *Name) SetAddress(coinType uint64, address []byte, opts *bind.TransactOpts) (*types.Transaction, error) {
+	resolver, err := NewResolver(n.backend, n.Name)
+	if err != nil {
+		return nil, err
+	}
+	return resolver.SetMultiAddress(opts, coinType, address)
+}

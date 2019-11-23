@@ -11,19 +11,17 @@ import (
 	"math/big"
 	"net"
 	"sort"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"time"
-
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 )
 
 const (
@@ -62,7 +60,7 @@ type ServiceConfig struct {
 }
 
 type Service struct {
-	w               whispertypes.PublicWhisperAPI
+	w               types.PublicWhisperAPI
 	whisperKeyID    string
 	whisperSymKeyID string
 	whisperFilterID string
@@ -81,7 +79,7 @@ type Service struct {
 }
 
 // New returns a new incentivization Service
-func New(prv *ecdsa.PrivateKey, w whispertypes.PublicWhisperAPI, config *ServiceConfig, contract Contract) *Service {
+func New(prv *ecdsa.PrivateKey, w types.PublicWhisperAPI, config *ServiceConfig, contract Contract) *Service {
 	logger := log.New("package", "status-go/incentivisation/service")
 	return &Service{
 		w:            w,
@@ -301,9 +299,9 @@ func (s *Service) Start(server *p2p.Server) error {
 	}
 	s.whisperSymKeyID = whisperSymKeyID
 
-	criteria := whispertypes.Criteria{
+	criteria := types.Criteria{
 		SymKeyID: whisperSymKeyID,
-		Topics:   []whispertypes.TopicType{toWhisperTopic(defaultTopic)},
+		Topics:   []types.TopicType{toWhisperTopic(defaultTopic)},
 	}
 	filterID, err := s.w.NewMessageFilter(criteria)
 	if err != nil {
@@ -430,7 +428,7 @@ func (s *Service) addressString() string {
 }
 
 // postPing publishes a whisper message
-func (s *Service) postPing() (hexutil.Bytes, error) {
+func (s *Service) postPing() (types.HexBytes, error) {
 	msg := statustransp.DefaultWhisperMessage()
 
 	msg.Topic = toWhisperTopic(defaultTopic)
@@ -478,8 +476,8 @@ func ip2Long(ip string) (uint32, error) {
 	return long, nil
 }
 
-func toWhisperTopic(s string) whispertypes.TopicType {
-	return whispertypes.BytesToTopic(crypto.Keccak256([]byte(s)))
+func toWhisperTopic(s string) types.TopicType {
+	return types.BytesToTopic(crypto.Keccak256([]byte(s)))
 }
 
 func int2ip(nn uint32) net.IP {

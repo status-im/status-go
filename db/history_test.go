@@ -4,8 +4,7 @@ import (
 	"testing"
 	"time"
 
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +13,7 @@ func TestTopicHistoryStoreLoadFromKey(t *testing.T) {
 	require.NoError(t, err)
 	th := TopicHistory{
 		db:       db,
-		Topic:    whispertypes.TopicType{1, 1, 1},
+		Topic:    types.TopicType{1, 1, 1},
 		Duration: 10 * time.Hour,
 	}
 	require.NoError(t, th.Save())
@@ -71,7 +70,7 @@ func TestTopicHistorySameRange(t *testing.T) {
 }
 
 func TestAddHistory(t *testing.T) {
-	topic := whispertypes.TopicType{1, 1, 1}
+	topic := types.TopicType{1, 1, 1}
 	now := time.Now()
 
 	topicdb, err := NewMemoryDBNamespace(TopicHistoryBucket)
@@ -80,7 +79,7 @@ func TestAddHistory(t *testing.T) {
 	require.NoError(t, err)
 
 	th := TopicHistory{db: topicdb, Topic: topic, Current: now}
-	id := protocol.Hash{1}
+	id := types.Hash{1}
 
 	req := HistoryRequest{requestDB: requestdb, topicDB: topicdb, ID: id}
 	req.AddHistory(th)
@@ -94,8 +93,8 @@ func TestAddHistory(t *testing.T) {
 }
 
 func TestRequestIncludesMethod(t *testing.T) {
-	topicOne := whispertypes.TopicType{1}
-	topicTwo := whispertypes.TopicType{2}
+	topicOne := types.TopicType{1}
+	topicTwo := types.TopicType{2}
 	testCases := []struct {
 		description string
 		result      bool

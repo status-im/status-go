@@ -2,7 +2,7 @@ package account
 
 import (
 	"github.com/ethereum/go-ethereum/crypto"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 func CreateAddress() (address, pubKey, privKey string, err error) {
@@ -15,8 +15,8 @@ func CreateAddress() (address, pubKey, privKey string, err error) {
 	pubKeyBytes := crypto.FromECDSAPub(&key.PublicKey)
 	addressBytes := crypto.PubkeyToAddress(key.PublicKey)
 
-	privKey = protocol.EncodeHex(privKeyBytes)
-	pubKey = protocol.EncodeHex(pubKeyBytes)
+	privKey = types.EncodeHex(privKeyBytes)
+	pubKey = types.EncodeHex(pubKeyBytes)
 	address = addressBytes.Hex()
 
 	return

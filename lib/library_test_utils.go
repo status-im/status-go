@@ -25,13 +25,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/status-im/status-go/signal"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
@@ -44,7 +43,7 @@ const initJS = `
 	};`
 
 var (
-	zeroHash       = gethcommon.Hash{}
+	zeroHash       = common.Hash{}
 	testChainDir   string
 	keystoreDir    string
 	nodeConfigJSON string
@@ -62,7 +61,7 @@ func buildSubAccountData(chatAddress string) *C.char {
 		{
 			Wallet:  true,
 			Chat:    true,
-			Address: gethcommon.HexToAddress(chatAddress),
+			Address: common.HexToAddress(chatAddress),
 		},
 	}
 	data, _ := json.Marshal(accs)
@@ -71,9 +70,9 @@ func buildSubAccountData(chatAddress string) *C.char {
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
 	return account.LoginParams{
-		ChatAddress: gethcommon.HexToAddress(chatAddress),
+		ChatAddress: common.HexToAddress(chatAddress),
 		Password:    password,
-		MainAccount: gethcommon.HexToAddress(mainAccountAddress),
+		MainAccount: common.HexToAddress(mainAccountAddress),
 	}
 }
 
@@ -461,7 +460,7 @@ func testLoginWithKeycard(t *testing.T, feed *event.Feed) bool { //nolint: gocyc
 		t.Errorf("whisper service not running: %v", err)
 	}
 
-	chatPubKeyHex := protocol.EncodeHex(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
+	chatPubKeyHex := types.EncodeHex(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
 	if whisperService.HasKeyPair(chatPubKeyHex) {
 		t.Error("identity already present in whisper")
 		return false
@@ -556,8 +555,8 @@ func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 		t.Errorf("failed to send transaction: %v", result.Error)
 		return false
 	}
-	hash := gethcommon.BytesToHash(result.Result)
-	if reflect.DeepEqual(hash, gethcommon.Hash{}) {
+	hash := common.BytesToHash(result.Result)
+	if reflect.DeepEqual(hash, common.Hash{}) {
 		t.Errorf("response hash empty: %s", hash.Hex())
 		return false
 	}

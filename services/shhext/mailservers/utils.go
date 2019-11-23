@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // GetFirstConnected returns first connected peer that is also added to a peer store.
@@ -12,7 +12,7 @@ import (
 func GetFirstConnected(provider PeersProvider, store *PeerStore) (*enode.Node, error) {
 	peers := provider.Peers()
 	for _, p := range peers {
-		if store.Exist(whispertypes.EnodeID(p.ID())) {
+		if store.Exist(types.EnodeID(p.ID())) {
 			return p.Node(), nil
 		}
 	}

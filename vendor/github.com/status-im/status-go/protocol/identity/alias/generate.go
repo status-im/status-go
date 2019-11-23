@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 const poly uint64 = 0xB8

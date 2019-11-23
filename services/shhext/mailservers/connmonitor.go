@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.
@@ -33,7 +33,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.quit = make(chan struct{})
 	mon.wg.Add(1)
 	go func() {
-		events := make(chan whispertypes.EnvelopeEvent, whisperEventsBuffer)
+		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
 		sub := mon.whisper.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()
 		defer mon.wg.Done()
@@ -49,7 +49,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 				if node == nil {
 					continue
 				}
-				if ev.Event == whispertypes.EventMailServerRequestCompleted {
+				if ev.Event == types.EventMailServerRequestCompleted {
 					err := mon.updateRecord(ev.Peer)
 					if err != nil {
 						log.Error("unable to update storage", "peer", ev.Peer, "error", err)
@@ -60,7 +60,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	}()
 }
 
-func (mon *LastUsedConnectionMonitor) updateRecord(nodeID whispertypes.EnodeID) error {
+func (mon *LastUsedConnectionMonitor) updateRecord(nodeID types.EnodeID) error {
 	node := mon.ps.Get(nodeID)
 	if node == nil {
 		return nil

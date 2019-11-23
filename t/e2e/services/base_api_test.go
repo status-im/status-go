@@ -68,7 +68,7 @@ func (s *BaseJSONRPCSuite) isMethodExported(method string, private bool) bool {
 }
 
 func (s *BaseJSONRPCSuite) SetupTest(upstreamEnabled, statusServiceEnabled, debugAPIEnabled bool) error {
-	s.Backend = api.NewStatusBackend()
+	s.Backend = api.NewGethStatusBackend()
 	s.NotNil(s.Backend)
 
 	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())

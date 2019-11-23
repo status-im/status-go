@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
-	statusproto "github.com/status-im/status-go/protocol/types"
 )
 
 type account struct {
@@ -15,7 +15,7 @@ type account struct {
 }
 
 func (a *account) toAccountInfo() AccountInfo {
-	publicKeyHex := statusproto.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
+	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
 	return AccountInfo{
@@ -27,7 +27,7 @@ func (a *account) toAccountInfo() AccountInfo {
 func (a *account) toIdentifiedAccountInfo(id string) IdentifiedAccountInfo {
 	info := a.toAccountInfo()
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
-	keyUIDHex := statusproto.EncodeHex(keyUID[:])
+	keyUIDHex := types.EncodeHex(keyUID[:])
 	return IdentifiedAccountInfo{
 		AccountInfo: info,
 		ID:          id,

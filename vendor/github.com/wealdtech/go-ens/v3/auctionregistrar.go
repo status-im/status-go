@@ -69,7 +69,13 @@ func NewAuctionRegistrarAt(backend bind.ContractBackend, domain string, address 
 // State returns the state of a nam
 func (r *AuctionRegistrar) State(name string) (string, error) {
 	entry, err := r.Entry(name)
-	return entry.State, err
+	if err != nil {
+		return "", err
+	}
+	if entry == nil {
+		return "", fmt.Errorf("no entry for %s", name)
+	}
+	return entry.State, nil
 }
 
 // Entry obtains a registrar entry for a name

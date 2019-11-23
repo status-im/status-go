@@ -14,8 +14,11 @@ replace github.com/status-im/status-go/protocol => ./protocol
 
 replace github.com/status-im/status-go/extkeys => ./extkeys
 
+replace github.com/status-im/status-go/eth-node => ./eth-node
+
 require (
 	github.com/beevik/ntp v0.2.0
+	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
@@ -33,7 +36,8 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-go/extkeys v0.0.0-00010101000000-000000000000
+	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a
+	github.com/status-im/status-go/extkeys v1.0.0
 	github.com/status-im/status-go/protocol v0.5.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/status-im/whisper v1.6.1
@@ -41,6 +45,8 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191119213627-4f8c1d86b1ba
+	golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3 // indirect
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

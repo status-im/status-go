@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -118,8 +117,8 @@ func testMessagesCount(t *testing.T, expected int, s *WMailServer) {
 func countMessages(t *testing.T, db DB) int {
 	var (
 		count      int
-		zero       protocol.Hash
-		emptyTopic whispertypes.TopicType
+		zero       types.Hash
+		emptyTopic types.TopicType
 	)
 
 	now := time.Now()

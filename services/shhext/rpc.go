@@ -1,19 +1,19 @@
-// TODO: These types should be defined using protobuf, but protoc can only emit []byte instead of hexutil.Bytes,
-// which causes issues when marshalong to JSON on the react side. Let's do that once the chat protocol is moved to the go repo.
+// TODO: These types should be defined using protobuf, but protoc can only emit []byte instead of types.HexBytes,
+// which causes issues when marshaling to JSON on the react side. Let's do that once the chat protocol is moved to the go repo.
 
 package shhext
 
 import (
 	"crypto/ecdsa"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // SendPublicMessageRPC represents the RPC payload for the SendPublicMessage RPC method
 type SendPublicMessageRPC struct {
 	Sig     string // TODO: remove
 	Chat    string
-	Payload hexutil.Bytes
+	Payload types.HexBytes
 }
 
 // TODO: implement with accordance to https://github.com/status-im/status-go/protocol/issues/28.
@@ -27,8 +27,8 @@ func (m SendPublicMessageRPC) PublicKey() *ecdsa.PublicKey { return nil }
 type SendDirectMessageRPC struct {
 	Sig     string // TODO: remove
 	Chat    string
-	Payload hexutil.Bytes
-	PubKey  hexutil.Bytes
+	Payload types.HexBytes
+	PubKey  types.HexBytes
 	DH      bool // TODO: make sure to remove safely
 }
 
@@ -44,8 +44,8 @@ func (m SendDirectMessageRPC) PublicKey() *ecdsa.PublicKey {
 
 type JoinRPC struct {
 	Chat    string
-	PubKey  hexutil.Bytes
-	Payload hexutil.Bytes
+	PubKey  types.HexBytes
+	Payload types.HexBytes
 }
 
 func (m JoinRPC) ID() string { return m.Chat }

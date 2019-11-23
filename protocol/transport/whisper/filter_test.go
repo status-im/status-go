@@ -8,12 +8,12 @@ import (
 	"os"
 	"testing"
 
-	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	_ "github.com/mutecomm/go-sqlcipher"
+	"github.com/status-im/status-go/eth-node/crypto"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"

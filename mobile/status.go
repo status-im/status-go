@@ -8,9 +8,9 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -24,7 +24,7 @@ import (
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
-var statusBackend = api.NewStatusBackend()
+var statusBackend = api.NewGethStatusBackend()
 
 // OpenAccounts opens database and returns accounts list.
 func OpenAccounts(datadir string) string {
@@ -535,7 +535,7 @@ func HashTransaction(txArgsJSON string) string {
 
 	result := struct {
 		Transaction transactions.SendTxArgs `json:"transaction"`
-		Hash        common.Hash             `json:"hash"`
+		Hash        types.Hash              `json:"hash"`
 	}{
 		Transaction: newTxArgs,
 		Hash:        hash,

@@ -702,9 +702,9 @@ func (d *groupChatParams) Encode() (string, error) {
 }
 
 // Start status node.
-func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, func()) {
+func (s *WhisperMailboxSuite) startBackend(name string) (*api.GethStatusBackend, func()) {
 	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
-	backend := api.NewStatusBackend()
+	backend := api.NewGethStatusBackend()
 	nodeConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	nodeConfig.DataDir = datadir
 	nodeConfig.KeyStoreDir = filepath.Join(datadir, "keystore")
@@ -734,14 +734,14 @@ func (s *WhisperMailboxSuite) startBackend(name string) (*api.StatusBackend, fun
 }
 
 // Start mailbox node.
-func (s *WhisperMailboxSuite) startMailboxBackend(name string) (*api.StatusBackend, func()) {
+func (s *WhisperMailboxSuite) startMailboxBackend(name string) (*api.GethStatusBackend, func()) {
 	return s.startMailboxBackendWithCallback(name, nil)
 }
 
 func (s *WhisperMailboxSuite) startMailboxBackendWithCallback(
 	name string,
 	callback func(*params.NodeConfig),
-) (*api.StatusBackend, func()) {
+) (*api.GethStatusBackend, func()) {
 	if name == "" {
 		name = "mailserver"
 	}
@@ -749,7 +749,7 @@ func (s *WhisperMailboxSuite) startMailboxBackendWithCallback(
 	mailboxConfig, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.Require().NoError(err)
 
-	mailboxBackend := api.NewStatusBackend()
+	mailboxBackend := api.NewGethStatusBackend()
 	s.Require().NoError(mailboxBackend.AccountManager().InitKeystore(mailboxConfig.KeyStoreDir))
 	datadir := filepath.Join(utils.RootDir, ".ethereumtest/mailbox", name)
 

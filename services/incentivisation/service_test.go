@@ -9,10 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -34,8 +33,8 @@ type Vote struct {
 }
 
 type MockWhisper struct {
-	sentMessages   []whispertypes.NewMessage
-	filterMessages []*whispertypes.Message
+	sentMessages   []types.NewMessage
+	filterMessages []*types.Message
 }
 
 func BuildMockContract() *MockContract {
@@ -48,12 +47,12 @@ func BuildMockContract() *MockContract {
 	return contract
 }
 
-func (c *MockContract) Vote(opts *bind.TransactOpts, joinNodes []gethcommon.Address, removeNodes []gethcommon.Address) (*types.Transaction, error) {
+func (c *MockContract) Vote(opts *bind.TransactOpts, joinNodes []gethcommon.Address, removeNodes []gethcommon.Address) (*gethtypes.Transaction, error) {
 
 	return nil, nil
 }
 
-func (c *MockContract) VoteSync(opts *bind.TransactOpts, joinNodes []gethcommon.Address, removeNodes []gethcommon.Address) (*types.Transaction, error) {
+func (c *MockContract) VoteSync(opts *bind.TransactOpts, joinNodes []gethcommon.Address, removeNodes []gethcommon.Address) (*gethtypes.Transaction, error) {
 	c.votes = append(c.votes, Vote{
 		joinNodes:   joinNodes,
 		removeNodes: removeNodes,
@@ -81,7 +80,7 @@ func (c *MockContract) Registered(opts *bind.CallOpts, publicKey []byte) (bool, 
 	return false, nil
 }
 
-func (c *MockContract) RegisterNode(opts *bind.TransactOpts, publicKey []byte, ip uint32, port uint16) (*types.Transaction, error) {
+func (c *MockContract) RegisterNode(opts *bind.TransactOpts, publicKey []byte, ip uint32, port uint16) (*gethtypes.Transaction, error) {
 	c.inactiveNodes = append(c.inactiveNodes, publicKey)
 	return nil, nil
 }
@@ -99,14 +98,14 @@ func (c *MockContract) GetInactiveNode(opts *bind.CallOpts, index *big.Int) ([]b
 	return c.inactiveNodes[index.Int64()], 0, 0, 0, 0, nil
 }
 
-func (w *MockWhisper) Post(ctx context.Context, req whispertypes.NewMessage) ([]byte, error) {
+func (w *MockWhisper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
 	w.sentMessages = append(w.sentMessages, req)
 	return nil, nil
 }
-func (w *MockWhisper) NewMessageFilter(req whispertypes.Criteria) (string, error) {
+func (w *MockWhisper) NewMessageFilter(req types.Criteria) (string, error) {
 	return "", nil
 }
-func (w *MockWhisper) AddPrivateKey(ctx context.Context, privateKey protocol.HexBytes) (string, error) {
+func (w *MockWhisper) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
 	return "", nil
 }
 func (w *MockWhisper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
@@ -115,7 +114,7 @@ func (w *MockWhisper) DeleteKeyPair(ctx context.Context, key string) (bool, erro
 func (w *MockWhisper) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
 	return "", nil
 }
-func (w *MockWhisper) GetFilterMessages(id string) ([]*whispertypes.Message, error) {
+func (w *MockWhisper) GetFilterMessages(id string) ([]*types.Message, error) {
 	return w.filterMessages, nil
 }
 
@@ -164,7 +163,7 @@ func (s *IncentivisationSuite) TestPerform() {
 
 	now := time.Now().Unix()
 	// Add some envelopes
-	s.mockWhisper.filterMessages = []*whispertypes.Message{
+	s.mockWhisper.filterMessages = []*types.Message{
 		{
 			// We strip the first byte when processing
 			Sig:       append(nodeOne, nodeOne[0]),

@@ -4,17 +4,17 @@ import (
 	"database/sql/driver"
 
 	"github.com/pkg/errors"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
-type hexutilSQL protocol.HexBytes
+type hexutilSQL types.HexBytes
 
 func (h hexutilSQL) Value() (driver.Value, error) {
 	return []byte(h), nil
 }
 
 func (h hexutilSQL) String() string {
-	return protocol.EncodeHex(h)
+	return types.EncodeHex(h)
 }
 
 func (h *hexutilSQL) Scan(value interface{}) error {
@@ -52,7 +52,7 @@ type Message struct {
 	Identicon string `json:"identicon"`
 	// To is a public key of the recipient unless it's a public message then it's empty.
 	To hexutilSQL `json:"to,omitempty"`
-	// BEGIN: fields from protocol.Message.
+	// BEGIN: fields from types.Message.
 	Content       string `json:"content"`
 	ContentType   string `json:"contentType"`
 	Timestamp     int64  `json:"timestamp"`

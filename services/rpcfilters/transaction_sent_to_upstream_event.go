@@ -4,22 +4,22 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // transactionSentToUpstreamEvent represents an event that one can subscribe to
 type transactionSentToUpstreamEvent struct {
 	sxMu     sync.Mutex
-	sx       map[int]chan common.Hash
-	listener chan common.Hash
+	sx       map[int]chan types.Hash
+	listener chan types.Hash
 	quit     chan struct{}
 }
 
 func newTransactionSentToUpstreamEvent() *transactionSentToUpstreamEvent {
 	return &transactionSentToUpstreamEvent{
-		sx:       make(map[int]chan common.Hash),
-		listener: make(chan common.Hash),
+		sx:       make(map[int]chan types.Hash),
+		listener: make(chan types.Hash),
 	}
 }
 
@@ -53,7 +53,7 @@ func (e *transactionSentToUpstreamEvent) numberOfSubscriptions() int {
 	return len(e.sx)
 }
 
-func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transactionHash common.Hash) {
+func (e *transactionSentToUpstreamEvent) processTransactionSentToUpstream(transactionHash types.Hash) {
 
 	e.sxMu.Lock()
 	defer e.sxMu.Unlock()
@@ -80,11 +80,11 @@ func (e *transactionSentToUpstreamEvent) Stop() {
 	}
 }
 
-func (e *transactionSentToUpstreamEvent) Subscribe() (int, chan common.Hash) {
+func (e *transactionSentToUpstreamEvent) Subscribe() (int, chan types.Hash) {
 	e.sxMu.Lock()
 	defer e.sxMu.Unlock()
 
-	channel := make(chan common.Hash, 512)
+	channel := make(chan types.Hash, 512)
 	id := len(e.sx)
 	e.sx[id] = channel
 	return id, channel
@@ -98,6 +98,6 @@ func (e *transactionSentToUpstreamEvent) Unsubscribe(id int) {
 }
 
 // Trigger gets called in order to trigger the event
-func (e *transactionSentToUpstreamEvent) Trigger(transactionHash common.Hash) {
+func (e *transactionSentToUpstreamEvent) Trigger(transactionHash types.Hash) {
 	e.listener <- transactionHash
 }
