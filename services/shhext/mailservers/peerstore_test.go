@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,11 +25,11 @@ func TestUpdateResetsInternalStorage(t *testing.T) {
 	r2, err := RandomNode()
 	require.NoError(t, err)
 	require.NoError(t, store.Update([]*enode.Node{r1, r2}))
-	require.True(t, store.Exist(whispertypes.EnodeID(r1.ID())))
-	require.True(t, store.Exist(whispertypes.EnodeID(r2.ID())))
+	require.True(t, store.Exist(types.EnodeID(r1.ID())))
+	require.True(t, store.Exist(types.EnodeID(r2.ID())))
 	require.NoError(t, store.Update([]*enode.Node{r2}))
-	require.False(t, store.Exist(whispertypes.EnodeID(r1.ID())))
-	require.True(t, store.Exist(whispertypes.EnodeID(r2.ID())))
+	require.False(t, store.Exist(types.EnodeID(r1.ID())))
+	require.True(t, store.Exist(types.EnodeID(r2.ID())))
 }
 
 func TestGetNodeByID(t *testing.T) {
@@ -37,8 +37,8 @@ func TestGetNodeByID(t *testing.T) {
 	r1, err := RandomNode()
 	require.NoError(t, err)
 	require.NoError(t, store.Update([]*enode.Node{r1}))
-	require.Equal(t, r1, store.Get(whispertypes.EnodeID(r1.ID())))
-	require.Nil(t, store.Get(whispertypes.EnodeID{1}))
+	require.Equal(t, r1, store.Get(types.EnodeID(r1.ID())))
+	require.Nil(t, store.Get(types.EnodeID{1}))
 }
 
 type fakePeerProvider struct {

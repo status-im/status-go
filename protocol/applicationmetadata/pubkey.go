@@ -2,7 +2,7 @@ package applicationmetadata
 
 import (
 	"crypto/ecdsa"
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 func (m *Message) RecoverKey() (*ecdsa.PublicKey, error) {

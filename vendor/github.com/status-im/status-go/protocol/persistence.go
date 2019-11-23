@@ -8,8 +8,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+	"github.com/status-im/status-go/eth-node/crypto"
 
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )

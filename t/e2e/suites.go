@@ -66,16 +66,16 @@ func (s *StatusNodeTestSuite) StopTestNode() {
 	s.False(s.StatusNode.IsRunning())
 }
 
-// BackendTestSuite is a test suite with api.StatusBackend initialized
+// BackendTestSuite is a test suite with api.GethStatusBackend initialized
 // and a few utility methods to start and stop node or get various services.
 type BackendTestSuite struct {
 	suite.Suite
-	Backend *api.StatusBackend
+	Backend *api.GethStatusBackend
 }
 
 // SetupTest initializes Backend.
 func (s *BackendTestSuite) SetupTest() {
-	s.Backend = api.NewStatusBackend()
+	s.Backend = api.NewGethStatusBackend()
 	s.NotNil(s.Backend)
 }
 

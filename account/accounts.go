@@ -13,13 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
-	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 // errors
@@ -158,7 +157,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	var err error
 	var foundKeyFile []byte
 
-	addressObj := gethcommon.BytesToAddress(gethcommon.FromHex(address))
+	addressObj := common.BytesToAddress(common.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
 		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
 			return nil
@@ -176,7 +175,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 			return fmt.Errorf("failed to read key file: %s", e)
 		}
 
-		if gethcommon.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
+		if common.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
 			foundKeyFile = rawKeyFile
 		}
 
@@ -325,7 +324,7 @@ func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password 
 		return address, "", err
 	}
 
-	pubKey = protocol.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = types.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
@@ -349,17 +348,17 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 	if err != nil {
 		return address, "", err
 	}
-	pubKey = protocol.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
+	pubKey = types.EncodeHex(crypto.FromECDSAPub(&key.PrivateKey.PublicKey))
 
 	return
 }
 
 // Accounts returns list of addresses for selected account, including
 // subaccounts.
-func (m *Manager) Accounts() ([]gethcommon.Address, error) {
+func (m *Manager) Accounts() ([]common.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	addresses := make([]gethcommon.Address, 0)
+	addresses := make([]common.Address, 0)
 	if m.mainAccountAddress != zeroAddress {
 		addresses = append(addresses, m.mainAccountAddress)
 	}

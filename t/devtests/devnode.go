@@ -30,7 +30,7 @@ type DevNodeSuite struct {
 	DevAccountAddress common.Address
 
 	dir     string
-	backend *api.StatusBackend
+	backend *api.GethStatusBackend
 	miner   *node.Node
 }
 
@@ -56,7 +56,7 @@ func (s *DevNodeSuite) SetupTest() {
 	config.UpstreamConfig.Enabled = true
 	config.WalletConfig.Enabled = true
 	config.UpstreamConfig.URL = s.miner.IPCEndpoint()
-	s.backend = api.NewStatusBackend()
+	s.backend = api.NewGethStatusBackend()
 	s.Require().NoError(s.backend.AccountManager().InitKeystore(config.KeyStoreDir))
 	_, err = s.backend.AccountManager().ImportAccount(s.DevAccount, "test")
 	s.Require().NoError(err)

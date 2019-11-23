@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -23,15 +22,16 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
-	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
 	"github.com/status-im/status-go/services/incentivisation"
+	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
-	"github.com/status-im/status-go/services/whisperbridge"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	whisper "github.com/status-im/whisper/whisperv6"
@@ -272,7 +272,7 @@ func activateStatusService(stack *node.Node, config *params.NodeConfig) error {
 	}
 
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var service *whisperbridge.WhisperService
+		var service *nodebridge.WhisperService
 		if err := ctx.Service(&service); err != nil {
 			return nil, err
 		}
@@ -316,13 +316,25 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		return
 	}
 
-	// Register Whisper status-go/protocol bridge
+	// Register eth-node node bridge
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var whisper *whisper.Whisper
-		if err := ctx.Service(&whisper); err != nil {
+		return &nodebridge.NodeService{Node: gethbridge.NewNodeBridge(stack)}, nil
+	})
+	if err != nil {
+		return
+	}
+
+	// Register Whisper eth-node bridge
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
 			return nil, err
 		}
-		return &whisperbridge.WhisperService{Whisper: gethbridge.NewGethWhisperWrapper(whisper)}, nil
+		w, err := ethnode.Node.GetWhisper(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &nodebridge.WhisperService{Whisper: w}, nil
 	})
 	if err != nil {
 		return
@@ -330,11 +342,11 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var service *whisperbridge.WhisperService
-		if err := ctx.Service(&service); err != nil {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
 			return nil, err
 		}
-		return shhext.New(service.Whisper, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+		return shhext.New(ethnode.Node, ctx, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
 	})
 }
 
@@ -398,7 +410,7 @@ func activateIncentivisationService(stack *node.Node, config *params.NodeConfig)
 	logger.Info("activating incentivisation")
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var w *whisperbridge.WhisperService
+		var w *nodebridge.WhisperService
 		if err := ctx.Service(&w); err != nil {
 			return nil, err
 		}

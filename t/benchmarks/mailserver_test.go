@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/node"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/shhext"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/require"
@@ -43,8 +44,6 @@ func testMailserverPeer(t *testing.T) {
 		BackupDisabledDataDir: os.TempDir(),
 		InstallationID:        "1",
 	}
-	mailService := shhext.New(gethbridge.NewGethWhisperWrapper(shhService), nil, nil, config)
-	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// create node with services
 	n, err := createNode()
@@ -53,11 +52,32 @@ func testMailserverPeer(t *testing.T) {
 		return shhService, nil
 	})
 	require.NoError(t, err)
+	// Register status-eth-node node bridge
+	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return &nodebridge.NodeService{Node: gethbridge.NewNodeBridge(n)}, nil
+	})
+	require.NoError(t, err)
+	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		w, err := ethnode.Node.GetWhisper(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &nodebridge.WhisperService{Whisper: w}, nil
+	})
+	require.NoError(t, err)
 	// register mail service as well
-	err = n.Register(func(_ *node.ServiceContext) (node.Service, error) {
+	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		mailService := shhext.New(gethbridge.NewNodeBridge(n), ctx, nil, nil, config)
 		return mailService, nil
 	})
 	require.NoError(t, err)
+	var mailService *shhext.Service
+	require.NoError(t, n.Service(&mailService))
+	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// start node
 	require.NoError(t, n.Start())
@@ -90,7 +110,7 @@ func testMailserverPeer(t *testing.T) {
 	requestID, err := shhextAPI.RequestMessages(context.TODO(), shhext.MessagesRequest{
 		MailServerPeer: *peerURL,
 		SymKeyID:       symKeyID,
-		Topic:          whispertypes.TopicType(topic),
+		Topic:          types.TopicType(topic),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, requestID)

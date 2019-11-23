@@ -9,8 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,13 +17,13 @@ import (
 
 type fakePeerEvents struct {
 	mu    sync.Mutex
-	nodes map[whispertypes.EnodeID]struct{}
+	nodes map[types.EnodeID]struct{}
 	input chan *p2p.PeerEvent
 }
 
-func (f *fakePeerEvents) Nodes() []whispertypes.EnodeID {
+func (f *fakePeerEvents) Nodes() []types.EnodeID {
 	f.mu.Lock()
-	rst := make([]whispertypes.EnodeID, 0, len(f.nodes))
+	rst := make([]types.EnodeID, 0, len(f.nodes))
 	for n := range f.nodes {
 		rst = append(rst, n)
 	}
@@ -34,7 +33,7 @@ func (f *fakePeerEvents) Nodes() []whispertypes.EnodeID {
 
 func (f *fakePeerEvents) AddPeer(node *enode.Node) {
 	f.mu.Lock()
-	f.nodes[whispertypes.EnodeID(node.ID())] = struct{}{}
+	f.nodes[types.EnodeID(node.ID())] = struct{}{}
 	f.mu.Unlock()
 	if f.input == nil {
 		return
@@ -47,7 +46,7 @@ func (f *fakePeerEvents) AddPeer(node *enode.Node) {
 
 func (f *fakePeerEvents) RemovePeer(node *enode.Node) {
 	f.mu.Lock()
-	delete(f.nodes, whispertypes.EnodeID(node.ID()))
+	delete(f.nodes, types.EnodeID(node.ID()))
 	f.mu.Unlock()
 	if f.input == nil {
 		return
@@ -59,7 +58,7 @@ func (f *fakePeerEvents) RemovePeer(node *enode.Node) {
 }
 
 func newFakePeerAdderRemover() *fakePeerEvents {
-	return &fakePeerEvents{nodes: map[whispertypes.EnodeID]struct{}{}}
+	return &fakePeerEvents{nodes: map[types.EnodeID]struct{}{}}
 }
 
 func (f *fakePeerEvents) SubscribeEvents(output chan *p2p.PeerEvent) event.Subscription {
@@ -83,10 +82,10 @@ func newFakeServer() *fakePeerEvents {
 }
 
 type fakeEnvelopeEvents struct {
-	input chan whispertypes.EnvelopeEvent
+	input chan types.EnvelopeEvent
 }
 
-func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whispertypes.EnvelopeEvent) whispertypes.Subscription {
+func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- types.EnvelopeEvent) types.Subscription {
 	return event.NewSubscription(func(quit <-chan struct{}) error {
 		for {
 			select {
@@ -102,7 +101,7 @@ func (f *fakeEnvelopeEvents) SubscribeEnvelopeEvents(output chan<- whispertypes.
 
 func newFakeEnvelopesEvents() *fakeEnvelopeEvents {
 	return &fakeEnvelopeEvents{
-		input: make(chan whispertypes.EnvelopeEvent),
+		input: make(chan types.EnvelopeEvent),
 	}
 }
 
@@ -114,13 +113,13 @@ func fillWithRandomNodes(t *testing.T, nodes []*enode.Node) {
 	}
 }
 
-func getMapWithRandomNodes(t *testing.T, n int) map[whispertypes.EnodeID]*enode.Node {
+func getMapWithRandomNodes(t *testing.T, n int) map[types.EnodeID]*enode.Node {
 	nodes := make([]*enode.Node, n)
 	fillWithRandomNodes(t, nodes)
 	return nodesToMap(nodes)
 }
 
-func mergeOldIntoNew(old, new map[whispertypes.EnodeID]*enode.Node) {
+func mergeOldIntoNew(old, new map[types.EnodeID]*enode.Node) {
 	for n := range old {
 		new[n] = old[n]
 	}
@@ -129,8 +128,8 @@ func mergeOldIntoNew(old, new map[whispertypes.EnodeID]*enode.Node) {
 func TestReplaceNodes(t *testing.T) {
 	type testCase struct {
 		description string
-		old         map[whispertypes.EnodeID]*enode.Node
-		new         map[whispertypes.EnodeID]*enode.Node
+		old         map[types.EnodeID]*enode.Node
+		new         map[types.EnodeID]*enode.Node
 		target      int
 	}
 	for _, tc := range []testCase{
@@ -183,7 +182,7 @@ func TestPartialReplaceNodesAboveTarget(t *testing.T) {
 	new := getMapWithRandomNodes(t, 2)
 	state := newInternalState(peers, 1, 0)
 	state.replaceNodes(old)
-	state.nodeAdded(whispertypes.EnodeID(initial.ID()))
+	state.nodeAdded(types.EnodeID(initial.ID()))
 	mergeOldIntoNew(old, new)
 	state.replaceNodes(new)
 	require.Len(t, peers.nodes, 1)
@@ -250,7 +249,7 @@ func TestConnectionManagerReplace(t *testing.T) {
 		if len(connected) != target {
 			return fmt.Errorf("unexpected number of connected servers: %d", len(connected))
 		}
-		if whispertypes.EnodeID(nodes[0].ID()) != connected[0] {
+		if types.EnodeID(nodes[0].ID()) != connected[0] {
 			return fmt.Errorf("connected with a wrong peer. expected %s, got %s", nodes[0].ID(), connected[0])
 		}
 		return nil
@@ -273,7 +272,7 @@ func TestConnectionManagerReplace(t *testing.T) {
 	}, time.Second, 100*time.Millisecond))
 }
 
-func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whisperMock *fakeEnvelopeEvents, target, maxFailures int, hash protocol.Hash) (*ConnectionManager, whispertypes.EnodeID) {
+func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whisperMock *fakeEnvelopeEvents, target, maxFailures int, hash types.Hash) (*ConnectionManager, types.EnodeID) {
 	connmanager := NewConnectionManager(server, whisperMock, target, maxFailures, 0)
 	connmanager.Start()
 	nodes := []*enode.Node{}
@@ -282,7 +281,7 @@ func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whispe
 	}
 	// Send two random nodes to connection manager.
 	connmanager.Notify(nodes)
-	var initial whispertypes.EnodeID
+	var initial types.EnodeID
 	// Wait until connection manager establishes connection with one node.
 	require.NoError(t, utils.Eventually(func() error {
 		nodes := server.Nodes()
@@ -294,8 +293,8 @@ func setupTestConnectionAfterExpiry(t *testing.T, server *fakePeerEvents, whispe
 	}, time.Second, 100*time.Millisecond))
 	// Send event that history request for connected peer was sent.
 	select {
-	case whisperMock.input <- whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestSent, Peer: initial, Hash: hash}:
+	case whisperMock.input <- types.EnvelopeEvent{
+		Event: types.EventMailServerRequestSent, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send a 'sent' event")
 	}
@@ -307,14 +306,14 @@ func TestConnectionChangedAfterExpiry(t *testing.T) {
 	whisperMock := newFakeEnvelopesEvents()
 	target := 1
 	maxFailures := 1
-	hash := protocol.Hash{1}
+	hash := types.Hash{1}
 	connmanager, initial := setupTestConnectionAfterExpiry(t, server, whisperMock, target, maxFailures, hash)
 	defer connmanager.Stop()
 
 	// And eventually expired.
 	select {
-	case whisperMock.input <- whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- types.EnvelopeEvent{
+		Event: types.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}
@@ -335,14 +334,14 @@ func TestConnectionChangedAfterSecondExpiry(t *testing.T) {
 	whisperMock := newFakeEnvelopesEvents()
 	target := 1
 	maxFailures := 2
-	hash := protocol.Hash{1}
+	hash := types.Hash{1}
 	connmanager, initial := setupTestConnectionAfterExpiry(t, server, whisperMock, target, maxFailures, hash)
 	defer connmanager.Stop()
 
 	// First expired is sent. Nothing should happen.
 	select {
-	case whisperMock.input <- whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- types.EnvelopeEvent{
+		Event: types.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}
@@ -361,8 +360,8 @@ func TestConnectionChangedAfterSecondExpiry(t *testing.T) {
 
 	// second expiry event
 	select {
-	case whisperMock.input <- whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
+	case whisperMock.input <- types.EnvelopeEvent{
+		Event: types.EventMailServerRequestExpired, Peer: initial, Hash: hash}:
 	case <-time.After(time.Second):
 		require.FailNow(t, "can't send an 'expiry' event")
 	}

@@ -3,7 +3,7 @@ github.com/BurntSushi/toml
 # github.com/allegro/bigcache v1.2.0
 github.com/allegro/bigcache
 github.com/allegro/bigcache/queue
-# github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7
+# github.com/aristanetworks/goarista v0.0.0-20190502180301-283422fc1708
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
 github.com/beevik/ntp
@@ -28,7 +28,7 @@ github.com/davecgh/go-spew/spew
 github.com/deckarep/golang-set
 # github.com/edsrzf/mmap-go v1.0.0
 github.com/edsrzf/mmap-go
-# github.com/elastic/gosigar v0.10.4
+# github.com/elastic/gosigar v0.10.5
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
 # github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.6
@@ -178,7 +178,7 @@ github.com/jbenet/goprocess/periodic
 github.com/jbenet/goprocess/ratelimit
 # github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 github.com/jinzhu/copier
-# github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356
+# github.com/karalabe/usb v0.0.0-20190819132248-550797b1cad8
 github.com/karalabe/usb
 # github.com/koron/go-ssdp v0.0.0-20180514024734-4a0ed625a78b
 github.com/koron/go-ssdp
@@ -369,13 +369,18 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-go/extkeys v0.0.0-00010101000000-000000000000 => ./extkeys
+# github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a => ./eth-node
+github.com/status-im/status-go/eth-node/bridge/geth
+github.com/status-im/status-go/eth-node/bridge/geth/ens
+github.com/status-im/status-go/eth-node/crypto
+github.com/status-im/status-go/eth-node/crypto/ecies
+github.com/status-im/status-go/eth-node/types
+github.com/status-im/status-go/eth-node/types/ens
+# github.com/status-im/status-go/extkeys v1.0.0 => ./extkeys
 github.com/status-im/status-go/extkeys
 # github.com/status-im/status-go/protocol v0.5.2 => ./protocol
 github.com/status-im/status-go/protocol
 github.com/status-im/status-go/protocol/applicationmetadata
-github.com/status-im/status-go/protocol/bridge/geth
-github.com/status-im/status-go/protocol/crypto
 github.com/status-im/status-go/protocol/datasync
 github.com/status-im/status-go/protocol/datasync/peer
 github.com/status-im/status-go/protocol/encryption
@@ -383,15 +388,12 @@ github.com/status-im/status-go/protocol/encryption/migrations
 github.com/status-im/status-go/protocol/encryption/multidevice
 github.com/status-im/status-go/protocol/encryption/publisher
 github.com/status-im/status-go/protocol/encryption/sharedsecret
-github.com/status-im/status-go/protocol/ens
 github.com/status-im/status-go/protocol/identity/alias
 github.com/status-im/status-go/protocol/identity/identicon
 github.com/status-im/status-go/protocol/migrations
 github.com/status-im/status-go/protocol/sqlite
 github.com/status-im/status-go/protocol/transport/whisper
 github.com/status-im/status-go/protocol/transport/whisper/migrations
-github.com/status-im/status-go/protocol/transport/whisper/types
-github.com/status-im/status-go/protocol/types
 github.com/status-im/status-go/protocol/v1
 github.com/status-im/status-go/protocol/zaputil
 # github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
@@ -436,7 +438,7 @@ github.com/vacp2p/mvds/state/migrations
 github.com/vacp2p/mvds/store
 github.com/vacp2p/mvds/store/migrations
 github.com/vacp2p/mvds/transport
-# github.com/wealdtech/go-ens/v3 v3.0.7
+# github.com/wealdtech/go-ens/v3 v3.0.9
 github.com/wealdtech/go-ens/v3
 github.com/wealdtech/go-ens/v3/contracts/auctionregistrar
 github.com/wealdtech/go-ens/v3/contracts/baseregistrar

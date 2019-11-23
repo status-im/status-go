@@ -5,10 +5,9 @@ import (
 	"database/sql"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	dr "github.com/status-im/doubleratchet"
+	"github.com/status-im/status-go/eth-node/crypto"
 
-	ecrypto "github.com/status-im/status-go/protocol/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
 
@@ -709,7 +708,7 @@ func (s *sqliteSessionStorage) Load(id []byte) (*dr.State, error) {
 		state.Step = step
 		state.KeysCount = keysCount
 
-		state.DHs = ecrypto.DHPair{
+		state.DHs = crypto.DHPair{
 			PrvKey: dhsPrivate,
 			PubKey: dhsPublic,
 		}

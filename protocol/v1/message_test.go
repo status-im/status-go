@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,7 +60,7 @@ func TestMessageID(t *testing.T) {
 	keyBytes := crypto.FromECDSAPub(&key.PublicKey)
 
 	data := []byte("test")
-	expectedID := protocol.HexBytes(crypto.Keccak256(append(keyBytes, data...)))
+	expectedID := types.HexBytes(crypto.Keccak256(append(keyBytes, data...)))
 	require.Equal(t, expectedID, MessageID(&key.PublicKey, data))
 }
 

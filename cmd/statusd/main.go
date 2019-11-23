@@ -125,7 +125,7 @@ func main() {
 		return
 	}
 
-	backend := api.NewStatusBackend()
+	backend := api.NewGethStatusBackend()
 	err = backend.AccountManager().InitKeystore(config.KeyStoreDir)
 	if err != nil {
 		logger.Error("Failed to init keystore", "error", err)

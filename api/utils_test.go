@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/t/utils"
@@ -13,7 +13,7 @@ import (
 )
 
 func TestHashMessage(t *testing.T) {
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))

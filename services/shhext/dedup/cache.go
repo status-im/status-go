@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/db"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 	"golang.org/x/crypto/sha3"
@@ -21,7 +21,7 @@ func newCache(db *leveldb.DB) *cache {
 	return &cache{db, time.Now}
 }
 
-func (d *cache) Has(filterID string, message *whispertypes.Message) (bool, error) {
+func (d *cache) Has(filterID string, message *types.Message) (bool, error) {
 	has, err := d.db.Has(d.KeyToday(filterID, message), nil)
 
 	if err != nil {
@@ -34,7 +34,7 @@ func (d *cache) Has(filterID string, message *whispertypes.Message) (bool, error
 	return d.db.Has(d.keyYesterday(filterID, message), nil)
 }
 
-func (d *cache) Put(filterID string, messages []*whispertypes.Message) error {
+func (d *cache) Put(filterID string, messages []*types.Message) error {
 	batch := leveldb.Batch{}
 
 	for _, msg := range messages {
@@ -89,11 +89,11 @@ func (d *cache) cleanOldEntries() error {
 	return d.db.Write(&batch, nil)
 }
 
-func (d *cache) keyYesterday(filterID string, message *whispertypes.Message) []byte {
+func (d *cache) keyYesterday(filterID string, message *types.Message) []byte {
 	return prefixedKey(d.yesterdayDateString(), filterID, message)
 }
 
-func (d *cache) KeyToday(filterID string, message *whispertypes.Message) []byte {
+func (d *cache) KeyToday(filterID string, message *types.Message) []byte {
 	return prefixedKey(d.todayDateString(), filterID, message)
 }
 
@@ -112,11 +112,11 @@ func dateString(t time.Time) string {
 	return t.Format("20060102")
 }
 
-func prefixedKey(date, filterID string, message *whispertypes.Message) []byte {
+func prefixedKey(date, filterID string, message *types.Message) []byte {
 	return db.Key(db.DeduplicatorCache, []byte(date), []byte(filterID), key(message))
 }
 
-func key(message *whispertypes.Message) []byte {
+func key(message *types.Message) []byte {
 	data := make([]byte, len(message.Payload)+len(message.Topic))
 	copy(data[:], message.Payload)
 	copy(data[len(message.Payload):], message.Topic[:])

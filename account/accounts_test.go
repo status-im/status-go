@@ -12,7 +12,6 @@ import (
 	"github.com/status-im/status-go/t/utils"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -33,7 +32,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount2PKFile()))
 
-	account1Address := gethcommon.BytesToAddress(gethcommon.FromHex(utils.TestConfig.Account1.WalletAddress))
+	account1Address := common.BytesToAddress(common.FromHex(utils.TestConfig.Account1.WalletAddress))
 
 	testCases := []struct {
 		name          string
@@ -87,7 +86,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 			if accountKey == nil {
 				require.Fail(t, "no error reported, but account key is missing")
 			}
-			accountAddress := gethcommon.BytesToAddress(gethcommon.FromHex(testCase.address))
+			accountAddress := common.BytesToAddress(common.FromHex(testCase.address))
 			if accountKey.Address != accountAddress {
 				require.Fail(t, "account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
@@ -109,7 +108,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 
 	accManager := NewManager()
 
-	address := gethcommon.HexToAddress(utils.TestConfig.Account3.WalletAddress)
+	address := common.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
 	require.NoError(t, err)
 }

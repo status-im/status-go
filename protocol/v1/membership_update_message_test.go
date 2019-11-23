@@ -6,8 +6,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	protocrypto "github.com/status-im/status-go/protocol/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -78,7 +77,7 @@ func TestSignMembershipUpdate(t *testing.T) {
 	update := testMembershipUpdateMessageStruct.Updates[0]
 	err = update.Sign(key)
 	require.NoError(t, err)
-	expected, err := protocrypto.SignStringAsHex(
+	expected, err := crypto.SignStringAsHex(
 		strings.Map(func(r rune) rune {
 			if unicode.IsSpace(r) {
 				return -1

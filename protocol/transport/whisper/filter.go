@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +26,7 @@ var (
 
 type whisperFilter struct {
 	FilterID string
-	Topic    whispertypes.TopicType
+	Topic    types.TopicType
 	SymKeyID string
 }
 
@@ -44,7 +44,7 @@ type Filter struct {
 	// It's encoded using encoding/hex.
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic whispertypes.TopicType `json:"topic"`
+	Topic types.TopicType `json:"topic"`
 	// Discovery is whether this is a discovery topic
 	Discovery bool `json:"discovery"`
 	// Negotiated tells us whether is a negotiated topic
@@ -58,7 +58,7 @@ func (c *Filter) IsPublic() bool {
 }
 
 type filtersManager struct {
-	whisper     whispertypes.Whisper
+	whisper     types.Whisper
 	persistence *sqlitePersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
@@ -71,7 +71,7 @@ type filtersManager struct {
 }
 
 // newFiltersManager returns a new filtersManager.
-func newFiltersManager(db *sql.DB, w whispertypes.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
+func newFiltersManager(db *sql.DB, w types.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -283,7 +283,7 @@ func (s *filtersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool
 }
 
 // LoadNegotiated loads a negotiated secret as a filter.
-func (s *filtersManager) LoadNegotiated(secret whispertypes.NegotiatedSecret) (*Filter, error) {
+func (s *filtersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -478,7 +478,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 		}
 	}
 
-	id, err := s.whisper.Subscribe(&whispertypes.SubscriptionOptions{
+	id, err := s.whisper.Subscribe(&types.SubscriptionOptions{
 		SymKeyID: symKeyID,
 		PoW:      minPow,
 		Topics:   topics,
@@ -490,7 +490,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 	return &whisperFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
-		Topic:    whispertypes.BytesToTopic(topic),
+		Topic:    types.BytesToTopic(topic),
 	}, nil
 }
 
@@ -514,7 +514,7 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 		return nil, err
 	}
 
-	id, err := s.whisper.Subscribe(&whispertypes.SubscriptionOptions{
+	id, err := s.whisper.Subscribe(&types.SubscriptionOptions{
 		PrivateKeyID: privateKeyID,
 		PoW:          pow,
 		Topics:       topics,
@@ -522,7 +522,7 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 	if err != nil {
 		return nil, err
 	}
-	return &whisperFilter{FilterID: id, Topic: whispertypes.BytesToTopic(topic)}, nil
+	return &whisperFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity
@@ -534,7 +534,7 @@ func (s *filtersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 }
 
 func toTopic(s string) []byte {
-	return crypto.Keccak256([]byte(s))[:whispertypes.TopicLength]
+	return crypto.Keccak256([]byte(s))[:types.TopicLength]
 }
 
 // ToTopic converts a string to a whisper topic.

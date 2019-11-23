@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
@@ -30,7 +30,7 @@ import (
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -65,7 +65,7 @@ func TestBackendStartNodeConcurrently(t *testing.T) {
 func TestBackendRestartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	count := 3
@@ -93,7 +93,7 @@ func TestBackendRestartNodeConcurrently(t *testing.T) {
 func TestBackendGettersConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -147,7 +147,7 @@ func TestBackendGettersConcurrently(t *testing.T) {
 func TestBackendAccountsConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -209,7 +209,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 func TestBackendInjectChatAccount(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -225,7 +225,7 @@ func TestBackendInjectChatAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	chatPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(chatPrivKey))
-	chatPubKeyHex := hexutil.Encode(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
+	chatPubKeyHex := types.EncodeHex(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
 	encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
 
 	whisperService, err := backend.StatusNode().WhisperService()
@@ -253,7 +253,7 @@ func TestBackendInjectChatAccount(t *testing.T) {
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
 	connections := [...]string{wifi, cellular, unknown}
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	count := 3
 
 	var wg sync.WaitGroup
@@ -271,7 +271,7 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 }
 
 func TestBackendConnectionChangesToOffline(t *testing.T) {
-	b := NewStatusBackend()
+	b := NewGethStatusBackend()
 	b.ConnectionChange(none, false)
 	assert.True(t, b.connectionState.Offline)
 
@@ -285,7 +285,7 @@ func TestBackendConnectionChangesToOffline(t *testing.T) {
 func TestBackendCallRPCConcurrently(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -327,7 +327,7 @@ func TestBackendCallRPCConcurrently(t *testing.T) {
 }
 
 func TestAppStateChange(t *testing.T) {
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 
 	var testCases = []struct {
 		name          string
@@ -361,7 +361,7 @@ func TestAppStateChange(t *testing.T) {
 func TestBlockedRPCMethods(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -381,7 +381,7 @@ func TestBlockedRPCMethods(t *testing.T) {
 }
 
 func TestCallRPCWithStoppedNode(t *testing.T) {
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 
 	resp, err := backend.CallRPC(
 		`{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}`,
@@ -401,7 +401,7 @@ func TestCallRPCWithStoppedNode(t *testing.T) {
 func TestStartStopMultipleTimes(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -420,7 +420,7 @@ func TestStartStopMultipleTimes(t *testing.T) {
 func TestSignHash(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -460,7 +460,7 @@ func TestSignHash(t *testing.T) {
 func TestHashTypedData(t *testing.T) {
 	utils.Init()
 
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
 	require.NoError(t, err)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
@@ -502,7 +502,7 @@ func TestHashTypedData(t *testing.T) {
 
 	hash, err := backend.HashTypedData(typed)
 	require.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, hash)
+	assert.NotEqual(t, types.Hash{}, hash)
 }
 
 func TestBackendGetVerifiedAccount(t *testing.T) {
@@ -512,9 +512,9 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "verified-account-test-")
 	require.NoError(t, err)
 	defer os.Remove(tmpdir)
-	backend := NewStatusBackend()
+	backend := NewGethStatusBackend()
 	backend.UpdateRootDataDir(tmpdir)
-	require.NoError(t, backend.accountManager.InitKeystore(filepath.Join(tmpdir, "keystore")))
+	require.NoError(t, backend.AccountManager().InitKeystore(filepath.Join(tmpdir, "keystore")))
 	require.NoError(t, backend.ensureAppDBOpened(multiaccounts.Account{Address: common.Address{1, 1, 1}}, password))
 	config, err := params.NewNodeConfig(tmpdir, 178733)
 	require.NoError(t, err)
@@ -538,7 +538,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		db := accounts.NewDB(backend.appDB)
-		_, err = backend.accountManager.ImportAccount(pkey, password)
+		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
 		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), "wrong-password")
@@ -551,7 +551,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 		require.NoError(t, err)
 		address := crypto.PubkeyToAddress(pkey.PublicKey)
 		db := accounts.NewDB(backend.appDB)
-		_, err = backend.accountManager.ImportAccount(pkey, password)
+		_, err = backend.AccountManager().ImportAccount(pkey, password)
 		require.NoError(t, err)
 		require.NoError(t, db.SaveAccounts([]accounts.Account{{Address: address}}))
 		key, err := backend.getVerifiedWalletAccount(address.String(), password)
@@ -563,7 +563,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 func TestLoginWithKey(t *testing.T) {
 	utils.Init()
 
-	b := NewStatusBackend()
+	b := NewGethStatusBackend()
 	pkey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	main := multiaccounts.Account{
@@ -576,7 +576,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, err)
 	keyhex := hex.EncodeToString(crypto.FromECDSA(pkey))
 
-	require.NoError(t, b.accountManager.InitKeystore(conf.KeyStoreDir))
+	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
 

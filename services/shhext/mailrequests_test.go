@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/suite"
 )
 
 var (
-	testHash = protocol.Hash{0x01}
+	testHash = types.Hash{0x01}
 )
 
 func TestMailRequestMonitorSuite(t *testing.T) {
@@ -26,7 +25,7 @@ type MailRequestMonitorSuite struct {
 
 func (s *MailRequestMonitorSuite) SetupTest() {
 	s.monitor = &MailRequestMonitor{
-		cache:            map[protocol.Hash]EnvelopeState{},
+		cache:            map[types.Hash]EnvelopeState{},
 		requestsRegistry: NewRequestsRegistry(0),
 	}
 }
@@ -35,10 +34,10 @@ func (s *MailRequestMonitorSuite) TestRequestCompleted() {
 	mock := newHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestCompleted,
+	s.monitor.handleEvent(types.EnvelopeEvent{
+		Event: types.EventMailServerRequestCompleted,
 		Hash:  testHash,
-		Data:  &whispertypes.MailServerResponse{},
+		Data:  &types.MailServerResponse{},
 	})
 	select {
 	case requestID := <-mock.requestsCompleted:
@@ -53,10 +52,10 @@ func (s *MailRequestMonitorSuite) TestRequestFailed() {
 	mock := newHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestCompleted,
+	s.monitor.handleEvent(types.EnvelopeEvent{
+		Event: types.EventMailServerRequestCompleted,
 		Hash:  testHash,
-		Data:  &whispertypes.MailServerResponse{Error: errors.New("test error")},
+		Data:  &types.MailServerResponse{Error: errors.New("test error")},
 	})
 	select {
 	case requestID := <-mock.requestsFailed:
@@ -71,8 +70,8 @@ func (s *MailRequestMonitorSuite) TestRequestExpiration() {
 	mock := newHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
-	s.monitor.handleEvent(whispertypes.EnvelopeEvent{
-		Event: whispertypes.EventMailServerRequestExpired,
+	s.monitor.handleEvent(types.EnvelopeEvent{
+		Event: types.EventMailServerRequestExpired,
 		Hash:  testHash,
 	})
 	select {

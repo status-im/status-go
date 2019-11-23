@@ -6,16 +6,16 @@ import (
 
 	"github.com/google/uuid"
 
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 const defaultMessagesRequestLimit = 100
 
-func createMessagesRequest(from, to uint32, cursor []byte, topics []whispertypes.TopicType) whispertypes.MessagesRequest {
+func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicType) types.MessagesRequest {
 	aUUID := uuid.New()
-	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by whispertypes.MessagesRequest
+	// uuid is 16 bytes, converted to hex it's 32 bytes as expected by types.MessagesRequest
 	id := []byte(hex.EncodeToString(aUUID[:]))
-	return whispertypes.MessagesRequest{
+	return types.MessagesRequest{
 		ID:     id,
 		From:   from,
 		To:     to,
@@ -25,16 +25,16 @@ func createMessagesRequest(from, to uint32, cursor []byte, topics []whispertypes
 	}
 }
 
-func topicsToBloom(topics ...whispertypes.TopicType) []byte {
+func topicsToBloom(topics ...types.TopicType) []byte {
 	i := new(big.Int)
 	for _, topic := range topics {
-		bloom := whispertypes.TopicToBloom(topic)
+		bloom := types.TopicToBloom(topic)
 		i.Or(i, new(big.Int).SetBytes(bloom[:]))
 	}
 
-	combined := make([]byte, whispertypes.BloomFilterSize)
+	combined := make([]byte, types.BloomFilterSize)
 	data := i.Bytes()
-	copy(combined[whispertypes.BloomFilterSize-len(data):], data[:])
+	copy(combined[types.BloomFilterSize-len(data):], data[:])
 
 	return combined
 }

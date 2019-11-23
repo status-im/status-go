@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 type InstallationMetadata struct {

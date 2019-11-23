@@ -5,19 +5,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var transactionHashes = []common.Hash{common.HexToHash("0xAA"), common.HexToHash("0xBB"), common.HexToHash("0xCC")}
+var transactionHashes = []types.Hash{types.HexToHash("0xAA"), types.HexToHash("0xBB"), types.HexToHash("0xCC")}
 
 func TestTransactionSentToUpstreamEventMultipleSubscribe(t *testing.T) {
 	event := newTransactionSentToUpstreamEvent()
 	require.NoError(t, event.Start())
 	defer event.Stop()
 
-	var subscriptionChannels []chan common.Hash
+	var subscriptionChannels []chan types.Hash
 	for i := 0; i < 3; i++ {
 		id, channel := event.Subscribe()
 		// test id assignment

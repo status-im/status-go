@@ -7,20 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
+	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
-	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/sqlite"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -39,6 +38,7 @@ var (
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
 type Messenger struct {
+	node        types.Node
 	identity    *ecdsa.PrivateKey
 	persistence *sqlitePersistence
 	transport   *transport.WhisperServiceTransport
@@ -168,11 +168,16 @@ func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 
 func NewMessenger(
 	identity *ecdsa.PrivateKey,
-	shh whispertypes.Whisper,
+	node types.Node,
 	installationID string,
 	opts ...Option,
 ) (*Messenger, error) {
 	var messenger *Messenger
+
+	shh, err := node.GetWhisper(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	c := config{}
 
@@ -249,7 +254,7 @@ func NewMessenger(
 	}
 
 	// Apply migrations for all components.
-	err := sqlite.Migrate(database)
+	err = sqlite.Migrate(database)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migrations")
 	}
@@ -292,6 +297,7 @@ func NewMessenger(
 	}
 
 	messenger = &Messenger{
+		node:                       node,
 		identity:                   identity,
 		persistence:                &sqlitePersistence{db: database},
 		transport:                  t,
@@ -404,7 +410,7 @@ func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*tran
 	var result []*transport.Filter
 	for _, secret := range secrets {
 		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
-		fSecret := whispertypes.NegotiatedSecret{
+		fSecret := types.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,
 		}
@@ -497,7 +503,7 @@ func (m *Messenger) AddMembersToChat(ctx context.Context, chat *Chat, members []
 	}
 	encodedMembers := make([]string, len(members))
 	for idx, member := range members {
-		encodedMembers[idx] = protocol.EncodeHex(crypto.FromECDSAPub(member))
+		encodedMembers[idx] = types.EncodeHex(crypto.FromECDSAPub(member))
 	}
 	event := v1protocol.NewMembersAddedEvent(encodedMembers, group.NextClockValue())
 	err = group.ProcessEvent(&m.identity.PublicKey, event)
@@ -517,7 +523,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chat *Chat) error {
 		return err
 	}
 	event := v1protocol.NewMemberJoinedEvent(
-		protocol.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+		types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 		group.NextClockValue(),
 	)
 	err = group.ProcessEvent(&m.identity.PublicKey, event)
@@ -1045,7 +1051,7 @@ func (p *postProcessor) matchMessage(message *v1protocol.Message, chats []*Chat)
 	case message.MessageT == v1protocol.MessageTypePrivate:
 		// It's an incoming private message. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
-		chatID := protocol.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		chatID := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
 		chat := findChatByID(chatID, chats)
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
@@ -1065,7 +1071,7 @@ func (p *postProcessor) matchMessage(message *v1protocol.Message, chats []*Chat)
 			return nil, errors.New("received group chat message for non-existing chat")
 		}
 
-		sigPubKeyHex := protocol.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		sigPubKeyHex := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
 		for _, member := range chat.Members {
 			if member.ID == sigPubKeyHex {
 				return chat, nil
@@ -1082,9 +1088,9 @@ func Identicon(id string) (string, error) {
 	return identicon.GenerateBase64(id)
 }
 
-// VerifyENSName verifies that a registered ENS name matches the expected public key
-func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetails []ens.ENSDetails) (map[string]ens.ENSResponse, error) {
-	verifier := ens.NewVerifier(m.logger)
+// VerifyENSNames verifies that a registered ENS name matches the expected public key
+func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetails []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
+	verifier := m.node.NewENSVerifier(m.logger)
 
 	ensResponse, err := verifier.CheckBatch(ensDetails, rpcEndpoint, contractAddress)
 	if err != nil {

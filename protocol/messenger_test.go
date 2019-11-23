@@ -11,14 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
-	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
-	"github.com/status-im/status-go/protocol/ens"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
+	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/sqlite"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
 	"github.com/status-im/status-go/protocol/tt"
-	protocol "github.com/status-im/status-go/protocol/types"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
@@ -46,9 +45,21 @@ type MessengerSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Whisper service should be shared.
-	shh      whispertypes.Whisper
+	shh      types.Whisper
 	tmpFiles []*os.File // files to clean up
 	logger   *zap.Logger
+}
+
+type testNode struct {
+	shh types.Whisper
+}
+
+func (n *testNode) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
+	panic("not implemented")
+}
+
+func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
+	return n.shh, nil
 }
 
 func (s *MessengerSuite) SetupTest() {
@@ -64,7 +75,7 @@ func (s *MessengerSuite) SetupTest() {
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerSuite) newMessenger(shh whispertypes.Whisper) *Messenger {
+func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
 	s.Require().NoError(err)
 
@@ -81,7 +92,7 @@ func (s *MessengerSuite) newMessenger(shh whispertypes.Whisper) *Messenger {
 	}
 	m, err := NewMessenger(
 		privateKey,
-		shh,
+		&testNode{shh: shh},
 		"installation-1",
 		options...,
 	)
@@ -133,7 +144,7 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				privateChat := Chat{
-					ID:        protocol.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					ID:        types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
 					ChatType:  ChatTypeOneToOne,
 					PublicKey: &key.PublicKey,
 					Active:    true,
@@ -155,10 +166,10 @@ func (s *MessengerSuite) TestInit() {
 					Active:   true,
 					Members: []ChatMember{
 						{
-							ID: protocol.EncodeHex(crypto.FromECDSAPub(&key1.PublicKey)),
+							ID: types.EncodeHex(crypto.FromECDSAPub(&key1.PublicKey)),
 						},
 						{
-							ID: protocol.EncodeHex(crypto.FromECDSAPub(&key2.PublicKey)),
+							ID: types.EncodeHex(crypto.FromECDSAPub(&key2.PublicKey)),
 						},
 					},
 				}
@@ -186,7 +197,7 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				contact := Contact{
-					ID:         protocol.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					ID:         types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
 					Name:       "Some Contact",
 					SystemTags: []string{contactAdded},
 				}
@@ -201,7 +212,7 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				contact := Contact{
-					ID:         protocol.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					ID:         types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
 					Name:       "Some Contact",
 					SystemTags: []string{contactAdded, contactBlocked},
 				}
@@ -216,7 +227,7 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				contact := Contact{
-					ID:         protocol.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					ID:         types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
 					Name:       "Some Contact",
 					SystemTags: []string{contactRequestReceived},
 				}
@@ -777,7 +788,7 @@ func (s *MessengerSuite) TestVerifyENSNames() {
 	pk3 := "044fee950d9748606da2f77d3c51bf16134a59bde4903aa68076a45d9eefbb54182a24f0c74b381bad0525a90e78770d11559aa02f77343d172f386e3b521c277a"
 	pk4 := "not a valid pk"
 
-	ensDetails := []ens.ENSDetails{
+	ensDetails := []enstypes.ENSDetails{
 		{
 			Name:            "pedro.stateofus.eth",
 			PublicKeyString: pk1,
@@ -896,20 +907,20 @@ func (s *MessengerSuite) TestSharedSecretHandler() {
 
 func (s *MessengerSuite) TestCreateGroupChat() {
 	chat, err := s.m.CreateGroupChat("test")
-	s.NoError(err)
-	s.Equal("test", chat.Name)
+	s.Require().NoError(err)
+	s.Require().Equal("test", chat.Name)
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	s.Contains(chat.ID, publicKeyHex)
+	s.Require().Contains(chat.ID, publicKeyHex)
 	s.EqualValues([]string{publicKeyHex}, []string{chat.Members[0].ID})
 }
 
 func (s *MessengerSuite) TestAddMembersToChat() {
 	chat, err := s.m.CreateGroupChat("test")
-	s.NoError(err)
+	s.Require().NoError(err)
 	key, err := crypto.GenerateKey()
-	s.NoError(err)
+	s.Require().NoError(err)
 	err = s.m.AddMembersToChat(context.Background(), chat, []*ecdsa.PublicKey{&key.PublicKey})
-	s.NoError(err)
+	s.Require().NoError(err)
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	keyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&key.PublicKey))
 	s.EqualValues([]string{publicKeyHex, keyHex}, []string{chat.Members[0].ID, chat.Members[1].ID})
@@ -920,7 +931,7 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 func (s *MessengerSuite) TestGroupChatAutocreate() {
 	theirMessenger := s.newMessenger(s.shh)
 	chat, err := theirMessenger.CreateGroupChat("test-group")
-	s.NoError(err)
+	s.Require().NoError(err)
 	err = theirMessenger.SaveChat(*chat)
 	s.NoError(err)
 	err = theirMessenger.AddMembersToChat(
@@ -991,11 +1002,11 @@ func (s *MessengerSuite) TestGroupChatMessages() {
 }
 
 type mockSendMessagesRequest struct {
-	whispertypes.Whisper
-	req whispertypes.MessagesRequest
+	types.Whisper
+	req types.MessagesRequest
 }
 
-func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request whispertypes.MessagesRequest) error {
+func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request types.MessagesRequest) error {
 	m.req = request
 	return nil
 }

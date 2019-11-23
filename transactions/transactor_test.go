@@ -282,7 +282,7 @@ func (s *TransactorSuite) TestContractCreation() {
 	hash, err := s.manager.SendTransaction(tx, selectedAccount)
 	s.NoError(err)
 	backend.Commit()
-	receipt, err := backend.TransactionReceipt(context.TODO(), hash)
+	receipt, err := backend.TransactionReceipt(context.TODO(), common.Hash(hash))
 	s.NoError(err)
 	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
 }

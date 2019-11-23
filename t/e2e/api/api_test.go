@@ -23,7 +23,7 @@ func TestAPI(t *testing.T) {
 
 type APITestSuite struct {
 	suite.Suite
-	backend *api.StatusBackend
+	backend *api.GethStatusBackend
 }
 
 func (s *APITestSuite) ensureNodeStopped() {
@@ -33,7 +33,7 @@ func (s *APITestSuite) ensureNodeStopped() {
 }
 
 func (s *APITestSuite) SetupTest() {
-	s.backend = api.NewStatusBackend()
+	s.backend = api.NewGethStatusBackend()
 	s.NotNil(s.backend)
 }
 

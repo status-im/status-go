@@ -6,8 +6,7 @@ import (
 	"errors"
 	"time"
 
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -26,7 +25,7 @@ type DB interface {
 }
 
 // TopicHistoryKey defines bytes that are used as unique key for TopicHistory.
-// first 4 bytes are whispertypes.TopicType bytes
+// first 4 bytes are types.TopicType bytes
 // next 8 bytes are time.Duration encoded in big endian notation.
 type TopicHistoryKey [12]byte
 
@@ -36,7 +35,7 @@ func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err e
 	if (key == TopicHistoryKey{}) {
 		return th, ErrEmptyKey
 	}
-	topic := whispertypes.TopicType{}
+	topic := types.TopicType{}
 	copy(topic[:], key[:4])
 	duration := binary.BigEndian.Uint64(key[4:])
 	th = TopicHistory{db: db, Topic: topic, Duration: time.Duration(duration)}
@@ -47,7 +46,7 @@ func LoadTopicHistoryFromKey(db DB, key TopicHistoryKey) (th TopicHistory, err e
 type TopicHistory struct {
 	db DB
 	// whisper topic
-	Topic whispertypes.TopicType
+	Topic types.TopicType
 
 	Duration time.Duration
 	// Timestamp that was used for the first request with this topic.
@@ -57,7 +56,7 @@ type TopicHistory struct {
 	Current time.Time
 	End     time.Time
 
-	RequestID protocol.Hash
+	RequestID types.Hash
 }
 
 // Key returns unique identifier for this TopicHistory.
@@ -115,7 +114,7 @@ func (t TopicHistory) SameRange(other TopicHistory) bool {
 
 // Pending returns true if this topic was requested from a mail server.
 func (t TopicHistory) Pending() bool {
-	return t.RequestID != protocol.Hash{}
+	return t.RequestID != types.Hash{}
 }
 
 // HistoryRequest is kept in the database while request is in the progress.
@@ -127,7 +126,7 @@ type HistoryRequest struct {
 	histories []TopicHistory
 
 	// Generated ID
-	ID protocol.Hash
+	ID types.Hash
 	// List of the topics
 	TopicHistoryKeys []TopicHistoryKey
 }
@@ -167,8 +166,8 @@ func (req HistoryRequest) Save() error {
 }
 
 // Replace saves request with new ID and all data attached to the old one.
-func (req HistoryRequest) Replace(id protocol.Hash) error {
-	if (req.ID != protocol.Hash{}) {
+func (req HistoryRequest) Replace(id types.Hash) error {
+	if (req.ID != types.Hash{}) {
 		if err := req.Delete(); err != nil {
 			return err
 		}
