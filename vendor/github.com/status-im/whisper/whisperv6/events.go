@@ -38,6 +38,7 @@ const (
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
 	Event EventType
+	Topic TopicType
 	Hash  common.Hash
 	Batch common.Hash
 	Peer  enode.ID
