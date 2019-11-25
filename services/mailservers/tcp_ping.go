@@ -19,7 +19,7 @@ type PingQuery struct {
 
 type PingResult struct {
 	ENode string  `json:"address"`
-	RTTMs int     `json:"rtt_ms"`
+	RTTMs *int    `json:"rttMs"`
 	Err   *string `json:"error"`
 }
 
@@ -28,7 +28,11 @@ func (pr *PingResult) Update(rttMs int, err error) {
 		errStr := err.Error()
 		pr.Err = &errStr
 	}
-	pr.RTTMs = rttMs
+	if rttMs > 0 {
+		pr.RTTMs = &rttMs
+	} else {
+		pr.RTTMs = nil
+	}
 }
 
 func enodeToAddr(enodeAddr string) (string, error) {
