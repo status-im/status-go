@@ -16,7 +16,7 @@ The call takes one struct argument which contains two attributes:
 The return value consists of a list of objects representing a result for each mailserver, each containing following attributes:
 
 * `address` - The `enode` address of given mailserver.
-* `rtt_ms` - Round Trip Time given in milliseconds. Set to `-1` in case of an error.`
+* `rttMs` - Round Trip Time given in milliseconds. Set to `null` in case of an error.`
 * `error` - A text of error that caused the ping failure.
 
 # Example
@@ -53,7 +53,7 @@ EOL
     },
     {
       "address": "enode://c42f368a23fa98ee546fd247220759062323249ef657d26d357a777443aec04db1b29a3a22ef3e7c548e18493ddaf51a31b0aed6079bd6ebe5ae838fcfaf3a49@206.189.243.162:999",
-      "rtt_ms": -1,
+      "rtt_ms": null,
       "error": "tcp check timeout: I/O timeout"
     }
   ]
