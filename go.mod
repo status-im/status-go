@@ -40,7 +40,7 @@ require (
 	github.com/status-im/status-go/extkeys v1.0.0
 	github.com/status-im/status-go/protocol v0.5.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
-	github.com/status-im/whisper v1.6.1
+	github.com/status-im/whisper v1.6.2
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.13.0

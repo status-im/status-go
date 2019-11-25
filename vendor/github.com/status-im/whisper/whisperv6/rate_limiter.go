@@ -14,14 +14,24 @@ import (
 type runLoop func(p *Peer, rw p2p.MsgReadWriter) error
 
 type RateLimiterHandler interface {
-	ExceedPeerLimit()
-	ExceedIPLimit()
+	IncProcessed()
+	IncExceedPeerLimit()
+	IncExceedIPLimit()
 }
 
 type MetricsRateLimiterHandler struct{}
 
-func (MetricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
-func (MetricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
+func (MetricsRateLimiterHandler) IncProcessed() {
+	rateLimitsProcessed.Inc()
+}
+
+func (MetricsRateLimiterHandler) IncExceedPeerLimit() {
+	rateLimitsExceeded.WithLabelValues("max_peers").Inc()
+}
+
+func (MetricsRateLimiterHandler) IncExceedIPLimit() {
+	rateLimitsExceeded.WithLabelValues("max_ips").Inc()
+}
 
 type PeerRateLimiterConfig struct {
 	LimitPerSecIP      int64
@@ -30,7 +40,7 @@ type PeerRateLimiterConfig struct {
 	WhitelistedPeerIDs []enode.ID
 }
 
-var defaultPeerRateLimiterConfig = PeerRateLimiterConfig{
+var peerRateLimiterDefaults = PeerRateLimiterConfig{
 	LimitPerSecIP:      10,
 	LimitPerSecPeerID:  5,
 	WhitelistedIPs:     nil,
@@ -52,7 +62,7 @@ type PeerRateLimiter struct {
 
 func NewPeerRateLimiter(handler RateLimiterHandler, cfg *PeerRateLimiterConfig) *PeerRateLimiter {
 	if cfg == nil {
-		copy := defaultPeerRateLimiterConfig
+		copy := peerRateLimiterDefaults
 		cfg = &copy
 	}
 
@@ -82,14 +92,14 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				return
 			}
 
-			rateLimiterProcessed.Inc(1)
+			r.handler.IncProcessed()
 
 			var ip string
 			if p != nil && p.peer != nil {
 				ip = p.peer.Node().IP().String()
 			}
 			if halted := r.throttleIP(ip); halted {
-				r.handler.ExceedIPLimit()
+				r.handler.IncExceedIPLimit()
 			}
 
 			var peerID []byte
@@ -97,7 +107,7 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				peerID = p.ID()
 			}
 			if halted := r.throttlePeer(peerID); halted {
-				r.handler.ExceedPeerLimit()
+				r.handler.IncExceedPeerLimit()
 			}
 
 			if err := in.WriteMsg(packet); err != nil {
