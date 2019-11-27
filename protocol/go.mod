@@ -9,7 +9,7 @@ replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-2
 replace github.com/status-im/status-go/eth-node => ../eth-node
 
 require (
-	github.com/cenkalti/backoff/v3 v3.0.0
+	github.com/cenkalti/backoff/v3 v3.1.1
 	github.com/golang/protobuf v1.3.2
 	github.com/gomarkdown/markdown v0.0.0-20191113114344-af599402d015
 	github.com/google/uuid v1.1.1
