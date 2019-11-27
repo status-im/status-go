@@ -18,7 +18,7 @@ import (
 )
 
 func TestVerifyAccountPassword(t *testing.T) {
-	accManager := NewManager()
+	accManager := NewGethManager()
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
 	require.NoError(t, err)
 	defer os.RemoveAll(keyStoreDir) //nolint: errcheck
@@ -106,7 +106,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 	err = utils.ImportTestAccount(keyStoreDir, "test-account3-before-eip55.pk")
 	require.NoError(t, err)
 
-	accManager := NewManager()
+	accManager := NewGethManager()
 
 	address := types.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
@@ -136,7 +136,7 @@ type testAccount struct {
 // SetupTest is used here for reinitializing the mock before every
 // test function to avoid faulty execution.
 func (s *ManagerTestSuite) SetupTest() {
-	s.accManager = NewManager()
+	s.accManager = NewGethManager()
 
 	keyStoreDir, err := ioutil.TempDir(os.TempDir(), "accounts")
 	s.Require().NoError(err)

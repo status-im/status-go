@@ -189,6 +189,10 @@ func (s *NTPTimeSource) runPeriodically(fn func() error) error {
 	return nil
 }
 
+func (s *NTPTimeSource) StartService() error {
+	return s.runPeriodically(s.updateOffset)
+}
+
 // Start runs a goroutine that updates local offset every updatePeriod.
 func (s *NTPTimeSource) Start(*p2p.Server) error {
 	return s.runPeriodically(s.updateOffset)

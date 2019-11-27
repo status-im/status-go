@@ -1,3 +1,5 @@
+// +build !nimbus
+
 package shhext
 
 import (
