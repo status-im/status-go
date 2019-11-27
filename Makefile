@@ -60,6 +60,15 @@ HELP_FUN = \
 			   print "\n"; \
 		   }
 
+nimbus: ##@build Build Nimbus
+	./eth-node/bridge/nimbus/build-nimbus.sh
+
+nimbus-statusgo: nimbus ##@build Build status-go (based on Nimbus node) as statusd server
+	C_INCLUDE_PATH="./eth-node/bridge/nimbus" go build -mod=vendor -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS) nimbus' $(BUILD_FLAGS) ./cmd/statusd && \
+	cp vendor/github.com/status-im/status-go/eth-node/bridge/nimbus/libnimbus.so $(GOBIN)
+	@echo "Compilation done."
+	@echo "Run \"build/bin/statusd -h\" to view available commands."
+
 statusgo: ##@build Build status-go as statusd server
 	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
@@ -93,7 +102,7 @@ statusgo-cross: statusgo-android statusgo-ios
 statusgo-android: ##@cross-compile Build status-go for Android
 	@echo "Building status-go for Android..."
 	gomobile init
-	gomobile bind -target=android -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
+	gomobile bind -v -target=android -ldflags="-s -w" $(BUILD_FLAGS_MOBILE) -o build/bin/statusgo.aar github.com/status-im/status-go/mobile
 	@echo "Android cross compilation done in build/bin/statusgo.aar"
 
 statusgo-ios: ##@cross-compile Build status-go for iOS
@@ -282,7 +291,8 @@ ci: lint canary-test test-unit test-e2e ##@tests Run all linters and tests at on
 ci-race: lint canary-test test-unit test-e2e-race ##@tests Run all linters and tests at once + race
 
 clean: ##@other Cleanup
-	rm -fr build/bin/* mailserver-config.json
+	rm -fr build/bin/* mailserver-config.json vendor/github.com/status-im/nimbus
+	git clean -xf
 
 deep-clean: clean
 	rm -Rdf .ethereumtest/StatusChain

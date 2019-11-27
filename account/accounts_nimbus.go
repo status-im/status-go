@@ -6,10 +6,15 @@ import (
 	"github.com/status-im/status-go/account/generator"
 )
 
-// NewManager returns new node account manager.
-func NewManager() *Manager {
-	m := &Manager{}
-	m.accountsGenerator = generator.New(m)
+// NimbusManager represents account manager interface.
+type NimbusManager struct {
+	*Manager
+}
+
+// NewNimbusManager returns new node account manager.
+func NewNimbusManager() *NimbusManager {
+	m := &NimbusManager{}
+	m.Manager = &Manager{accountsGenerator: generator.New(m)}
 	return m
 }
 

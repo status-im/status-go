@@ -1,3 +1,5 @@
+// +build !nimbus
+
 package node
 
 import (
@@ -134,7 +136,7 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 		return &nodebridge.NodeService{Node: gethbridge.NewNodeBridge(stack)}, nil
 	})
 	if err != nil {
-		return fmt.Errorf("failed to register NodeBridhe: %v", err)
+		return fmt.Errorf("failed to register NodeBridge: %v", err)
 	}
 
 	// start Whisper service.

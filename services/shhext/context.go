@@ -23,11 +23,6 @@ var (
 	timeKey            = NewContextKey("time")
 )
 
-// NewContextFromService creates new context instance using Service fileds directly and Storage.
-func NewContextFromService(ctx context.Context, service *Service, storage db.Storage) Context {
-	return NewContext(ctx, service.w.GetCurrentTime, service.requestsRegistry, storage)
-}
-
 // NewContext creates Context with all required fields.
 func NewContext(ctx context.Context, source TimeSource, registry *RequestsRegistry, storage db.Storage) Context {
 	ctx = context.WithValue(ctx, historyDBKey, db.NewHistoryStore(storage))

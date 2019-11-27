@@ -8,7 +8,7 @@ import (
 	"github.com/status-im/status-go/node"
 )
 
-// Make sure that Service implements node.Service interface.
+// Make sure that Service implements gethnode.Service interface.
 var _ gethnode.Service = (*Service)(nil)
 
 // Service represents our own implementation of personal sign operations.
