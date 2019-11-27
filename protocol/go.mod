@@ -14,7 +14,7 @@ require (
 	github.com/gomarkdown/markdown v0.0.0-20191113114344-af599402d015
 	github.com/google/uuid v1.1.1
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
-	github.com/lucasb-eyer/go-colorful v1.0.2
+	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/pkg/errors v0.8.1
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
