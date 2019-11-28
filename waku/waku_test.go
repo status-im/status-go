@@ -19,7 +19,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-func TestWhisperBasic(t *testing.T) {
+func TestBasic(t *testing.T) {
 	w := New(&DefaultConfig)
 	p := w.Protocols()
 	shh := p[0]
@@ -36,7 +36,7 @@ func TestWhisperBasic(t *testing.T) {
 		t.Fatalf("failed shh.Run.")
 	}
 	if uint64(w.Version()) != ProtocolVersion {
-		t.Fatalf("failed whisper Version: %v.", shh.Version)
+		t.Fatalf("failed waku Version: %v.", shh.Version)
 	}
 	if w.GetFilter("non-existent") != nil {
 		t.Fatalf("failed GetFilter.")
@@ -101,7 +101,7 @@ func TestWhisperBasic(t *testing.T) {
 	}
 }
 
-func TestWhisperAsymmetricKeyImport(t *testing.T) {
+func TestAsymmetricKeyImport(t *testing.T) {
 	var (
 		w           = New(&DefaultConfig)
 		privateKeys []*ecdsa.PrivateKey
@@ -132,7 +132,7 @@ func TestWhisperAsymmetricKeyImport(t *testing.T) {
 	}
 }
 
-func TestWhisperIdentityManagement(t *testing.T) {
+func TestWakuIdentityManagement(t *testing.T) {
 	w := New(&DefaultConfig)
 	id1, err := w.NewKeyPair()
 	if err != nil {
@@ -250,7 +250,7 @@ func TestWhisperIdentityManagement(t *testing.T) {
 	}
 }
 
-func TestWhisperSymKeyManagement(t *testing.T) {
+func TestSymKeyManagement(t *testing.T) {
 	InitSingleTest()
 
 	var err error
@@ -1274,7 +1274,7 @@ func discardPipe() *p2p.MsgPipeRW {
 	return rw2
 }
 
-func TestWhisperTimeDesyncEnvelopeIgnored(t *testing.T) {
+func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	c := &Config{
 		MaxMessageSize:     DefaultMaxMessageSize,
 		MinimumAcceptedPOW: 0,

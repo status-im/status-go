@@ -15,9 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-// Peer represents a whisper protocol peer connection.
+// Peer represents a waku protocol peer connection.
 type Peer struct {
-	host *Whisper
+	host *Waku
 	peer *p2p.Peer
 	ws   p2p.MsgReadWriter
 
@@ -33,8 +33,8 @@ type Peer struct {
 	quit chan struct{}
 }
 
-// newPeer creates a new whisper peer object, but does not run the handshake itself.
-func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
+// newPeer creates a new waku peer object, but does not run the handshake itself.
+func newPeer(host *Waku, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	return &Peer{
 		host:           host,
 		peer:           remote,
@@ -48,7 +48,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	}
 }
 
-// start initiates the peer updater, periodically broadcasting the whisper packets
+// start initiates the peer updater, periodically broadcasting the waku packets
 // into the network.
 func (peer *Peer) start() {
 	go peer.update()

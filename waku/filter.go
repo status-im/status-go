@@ -51,13 +51,13 @@ func (store *MemoryMessageStore) Pop() ([]*ReceivedMessage, error) {
 	return all, nil
 }
 
-// Filter represents a Whisper message filter
+// Filter represents a Waku message filter
 type Filter struct {
 	Src        *ecdsa.PublicKey  // Sender of the message
 	KeyAsym    *ecdsa.PrivateKey // Private Key of recipient
 	KeySym     []byte            // Key associated with the Topic
 	Topics     [][]byte          // Topics to filter messages with
-	PoW        float64           // Proof of work as described in the Whisper spec
+	PoW        float64           // Proof of work as described in the Waku spec
 	AllowP2P   bool              // Indicates whether this filter is interested in direct peer-to-peer messages
 	SymKeyHash common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
 	id         string            // unique identifier
@@ -73,17 +73,17 @@ type Filters struct {
 	topicMatcher     map[TopicType]map[*Filter]struct{} // map a topic to the filters that are interested in being notified when a message matches that topic
 	allTopicsMatcher map[*Filter]struct{}               // list all the filters that will be notified of a new message, no matter what its topic is
 
-	whisper *Whisper
-	mutex   sync.RWMutex
+	waku  *Waku
+	mutex sync.RWMutex
 }
 
 // NewFilters returns a newly created filter collection
-func NewFilters(w *Whisper) *Filters {
+func NewFilters(w *Waku) *Filters {
 	return &Filters{
 		watchers:         make(map[string]*Filter),
 		topicMatcher:     make(map[TopicType]map[*Filter]struct{}),
 		allTopicsMatcher: make(map[*Filter]struct{}),
-		whisper:          w,
+		waku:             w,
 	}
 }
 

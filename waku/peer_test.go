@@ -63,7 +63,7 @@ type TestData struct {
 }
 
 type TestNode struct {
-	shh     *Whisper
+	shh     *Waku
 	id      *ecdsa.PrivateKey
 	server  *p2p.Server
 	filerID string
@@ -87,7 +87,7 @@ var prevTime time.Time
 var cntPrev int
 
 func TestSimulation(t *testing.T) {
-	// create a chain of whisper nodes,
+	// create a chain of waku nodes,
 	// installs the filters with shared (predefined) parameters
 	initialize(t)
 
@@ -182,7 +182,7 @@ func initialize(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed convert the key: %s.", keys[i])
 		}
-		name := common.MakeName("whisper-go", "2.0")
+		name := common.MakeName("waku-go", "2.0")
 
 		node.server = &p2p.Server{
 			Config: p2p.Config{
@@ -490,9 +490,9 @@ func waitForServersToStart(t *testing.T) {
 	t.Fatalf("Failed to start all the servers, running: %d", started)
 }
 
-//two generic whisper node handshake
+//two generic waku node handshake
 func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
-	w1 := Whisper{}
+	w1 := Waku{}
 	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), false}})
 	err := p1.handshake()
 	if err != nil {
@@ -500,9 +500,9 @@ func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
 	}
 }
 
-//two generic whisper node handshake. one don't send light flag
+//two generic waku node handshake. one don't send light flag
 func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
-	w1 := Whisper{}
+	w1 := Waku{}
 	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize)}})
 	err := p1.handshake()
 	if err != nil {
@@ -512,7 +512,7 @@ func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
 
 //two light nodes handshake. restriction disabled
 func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
-	w1 := Whisper{}
+	w1 := Waku{}
 	w1.settings.Store(restrictConnectionBetweenLightClientsIdx, false)
 	w1.SetLightClientMode(true)
 	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}})
@@ -524,7 +524,7 @@ func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 
 //two light nodes handshake. restriction enabled
 func TestTwoLightPeerHandshakeError(t *testing.T) {
-	w1 := Whisper{}
+	w1 := Waku{}
 	w1.settings.Store(restrictConnectionBetweenLightClientsIdx, true)
 	w1.SetLightClientMode(true)
 	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}})

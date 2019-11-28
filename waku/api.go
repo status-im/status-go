@@ -25,26 +25,26 @@ var (
 	ErrNoTopics             = errors.New("missing topic(s)")
 )
 
-// PublicWhisperAPI provides the whisper RPC service that can be
+// PublicWakuAPI provides the waku RPC service that can be
 // use publicly without security implications.
-type PublicWhisperAPI struct {
-	w *Whisper
+type PublicWakuAPI struct {
+	w *Waku
 
 	mu       sync.Mutex
 	lastUsed map[string]time.Time // keeps track when a filter was polled for the last time.
 }
 
-// NewPublicWhisperAPI create a new RPC whisper service.
-func NewPublicWhisperAPI(w *Whisper) *PublicWhisperAPI {
-	api := &PublicWhisperAPI{
+// NewPublicWakuAPI create a new RPC waku service.
+func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
+	api := &PublicWakuAPI{
 		w:        w,
 		lastUsed: make(map[string]time.Time),
 	}
 	return api
 }
 
-// Version returns the Whisper sub-protocol version.
-func (api *PublicWhisperAPI) Version(ctx context.Context) string {
+// Version returns the Waku sub-protocol version.
+func (api *PublicWakuAPI) Version(ctx context.Context) string {
 	return ProtocolVersionStr
 }
 
@@ -56,8 +56,8 @@ type Info struct {
 	MaxMessageSize uint32  `json:"maxMessageSize"` // Maximum accepted message size
 }
 
-// Info returns diagnostic information about the whisper node.
-func (api *PublicWhisperAPI) Info(ctx context.Context) Info {
+// Info returns diagnostic information about the waku node.
+func (api *PublicWakuAPI) Info(ctx context.Context) Info {
 	stats := api.w.Stats()
 	return Info{
 		Memory:         stats.memoryUsed,
@@ -69,23 +69,23 @@ func (api *PublicWhisperAPI) Info(ctx context.Context) Info {
 
 // SetMaxMessageSize sets the maximum message size that is accepted.
 // Upper limit is defined by MaxMessageSize.
-func (api *PublicWhisperAPI) SetMaxMessageSize(ctx context.Context, size uint32) (bool, error) {
+func (api *PublicWakuAPI) SetMaxMessageSize(ctx context.Context, size uint32) (bool, error) {
 	return true, api.w.SetMaxMessageSize(size)
 }
 
 // SetMinPoW sets the minimum PoW, and notifies the peers.
-func (api *PublicWhisperAPI) SetMinPoW(ctx context.Context, pow float64) (bool, error) {
+func (api *PublicWakuAPI) SetMinPoW(ctx context.Context, pow float64) (bool, error) {
 	return true, api.w.SetMinimumPoW(pow)
 }
 
 // SetBloomFilter sets the new value of bloom filter, and notifies the peers.
-func (api *PublicWhisperAPI) SetBloomFilter(ctx context.Context, bloom hexutil.Bytes) (bool, error) {
+func (api *PublicWakuAPI) SetBloomFilter(ctx context.Context, bloom hexutil.Bytes) (bool, error) {
 	return true, api.w.SetBloomFilter(bloom)
 }
 
 // MarkTrustedPeer marks a peer trusted, which will allow it to send historic (expired) messages.
 // Note: This function is not adding new nodes, the node needs to exists as a peer.
-func (api *PublicWhisperAPI) MarkTrustedPeer(ctx context.Context, url string) (bool, error) {
+func (api *PublicWakuAPI) MarkTrustedPeer(ctx context.Context, url string) (bool, error) {
 	n, err := enode.Parse(enode.ValidSchemes, url)
 	if err != nil {
 		return false, err
@@ -95,12 +95,12 @@ func (api *PublicWhisperAPI) MarkTrustedPeer(ctx context.Context, url string) (b
 
 // NewKeyPair generates a new public and private key pair for message decryption and encryption.
 // It returns an ID that can be used to refer to the keypair.
-func (api *PublicWhisperAPI) NewKeyPair(ctx context.Context) (string, error) {
+func (api *PublicWakuAPI) NewKeyPair(ctx context.Context) (string, error) {
 	return api.w.NewKeyPair()
 }
 
 // AddPrivateKey imports the given private key.
-func (api *PublicWhisperAPI) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
+func (api *PublicWakuAPI) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
 	key, err := crypto.ToECDSA(privateKey)
 	if err != nil {
 		return "", err
@@ -109,7 +109,7 @@ func (api *PublicWhisperAPI) AddPrivateKey(ctx context.Context, privateKey hexut
 }
 
 // DeleteKeyPair removes the key with the given key if it exists.
-func (api *PublicWhisperAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
+func (api *PublicWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
 	if ok := api.w.DeleteKeyPair(key); ok {
 		return true, nil
 	}
@@ -117,13 +117,13 @@ func (api *PublicWhisperAPI) DeleteKeyPair(ctx context.Context, key string) (boo
 }
 
 // HasKeyPair returns an indication if the node has a key pair that is associated with the given id.
-func (api *PublicWhisperAPI) HasKeyPair(ctx context.Context, id string) bool {
+func (api *PublicWakuAPI) HasKeyPair(ctx context.Context, id string) bool {
 	return api.w.HasKeyPair(id)
 }
 
 // GetPublicKey returns the public key associated with the given key. The key is the hex
 // encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWhisperAPI) GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	key, err := api.w.GetPrivateKey(id)
 	if err != nil {
 		return hexutil.Bytes{}, err
@@ -133,7 +133,7 @@ func (api *PublicWhisperAPI) GetPublicKey(ctx context.Context, id string) (hexut
 
 // GetPrivateKey returns the private key associated with the given key. The key is the hex
 // encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWhisperAPI) GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	key, err := api.w.GetPrivateKey(id)
 	if err != nil {
 		return hexutil.Bytes{}, err
@@ -144,53 +144,53 @@ func (api *PublicWhisperAPI) GetPrivateKey(ctx context.Context, id string) (hexu
 // NewSymKey generate a random symmetric key.
 // It returns an ID that can be used to refer to the key.
 // Can be used encrypting and decrypting messages where the key is known to both parties.
-func (api *PublicWhisperAPI) NewSymKey(ctx context.Context) (string, error) {
+func (api *PublicWakuAPI) NewSymKey(ctx context.Context) (string, error) {
 	return api.w.GenerateSymKey()
 }
 
 // AddSymKey import a symmetric key.
 // It returns an ID that can be used to refer to the key.
 // Can be used encrypting and decrypting messages where the key is known to both parties.
-func (api *PublicWhisperAPI) AddSymKey(ctx context.Context, key hexutil.Bytes) (string, error) {
+func (api *PublicWakuAPI) AddSymKey(ctx context.Context, key hexutil.Bytes) (string, error) {
 	return api.w.AddSymKeyDirect([]byte(key))
 }
 
 // GenerateSymKeyFromPassword derive a key from the given password, stores it, and returns its ID.
-func (api *PublicWhisperAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
+func (api *PublicWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
 	return api.w.AddSymKeyFromPassword(passwd)
 }
 
 // HasSymKey returns an indication if the node has a symmetric key associated with the given key.
-func (api *PublicWhisperAPI) HasSymKey(ctx context.Context, id string) bool {
+func (api *PublicWakuAPI) HasSymKey(ctx context.Context, id string) bool {
 	return api.w.HasSymKey(id)
 }
 
 // GetSymKey returns the symmetric key associated with the given id.
-func (api *PublicWhisperAPI) GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	return api.w.GetSymKey(id)
 }
 
 // DeleteSymKey deletes the symmetric key that is associated with the given id.
-func (api *PublicWhisperAPI) DeleteSymKey(ctx context.Context, id string) bool {
+func (api *PublicWakuAPI) DeleteSymKey(ctx context.Context, id string) bool {
 	return api.w.DeleteSymKey(id)
 }
 
 // MakeLightClient turns the node into light client, which does not forward
 // any incoming messages, and sends only messages originated in this node.
-func (api *PublicWhisperAPI) MakeLightClient(ctx context.Context) bool {
+func (api *PublicWakuAPI) MakeLightClient(ctx context.Context) bool {
 	api.w.SetLightClientMode(true)
 	return api.w.LightClientMode()
 }
 
 // CancelLightClient cancels light client mode.
-func (api *PublicWhisperAPI) CancelLightClient(ctx context.Context) bool {
+func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
 	api.w.SetLightClientMode(false)
 	return !api.w.LightClientMode()
 }
 
 //go:generate gencodec -type NewMessage -field-override newMessageOverride -out gen_newmessage_json.go
 
-// NewMessage represents a new whisper message that is posted through the RPC.
+// NewMessage represents a new waku message that is posted through the RPC.
 type NewMessage struct {
 	SymKeyID   string    `json:"symKeyID"`
 	PublicKey  []byte    `json:"pubKey"`
@@ -210,9 +210,9 @@ type newMessageOverride struct {
 	Padding   hexutil.Bytes
 }
 
-// Post posts a message on the Whisper network.
+// Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -261,13 +261,13 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 	}
 
 	// encrypt and sent message
-	whisperMsg, err := NewSentMessage(params)
+	msg, err := NewSentMessage(params)
 	if err != nil {
 		return nil, err
 	}
 
 	var result []byte
-	env, err := whisperMsg.Wrap(params, api.w.GetCurrentTime())
+	env, err := msg.Wrap(params, api.w.GetCurrentTime())
 	if err != nil {
 		return nil, err
 	}
@@ -300,12 +300,12 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 }
 
 // UninstallFilter is alias for Unsubscribe
-func (api *PublicWhisperAPI) UninstallFilter(id string) {
+func (api *PublicWakuAPI) UninstallFilter(id string) {
 	api.w.Unsubscribe(id)
 }
 
 // Unsubscribe disables and removes an existing filter.
-func (api *PublicWhisperAPI) Unsubscribe(id string) {
+func (api *PublicWakuAPI) Unsubscribe(id string) {
 	api.w.Unsubscribe(id)
 }
 
@@ -327,7 +327,7 @@ type criteriaOverride struct {
 
 // Messages set up a subscription that fires events when messages arrive that match
 // the given set of criteria.
-func (api *PublicWhisperAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Subscription, error) {
+func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Subscription, error) {
 	var (
 		symKeyGiven = len(crit.SymKeyID) > 0
 		pubKeyGiven = len(crit.PrivateKeyID) > 0
@@ -396,7 +396,7 @@ func (api *PublicWhisperAPI) Messages(ctx context.Context, crit Criteria) (*rpc.
 	// create subscription and start waiting for message events
 	rpcSub := notifier.CreateSubscription()
 	go func() {
-		// for now poll internally, refactor whisper internal for channel support
+		// for now poll internally, refactor waku internal for channel support
 		ticker := time.NewTicker(250 * time.Millisecond)
 		defer ticker.Stop()
 
@@ -425,7 +425,7 @@ func (api *PublicWhisperAPI) Messages(ctx context.Context, crit Criteria) (*rpc.
 
 //go:generate gencodec -type Message -field-override messageOverride -out gen_message_json.go
 
-// Message is the RPC representation of a whisper message.
+// Message is the RPC representation of a waku message.
 type Message struct {
 	Sig       []byte    `json:"sig,omitempty"`
 	TTL       uint32    `json:"ttl"`
@@ -447,8 +447,8 @@ type messageOverride struct {
 	Dst     hexutil.Bytes
 }
 
-// ToWhisperMessage converts an internal message into an API version.
-func ToWhisperMessage(message *ReceivedMessage) *Message {
+// ToWakuMessage converts an internal message into an API version.
+func ToWakuMessage(message *ReceivedMessage) *Message {
 	msg := Message{
 		Payload:   message.Payload,
 		Padding:   message.Padding,
@@ -481,14 +481,14 @@ func ToWhisperMessage(message *ReceivedMessage) *Message {
 func toMessage(messages []*ReceivedMessage) []*Message {
 	msgs := make([]*Message, len(messages))
 	for i, msg := range messages {
-		msgs[i] = ToWhisperMessage(msg)
+		msgs[i] = ToWakuMessage(msg)
 	}
 	return msgs
 }
 
 // GetFilterMessages returns the messages that match the filter criteria and
 // are received between the last poll and now.
-func (api *PublicWhisperAPI) GetFilterMessages(id string) ([]*Message, error) {
+func (api *PublicWakuAPI) GetFilterMessages(id string) ([]*Message, error) {
 	api.mu.Lock()
 	f := api.w.GetFilter(id)
 	if f == nil {
@@ -501,14 +501,14 @@ func (api *PublicWhisperAPI) GetFilterMessages(id string) ([]*Message, error) {
 	receivedMessages := f.Retrieve()
 	messages := make([]*Message, 0, len(receivedMessages))
 	for _, msg := range receivedMessages {
-		messages = append(messages, ToWhisperMessage(msg))
+		messages = append(messages, ToWakuMessage(msg))
 	}
 
 	return messages, nil
 }
 
 // DeleteMessageFilter deletes a filter.
-func (api *PublicWhisperAPI) DeleteMessageFilter(id string) (bool, error) {
+func (api *PublicWakuAPI) DeleteMessageFilter(id string) (bool, error) {
 	api.mu.Lock()
 	defer api.mu.Unlock()
 
@@ -518,7 +518,7 @@ func (api *PublicWhisperAPI) DeleteMessageFilter(id string) (bool, error) {
 
 // NewMessageFilter creates a new filter that can be used to poll for
 // (new) messages that satisfy the given criteria.
-func (api *PublicWhisperAPI) NewMessageFilter(req Criteria) (string, error) {
+func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	var (
 		src     *ecdsa.PublicKey
 		keySym  []byte

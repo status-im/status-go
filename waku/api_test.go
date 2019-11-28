@@ -13,7 +13,7 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error generating symmetric key: %v", err)
 	}
-	api := PublicWhisperAPI{
+	api := PublicWakuAPI{
 		w:        w,
 		lastUsed: make(map[string]time.Time),
 	}

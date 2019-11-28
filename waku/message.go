@@ -32,14 +32,14 @@ type MessageParams struct {
 }
 
 // SentMessage represents an end-user data packet to transmit through the
-// Whisper protocol. These are wrapped into Envelopes that need not be
+// Waku protocol. These are wrapped into Envelopes that need not be
 // understood by intermediate nodes, just forwarded.
 type sentMessage struct {
 	Raw []byte
 }
 
 // ReceivedMessage represents a data packet to be received through the
-// Whisper protocol and successfully decrypted.
+// Waku protocol and successfully decrypted.
 type ReceivedMessage struct {
 	Raw []byte
 
@@ -48,7 +48,7 @@ type ReceivedMessage struct {
 	Signature []byte
 	Salt      []byte
 
-	PoW   float64          // Proof of work as described in the Whisper spec
+	PoW   float64          // Proof of work as described in the Waku spec
 	Sent  uint32           // Time when the message was posted into the network
 	TTL   uint32           // Maximum time to live allowed for the message
 	Src   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
@@ -73,7 +73,7 @@ func (msg *ReceivedMessage) isAsymmetricEncryption() bool {
 	return msg.Dst != nil
 }
 
-// NewSentMessage creates and initializes a non-signed, non-encrypted Whisper message.
+// NewSentMessage creates and initializes a non-signed, non-encrypted Waku message.
 func NewSentMessage(params *MessageParams) (*sentMessage, error) {
 	const payloadSizeFieldMaxSize = 4
 	msg := sentMessage{}

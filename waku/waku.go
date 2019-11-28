@@ -40,12 +40,12 @@ type Statistics struct {
 }
 
 const (
-	maxMsgSizeIdx                            = iota // Maximal message length allowed by the whisper node
+	maxMsgSizeIdx                            = iota // Maximal message length allowed by the waku node
 	overflowIdx                                     // Indicator of message queue overflow
-	minPowIdx                                       // Minimal PoW required by the whisper node
-	minPowToleranceIdx                              // Minimal PoW tolerated by the whisper node for a limited time
+	minPowIdx                                       // Minimal PoW required by the waku node
+	minPowToleranceIdx                              // Minimal PoW tolerated by the waku node for a limited time
 	bloomFilterIdx                                  // Bloom filter for topics of interest for this node
-	bloomFilterToleranceIdx                         // Bloom filter tolerated by the whisper node for a limited time
+	bloomFilterToleranceIdx                         // Bloom filter tolerated by the waku node for a limited time
 	lightClientModeIdx                              // Light client mode. (does not forward any messages)
 	restrictConnectionBetweenLightClientsIdx        // Restrict connection between two light clients
 )
@@ -57,9 +57,9 @@ type MailServerResponse struct {
 	Error            error
 }
 
-// Whisper represents a dark communication interface through the Ethereum
+// Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
-type Whisper struct {
+type Waku struct {
 	protocol p2p.Protocol // Protocol description and parameters
 	filters  *Filters     // Message filters installed with Subscribe function
 
@@ -74,7 +74,7 @@ type Whisper struct {
 	peerMu sync.RWMutex       // Mutex to sync the active peer set
 	peers  map[*Peer]struct{} // Set of currently active peers
 
-	messageQueue chan *Envelope   // Message queue for normal whisper messages
+	messageQueue chan *Envelope   // Message queue for normal waku messages
 	p2pMsgQueue  chan interface{} // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
 	quit         chan struct{}    // Channel used for graceful exit
 
@@ -82,10 +82,10 @@ type Whisper struct {
 
 	disableConfirmations bool // do not reply with confirmations
 
-	syncAllowance int // maximum time in seconds allowed to process the whisper-related messages
+	syncAllowance int // maximum time in seconds allowed to process the waku-related messages
 
 	statsMu sync.Mutex // guard stats
-	stats   Statistics // Statistics of whisper node
+	stats   Statistics // Statistics of waku node
 
 	mailServer MailServer // MailServer interface
 
@@ -95,16 +95,16 @@ type Whisper struct {
 
 	envelopeFeed event.Feed
 
-	timeSource func() time.Time // source of time for whisper
+	timeSource func() time.Time // source of time for waku
 }
 
-// New creates a Whisper client ready to communicate through the Ethereum P2P network.
-func New(cfg *Config) *Whisper {
+// New creates a Waku client ready to communicate through the Ethereum P2P network.
+func New(cfg *Config) *Waku {
 	if cfg == nil {
 		cfg = &DefaultConfig
 	}
 
-	whisper := &Whisper{
+	waku := &Waku{
 		privateKeys:          make(map[string]*ecdsa.PrivateKey),
 		symKeys:              make(map[string][]byte),
 		envelopes:            make(map[common.Hash]*Envelope),
@@ -118,58 +118,58 @@ func New(cfg *Config) *Whisper {
 		disableConfirmations: !cfg.EnableConfirmations,
 	}
 
-	whisper.filters = NewFilters(whisper)
+	waku.filters = NewFilters(waku)
 
-	whisper.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
-	whisper.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
-	whisper.settings.Store(overflowIdx, false)
-	whisper.settings.Store(restrictConnectionBetweenLightClientsIdx, cfg.RestrictConnectionBetweenLightClients)
+	waku.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
+	waku.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
+	waku.settings.Store(overflowIdx, false)
+	waku.settings.Store(restrictConnectionBetweenLightClientsIdx, cfg.RestrictConnectionBetweenLightClients)
 
-	// p2p whisper sub protocol handler
-	whisper.protocol = p2p.Protocol{
+	// p2p waku sub protocol handler
+	waku.protocol = p2p.Protocol{
 		Name:    ProtocolName,
 		Version: uint(ProtocolVersion),
 		Length:  NumberOfMessageCodes,
-		Run:     whisper.HandlePeer,
+		Run:     waku.HandlePeer,
 		NodeInfo: func() interface{} {
 			return map[string]interface{}{
 				"version":        ProtocolVersionStr,
-				"maxMessageSize": whisper.MaxMessageSize(),
-				"minimumPoW":     whisper.MinPow(),
+				"maxMessageSize": waku.MaxMessageSize(),
+				"minimumPoW":     waku.MinPow(),
 			}
 		},
 	}
 
-	return whisper
+	return waku
 }
 
 // NewMessageStore returns object that implements MessageStore.
-func (whisper *Whisper) NewMessageStore() MessageStore {
-	if whisper.messageStoreFabric != nil {
-		return whisper.messageStoreFabric()
+func (waku *Waku) NewMessageStore() MessageStore {
+	if waku.messageStoreFabric != nil {
+		return waku.messageStoreFabric()
 	}
 	return NewMemoryMessageStore()
 }
 
 // SetMessageStore allows to inject custom implementation of the message store.
-func (whisper *Whisper) SetMessageStore(fabric func() MessageStore) {
-	whisper.messageStoreFabric = fabric
+func (waku *Waku) SetMessageStore(fabric func() MessageStore) {
+	waku.messageStoreFabric = fabric
 }
 
-// SetTimeSource assigns a particular source of time to a whisper object.
-func (whisper *Whisper) SetTimeSource(timesource func() time.Time) {
-	whisper.timeSource = timesource
+// SetTimeSource assigns a particular source of time to a waku object.
+func (waku *Waku) SetTimeSource(timesource func() time.Time) {
+	waku.timeSource = timesource
 }
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
-// In order to prevent blocking whisper producers events must be amply buffered.
-func (whisper *Whisper) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
-	return whisper.envelopeFeed.Subscribe(events)
+// In order to prevent blocking waku producers events must be amply buffered.
+func (waku *Waku) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
+	return waku.envelopeFeed.Subscribe(events)
 }
 
 // MinPow returns the PoW value required by this node.
-func (whisper *Whisper) MinPow() float64 {
-	val, exist := whisper.settings.Load(minPowIdx)
+func (waku *Waku) MinPow() float64 {
+	val, exist := waku.settings.Load(minPowIdx)
 	if !exist || val == nil {
 		return DefaultMinimumPoW
 	}
@@ -184,8 +184,8 @@ func (whisper *Whisper) MinPow() float64 {
 // MinPowTolerance returns the value of minimum PoW which is tolerated for a limited
 // time after PoW was changed. If sufficient time have elapsed or no change of PoW
 // have ever occurred, the return value will be the same as return value of MinPow().
-func (whisper *Whisper) MinPowTolerance() float64 {
-	val, exist := whisper.settings.Load(minPowToleranceIdx)
+func (waku *Waku) MinPowTolerance() float64 {
+	val, exist := waku.settings.Load(minPowToleranceIdx)
 	if !exist || val == nil {
 		return DefaultMinimumPoW
 	}
@@ -196,8 +196,8 @@ func (whisper *Whisper) MinPowTolerance() float64 {
 // The nodes are required to send only messages that match the advertised bloom filter.
 // If a message does not match the bloom, it will tantamount to spam, and the peer will
 // be disconnected.
-func (whisper *Whisper) BloomFilter() []byte {
-	val, exist := whisper.settings.Load(bloomFilterIdx)
+func (waku *Waku) BloomFilter() []byte {
+	val, exist := waku.settings.Load(bloomFilterIdx)
 	if !exist || val == nil {
 		return nil
 	}
@@ -208,8 +208,8 @@ func (whisper *Whisper) BloomFilter() []byte {
 // time after new bloom was advertised to the peers. If sufficient time have elapsed
 // or no change of bloom filter have ever occurred, the return value will be the same
 // as return value of BloomFilter().
-func (whisper *Whisper) BloomFilterTolerance() []byte {
-	val, exist := whisper.settings.Load(bloomFilterToleranceIdx)
+func (waku *Waku) BloomFilterTolerance() []byte {
+	val, exist := waku.settings.Load(bloomFilterToleranceIdx)
 	if !exist || val == nil {
 		return nil
 	}
@@ -217,61 +217,61 @@ func (whisper *Whisper) BloomFilterTolerance() []byte {
 }
 
 // MaxMessageSize returns the maximum accepted message size.
-func (whisper *Whisper) MaxMessageSize() uint32 {
-	val, _ := whisper.settings.Load(maxMsgSizeIdx)
+func (waku *Waku) MaxMessageSize() uint32 {
+	val, _ := waku.settings.Load(maxMsgSizeIdx)
 	return val.(uint32)
 }
 
 // Overflow returns an indication if the message queue is full.
-func (whisper *Whisper) Overflow() bool {
-	val, _ := whisper.settings.Load(overflowIdx)
+func (waku *Waku) Overflow() bool {
+	val, _ := waku.settings.Load(overflowIdx)
 	return val.(bool)
 }
 
-// APIs returns the RPC descriptors the Whisper implementation offers
-func (whisper *Whisper) APIs() []rpc.API {
+// APIs returns the RPC descriptors the Waku implementation offers
+func (waku *Waku) APIs() []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: ProtocolName,
 			Version:   ProtocolVersionStr,
-			Service:   NewPublicWhisperAPI(whisper),
+			Service:   NewPublicWakuAPI(waku),
 			Public:    true,
 		},
 	}
 }
 
 // GetCurrentTime returns current time.
-func (whisper *Whisper) GetCurrentTime() time.Time {
-	return whisper.timeSource()
+func (waku *Waku) GetCurrentTime() time.Time {
+	return waku.timeSource()
 }
 
 // RegisterServer registers MailServer interface.
 // MailServer will process all the incoming messages with p2pRequestCode.
-func (whisper *Whisper) RegisterServer(server MailServer) {
-	whisper.mailServer = server
+func (waku *Waku) RegisterServer(server MailServer) {
+	waku.mailServer = server
 }
 
-// Protocols returns the whisper sub-protocols ran by this particular client.
-func (whisper *Whisper) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{whisper.protocol}
+// Protocols returns the waku sub-protocols ran by this particular client.
+func (waku *Waku) Protocols() []p2p.Protocol {
+	return []p2p.Protocol{waku.protocol}
 }
 
-// Version returns the whisper sub-protocols version number.
-func (whisper *Whisper) Version() uint {
-	return whisper.protocol.Version
+// Version returns the waku sub-protocols version number.
+func (waku *Waku) Version() uint {
+	return waku.protocol.Version
 }
 
 // SetMaxMessageSize sets the maximal message size allowed by this node
-func (whisper *Whisper) SetMaxMessageSize(size uint32) error {
+func (waku *Waku) SetMaxMessageSize(size uint32) error {
 	if size > MaxMessageSize {
 		return fmt.Errorf("message size too large [%d>%d]", size, MaxMessageSize)
 	}
-	whisper.settings.Store(maxMsgSizeIdx, size)
+	waku.settings.Store(maxMsgSizeIdx, size)
 	return nil
 }
 
 // SetBloomFilter sets the new bloom filter
-func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
+func (waku *Waku) SetBloomFilter(bloom []byte) error {
 	if len(bloom) != BloomFilterSize {
 		return fmt.Errorf("invalid bloom filter size: %d", len(bloom))
 	}
@@ -279,55 +279,55 @@ func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
 	b := make([]byte, BloomFilterSize)
 	copy(b, bloom)
 
-	whisper.settings.Store(bloomFilterIdx, b)
-	whisper.notifyPeersAboutBloomFilterChange(b)
+	waku.settings.Store(bloomFilterIdx, b)
+	waku.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
-		time.Sleep(time.Duration(whisper.syncAllowance) * time.Second)
-		whisper.settings.Store(bloomFilterToleranceIdx, b)
+		time.Sleep(time.Duration(waku.syncAllowance) * time.Second)
+		waku.settings.Store(bloomFilterToleranceIdx, b)
 	}()
 
 	return nil
 }
 
 // SetMinimumPoW sets the minimal PoW required by this node
-func (whisper *Whisper) SetMinimumPoW(val float64) error {
+func (waku *Waku) SetMinimumPoW(val float64) error {
 	if val < 0.0 {
 		return fmt.Errorf("invalid PoW: %f", val)
 	}
 
-	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(val)
+	waku.settings.Store(minPowIdx, val)
+	waku.notifyPeersAboutPowRequirementChange(val)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
-		time.Sleep(time.Duration(whisper.syncAllowance) * time.Second)
-		whisper.settings.Store(minPowToleranceIdx, val)
+		time.Sleep(time.Duration(waku.syncAllowance) * time.Second)
+		waku.settings.Store(minPowToleranceIdx, val)
 	}()
 
 	return nil
 }
 
 // SetMinimumPowTest sets the minimal PoW in test environment
-func (whisper *Whisper) SetMinimumPowTest(val float64) {
-	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(val)
-	whisper.settings.Store(minPowToleranceIdx, val)
+func (waku *Waku) SetMinimumPowTest(val float64) {
+	waku.settings.Store(minPowIdx, val)
+	waku.notifyPeersAboutPowRequirementChange(val)
+	waku.settings.Store(minPowToleranceIdx, val)
 }
 
 //SetLightClientMode makes node light client (does not forward any messages)
-func (whisper *Whisper) SetLightClientMode(v bool) {
-	whisper.settings.Store(lightClientModeIdx, v)
+func (waku *Waku) SetLightClientMode(v bool) {
+	waku.settings.Store(lightClientModeIdx, v)
 }
 
-func (whisper *Whisper) SetRateLimiter(r *PeerRateLimiter) {
-	whisper.rateLimiter = r
+func (waku *Waku) SetRateLimiter(r *PeerRateLimiter) {
+	waku.rateLimiter = r
 }
 
 //LightClientMode indicates is this node is light client (does not forward any messages)
-func (whisper *Whisper) LightClientMode() bool {
-	val, exist := whisper.settings.Load(lightClientModeIdx)
+func (waku *Waku) LightClientMode() bool {
+	val, exist := waku.settings.Load(lightClientModeIdx)
 	if !exist || val == nil {
 		return false
 	}
@@ -336,8 +336,8 @@ func (whisper *Whisper) LightClientMode() bool {
 }
 
 //LightClientModeConnectionRestricted indicates that connection to light client in light client mode not allowed
-func (whisper *Whisper) LightClientModeConnectionRestricted() bool {
-	val, exist := whisper.settings.Load(restrictConnectionBetweenLightClientsIdx)
+func (waku *Waku) LightClientModeConnectionRestricted() bool {
+	val, exist := waku.settings.Load(restrictConnectionBetweenLightClientsIdx)
 	if !exist || val == nil {
 		return false
 	}
@@ -345,8 +345,8 @@ func (whisper *Whisper) LightClientModeConnectionRestricted() bool {
 	return v && ok
 }
 
-func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
-	arr := whisper.getPeers()
+func (waku *Waku) notifyPeersAboutPowRequirementChange(pow float64) {
+	arr := waku.getPeers()
 	for _, p := range arr {
 		err := p.notifyAboutPowRequirementChange(pow)
 		if err != nil {
@@ -359,8 +359,8 @@ func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
 	}
 }
 
-func (whisper *Whisper) notifyPeersAboutBloomFilterChange(bloom []byte) {
-	arr := whisper.getPeers()
+func (waku *Waku) notifyPeersAboutBloomFilterChange(bloom []byte) {
+	arr := waku.getPeers()
 	for _, p := range arr {
 		err := p.notifyAboutBloomFilterChange(bloom)
 		if err != nil {
@@ -373,23 +373,23 @@ func (whisper *Whisper) notifyPeersAboutBloomFilterChange(bloom []byte) {
 	}
 }
 
-func (whisper *Whisper) getPeers() []*Peer {
-	arr := make([]*Peer, len(whisper.peers))
+func (waku *Waku) getPeers() []*Peer {
+	arr := make([]*Peer, len(waku.peers))
 	i := 0
-	whisper.peerMu.Lock()
-	for p := range whisper.peers {
+	waku.peerMu.Lock()
+	for p := range waku.peers {
 		arr[i] = p
 		i++
 	}
-	whisper.peerMu.Unlock()
+	waku.peerMu.Unlock()
 	return arr
 }
 
 // getPeer retrieves peer by ID
-func (whisper *Whisper) getPeer(peerID []byte) (*Peer, error) {
-	whisper.peerMu.Lock()
-	defer whisper.peerMu.Unlock()
-	for p := range whisper.peers {
+func (waku *Waku) getPeer(peerID []byte) (*Peer, error) {
+	waku.peerMu.Lock()
+	defer waku.peerMu.Unlock()
+	for p := range waku.peers {
 		id := p.peer.ID()
 		if bytes.Equal(peerID, id[:]) {
 			return p, nil
@@ -400,8 +400,8 @@ func (whisper *Whisper) getPeer(peerID []byte) (*Peer, error) {
 
 // AllowP2PMessagesFromPeer marks specific peer trusted,
 // which will allow it to send historic (expired) messages.
-func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
-	p, err := whisper.getPeer(peerID)
+func (waku *Waku) AllowP2PMessagesFromPeer(peerID []byte) error {
+	p, err := waku.getPeer(peerID)
 	if err != nil {
 		return err
 	}
@@ -413,17 +413,17 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 // which is known to implement MailServer interface, and is supposed to process this
 // request and respond with a number of peer-to-peer messages (possibly expired),
 // which are not supposed to be forwarded any further.
-// The whisper protocol is agnostic of the format and contents of envelope.
-func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
-	return whisper.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
+// The waku protocol is agnostic of the format and contents of envelope.
+func (waku *Waku) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
+	return waku.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
 }
 
-func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *Envelope, timeout time.Duration) error {
-	p, err := whisper.getPeer(peerID)
+func (waku *Waku) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *Envelope, timeout time.Duration) error {
+	p, err := waku.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	whisper.envelopeFeed.Send(EnvelopeEvent{
+	waku.envelopeFeed.Send(EnvelopeEvent{
 		Peer:  p.peer.ID(),
 		Topic: envelope.Topic,
 		Hash:  envelope.Hash(),
@@ -432,16 +432,16 @@ func (whisper *Whisper) RequestHistoricMessagesWithTimeout(peerID []byte, envelo
 	p.trusted = true
 	err = p2p.Send(p.ws, p2pRequestCode, envelope)
 	if timeout != 0 {
-		go whisper.expireRequestHistoricMessages(p.peer.ID(), envelope.Hash(), timeout)
+		go waku.expireRequestHistoricMessages(p.peer.ID(), envelope.Hash(), timeout)
 	}
 	return err
 }
 
-func (whisper *Whisper) SendMessagesRequest(peerID []byte, request MessagesRequest) error {
+func (waku *Waku) SendMessagesRequest(peerID []byte, request MessagesRequest) error {
 	if err := request.Validate(); err != nil {
 		return err
 	}
-	p, err := whisper.getPeer(peerID)
+	p, err := waku.getPeer(peerID)
 	if err != nil {
 		return err
 	}
@@ -449,7 +449,7 @@ func (whisper *Whisper) SendMessagesRequest(peerID []byte, request MessagesReque
 	if err := p2p.Send(p.ws, p2pRequestCode, request); err != nil {
 		return err
 	}
-	whisper.envelopeFeed.Send(EnvelopeEvent{
+	waku.envelopeFeed.Send(EnvelopeEvent{
 		Peer:  p.peer.ID(),
 		Hash:  common.BytesToHash(request.ID),
 		Event: EventMailServerRequestSent,
@@ -457,14 +457,14 @@ func (whisper *Whisper) SendMessagesRequest(peerID []byte, request MessagesReque
 	return nil
 }
 
-func (whisper *Whisper) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
+func (waku *Waku) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
-	case <-whisper.quit:
+	case <-waku.quit:
 		return
 	case <-timer.C:
-		whisper.envelopeFeed.Send(EnvelopeEvent{
+		waku.envelopeFeed.Send(EnvelopeEvent{
 			Peer:  peer,
 			Hash:  hash,
 			Event: EventMailServerRequestExpired,
@@ -472,7 +472,7 @@ func (whisper *Whisper) expireRequestHistoricMessages(peer enode.ID, hash common
 	}
 }
 
-func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
+func (waku *Waku) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
 	size, r, err := rlp.EncodeToReader(payload)
 	if err != nil {
 		return err
@@ -482,19 +482,19 @@ func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) 
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
-	p, err := whisper.getPeer(peerID)
+func (waku *Waku) SendP2PMessage(peerID []byte, envelopes ...*Envelope) error {
+	p, err := waku.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(p, envelopes...)
+	return waku.SendP2PDirect(p, envelopes...)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 // If only a single envelope is given, data is sent as a single object
 // rather than a slice. This is important to keep this method backward compatible
 // as it used to send only single envelopes.
-func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+func (waku *Waku) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
 	if len(envelopes) == 1 {
 		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
 	}
@@ -505,7 +505,7 @@ func (whisper *Whisper) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error 
 // If only a single envelope is given, data is sent as a single object
 // rather than a slice. This is important to keep this method backward compatible
 // as it used to send only single envelopes.
-func (whisper *Whisper) SendRawP2PDirect(peer *Peer, envelopes ...rlp.RawValue) error {
+func (waku *Waku) SendRawP2PDirect(peer *Peer, envelopes ...rlp.RawValue) error {
 	if len(envelopes) == 1 {
 		return p2p.Send(peer.ws, p2pMessageCode, envelopes[0])
 	}
@@ -514,7 +514,7 @@ func (whisper *Whisper) SendRawP2PDirect(peer *Peer, envelopes ...rlp.RawValue) 
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
 // it into the known identities for message decryption. Returns ID of the new key pair.
-func (whisper *Whisper) NewKeyPair() (string, error) {
+func (waku *Waku) NewKeyPair() (string, error) {
 	key, err := crypto.GenerateKey()
 	if err != nil || !validatePrivateKey(key) {
 		key, err = crypto.GenerateKey() // retry once
@@ -531,102 +531,102 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
 		return "", err
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	if whisper.privateKeys[id] != nil {
+	if waku.privateKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	whisper.privateKeys[id] = key
+	waku.privateKeys[id] = key
 	return id, nil
 }
 
 // DeleteKeyPair deletes the specified key if it exists.
-func (whisper *Whisper) DeleteKeyPair(key string) bool {
+func (waku *Waku) DeleteKeyPair(key string) bool {
 	deterministicID, err := toDeterministicID(key, keyIDSize)
 	if err != nil {
 		return false
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	if whisper.privateKeys[deterministicID] != nil {
-		delete(whisper.privateKeys, deterministicID)
+	if waku.privateKeys[deterministicID] != nil {
+		delete(waku.privateKeys, deterministicID)
 		return true
 	}
 	return false
 }
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
-func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
+func (waku *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
 	if err != nil {
 		return "", err
 	}
-	if whisper.HasKeyPair(id) {
+	if waku.HasKeyPair(id) {
 		return id, nil // no need to re-inject
 	}
 
-	whisper.keyMu.Lock()
-	whisper.privateKeys[id] = key
-	whisper.keyMu.Unlock()
-	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
+	waku.keyMu.Lock()
+	waku.privateKeys[id] = key
+	waku.keyMu.Unlock()
+	log.Info("Waku identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
 
 	return id, nil
 }
 
 // SelectKeyPair adds cryptographic identity, and makes sure
 // that it is the only private key known to the node.
-func (whisper *Whisper) SelectKeyPair(key *ecdsa.PrivateKey) error {
+func (waku *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
 	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
 	if err != nil {
 		return err
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	whisper.privateKeys[id] = key
+	waku.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
+	waku.privateKeys[id] = key
 
-	log.Info("Whisper identity selected", "id", id, "key", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
+	log.Info("Waku identity selected", "id", id, "key", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
 	return nil
 }
 
 // DeleteKeyPairs removes all cryptographic identities known to the node
-func (whisper *Whisper) DeleteKeyPairs() error {
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+func (waku *Waku) DeleteKeyPairs() error {
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey)
+	waku.privateKeys = make(map[string]*ecdsa.PrivateKey)
 
 	return nil
 }
 
-// HasKeyPair checks if the whisper node is configured with the private key
+// HasKeyPair checks if the waku node is configured with the private key
 // of the specified public pair.
-func (whisper *Whisper) HasKeyPair(id string) bool {
+func (waku *Waku) HasKeyPair(id string) bool {
 	deterministicID, err := toDeterministicID(id, keyIDSize)
 	if err != nil {
 		return false
 	}
 
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	return whisper.privateKeys[deterministicID] != nil
+	waku.keyMu.RLock()
+	defer waku.keyMu.RUnlock()
+	return waku.privateKeys[deterministicID] != nil
 }
 
 // GetPrivateKey retrieves the private key of the specified identity.
-func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
+func (waku *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 	deterministicID, err := toDeterministicID(id, keyIDSize)
 	if err != nil {
 		return nil, err
 	}
 
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	key := whisper.privateKeys[deterministicID]
+	waku.keyMu.RLock()
+	defer waku.keyMu.RUnlock()
+	key := waku.privateKeys[deterministicID]
 	if key == nil {
 		return nil, fmt.Errorf("invalid id")
 	}
@@ -635,7 +635,7 @@ func (whisper *Whisper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 
 // GenerateSymKey generates a random symmetric key and stores it under id,
 // which is then returned. Will be used in the future for session key exchange.
-func (whisper *Whisper) GenerateSymKey() (string, error) {
+func (waku *Waku) GenerateSymKey() (string, error) {
 	key, err := generateSecureRandomData(aesKeyLength)
 	if err != nil {
 		return "", err
@@ -648,35 +648,35 @@ func (whisper *Whisper) GenerateSymKey() (string, error) {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	if whisper.symKeys[id] != nil {
+	if waku.symKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	whisper.symKeys[id] = key
+	waku.symKeys[id] = key
 	return id, nil
 }
 
 // AddSymKey stores the key with a given id.
-func (whisper *Whisper) AddSymKey(id string, key []byte) (string, error) {
+func (waku *Waku) AddSymKey(id string, key []byte) (string, error) {
 	deterministicID, err := toDeterministicID(id, keyIDSize)
 	if err != nil {
 		return "", err
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	if whisper.symKeys[deterministicID] != nil {
+	if waku.symKeys[deterministicID] != nil {
 		return "", fmt.Errorf("key already exists: %v", id)
 	}
-	whisper.symKeys[deterministicID] = key
+	waku.symKeys[deterministicID] = key
 	return deterministicID, nil
 }
 
 // AddSymKeyDirect stores the key, and returns its id.
-func (whisper *Whisper) AddSymKeyDirect(key []byte) (string, error) {
+func (waku *Waku) AddSymKeyDirect(key []byte) (string, error) {
 	if len(key) != aesKeyLength {
 		return "", fmt.Errorf("wrong key size: %d", len(key))
 	}
@@ -686,23 +686,23 @@ func (whisper *Whisper) AddSymKeyDirect(key []byte) (string, error) {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
-	if whisper.symKeys[id] != nil {
+	if waku.symKeys[id] != nil {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
-	whisper.symKeys[id] = key
+	waku.symKeys[id] = key
 	return id, nil
 }
 
 // AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
-func (whisper *Whisper) AddSymKeyFromPassword(password string) (string, error) {
+func (waku *Waku) AddSymKeyFromPassword(password string) (string, error) {
 	id, err := GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
-	if whisper.HasSymKey(id) {
+	if waku.HasSymKey(id) {
 		return "", fmt.Errorf("failed to generate unique ID")
 	}
 
@@ -713,59 +713,59 @@ func (whisper *Whisper) AddSymKeyFromPassword(password string) (string, error) {
 		return "", err
 	}
 
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
 
 	// double check is necessary, because deriveKeyMaterial() is very slow
-	if whisper.symKeys[id] != nil {
+	if waku.symKeys[id] != nil {
 		return "", fmt.Errorf("critical error: failed to generate unique ID")
 	}
-	whisper.symKeys[id] = derived
+	waku.symKeys[id] = derived
 	return id, nil
 }
 
 // HasSymKey returns true if there is a key associated with the given id.
 // Otherwise returns false.
-func (whisper *Whisper) HasSymKey(id string) bool {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	return whisper.symKeys[id] != nil
+func (waku *Waku) HasSymKey(id string) bool {
+	waku.keyMu.RLock()
+	defer waku.keyMu.RUnlock()
+	return waku.symKeys[id] != nil
 }
 
 // DeleteSymKey deletes the key associated with the name string if it exists.
-func (whisper *Whisper) DeleteSymKey(id string) bool {
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-	if whisper.symKeys[id] != nil {
-		delete(whisper.symKeys, id)
+func (waku *Waku) DeleteSymKey(id string) bool {
+	waku.keyMu.Lock()
+	defer waku.keyMu.Unlock()
+	if waku.symKeys[id] != nil {
+		delete(waku.symKeys, id)
 		return true
 	}
 	return false
 }
 
 // GetSymKey returns the symmetric key associated with the given id.
-func (whisper *Whisper) GetSymKey(id string) ([]byte, error) {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-	if whisper.symKeys[id] != nil {
-		return whisper.symKeys[id], nil
+func (waku *Waku) GetSymKey(id string) ([]byte, error) {
+	waku.keyMu.RLock()
+	defer waku.keyMu.RUnlock()
+	if waku.symKeys[id] != nil {
+		return waku.symKeys[id], nil
 	}
 	return nil, fmt.Errorf("non-existent key ID")
 }
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (whisper *Whisper) Subscribe(f *Filter) (string, error) {
-	s, err := whisper.filters.Install(f)
+func (waku *Waku) Subscribe(f *Filter) (string, error) {
+	s, err := waku.filters.Install(f)
 	if err == nil {
-		whisper.updateBloomFilter(f)
+		waku.updateBloomFilter(f)
 	}
 	return s, err
 }
 
 // updateBloomFilter recalculates the new value of bloom filter,
 // and informs the peers if necessary.
-func (whisper *Whisper) updateBloomFilter(f *Filter) {
+func (waku *Waku) updateBloomFilter(f *Filter) {
 	aggregate := make([]byte, BloomFilterSize)
 	for _, t := range f.Topics {
 		top := BytesToTopic(t)
@@ -773,31 +773,31 @@ func (whisper *Whisper) updateBloomFilter(f *Filter) {
 		aggregate = addBloom(aggregate, b)
 	}
 
-	if !BloomFilterMatch(whisper.BloomFilter(), aggregate) {
+	if !BloomFilterMatch(waku.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
-		aggregate = addBloom(whisper.BloomFilter(), aggregate)
-		whisper.SetBloomFilter(aggregate)
+		aggregate = addBloom(waku.BloomFilter(), aggregate)
+		waku.SetBloomFilter(aggregate)
 	}
 }
 
 // GetFilter returns the filter by id.
-func (whisper *Whisper) GetFilter(id string) *Filter {
-	return whisper.filters.Get(id)
+func (waku *Waku) GetFilter(id string) *Filter {
+	return waku.filters.Get(id)
 }
 
 // Unsubscribe removes an installed message handler.
-func (whisper *Whisper) Unsubscribe(id string) error {
-	ok := whisper.filters.Uninstall(id)
+func (waku *Waku) Unsubscribe(id string) error {
+	ok := waku.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("Unsubscribe: Invalid ID")
 	}
 	return nil
 }
 
-// Send injects a message into the whisper send queue, to be distributed in the
+// Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (whisper *Whisper) Send(envelope *Envelope) error {
-	ok, err := whisper.add(envelope, false)
+func (waku *Waku) Send(envelope *Envelope) error {
+	ok, err := waku.add(envelope, false)
 	if err == nil && !ok {
 		return fmt.Errorf("failed to add envelope")
 	}
@@ -805,59 +805,59 @@ func (whisper *Whisper) Send(envelope *Envelope) error {
 }
 
 // Start implements node.Service, starting the background data propagation thread
-// of the Whisper protocol.
-func (whisper *Whisper) Start(*p2p.Server) error {
-	log.Info("started whisper v." + ProtocolVersionStr)
-	go whisper.update()
+// of the Waku protocol.
+func (waku *Waku) Start(*p2p.Server) error {
+	log.Info("started waku v." + ProtocolVersionStr)
+	go waku.update()
 
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
-		go whisper.processQueue()
+		go waku.processQueue()
 	}
-	go whisper.processP2P()
+	go waku.processP2P()
 
 	return nil
 }
 
 // Stop implements node.Service, stopping the background data propagation thread
-// of the Whisper protocol.
-func (whisper *Whisper) Stop() error {
-	close(whisper.quit)
-	log.Info("whisper stopped")
+// of the Waku protocol.
+func (waku *Waku) Stop() error {
+	close(waku.quit)
+	log.Info("waku stopped")
 	return nil
 }
 
-// HandlePeer is called by the underlying P2P layer when the whisper sub-protocol
+// HandlePeer is called by the underlying P2P layer when the waku sub-protocol
 // connection is negotiated.
-func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+func (waku *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	// Create the new peer and start tracking it
-	whisperPeer := newPeer(whisper, peer, rw)
+	wakuPeer := newPeer(waku, peer, rw)
 
-	whisper.peerMu.Lock()
-	whisper.peers[whisperPeer] = struct{}{}
-	whisper.peerMu.Unlock()
+	waku.peerMu.Lock()
+	waku.peers[wakuPeer] = struct{}{}
+	waku.peerMu.Unlock()
 
 	defer func() {
-		whisper.peerMu.Lock()
-		delete(whisper.peers, whisperPeer)
-		whisper.peerMu.Unlock()
+		waku.peerMu.Lock()
+		delete(waku.peers, wakuPeer)
+		waku.peerMu.Unlock()
 	}()
 
 	// Run the peer handshake and state updates
-	if err := whisperPeer.handshake(); err != nil {
+	if err := wakuPeer.handshake(); err != nil {
 		return err
 	}
-	whisperPeer.start()
-	defer whisperPeer.stop()
+	wakuPeer.start()
+	defer wakuPeer.stop()
 
-	if whisper.rateLimiter != nil {
-		return whisper.rateLimiter.decorate(whisperPeer, rw, whisper.runMessageLoop)
+	if waku.rateLimiter != nil {
+		return waku.rateLimiter.decorate(wakuPeer, rw, waku.runMessageLoop)
 	}
-	return whisper.runMessageLoop(whisperPeer, rw)
+	return waku.runMessageLoop(wakuPeer, rw)
 }
 
 // TODO
-//func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
+//func (waku *Waku) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
 //	envelopeErrors []EnvelopeError) {
 //	batchHash := crypto.Keccak256Hash(data)
 //	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors)); err != nil {
@@ -870,7 +870,7 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 //}
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
-func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
+func (waku *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	for {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
@@ -878,7 +878,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			log.Info("message loop", "peer", p.peer.ID(), "err", err)
 			return err
 		}
-		if packet.Size > whisper.MaxMessageSize() {
+		if packet.Size > waku.MaxMessageSize() {
 			log.Warn("oversized message received", "peer", p.peer.ID())
 			return errors.New("oversized message received")
 		}
@@ -905,7 +905,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			trouble := false
 			envelopeErrors := []EnvelopeError{}
 			for _, env := range envelopes {
-				cached, err := whisper.add(env, whisper.LightClientMode())
+				cached, err := waku.add(env, waku.LightClientMode())
 				if err != nil {
 					_, isTimeSyncError := err.(TimeSyncError)
 					if !isTimeSyncError {
@@ -915,7 +915,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					envelopeErrors = append(envelopeErrors, ErrorToEnvelopeError(env.Hash(), err))
 				}
 
-				whisper.envelopeFeed.Send(EnvelopeEvent{
+				waku.envelopeFeed.Send(EnvelopeEvent{
 					Event: EventEnvelopeReceived,
 					Topic: env.Topic,
 					Hash:  env.Hash(),
@@ -926,9 +926,9 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					p.mark(env)
 				}
 			}
-			if !whisper.disableConfirmations {
+			if !waku.disableConfirmations {
 				// TODO
-				//go whisper.sendConfirmation(p.peer.ID(), rw, data, envelopeErrors)
+				//go waku.sendConfirmation(p.peer.ID(), rw, data, envelopeErrors)
 			}
 
 			if trouble {
@@ -948,7 +948,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		//			envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
 		//			log.Error("failed to decode messages response into first version of response", "peer", p.peer.ID(), "error", err)
 		//		}
-		//		whisper.envelopeFeed.Send(EnvelopeEvent{
+		//		waku.envelopeFeed.Send(EnvelopeEvent{
 		//			Batch: response.Hash,
 		//			Event: EventBatchAcknowledged,
 		//			Peer:  p.peer.ID(),
@@ -964,7 +964,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		//		log.Error("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
 		//		return errors.New("invalid confirmation message")
 		//	}
-		//	whisper.envelopeFeed.Send(EnvelopeEvent{
+		//	waku.envelopeFeed.Send(EnvelopeEvent{
 		//		Batch: batchHash,
 		//		Event: EventBatchAcknowledged,
 		//		Peer:  p.peer.ID(),
@@ -1021,7 +1021,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 				if err = packet.Decode(&envelopes); err == nil {
 					for _, envelope := range envelopes {
-						whisper.postP2P(envelope)
+						waku.postP2P(envelope)
 					}
 					continue
 				}
@@ -1035,7 +1035,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 
 				if err = packet.Decode(&envelope); err == nil {
-					whisper.postP2P(envelope)
+					waku.postP2P(envelope)
 					continue
 				}
 
@@ -1046,7 +1046,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			}
 		case p2pRequestCode:
 			// Must be processed if mail server is implemented. Otherwise ignore.
-			if whisper.mailServer != nil {
+			if waku.mailServer != nil {
 				// Read all data as we will try to decode it possibly twice.
 				data, err := ioutil.ReadAll(packet.Payload)
 				if err != nil {
@@ -1058,7 +1058,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var requestDeprecated Envelope
 				errDepReq := packet.Decode(&requestDeprecated)
 				if errDepReq == nil {
-					whisper.mailServer.DeliverMail(p, &requestDeprecated)
+					waku.mailServer.DeliverMail(p, &requestDeprecated)
 					continue
 				} else {
 					log.Info("failed to decode p2p request message (deprecated)", "peer", p.peer.ID(), "err", errDepReq)
@@ -1073,7 +1073,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				var request MessagesRequest
 				errReq := packet.Decode(&request)
 				if errReq == nil {
-					whisper.mailServer.Deliver(p, request)
+					waku.mailServer.Deliver(p, request)
 					continue
 				} else {
 					log.Info("failed to decode p2p request message", "peer", p.peer.ID(), "err", errReq)
@@ -1097,12 +1097,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 
 				if event != nil {
-					whisper.postP2P(*event)
+					waku.postP2P(*event)
 				}
 
 			}
 		default:
-			// New message types might be implemented in the future versions of Whisper.
+			// New message types might be implemented in the future versions of Waku.
 			// For forward compatibility, just ignore.
 		}
 
@@ -1111,11 +1111,11 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 }
 
 // add inserts a new envelope into the message pool to be distributed within the
-// whisper network. It also inserts the envelope into the expiration pool at the
+// waku network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
-func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
-	now := uint32(whisper.timeSource().Unix())
+func (waku *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
+	now := uint32(waku.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
 	envelopesReceivedCounter.Inc()
@@ -1140,61 +1140,61 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 		return false, nil // drop envelope without error
 	}
 
-	if uint32(envelope.size()) > whisper.MaxMessageSize() {
+	if uint32(envelope.size()) > waku.MaxMessageSize() {
 		envelopesCacheFailedCounter.WithLabelValues("oversized").Inc()
 		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
 	}
 
-	if envelope.PoW() < whisper.MinPow() {
+	if envelope.PoW() < waku.MinPow() {
 		// maybe the value was recently changed, and the peers did not adjust yet.
 		// in this case the previous value is retrieved by MinPowTolerance()
 		// for a short period of peer synchronization.
-		if envelope.PoW() < whisper.MinPowTolerance() {
+		if envelope.PoW() < waku.MinPowTolerance() {
 			envelopesCacheFailedCounter.WithLabelValues("low_pow").Inc()
 			return false, fmt.Errorf("envelope with low PoW received: PoW=%f, hash=[%v]", envelope.PoW(), envelope.Hash().Hex())
 		}
 	}
 
-	if !BloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
+	if !BloomFilterMatch(waku.BloomFilter(), envelope.Bloom()) {
 		// maybe the value was recently changed, and the peers did not adjust yet.
 		// in this case the previous value is retrieved by BloomFilterTolerance()
 		// for a short period of peer synchronization.
-		if !BloomFilterMatch(whisper.BloomFilterTolerance(), envelope.Bloom()) {
+		if !BloomFilterMatch(waku.BloomFilterTolerance(), envelope.Bloom()) {
 			envelopesCacheFailedCounter.WithLabelValues("no_bloom_match").Inc()
 			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
-				envelope.Hash().Hex(), whisper.BloomFilter(), envelope.Bloom(), envelope.Topic)
+				envelope.Hash().Hex(), waku.BloomFilter(), envelope.Bloom(), envelope.Topic)
 		}
 	}
 
 	hash := envelope.Hash()
 
-	whisper.poolMu.Lock()
-	_, alreadyCached := whisper.envelopes[hash]
+	waku.poolMu.Lock()
+	_, alreadyCached := waku.envelopes[hash]
 	if !alreadyCached {
-		whisper.envelopes[hash] = envelope
-		if whisper.expirations[envelope.Expiry] == nil {
-			whisper.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
+		waku.envelopes[hash] = envelope
+		if waku.expirations[envelope.Expiry] == nil {
+			waku.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
 		}
-		if !whisper.expirations[envelope.Expiry].Contains(hash) {
-			whisper.expirations[envelope.Expiry].Add(hash)
+		if !waku.expirations[envelope.Expiry].Contains(hash) {
+			waku.expirations[envelope.Expiry].Add(hash)
 		}
 	}
-	whisper.poolMu.Unlock()
+	waku.poolMu.Unlock()
 
 	if alreadyCached {
-		log.Trace("whisper envelope already cached", "hash", envelope.Hash().Hex())
+		log.Trace("waku envelope already cached", "hash", envelope.Hash().Hex())
 		envelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
-		log.Trace("cached whisper envelope", "hash", envelope.Hash().Hex())
+		log.Trace("cached waku envelope", "hash", envelope.Hash().Hex())
 		envelopesCachedCounter.WithLabelValues("miss").Inc()
 		envelopesSizeMeter.Observe(float64(envelope.size()))
-		whisper.statsMu.Lock()
-		whisper.stats.memoryUsed += envelope.size()
-		whisper.statsMu.Unlock()
-		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
-		if whisper.mailServer != nil {
-			whisper.mailServer.Archive(envelope)
-			whisper.envelopeFeed.Send(EnvelopeEvent{
+		waku.statsMu.Lock()
+		waku.stats.memoryUsed += envelope.size()
+		waku.statsMu.Unlock()
+		waku.postEvent(envelope, isP2P) // notify the local node about the new message
+		if waku.mailServer != nil {
+			waku.mailServer.Archive(envelope)
+			waku.envelopeFeed.Send(EnvelopeEvent{
 				Topic: envelope.Topic,
 				Hash:  envelope.Hash(),
 				Event: EventMailServerEnvelopeArchived,
@@ -1204,47 +1204,47 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	return true, nil
 }
 
-func (whisper *Whisper) postP2P(event interface{}) {
-	whisper.p2pMsgQueue <- event
+func (waku *Waku) postP2P(event interface{}) {
+	waku.p2pMsgQueue <- event
 }
 
 // postEvent queues the message for further processing.
-func (whisper *Whisper) postEvent(envelope *Envelope, isP2P bool) {
+func (waku *Waku) postEvent(envelope *Envelope, isP2P bool) {
 	if isP2P {
-		whisper.postP2P(envelope)
+		waku.postP2P(envelope)
 	} else {
-		whisper.checkOverflow()
-		whisper.messageQueue <- envelope
+		waku.checkOverflow()
+		waku.messageQueue <- envelope
 	}
 
 }
 
 // checkOverflow checks if message queue overflow occurs and reports it if necessary.
-func (whisper *Whisper) checkOverflow() {
-	queueSize := len(whisper.messageQueue)
+func (waku *Waku) checkOverflow() {
+	queueSize := len(waku.messageQueue)
 
 	if queueSize == messageQueueLimit {
-		if !whisper.Overflow() {
-			whisper.settings.Store(overflowIdx, true)
+		if !waku.Overflow() {
+			waku.settings.Store(overflowIdx, true)
 			log.Warn("message queue overflow")
 		}
 	} else if queueSize <= messageQueueLimit/2 {
-		if whisper.Overflow() {
-			whisper.settings.Store(overflowIdx, false)
+		if waku.Overflow() {
+			waku.settings.Store(overflowIdx, false)
 			log.Warn("message queue overflow fixed (back to normal)")
 		}
 	}
 }
 
-// processQueue delivers the messages to the watchers during the lifetime of the whisper node.
-func (whisper *Whisper) processQueue() {
+// processQueue delivers the messages to the watchers during the lifetime of the waku node.
+func (waku *Waku) processQueue() {
 	for {
 		select {
-		case <-whisper.quit:
+		case <-waku.quit:
 			return
-		case e := <-whisper.messageQueue:
-			whisper.filters.NotifyWatchers(e, false)
-			whisper.envelopeFeed.Send(EnvelopeEvent{
+		case e := <-waku.messageQueue:
+			waku.filters.NotifyWatchers(e, false)
+			waku.envelopeFeed.Send(EnvelopeEvent{
 				Topic: e.Topic,
 				Hash:  e.Hash(),
 				Event: EventEnvelopeAvailable,
@@ -1253,30 +1253,30 @@ func (whisper *Whisper) processQueue() {
 	}
 }
 
-func (whisper *Whisper) processP2P() {
+func (waku *Waku) processP2P() {
 	for {
 		select {
-		case <-whisper.quit:
+		case <-waku.quit:
 			return
-		case e := <-whisper.p2pMsgQueue:
+		case e := <-waku.p2pMsgQueue:
 			switch event := e.(type) {
 			case *Envelope:
-				whisper.filters.NotifyWatchers(event, true)
-				whisper.envelopeFeed.Send(EnvelopeEvent{
+				waku.filters.NotifyWatchers(event, true)
+				waku.envelopeFeed.Send(EnvelopeEvent{
 					Topic: event.Topic,
 					Hash:  event.Hash(),
 					Event: EventEnvelopeAvailable,
 				})
 			case EnvelopeEvent:
-				whisper.envelopeFeed.Send(event)
+				waku.envelopeFeed.Send(event)
 			}
 		}
 	}
 }
 
-// update loops until the lifetime of the whisper node, updating its internal
+// update loops until the lifetime of the waku node, updating its internal
 // state by expiring stale messages from the pool.
-func (whisper *Whisper) update() {
+func (waku *Waku) update() {
 	// Start a ticker to check for expirations
 	expire := time.NewTicker(expirationCycle)
 
@@ -1284,9 +1284,9 @@ func (whisper *Whisper) update() {
 	for {
 		select {
 		case <-expire.C:
-			whisper.expire()
+			waku.expire()
 
-		case <-whisper.quit:
+		case <-waku.quit:
 			return
 		}
 	}
@@ -1294,62 +1294,62 @@ func (whisper *Whisper) update() {
 
 // expire iterates over all the expiration timestamps, removing all stale
 // messages from the pools.
-func (whisper *Whisper) expire() {
-	whisper.poolMu.Lock()
-	defer whisper.poolMu.Unlock()
+func (waku *Waku) expire() {
+	waku.poolMu.Lock()
+	defer waku.poolMu.Unlock()
 
-	whisper.statsMu.Lock()
-	defer whisper.statsMu.Unlock()
-	whisper.stats.reset()
-	now := uint32(whisper.timeSource().Unix())
-	for expiry, hashSet := range whisper.expirations {
+	waku.statsMu.Lock()
+	defer waku.statsMu.Unlock()
+	waku.stats.reset()
+	now := uint32(waku.timeSource().Unix())
+	for expiry, hashSet := range waku.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
 			hashSet.Each(func(v interface{}) bool {
-				sz := whisper.envelopes[v.(common.Hash)].size()
-				delete(whisper.envelopes, v.(common.Hash))
+				sz := waku.envelopes[v.(common.Hash)].size()
+				delete(waku.envelopes, v.(common.Hash))
 				envelopesCachedCounter.WithLabelValues("clear").Inc()
-				whisper.envelopeFeed.Send(EnvelopeEvent{
+				waku.envelopeFeed.Send(EnvelopeEvent{
 					Hash:  v.(common.Hash),
 					Event: EventEnvelopeExpired,
 				})
-				whisper.stats.messagesCleared++
-				whisper.stats.memoryCleared += sz
-				whisper.stats.memoryUsed -= sz
+				waku.stats.messagesCleared++
+				waku.stats.memoryCleared += sz
+				waku.stats.memoryUsed -= sz
 				return false
 			})
-			whisper.expirations[expiry].Clear()
-			delete(whisper.expirations, expiry)
+			waku.expirations[expiry].Clear()
+			delete(waku.expirations, expiry)
 		}
 	}
 }
 
-// Stats returns the whisper node statistics.
-func (whisper *Whisper) Stats() Statistics {
-	whisper.statsMu.Lock()
-	defer whisper.statsMu.Unlock()
+// Stats returns the waku node statistics.
+func (waku *Waku) Stats() Statistics {
+	waku.statsMu.Lock()
+	defer waku.statsMu.Unlock()
 
-	return whisper.stats
+	return waku.stats
 }
 
 // Envelopes retrieves all the messages currently pooled by the node.
-func (whisper *Whisper) Envelopes() []*Envelope {
-	whisper.poolMu.RLock()
-	defer whisper.poolMu.RUnlock()
+func (waku *Waku) Envelopes() []*Envelope {
+	waku.poolMu.RLock()
+	defer waku.poolMu.RUnlock()
 
-	all := make([]*Envelope, 0, len(whisper.envelopes))
-	for _, envelope := range whisper.envelopes {
+	all := make([]*Envelope, 0, len(waku.envelopes))
+	for _, envelope := range waku.envelopes {
 		all = append(all, envelope)
 	}
 	return all
 }
 
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.
-func (whisper *Whisper) isEnvelopeCached(hash common.Hash) bool {
-	whisper.poolMu.Lock()
-	defer whisper.poolMu.Unlock()
+func (waku *Waku) isEnvelopeCached(hash common.Hash) bool {
+	waku.poolMu.Lock()
+	defer waku.poolMu.Unlock()
 
-	_, exist := whisper.envelopes[hash]
+	_, exist := waku.envelopes[hash]
 	return exist
 }
 
@@ -1494,11 +1494,11 @@ func addBloom(a, b []byte) []byte {
 
 // SelectedKeyPairID returns the id of currently selected key pair.
 // It helps distinguish between different users w/o exposing the user identity itself.
-func (whisper *Whisper) SelectedKeyPairID() string {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
+func (waku *Waku) SelectedKeyPairID() string {
+	waku.keyMu.RLock()
+	defer waku.keyMu.RUnlock()
 
-	for id := range whisper.privateKeys {
+	for id := range waku.privateKeys {
 		return id
 	}
 	return ""
@@ -1506,7 +1506,7 @@ func (whisper *Whisper) SelectedKeyPairID() string {
 
 // GetEnvelope retrieves an envelope from the message queue by its hash.
 // It returns nil if the envelope can not be found.
-func (w *Whisper) GetEnvelope(hash common.Hash) *Envelope {
+func (w *Waku) GetEnvelope(hash common.Hash) *Envelope {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 	return w.envelopes[hash]

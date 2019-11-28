@@ -449,9 +449,9 @@ func TestAesNonce(t *testing.T) {
 		t.Fatalf("NewGCM failed: %s", err)
 	}
 	// This is the most important single test in this package.
-	// If it fails, whisper will not be working.
+	// If it fails, waku will not be working.
 	if aesgcm.NonceSize() != aesNonceLength {
-		t.Fatalf("Nonce size is wrong. This is a critical error. Apparently AES nonce size have changed in the new version of AES GCM package. Whisper will not be working until this problem is resolved.")
+		t.Fatalf("Nonce size is wrong. This is a critical error. Apparently AES nonce size have changed in the new version of AES GCM package. Waku will not be working until this problem is resolved.")
 	}
 }
 

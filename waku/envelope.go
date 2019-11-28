@@ -23,7 +23,7 @@ type Envelope struct {
 	Data   []byte
 	Nonce  uint64
 
-	pow float64 // Message-specific PoW as described in the Whisper specification.
+	pow float64 // Message-specific PoW as described in the Waku specification.
 
 	// the following variables should not be accessed directly, use the corresponding function instead: Hash(), Bloom()
 	hash  common.Hash // Cached hash of the envelope to avoid rehashing every time.
@@ -41,7 +41,7 @@ func (e *Envelope) rlpWithoutNonce() []byte {
 	return res
 }
 
-// NewEnvelope wraps a Whisper message with expiration and destination data
+// NewEnvelope wraps a Waku message with expiration and destination data
 // included into an envelope for network forwarding.
 func NewEnvelope(ttl uint32, topic TopicType, msg *sentMessage, now time.Time) *Envelope {
 	env := Envelope{
