@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/prometheus/common/log"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // MessageStore defines interface for temporary message store.

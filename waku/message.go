@@ -4,8 +4,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
+	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
+	mrand "math/rand"
 	"strconv"
 	"time"
 

@@ -72,7 +72,6 @@ type MailServer interface {
 	Archive(env *Envelope)
 	DeliverMail(whisperPeer *Peer, request *Envelope) // DEPRECATED
 	Deliver(whisperPeer *Peer, request MessagesRequest)
-	SyncMail(*Peer, SyncMailRequest) error
 }
 
 // MessagesRequest contains details of a request of historic messages.

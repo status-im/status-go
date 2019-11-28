@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -117,7 +118,7 @@ func (e *Envelope) calculatePoW(diff uint32) {
 	binary.BigEndian.PutUint64(buf[len(rlp):], e.Nonce)
 	powHash := new(big.Int).SetBytes(crypto.Keccak256(buf))
 	leadingZeroes := 256 - powHash.BitLen()
-	x := gmath.Pow(2, float64(leadingZeroes))
+	x := math.Pow(2, float64(leadingZeroes))
 	x /= float64(len(rlp))
 	x /= float64(e.TTL + diff)
 	e.pow = x
@@ -127,8 +128,8 @@ func (e *Envelope) powToFirstBit(pow float64) int {
 	x := pow
 	x *= float64(e.size())
 	x *= float64(e.TTL)
-	bits := gmath.Log2(x)
-	bits = gmath.Ceil(bits)
+	bits := math.Log2(x)
+	bits = math.Ceil(bits)
 	res := int(bits)
 	if res < 1 {
 		res = 1
@@ -250,12 +251,4 @@ func TopicToBloom(topic TopicType) []byte {
 		b[byteIndex] = (1 << uint(bitIndex))
 	}
 	return b
-}
-
-// GetEnvelope retrieves an envelope from the message queue by its hash.
-// It returns nil if the envelope can not be found.
-func (w *Whisper) GetEnvelope(hash common.Hash) *Envelope {
-	w.poolMu.RLock()
-	defer w.poolMu.RUnlock()
-	return w.envelopes[hash]
 }

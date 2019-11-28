@@ -17,11 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/prometheus/common/log"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
 )
@@ -115,7 +115,7 @@ func New(cfg *Config) *Whisper {
 		quit:                 make(chan struct{}),
 		syncAllowance:        DefaultSyncAllowance,
 		timeSource:           time.Now,
-		disableConfirmations: cfg.DisableConfirmations,
+		disableConfirmations: !cfg.EnableConfirmations,
 	}
 
 	whisper.filters = NewFilters(whisper)
@@ -479,34 +479,6 @@ func (whisper *Whisper) SendHistoricMessageResponse(peer *Peer, payload []byte) 
 	}
 
 	return peer.ws.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
-}
-
-// SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
-func (whisper *Whisper) SyncMessages(peerID []byte, req SyncMailRequest) error {
-	if whisper.mailServer == nil {
-		return errors.New("can not sync messages if Mail Server is not configured")
-	}
-
-	p, err := whisper.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-
-	if err := req.Validate(); err != nil {
-		return err
-	}
-
-	return p2p.Send(p.ws, p2pSyncRequestCode, req)
-}
-
-// SendSyncResponse sends a response to a Mail Server with a slice of envelopes.
-func (whisper *Whisper) SendSyncResponse(p *Peer, data SyncResponse) error {
-	return p2p.Send(p.ws, p2pSyncResponseCode, data)
-}
-
-// SendRawSyncResponse sends a response to a Mail Server with a slice of envelopes.
-func (whisper *Whisper) SendRawSyncResponse(p *Peer, data RawSyncResponse) error {
-	return p2p.Send(p.ws, p2pSyncResponseCode, data)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -884,17 +856,18 @@ func (whisper *Whisper) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	return whisper.runMessageLoop(whisperPeer, rw)
 }
 
-func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
-	envelopeErrors []EnvelopeError) {
-	batchHash := crypto.Keccak256Hash(data)
-	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors)); err != nil {
-		log.Warn("failed to deliver messages response", "hash", batchHash, "envelopes errors", envelopeErrors,
-			"peer", peer, "error", err)
-	}
-	if err := p2p.Send(rw, batchAcknowledgedCode, batchHash); err != nil {
-		log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", peer, "error", err)
-	}
-}
+// TODO
+//func (whisper *Whisper) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
+//	envelopeErrors []EnvelopeError) {
+//	batchHash := crypto.Keccak256Hash(data)
+//	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors)); err != nil {
+//		log.Warn("failed to deliver messages response", "hash", batchHash, "envelopes errors", envelopeErrors,
+//			"peer", peer, "error", err)
+//	}
+//	if err := p2p.Send(rw, batchAcknowledgedCode, batchHash); err != nil {
+//		log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", peer, "error", err)
+//	}
+//}
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
@@ -954,45 +927,48 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				}
 			}
 			if !whisper.disableConfirmations {
-				go whisper.sendConfirmation(p.peer.ID(), rw, data, envelopeErrors)
+				// TODO
+				//go whisper.sendConfirmation(p.peer.ID(), rw, data, envelopeErrors)
 			}
 
 			if trouble {
 				return errors.New("invalid envelope")
 			}
-		case messageResponseCode:
-			var multiResponse MultiVersionResponse
-			if err := packet.Decode(&multiResponse); err != nil {
-				envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-				log.Error("failed to decode messages response", "peer", p.peer.ID(), "error", err)
-				return errors.New("invalid response message")
-			}
-			if multiResponse.Version == 1 {
-				response, err := multiResponse.DecodeResponse1()
-				if err != nil {
-					envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-					log.Error("failed to decode messages response into first version of response", "peer", p.peer.ID(), "error", err)
-				}
-				whisper.envelopeFeed.Send(EnvelopeEvent{
-					Batch: response.Hash,
-					Event: EventBatchAcknowledged,
-					Peer:  p.peer.ID(),
-					Data:  response.Errors,
-				})
-			} else {
-				log.Warn("unknown version of the messages response was received. response is ignored", "peer", p.peer.ID(), "version", multiResponse.Version)
-			}
-		case batchAcknowledgedCode:
-			var batchHash common.Hash
-			if err := packet.Decode(&batchHash); err != nil {
-				log.Error("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
-				return errors.New("invalid confirmation message")
-			}
-			whisper.envelopeFeed.Send(EnvelopeEvent{
-				Batch: batchHash,
-				Event: EventBatchAcknowledged,
-				Peer:  p.peer.ID(),
-			})
+		//case messageResponseCode:
+		// TODO
+		//	var multiResponse MultiVersionResponse
+		//	if err := packet.Decode(&multiResponse); err != nil {
+		//		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
+		//		log.Error("failed to decode messages response", "peer", p.peer.ID(), "error", err)
+		//		return errors.New("invalid response message")
+		//	}
+		//	if multiResponse.Version == 1 {
+		//		response, err := multiResponse.DecodeResponse1()
+		//		if err != nil {
+		//			envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
+		//			log.Error("failed to decode messages response into first version of response", "peer", p.peer.ID(), "error", err)
+		//		}
+		//		whisper.envelopeFeed.Send(EnvelopeEvent{
+		//			Batch: response.Hash,
+		//			Event: EventBatchAcknowledged,
+		//			Peer:  p.peer.ID(),
+		//			Data:  response.Errors,
+		//		})
+		//	} else {
+		//		log.Warn("unknown version of the messages response was received. response is ignored", "peer", p.peer.ID(), "version", multiResponse.Version)
+		//	}
+		//case batchAcknowledgedCode:
+		// TODO
+		//	var batchHash common.Hash
+		//	if err := packet.Decode(&batchHash); err != nil {
+		//		log.Error("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
+		//		return errors.New("invalid confirmation message")
+		//	}
+		//	whisper.envelopeFeed.Send(EnvelopeEvent{
+		//		Batch: batchHash,
+		//		Event: EventBatchAcknowledged,
+		//		Peer:  p.peer.ID(),
+		//	})
 		case powRequirementCode:
 			s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 			i, err := s.Uint()
@@ -1066,62 +1042,6 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				if err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return fmt.Errorf("invalid direct message: %v", err)
-				}
-			}
-		case p2pSyncRequestCode:
-			// TODO(adam): should we limit who can send this request?
-			if whisper.mailServer != nil {
-				var request SyncMailRequest
-				if err := packet.Decode(&request); err != nil {
-					return fmt.Errorf("failed to decode p2pSyncRequestCode payload: %v", err)
-				}
-
-				if err := request.Validate(); err != nil {
-					return fmt.Errorf("sync mail request was invalid: %v", err)
-				}
-
-				if err := whisper.mailServer.SyncMail(p, request); err != nil {
-					log.Error(
-						"failed to sync envelopes",
-						"peer", p.peer.ID().String(),
-					)
-					_ = whisper.SendSyncResponse(
-						p,
-						SyncResponse{Error: err.Error()},
-					)
-					return err
-				}
-			} else {
-				log.Debug("requested to sync messages but mail servers is not registered", "peer", p.peer.ID().String())
-			}
-		case p2pSyncResponseCode:
-			// TODO(adam): currently, there is no feedback when a sync response
-			// is received. An idea to fix this:
-			//   1. Sending a request contains an ID,
-			//   2. Each sync response contains this ID,
-			//   3. There is a way to call whisper.SyncMessages() and wait for the response.Final to be received for that particular request ID.
-			//   4. If Cursor is not empty, another p2pSyncRequestCode should be sent.
-			if p.trusted && whisper.mailServer != nil {
-				var resp SyncResponse
-				if err = packet.Decode(&resp); err != nil {
-					return fmt.Errorf("failed to decode p2pSyncResponseCode payload: %v", err)
-				}
-
-				log.Info("received sync response", "count", len(resp.Envelopes), "final", resp.Final, "err", resp.Error, "cursor", resp.Cursor)
-
-				for _, envelope := range resp.Envelopes {
-					whisper.mailServer.Archive(envelope)
-				}
-
-				if resp.Error != "" || resp.Final {
-					whisper.envelopeFeed.Send(EnvelopeEvent{
-						Event: EventMailServerSyncFinished,
-						Peer:  p.peer.ID(),
-						Data: SyncEventResponse{
-							Cursor: resp.Cursor,
-							Error:  resp.Error,
-						},
-					})
 				}
 			}
 		case p2pRequestCode:
@@ -1582,4 +1502,12 @@ func (whisper *Whisper) SelectedKeyPairID() string {
 		return id
 	}
 	return ""
+}
+
+// GetEnvelope retrieves an envelope from the message queue by its hash.
+// It returns nil if the envelope can not be found.
+func (w *Whisper) GetEnvelope(hash common.Hash) *Envelope {
+	w.poolMu.RLock()
+	defer w.poolMu.RUnlock()
+	return w.envelopes[hash]
 }
