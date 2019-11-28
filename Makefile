@@ -298,11 +298,14 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	@go generate ./static
 	@echo "Done"
 
+run-bootnode-systemd: ##@Easy way to run a bootnode locally with Docker Compose
+	@cd _assets/systemd/bootnode/ && $(MAKE)
+
 run-bootnode-docker: ##@Easy way to run a bootnode locally with Docker Compose
-	cd _assets/compose/bootnode/ && $(MAKE)
+	@cd _assets/compose/bootnode/ && $(MAKE)
 
 run-mailserver-systemd: ##@Easy Run a mailserver locally with systemd
-	@_assets/systemd/start.sh
+	@cd _assets/systemd/mailserver/ && $(MAKE)
 
 run-mailserver-docker: ##@Easy Run a mailserver locally with Docker Compose
 	@cd _assets/compose/mailserver/ && $(MAKE)

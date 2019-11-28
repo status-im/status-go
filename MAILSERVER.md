@@ -23,4 +23,4 @@ make run-mailserver-systemd
 ```
 This will generate the necessary config, define and then start the service.
 
-For more details read the [README](_assets/systemd/README.md).
+For more details read the [README](_assets/systemd/mailserver/README.md).
