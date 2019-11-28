@@ -12,20 +12,21 @@ The steps it takes are:
 
 # Usage
 
-To simply configure and start the service run `./start.sh`.
+To simply configure and start the service run `make`.
 
-In order to manage the new `statusd` service you use `systemctl` command:
+In order to manage the new `statusd` service you use other `Makefile` targets:
 
-* `systemctl --user start statusd` - Start the service
-* `systemctl --user stop statusd` - Stop the service
-* `systemctl --user status statusd` - Check service status
-* `systemctl --user disable statusd` - Disable the service
-* `journalctl --user-unit statusd` - Read the service logs
+* `make info` - Info about service
+* `make enode` - Get enode address
+* `make start` - Start the service
+* `make stop` - Stop the service
+* `make status` - Check service status
+* `make enable` - Enable the service
+* `make disable` - Disable the service
+* `make logs` - Read the service logs
+* `make clean` - Stop service and remove it
 
-If you want to remove the service you can use the `clean.sh` script:
-```bash
-_assets/systemd/clean.sh
-```
+All the above commands are just wrappers around the [`systemctl`](http://man7.org/linux/man-pages/man1/systemctl.1.html) and [`journalctl`](http://man7.org/linux/man-pages/man1/journalctl.1.html) commands.
 
 # Settings
 
