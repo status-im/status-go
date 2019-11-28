@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 
@@ -31,7 +32,9 @@ func (f *bootnodes) Set(value string) error {
 
 func main() {
 	var (
+		writeAddr   = flag.Bool("writeaddress", false, "write out the node's public key and quit")
 		listenAddr  = flag.String("addr", ":30301", "listen address")
+		genKeyFile  = flag.String("genkey", "", "generate a node key")
 		nodeKeyFile = flag.String("nodekey", "", "private key filename")
 		keydata     = flag.String("keydata", "", "hex encoded private key")
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-9)")
@@ -50,6 +53,17 @@ func main() {
 	}
 	log.Root().SetHandler(glogger)
 
+	if len(*genKeyFile) != 0 {
+		log.Info("Generating key file", "path", *genKeyFile)
+		key, err := crypto.GenerateKey()
+		if err != nil {
+			log.Crit("unable to generate key", "error", err)
+		}
+		if err := crypto.SaveECDSA(*genKeyFile, key); err != nil {
+			log.Crit("unable to save key", "error", err)
+		}
+		os.Exit(0)
+	}
 	if len(*nodeKeyFile) == 0 && len(*keydata) == 0 {
 		log.Crit("either `nodekey` or `keydata` must be provided")
 	}
@@ -68,6 +82,11 @@ func main() {
 		if err != nil {
 			log.Crit("unable to convert decoded hex into ecdsa.PrivateKey", "data", key, "error", err)
 		}
+	}
+	if *writeAddr {
+		// we remove the first uncompressed byte since it's not used in an enode address
+		fmt.Printf("%x\n", crypto.FromECDSAPub(&nodeKey.PublicKey)[1:])
+		os.Exit(0)
 	}
 
 	addr, err := net.ResolveUDPAddr("udp", *listenAddr)
