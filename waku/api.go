@@ -50,7 +50,6 @@ func (api *PublicWakuAPI) Version(ctx context.Context) string {
 
 // Info contains diagnostic information.
 type Info struct {
-	Memory         int     `json:"memory"`         // Memory size of the floating messages in bytes.
 	Messages       int     `json:"messages"`       // Number of floating messages.
 	MinPow         float64 `json:"minPow"`         // Minimal accepted PoW
 	MaxMessageSize uint32  `json:"maxMessageSize"` // Maximum accepted message size
@@ -58,10 +57,8 @@ type Info struct {
 
 // Info returns diagnostic information about the waku node.
 func (api *PublicWakuAPI) Info(ctx context.Context) Info {
-	stats := api.w.Stats()
 	return Info{
-		Memory:         stats.memoryUsed,
-		Messages:       len(api.w.messageQueue) + len(api.w.p2pMsgQueue),
+		Messages:       len(api.w.msgQueue) + len(api.w.p2pMsgQueue),
 		MinPow:         api.w.MinPow(),
 		MaxMessageSize: api.w.MaxMessageSize(),
 	}
@@ -75,7 +72,7 @@ func (api *PublicWakuAPI) SetMaxMessageSize(ctx context.Context, size uint32) (b
 
 // SetMinPoW sets the minimum PoW, and notifies the peers.
 func (api *PublicWakuAPI) SetMinPoW(ctx context.Context, pow float64) (bool, error) {
-	return true, api.w.SetMinimumPoW(pow)
+	return true, api.w.SetMinimumPoW(pow, true)
 }
 
 // SetBloomFilter sets the new value of bloom filter, and notifies the peers.
@@ -267,7 +264,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	}
 
 	var result []byte
-	env, err := msg.Wrap(params, api.w.GetCurrentTime())
+	env, err := msg.Wrap(params, api.w.CurrentTime())
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +275,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse target peer: %s", err)
 		}
-		err = api.w.SendP2PMessage(n.ID().Bytes(), env)
+		err = api.w.SendP2PMessages(n.ID().Bytes(), env)
 		if err == nil {
 			hash := env.Hash()
 			result = hash[:]
@@ -347,7 +344,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 	filter := Filter{
 		PoW:      crit.MinPow,
-		Messages: api.w.NewMessageStore(),
+		Messages: NewMemoryMessageStore(),
 		AllowP2P: crit.AllowP2P,
 	}
 
@@ -411,10 +408,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 					}
 				}
 			case <-rpcSub.Err():
-				api.w.Unsubscribe(id)
-				return
-			case <-notifier.Closed():
-				api.w.Unsubscribe(id)
+				_ = api.w.Unsubscribe(id)
 				return
 			}
 		}
@@ -572,7 +566,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		PoW:      req.MinPow,
 		AllowP2P: req.AllowP2P,
 		Topics:   topics,
-		Messages: api.w.NewMessageStore(),
+		Messages: NewMemoryMessageStore(),
 	}
 
 	id, err := api.w.Subscribe(f)

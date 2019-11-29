@@ -7,7 +7,7 @@ import (
 )
 
 func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
-	w := New(nil)
+	w := New(nil, nil)
 
 	keyID, err := w.GenerateSymKey()
 	if err != nil {

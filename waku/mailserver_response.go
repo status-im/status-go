@@ -43,15 +43,15 @@ func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []by
 // * request failed
 // If the payload is unknown/unparseable, it returns `nil`
 func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
-
 	if len(payload) < common.HashLength {
 		return nil, invalidResponseSizeError(len(payload))
 	}
 
 	event, err := tryCreateMailServerRequestFailedEvent(nodeID, payload)
-
-	if err != nil || event != nil {
-		return event, err
+	if err != nil {
+		return nil, err
+	} else if event != nil {
+		return event, nil
 	}
 
 	return tryCreateMailServerRequestCompletedEvent(nodeID, payload)

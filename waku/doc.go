@@ -173,3 +173,10 @@ func ErrorToEnvelopeError(hash common.Hash, err error) EnvelopeError {
 		Description: err.Error(),
 	}
 }
+
+// MailServerResponse is the response payload sent by the mailserver.
+type MailServerResponse struct {
+	LastEnvelopeHash common.Hash
+	Cursor           []byte
+	Error            error
+}

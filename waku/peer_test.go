@@ -125,12 +125,12 @@ func TestSimulation(t *testing.T) {
 func resetParams(t *testing.T) {
 	// change pow only for node zero
 	masterPow = 7777777.0
-	nodes[0].shh.SetMinimumPoW(masterPow)
+	_ = nodes[0].shh.SetMinimumPoW(masterPow, true)
 
 	// change bloom for all nodes
 	masterBloomFilter = TopicToBloom(sharedTopic)
 	for i := 0; i < NumNodes; i++ {
-		nodes[i].shh.SetBloomFilter(masterBloomFilter)
+		_ = nodes[i].shh.SetBloomFilter(masterBloomFilter)
 	}
 
 	round++
@@ -163,13 +163,13 @@ func initialize(t *testing.T) {
 		var node TestNode
 		b := make([]byte, BloomFilterSize)
 		copy(b, masterBloomFilter)
-		node.shh = New(&DefaultConfig)
-		node.shh.SetMinimumPoW(masterPow)
-		node.shh.SetBloomFilter(b)
+		node.shh = New(nil, nil)
+		_ = node.shh.SetMinimumPoW(masterPow, false)
+		_ = node.shh.SetBloomFilter(b)
 		if !bytes.Equal(node.shh.BloomFilter(), masterBloomFilter) {
 			t.Fatalf("bloom mismatch on init.")
 		}
-		node.shh.Start(nil)
+		_ = node.shh.Start(nil)
 		topics := make([]TopicType, 0)
 		topics = append(topics, sharedTopic)
 		f := Filter{KeySym: sharedKey, Messages: NewMemoryMessageStore()}
@@ -225,8 +225,8 @@ func stopServers() {
 	for i := 0; i < NumNodes; i++ {
 		n := nodes[i]
 		if n != nil {
-			n.shh.Unsubscribe(n.filerID)
-			n.shh.Stop()
+			_ = n.shh.Unsubscribe(n.filerID)
+			_ = n.shh.Stop()
 			n.server.Stop()
 		}
 	}
@@ -513,7 +513,7 @@ func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
 //two light nodes handshake. restriction disabled
 func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 	w1 := Waku{}
-	w1.settings.Store(restrictConnectionBetweenLightClientsIdx, false)
+	w1.settings.RestrictLightClientsConn = false
 	w1.SetLightClientMode(true)
 	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}})
 	err := p1.handshake()
@@ -525,7 +525,7 @@ func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 //two light nodes handshake. restriction enabled
 func TestTwoLightPeerHandshakeError(t *testing.T) {
 	w1 := Waku{}
-	w1.settings.Store(restrictConnectionBetweenLightClientsIdx, true)
+	w1.settings.RestrictLightClientsConn = true
 	w1.SetLightClientMode(true)
 	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}})
 	err := p1.handshake()

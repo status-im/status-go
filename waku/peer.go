@@ -72,7 +72,8 @@ func (peer *Peer) handshake() error {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
-		confirmationsEnabled := !peer.host.disableConfirmations
+		// TODO
+		confirmationsEnabled := false
 
 		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled)
 	}()

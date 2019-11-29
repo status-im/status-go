@@ -20,7 +20,7 @@ import (
 )
 
 func TestBasic(t *testing.T) {
-	w := New(&DefaultConfig)
+	w := New(nil, nil)
 	p := w.Protocols()
 	shh := p[0]
 	if shh.Name != ProtocolName {
@@ -103,7 +103,7 @@ func TestBasic(t *testing.T) {
 
 func TestAsymmetricKeyImport(t *testing.T) {
 	var (
-		w           = New(&DefaultConfig)
+		w           = New(nil, nil)
 		privateKeys []*ecdsa.PrivateKey
 	)
 
@@ -133,7 +133,7 @@ func TestAsymmetricKeyImport(t *testing.T) {
 }
 
 func TestWakuIdentityManagement(t *testing.T) {
-	w := New(&DefaultConfig)
+	w := New(nil, nil)
 	id1, err := w.NewKeyPair()
 	if err != nil {
 		t.Fatalf("failed to generate new key pair: %s.", err)
@@ -255,7 +255,7 @@ func TestSymKeyManagement(t *testing.T) {
 
 	var err error
 	var k1, k2 []byte
-	w := New(&DefaultConfig)
+	w := New(nil, nil)
 	id1 := string("arbitrary-string-1")
 	id2 := string("arbitrary-string-2")
 
@@ -446,10 +446,10 @@ func TestSymKeyManagement(t *testing.T) {
 func TestExpiry(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	w.SetMinimumPowTest(0.0000001)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
-	w.Start(nil)
+	w := New(nil, nil)
+	_ = w.SetMinimumPoW(0.0000001, false)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
+	_ = w.Start(nil)
 	defer w.Stop()
 
 	params, err := generateMessageParams()
@@ -510,8 +510,8 @@ func TestExpiry(t *testing.T) {
 func TestCustomization(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w := New(nil, nil)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
 	w.Start(nil)
 	defer w.Stop()
@@ -545,7 +545,7 @@ func TestCustomization(t *testing.T) {
 		t.Fatalf("successfully sent envelope with PoW %.06f, false positive (seed %d).", env.PoW(), seed)
 	}
 
-	w.SetMinimumPowTest(smallPoW / 2)
+	_ = w.SetMinimumPoW(smallPoW/2, true)
 	err = w.Send(env)
 	if err != nil {
 		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
@@ -560,13 +560,13 @@ func TestCustomization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
-	w.SetMaxMessageSize(uint32(env.size() - 1))
+	_ = w.SetMaxMessageSize(uint32(env.size() - 1))
 	err = w.Send(env)
 	if err == nil {
 		t.Fatalf("successfully sent oversized envelope (seed %d): false positive.", seed)
 	}
 
-	w.SetMaxMessageSize(DefaultMaxMessageSize)
+	_ = w.SetMaxMessageSize(DefaultMaxMessageSize)
 	err = w.Send(env)
 	if err != nil {
 		t.Fatalf("failed to send second envelope with seed %d: %s.", seed, err)
@@ -601,10 +601,10 @@ func TestCustomization(t *testing.T) {
 func TestSymmetricSendCycle(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w := New(nil, nil)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
+	_ = w.Start(nil)
 	defer w.Stop()
 
 	filter1, err := generateFilter(t, true)
@@ -614,7 +614,7 @@ func TestSymmetricSendCycle(t *testing.T) {
 	filter1.PoW = DefaultMinimumPoW
 
 	// Copy the first filter since some of its fields
-	// are randomly gnerated.
+	// are randomly generated.
 	filter2 := &Filter{
 		KeySym:   filter1.KeySym,
 		Topics:   filter1.Topics,
@@ -690,8 +690,8 @@ func TestSymmetricSendCycle(t *testing.T) {
 func TestSymmetricSendWithoutAKey(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w := New(nil, nil)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
 	w.Start(nil)
 	defer w.Stop()
@@ -758,8 +758,8 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 func TestSymmetricSendKeyMismatch(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w := New(nil, nil)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
 	w.Start(nil)
 	defer w.Stop()
@@ -867,7 +867,7 @@ func TestBloom(t *testing.T) {
 		t.Fatalf("bloomFilterMatch false negative")
 	}
 
-	w := New(&DefaultConfig)
+	w := New(nil, nil)
 	f := w.BloomFilter()
 	if f != nil {
 		t.Fatalf("wrong bloom on creation")
@@ -885,10 +885,10 @@ func TestBloom(t *testing.T) {
 func TestSendP2PDirect(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	w.SetMinimumPowTest(0.0000001)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
-	w.Start(nil)
+	w := New(nil, nil)
+	_ = w.SetMinimumPoW(0.0000001, false)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
+	_ = w.Start(nil)
 	defer w.Stop()
 
 	rwStub := &rwP2PMessagesStub{}
@@ -909,24 +909,6 @@ func TestSendP2PDirect(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	// verify sending a single envelope
-	err = w.SendP2PDirect(peerW, env)
-	if err != nil {
-		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
-	}
-	if len(rwStub.messages) != 1 {
-		t.Fatalf("invalid number of messages sent to peer: %d, expected 1", len(rwStub.messages))
-	}
-	var envelope Envelope
-	if err := rwStub.messages[0].Decode(&envelope); err != nil {
-		t.Fatalf("failed to decode envelopes: %s", err)
-	}
-	if envelope.Hash() != env.Hash() {
-		t.Fatalf("invalid envelope %d, expected %d", envelope.Hash(), env.Hash())
-	}
-	rwStub.messages = nil
-
-	// send a batch of envelopes
 	err = w.SendP2PDirect(peerW, env, env, env)
 	if err != nil {
 		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
@@ -948,9 +930,9 @@ func TestSendP2PDirect(t *testing.T) {
 func TestHandleP2PMessageCode(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&DefaultConfig)
-	w.SetMinimumPowTest(0.0000001)
-	defer w.SetMinimumPowTest(DefaultMinimumPoW)
+	w := New(nil, nil)
+	w.SetMinimumPoW(0.0000001, false)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
 	w.Start(nil)
 	defer w.Stop()
 
@@ -975,7 +957,7 @@ func TestHandleP2PMessageCode(t *testing.T) {
 
 	// read a single envelope
 	rwStub := &rwP2PMessagesStub{}
-	rwStub.payload = []interface{}{env}
+	rwStub.payload = []interface{}{[]*Envelope{env}}
 
 	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), nil)
 	peer.trusted = true
@@ -1031,10 +1013,10 @@ func (stub *rwP2PMessagesStub) WriteMsg(m p2p.Msg) error {
 
 func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 	conf := &Config{
-		MinimumAcceptedPOW:  0,
+		MinimumAcceptedPoW:  0,
 		EnableConfirmations: expectConfirmations,
 	}
-	w := New(conf)
+	w := New(conf, nil)
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
@@ -1049,9 +1031,10 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations}))
 }
 
-func TestConfirmationHadnshakeExtension(t *testing.T) {
-	testConfirmationsHandshake(t, true)
-}
+// TODO
+//func TestConfirmationHadnshakeExtension(t *testing.T) {
+//	testConfirmationsHandshake(t, true)
+//}
 
 func TestHandshakeWithConfirmationsDisabled(t *testing.T) {
 	testConfirmationsHandshake(t, false)
@@ -1140,10 +1123,10 @@ func TestHandshakeWithConfirmationsDisabled(t *testing.T) {
 
 func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []EnvelopeError) {
 	conf := &Config{
-		MinimumAcceptedPOW: 0,
+		MinimumAcceptedPoW: 0,
 		MaxMessageSize:     10 << 20,
 	}
-	w := New(conf)
+	w := New(conf, nil)
 	events := make(chan EnvelopeEvent, 2)
 	sub := w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
@@ -1277,7 +1260,7 @@ func discardPipe() *p2p.MsgPipeRW {
 func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	c := &Config{
 		MaxMessageSize:     DefaultMaxMessageSize,
-		MinimumAcceptedPOW: 0,
+		MinimumAcceptedPoW: 0,
 	}
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() {
@@ -1286,7 +1269,7 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	}()
 	p1 := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	p2 := p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"shh", 6}})
-	w1, w2 := New(c), New(c)
+	w1, w2 := New(c, nil), New(c, nil)
 	errc := make(chan error)
 	go func() {
 		w1.HandlePeer(p2, rw2)
@@ -1319,7 +1302,7 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 }
 
 func TestRequestSentEventWithExpiry(t *testing.T) {
-	w := New(nil)
+	w := New(nil, nil)
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	rw := discardPipe()
 	defer rw.Close()
@@ -1352,21 +1335,21 @@ func TestSendMessagesRequest(t *testing.T) {
 	}
 
 	t.Run("InvalidID", func(t *testing.T) {
-		w := New(nil)
+		w := New(nil, nil)
 		err := w.SendMessagesRequest([]byte{0x01, 0x02}, MessagesRequest{})
 		require.EqualError(t, err, "invalid 'ID', expected a 32-byte slice")
 	})
 
 	t.Run("WithoutPeer", func(t *testing.T) {
-		w := New(nil)
+		w := New(nil, nil)
 		err := w.SendMessagesRequest([]byte{0x01, 0x02}, validMessagesRequest)
-		require.EqualError(t, err, "Could not find peer with ID: 0102")
+		require.EqualError(t, err, "could not find peer with ID: 0102")
 	})
 
 	t.Run("AllGood", func(t *testing.T) {
 		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 		rw1, rw2 := p2p.MsgPipe()
-		w := New(nil)
+		w := New(nil, nil)
 		w.peers[newPeer(w, p, rw1)] = struct{}{}
 
 		go func() {
@@ -1438,7 +1421,7 @@ func (m *mockMailServer) Deliver(p *Peer, r MessagesRequest) {
 }
 
 func TestMailserverCompletionEvent(t *testing.T) {
-	w := New(nil)
+	w := New(nil, nil)
 	require.NoError(t, w.Start(nil))
 	defer w.Stop()
 

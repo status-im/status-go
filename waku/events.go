@@ -44,10 +44,3 @@ type EnvelopeEvent struct {
 	Peer  enode.ID
 	Data  interface{}
 }
-
-// SyncEventResponse is a response from the Mail Server
-// form which the peer received envelopes.
-type SyncEventResponse struct {
-	Cursor []byte
-	Error  string
-}
