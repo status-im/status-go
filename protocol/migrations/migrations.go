@@ -114,7 +114,7 @@ func _000001_initUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 832, mode: os.FileMode(0644), modTime: time.Unix(1575009877, 0)}
+	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 832, mode: os.FileMode(0644), modTime: time.Unix(1575563165, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1c, 0xa4, 0xac, 0x0, 0xd3, 0x19, 0x53, 0x35, 0x91, 0x1c, 0x94, 0xea, 0xde, 0xa7, 0x75, 0xb6, 0x73, 0x1d, 0x42, 0x14, 0xca, 0x84, 0x5b, 0xdb, 0x10, 0x94, 0x28, 0xc0, 0x33, 0x95, 0x7f, 0xf}}
 	return a, nil
 }
@@ -154,7 +154,7 @@ func _000002_add_chatsUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_chats.up.db.sql", size: 495, mode: os.FileMode(0644), modTime: time.Unix(1575009877, 0)}
+	info := bindataFileInfo{name: "000002_add_chats.up.db.sql", size: 495, mode: os.FileMode(0644), modTime: time.Unix(1575563165, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6e, 0xca, 0x2b, 0xf7, 0xca, 0x21, 0xda, 0x17, 0x1f, 0x97, 0xa8, 0x12, 0xb5, 0x6c, 0xad, 0x92, 0xe7, 0x2, 0xaf, 0x1, 0xcb, 0x5e, 0xe9, 0x71, 0xc4, 0x81, 0xa7, 0x3, 0x93, 0x5b, 0x73, 0x73}}
 	return a, nil
 }
@@ -234,7 +234,7 @@ func _000004_user_messages_compatibilityUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000004_user_messages_compatibility.up.sql", size: 980, mode: os.FileMode(0644), modTime: time.Unix(1575009877, 0)}
+	info := bindataFileInfo{name: "000004_user_messages_compatibility.up.sql", size: 980, mode: os.FileMode(0644), modTime: time.Unix(1575563165, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc, 0x7a, 0xba, 0xae, 0x6d, 0xef, 0x69, 0x12, 0x6b, 0x48, 0xe3, 0xa7, 0xad, 0x21, 0x4a, 0xcf, 0x4f, 0xbc, 0x14, 0xc1, 0x19, 0x69, 0x1c, 0xc, 0xa2, 0x3d, 0xbc, 0x12, 0x32, 0x71, 0x76, 0x15}}
 	return a, nil
 }
@@ -274,7 +274,7 @@ func _1567112142_user_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1567112142_user_messages.up.sql", size: 543, mode: os.FileMode(0644), modTime: time.Unix(1575009877, 0)}
+	info := bindataFileInfo{name: "1567112142_user_messages.up.sql", size: 543, mode: os.FileMode(0644), modTime: time.Unix(1575563165, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xff, 0xc0, 0x47, 0x32, 0xa9, 0xa4, 0x6, 0x63, 0x6b, 0xe7, 0x79, 0x2b, 0x80, 0x52, 0x2b, 0x6f, 0xf9, 0x9d, 0x9a, 0xc2, 0xa9, 0x7a, 0xf7, 0x4d, 0x14, 0x12, 0x21, 0x10, 0xc4, 0x30, 0x42, 0xaa}}
 	return a, nil
 }

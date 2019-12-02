@@ -35,36 +35,20 @@ message ChatMessage {
   }
 
   enum MessageType {
-    ONE_TO_ONE = 0;
-    PUBLIC_GROUP = 1;
-    PRIVATE_GROUP = 2;
+    UNKNOWN_MESSAGE_TYPE = 0;
+    ONE_TO_ONE = 1;
+    PUBLIC_GROUP = 2;
+    PRIVATE_GROUP = 3;
     // Only local
-    SYSTEM_MESSAGE_PRIVATE_GROUP = 3;
+    SYSTEM_MESSAGE_PRIVATE_GROUP = 4;
     }
   enum ContentType {
-    TEXT_PLAIN = 0;
-    STICKER = 1;
-    STATUS = 2;
-    EMOJI = 3;
-    COMMAND = 4;
-    COMMAND_REQUEST = 5;
-  }
-}
-
-message ApplicationMetadataMessage {
-  // Signature of the payload field
-  bytes signature = 1;
-  // This is the encoded protobuf of the application level message, i.e ChatMessage
-  bytes payload = 2;
-
-  // The type of protobuf message sent
-  MessageType message_type = 3;
-
-  enum MessageType {
-    TEXT_MESSAGE = 0;
-    CONTACT_REQUEST = 1;
-    MEMBERSHIP_UPDATE = 2;
-    PAIR_INSTALLATION = 3;
-    SYNC_INSTALLATION = 4;
+    UNKNOWN_CONTENT_TYPE = 0;
+    TEXT_PLAIN = 1;
+    STICKER = 2;
+    STATUS = 3;
+    EMOJI = 4;
+    COMMAND = 5;
+    COMMAND_REQUEST = 6;
   }
 }

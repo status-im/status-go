@@ -98,7 +98,6 @@ func (s *MessageProcessorSuite) SetupTest() {
 		database,
 		encryptionProtocol,
 		whisperTransport,
-		nil,
 		s.logger,
 		featureFlags{},
 	)
@@ -120,7 +119,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
 	message := &types.Message{}
@@ -136,7 +135,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
 	s.Require().True(proto.Equal(&s.testMessage.ChatMessage, &parsedMessage))
-	s.Require().Equal(v1protocol.MessageT, decodedMessages[0].MessageType)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
 func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
@@ -149,7 +148,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
 	dataSyncMessage := datasyncproto.Payload{
@@ -173,7 +172,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
 	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
 	s.Require().True(proto.Equal(&s.testMessage.ChatMessage, &parsedMessage))
-	s.Require().Equal(v1protocol.MessageT, decodedMessages[0].MessageType)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
 func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
@@ -186,7 +185,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	encodedPayload, err := proto.Marshal(&s.testMessage)
 	s.Require().NoError(err)
 
-	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, authorKey)
+	wrappedPayload, err := v1protocol.WrapMessageV1(encodedPayload, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, authorKey)
 	s.Require().NoError(err)
 
 	dataSyncMessage := datasyncproto.Payload{
@@ -234,5 +233,5 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
 	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
 	s.Require().True(proto.Equal(&s.testMessage.ChatMessage, &parsedMessage))
-	s.Require().Equal(v1protocol.MessageT, decodedMessages[0].MessageType)
+	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }

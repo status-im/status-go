@@ -406,7 +406,7 @@ func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingSt
 }
 
 // BlockContact updates a contact, deletes all the messages and 1-to-1 chat, updates the unread messages count and returns a map with the new count
-func (db sqlitePersistence) BlockContact(contact Contact) ([]*Chat, error) {
+func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 	var chats []*Chat
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {

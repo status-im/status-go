@@ -14,6 +14,7 @@ import (
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/protobuf"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	datasyncnode "github.com/vacp2p/mvds/node"
@@ -28,16 +29,11 @@ const (
 	whisperPoWTime = 5
 )
 
-type messageHandler interface {
-	HandleMembershipUpdate(m v1protocol.MembershipUpdateMessage) error
-}
-
 type messageProcessor struct {
 	identity  *ecdsa.PrivateKey
 	datasync  *datasync.DataSync
 	protocol  *encryption.Protocol
 	transport *transport.WhisperServiceTransport
-	handler   messageHandler
 	logger    *zap.Logger
 
 	featureFlags featureFlags
@@ -48,7 +44,6 @@ func newMessageProcessor(
 	database *sql.DB,
 	enc *encryption.Protocol,
 	transport *transport.WhisperServiceTransport,
-	handler messageHandler,
 	logger *zap.Logger,
 	features featureFlags,
 ) (*messageProcessor, error) {
@@ -71,7 +66,6 @@ func newMessageProcessor(
 		datasync:     ds,
 		protocol:     enc,
 		transport:    transport,
-		handler:      handler,
 		logger:       logger,
 		featureFlags: features,
 	}
@@ -97,13 +91,14 @@ func (p *messageProcessor) SendPrivateRaw(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	data []byte,
+	messageType protobuf.ApplicationMetadataMessage_Type,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private message",
 		zap.Binary("public-key", crypto.FromECDSAPub(recipient)),
 		zap.String("site", "SendPrivateRaw"),
 	)
-	return p.sendPrivate(ctx, recipient, data)
+	return p.sendPrivate(ctx, recipient, data, messageType)
 }
 
 // SendGroupRaw takes encoded data, encrypts it and sends through the wire,
@@ -112,13 +107,14 @@ func (p *messageProcessor) SendGroupRaw(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
 	data []byte,
+	messageType protobuf.ApplicationMetadataMessage_Type,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private group message",
 		zap.String("site", "SendGroupRaw"),
 	)
 	// Calculate messageID first
-	wrappedMessage, err := p.wrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data, messageType)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -126,7 +122,7 @@ func (p *messageProcessor) SendGroupRaw(
 	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
 
 	for _, recipient := range recipients {
-		_, err = p.sendPrivate(ctx, recipient, data)
+		_, err = p.sendPrivate(ctx, recipient, data, messageType)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message")
 		}
@@ -139,10 +135,11 @@ func (p *messageProcessor) sendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	data []byte,
+	messageType protobuf.ApplicationMetadataMessage_Type,
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
 
-	wrappedMessage, err := p.wrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data, messageType)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -176,37 +173,34 @@ func (p *messageProcessor) sendPrivate(
 func (p *messageProcessor) SendMembershipUpdate(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
-	chatID string,
-	updates []v1protocol.MembershipUpdate,
-	clock int64,
-) ([][]byte, error) {
+	group *v1protocol.Group,
+	chatMessage *protobuf.ChatMessage,
+) ([]byte, error) {
 	p.logger.Debug("sending a membership update", zap.Int("membersCount", len(recipients)))
 
 	message := v1protocol.MembershipUpdateMessage{
-		ChatID:  chatID,
-		Updates: updates,
+		ChatID:  group.ChatID(),
+		Events:  group.Events(),
+		Message: chatMessage,
 	}
 	encodedMessage, err := v1protocol.EncodeMembershipUpdateMessage(message)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to encode membership update message")
 	}
 
-	var resultIDs [][]byte
-	for _, recipient := range recipients {
-		messageID, err := p.sendPrivate(ctx, recipient, encodedMessage)
-		if err != nil {
-			return nil, err
-		}
-		resultIDs = append(resultIDs, messageID)
-	}
-	return resultIDs, nil
+	return p.SendGroupRaw(ctx, recipients, encodedMessage, protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE)
 }
 
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, error) {
+func (p *messageProcessor) SendPublicRaw(
+	ctx context.Context,
+	chatName string,
+	data []byte,
+	messageType protobuf.ApplicationMetadataMessage_Type,
+) ([]byte, error) {
 	var newMessage *types.NewMessage
 
-	wrappedMessage, err := p.wrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data, messageType)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -228,16 +222,6 @@ func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, d
 	p.transport.Track([][]byte{messageID}, hash, newMessage)
 
 	return messageID, nil
-}
-
-func (p *messageProcessor) processMembershipUpdate(m v1protocol.MembershipUpdateMessage) error {
-	if err := m.Verify(); err != nil {
-		return err
-	}
-	if p.handler != nil {
-		return p.handler.HandleMembershipUpdate(m)
-	}
-	return errors.New("missing handler")
 }
 
 func (p *messageProcessor) processPairMessage(m v1protocol.PairMessage) error {
@@ -336,8 +320,8 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 	return nil
 }
 
-func (p *messageProcessor) wrapMessageV1(encodedMessage []byte) ([]byte, error) {
-	wrappedMessage, err := v1protocol.WrapMessageV1(encodedMessage, p.identity)
+func (p *messageProcessor) wrapMessageV1(encodedMessage []byte, messageType protobuf.ApplicationMetadataMessage_Type) ([]byte, error) {
+	wrappedMessage, err := v1protocol.WrapMessageV1(encodedMessage, messageType, p.identity)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}

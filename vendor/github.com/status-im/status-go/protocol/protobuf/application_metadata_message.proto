@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package protobuf;
+
+message ApplicationMetadataMessage {
+  // Signature of the payload field
+  bytes signature = 1;
+  // This is the encoded protobuf of the application level message, i.e ChatMessage
+  bytes payload = 2;
+
+  // The type of protobuf message sent
+  Type type = 3;
+
+  enum Type {
+    UNKNOWN = 0;
+    CHAT_MESSAGE = 1;
+    CONTACT_REQUEST = 2;
+    MEMBERSHIP_UPDATE_MESSAGE = 3;
+    PAIR_INSTALLATION = 4;
+    SYNC_INSTALLATION = 5;
+  }
+}

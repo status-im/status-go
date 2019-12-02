@@ -2,17 +2,17 @@ package protocol
 
 import "time"
 
-const clockBumpInMs = int64(time.Minute / time.Millisecond)
+const clockBumpInMs = uint64(time.Minute / time.Millisecond)
 
 // CalcMessageClock calculates a new clock value for Message.
 // It is used to properly sort messages and accommodate the fact
 // that time might be different on each device.
-func CalcMessageClock(lastObservedValue int64, timeInMs TimestampInMs) int64 {
+func CalcMessageClock(lastObservedValue uint64, timeInMs uint64) uint64 {
 	clock := lastObservedValue
-	if clock < int64(timeInMs) {
+	if clock < timeInMs {
 		// Added time should be larger than time skew tollerance for a message.
 		// Here, we use 1 minute which is larger than accepted message time skew by Whisper.
-		clock = int64(timeInMs) + clockBumpInMs
+		clock = timeInMs + clockBumpInMs
 	} else {
 		clock++
 	}

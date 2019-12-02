@@ -63,6 +63,41 @@ func (p *Parser) Inline(currBlock ast.Node, data []byte) {
 	p.nesting--
 }
 
+const pkLength = 132
+
+func mention(p *Parser, data []byte, offset int) (int, ast.Node) {
+	data = data[offset:]
+	n := len(data)
+
+	if n < pkLength+1 {
+		return 0, nil
+	}
+
+	// need to start with 0x
+	if data[1] != '0' || data[2] != 'x' {
+
+		return 0, nil
+	}
+
+	i := 3
+	for i < pkLength+1 {
+		if !isValidPublicKeyChar(data[i]) {
+			return 0, nil
+		}
+		i++
+	}
+
+	// Check there's a space
+	if n != pkLength+1 && !isValidTerminatingMentionChar(data[pkLength+1]) {
+		return 0, nil
+	}
+
+	mention := &ast.Mention{}
+	mention.Literal = data[1 : pkLength+1]
+
+	return i, mention
+}
+
 func statusTag(p *Parser, data []byte, offset int) (int, ast.Node) {
 	data = data[offset:]
 	n := len(data)

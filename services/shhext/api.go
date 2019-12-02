@@ -21,7 +21,6 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol"
@@ -448,15 +447,44 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessa
 // It's important to call PublicAPI.afterSend() so that the client receives a signal
 // with confirmation that the message left the device.
 func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (types.HexBytes, error) {
-	publicKey, err := crypto.UnmarshalPubkey(msg.PubKey)
-	if err != nil {
-		return nil, err
-	}
 	chat := protocol.Chat{
-		PublicKey: publicKey,
+		ChatType: protocol.ChatTypeOneToOne,
+		ID:       types.EncodeHex(msg.PubKey),
 	}
 
 	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
+}
+
+func (api *PublicAPI) Join(chat protocol.Chat) error {
+	return api.service.messenger.Join(chat)
+}
+
+func (api *PublicAPI) Leave(chat protocol.Chat) error {
+	return api.service.messenger.Leave(chat)
+}
+
+func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.LeaveGroupChat(ctx, chatID)
+}
+
+func (api *PublicAPI) CreateGroupChatWithMembers(ctx Context, name string, members []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateGroupChatWithMembers(ctx, name, members)
+}
+
+func (api *PublicAPI) AddMembersToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddMembersToGroupChat(ctx, chatID, members)
+}
+
+func (api *PublicAPI) RemoveMemberFromGroupChat(ctx Context, chatID string, member string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveMemberFromGroupChat(ctx, chatID, member)
+}
+
+func (api *PublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddAdminsToGroupChat(ctx, chatID, members)
+}
+
+func (api *PublicAPI) ConfirmJoiningGroup(ctx context.Context, chatID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ConfirmJoiningGroup(ctx, chatID)
 }
 
 func (api *PublicAPI) requestMessagesUsingPayload(request db.HistoryRequest, peer, symkeyID string, payload []byte, force bool, timeout time.Duration, topics []types.TopicType) (hash types.Hash, err error) {
@@ -571,12 +599,12 @@ func (api *PublicAPI) LoadFilters(parent context.Context, chats []*statustransp.
 	return api.service.messenger.LoadFilters(chats)
 }
 
-func (api *PublicAPI) SaveChat(parent context.Context, chat protocol.Chat) error {
+func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) error {
 	api.log.Info("saving chat", "chat", chat)
 	return api.service.messenger.SaveChat(chat)
 }
 
-func (api *PublicAPI) Chats(parent context.Context) ([]*protocol.Chat, error) {
+func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.Chats()
 }
 
@@ -584,16 +612,16 @@ func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.DeleteChat(chatID)
 }
 
-func (api *PublicAPI) SaveContact(parent context.Context, contact protocol.Contact) error {
+func (api *PublicAPI) SaveContact(parent context.Context, contact *protocol.Contact) error {
 	return api.service.messenger.SaveContact(contact)
 }
 
-func (api *PublicAPI) BlockContact(parent context.Context, contact protocol.Contact) ([]*protocol.Chat, error) {
+func (api *PublicAPI) BlockContact(parent context.Context, contact *protocol.Contact) ([]*protocol.Chat, error) {
 	api.log.Info("blocking contact", "contact", contact.ID)
 	return api.service.messenger.BlockContact(contact)
 }
 
-func (api *PublicAPI) Contacts(parent context.Context) ([]*protocol.Contact, error) {
+func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
 	return api.service.messenger.Contacts()
 }
 
@@ -641,10 +669,6 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 		Messages: messages,
 		Cursor:   cursor,
 	}, nil
-}
-
-func (api *PublicAPI) AddSystemMessages(messages []*protocol.Message) ([]*protocol.Message, error) {
-	return api.service.messenger.AddSystemMessages(messages)
 }
 
 func (api *PublicAPI) DeleteMessage(id string) error {
