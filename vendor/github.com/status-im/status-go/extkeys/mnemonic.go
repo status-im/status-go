@@ -24,6 +24,7 @@ import (
 // https://github.com/trezor/trezor-crypto/blob/master/bip39.c
 // https://github.com/trezor/python-mnemonic/blob/master/mnemonic/mnemonic.py
 // https://github.com/bitpay/bitcore-mnemonic/blob/master/lib/mnemonic.js (used in eth-lightwallet.js)
+// https://github.com/tyler-smith/go-bip39/blob/master/bip39.go
 
 const defaultSalt = "mnemonic"
 
@@ -73,6 +74,21 @@ var (
 	rightShift11BitsDivider = big.NewInt(2048)
 	bigOne                  = big.NewInt(1)
 	bigTwo                  = big.NewInt(2)
+
+	wordLengthChecksumMasksMapping = map[int]*big.Int{
+		12: big.NewInt(15),
+		15: big.NewInt(31),
+		18: big.NewInt(63),
+		21: big.NewInt(127),
+		24: big.NewInt(255),
+	}
+
+	wordLengthChecksumShiftMapping = map[int]*big.Int{
+		12: big.NewInt(16),
+		15: big.NewInt(8),
+		18: big.NewInt(4),
+		21: big.NewInt(2),
+	}
 )
 
 // Language is language identifier
@@ -201,11 +217,11 @@ func (m *Mnemonic) MnemonicPhrase(strength EntropyStrength, language Language) (
 	return strings.Join(words, wordSeperator), nil
 }
 
-// ValidMnemonic validates mnemonic string
-func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
+// ValidateMnemonic validates that all words from a mnemonic string are in wordlist and that checksum is valid
+func (m *Mnemonic) ValidateMnemonic(mnemonic string, language Language) error {
 	wordList, err := m.WordList(language)
 	if err != nil {
-		return false
+		return errors.New("invalid language specified")
 	}
 
 	// Create a list of all the words in the mnemonic sentence
@@ -216,17 +232,61 @@ func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
 
 	// The number of words should be 12, 15, 18, 21 or 24
 	if numOfWords%3 != 0 || numOfWords < 12 || numOfWords > 24 {
-		return false
+		return errors.New("mnemonic contains an invalid number of words")
 	}
+
+	// Create reverse lookup map for dictionary
+	wordMap := map[string]int{}
+	for i, v := range wordList {
+		wordMap[v] = i
+	}
+
+	b := big.NewInt(0)
 
 	// Check if all words belong in the wordlist
 	for i := 0; i < numOfWords; i++ {
-		if !contains(wordList, words[i]) {
-			return false
+
+		wordIndex, ok := wordMap[words[i]]
+		if !ok {
+			return fmt.Errorf("word %s not found in the dictionary", words[i])
 		}
+		var wordBytes [2]byte
+		binary.BigEndian.PutUint16(wordBytes[:], uint16(wordIndex))
+		b = b.Mul(b, rightShift11BitsDivider)
+		b = b.Or(b, big.NewInt(0).SetBytes(wordBytes[:]))
 	}
 
-	return true
+	checksum := big.NewInt(0)
+	checksumMask := wordLengthChecksumMasksMapping[numOfWords]
+	checksum = checksum.And(b, checksumMask)
+
+	b.Div(b, big.NewInt(0).Add(checksumMask, bigOne))
+
+	// Calculate entropy from mnemonic
+	entropy := b.Bytes()
+	entropy = padByteSlice(entropy, len(words)/3*4)
+
+	// Calculate checksum from entropy derived above
+	hasher := sha256.New()
+	hasher.Write(entropy)
+	computedChecksumBytes := hasher.Sum(nil)
+	computedChecksum := big.NewInt(int64(computedChecksumBytes[0]))
+
+	if l := len(words); l != 24 {
+		checksumShift := wordLengthChecksumShiftMapping[l]
+		computedChecksum.Div(computedChecksum, checksumShift)
+	}
+
+	if checksum.Cmp(computedChecksum) != 0 {
+		return errors.New("checksum for mnemonic seed is invalid")
+	}
+
+	return nil
+}
+
+// ValidMnemonic validates mnemonic string
+func (m *Mnemonic) ValidMnemonic(mnemonic string, language Language) bool {
+	return m.ValidateMnemonic(mnemonic, language) == nil
 }
 
 // WordList returns list of words for a given language

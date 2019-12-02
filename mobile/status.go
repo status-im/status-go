@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -704,4 +705,10 @@ func Identicon(pk string) string {
 	// We ignore any error, empty string is considered an error
 	identicon, _ := protocol.Identicon(pk)
 	return identicon
+}
+
+func ValidateMnemonic(mnemonic string) string {
+	m := extkeys.NewMnemonic()
+	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
+	return makeJSONResponse(err)
 }
