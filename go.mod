@@ -38,7 +38,7 @@ require (
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a
 	github.com/status-im/status-go/extkeys v1.0.0
-	github.com/status-im/status-go/protocol v0.5.2
+	github.com/status-im/status-go/protocol v0.36.0
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/status-im/whisper v1.6.2
 	github.com/stretchr/testify v1.4.0
