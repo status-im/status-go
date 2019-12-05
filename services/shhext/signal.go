@@ -2,6 +2,7 @@ package shhext
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -43,6 +44,6 @@ func (h PublisherSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
 	signal.SendWhisperFilterAdded(filters)
 }
 
-func (h PublisherSignalHandler) NewMessages(messages []*signal.Messages) {
-	signal.SendNewMessages(messages)
+func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
+	signal.SendNewMessages(response)
 }

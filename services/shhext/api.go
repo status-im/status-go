@@ -27,7 +27,6 @@ import (
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
-	statusprotomessage "github.com/status-im/status-go/protocol/v1"
 )
 
 const (
@@ -444,10 +443,6 @@ func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessa
 	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
 }
 
-func (api *PublicAPI) PrepareContent(ctx context.Context, content statusprotomessage.Content) statusprotomessage.Content {
-	return api.service.messenger.PrepareContent(content)
-}
-
 // SendDirectMessage sends a 1:1 chat message to the underlying transport
 // Message's payload is a transit encoded message.
 // It's important to call PublicAPI.afterSend() so that the client receives a signal
@@ -648,8 +643,8 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
-func (api *PublicAPI) SaveMessages(messages []*protocol.Message) error {
-	return api.service.messenger.SaveMessages(messages)
+func (api *PublicAPI) AddSystemMessages(messages []*protocol.Message) ([]*protocol.Message, error) {
+	return api.service.messenger.AddSystemMessages(messages)
 }
 
 func (api *PublicAPI) DeleteMessage(id string) error {
@@ -660,12 +655,20 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 	return api.service.messenger.DeleteMessagesByChatID(id)
 }
 
-func (api *PublicAPI) MarkMessagesSeen(ids []string) error {
-	return api.service.messenger.MarkMessagesSeen(ids...)
+func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) error {
+	return api.service.messenger.MarkMessagesSeen(chatID, ids)
 }
 
 func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
 	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
+}
+
+func (api *PublicAPI) SendChatMessage(ctx context.Context, message *protocol.Message) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendChatMessage(ctx, message)
+}
+
+func (api *PublicAPI) ReSendChatMessage(ctx context.Context, messageID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ReSendChatMessage(ctx, messageID)
 }
 
 // -----

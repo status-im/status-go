@@ -1,29 +1,14 @@
 package protocol
 
 import (
-	"bytes"
 	"crypto/ecdsa"
-	"encoding/hex"
-	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-)
-
-const (
-	// ContentTypeTextPlain means that the message contains plain text.
-	ContentTypeTextPlain = "text/plain"
-)
-
-// Message types.
-const (
-	MessageTypePublicGroup  = "public-group-user-message"
-	MessageTypePrivate      = "user-message"
-	MessageTypePrivateGroup = "group-user-message"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 var (
@@ -60,95 +45,11 @@ const (
 	MessageRead Flags = 1 << iota
 )
 
-// Message is a chat message sent by an user.
-type Message struct {
-	Text      string        `json:"text"` // TODO: why is this duplicated?
-	ContentT  string        `json:"content_type"`
-	MessageT  string        `json:"message_type"`
-	Clock     int64         `json:"clock"` // lamport timestamp; see CalcMessageClock for more details
-	Timestamp TimestampInMs `json:"timestamp"`
-	Content   Content       `json:"content"`
-
-	Flags     Flags            `json:"-"`
-	ID        []byte           `json:"-"`
-	SigPubKey *ecdsa.PublicKey `json:"-"`
-	ChatID    string           `json:"-"` // reference to Chat.ID; not connected to Content.ChatID which is set by sender
-}
-
-func (m *Message) MarshalJSON() ([]byte, error) {
-	type MessageAlias Message
-	item := struct {
-		*MessageAlias
-		ID string `json:"id"`
-	}{
-		MessageAlias: (*MessageAlias)(m),
-		ID:           "0x" + hex.EncodeToString(m.ID),
-	}
-
-	return json.Marshal(item)
-}
-
-// createTextMessage creates a Message.
-func createTextMessage(data []byte, lastClock int64, chatID, messageType string) Message {
-	text := strings.TrimSpace(string(data))
-	ts := TimestampInMsFromTime(time.Now())
-	clock := CalcMessageClock(lastClock, ts)
-
-	return Message{
-		Text:      text,
-		ContentT:  ContentTypeTextPlain,
-		MessageT:  messageType,
-		Clock:     clock,
-		Timestamp: ts,
-		Content:   Content{ChatID: chatID, Text: text},
-	}
-}
-
-// CreatePublicTextMessage creates a public text Message.
-func CreatePublicTextMessage(data []byte, lastClock int64, chatID string) Message {
-	m := createTextMessage(data, lastClock, chatID, MessageTypePublicGroup)
-	return m
-}
-
-// CreatePrivateTextMessage creates a one-to-one message.
-func CreatePrivateTextMessage(data []byte, lastClock int64, chatID string) Message {
-	return createTextMessage(data, lastClock, chatID, MessageTypePrivate)
-}
-
-// CreatePrivateGroupTextMessage creates a group message.
-func CreatePrivateGroupTextMessage(data []byte, lastClock int64, chatID string) Message {
-	return createTextMessage(data, lastClock, chatID, MessageTypePrivateGroup)
-}
-
-func decodeTransitMessage(originalPayload []byte) (interface{}, error) {
-	payload := make([]byte, len(originalPayload))
-	copy(payload, originalPayload)
-	// This modifies the payload
-	buf := bytes.NewBuffer(payload)
-
-	decoder := NewMessageDecoder(buf)
-	value, err := decoder.Decode()
-	if err != nil {
-		return nil, err
-	}
-	return value, nil
-}
-
-// EncodeMessage encodes a Message using Transit serialization.
-func EncodeMessage(value Message) ([]byte, error) {
-	var buf bytes.Buffer
-	encoder := NewMessageEncoder(&buf)
-	if err := encoder.Encode(value); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 // MessageID calculates the messageID from author's compressed public key
 // and not encrypted but encoded payload.
 func MessageID(author *ecdsa.PublicKey, data []byte) types.HexBytes {
 	keyBytes := crypto.FromECDSAPub(author)
-	return crypto.Keccak256(append(keyBytes, data...))
+	return types.HexBytes(crypto.Keccak256(append(keyBytes, data...)))
 }
 
 // WrapMessageV1 wraps a payload into a protobuf message and signs it if an identity is provided
@@ -162,7 +63,7 @@ func WrapMessageV1(payload []byte, identity *ecdsa.PrivateKey) ([]byte, error) {
 		}
 	}
 
-	message := &StatusProtocolMessage{
+	message := &protobuf.ApplicationMetadataMessage{
 		Signature: signature,
 		Payload:   payload,
 	}

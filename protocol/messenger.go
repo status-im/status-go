@@ -4,12 +4,15 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"strings"
+	"encoding/hex"
+	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
@@ -18,10 +21,13 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
+
+const PubKeyStringLength = 132
 
 var (
 	ErrChatIDEmpty    = errors.New("chat ID is empty")
@@ -46,20 +52,29 @@ type Messenger struct {
 	processor   *messageProcessor
 	logger      *zap.Logger
 
-	ownMessages                []*v1protocol.Message
 	featureFlags               featureFlags
 	messagesPersistenceEnabled bool
 	shutdownTasks              []func() error
 }
 
-type featureFlags struct {
-	genericDiscoveryTopicEnabled bool
-	// sendV1Messages indicates whether we should send
-	// messages compatible only with V1 and later.
-	// V1 messages adds additional wrapping
-	// which contains a signature and payload.
-	sendV1Messages bool
+type RawResponse struct {
+	Filter   *transport.Filter           `json:"filter"`
+	Messages []*v1protocol.StatusMessage `json:"messages"`
+}
 
+type MessengerResponse struct {
+	Chats    []*Chat    `json:"chats,omitEmpty"`
+	Messages []*Message `json:"messages,omitEmpty"`
+	Contacts []*Contact `json:"contacts,omitEmpty"`
+	// Raw unprocessed messages
+	RawMessages []*RawResponse `json:"rawMessages,omitEmpty"`
+}
+
+func (m *MessengerResponse) IsEmpty() bool {
+	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.RawMessages) == 0
+}
+
+type featureFlags struct {
 	// datasync indicates whether direct messages should be sent exclusively
 	// using datasync, breaking change for non-v1 clients. Public messages
 	// are not impacted
@@ -117,13 +132,6 @@ func WithCustomLogger(logger *zap.Logger) Option {
 	}
 }
 
-func WithGenericDiscoveryTopicSupport() Option {
-	return func(c *config) error {
-		c.featureFlags.genericDiscoveryTopicEnabled = true
-		return nil
-	}
-}
-
 func WithMessagesPersistenceEnabled() Option {
 	return func(c *config) error {
 		c.messagesPersistenceEnabled = true
@@ -141,13 +149,6 @@ func WithDatabaseConfig(dbPath, dbKey string) Option {
 func WithDatabase(db *sql.DB) Option {
 	return func(c *config) error {
 		c.db = db
-		return nil
-	}
-}
-
-func WithSendV1Messages() Option {
-	return func(c *config) error {
-		c.featureFlags.sendV1Messages = true
 		return nil
 	}
 }
@@ -267,7 +268,6 @@ func NewMessenger(
 		nil,
 		c.envelopesMonitorConfig,
 		logger,
-		transport.SetGenericDiscoveryTopicSupport(c.featureFlags.genericDiscoveryTopicEnabled),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create a WhisperServiceTransport")
@@ -624,47 +624,58 @@ func (m *Messenger) Contacts() ([]*Contact, error) {
 	return m.persistence.Contacts()
 }
 
-func (m *Messenger) Send(ctx context.Context, chatID string, data []byte) ([][]byte, error) {
-	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chatID))
+func timestampInMs() uint64 {
+	return uint64(time.Now().UnixNano() / int64(time.Millisecond))
+}
 
-	// A valid added chat is required.
-	chat, err := m.chatByID(chatID)
+// ReSendChatMessage pulls a message from the database and sends it again
+func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "ReSendChatMessage"))
+	var response MessengerResponse
+	message, err := m.persistence.MessageByID(messageID)
 	if err != nil {
 		return nil, err
 	}
+	if message == nil {
+		return nil, errors.New("message not found")
+	}
+	if message.RawPayload == nil {
+		return nil, errors.New("message payload not found, can't resend message")
+	}
 
-	clock, err := m.persistence.LastMessageClock(chat.ID)
+	chat, err := m.chatByID(message.LocalChatID)
 	if err != nil {
 		return nil, err
 	}
-
-	logger.Debug("last message clock received", zap.Int64("clock", clock))
 
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
-		logger.Debug("sending private message", zap.Binary("publicKey", crypto.FromECDSAPub(chat.PublicKey)))
-		id, message, err := m.processor.SendPrivate(ctx, chat.PublicKey, chat.ID, data, clock)
+		publicKey := crypto.FromECDSAPub(chat.PublicKey)
+		logger.Debug("re-sending private message", zap.Binary("publicKey", publicKey))
+		id, err := m.processor.SendPrivateRaw(ctx, chat.PublicKey, message.RawPayload)
 		if err != nil {
 			return nil, err
 		}
-		if err := m.cacheOwnMessage(chatID, id, message); err != nil {
+		message.ID = "0x" + hex.EncodeToString(id)
+		err = m.sendToPairedDevices(ctx, message.RawPayload)
+		if err != nil {
 			return nil, err
 		}
-		return [][]byte{id}, nil
+
 	case ChatTypePublic:
-		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		id, err := m.processor.SendPublic(ctx, chat.ID, data, clock)
+		logger.Debug("re-sending public message", zap.String("chatName", chat.Name))
+		id, err := m.processor.SendPublicRaw(ctx, chat.ID, message.RawPayload)
 		if err != nil {
 			return nil, err
 		}
-		return [][]byte{id}, nil
+		message.ID = "0x" + hex.EncodeToString(id)
 	case ChatTypePrivateGroupChat:
-		logger.Debug("sending group message", zap.String("chatName", chat.Name))
+		logger.Debug("re-sending group message", zap.String("chatName", chat.Name))
 		recipients, err := chat.MembersAsPublicKeys()
 		if err != nil {
 			return nil, err
 		}
-		// Filter me out of recipients.
+
 		n := 0
 		for _, item := range recipients {
 			if !isPubKeyEqual(item, &m.identity.PublicKey) {
@@ -672,38 +683,184 @@ func (m *Messenger) Send(ctx context.Context, chatID string, data []byte) ([][]b
 				n++
 			}
 		}
-		ids, messages, err := m.processor.SendGroup(ctx, recipients[:n], chat.ID, data, clock)
+		id, err := m.processor.SendGroupRaw(ctx, recipients[:n], message.RawPayload)
 		if err != nil {
 			return nil, err
 		}
-		for idx, message := range messages {
-			if err := m.cacheOwnMessage(chatID, ids[idx], message); err != nil {
-				return nil, err
-			}
+
+		message.ID = "0x" + hex.EncodeToString(id)
+
+		err = m.sendToPairedDevices(ctx, message.RawPayload)
+		if err != nil {
+			return nil, err
 		}
-		return ids, nil
+
 	default:
-		return nil, errors.New("chat is neither public nor private")
+		return nil, errors.New("chat type not supported")
 	}
+
+	response.Messages = []*Message{message}
+	response.Chats = []*Chat{chat}
+	return &response, nil
 }
 
-func (m *Messenger) cacheOwnMessage(chatID string, id []byte, message *v1protocol.Message) error {
-	// Save our message because it won't be received from the transport layer.
-	message.ID = id // a Message need ID to be properly stored in the db
-	message.SigPubKey = &m.identity.PublicKey
-	message.ChatID = chatID
-
-	if m.messagesPersistenceEnabled {
-		_, err := m.persistence.SaveMessages([]*v1protocol.Message{message})
+// sendToPairedDevices will check if we have any paired devices and send to them if necessary
+func (m *Messenger) sendToPairedDevices(ctx context.Context, payload []byte) error {
+	activeInstallations, err := m.encryptor.GetOurActiveInstallations(&m.identity.PublicKey)
+	if err != nil {
+		return err
+	}
+	// We send a message to any paired device
+	if len(activeInstallations) > 1 {
+		_, err := m.processor.SendPrivateRaw(ctx, &m.identity.PublicKey, payload)
 		if err != nil {
 			return err
 		}
 	}
-
-	// Cache it to be returned in Retrieve().
-	m.ownMessages = append(m.ownMessages, message)
-
 	return nil
+}
+
+// SendChatMessage takes a minimal message and sends it based on the corresponding chat
+func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
+	var response MessengerResponse
+
+	// A valid added chat is required.
+	chat, err := m.chatByID(message.ChatId)
+	if err != nil {
+		return nil, err
+	}
+
+	clock := chat.LastClockValue
+	timestamp := timestampInMs()
+	if clock == 0 || clock < timestamp {
+		clock = timestamp
+	} else {
+		clock = clock + 1
+	}
+
+	message.LocalChatID = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.From = "0x" + hex.EncodeToString(crypto.FromECDSAPub(&m.identity.PublicKey))
+	message.SigPubKey = &m.identity.PublicKey
+	message.WhisperTimestamp = timestamp
+	message.Seen = true
+	message.OutgoingStatus = OutgoingStatusSending
+
+	identicon, err := identicon.GenerateBase64(message.From)
+	if err != nil {
+		return nil, err
+	}
+
+	message.Identicon = identicon
+
+	alias, err := alias.GenerateFromPublicKeyString(message.From)
+	if err != nil {
+		return nil, err
+	}
+
+	message.Alias = alias
+
+	switch chat.ChatType {
+	case ChatTypeOneToOne:
+		publicKey := crypto.FromECDSAPub(chat.PublicKey)
+		logger.Debug("sending private message", zap.Binary("publicKey", publicKey))
+		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+		encodedMessage, err := proto.Marshal(message)
+		if err != nil {
+			return nil, err
+		}
+		message.RawPayload = encodedMessage
+
+		id, err := m.processor.SendPrivateRaw(ctx, chat.PublicKey, encodedMessage)
+		if err != nil {
+			return nil, err
+		}
+		message.ID = "0x" + hex.EncodeToString(id)
+
+		err = m.sendToPairedDevices(ctx, encodedMessage)
+		if err != nil {
+			return nil, err
+		}
+
+	case ChatTypePublic:
+		logger.Debug("sending public message", zap.String("chatName", chat.Name))
+		message.MessageType = protobuf.ChatMessage_PUBLIC_GROUP
+		encodedMessage, err := proto.Marshal(message)
+		if err != nil {
+			return nil, err
+		}
+		message.RawPayload = encodedMessage
+
+		id, err := m.processor.SendPublicRaw(ctx, chat.ID, encodedMessage)
+		if err != nil {
+			return nil, err
+		}
+		message.ID = "0x" + hex.EncodeToString(id)
+	case ChatTypePrivateGroupChat:
+		logger.Debug("sending public message", zap.String("chatName", chat.Name))
+		message.MessageType = protobuf.ChatMessage_PRIVATE_GROUP
+		encodedMessage, err := proto.Marshal(message)
+		if err != nil {
+			return nil, err
+		}
+		message.RawPayload = encodedMessage
+
+		logger.Debug("sending group message", zap.String("chatName", chat.Name))
+		recipients, err := chat.MembersAsPublicKeys()
+		if err != nil {
+			return nil, err
+		}
+
+		n := 0
+		for _, item := range recipients {
+			if !isPubKeyEqual(item, &m.identity.PublicKey) {
+				recipients[n] = item
+				n++
+			}
+		}
+		id, err := m.processor.SendGroupRaw(ctx, recipients[:n], encodedMessage)
+		if err != nil {
+			return nil, err
+		}
+
+		message.ID = "0x" + hex.EncodeToString(id)
+
+		err = m.sendToPairedDevices(ctx, encodedMessage)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, errors.New("chat type not supported")
+	}
+
+	err = message.PrepareContent()
+	if err != nil {
+		return nil, err
+	}
+
+	jsonMessage, err := json.Marshal(message)
+	if err != nil {
+		return nil, err
+	}
+
+	chat.LastClockValue = clock
+	chat.LastMessage = jsonMessage
+	chat.Timestamp = int64(timestamp)
+	if err := m.SaveChat(*chat); err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	if err != nil {
+		return nil, err
+	}
+
+	response.Chats = []*Chat{chat}
+	response.Messages = []*Message{message}
+	return &response, nil
 }
 
 // SendRaw takes encoded data, encrypts it and sends through the wire.
@@ -717,94 +874,48 @@ func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte
 	return nil, errors.New("chat is neither public nor private")
 }
 
-type RetrieveConfig struct {
-	From        time.Time
-	To          time.Time
-	latest      bool
-	last24Hours bool
-}
-
-var (
-	RetrieveLatest  = RetrieveConfig{latest: true}
-	RetrieveLastDay = RetrieveConfig{latest: true, last24Hours: true}
-)
-
-// RetrieveAll retrieves all previously fetched messages
-func (m *Messenger) RetrieveAll(ctx context.Context, c RetrieveConfig) ([]*v1protocol.Message, error) {
-	result, err := m.retrieveLatest(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	postProcess := newPostProcessor(m, postProcessorConfig{
-		MatchChat: true,
-		Persist:   true,
-	})
-	result, err = postProcess.Run(result)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to post process messages")
-	}
-
-	retrievedMessages, err := m.retrieveSaved(ctx, c)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get saved messages")
-	}
-	result = append(result, retrievedMessages...)
-
-	// Include own messages.
-	result = append(result, m.ownMessages...)
-	m.ownMessages = nil
-
-	return result, nil
-}
-
-func (m *Messenger) retrieveLatest(ctx context.Context) ([]*v1protocol.Message, error) {
-	latest, err := m.transport.RetrieveAllMessages()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to retrieve messages")
-	}
-
-	logger := m.logger.With(zap.String("site", "retrieveLatest"))
-	logger.Debug("retrieved messages", zap.Int("count", len(latest)))
-
-	var result []*v1protocol.Message
-	for _, transpMessage := range latest {
-		protoMessages, err := m.processor.Process(transpMessage.Message)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, protoMessages...)
-	}
-	return result, nil
-}
-
-func (m *Messenger) retrieveSaved(ctx context.Context, c RetrieveConfig) (messages []*v1protocol.Message, err error) {
-	if !m.messagesPersistenceEnabled {
-		return nil, nil
-	}
-
-	if !c.latest {
-		return m.persistence.Messages(c.From, c.To)
-	}
-
-	if c.last24Hours {
-		to := time.Now()
-		from := to.Add(-time.Hour * 24)
-		return m.persistence.Messages(from, to)
-	}
-
-	return nil, nil
-}
-
-// DEPRECATED
-func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*v1protocol.StatusMessage, error) {
+// RetrieveAll retrieves messages from all filters, processes them and returns a
+// MessengerResponse to the client
+func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 	chatWithMessages, err := m.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
 	}
 
-	logger := m.logger.With(zap.String("site", "RetrieveRawAll"))
-	result := make(map[transport.Filter][]*v1protocol.StatusMessage)
+	return m.handleRetrievedMessages(chatWithMessages)
+}
+
+func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
+	response := &MessengerResponse{
+		Chats:    []*Chat{},
+		Messages: []*Message{},
+	}
+	allChats, err := m.persistence.Chats()
+	if err != nil {
+		return nil, err
+	}
+
+	postProcessor := newPostProcessor(m, postProcessorConfig{MatchChat: true})
+
+	logger := m.logger.With(zap.String("site", "RetrieveAll"))
+	rawMessages := make(map[transport.Filter][]*v1protocol.StatusMessage)
+
+	// We should query this instead
+	contacts, err := m.Contacts()
+	if err != nil {
+		return nil, err
+	}
+
+	blockedContacts := make(map[string]bool)
+	for _, c := range contacts {
+		if c.IsBlocked() {
+			blockedContacts[c.ID] = true
+		}
+	}
+
+	allContactsMap := make(map[string]*Contact)
+	allChatsMap := make(map[string]*Chat)
+	existingMessagesMap := make(map[string]bool)
 
 	for chat, messages := range chatWithMessages {
 		for _, shhMessage := range messages {
@@ -816,48 +927,130 @@ func (m *Messenger) RetrieveRawAll() (map[transport.Filter][]*v1protocol.StatusM
 			}
 
 			for _, msg := range statusMessages {
-				if msg.ParsedMessage != nil {
-					if textMessage, ok := msg.ParsedMessage.(v1protocol.Message); ok {
-						textMessage.Content = v1protocol.PrepareContent(textMessage.Content)
-						msg.ParsedMessage = textMessage
+				// Check for messages from blocked users
+				senderID := "0x" + hex.EncodeToString(crypto.FromECDSAPub(msg.SigPubKey()))
+				if blockedContacts[senderID] {
+					continue
+				}
+				// Don't process duplicates
+				messageID := "0x" + hex.EncodeToString(msg.ID)
+				if _, ok := existingMessagesMap[messageID]; ok {
+					continue
+				}
+				existingMessagesMap[messageID] = true
+
+				// Check against the database, this is probably a bit slow for
+				// each message, but for now might do, we'll make it faster later
+				existingMessage, err := m.persistence.MessageByID(messageID)
+				if err != nil && err != errRecordNotFound {
+					return nil, err
+				}
+				if existingMessage != nil {
+					continue
+				}
+
+				publicKey := msg.SigPubKey()
+				if publicKey == nil {
+					return nil, errors.New("public key can't be nil")
+				}
+
+				var contact *Contact
+				if c, ok := allContactsMap[senderID]; ok {
+					contact = c
+				} else {
+					c, err := buildContact(publicKey)
+					if err != nil {
+						logger.Info("failed to build contact", zap.Error(err))
+						continue
 					}
+					contact = c
+					allContactsMap[senderID] = c
+					response.Contacts = append(response.Contacts, c)
+				}
+
+				if msg.ParsedMessage != nil {
+					if textMessage, ok := msg.ParsedMessage.(protobuf.ChatMessage); ok {
+						receivedMessage := &Message{
+							ID:               messageID,
+							ChatMessage:      textMessage,
+							From:             contact.ID,
+							Alias:            contact.Alias,
+							SigPubKey:        publicKey,
+							Identicon:        contact.Identicon,
+							WhisperTimestamp: uint64(msg.TransportMessage.Timestamp) * 1000,
+						}
+						receivedMessage.PrepareContent()
+
+						chat, err := postProcessor.matchMessage(receivedMessage, allChats)
+						if err != nil {
+							logger.Warn("failed to match message", zap.String("receivedChatID", receivedMessage.ChatId), zap.Error(err))
+							continue
+						}
+
+						// If deleted-at is greater, ignore message
+						if chat.DeletedAtClockValue >= receivedMessage.Clock {
+							continue
+						}
+
+						// Set the LocalChatID for the message
+						receivedMessage.LocalChatID = chat.ID
+
+						if c, ok := allChatsMap[chat.ID]; ok {
+							chat = c
+						}
+
+						// Increase unviewed count
+						if !isPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
+							chat.UnviewedMessagesCount++
+						} else {
+							// Our own message, mark as sent
+							receivedMessage.OutgoingStatus = OutgoingStatusSent
+						}
+
+						// Update chat timestamp
+						chat.Timestamp = int64(timestampInMs())
+						// Update last clock value
+						if chat.LastClockValue <= receivedMessage.Clock {
+							chat.LastClockValue = receivedMessage.Clock
+							encodedLastMessage, err := json.Marshal(receivedMessage)
+							if err != nil {
+								return nil, err
+							}
+							chat.LastMessage = encodedLastMessage
+						}
+
+						// Set chat active
+						chat.Active = true
+						// Set in the map
+						allChatsMap[chat.ID] = chat
+						// Add to response
+						response.Messages = append(response.Messages, receivedMessage)
+					}
+				} else {
+					// RawMessage, not processed here, pass straight to the client
+					rawMessages[chat] = append(rawMessages[chat], msg)
 				}
 
 			}
-
-			result[chat] = append(result[chat], statusMessages...)
 		}
 	}
 
-	err = m.updateContactsFromMessages(result)
+	err = m.persistence.SetContactsGeneratedData(response.Contacts, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
-}
-
-func (m *Messenger) updateContactsFromMessages(messages map[transport.Filter][]*v1protocol.StatusMessage) error {
-	allContactsMap := make(map[string]bool)
-	var allContacts []Contact
-	for _, chatMessages := range messages {
-		for _, message := range chatMessages {
-			publicKey := message.SigPubKey()
-			address := strings.ToLower(crypto.PubkeyToAddress(*publicKey).Hex())
-
-			if _, ok := allContactsMap[address]; ok {
-				continue
-			}
-			contact, err := buildContact(publicKey)
-			if err != nil {
-				continue
-			}
-
-			allContactsMap[address] = true
-			allContacts = append(allContacts, *contact)
-		}
+	for _, c := range allChatsMap {
+		response.Chats = append(response.Chats, c)
 	}
-	return m.persistence.SetContactsGeneratedData(allContacts, nil)
+
+	m.persistence.SaveChats(response.Chats)
+	m.SaveMessages(response.Messages)
+
+	for filter, messages := range rawMessages {
+		response.RawMessages = append(response.RawMessages, &RawResponse{Filter: &filter, Messages: messages})
+	}
+	return response, nil
 }
 
 func (m *Messenger) RequestHistoricMessages(
@@ -909,6 +1102,47 @@ func (m *Messenger) SaveMessages(messages []*Message) error {
 	return m.persistence.SaveMessagesLegacy(messages)
 }
 
+// AddSystemMessages format an array of system-messages and saves them to the database
+// It's needed until group chats are fully in status-go.
+func (m *Messenger) AddSystemMessages(messages []*Message) ([]*Message, error) {
+	timestamp := timestampInMs()
+
+	for _, message := range messages {
+		message.LocalChatID = message.ChatId
+		message.Timestamp = timestamp
+		message.WhisperTimestamp = timestamp
+		message.Seen = true
+
+		identicon, err := identicon.GenerateBase64(message.From)
+		if err != nil {
+			return nil, err
+		}
+
+		message.Identicon = identicon
+
+		alias, err := alias.GenerateFromPublicKeyString(message.From)
+		if err != nil {
+			return nil, err
+		}
+
+		message.ID = "0x" + hex.EncodeToString(crypto.Keccak256([]byte(message.Text+message.From+strconv.FormatUint(message.Clock, 10))))
+		message.Alias = alias
+		message.ContentType = protobuf.ChatMessage_STATUS
+		message.MessageType = protobuf.ChatMessage_SYSTEM_MESSAGE_PRIVATE_GROUP
+		err = message.PrepareContent()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err := m.SaveMessages(messages)
+	if err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
 // DEPRECATED: required by status-react.
 func (m *Messenger) DeleteMessage(id string) error {
 	return m.persistence.DeleteMessage(id)
@@ -920,8 +1154,8 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 }
 
 // DEPRECATED: required by status-react.
-func (m *Messenger) MarkMessagesSeen(ids ...string) error {
-	return m.persistence.MarkMessagesSeen(ids...)
+func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) error {
+	return m.persistence.MarkMessagesSeen(chatID, ids)
 }
 
 // DEPRECATED: required by status-react.
@@ -955,100 +1189,68 @@ func newPostProcessor(m *Messenger, config postProcessorConfig) *postProcessor {
 	}
 }
 
-func (p *postProcessor) Run(messages []*v1protocol.Message) ([]*v1protocol.Message, error) {
-	var err error
-
-	p.logger.Debug("running post processor", zap.Int("messages", len(messages)))
-
-	var fns []func([]*v1protocol.Message) ([]*v1protocol.Message, error)
-
-	// Order is important. Persisting messages should be always at the end.
-	if p.config.MatchChat {
-		fns = append(fns, p.matchMessages)
-	}
-	if p.config.Parse {
-		fns = append(fns, p.parseMessages)
-	}
-	if p.config.Persist {
-		fns = append(fns, p.saveMessages)
-	}
-
-	for _, fn := range fns {
-		messages, err = fn(messages)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return messages, nil
-}
-
-func (p *postProcessor) saveMessages(messages []*v1protocol.Message) ([]*v1protocol.Message, error) {
-	_, err := p.persistence.SaveMessages(messages)
-	if err != nil {
-		return nil, err
-	}
-	return messages, nil
-}
-
-func (p *postProcessor) parseMessages(messages []*v1protocol.Message) ([]*v1protocol.Message, error) {
-	for _, m := range messages {
-		m.Content = v1protocol.PrepareContent(m.Content)
-	}
-
-	return messages, nil
-}
-
-func (p *postProcessor) matchMessages(messages []*v1protocol.Message) ([]*v1protocol.Message, error) {
+func (p *postProcessor) matchMessages(messages []*Message) ([]*Message, error) {
 	chats, err := p.persistence.Chats()
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]*v1protocol.Message, 0, len(messages))
+	result := make([]*Message, 0, len(messages))
 	for _, message := range messages {
 		chat, err := p.matchMessage(message, chats)
 		if err != nil {
 			p.logger.Error("failed to match a chat to a message", zap.Error(err))
 			continue
 		}
-		message.ChatID = chat.ID
+		message.LocalChatID = chat.ID
 		result = append(result, message)
 	}
 	return result, nil
 }
 
-func (p *postProcessor) matchMessage(message *v1protocol.Message, chats []*Chat) (*Chat, error) {
+func (p *postProcessor) matchMessage(message *Message, chats []*Chat) (*Chat, error) {
 	if message.SigPubKey == nil {
 		p.logger.Error("public key can't be empty")
 		return nil, errors.New("received a message with empty public key")
 	}
 
 	switch {
-	case message.MessageT == v1protocol.MessageTypePublicGroup:
+	case message.MessageType == protobuf.ChatMessage_PUBLIC_GROUP:
 		// For public messages, all outgoing and incoming messages have the same chatID
 		// equal to a public chat name.
-		chatID := message.Content.ChatID
+		chatID := message.ChatId
 		chat := findChatByID(chatID, chats)
 		if chat == nil {
 			return nil, errors.New("received a public message from non-existing chat")
 		}
 		return chat, nil
-	case message.MessageT == v1protocol.MessageTypePrivate && isPubKeyEqual(message.SigPubKey, p.myPublicKey):
-		// It's a private message coming from us so we rely on Message.Content.ChatID.
+	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && isPubKeyEqual(message.SigPubKey, p.myPublicKey):
+		// It's a private message coming from us so we rely on Message.ChatId
 		// If chat does not exist, it should be created to support multidevice synchronization.
-		chatID := message.Content.ChatID
+		chatID := message.ChatId
 		chat := findChatByID(chatID, chats)
 		if chat == nil {
-			// TODO: this should be a three-word name used in the mobile client
-			newChat := CreateOneToOneChat(chatID[:8], message.SigPubKey)
+			if len(chatID) != PubKeyStringLength {
+				return nil, errors.New("invalid pubkey length")
+			}
+			bytePubKey, err := hex.DecodeString(chatID[2:])
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode hex chatID")
+			}
+
+			pubKey, err := crypto.UnmarshalPubkey(bytePubKey)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode pubkey")
+			}
+
+			newChat := CreateOneToOneChat(chatID[:8], pubKey)
 			if err := p.persistence.SaveChat(newChat); err != nil {
 				return nil, errors.Wrap(err, "failed to save newly created chat")
 			}
 			chat = &newChat
 		}
 		return chat, nil
-	case message.MessageT == v1protocol.MessageTypePrivate:
+	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE:
 		// It's an incoming private message. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
 		chatID := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
@@ -1062,21 +1264,34 @@ func (p *postProcessor) matchMessage(message *v1protocol.Message, chats []*Chat)
 			chat = &newChat
 		}
 		return chat, nil
-	case message.MessageT == v1protocol.MessageTypePrivateGroup:
+	case message.MessageType == protobuf.ChatMessage_PRIVATE_GROUP:
 		// In the case of a group message, ChatID is the same for all messages belonging to a group.
 		// It needs to be verified if the signature public key belongs to the chat.
-		chatID := message.Content.ChatID
+		chatID := message.ChatId
 		chat := findChatByID(chatID, chats)
 		if chat == nil {
 			return nil, errors.New("received group chat message for non-existing chat")
 		}
 
-		sigPubKeyHex := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		theirKeyHex := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		myKeyHex := types.EncodeHex(crypto.FromECDSAPub(p.myPublicKey))
+		var theyJoined bool
+		var iJoined bool
 		for _, member := range chat.Members {
-			if member.ID == sigPubKeyHex {
-				return chat, nil
+			if member.ID == theirKeyHex && member.Joined {
+				theyJoined = true
 			}
 		}
+		for _, member := range chat.Members {
+			if member.ID == myKeyHex && member.Joined {
+				iJoined = true
+			}
+		}
+
+		if theyJoined && iJoined {
+			return chat, nil
+		}
+
 		return nil, errors.New("did not find a matching group chat")
 	default:
 		return nil, errors.New("can not match a chat because there is no valid case")
@@ -1098,7 +1313,7 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 	}
 
 	// Update contacts
-	var contacts []Contact
+	var contacts []*Contact
 	for _, details := range ensResponse {
 		if details.Error == nil {
 			contact, err := buildContact(details.PublicKey)
@@ -1109,7 +1324,7 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 			contact.ENSVerifiedAt = details.VerifiedAt
 			contact.Name = details.Name
 
-			contacts = append(contacts, *contact)
+			contacts = append(contacts, contact)
 		} else {
 			m.logger.Warn("Failed to resolve ens name",
 				zap.String("name", details.Name),
@@ -1132,9 +1347,4 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 // GenerateAlias name returns the generated name given a public key hex encoded prefixed with 0x
 func GenerateAlias(id string) (string, error) {
 	return alias.GenerateFromPublicKeyString(id)
-}
-
-// PrepareContent parses the content of a message and returns the parsed version
-func (m *Messenger) PrepareContent(content v1protocol.Content) v1protocol.Content {
-	return v1protocol.PrepareContent(content)
 }

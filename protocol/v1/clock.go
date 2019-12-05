@@ -5,7 +5,7 @@ import "time"
 const clockBumpInMs = int64(time.Minute / time.Millisecond)
 
 // CalcMessageClock calculates a new clock value for Message.
-// It is used to properly sort messages and accomodate the fact
+// It is used to properly sort messages and accommodate the fact
 // that time might be different on each device.
 func CalcMessageClock(lastObservedValue int64, timeInMs TimestampInMs) int64 {
 	clock := lastObservedValue

@@ -96,7 +96,9 @@ CREATE INDEX mailserver_request_gaps_chat_id_idx ON mailserver_request_gaps (cha
 CREATE TABLE IF NOT EXISTS mailserver_topics (
     topic VARCHAR PRIMARY KEY,
     chat_ids VARCHAR,
-    last_request INTEGER DEFAULT 1
+    last_request INTEGER DEFAULT 1,
+    discovery BOOLEAN DEFAULT FALSE,
+    negotiated BOOLEAN DEFAULT FALSE
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS mailserver_chat_request_ranges (

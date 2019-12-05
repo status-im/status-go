@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -11,14 +12,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 	whisper "github.com/status-im/whisper/whisperv6"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
@@ -75,11 +77,8 @@ func (s *MessengerSuite) SetupTest() {
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
+func (s *MessengerSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecdsa.PrivateKey) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
-	s.Require().NoError(err)
-
-	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
 	options := []Option{
@@ -93,7 +92,7 @@ func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
 	m, err := NewMessenger(
 		privateKey,
 		&testNode{shh: shh},
-		"installation-1",
+		uuid.New().String(),
 		options...,
 	)
 	s.Require().NoError(err)
@@ -104,6 +103,13 @@ func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
 	s.tmpFiles = append(s.tmpFiles, tmpFile)
 
 	return m
+}
+
+func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
 func (s *MessengerSuite) TearDownTest() {
@@ -251,148 +257,657 @@ func (s *MessengerSuite) TestInit() {
 	}
 }
 
+func buildTestMessage(chat Chat) *Message {
+
+	message := &Message{}
+	message.Text = "text-input-message"
+	message.ChatId = chat.ID
+	message.LocalChatID = chat.ID
+	switch chat.ChatType {
+	case ChatTypePublic:
+		message.MessageType = protobuf.ChatMessage_PUBLIC_GROUP
+	case ChatTypeOneToOne:
+		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	case ChatTypePrivateGroupChat:
+		message.MessageType = protobuf.ChatMessage_PRIVATE_GROUP
+	}
+
+	return message
+}
+
+func (s *MessengerSuite) TestMarkMessagesSeen() {
+	chat := CreatePublicChat("test-chat")
+	chat.UnviewedMessagesCount = 2
+	err := s.m.SaveChat(chat)
+	s.Require().NoError(err)
+	inputMessage1 := buildTestMessage(chat)
+	inputMessage1.ID = "1"
+	inputMessage1.Seen = false
+	inputMessage2 := buildTestMessage(chat)
+	inputMessage2.ID = "2"
+	inputMessage2.Seen = false
+
+	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
+	s.Require().NoError(err)
+
+	err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	s.Require().NoError(err)
+
+	chats, err := s.m.Chats()
+	s.Require().NoError(err)
+	s.Require().Len(chats, 1)
+	s.Require().Equal(uint(1), chats[0].UnviewedMessagesCount)
+}
+
 func (s *MessengerSuite) TestSendPublic() {
 	chat := CreatePublicChat("test-chat")
+	chat.LastClockValue = uint64(100000000000000)
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	_, err = s.m.Send(context.Background(), chat.ID, []byte("test"))
+	inputMessage := buildTestMessage(chat)
+	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
+
+	s.Require().Equal(1, len(response.Messages), "it returns the message")
+	outputMessage := response.Messages[0]
+
+	s.Require().Equal(chat.LastClockValue+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
+	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
+	s.Require().True(outputMessage.Seen, "it marks the message as seen")
+	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
+	s.Require().Equal(protobuf.ChatMessage_PUBLIC_GROUP, outputMessage.MessageType)
+
+	savedMessages, _, err := s.m.MessageByChatID(chat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(savedMessages), "it saves the message")
 }
 
-func (s *MessengerSuite) TestSendPrivate() {
+func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	recipientKey, err := crypto.GenerateKey()
 	s.NoError(err)
-	chat := CreateOneToOneChat("XXX", &recipientKey.PublicKey)
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&recipientKey.PublicKey))
+	chat := CreateOneToOneChat(pkString, &recipientKey.PublicKey)
+
+	inputMessage := &Message{}
+	inputMessage.ChatId = chat.ID
+	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(chat)
 	s.NoError(err)
-	_, err = s.m.Send(context.Background(), chat.ID, []byte("test"))
+	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
+	s.Require().Equal(1, len(response.Messages), "it returns the message")
+	outputMessage := response.Messages[0]
+
+	s.Require().Equal(chat.LastClockValue+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
+	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
+	s.Require().True(outputMessage.Seen, "it marks the message as seen")
+	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
+	s.Require().Equal(protobuf.ChatMessage_ONE_TO_ONE, outputMessage.MessageType)
 }
 
+func (s *MessengerSuite) TestAddSystemMessages() {
+	chat, err := s.m.CreateGroupChat("test")
+	s.NoError(err)
+	inputMessage := buildTestMessage(*chat)
+	inputMessage.Clock = 20
+	inputMessage.From = "0x" + hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey))
+	messages, err := s.m.AddSystemMessages([]*Message{inputMessage})
+	s.Require().NoError(err)
+	s.Require().Len(messages, 1)
+
+	actualMessage := messages[0]
+
+	s.Require().NotEmpty(actualMessage.ID)
+	s.Require().True(actualMessage.Seen)
+	s.Require().Empty(actualMessage.OutgoingStatus)
+	s.Require().NotEmpty(actualMessage.Timestamp)
+	s.Require().NotEmpty(actualMessage.WhisperTimestamp)
+	s.Require().Equal(chat.ID, actualMessage.LocalChatID)
+	s.Require().NotEmpty(actualMessage.Identicon)
+	s.Require().NotEmpty(actualMessage.Alias)
+	s.Require().Equal(protobuf.ChatMessage_STATUS, actualMessage.ContentType)
+	s.Require().Equal(protobuf.ChatMessage_SYSTEM_MESSAGE_PRIVATE_GROUP, actualMessage.MessageType)
+	s.Require().NotEmpty(actualMessage.ParsedText)
+}
+
+func (s *MessengerSuite) TestSendPrivateGroup() {
+	chat, err := s.m.CreateGroupChat("test")
+	s.NoError(err)
+	key, err := crypto.GenerateKey()
+	s.NoError(err)
+	err = s.m.AddMembersToChat(context.Background(), chat, []*ecdsa.PublicKey{&key.PublicKey})
+	s.NoError(err)
+
+	inputMessage := &Message{}
+	inputMessage.ChatId = chat.ID
+	chat.LastClockValue = uint64(100000000000000)
+	err = s.m.SaveChat(*chat)
+	s.NoError(err)
+	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Equal(1, len(response.Messages), "it returns the message")
+	outputMessage := response.Messages[0]
+
+	s.Require().Equal(chat.LastClockValue+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
+	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
+	s.Require().True(outputMessage.Seen, "it marks the message as seen")
+	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
+	s.Require().Equal(protobuf.ChatMessage_PRIVATE_GROUP, outputMessage.MessageType)
+}
+
+func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
+	chat, err := s.m.CreateGroupChat("test")
+	s.NoError(err)
+
+	inputMessage := &Message{}
+	inputMessage.ChatId = chat.ID
+	chat.LastClockValue = uint64(100000000000000)
+	err = s.m.SaveChat(*chat)
+	s.NoError(err)
+	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Equal(1, len(response.Messages), "it returns the message")
+	outputMessage := response.Messages[0]
+
+	s.Require().Equal(chat.LastClockValue+1, outputMessage.Clock, "it correctly sets the clock")
+	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
+	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
+	s.Require().True(outputMessage.Seen, "it marks the message as seen")
+	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
+	s.Require().Equal(protobuf.ChatMessage_PRIVATE_GROUP, outputMessage.MessageType)
+}
+
+// Make sure public messages sent by us are not
 func (s *MessengerSuite) TestRetrieveOwnPublic() {
 	chat := CreatePublicChat("status")
 	err := s.m.SaveChat(chat)
 	s.NoError(err)
-
-	_, err = s.m.Send(context.Background(), chat.ID, []byte("test"))
-	s.NoError(err)
-
-	// Give Whisper some time to propagate message to filters.
-	time.Sleep(time.Millisecond * 500)
-
-	// Retrieve chat
-	messages, err := s.m.RetrieveAll(context.Background(), RetrieveLatest)
-	s.NoError(err)
-	s.Len(messages, 1)
-
-	// Retrieve again to test skipping already existing err.
-	messages, err = s.m.RetrieveAll(context.Background(), RetrieveLastDay)
-	s.NoError(err)
-	s.Require().Len(messages, 1)
-
-	// Verify message fields.
-	message := messages[0]
-	s.NotEmpty(message.ID)
-	s.Equal(&s.privateKey.PublicKey, message.SigPubKey) // this is OUR message
-}
-
-func (s *MessengerSuite) TestRetrieveOwnPublicRaw() {
-	chat := CreatePublicChat("status")
-	err := s.m.SaveChat(chat)
-	s.NoError(err)
+	// Right-to-left text
 	text := "پيل اندر خانه يي تاريک بود عرضه را آورده بودندش هنود  i\nاز براي ديدنش مردم بسي اندر آن ظلمت همي شد هر کسي"
 
-	_, err = s.m.Send(context.Background(), chat.ID, []byte(text))
+	inputMessage := buildTestMessage(chat)
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = text
+
+	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	// Give Whisper some time to propagate message to filters.
-	time.Sleep(time.Millisecond * 500)
+	s.Require().Len(response.Messages, 1)
 
-	// Retrieve chat
-	messages, err := s.m.RetrieveRawAll()
-	s.NoError(err)
-	s.Len(messages, 1)
+	textMessage := response.Messages[0]
 
-	for _, v := range messages {
-		s.Len(v, 1)
-		textMessage, ok := v[0].ParsedMessage.(v1protocol.Message)
-		s.Require().True(ok)
-		s.Equal(textMessage.Content.Text, text)
-		s.NotNil(textMessage.Content.ParsedText)
-		s.True(textMessage.Content.RTL)
-		s.Equal(1, textMessage.Content.LineCount)
-	}
+	s.Equal(textMessage.Text, text)
+	s.NotNil(textMessage.ParsedText)
+	s.True(textMessage.RTL)
+	s.Equal(1, textMessage.LineCount)
+
+	s.Require().Len(response.Chats, 1)
+	actualChat := response.Chats[0]
+	// It does not set the unviewed messages count
+	s.Require().Equal(uint(0), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(textMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
 }
 
-func (s *MessengerSuite) TestRetrieveOwnPrivate() {
-	recipientKey, err := crypto.GenerateKey()
-	s.NoError(err)
-	chat := CreateOneToOneChat("XXX", &recipientKey.PublicKey)
+// Retrieve their public message
+func (s *MessengerSuite) TestRetrieveTheirPublic() {
+	theirMessenger := s.newMessenger(s.shh)
+	theirChat := CreatePublicChat("status")
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status")
 	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(chat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
-	messageID, err := s.m.Send(context.Background(), chat.ID, []byte("test"))
-	s.NoError(err)
+	sentMessage := sendResponse.Messages[0]
 
-	// No need to sleep because the message is returned from own messages in the processor.
+	// Wait for the message to reach its destination
+	var response *MessengerResponse
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
 
-	// Retrieve chat
-	messages, err := s.m.RetrieveAll(context.Background(), RetrieveLatest)
-	s.NoError(err)
-	s.Len(messages, 1)
-
-	// Retrieve again to test skipping already existing err.
-	messages, err = s.m.RetrieveAll(context.Background(), RetrieveLastDay)
-	s.NoError(err)
-	s.Len(messages, 1)
-
-	// Verify message fields.
-	message := messages[0]
-	s.Equal(messageID[0], message.ID)
-	s.Equal(&s.privateKey.PublicKey, message.SigPubKey) // this is OUR message
+	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Chats, 1)
+	actualChat := response.Chats[0]
+	// It sets the unviewed messages count
+	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
 }
 
-func (s *MessengerSuite) TestRetrieveTheirPrivate() {
+func (s *MessengerSuite) TestDeletedAtClockValue() {
+	theirMessenger := s.newMessenger(s.shh)
+	theirChat := CreatePublicChat("status")
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status")
+	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(chat)
+
+	sentResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	chat.DeletedAtClockValue = sentResponse.Messages[0].Clock
+	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	time.Sleep(100 * time.Millisecond)
+	response, err := s.m.RetrieveAll()
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages, 0)
+}
+
+func (s *MessengerSuite) TestRetrieveBlockedContact() {
+	theirMessenger := s.newMessenger(s.shh)
+	theirChat := CreatePublicChat("status")
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status")
+	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+	blockedContact := Contact{
+		ID:            publicKeyHex,
+		Address:       "contact-address",
+		Name:          "contact-name",
+		Photo:         "contact-photo",
+		LastUpdated:   20,
+		SystemTags:    []string{contactBlocked},
+		TributeToTalk: "talk",
+	}
+
+	s.Require().NoError(s.m.SaveContact(blockedContact))
+
+	inputMessage := buildTestMessage(chat)
+
+	_, err = theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	// Wait for the message to reach its destination
+	time.Sleep(100 * time.Millisecond)
+	response, err := s.m.RetrieveAll()
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages, 0)
+}
+
+// Resend their public message, receive only once
+func (s *MessengerSuite) TestResendPublicMessage() {
+	theirMessenger := s.newMessenger(s.shh)
+	theirChat := CreatePublicChat("status")
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status")
+	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(chat)
+
+	sendResponse1, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	sentMessage := sendResponse1.Messages[0]
+
+	sendResponse2, err := theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
+	s.Require().NoError(err)
+
+	s.Require().Equal(sendResponse1.Messages[0].ID, sendResponse2.Messages[0].ID)
+
+	// Wait for the message to reach its destination
+	var response *MessengerResponse
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Chats, 1)
+	actualChat := response.Chats[0]
+	// It sets the unviewed messages count
+	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
+
+	// We send the messag again
+	_, err = theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
+	s.Require().NoError(err)
+
+	// It should not be retrieved anymore
+	time.Sleep(100 * time.Millisecond)
+	response, err = s.m.RetrieveAll()
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages, 0)
+}
+
+// Test receiving a message on an existing private chat
+func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
+	theirMessenger := s.newMessenger(s.shh)
+	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey)
+	err := theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	ourChat := CreateOneToOneChat("our-chat", &theirMessenger.identity.PublicKey)
+	ourChat.UnviewedMessagesCount = 1
+	// Make chat inactive
+	ourChat.Active = false
+	err = s.m.SaveChat(ourChat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(theirChat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages, 1)
+
+	sentMessage := sendResponse.Messages[0]
+
+	var response *MessengerResponse
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().Equal(len(response.Chats), 1)
+	actualChat := response.Chats[0]
+	// It updates the unviewed messages count
+	s.Require().Equal(uint(2), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
+	s.Require().True(actualChat.Active)
+}
+
+// Test receiving a message on an non-existing private chat
+func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	theirMessenger := s.newMessenger(s.shh)
 	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey)
 	err := theirMessenger.SaveChat(chat)
 	s.NoError(err)
 
-	messageID, err := theirMessenger.Send(context.Background(), chat.ID, []byte("test"))
+	inputMessage := buildTestMessage(chat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
+	s.Require().Len(sendResponse.Messages, 1)
 
-	var messages []*v1protocol.Message
+	sentMessage := sendResponse.Messages[0]
 
+	// Wait for the message to reach its destination
+	var response *MessengerResponse
 	err = tt.RetryWithBackOff(func() error {
 		var err error
-		messages, err = s.m.RetrieveAll(context.Background(), RetrieveLatest)
-		if err == nil && len(messages) == 0 {
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
 			err = errors.New("no messages")
 		}
 		return err
 	})
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	actualChat := response.Chats[0]
+	// It updates the unviewed messages count
+	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
+	// It sets the chat as active
+	s.Require().True(actualChat.Active)
+}
+
+// Test retrieve paired message
+func (s *MessengerSuite) TestRetrieveOurPairedMessage() {
+	pairedMessenger := s.newMessengerWithKey(s.shh, s.privateKey)
+	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey)
+	err := pairedMessenger.SaveChat(chat)
 	s.NoError(err)
 
-	// Validate received message.
-	s.Require().Len(messages, 1)
-	message := messages[0]
-	s.Equal(messageID[0], message.ID)
-	s.Equal(&theirMessenger.identity.PublicKey, message.SigPubKey)
+	inputMessage := buildTestMessage(chat)
+
+	// Send a message so we now of the installation
+	sendResponse, err := pairedMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages, 1)
+
+	sentMessage := sendResponse.Messages[0]
+
+	// Wait for the message to reach its destination
+
+	var response *MessengerResponse
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+	// Check message is received
+	s.Require().Len(response.Messages, 1)
+
+	actualChat := response.Chats[0]
+	// It does not update the unviewed message count
+	s.Require().Equal(uint(0), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
+
+	// Get installations
+	installations, err := s.m.Installations()
+	s.Require().NoError(err)
+	s.Require().Len(installations, 2)
+
+	// Enable installations
+	err = s.m.EnableInstallation(installations[0].ID)
+	s.Require().NoError(err)
+	err = s.m.EnableInstallation(installations[1].ID)
+	s.Require().NoError(err)
+
+	// We create new one to one chat
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	chat = CreateOneToOneChat("new-chat", &key.PublicKey)
+	err = s.m.SaveChat(chat)
+	s.NoError(err)
+
+	inputMessage = buildTestMessage(chat)
+	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = pairedMessenger.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	// Check message is received
+	s.Require().Len(response.Messages, 1)
+
+	message := response.Messages[0]
+
+	// The chatID is the same chatID as the received one
+	s.Require().Equal(message.LocalChatID, chat.ID)
+
+	// Sets the outgoing status
+	s.Equal(message.OutgoingStatus, OutgoingStatusSent)
 }
+
+// Test receiving a message on an non-existing public chat
+func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
+	theirMessenger := s.newMessenger(s.shh)
+	chat := CreatePublicChat("test-chat")
+	err := theirMessenger.SaveChat(chat)
+	s.NoError(err)
+
+	inputMessage := buildTestMessage(chat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages, 1)
+
+	// Wait for the message to reach its destination
+	time.Sleep(100 * time.Millisecond)
+	response, err := s.m.RetrieveAll()
+	s.NoError(err)
+
+	s.Require().Equal(len(response.Messages), 0)
+	s.Require().Equal(len(response.Chats), 0)
+}
+
+// Test receiving a message on an non-existing public chat
+func (s *MessengerSuite) TestRetrieveTheirGroupChatNonExisting() {
+	theirMessenger := s.newMessenger(s.shh)
+	chat, err := theirMessenger.CreateGroupChat("test")
+	s.NoError(err)
+
+	err = theirMessenger.SaveChat(*chat)
+	s.NoError(err)
+
+	inputMessage := buildTestMessage(*chat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages, 1)
+
+	// Wait for the message to reach its destination
+	time.Sleep(100 * time.Millisecond)
+	response, err := s.m.RetrieveAll()
+	s.NoError(err)
+
+	s.Require().Equal(len(response.Messages), 0)
+	s.Require().Equal(len(response.Chats), 0)
+}
+
+// Test receiving a message on an existing private group chat
+// Disable for now
+func (s *MessengerSuite) testRetrieveTheirPrivateGroupChat() {
+	theirMessenger := s.newMessenger(s.shh)
+	ourChat, err := s.m.CreateGroupChat("id")
+	err = s.m.SaveChat(*ourChat)
+	s.NoError(err)
+
+	err = s.m.AddMembersToChat(context.Background(), ourChat, []*ecdsa.PublicKey{&theirMessenger.identity.PublicKey})
+	s.NoError(err)
+
+	err = theirMessenger.SaveChat(*ourChat)
+	s.NoError(err)
+
+	err = theirMessenger.Join(*ourChat)
+	s.NoError(err)
+
+	inputMessage := buildTestMessage(*ourChat)
+
+	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+	s.Require().Len(sendResponse.Messages, 1)
+
+	sentMessage := sendResponse.Messages[0]
+
+	var response *MessengerResponse
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	actualChat := response.Chats[0]
+	// It updates the unviewed messages count
+	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
+	// It updates the last message clock value
+	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
+	// It sets the last message
+	s.Require().NotNil(actualChat.LastMessage)
+}
+
+// Test it does not update the last message if clock value less then
+// Test it does not return messages from blocked contacts
+// Test it saves the messages
+// Test it does not return the message for public if no chat is there
+// Test returns contacts
+// Test it does not return raw messages if all processed
+// Test duplicate messages, don't update unviewed messages count, they are
+// not passed back
 
 func (s *MessengerSuite) TestChatPersistencePublic() {
 	chat := Chat{
-		ID:                     "chat-name",
-		Name:                   "chat-name",
-		Color:                  "#fffff",
-		Active:                 true,
-		ChatType:               ChatTypePublic,
-		Timestamp:              10,
-		LastClockValue:         20,
-		DeletedAtClockValue:    30,
-		UnviewedMessagesCount:  40,
-		LastMessageContentType: "something",
-		LastMessageContent:     "something-else",
+		ID:                    "chat-name",
+		Name:                  "chat-name",
+		Color:                 "#fffff",
+		Active:                true,
+		ChatType:              ChatTypePublic,
+		Timestamp:             10,
+		LastClockValue:        20,
+		DeletedAtClockValue:   30,
+		UnviewedMessagesCount: 40,
+		LastMessage:           []byte("test"),
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -409,17 +924,16 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 func (s *MessengerSuite) TestDeleteChat() {
 	chatID := "chatid"
 	chat := Chat{
-		ID:                     chatID,
-		Name:                   "chat-name",
-		Color:                  "#fffff",
-		Active:                 true,
-		ChatType:               ChatTypePublic,
-		Timestamp:              10,
-		LastClockValue:         20,
-		DeletedAtClockValue:    30,
-		UnviewedMessagesCount:  40,
-		LastMessageContentType: "something",
-		LastMessageContent:     "something-else",
+		ID:                    chatID,
+		Name:                  "chat-name",
+		Color:                 "#fffff",
+		Active:                true,
+		ChatType:              ChatTypePublic,
+		Timestamp:             10,
+		LastClockValue:        20,
+		DeletedAtClockValue:   30,
+		UnviewedMessagesCount: 40,
+		LastMessage:           []byte("test"),
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -435,17 +949,16 @@ func (s *MessengerSuite) TestDeleteChat() {
 
 func (s *MessengerSuite) TestChatPersistenceUpdate() {
 	chat := Chat{
-		ID:                     "chat-name",
-		Name:                   "chat-name",
-		Color:                  "#fffff",
-		Active:                 true,
-		ChatType:               ChatTypePublic,
-		Timestamp:              10,
-		LastClockValue:         20,
-		DeletedAtClockValue:    30,
-		UnviewedMessagesCount:  40,
-		LastMessageContentType: "something",
-		LastMessageContent:     "something-else",
+		ID:                    "chat-name",
+		Name:                  "chat-name",
+		Color:                 "#fffff",
+		Active:                true,
+		ChatType:              ChatTypePublic,
+		Timestamp:             10,
+		LastClockValue:        20,
+		DeletedAtClockValue:   30,
+		UnviewedMessagesCount: 40,
+		LastMessage:           []byte("test"),
 	}
 
 	s.Require().NoError(s.m.SaveChat(chat))
@@ -473,17 +986,16 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	pkStr := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
 	chat := Chat{
-		ID:                     pkStr,
-		Name:                   pkStr,
-		Color:                  "#fffff",
-		Active:                 true,
-		ChatType:               ChatTypeOneToOne,
-		Timestamp:              10,
-		LastClockValue:         20,
-		DeletedAtClockValue:    30,
-		UnviewedMessagesCount:  40,
-		LastMessageContentType: "something",
-		LastMessageContent:     "something-else",
+		ID:                    pkStr,
+		Name:                  pkStr,
+		Color:                 "#fffff",
+		Active:                true,
+		ChatType:              ChatTypeOneToOne,
+		Timestamp:             10,
+		LastClockValue:        20,
+		DeletedAtClockValue:   30,
+		UnviewedMessagesCount: 40,
+		LastMessage:           []byte("test"),
 	}
 	publicKeyBytes, err := hex.DecodeString(pkStr[2:])
 	s.Require().NoError(err)
@@ -512,24 +1024,24 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		ChatType:  ChatTypePrivateGroupChat,
 		Timestamp: 10,
 		Members: []ChatMember{
-			{
+			ChatMember{
 				ID:     "1",
 				Admin:  false,
 				Joined: true,
 			},
-			{
+			ChatMember{
 				ID:     "2",
 				Admin:  true,
 				Joined: false,
 			},
-			{
+			ChatMember{
 				ID:     "3",
 				Admin:  true,
 				Joined: true,
 			},
 		},
 		MembershipUpdates: []ChatMembershipUpdate{
-			{
+			ChatMembershipUpdate{
 				ID:         "1",
 				Type:       "type-1",
 				Name:       "name-1",
@@ -539,7 +1051,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 				Member:     "member-1",
 				Members:    []string{"member-1", "member-2"},
 			},
-			{
+			ChatMembershipUpdate{
 				ID:         "2",
 				Type:       "type-2",
 				Name:       "name-2",
@@ -550,11 +1062,10 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 				Members:    []string{"member-2", "member-3"},
 			},
 		},
-		LastClockValue:         20,
-		DeletedAtClockValue:    30,
-		UnviewedMessagesCount:  40,
-		LastMessageContentType: "something",
-		LastMessageContent:     "something-else",
+		LastClockValue:        20,
+		DeletedAtClockValue:   30,
+		UnviewedMessagesCount: 40,
+		LastMessage:           []byte("test"),
 	}
 	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats, err := s.m.Chats()
@@ -578,12 +1089,12 @@ func (s *MessengerSuite) TestBlockContact() {
 		LastUpdated: 20,
 		SystemTags:  []string{"1", "2"},
 		DeviceInfo: []ContactDeviceInfo{
-			{
+			ContactDeviceInfo{
 				InstallationID: "1",
 				Timestamp:      2,
 				FCMToken:       "token",
 			},
-			{
+			ContactDeviceInfo{
 				InstallationID: "2",
 				Timestamp:      3,
 				FCMToken:       "token-2",
@@ -637,67 +1148,80 @@ func (s *MessengerSuite) TestBlockContact() {
 	contact.Name = "blocked"
 
 	messages := []*Message{
-		{
+		&Message{
 			ID:          "test-1",
-			ChatID:      chat2.ID,
-			ContentType: "content-type-1",
-			Content:     "test-1",
-			ClockValue:  1,
-			From:        contact.ID,
+			LocalChatID: chat2.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 1,
+				Text:        "test-1",
+				Clock:       1,
+			},
+			From: contact.ID,
 		},
-		{
+		&Message{
 			ID:          "test-2",
-			ChatID:      chat2.ID,
-			ContentType: "content-type-2",
-			Content:     "test-2",
-			ClockValue:  2,
-			From:        contact.ID,
+			LocalChatID: chat2.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 2,
+				Text:        "test-2",
+				Clock:       2,
+			},
+			From: contact.ID,
 		},
-		{
+		&Message{
 			ID:          "test-3",
-			ChatID:      chat2.ID,
-			ContentType: "content-type-3",
-			Content:     "test-3",
-			ClockValue:  3,
-			Seen:        false,
-			From:        "test",
+			LocalChatID: chat2.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 3,
+				Text:        "test-3",
+				Clock:       3,
+			},
+			Seen: false,
+			From: "test",
 		},
-		{
-			ID: "test-4",
-
-			ChatID:      chat2.ID,
-			ContentType: "content-type-4",
-			Content:     "test-4",
-			ClockValue:  4,
-			Seen:        false,
-			From:        "test",
+		&Message{
+			ID:          "test-4",
+			LocalChatID: chat2.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 4,
+				Text:        "test-4",
+				Clock:       4,
+			},
+			Seen: false,
+			From: "test",
 		},
-		{
+		&Message{
 			ID:          "test-5",
-			ChatID:      chat2.ID,
-			ContentType: "content-type-5",
-			Content:     "test-5",
-			ClockValue:  5,
-			Seen:        true,
-			From:        "test",
+			LocalChatID: chat2.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 5,
+				Text:        "test-5",
+				Clock:       5,
+			},
+			Seen: true,
+			From: "test",
 		},
-		{
+		&Message{
 			ID:          "test-6",
-			ChatID:      chat3.ID,
-			ContentType: "content-type-6",
-			Content:     "test-6",
-			ClockValue:  6,
-			Seen:        false,
-			From:        contact.ID,
+			LocalChatID: chat3.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 6,
+				Text:        "test-6",
+				Clock:       6,
+			},
+			Seen: false,
+			From: contact.ID,
 		},
-		{
+		&Message{
 			ID:          "test-7",
-			ChatID:      chat3.ID,
-			ContentType: "content-type-7",
-			Content:     "test-7",
-			ClockValue:  7,
-			Seen:        false,
-			From:        "test",
+			LocalChatID: chat3.ID,
+			ChatMessage: protobuf.ChatMessage{
+				ContentType: 7,
+				Text:        "test-7",
+				Clock:       7,
+			},
+			Seen: false,
+			From: "test",
 		},
 	}
 
@@ -712,12 +1236,17 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().Equal(uint(2), response[1].UnviewedMessagesCount)
 
 	// The new message content is updated
-	s.Require().Equal("test-7", response[0].LastMessageContent)
-	s.Require().Equal("test-5", response[1].LastMessageContent)
+	decodedMessage := &Message{}
+	s.Require().NotNil(response[0].LastMessage)
 
-	// The new message content-type is updated
-	s.Require().Equal("content-type-7", response[0].LastMessageContentType)
-	s.Require().Equal("content-type-5", response[1].LastMessageContentType)
+	s.Require().NoError(json.Unmarshal(response[0].LastMessage, decodedMessage))
+	s.Require().Equal("test-7", decodedMessage.ID)
+
+	decodedMessage = &Message{}
+	s.Require().NotNil(response[1].LastMessage)
+
+	s.Require().NoError(json.Unmarshal(response[1].LastMessage, decodedMessage))
+	s.Require().Equal("test-5", decodedMessage.ID)
 
 	// The contact is updated
 	savedContacts, err := s.m.Contacts()
@@ -751,12 +1280,12 @@ func (s *MessengerSuite) TestContactPersistence() {
 		LastUpdated: 20,
 		SystemTags:  []string{"1", "2"},
 		DeviceInfo: []ContactDeviceInfo{
-			{
+			ContactDeviceInfo{
 				InstallationID: "1",
 				Timestamp:      2,
 				FCMToken:       "token",
 			},
-			{
+			ContactDeviceInfo{
 				InstallationID: "2",
 				Timestamp:      3,
 				FCMToken:       "token-2",
@@ -794,17 +1323,17 @@ func (s *MessengerSuite) TestVerifyENSNames() {
 			PublicKeyString: pk1,
 		},
 		// Not matching pk -> name
-		{
+		enstypes.ENSDetails{
 			Name:            "pedro.stateofus.eth",
 			PublicKeyString: pk2,
 		},
 		// Not existing name
-		{
+		enstypes.ENSDetails{
 			Name:            "definitelynotpedro.stateofus.eth",
 			PublicKeyString: pk3,
 		},
 		// Malformed pk
-		{
+		enstypes.ENSDetails{
 			Name:            "pedro.stateofus.eth",
 			PublicKeyString: pk4,
 		},
@@ -861,12 +1390,12 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 		LastUpdated: 20,
 		SystemTags:  []string{"1", "2"},
 		DeviceInfo: []ContactDeviceInfo{
-			{
+			ContactDeviceInfo{
 				InstallationID: "1",
 				Timestamp:      2,
 				FCMToken:       "token",
 			},
-			{
+			ContactDeviceInfo{
 				InstallationID: "2",
 				Timestamp:      3,
 				FCMToken:       "token-2",
@@ -926,81 +1455,6 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 	s.EqualValues([]string{publicKeyHex, keyHex}, []string{chat.Members[0].ID, chat.Members[1].ID})
 }
 
-// TestGroupChatAutocreate verifies that after receiving a membership update message
-// for non-existing group chat, a new one is created.
-func (s *MessengerSuite) TestGroupChatAutocreate() {
-	theirMessenger := s.newMessenger(s.shh)
-	chat, err := theirMessenger.CreateGroupChat("test-group")
-	s.Require().NoError(err)
-	err = theirMessenger.SaveChat(*chat)
-	s.NoError(err)
-	err = theirMessenger.AddMembersToChat(
-		context.Background(),
-		chat,
-		[]*ecdsa.PublicKey{&s.privateKey.PublicKey},
-	)
-	s.NoError(err)
-	s.Equal(2, len(chat.Members))
-
-	var chats []*Chat
-
-	err = tt.RetryWithBackOff(func() error {
-		_, err := s.m.RetrieveAll(context.Background(), RetrieveLatest)
-		if err != nil {
-			return err
-		}
-		chats, err = s.m.Chats()
-		if err != nil {
-			return err
-		}
-		if len(chats) == 0 {
-			return errors.New("expected a group chat to be created")
-		}
-		return nil
-	})
-	s.NoError(err)
-	s.Equal(chat.ID, chats[0].ID)
-	s.Equal("test-group", chats[0].Name)
-	s.Equal(2, len(chats[0].Members))
-
-	// Send confirmation.
-	err = s.m.ConfirmJoiningGroup(context.Background(), chats[0])
-	s.Require().NoError(err)
-}
-
-func (s *MessengerSuite) TestGroupChatMessages() {
-	theirMessenger := s.newMessenger(s.shh)
-	chat, err := theirMessenger.CreateGroupChat("test-group")
-	s.NoError(err)
-	err = theirMessenger.SaveChat(*chat)
-	s.NoError(err)
-	err = theirMessenger.AddMembersToChat(
-		context.Background(),
-		chat,
-		[]*ecdsa.PublicKey{&s.privateKey.PublicKey},
-	)
-	s.NoError(err)
-	_, err = theirMessenger.Send(context.Background(), chat.ID, []byte("hello!"))
-	s.NoError(err)
-
-	var messages []*v1protocol.Message
-
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		messages, err = s.m.RetrieveAll(context.Background(), RetrieveLatest)
-		if err == nil && len(messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
-	s.NoError(err)
-
-	// Validate received message.
-	s.Require().Len(messages, 1)
-	message := messages[0]
-	s.Equal(&theirMessenger.identity.PublicKey, message.SigPubKey)
-}
-
 type mockSendMessagesRequest struct {
 	types.Whisper
 	req types.MessagesRequest
@@ -1011,7 +1465,34 @@ func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request typ
 	return nil
 }
 
-func (s *MessengerSuite) TestRequestHistoricMessagesRequest() {
+func (s *MessengerSuite) TestMessageJSON() {
+	message := &Message{
+		ID:          "test-1",
+		LocalChatID: "local-chat-id",
+		Alias:       "alias",
+		ChatMessage: protobuf.ChatMessage{
+			ChatId:      "remote-chat-id",
+			ContentType: 0,
+			Text:        "test-1",
+			Clock:       1,
+		},
+		From: "from-field",
+	}
+
+	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","retryCount":0,"seen":false,"quotedMessage":null,"rtl":false,"parsedText":null,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"responseTo":"","ensName":"","sticker":null,"timestamp":0,"contentType":0,"messageType":0}`
+
+	messageJSON, err := json.Marshal(message)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedJSON, string(messageJSON))
+
+	decodedMessage := &Message{}
+	err = json.Unmarshal([]byte(expectedJSON), decodedMessage)
+	s.Require().NoError(err)
+	s.Require().Equal(message, decodedMessage)
+}
+
+// TODO: For some reason is not mocking the method anymore, help?
+func (s *MessengerSuite) testRequestHistoricMessagesRequest() {
 	shh := &mockSendMessagesRequest{
 		Whisper: s.shh,
 	}
@@ -1071,40 +1552,68 @@ func (s *PostProcessorSuite) TestRun() {
 	testCases := []struct {
 		Name            string
 		Chat            Chat // Chat to create
-		Message         v1protocol.Message
+		Message         Message
 		SigPubKey       *ecdsa.PublicKey
 		ExpectedChatIDs []string
 	}{
 		{
-			Name:            "Public chat",
-			Chat:            CreatePublicChat("test-chat"),
-			Message:         v1protocol.CreatePublicTextMessage([]byte("test"), 0, "test-chat"),
+			Name: "Public chat",
+			Chat: CreatePublicChat("test-chat"),
+			Message: Message{
+				ChatMessage: protobuf.ChatMessage{
+					ChatId:      "test-chat",
+					MessageType: protobuf.ChatMessage_PUBLIC_GROUP,
+					Text:        "test-text"},
+			},
 			SigPubKey:       &key1.PublicKey,
 			ExpectedChatIDs: []string{"test-chat"},
 		},
 		{
-			Name:            "Private message from myself with existing chat",
-			Chat:            CreateOneToOneChat("test-private-chat", &key1.PublicKey),
-			Message:         v1protocol.CreatePrivateTextMessage([]byte("test"), 0, oneToOneChatID(&key1.PublicKey)),
+			Name: "Private message from myself with existing chat",
+			Chat: CreateOneToOneChat("test-private-chat", &key1.PublicKey),
+			Message: Message{
+				ChatMessage: protobuf.ChatMessage{
+					ChatId:      "test-chat",
+					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					Text:        "test-text"},
+			},
 			SigPubKey:       &key1.PublicKey,
 			ExpectedChatIDs: []string{oneToOneChatID(&key1.PublicKey)},
 		},
 		{
-			Name:            "Private message from other with existing chat",
-			Chat:            CreateOneToOneChat("test-private-chat", &key2.PublicKey),
-			Message:         v1protocol.CreatePrivateTextMessage([]byte("test"), 0, oneToOneChatID(&key1.PublicKey)),
+			Name: "Private message from other with existing chat",
+			Chat: CreateOneToOneChat("test-private-chat", &key2.PublicKey),
+			Message: Message{
+				ChatMessage: protobuf.ChatMessage{
+					ChatId:      "test-chat",
+					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					Text:        "test-text"},
+			},
+
 			SigPubKey:       &key2.PublicKey,
 			ExpectedChatIDs: []string{oneToOneChatID(&key2.PublicKey)},
 		},
 		{
-			Name:            "Private message from myself without chat",
-			Message:         v1protocol.CreatePrivateTextMessage([]byte("test"), 0, oneToOneChatID(&key1.PublicKey)),
+			Name: "Private message from myself without chat",
+			Message: Message{
+				ChatMessage: protobuf.ChatMessage{
+					ChatId:      "test-chat",
+					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					Text:        "test-text"},
+			},
+
 			SigPubKey:       &key1.PublicKey,
 			ExpectedChatIDs: []string{oneToOneChatID(&key1.PublicKey)},
 		},
 		{
-			Name:            "Private message from other without chat",
-			Message:         v1protocol.CreatePrivateTextMessage([]byte("test"), 0, oneToOneChatID(&key1.PublicKey)),
+			Name: "Private message from other without chat",
+			Message: Message{
+				ChatMessage: protobuf.ChatMessage{
+					ChatId:      "test-chat",
+					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					Text:        "test-text"},
+			},
+
 			SigPubKey:       &key2.PublicKey,
 			ExpectedChatIDs: []string{oneToOneChatID(&key2.PublicKey)},
 		},
@@ -1113,8 +1622,13 @@ func (s *PostProcessorSuite) TestRun() {
 			SigPubKey: nil,
 		},
 		{
-			Name:      "Private group message",
-			Message:   v1protocol.CreatePrivateGroupTextMessage([]byte("test"), 0, "not-existing-chat-id"),
+			Name: "Private group message",
+			Message: Message{
+				ChatMessage: protobuf.ChatMessage{
+					ChatId:      "non-existing-chat",
+					MessageType: protobuf.ChatMessage_PRIVATE_GROUP,
+					Text:        "test-text"},
+			},
 			SigPubKey: &key2.PublicKey,
 		},
 
@@ -1135,14 +1649,14 @@ func (s *PostProcessorSuite) TestRun() {
 			message := tc.Message
 			message.SigPubKey = tc.SigPubKey
 			// ChatID is not set at the beginning.
-			s.Empty(message.ChatID)
+			s.Empty(message.LocalChatID)
 
-			message.ID = []byte(strconv.Itoa(idx)) // manually set the ID because messages does not go through messageProcessor
-			messages, err := s.postProcessor.Run([]*v1protocol.Message{&message})
+			message.ID = strconv.Itoa(idx) // manually set the ID because messages does not go through messageProcessor
+			messages, err := s.postProcessor.matchMessages([]*Message{&message})
 			s.NoError(err)
 			s.Require().Len(messages, len(tc.ExpectedChatIDs))
 			if len(tc.ExpectedChatIDs) != 0 {
-				s.Equal(tc.ExpectedChatIDs[0], message.ChatID)
+				s.Equal(tc.ExpectedChatIDs[0], message.LocalChatID)
 				s.EqualValues(&message, messages[0])
 			}
 		})

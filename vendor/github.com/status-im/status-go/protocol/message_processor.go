@@ -92,25 +92,6 @@ func (p *messageProcessor) Stop() {
 	p.datasync.Stop() // idempotent op
 }
 
-func (p *messageProcessor) SendPrivate(
-	ctx context.Context,
-	recipient *ecdsa.PublicKey,
-	chatID string,
-	data []byte,
-	clock int64,
-) ([]byte, *v1protocol.Message, error) {
-	message := v1protocol.CreatePrivateTextMessage(data, clock, chatID)
-	encodedMessage, err := p.encodeMessage(message)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to encode message")
-	}
-	messageID, err := p.sendPrivate(ctx, recipient, encodedMessage)
-	if err != nil {
-		return nil, nil, err
-	}
-	return messageID, &message, nil
-}
-
 // SendPrivateRaw takes encoded data, encrypts it and sends through the wire.
 func (p *messageProcessor) SendPrivateRaw(
 	ctx context.Context,
@@ -125,6 +106,34 @@ func (p *messageProcessor) SendPrivateRaw(
 	return p.sendPrivate(ctx, recipient, data)
 }
 
+// SendGroupRaw takes encoded data, encrypts it and sends through the wire,
+// always return the messageID
+func (p *messageProcessor) SendGroupRaw(
+	ctx context.Context,
+	recipients []*ecdsa.PublicKey,
+	data []byte,
+) ([]byte, error) {
+	p.logger.Debug(
+		"sending a private group message",
+		zap.String("site", "SendGroupRaw"),
+	)
+	// Calculate messageID first
+	wrappedMessage, err := p.wrapMessageV1(data)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap message")
+	}
+
+	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+
+	for _, recipient := range recipients {
+		_, err = p.sendPrivate(ctx, recipient, data)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to send message")
+		}
+	}
+	return messageID, nil
+}
+
 // sendPrivate sends data to the recipient identifying with a given public key.
 func (p *messageProcessor) sendPrivate(
 	ctx context.Context,
@@ -133,7 +142,7 @@ func (p *messageProcessor) sendPrivate(
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
 
-	wrappedMessage, err := p.tryWrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -162,32 +171,6 @@ func (p *messageProcessor) sendPrivate(
 	}
 
 	return messageID, nil
-}
-
-func (p *messageProcessor) SendGroup(
-	ctx context.Context,
-	recipients []*ecdsa.PublicKey,
-	chatID string,
-	data []byte,
-	clock int64,
-) ([][]byte, []*v1protocol.Message, error) {
-	p.logger.Debug("sending a group message", zap.Int("membersCount", len(recipients)))
-
-	message := v1protocol.CreatePrivateGroupTextMessage(data, clock, chatID)
-	encodedMessage, err := p.encodeMessage(message)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to encode message")
-	}
-
-	var resultIDs [][]byte
-	for _, recipient := range recipients {
-		messageID, err := p.sendPrivate(ctx, recipient, encodedMessage)
-		if err != nil {
-			return nil, nil, err
-		}
-		resultIDs = append(resultIDs, messageID)
-	}
-	return resultIDs, nil, nil
 }
 
 func (p *messageProcessor) SendMembershipUpdate(
@@ -219,46 +202,11 @@ func (p *messageProcessor) SendMembershipUpdate(
 	return resultIDs, nil
 }
 
-func (p *messageProcessor) SendPublic(ctx context.Context, chatID string, data []byte, clock int64) ([]byte, error) {
-	message := v1protocol.CreatePublicTextMessage(data, clock, chatID)
-
-	encodedMessage, err := p.encodeMessage(message)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode message")
-	}
-
-	wrappedMessage, err := p.tryWrapMessageV1(encodedMessage)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to wrap message")
-	}
-
-	messageSpec, err := p.protocol.BuildPublicMessage(p.identity, wrappedMessage)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to build public message")
-	}
-
-	newMessage, err := messageSpecToWhisper(messageSpec)
-	if err != nil {
-		return nil, err
-	}
-
-	hash, err := p.transport.SendPublic(ctx, newMessage, chatID)
-	if err != nil {
-		return nil, err
-	}
-
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
-
-	p.transport.Track([][]byte{messageID}, hash, newMessage)
-
-	return messageID, nil
-}
-
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.
 func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, data []byte) ([]byte, error) {
 	var newMessage *types.NewMessage
 
-	wrappedMessage, err := p.tryWrapMessageV1(data)
+	wrappedMessage, err := p.wrapMessageV1(data)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -280,61 +228,6 @@ func (p *messageProcessor) SendPublicRaw(ctx context.Context, chatName string, d
 	p.transport.Track([][]byte{messageID}, hash, newMessage)
 
 	return messageID, nil
-}
-
-// Process processes received Whisper messages through all the layers
-// and returns decoded user messages.
-// It also handled all non-user messages like PairMessage.
-func (p *messageProcessor) Process(shhMessage *types.Message) ([]*v1protocol.Message, error) {
-	logger := p.logger.With(zap.String("site", "Process"))
-
-	var decodedMessages []*v1protocol.Message
-
-	hlogger := logger.With(zap.Binary("hash", shhMessage.Hash))
-	hlogger.Debug("handling a received message")
-
-	statusMessages, err := p.handleMessages(shhMessage, true)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, statusMessage := range statusMessages {
-		switch m := statusMessage.ParsedMessage.(type) {
-		case v1protocol.Message:
-			m.ID = statusMessage.ID
-			m.SigPubKey = statusMessage.SigPubKey()
-			decodedMessages = append(decodedMessages, &m)
-		case v1protocol.MembershipUpdateMessage:
-			// Handle user message that can be attached to the membership update.
-			userMessage := m.Message
-			if userMessage != nil {
-				userMessage.ID = statusMessage.ID
-				userMessage.SigPubKey = statusMessage.SigPubKey()
-				decodedMessages = append(decodedMessages, userMessage)
-			}
-
-			if err := p.processMembershipUpdate(m); err != nil {
-				hlogger.Error("failed to process MembershipUpdateMessage", zap.Error(err))
-			}
-		case v1protocol.PairMessage:
-			fromOurDevice := isPubKeyEqual(statusMessage.SigPubKey(), &p.identity.PublicKey)
-			if !fromOurDevice {
-				hlogger.Debug("received PairMessage from not our device, skipping")
-				break
-			}
-
-			if err := p.processPairMessage(m); err != nil {
-				hlogger.Error("failed to process PairMessage", zap.Error(err))
-			}
-		default:
-			hlogger.Error(
-				"skipped a public message of unsupported type",
-				zap.Any("value", statusMessage.ParsedMessage),
-			)
-		}
-	}
-
-	return decodedMessages, nil
 }
 
 func (p *messageProcessor) processMembershipUpdate(m v1protocol.MembershipUpdateMessage) error {
@@ -443,23 +336,12 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 	return nil
 }
 
-func (p *messageProcessor) encodeMessage(message v1protocol.Message) ([]byte, error) {
-	encodedMessage, err := v1protocol.EncodeMessage(message)
+func (p *messageProcessor) wrapMessageV1(encodedMessage []byte) ([]byte, error) {
+	wrappedMessage, err := v1protocol.WrapMessageV1(encodedMessage, p.identity)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode message")
+		return nil, errors.Wrap(err, "failed to wrap message")
 	}
-	return encodedMessage, nil
-}
-
-func (p *messageProcessor) tryWrapMessageV1(encodedMessage []byte) ([]byte, error) {
-	if p.featureFlags.sendV1Messages {
-		wrappedMessage, err := v1protocol.WrapMessageV1(encodedMessage, p.identity)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap message")
-		}
-		return wrappedMessage, nil
-	}
-	return encodedMessage, nil
+	return wrappedMessage, nil
 }
 
 func (p *messageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
@@ -520,15 +402,9 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 	case messageSpec.SharedSecret != nil:
 		logger.Debug("sending using shared secret")
 		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret)
-	case messageSpec.PartitionedTopicMode() == encryption.PartitionTopicV1:
+	default:
 		logger.Debug("sending partitioned topic")
 		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
-	case !p.featureFlags.genericDiscoveryTopicEnabled:
-		logger.Debug("sending partitioned topic (generic discovery topic disabled)")
-		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
-	default:
-		logger.Debug("sending using discovery topic")
-		hash, err = p.transport.SendPrivateOnDiscovery(ctx, newMessage, publicKey)
 	}
 	if err != nil {
 		return nil, nil, err

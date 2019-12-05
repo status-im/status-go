@@ -6,12 +6,9 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"encoding/hex"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/status-im/status-go/eth-node/crypto"
-
-	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 var (
@@ -24,21 +21,46 @@ type sqlitePersistence struct {
 	db *sql.DB
 }
 
-func (db sqlitePersistence) LastMessageClock(chatID string) (int64, error) {
-	if chatID == "" {
-		return 0, errors.New("chat ID is empty")
-	}
-
-	var last sql.NullInt64
-	err := db.db.QueryRow("SELECT max(clock) FROM user_messages WHERE chat_id = ?", chatID).Scan(&last)
-	if err != nil {
-		return 0, err
-	}
-	return last.Int64, nil
+func (db sqlitePersistence) SaveChat(chat Chat) error {
+	return db.saveChat(nil, chat)
 }
 
-func (db sqlitePersistence) SaveChat(chat Chat) error {
+func (db sqlitePersistence) SaveChats(chats []*Chat) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	for _, chat := range chats {
+		err := db.saveChat(tx, *chat)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	var err error
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
 
 	pkey := []byte{}
 	// For one to one chatID is an encoded public key
@@ -72,8 +94,8 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := db.db.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message_content_type, last_message_content, last_message_timestamp, last_message_clock_value, members, membership_updates)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message, members, membership_updates)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -90,10 +112,7 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 		pkey,
 		chat.UnviewedMessagesCount,
 		chat.LastClockValue,
-		chat.LastMessageContentType,
-		chat.LastMessageContent,
-		chat.LastMessageTimestamp,
-		chat.LastMessageClockValue,
+		chat.LastMessage,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 	)
@@ -141,10 +160,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			public_key,
 			unviewed_message_count,
 			last_clock_value,
-			last_message_content_type,
-			last_message_content,
-			last_message_timestamp,
-			last_message_clock_value,
+			last_message,
 			members,
 			membership_updates
 		FROM chats
@@ -157,11 +173,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 
 	for rows.Next() {
 		var (
-			lastMessageContentType sql.NullString
-			lastMessageContent     sql.NullString
-			lastMessageTimestamp   sql.NullInt64
-			lastMessageClockValue  sql.NullInt64
-
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
@@ -178,20 +189,13 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&pkey,
 			&chat.UnviewedMessagesCount,
 			&chat.LastClockValue,
-			&lastMessageContentType,
-			&lastMessageContent,
-			&lastMessageTimestamp,
-			&lastMessageClockValue,
+			&chat.LastMessage,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 		)
 		if err != nil {
 			return
 		}
-		chat.LastMessageContent = lastMessageContent.String
-		chat.LastMessageContentType = lastMessageContentType.String
-		chat.LastMessageTimestamp = lastMessageTimestamp.Int64
-		chat.LastMessageClockValue = lastMessageClockValue.Int64
 
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
@@ -289,7 +293,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SetContactsENSData(contacts []Contact) error {
+func (db sqlitePersistence) SetContactsENSData(contacts []*Contact) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -323,7 +327,7 @@ func (db sqlitePersistence) SetContactsENSData(contacts []Contact) error {
 
 // SetContactsGeneratedData sets a contact generated data if not existing already
 // in the database
-func (db sqlitePersistence) SetContactsGeneratedData(contacts []Contact, tx *sql.Tx) (err error) {
+func (db sqlitePersistence) SetContactsGeneratedData(contacts []*Contact, tx *sql.Tx) (err error) {
 	if tx == nil {
 		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 		if err != nil {
@@ -433,111 +437,5 @@ func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) (err error)
 		contact.ENSVerifiedAt,
 		contact.TributeToTalk,
 	)
-	return
-}
-
-// Messages returns messages for a given contact, in a given period. Ordered by a timestamp.
-func (db sqlitePersistence) Messages(from, to time.Time) (result []*v1protocol.Message, err error) {
-	rows, err := db.db.Query(`
-		SELECT
-			id,
-			chat_id,
-			content_type,
-			message_type,
-			text,
-			clock,
-			timestamp,
-			content_chat_id,
-			content_text,
-			public_key,
-			flags
-		FROM user_messages
-		WHERE timestamp >= ? AND timestamp <= ?
-		ORDER BY timestamp`,
-		v1protocol.TimestampInMsFromTime(from),
-		v1protocol.TimestampInMsFromTime(to),
-	)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		msg := v1protocol.Message{
-			Content: v1protocol.Content{},
-		}
-		var pkey []byte
-		err = rows.Scan(
-			&msg.ID, &msg.ChatID, &msg.ContentT, &msg.MessageT, &msg.Text, &msg.Clock,
-			&msg.Timestamp, &msg.Content.ChatID, &msg.Content.Text, &pkey, &msg.Flags,
-		)
-		if err != nil {
-			return
-		}
-		if len(pkey) != 0 {
-			msg.SigPubKey, err = crypto.UnmarshalPubkey(pkey)
-			if err != nil {
-				return
-			}
-		}
-		result = append(result, &msg)
-	}
-	return
-}
-
-func (db sqlitePersistence) SaveMessages(messages []*v1protocol.Message) (last int64, err error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	stmt, err := tx.Prepare(`
-		INSERT OR IGNORE INTO user_messages(
-			id,
-			chat_id,
-			content_type,
-			message_type,
-			text,
-			clock,
-			timestamp,
-			content_chat_id,
-			content_text,
-			public_key,
-			flags
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`)
-	if err != nil {
-		return
-	}
-
-	var rst sql.Result
-
-	for _, msg := range messages {
-		var pkey []byte
-		if msg.SigPubKey != nil {
-			pkey = crypto.FromECDSAPub(msg.SigPubKey)
-		}
-		rst, err = stmt.Exec(
-			msg.ID, msg.ChatID, msg.ContentT, msg.MessageT, msg.Text, msg.Clock, msg.Timestamp,
-			msg.Content.ChatID, msg.Content.Text, pkey, msg.Flags,
-		)
-		if err != nil {
-			return
-		}
-
-		last, err = rst.LastInsertId()
-		if err != nil {
-			return
-		}
-	}
-
 	return
 }

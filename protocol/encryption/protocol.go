@@ -384,6 +384,11 @@ func (p *Protocol) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*multi
 	return p.multidevice.GetOurInstallations(myIdentityKey)
 }
 
+// GetOurActiveInstallations returns all the active installations available given an identity
+func (p *Protocol) GetOurActiveInstallations(myIdentityKey *ecdsa.PublicKey) ([]*multidevice.Installation, error) {
+	return p.multidevice.GetOurActiveInstallations(myIdentityKey)
+}
+
 // SetInstallationMetadata sets the metadata for our own installation
 func (p *Protocol) SetInstallationMetadata(myIdentityKey *ecdsa.PublicKey, installationID string, data *multidevice.InstallationMetadata) error {
 	return p.multidevice.SetInstallationMetadata(myIdentityKey, installationID, data)

@@ -1,4 +1,4 @@
-package applicationmetadata
+package protobuf
 
 import (
 	"github.com/golang/protobuf/proto"
@@ -6,8 +6,8 @@ import (
 
 //go:generate protoc --go_out=. ./message.proto
 
-func Unmarshal(payload []byte) (*Message, error) {
-	var message Message
+func Unmarshal(payload []byte) (*ApplicationMetadataMessage, error) {
+	var message ApplicationMetadataMessage
 	err := proto.Unmarshal(payload, &message)
 	if err != nil {
 		return nil, err
