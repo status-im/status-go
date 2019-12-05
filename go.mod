@@ -17,12 +17,19 @@ replace github.com/status-im/status-go/extkeys => ./extkeys
 replace github.com/status-im/status-go/eth-node => ./eth-node
 
 require (
+	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
+	github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4 // indirect
 	github.com/beevik/ntp v0.2.0
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.1.0 // indirect
 	github.com/elastic/gosigar v0.10.5 // indirect
 	github.com/ethereum/go-ethereum v1.9.5
+	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-playground/locales v0.12.1 // indirect
 	github.com/go-playground/universal-translator v0.16.0 // indirect
 	github.com/golang/mock v1.3.1
+	github.com/json-iterator/go v1.1.7 // indirect
+	github.com/kevinburke/go-bindata v3.13.0+incompatible // indirect
 	github.com/leodido/go-urn v1.1.0 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p v0.4.0 // indirect
@@ -32,15 +39,19 @@ require (
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/client_golang v1.2.1
+	github.com/prometheus/client_golang v1.0.0
+	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4 // indirect
+	github.com/prometheus/common v0.6.0 // indirect
+	github.com/prometheus/procfs v0.0.5 // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
+	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a
 	github.com/status-im/status-go/extkeys v1.0.0
-	github.com/status-im/status-go/protocol v0.5.2
+	github.com/status-im/status-go/protocol v0.0.0-00010101000000-000000000000
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
-	github.com/status-im/whisper v1.6.2
+	github.com/status-im/whisper v1.6.1
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.13.0

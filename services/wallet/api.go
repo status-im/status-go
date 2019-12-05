@@ -67,3 +67,17 @@ func (api *API) GetTokensBalances(ctx context.Context, accounts, tokens []common
 	}
 	return GetTokensBalances(ctx, api.s.client, accounts, tokens)
 }
+
+func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
+	log.Debug("call to get custom tokens")
+	rst, err := api.s.db.GetCustomTokens()
+	log.Debug("result from database for custom tokens", "len", len(rst))
+	return rst, err
+}
+
+func (api *API) CreateCustomToken(ctx context.Context, token Token) error {
+	log.Debug("call to create custom token")
+	err := api.s.db.CreateCustomToken(token)
+	log.Debug("result from database for create custom token", "err", err)
+	return err
+}
