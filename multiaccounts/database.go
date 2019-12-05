@@ -3,19 +3,17 @@ package multiaccounts
 import (
 	"database/sql"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/multiaccounts/migrations"
 	"github.com/status-im/status-go/sqlite"
 )
 
 // Account stores public information about account.
 type Account struct {
-	Name           string         `json:"name"`
-	Address        common.Address `json:"address"`
-	Timestamp      int64          `json:"timestamp"`
-	PhotoPath      string         `json:"photo-path"`
-	KeycardPairing string         `json:"keycard-pairing"`
-	KeyUID         string         `json:"key-uid"`
+	Name           string `json:"name"`
+	Timestamp      int64  `json:"timestamp"`
+	PhotoPath      string `json:"photo-path"`
+	KeycardPairing string `json:"keycard-pairing"`
+	KeyUID         string `json:"key-uid"`
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -40,7 +38,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, name, loginTimestamp, photoPath, keycardPairing, keyUid from accounts ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT name, loginTimestamp, photoPath, keycardPairing, keyUid from accounts ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +46,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	inthelper := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
-		err = rows.Scan(&acc.Address, &acc.Name, &inthelper, &acc.PhotoPath, &acc.KeycardPairing, &acc.KeyUID)
+		err = rows.Scan(&acc.Name, &inthelper, &acc.PhotoPath, &acc.KeycardPairing, &acc.KeyUID)
 		if err != nil {
 			return nil, err
 		}
@@ -59,21 +57,21 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (address, name, photoPath, keycardPairing, keyUid) VALUES (?, ?, ?, ?, ?)", account.Address, account.Name, account.PhotoPath, account.KeycardPairing, account.KeyUID)
+	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (name, photoPath, keycardPairing, keyUid) VALUES (?, ?, ?, ?)", account.Name, account.PhotoPath, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
 func (db *Database) UpdateAccount(account Account) error {
-	_, err := db.db.Exec("UPDATE accounts SET name = ?, photoPath = ?, keycardPairing = ?, keyUid = ? WHERE address = ?", account.Name, account.PhotoPath, account.KeycardPairing, account.KeyUID, account.Address)
+	_, err := db.db.Exec("UPDATE accounts SET name = ?, photoPath = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.PhotoPath, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
-func (db *Database) UpdateAccountTimestamp(address common.Address, loginTimestamp int64) error {
-	_, err := db.db.Exec("UPDATE accounts SET loginTimestamp = ? WHERE address = ?", loginTimestamp, address)
+func (db *Database) UpdateAccountTimestamp(keyUID string, loginTimestamp int64) error {
+	_, err := db.db.Exec("UPDATE accounts SET loginTimestamp = ? WHERE keyUid = ?", loginTimestamp, keyUID)
 	return err
 }
 
-func (db *Database) DeleteAccount(address common.Address) error {
-	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
+func (db *Database) DeleteAccount(keyUID string) error {
+	_, err := db.db.Exec("DELETE FROM accounts WHERE keyUid = ?", keyUID)
 	return err
 }

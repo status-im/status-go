@@ -52,7 +52,7 @@ var (
 func buildAccountData(name, chatAddress string) *C.char {
 	return C.CString(fmt.Sprintf(`{
 		"name": "%s",
-		"address": "%s"
+		"key-uid": "%s"
 	}`, name, chatAddress))
 }
 

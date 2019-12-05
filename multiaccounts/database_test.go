@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +22,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 func TestAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{Name: "string", Address: common.Address{0xff}}
+	expected := Account{Name: "string", KeyUID: "string"}
 	require.NoError(t, db.SaveAccount(expected))
 	accounts, err := db.GetAccounts()
 	require.NoError(t, err)
@@ -34,7 +33,7 @@ func TestAccounts(t *testing.T) {
 func TestAccountsUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := Account{Address: common.Address{0x01}}
+	expected := Account{KeyUID: "string"}
 	require.NoError(t, db.SaveAccount(expected))
 	expected.PhotoPath = "chars"
 	require.NoError(t, db.UpdateAccount(expected))
@@ -48,12 +47,12 @@ func TestLoginUpdate(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	accounts := []Account{{Name: "first", Address: common.Address{0xff}}, {Name: "second", Address: common.Address{0xf1}}}
+	accounts := []Account{{Name: "first", KeyUID: "0x1"}, {Name: "second", KeyUID: "0x2"}}
 	for _, acc := range accounts {
 		require.NoError(t, db.SaveAccount(acc))
 	}
-	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].Address, 100))
-	require.NoError(t, db.UpdateAccountTimestamp(accounts[1].Address, 10))
+	require.NoError(t, db.UpdateAccountTimestamp(accounts[0].KeyUID, 100))
+	require.NoError(t, db.UpdateAccountTimestamp(accounts[1].KeyUID, 10))
 	accounts[0].Timestamp = 100
 	accounts[1].Timestamp = 10
 	rst, err := db.GetAccounts()

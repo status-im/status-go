@@ -113,7 +113,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	defer os.Remove(tmpdir)
 
 	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
-	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, utils.TestConfig.Account1.Password,
+	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithDataDir(tmpdir),
 	)
@@ -186,7 +186,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	defer os.Remove(tmpdir)
 
 	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
-	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, utils.TestConfig.Account1.Password,
+	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithDataDir(tmpdir),
 	)
@@ -223,7 +223,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	defer os.Remove(tmpdir)
 
 	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
-	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, utils.TestConfig.Account1.Password,
+	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithDataDir(tmpdir),
 	)
@@ -250,7 +250,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	s.NoError(err)
 
 	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
-	s.StartTestBackendWithAccount(multiaccounts.Account{Address: wallet}, utils.TestConfig.Account1.Password,
+	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithUpstream(addr),
 		e2e.WithDataDir(tmpdir),

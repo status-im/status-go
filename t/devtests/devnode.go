@@ -2,6 +2,7 @@ package devtests
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"io/ioutil"
 	"os"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -62,9 +64,11 @@ func (s *DevNodeSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.backend.UpdateRootDataDir(s.dir)
 	s.Require().NoError(s.backend.OpenAccounts())
+	keyUIDHex := sha256.Sum256(crypto.FromECDSAPub(&account.PublicKey))
+	keyUID := types.EncodeHex(keyUIDHex[:])
 	s.Require().NoError(s.backend.StartNodeWithAccountAndConfig(multiaccounts.Account{
-		Name:    "main",
-		Address: s.DevAccountAddress,
+		Name:   "main",
+		KeyUID: keyUID,
 	}, "test", config, []accounts.Account{{Address: s.DevAccountAddress, Wallet: true, Chat: true}}))
 	s.Remote, err = s.miner.Attach()
 	s.Require().NoError(err)

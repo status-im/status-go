@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -515,7 +516,7 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	backend := NewGethStatusBackend()
 	backend.UpdateRootDataDir(tmpdir)
 	require.NoError(t, backend.AccountManager().InitKeystore(filepath.Join(tmpdir, "keystore")))
-	require.NoError(t, backend.ensureAppDBOpened(multiaccounts.Account{Address: common.Address{1, 1, 1}}, password))
+	require.NoError(t, backend.ensureAppDBOpened(multiaccounts.Account{KeyUID: "0x1"}, password))
 	config, err := params.NewNodeConfig(tmpdir, 178733)
 	require.NoError(t, err)
 	// this is for StatusNode().Config() call inside of the getVerifiedWalletAccount
@@ -566,8 +567,10 @@ func TestLoginWithKey(t *testing.T) {
 	b := NewGethStatusBackend()
 	pkey, err := crypto.GenerateKey()
 	require.NoError(t, err)
+	keyUIDHex := sha256.Sum256(crypto.FromECDSAPub(&pkey.PublicKey))
+	keyUID := types.EncodeHex(keyUIDHex[:])
 	main := multiaccounts.Account{
-		Address: crypto.PubkeyToAddress(pkey.PublicKey),
+		KeyUID: keyUID,
 	}
 	tmpdir, err := ioutil.TempDir("", "login-with-key-test-")
 	require.NoError(t, err)
