@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/node"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper"
 	"github.com/stretchr/testify/require"
 )
 

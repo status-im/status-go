@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper"
 
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"

@@ -26,7 +26,7 @@ import (
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
@@ -469,7 +469,7 @@ func (s *RequestMessagesSyncSuite) TestExpired() {
 }
 
 func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
-	const cursorSize = 36 // taken from mailserver_response.go from whisperv6 package
+	const cursorSize = 36 // taken from mailserver_response.go from whisper package
 	cursor := [cursorSize]byte{}
 	cursor[0] = 0x01
 

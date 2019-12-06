@@ -5,7 +5,7 @@ import (
 	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper"
 	"go.uber.org/zap"
 )
 

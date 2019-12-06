@@ -8,6 +8,8 @@ replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-2
 
 replace github.com/status-im/status-go/eth-node => ../eth-node
 
+replace github.com/status-im/status-go/whisper => ../whisper
+
 require (
 	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/ethereum/go-ethereum v1.9.5
@@ -23,7 +25,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/status-go/eth-node v0.0.0-20191120100713-5053b0b6835b
-	github.com/status-im/whisper v1.5.2
+	github.com/status-im/status-go/whisper v1.0.0
 	github.com/stretchr/testify v1.4.0
 	github.com/vacp2p/mvds v0.0.23
 	go.uber.org/zap v1.13.0
