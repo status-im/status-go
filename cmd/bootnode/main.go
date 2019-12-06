@@ -14,6 +14,19 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 )
 
+var (
+	writeAddr   = flag.Bool("writeaddress", false, "write out the node's public key and quit")
+	listenAddr  = flag.String("addr", ":30301", "listen address")
+	genKeyFile  = flag.String("genkey", "", "generate a node key")
+	nodeKeyFile = flag.String("nodekey", "", "private key filename")
+	keydata     = flag.String("keydata", "", "hex encoded private key")
+	verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-9)")
+	vmodule     = flag.String("vmodule", "", "log verbosity pattern")
+	nursery     = bootnodes{}
+	nodeKey     *ecdsa.PrivateKey
+	err         error
+)
+
 type bootnodes []*discv5.Node
 
 func (f *bootnodes) String() string {
@@ -30,19 +43,7 @@ func (f *bootnodes) Set(value string) error {
 	return nil
 }
 
-func main() {
-	var (
-		writeAddr   = flag.Bool("writeaddress", false, "write out the node's public key and quit")
-		listenAddr  = flag.String("addr", ":30301", "listen address")
-		genKeyFile  = flag.String("genkey", "", "generate a node key")
-		nodeKeyFile = flag.String("nodekey", "", "private key filename")
-		keydata     = flag.String("keydata", "", "hex encoded private key")
-		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-9)")
-		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
-		nursery     = bootnodes{}
-		nodeKey     *ecdsa.PrivateKey
-		err         error
-	)
+func main() { // nolint: gocyclo
 	flag.Var(&nursery, "n", "These nodes are used to connect to the network if the table is empty and there are no known nodes in the database.")
 	flag.Parse()
 
@@ -106,5 +107,6 @@ func main() {
 	if err := tab.SetFallbackNodes(nursery); err != nil {
 		log.Crit("Failed to set fallback", "nodes", nursery, "error", err)
 	}
+
 	select {}
 }
