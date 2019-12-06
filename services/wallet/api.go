@@ -75,9 +75,16 @@ func (api *API) GetCustomTokens(ctx context.Context) ([]*Token, error) {
 	return rst, err
 }
 
-func (api *API) CreateCustomToken(ctx context.Context, token Token) error {
-	log.Debug("call to create custom token")
-	err := api.s.db.CreateCustomToken(token)
-	log.Debug("result from database for create custom token", "err", err)
+func (api *API) AddCustomToken(ctx context.Context, token Token) error {
+	log.Debug("call to create or edit custom token")
+	err := api.s.db.AddCustomToken(token)
+	log.Debug("result from database for create or edit custom token", "err", err)
+	return err
+}
+
+func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) error {
+	log.Debug("call to remove custom token")
+	err := api.s.db.DeleteCustomToken(address)
+	log.Debug("result from database for remove custom token", "err", err)
 	return err
 }

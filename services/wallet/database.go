@@ -303,7 +303,7 @@ func (db *Database) GetCustomTokens() ([]*Token, error) {
 	return rst, nil
 }
 
-func (db *Database) CreateCustomToken(token Token) (err error) {
+func (db *Database) AddCustomToken(token Token) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
@@ -312,7 +312,7 @@ func (db *Database) CreateCustomToken(token Token) (err error) {
 	if err != nil {
 		return
 	}
-	insert, err = tx.Prepare("INSERT INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return
 	}
@@ -326,6 +326,11 @@ func (db *Database) CreateCustomToken(token Token) (err error) {
 
 	_, err = insert.Exec(db.network, token.Address, token.Name, token.Symbol, token.Decimals, token.Color)
 	return
+}
+
+func (db *Database) DeleteCustomToken(address common.Address) error {
+	_, err := db.db.Exec(`DELETE FROM TOKENS WHERE address = ?`, address)
+	return err
 }
 
 // statementCreator allows to pass transaction or database to use in consumer.
