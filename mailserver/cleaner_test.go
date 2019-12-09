@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"

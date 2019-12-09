@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )

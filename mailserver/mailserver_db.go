@@ -3,7 +3,7 @@ package mailserver
 import (
 	"time"
 
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // DB is an interface to abstract interactions with the db so that the mailserver

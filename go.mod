@@ -16,7 +16,7 @@ replace github.com/status-im/status-go/extkeys => ./extkeys
 
 replace github.com/status-im/status-go/eth-node => ./eth-node
 
-replace github.com/status-im/status-go/whisper => ./whisper
+replace github.com/status-im/status-go/whisper/v6 => ./whisper
 
 require (
 	github.com/beevik/ntp v0.2.0
@@ -46,7 +46,7 @@ require (
 	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a
 	github.com/status-im/status-go/extkeys v1.0.0
 	github.com/status-im/status-go/protocol v0.5.2
-	github.com/status-im/status-go/whisper v1.0.0
+	github.com/status-im/status-go/whisper/v6 v6.0.0
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
