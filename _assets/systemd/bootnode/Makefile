@@ -31,7 +31,7 @@ $(ENODE)
 endef
 export INFO_MSG
 
-all: checks build save-address service enable restart info
+all: checks build genkey save-address service enable restart info
 
 clean: stop disable rm-service forget 
 
@@ -100,6 +100,7 @@ build: $(GIT_ROOT)/build/bin/bootnode
 .PHONY: build
 
 $(SERVICE_DIR):
+	echo $(SERVICE_DIR)
 	@mkdir -p $(SERVICE_DIR)
 
 service: $(SERVICE_DIR)
