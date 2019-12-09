@@ -299,19 +299,25 @@ update-fleet-config: ##@other Update fleets configuration from fleets.status.im
 	@echo "Done"
 
 run-bootnode-systemd: ##@Easy way to run a bootnode locally with Docker Compose
-	@cd _assets/systemd/bootnode/ && $(MAKE)
+	@cd _assets/systemd/bootnode && $(MAKE)
 
 run-bootnode-docker: ##@Easy way to run a bootnode locally with Docker Compose
-	@cd _assets/compose/bootnode/ && $(MAKE)
+	@cd _assets/compose/bootnode && $(MAKE)
 
 run-mailserver-systemd: ##@Easy Run a mailserver locally with systemd
-	@cd _assets/systemd/mailserver/ && $(MAKE)
+	@cd _assets/systemd/mailserver && $(MAKE)
 
 run-mailserver-docker: ##@Easy Run a mailserver locally with Docker Compose
-	@cd _assets/compose/mailserver/ && $(MAKE)
+	@cd _assets/compose/mailserver && $(MAKE)
+
+clean-bootnode-systemd: ##@Easy Clean your systemd service for running a bootnode
+	@cd _assets/systemd/bootnode && $(MAKE) clean
+
+clean-bootnode-docker: ##@Easy Clean your Docker container running a bootnode
+	@cd _assets/compose/bootnode && $(MAKE) clean
 
 clean-mailserver-systemd: ##@Easy Clean your systemd service for running a mailserver
-	@./_assets/systemd/clean.sh
+	@cd _assets/systemd/mailserver && $(MAKE) clean
 
 clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserver
-	@cd _assets/compose/mailserver/ && $(MAKE) clean
+	@cd _assets/compose/mailserver && $(MAKE) clean
