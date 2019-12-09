@@ -43,9 +43,9 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a
+	github.com/status-im/status-go/eth-node v1.0.0
 	github.com/status-im/status-go/extkeys v1.0.0
-	github.com/status-im/status-go/protocol v0.5.2
+	github.com/status-im/status-go/protocol v1.0.0
 	github.com/status-im/status-go/whisper/v6 v6.0.1
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.4.0
