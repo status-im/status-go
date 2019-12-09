@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/require"
 )
 

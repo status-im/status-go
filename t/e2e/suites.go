@@ -3,7 +3,7 @@ package e2e
 import (
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/multiaccounts"

@@ -14,7 +14,7 @@ import (
 
 	_ "github.com/mutecomm/go-sqlcipher"
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 )

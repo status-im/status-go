@@ -13,7 +13,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/shhext"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/require"
 )
 

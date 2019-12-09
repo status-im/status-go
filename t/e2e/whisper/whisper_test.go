@@ -11,7 +11,7 @@ import (
 	"github.com/status-im/status-go/account"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 )
 

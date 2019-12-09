@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/sqlite"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 )
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 type gethPublicWhisperAPIWrapper struct {

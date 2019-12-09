@@ -2,7 +2,7 @@ package gethbridge
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // NewGethEnvelopeEventWrapper returns a types.EnvelopeEvent object that mimics Geth's EnvelopeEvent

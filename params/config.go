@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/static"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 

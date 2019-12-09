@@ -18,7 +18,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/mailservers"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"

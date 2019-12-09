@@ -21,7 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 )
