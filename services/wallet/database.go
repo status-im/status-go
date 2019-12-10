@@ -312,10 +312,6 @@ func (db *Database) AddCustomToken(token Token) (err error) {
 	if err != nil {
 		return
 	}
-	insert, err = tx.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
-	if err != nil {
-		return
-	}
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -323,6 +319,11 @@ func (db *Database) AddCustomToken(token Token) (err error) {
 			_ = tx.Rollback()
 		}
 	}()
+
+	insert, err = tx.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return
+	}
 
 	_, err = insert.Exec(db.network, token.Address, token.Name, token.Symbol, token.Decimals, token.Color)
 	return
