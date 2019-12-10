@@ -250,7 +250,7 @@ func TestCustomTokens(t *testing.T) {
 		Color:    "#fa6565",
 	}
 
-	err = db.CreateCustomToken(token)
+	err = db.AddCustomToken(token)
 	require.NoError(t, err)
 
 	rst, err = db.GetCustomTokens()
@@ -258,7 +258,7 @@ func TestCustomTokens(t *testing.T) {
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, token, *rst[0])
 
-	rst, err = db.DeleteCustomToken(token.Address)
+	err = db.DeleteCustomToken(token.Address)
 	require.NoError(t, err)
 
 	rst, err = db.GetCustomTokens()
