@@ -24,6 +24,10 @@ const (
 // to get the maximum number of cached peers allowed.
 var maxCachedPeersMultiplier = 1
 
+// maxPendingPeersMultiplier peers max limit will be multiplied by this number
+// to get the maximum number of pending peers allowed.
+var maxPendingPeersMultiplier = 2
+
 // TopicPoolInterface the TopicPool interface.
 type TopicPoolInterface interface {
 	StopSearch(server *p2p.Server)
@@ -52,9 +56,11 @@ func newTopicPool(discovery discovery.Discovery, topic discv5.Topic, limits para
 		fastModeTimeout:      DefaultTopicFastModeTimeout,
 		pendingPeers:         make(map[enode.ID]*peerInfoItem),
 		discoveredPeersQueue: make(peerPriorityQueue, 0),
+		discoveredPeers:      make(map[enode.ID]bool),
 		connectedPeers:       make(map[enode.ID]*peerInfo),
 		cache:                cache,
 		maxCachedPeers:       limits.Max * maxCachedPeersMultiplier,
+		maxPendingPeers:      limits.Max * maxPendingPeersMultiplier,
 	}
 	heap.Init(&pool.discoveredPeersQueue)
 
@@ -85,12 +91,14 @@ type TopicPool struct {
 
 	pendingPeers         map[enode.ID]*peerInfoItem // contains found and requested to be connected peers but not confirmed
 	discoveredPeersQueue peerPriorityQueue          // priority queue to find the most recently discovered peers; does not containt peers requested to connect
+	discoveredPeers      map[enode.ID]bool          // remembers which peers have already been discovered and are enqueued
 	connectedPeers       map[enode.ID]*peerInfo     // currently connected peers
 
 	stopSearchTimeout *time.Time
 
-	maxCachedPeers int
-	cache          *Cache
+	maxPendingPeers int
+	maxCachedPeers  int
+	cache           *Cache
 }
 
 func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
@@ -101,12 +109,33 @@ func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
 		peerInfo: peer,
 		index:    notQueuedIndex,
 	}
+
+	// maxPendingPeers = 0 means no limits.
+	if t.maxPendingPeers == 0 || t.maxPendingPeers >= len(t.pendingPeers) {
+		return
+	}
+
+	var oldestPeer *peerInfo
+	for _, i := range t.pendingPeers {
+		if oldestPeer != nil && oldestPeer.discoveredTime < i.peerInfo.discoveredTime {
+			continue
+		}
+
+		oldestPeer = i.peerInfo
+	}
+
+	t.removeFromPendingPeers(oldestPeer.NodeID())
 }
 
 // addToQueue adds the passed peer to the queue if it is already pending.
 func (t *TopicPool) addToQueue(peer *peerInfo) {
 	if p, ok := t.pendingPeers[peer.NodeID()]; ok {
+		if _, ok := t.discoveredPeers[peer.NodeID()]; ok {
+			return
+		}
+
 		heap.Push(&t.discoveredPeersQueue, p)
+		t.discoveredPeers[peer.NodeID()] = true
 	}
 }
 
@@ -116,6 +145,7 @@ func (t *TopicPool) popFromQueue() *peerInfo {
 	}
 	item := heap.Pop(&t.discoveredPeersQueue).(*peerInfoItem)
 	item.index = notQueuedIndex
+	delete(t.discoveredPeers, item.peerInfo.NodeID())
 	return item.peerInfo
 }
 
@@ -127,6 +157,7 @@ func (t *TopicPool) removeFromPendingPeers(nodeID enode.ID) {
 	delete(t.pendingPeers, nodeID)
 	if peer.index != notQueuedIndex {
 		heap.Remove(&t.discoveredPeersQueue, peer.index)
+		delete(t.discoveredPeers, nodeID)
 	}
 }
 

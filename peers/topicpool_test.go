@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -338,6 +339,63 @@ func (s *TopicPoolSuite) TestMaxCachedPeers() {
 	s.True(s.topicPool.maxCachedPeersReached())
 	cached = s.topicPool.cache.GetPeersRange(s.topicPool.topic, 5)
 	s.Equal(3, len(cached))
+}
+
+func (s *TopicPoolSuite) TestMaxPendingPeers() {
+	s.topicPool.maxPendingPeers = 2
+
+	nodeID1, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	nodeID2, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	nodeID3, peer3 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	pk1, _ := peer1.ID.Pubkey()
+	pk2, _ := peer2.ID.Pubkey()
+	pk3, _ := peer3.ID.Pubkey()
+
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer2, publicKey: pk2})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer3, publicKey: pk3})
+
+	s.Equal(2, len(s.topicPool.pendingPeers))
+	s.Require().NotContains(s.topicPool.pendingPeers, nodeID1)
+	s.Require().Contains(s.topicPool.pendingPeers, nodeID2)
+	s.Require().Contains(s.topicPool.pendingPeers, nodeID3)
+
+	// maxPendingPeers = 0 means no limits.
+	s.topicPool.maxPendingPeers = 0
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1})
+
+	s.Equal(3, len(s.topicPool.pendingPeers))
+	s.Require().Contains(s.topicPool.pendingPeers, nodeID1)
+	s.Require().Contains(s.topicPool.pendingPeers, nodeID2)
+	s.Require().Contains(s.topicPool.pendingPeers, nodeID3)
+}
+
+func (s *TopicPoolSuite) TestQueueDuplicatePeers() {
+	_, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	_, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	pk1, _ := peer1.ID.Pubkey()
+	pk2, _ := peer2.ID.Pubkey()
+	peerInfo1 := &peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1}
+	peerInfo2 := &peerInfo{discoveredTime: mclock.Now(), node: peer2, publicKey: pk2}
+
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer2, publicKey: pk2})
+	s.topicPool.addToQueue(peerInfo1)
+	s.topicPool.addToQueue(peerInfo2)
+
+	s.Equal(2, len(s.topicPool.discoveredPeersQueue))
+	s.Equal(2, len(s.topicPool.discoveredPeers))
+
+	s.topicPool.addToQueue(peerInfo1)
+
+	s.Equal(2, len(s.topicPool.discoveredPeersQueue))
+	s.Equal(2, len(s.topicPool.discoveredPeers))
+
+	peer := s.topicPool.popFromQueue()
+
+	s.Equal(1, len(s.topicPool.discoveredPeersQueue))
+	s.Equal(1, len(s.topicPool.discoveredPeers))
+	s.Require().NotContains(s.topicPool.discoveredPeers, peer.NodeID())
 }
 
 func (s *TopicPoolSuite) TestNewTopicPoolInterface() {
