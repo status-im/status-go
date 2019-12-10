@@ -295,8 +295,7 @@ func (db *Database) GetCustomTokens() ([]*Token, error) {
 	var rst []*Token
 	for rows.Next() {
 		token := &Token{}
-		err = rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color)
-
+		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color)
 		if err != nil {
 			return nil, err
 		}
@@ -307,14 +306,13 @@ func (db *Database) GetCustomTokens() ([]*Token, error) {
 	return rst, nil
 }
 
-func (db *Database) AddCustomToken(token Token) (err error) {
-	var insert *sql.Stmt
-	insert, err = db.db.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
+func (db *Database) AddCustomToken(token Token) error {
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		return
+		return err
 	}
 	_, err = insert.Exec(db.network, token.Address, token.Name, token.Symbol, token.Decimals, token.Color)
-	return
+	return err
 }
 
 func (db *Database) DeleteCustomToken(address common.Address) error {
