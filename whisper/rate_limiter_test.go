@@ -153,5 +153,5 @@ type mockRateLimiterHandler struct {
 	exceedIPLimit   int
 }
 
-func (m *mockRateLimiterHandler) ExceedPeerLimit() { m.exceedPeerLimit += 1 }
-func (m *mockRateLimiterHandler) ExceedIPLimit()   { m.exceedIPLimit += 1 }
+func (m *mockRateLimiterHandler) ExceedPeerLimit() error { m.exceedPeerLimit += 1; return nil }
+func (m *mockRateLimiterHandler) ExceedIPLimit() error   { m.exceedIPLimit += 1; return nil }

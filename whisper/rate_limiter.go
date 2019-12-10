@@ -14,14 +14,14 @@ import (
 type runLoop func(p *Peer, rw p2p.MsgReadWriter) error
 
 type RateLimiterHandler interface {
-	ExceedPeerLimit()
-	ExceedIPLimit()
+	ExceedPeerLimit() error
+	ExceedIPLimit() error
 }
 
 type MetricsRateLimiterHandler struct{}
 
-func (MetricsRateLimiterHandler) ExceedPeerLimit() { rateLimiterPeerExceeded.Inc(1) }
-func (MetricsRateLimiterHandler) ExceedIPLimit()   { rateLimiterIPExceeded.Inc(1) }
+func (MetricsRateLimiterHandler) ExceedPeerLimit() error { rateLimiterPeerExceeded.Inc(1); return nil }
+func (MetricsRateLimiterHandler) ExceedIPLimit() error   { rateLimiterIPExceeded.Inc(1); return nil }
 
 type PeerRateLimiterConfig struct {
 	LimitPerSecIP      int64
@@ -89,7 +89,10 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				ip = p.peer.Node().IP().String()
 			}
 			if halted := r.throttleIP(ip); halted {
-				r.handler.ExceedIPLimit()
+				if err := r.handler.ExceedIPLimit(); err != nil {
+					errC <- fmt.Errorf("exceeded rate limit by IP: %v", err)
+					return
+				}
 			}
 
 			var peerID []byte
@@ -97,7 +100,10 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				peerID = p.ID()
 			}
 			if halted := r.throttlePeer(peerID); halted {
-				r.handler.ExceedPeerLimit()
+				if err := r.handler.ExceedPeerLimit(); err != nil {
+					errC <- fmt.Errorf("exceeded rate limit by peer: %v", err)
+					return
+				}
 			}
 
 			if err := in.WriteMsg(packet); err != nil {

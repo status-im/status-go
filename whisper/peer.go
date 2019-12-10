@@ -43,6 +43,8 @@ type Peer struct {
 	bloomFilter          []byte
 	fullNode             bool
 	confirmationsEnabled bool
+	rateLimitsMu         sync.Mutex
+	rateLimits           RateLimits
 
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 
@@ -89,8 +91,9 @@ func (peer *Peer) handshake() error {
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
 		confirmationsEnabled := !peer.host.disableConfirmations
+		rateLimits := peer.host.RateLimits()
 
-		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled)
+		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled, rateLimits)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -143,6 +146,13 @@ func (peer *Peer) handshake() error {
 		log.Warn("confirmations are disabled", "peer", peer.ID())
 	} else {
 		peer.confirmationsEnabled = confirmationsEnabled
+	}
+
+	var rateLimits RateLimits
+	if err := s.Decode(&rateLimits); err != nil {
+		log.Info("rate limiting disabled", "err", err)
+	} else {
+		peer.setRateLimits(rateLimits)
 	}
 
 	if err := <-errc; err != nil {
@@ -268,6 +278,12 @@ func (peer *Peer) setBloomFilter(bloom []byte) {
 	if peer.fullNode && peer.bloomFilter == nil {
 		peer.bloomFilter = MakeFullNodeBloom()
 	}
+}
+
+func (peer *Peer) setRateLimits(r RateLimits) {
+	peer.rateLimitsMu.Lock()
+	peer.rateLimits = r
+	peer.rateLimitsMu.Unlock()
 }
 
 func MakeFullNodeBloom() []byte {

@@ -337,6 +337,8 @@ func (whisper *Whisper) SetLightClientMode(v bool) {
 	whisper.settings.Store(lightClientModeIdx, v)
 }
 
+// SetRateLimiter sets an active rate limiter.
+// It must be run before Whisper is started.
 func (whisper *Whisper) SetRateLimiter(r *PeerRateLimiter) {
 	whisper.rateLimiter = r
 }
@@ -359,6 +361,17 @@ func (whisper *Whisper) LightClientModeConnectionRestricted() bool {
 	}
 	v, ok := val.(bool)
 	return v && ok
+}
+
+// RateLimiting returns RateLimits information.
+func (whisper *Whisper) RateLimits() RateLimits {
+	if whisper.rateLimiter == nil {
+		return RateLimits{}
+	}
+	return RateLimits{
+		IPLimits:     uint64(whisper.rateLimiter.limitPerSecIP),
+		PeerIDLimits: uint64(whisper.rateLimiter.limitPerSecPeerID),
+	}
 }
 
 func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
@@ -1027,6 +1040,13 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				return errors.New("invalid bloom filter exchange message")
 			}
 			p.setBloomFilter(bloom)
+		case rateLimitingCode:
+			var rateLimits RateLimits
+			if err := packet.Decode(&rateLimits); err != nil {
+				log.Warn("invalid rate limits information", "peer", p.peer.ID(), "err", err)
+				return errors.New("invalid rate limits exchange message")
+			}
+			p.setRateLimits(rateLimits)
 		case p2pMessageCode:
 			// peer-to-peer message, sent directly to peer bypassing PoW checks, etc.
 			// this message is not supposed to be forwarded to other peers, and

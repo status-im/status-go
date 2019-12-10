@@ -551,6 +551,21 @@ func TestTwoLightPeerHandshakeError(t *testing.T) {
 	}
 }
 
+func TestRateLimitsInHandshake(t *testing.T) {
+	w1 := Whisper{}
+	rateLimits := RateLimits{IPLimits: 20, PeerIDLimits: 10}
+	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{
+		payload: []interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true, true, rateLimits},
+	})
+	err := p1.handshake()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p1.rateLimits != rateLimits {
+		t.Errorf("rate limits from handshake is not stored properly in Peer object")
+	}
+}
+
 type rwStub struct {
 	payload []interface{}
 }
