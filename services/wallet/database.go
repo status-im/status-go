@@ -273,6 +273,53 @@ SELECT blocks.hash, blk_number FROM accounts_to_blocks JOIN blocks ON blk_number
 	return nil, err
 }
 
+type Token struct {
+	Address common.Address `json:"address"`
+	Name    string         `json:"name"`
+	Symbol  string         `json:"symbol"`
+	Color   string         `json:"color"`
+
+	// Decimals defines how divisible the token is. For example, 0 would be
+	// indivisible, whereas 18 would allow very small amounts of the token
+	// to be traded.
+	Decimals uint `json:"decimals"`
+}
+
+func (db *Database) GetCustomTokens() ([]*Token, error) {
+	rows, err := db.db.Query(`SELECT address, name, symbol, decimals, color FROM tokens WHERE network_id = ?`, db.network)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []*Token
+	for rows.Next() {
+		token := &Token{}
+		err := rows.Scan(&token.Address, &token.Name, &token.Symbol, &token.Decimals, &token.Color)
+		if err != nil {
+			return nil, err
+		}
+
+		rst = append(rst, token)
+	}
+
+	return rst, nil
+}
+
+func (db *Database) AddCustomToken(token Token) error {
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO TOKENS (network_id, address, name, symbol, decimals, color) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	_, err = insert.Exec(db.network, token.Address, token.Name, token.Symbol, token.Decimals, token.Color)
+	return err
+}
+
+func (db *Database) DeleteCustomToken(address common.Address) error {
+	_, err := db.db.Exec(`DELETE FROM TOKENS WHERE address = ?`, address)
+	return err
+}
+
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
