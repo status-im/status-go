@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package protobuf;
+
+message PairInstallation {
+  uint64 clock = 1;
+  string installation_id = 2;
+  string device_type = 3;
+  string name = 4;
+}
+
+message SyncInstallationContact {
+  uint64 clock = 1;
+  string id = 2;
+  string profile_image = 3;
+  string ens_name = 4;
+  uint64 last_updated = 5;
+  repeated string system_tags = 6;
+}
+
+message SyncInstallationAccount {
+  uint64 clock = 1;
+  string profile_image = 2;
+  uint64 last_updated = 3;
+}
+
+message SyncInstallationPublicChat {
+  uint64 clock = 1;
+  string id = 2;
+}
+
+message SyncInstallation {
+  repeated SyncInstallationContact contacts = 1;
+  repeated SyncInstallationPublicChat public_chats = 2;
+  SyncInstallationAccount account = 3;
+}

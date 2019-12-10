@@ -5,12 +5,16 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/status-im/status-go/logutils"
 
+	commongethtypes "github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -18,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/db"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
@@ -25,6 +30,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 
+	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
 	protocol "github.com/status-im/status-go/protocol"
 	protocolwhisper "github.com/status-im/status-go/protocol/transport/whisper"
@@ -64,6 +70,7 @@ type Service struct {
 	cache            *mailservers.Cache
 	connManager      *mailservers.ConnectionManager
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
+	accountsDB       *accounts.Database
 }
 
 // Make sure that Service implements node.Service interface.
@@ -150,10 +157,12 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { /
 	if err != nil {
 		return err
 	}
+	s.accountsDB = accounts.NewDB(db)
 	s.messenger = messenger
 	// Start a loop that retrieves all messages and propagates them to status-react.
 	s.cancelMessenger = make(chan struct{})
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
+	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
 
 	return s.messenger.Init()
 }
@@ -174,6 +183,82 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 				PublisherSignalHandler{}.NewMessages(response)
 			}
 		case <-cancel:
+			return
+		}
+	}
+}
+
+type verifyTransactionClient struct {
+	chainID *big.Int
+	url     string
+}
+
+func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, bool, error) {
+	signer := gethtypes.NewEIP155Signer(c.chainID)
+	client, err := ethclient.Dial(c.url)
+	if err != nil {
+		return coretypes.Message{}, false, err
+	}
+
+	transaction, pending, err := client.TransactionByHash(ctx, commongethtypes.BytesToHash(hash.Bytes()))
+	if err != nil {
+		return coretypes.Message{}, false, err
+	}
+
+	message, err := transaction.AsMessage(signer)
+	if err != nil {
+		return coretypes.Message{}, false, err
+	}
+	from := types.BytesToAddress(message.From().Bytes())
+	to := types.BytesToAddress(message.To().Bytes())
+
+	return coretypes.NewMessage(
+		from,
+		&to,
+		message.Nonce(),
+		message.Value(),
+		message.Gas(),
+		message.GasPrice(),
+		message.Data(),
+		message.CheckNonce(),
+	), pending, nil
+}
+
+func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
+	if s.config.VerifyTransactionURL == "" {
+		log.Warn("not starting transaction loop")
+		return
+	}
+
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	ctx, cancelVerifyTransaction := context.WithCancel(context.Background())
+
+	for {
+		select {
+		case <-ticker.C:
+			accounts, err := s.accountsDB.GetAccounts()
+			if err != nil {
+				log.Error("failed to retrieve accounts", "err", err)
+			}
+			var wallets []types.Address
+			for _, account := range accounts {
+				if account.Wallet {
+					wallets = append(wallets, types.BytesToAddress(account.Address.Bytes()))
+				}
+			}
+
+			response, err := s.messenger.ValidateTransactions(ctx, wallets)
+			if err != nil {
+				log.Error("failed to validate transactions", "err", err)
+				continue
+			}
+			if !response.IsEmpty() {
+				PublisherSignalHandler{}.NewMessages(response)
+			}
+		case <-cancel:
+			cancelVerifyTransaction()
 			return
 		}
 	}
@@ -356,6 +441,14 @@ func buildMessengerOptions(config params.ShhextConfig, db *sql.DB, envelopesMoni
 
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
+	}
+
+	if config.VerifyTransactionURL != "" {
+		client := &verifyTransactionClient{
+			url:     config.VerifyTransactionURL,
+			chainID: big.NewInt(config.VerifyTransactionChainID),
+		}
+		options = append(options, protocol.WithVerifyTransactionClient(client))
 	}
 
 	return options

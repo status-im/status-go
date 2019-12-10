@@ -16,6 +16,60 @@ func TestMessageValidatorSuite(t *testing.T) {
 	suite.Run(t, new(MessageValidatorSuite))
 }
 
+func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
+	testCases := []struct {
+		Name    string
+		Valid   bool
+		Message protobuf.RequestAddressForTransaction
+	}{
+		{
+			Name:  "valid message",
+			Valid: true,
+			Message: protobuf.RequestAddressForTransaction{
+				Clock:    30,
+				Value:    "0.34",
+				Contract: "some contract",
+			},
+		},
+		{
+			Name:  "missing clock value",
+			Valid: false,
+			Message: protobuf.RequestAddressForTransaction{
+				Value:    "0.34",
+				Contract: "some contract",
+			},
+		},
+		{
+			Name:  "missing value",
+			Valid: false,
+			Message: protobuf.RequestAddressForTransaction{
+				Clock:    30,
+				Contract: "some contract",
+			},
+		},
+		{
+			Name:  "non number value",
+			Valid: false,
+			Message: protobuf.RequestAddressForTransaction{
+				Clock:    30,
+				Value:    "most definitely not a number",
+				Contract: "some contract",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			err := ValidateReceivedRequestAddressForTransaction(&tc.Message)
+			if tc.Valid {
+				s.Nil(err)
+			} else {
+				s.NotNil(err)
+			}
+		})
+	}
+
+}
+
 func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 	testCases := []struct {
 		Name    string
@@ -145,6 +199,20 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
+			Name:  "Request address for transaction message type",
+			Valid: false,
+			Message: protobuf.ChatMessage{
+				ChatId:      "a",
+				Text:        "valid",
+				Clock:       2,
+				Timestamp:   3,
+				ResponseTo:  "",
+				EnsName:     "",
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
+			},
+		},
+		{
 			Name:  "Valid  emoji only emssage",
 			Valid: true,
 			Message: protobuf.ChatMessage{
@@ -187,25 +255,6 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				Payload: &protobuf.ChatMessage_Sticker{
 					Sticker: &protobuf.StickerMessage{
 						Pack: 1,
-						Hash: "some-hash",
-					},
-				},
-				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
-				ContentType: protobuf.ChatMessage_STICKER,
-			},
-		},
-		{
-			Name:  "Invalid sticker message without Pack",
-			Valid: false,
-			Message: protobuf.ChatMessage{
-				ChatId:     "a",
-				Text:       "valid",
-				Clock:      2,
-				Timestamp:  3,
-				ResponseTo: "",
-				EnsName:    "",
-				Payload: &protobuf.ChatMessage_Sticker{
-					Sticker: &protobuf.StickerMessage{
 						Hash: "some-hash",
 					},
 				},

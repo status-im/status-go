@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -8,6 +9,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	types "github.com/status-im/status-go/eth-node/types"
+	"golang.org/x/crypto/sha3"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
@@ -191,4 +194,57 @@ func generateSecureRandomData(length int) ([]byte, error) {
 	}
 
 	return res, nil
+}
+
+// TextHash is a helper function that calculates a hash for the given message that can be
+// safely used to calculate a signature from.
+//
+// The hash is calulcated as
+//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//
+// This gives context to the signed message and prevents signing of transactions.
+func TextHash(data []byte) []byte {
+	hash, _ := TextAndHash(data)
+	return hash
+}
+
+// TextAndHash is a helper function that calculates a hash for the given message that can be
+// safely used to calculate a signature from.
+//
+// The hash is calulcated as
+//   keccak256("\x19Ethereum Signed Message:\n"${message length}${message}).
+//
+// This gives context to the signed message and prevents signing of transactions.
+func TextAndHash(data []byte) ([]byte, string) {
+	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), string(data))
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write([]byte(msg))
+	return hasher.Sum(nil), msg
+}
+
+func EcRecover(ctx context.Context, data types.HexBytes, sig types.HexBytes) (types.Address, error) {
+	// Returns the address for the Account that was used to create the signature.
+	//
+	// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
+	// the address of:
+	// hash = keccak256("\x19${byteVersion}Ethereum Signed Message:\n${message length}${message}")
+	// addr = ecrecover(hash, signature)
+	//
+	// Note, the signature must conform to the secp256k1 curve R, S and V values, where
+	// the V value must be be 27 or 28 for legacy reasons.
+	//
+	// https://github.com/ethereum/go-ethereum/wiki/Management-APIs#personal_ecRecover
+	if len(sig) != 65 {
+		return types.Address{}, fmt.Errorf("signature must be 65 bytes long")
+	}
+	if sig[64] != 27 && sig[64] != 28 {
+		return types.Address{}, fmt.Errorf("invalid Ethereum signature (V is not 27 or 28)")
+	}
+	sig[64] -= 27 // Transform yellow paper V from 27/28 to 0/1
+	hash := TextHash(data)
+	rpk, err := SigToPub(hash, sig)
+	if err != nil {
+		return types.Address{}, err
+	}
+	return PubkeyToAddress(*rpk), nil
 }

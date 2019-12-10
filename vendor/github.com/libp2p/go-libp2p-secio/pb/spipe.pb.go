@@ -8,6 +8,7 @@ import (
 	proto "github.com/gogo/protobuf/proto"
 	io "io"
 	math "math"
+	math_bits "math/bits"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -19,7 +20,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type Propose struct {
 	Rand      []byte `protobuf:"bytes,1,opt,name=rand" json:"rand"`
@@ -43,7 +44,7 @@ func (m *Propose) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return xxx_messageInfo_Propose.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +117,7 @@ func (m *Exchange) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return xxx_messageInfo_Exchange.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -176,7 +177,7 @@ var fileDescriptor_c474ec75f0379e64 = []byte{
 func (m *Propose) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -184,41 +185,51 @@ func (m *Propose) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *Propose) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Propose) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.Rand != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Rand)))
-		i += copy(dAtA[i:], m.Rand)
-	}
-	if m.Pubkey != nil {
-		dAtA[i] = 0x12
-		i++
-		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Pubkey)))
-		i += copy(dAtA[i:], m.Pubkey)
-	}
-	dAtA[i] = 0x1a
-	i++
-	i = encodeVarintSpipe(dAtA, i, uint64(len(m.Exchanges)))
-	i += copy(dAtA[i:], m.Exchanges)
-	dAtA[i] = 0x22
-	i++
-	i = encodeVarintSpipe(dAtA, i, uint64(len(m.Ciphers)))
-	i += copy(dAtA[i:], m.Ciphers)
-	dAtA[i] = 0x2a
-	i++
+	i -= len(m.Hashes)
+	copy(dAtA[i:], m.Hashes)
 	i = encodeVarintSpipe(dAtA, i, uint64(len(m.Hashes)))
-	i += copy(dAtA[i:], m.Hashes)
-	return i, nil
+	i--
+	dAtA[i] = 0x2a
+	i -= len(m.Ciphers)
+	copy(dAtA[i:], m.Ciphers)
+	i = encodeVarintSpipe(dAtA, i, uint64(len(m.Ciphers)))
+	i--
+	dAtA[i] = 0x22
+	i -= len(m.Exchanges)
+	copy(dAtA[i:], m.Exchanges)
+	i = encodeVarintSpipe(dAtA, i, uint64(len(m.Exchanges)))
+	i--
+	dAtA[i] = 0x1a
+	if m.Pubkey != nil {
+		i -= len(m.Pubkey)
+		copy(dAtA[i:], m.Pubkey)
+		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Pubkey)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if m.Rand != nil {
+		i -= len(m.Rand)
+		copy(dAtA[i:], m.Rand)
+		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Rand)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *Exchange) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -226,33 +237,42 @@ func (m *Exchange) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *Exchange) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Exchange) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.Epubkey != nil {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Epubkey)))
-		i += copy(dAtA[i:], m.Epubkey)
-	}
 	if m.Signature != nil {
-		dAtA[i] = 0x12
-		i++
+		i -= len(m.Signature)
+		copy(dAtA[i:], m.Signature)
 		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Signature)))
-		i += copy(dAtA[i:], m.Signature)
+		i--
+		dAtA[i] = 0x12
 	}
-	return i, nil
+	if m.Epubkey != nil {
+		i -= len(m.Epubkey)
+		copy(dAtA[i:], m.Epubkey)
+		i = encodeVarintSpipe(dAtA, i, uint64(len(m.Epubkey)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func encodeVarintSpipe(dAtA []byte, offset int, v uint64) int {
+	offset -= sovSpipe(v)
+	base := offset
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	dAtA[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 func (m *Propose) Size() (n int) {
 	if m == nil {
@@ -295,14 +315,7 @@ func (m *Exchange) Size() (n int) {
 }
 
 func sovSpipe(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 func sozSpipe(x uint64) (n int) {
 	return sovSpipe(uint64((x << 1) ^ uint64((int64(x) >> 63))))
@@ -648,6 +661,7 @@ func (m *Exchange) Unmarshal(dAtA []byte) error {
 func skipSpipe(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -679,10 +693,8 @@ func skipSpipe(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -703,55 +715,30 @@ func skipSpipe(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthSpipe
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthSpipe
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowSpipe
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipSpipe(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthSpipe
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupSpipe
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthSpipe
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthSpipe = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowSpipe   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthSpipe        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowSpipe          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupSpipe = fmt.Errorf("proto: unexpected end of group")
 )

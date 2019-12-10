@@ -515,6 +515,11 @@ type ShhextConfig struct {
 
 	// DatasyncEnabled indicates whether we should enable dataasync
 	DataSyncEnabled bool
+
+	// VerifyTransactionURL is the URL for verifying transactions.
+	// IMPORTANT: It should always be mainnet unless used for testing
+	VerifyTransactionURL     string
+	VerifyTransactionChainID int64
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
