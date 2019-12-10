@@ -280,7 +280,7 @@ type Token struct {
 	Color   string         `json:"color"`
 
 	// Decimals defines how divisible the token is. For example, 0 would be
-	// not divisible, whereas 18 would allow very small amounts of the token
+	// indivisible, whereas 18 would allow very small amounts of the token
 	// to be traded.
 	Decimals uint `json:"decimals"`
 }
