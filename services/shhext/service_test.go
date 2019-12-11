@@ -429,8 +429,25 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 		errorc <- err
 	}()
 	whisperWrapper := gethbridge.NewGethWhisperWrapper(w)
-	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{whisper.ProtocolVersion, math.Float64bits(whisperWrapper.MinPow()), whisperWrapper.BloomFilter(), false, true}))
-	s.Require().NoError(p2p.SendItems(rw1, statusCode, whisper.ProtocolVersion, whisper.ProtocolVersion, math.Float64bits(whisperWrapper.MinPow()), whisperWrapper.BloomFilter(), true, true))
+	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{
+		whisper.ProtocolVersion,
+		math.Float64bits(whisperWrapper.MinPow()),
+		whisperWrapper.BloomFilter(),
+		false,
+		true,
+		whisper.RateLimits{},
+	}))
+	s.Require().NoError(p2p.SendItems(
+		rw1,
+		statusCode,
+		whisper.ProtocolVersion,
+		whisper.ProtocolVersion,
+		math.Float64bits(whisperWrapper.MinPow()),
+		whisperWrapper.BloomFilter(),
+		true,
+		true,
+		whisper.RateLimits{},
+	))
 
 	nodeWrapper := &testNodeWrapper{w: whisperWrapper}
 	s.localService = New(nodeWrapper, nil, nil, db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
