@@ -233,3 +233,35 @@ func TestDBLastHeadDoesntExist(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, last)
 }
+
+func TestCustomTokens(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	rst, err := db.GetCustomTokens()
+	require.NoError(t, err)
+	require.Nil(t, rst)
+
+	token := Token{
+		Address:  common.Address{1},
+		Name:     "Zilliqa",
+		Symbol:   "ZIL",
+		Decimals: 12,
+		Color:    "#fa6565",
+	}
+
+	err = db.AddCustomToken(token)
+	require.NoError(t, err)
+
+	rst, err = db.GetCustomTokens()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rst))
+	require.Equal(t, token, *rst[0])
+
+	err = db.DeleteCustomToken(token.Address)
+	require.NoError(t, err)
+
+	rst, err = db.GetCustomTokens()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(rst))
+}

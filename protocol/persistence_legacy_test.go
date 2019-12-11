@@ -355,62 +355,6 @@ func TestUpdateMessageOutgoingStatus(t *testing.T) {
 	require.Equal(t, "new-status", m.OutgoingStatus)
 }
 
-func TestSetContactGeneratedData(t *testing.T) {
-	db, err := openTestDB()
-	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
-	existingContact := Contact{
-		ID:          "contact-one",
-		Address:     "contact-address",
-		Name:        "contact-name",
-		Photo:       "contact-photo",
-		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
-		DeviceInfo: []ContactDeviceInfo{
-			ContactDeviceInfo{
-				InstallationID: "1",
-				Timestamp:      2,
-				FCMToken:       "token",
-			},
-			ContactDeviceInfo{
-				InstallationID: "2",
-				Timestamp:      3,
-				FCMToken:       "token-2",
-			},
-		},
-		TributeToTalk: "talk",
-	}
-
-	existingContactUpdate := Contact{
-		ID:      "contact-one",
-		Address: "contact-address",
-		Alias:   "generated-name-one",
-	}
-
-	nonExistingContactUpdate := Contact{
-		ID:      "contact-two",
-		Address: "contact-address",
-		Alias:   "generated-name-two",
-	}
-
-	err = p.SaveContact(existingContact, nil)
-	require.NoError(t, err)
-
-	err = p.SetContactsGeneratedData([]*Contact{&existingContactUpdate, &nonExistingContactUpdate}, nil)
-	require.NoError(t, err)
-
-	allContacts, err := p.Contacts()
-	require.NoError(t, err)
-
-	require.Equal(t, 2, len(allContacts))
-
-	// Make sure it has not been modified
-	require.Equal(t, int64(20), allContacts[0].LastUpdated)
-
-	// Ensure new contact has been saved
-	require.Equal(t, "contact-two", allContacts[1].ID)
-}
-
 func openTestDB() (*sql.DB, error) {
 	dbPath, err := ioutil.TempFile("", "")
 	if err != nil {

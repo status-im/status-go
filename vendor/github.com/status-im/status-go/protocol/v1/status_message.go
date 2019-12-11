@@ -17,18 +17,12 @@ import (
 
 type StatusMessageT int
 
-const (
-	MessageT StatusMessageT = iota + 1
-	MembershipUpdateMessageT
-	PairMessageT
-)
-
 // StatusMessage is any Status Protocol message.
 type StatusMessage struct {
 	// TransportMessage is the parsed message received from the transport layer, i.e the input
 	TransportMessage *types.Message `json:"transportMessage"`
-	// MessageType is the type of application message contained
-	MessageType StatusMessageT `json:"-"`
+	// Type is the type of application message contained
+	Type protobuf.ApplicationMetadataMessage_Type `json:"-"`
 	// ParsedMessage is the parsed message by the application layer, i.e the output
 	ParsedMessage interface{} `json:"-"`
 
@@ -157,23 +151,37 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 	// Calculate ID using the wrapped record
 	m.ID = MessageID(recoveredKey, m.DecryptedPayload)
 	m.DecryptedPayload = message.Payload
+	m.Type = message.Type
 	return nil
 
 }
 
 func (m *StatusMessage) HandleApplication() error {
-	// Try protobuf first
-	var message protobuf.ChatMessage
+	switch m.Type {
+	case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
+		var message protobuf.ChatMessage
 
-	err := proto.Unmarshal(m.DecryptedPayload, &message)
-	if err != nil {
-		m.ParsedMessage = nil
-		log.Printf("[message::DecodeMessage] could not decode protobuf message: %#x, err: %v", m.Hash, err.Error())
-	} else {
-		m.MessageType = MessageT
-		m.ParsedMessage = message
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode ChatMessage: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
 
-		return nil
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE:
+		var message protobuf.MembershipUpdateMessage
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode MembershipUpdateMessage: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
 	}
+
 	return nil
 }

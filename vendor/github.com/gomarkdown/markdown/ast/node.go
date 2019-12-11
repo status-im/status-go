@@ -348,6 +348,21 @@ func (c *StatusTag) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&c1)
 }
 
+type Mention struct {
+	Leaf
+}
+
+func (c *Mention) MarshalJSON() ([]byte, error) {
+	type MentionJSON struct {
+		Type    string `json:"type"`
+		Literal string `json:"literal"`
+	}
+	var c1 MentionJSON
+	c1.Literal = string(c.Literal)
+	c1.Type = "mention"
+	return json.Marshal(&c1)
+}
+
 // Strong represents markdown strong node
 type Strong struct {
 	Leaf

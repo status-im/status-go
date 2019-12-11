@@ -151,7 +151,7 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 	s.cancelMessenger = make(chan struct{})
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 
-	return nil
+	return s.messenger.Init()
 }
 
 func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {

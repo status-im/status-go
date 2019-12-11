@@ -5,10 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/gob"
-	"encoding/hex"
 
 	"github.com/pkg/errors"
-	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 var (
@@ -45,6 +43,26 @@ func (db sqlitePersistence) SaveChats(chats []*Chat) error {
 	return nil
 }
 
+func (db sqlitePersistence) SaveContacts(contacts []*Contact) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	for _, contact := range contacts {
+		err := db.SaveContact(contact, tx)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	var err error
 	if tx == nil {
@@ -60,21 +78,6 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 			// don't shadow original error
 			_ = tx.Rollback()
 		}()
-	}
-
-	pkey := []byte{}
-	// For one to one chatID is an encoded public key
-	if chat.ChatType == ChatTypeOneToOne {
-		pkey, err = hex.DecodeString(chat.ID[2:])
-		if err != nil {
-			return err
-		}
-		// Safety check, make sure is well formed
-		_, err := crypto.UnmarshalPubkey(pkey)
-		if err != nil {
-			return err
-		}
-
 	}
 
 	// Encode members
@@ -94,8 +97,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, public_key, unviewed_message_count, last_clock_value, last_message, members, membership_updates)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -109,7 +112,6 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.ChatType,
 		chat.Timestamp,
 		chat.DeletedAtClockValue,
-		pkey,
 		chat.UnviewedMessagesCount,
 		chat.LastClockValue,
 		chat.LastMessage,
@@ -157,7 +159,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			type,
 			timestamp,
 			deleted_at_clock_value,
-			public_key,
 			unviewed_message_count,
 			last_clock_value,
 			last_message,
@@ -176,7 +177,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
-			pkey                     []byte
 		)
 		err = rows.Scan(
 			&chat.ID,
@@ -186,7 +186,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.ChatType,
 			&chat.Timestamp,
 			&chat.DeletedAtClockValue,
-			&pkey,
 			&chat.UnviewedMessagesCount,
 			&chat.LastClockValue,
 			&chat.LastMessage,
@@ -211,16 +210,71 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			return
 		}
 
-		if len(pkey) != 0 {
-			chat.PublicKey, err = crypto.UnmarshalPubkey(pkey)
-			if err != nil {
-				return
-			}
-		}
 		chats = append(chats, &chat)
 	}
 
 	return
+}
+
+func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
+	var (
+		chat                     Chat
+		encodedMembers           []byte
+		encodedMembershipUpdates []byte
+	)
+
+	err := db.db.QueryRow(`
+		SELECT
+			id,
+			name,
+			color,
+			active,
+			type,
+			timestamp,
+			deleted_at_clock_value,
+			unviewed_message_count,
+			last_clock_value,
+			last_message,
+			members,
+			membership_updates
+		FROM chats
+		WHERE id = ?
+	`, chatID).Scan(&chat.ID,
+		&chat.Name,
+		&chat.Color,
+		&chat.Active,
+		&chat.ChatType,
+		&chat.Timestamp,
+		&chat.DeletedAtClockValue,
+		&chat.UnviewedMessagesCount,
+		&chat.LastClockValue,
+		&chat.LastMessage,
+		&encodedMembers,
+		&encodedMembershipUpdates,
+	)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, nil
+	case nil:
+		// Restore members
+		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
+		err = membersDecoder.Decode(&chat.Members)
+		if err != nil {
+			return nil, err
+		}
+
+		// Restore membership updates
+		membershipUpdatesDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembershipUpdates))
+		err = membershipUpdatesDecoder.Decode(&chat.MembershipUpdates)
+		if err != nil {
+			return nil, err
+		}
+
+		return &chat, nil
+	}
+
+	return nil, err
+
 }
 
 func (db sqlitePersistence) Contacts() ([]*Contact, error) {
@@ -293,83 +347,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SetContactsENSData(contacts []*Contact) error {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	// Ensure contacts exists
-
-	err = db.SetContactsGeneratedData(contacts, tx)
-	if err != nil {
-		return err
-	}
-
-	// Update ens data
-	for _, contact := range contacts {
-		_, err := tx.Exec(`UPDATE contacts SET name = ?, ens_verified = ? , ens_verified_at = ? WHERE id = ?`, contact.Name, contact.ENSVerified, contact.ENSVerifiedAt, contact.ID)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// SetContactsGeneratedData sets a contact generated data if not existing already
-// in the database
-func (db sqlitePersistence) SetContactsGeneratedData(contacts []*Contact, tx *sql.Tx) (err error) {
-	if tx == nil {
-		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err == nil {
-				err = tx.Commit()
-				return
-
-			}
-			// don't shadow original error
-			_ = tx.Rollback()
-		}()
-	}
-
-	for _, contact := range contacts {
-		_, err = tx.Exec(`
-			INSERT OR IGNORE INTO contacts(
-				id,
-				address,
-				name,
-				alias,
-				identicon,
-				photo,
-				last_updated,
-				tribute_to_talk
-			) VALUES (?, ?, "", ?, ?, "", 0, "")`,
-			contact.ID,
-			contact.Address,
-			contact.Alias,
-			contact.Identicon,
-		)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-func (db sqlitePersistence) SaveContact(contact Contact, tx *sql.Tx) (err error) {
+func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error) {
 	if tx == nil {
 		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
 		if err != nil {

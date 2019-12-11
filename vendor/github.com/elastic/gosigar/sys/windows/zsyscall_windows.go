@@ -5,8 +5,6 @@ package windows
 import (
 	"syscall"
 	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
 
 var _ unsafe.Pointer
@@ -37,10 +35,10 @@ func errnoErr(e syscall.Errno) error {
 }
 
 var (
-	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
-	modpsapi    = windows.NewLazySystemDLL("psapi.dll")
-	modntdll    = windows.NewLazySystemDLL("ntdll.dll")
-	modadvapi32 = windows.NewLazySystemDLL("advapi32.dll")
+	modkernel32 = syscall.NewLazyDLL("kernel32.dll")
+	modpsapi    = syscall.NewLazyDLL("psapi.dll")
+	modntdll    = syscall.NewLazyDLL("ntdll.dll")
+	modadvapi32 = syscall.NewLazyDLL("advapi32.dll")
 
 	procGlobalMemoryStatusEx             = modkernel32.NewProc("GlobalMemoryStatusEx")
 	procGetLogicalDriveStringsW          = modkernel32.NewProc("GetLogicalDriveStringsW")

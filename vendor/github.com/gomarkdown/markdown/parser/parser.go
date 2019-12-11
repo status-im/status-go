@@ -143,6 +143,7 @@ func NewWithExtensions(extension Extensions) *Parser {
 	p.inlineCallback[' '] = maybeLineBreak
 	p.inlineCallback['*'] = emphasis
 	p.inlineCallback['#'] = statusTag
+	p.inlineCallback['@'] = mention
 	p.inlineCallback['_'] = emphasis
 	if p.extensions&Strikethrough != 0 {
 		p.inlineCallback['~'] = emphasis
@@ -682,6 +683,14 @@ func isAlnum(c byte) bool {
 
 func isValidStatusTagChar(c byte) bool {
 	return isAlnum(c) || c == '-'
+}
+
+func isValidTerminatingMentionChar(c byte) bool {
+	return isSpace(c) || c == '.' || c == ',' || c == ':' || c == ';'
+}
+
+func isValidPublicKeyChar(c byte) bool {
+	return c == '0' || c == '1' || c == '2' || c == '3' || c == '4' || c == '5' || c == '6' || c == '7' || c == '8' || c == '9' || c == 'a' || c == 'b' || c == 'c' || c == 'd' || c == 'e' || c == 'f'
 }
 
 // TODO: this is not used
