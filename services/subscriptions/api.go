@@ -38,7 +38,7 @@ func (api *API) SubscribeSignal(method string, args []interface{}) (Subscription
 	}
 
 	if err != nil {
-		return SubscriptionID(""), fmt.Errorf("[SubscribeSignal] could not subscribe, failed to call %s: %v", method, err)
+		return "", fmt.Errorf("[SubscribeSignal] could not subscribe, failed to call %s: %v", method, err)
 	}
 
 	return api.activeSubscriptions.Create(namespace, filter)
@@ -46,8 +46,4 @@ func (api *API) SubscribeSignal(method string, args []interface{}) (Subscription
 
 func (api *API) UnsubscribeSignal(id string) error {
 	return api.activeSubscriptions.Remove(SubscriptionID(id))
-}
-
-func (api *API) shutdown() error {
-	return api.activeSubscriptions.removeAll()
 }

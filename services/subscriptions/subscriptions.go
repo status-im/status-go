@@ -46,7 +46,6 @@ func (s *Subscriptions) Remove(id SubscriptionID) error {
 	defer s.mu.Unlock()
 
 	found, err := s.stopSubscription(id, true)
-
 	if found {
 		delete(s.subs, id)
 	}
@@ -76,13 +75,10 @@ func (s *Subscriptions) removeAll() error {
 	return nil
 }
 
-// stopSubscription isn't thread safe!
 func (s *Subscriptions) stopSubscription(id SubscriptionID, uninstall bool) (bool, error) {
 	sub, found := s.subs[id]
 	if !found {
 		return false, nil
 	}
-
 	return true, sub.Stop(uninstall)
-
 }

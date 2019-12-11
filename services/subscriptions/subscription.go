@@ -3,36 +3,41 @@ package subscriptions
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
 type SubscriptionID string
 
 type Subscription struct {
+	mu      sync.RWMutex
 	id      SubscriptionID
 	signal  *filterSignal
 	quit    chan struct{}
 	filter  filter
-	stopped bool
+	started bool
 }
 
 func NewSubscription(namespace string, filter filter) *Subscription {
 	subscriptionID := NewSubscriptionID(namespace, filter.getID())
-
-	quit := make(chan struct{})
-
 	return &Subscription{
 		id:     subscriptionID,
-		quit:   quit,
 		signal: newFilterSignal(string(subscriptionID)),
 		filter: filter,
 	}
 }
 
 func (s *Subscription) Start(checkPeriod time.Duration) error {
-	if s.stopped {
-		return errors.New("it is impossible to start an already stopped subscription")
+	s.mu.Lock()
+	if s.started {
+		s.mu.Unlock()
+		return errors.New("subscription already started or used")
 	}
+	s.started = true
+	s.quit = make(chan struct{})
+	quit := s.quit
+	s.mu.Unlock()
+
 	ticker := time.NewTicker(checkPeriod)
 	defer ticker.Stop()
 
@@ -45,22 +50,31 @@ func (s *Subscription) Start(checkPeriod time.Duration) error {
 			} else if len(filterData) > 0 {
 				s.signal.SendData(filterData)
 			}
-		case <-s.quit:
+		case <-quit:
 			return nil
 		}
 	}
 }
 
 func (s *Subscription) Stop(uninstall bool) error {
-	if s.stopped {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.started {
 		return nil
 	}
-	close(s.quit)
-	if uninstall {
-		return s.filter.uninstall()
+	select {
+	case _, ok := <-s.quit:
+		// handle a case of a closed channel
+		if !ok {
+			return nil
+		}
+	default:
+		close(s.quit)
 	}
-	s.stopped = true
-	return nil
+	if !uninstall {
+		return nil
+	}
+	return s.filter.uninstall()
 }
 
 func NewSubscriptionID(namespace, filterID string) SubscriptionID {
