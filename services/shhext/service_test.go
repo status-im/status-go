@@ -89,15 +89,17 @@ func TestShhExtSuite(t *testing.T) {
 type ShhExtSuite struct {
 	suite.Suite
 
-	nodes    []*node.Node
-	services []*Service
-	whisper  []types.Whisper
+	nodes          []*node.Node
+	services       []*Service
+	whisperWrapper []types.Whisper
+	whisper        []*whisper.Whisper
 }
 
 func (s *ShhExtSuite) SetupTest() {
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
-	s.whisper = make([]types.Whisper, 2)
+	s.whisper = make([]*whisper.Whisper, 2)
+	s.whisperWrapper = make([]types.Whisper, 2)
 
 	directory, err := ioutil.TempDir("", "status-go-testing")
 	s.Require().NoError(err)
@@ -115,7 +117,8 @@ func (s *ShhExtSuite) SetupTest() {
 		}
 		stack, err := node.New(cfg)
 		s.NoError(err)
-		s.whisper[i] = gethbridge.NewGethWhisperWrapper(whisper.New(nil))
+		s.whisper[i] = whisper.New(nil)
+		s.whisperWrapper[i] = gethbridge.NewGethWhisperWrapper(s.whisper[i])
 
 		privateKey, err := crypto.GenerateKey()
 		s.NoError(err)
@@ -123,7 +126,7 @@ func (s *ShhExtSuite) SetupTest() {
 		s.NoError(err)
 
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
-			return gethbridge.GetGethWhisperFrom(s.whisper[i]), nil
+			return gethbridge.GetGethWhisperFrom(s.whisperWrapper[i]), nil
 		}))
 
 		config := params.ShhextConfig{
@@ -135,7 +138,7 @@ func (s *ShhExtSuite) SetupTest() {
 		}
 		db, err := leveldb.Open(storage.NewMemStorage(), nil)
 		s.Require().NoError(err)
-		nodeWrapper := &testNodeWrapper{w: s.whisper[i]}
+		nodeWrapper := &testNodeWrapper{w: s.whisperWrapper[i]}
 		s.services[i] = New(nodeWrapper, nil, nil, db, config)
 
 		tmpdir, err := ioutil.TempDir("", "test-shhext-service")
@@ -170,7 +173,7 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	shh := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	err = shh.SelectKeyPair(privateKey)
+	err = gethbridge.GetGethWhisperFrom(shh).SelectKeyPair(privateKey)
 	s.Require().NoError(err)
 
 	nodeWrapper := &testNodeWrapper{w: shh}
@@ -298,7 +301,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	shh := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	err = shh.SelectKeyPair(privateKey)
+	err = gethbridge.GetGethWhisperFrom(shh).SelectKeyPair(privateKey)
 	s.Require().NoError(err)
 	aNode, err := node.New(&node.Config{
 		P2P: p2p.Config{

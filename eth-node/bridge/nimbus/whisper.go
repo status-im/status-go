@@ -178,12 +178,6 @@ func (w *nimbusWhisperWrapper) DeleteKeyPair(key string) bool {
 	}).(bool)
 }
 
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (w *nimbusWhisperWrapper) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	return errors.New("not implemented")
-}
-
 func (w *nimbusWhisperWrapper) AddSymKeyDirect(key []byte) (string, error) {
 	retVal := w.routineQueue.Send(func(c chan<- interface{}) {
 		keyC := C.CBytes(key)
