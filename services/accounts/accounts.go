@@ -3,8 +3,8 @@ package accounts
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
@@ -31,6 +31,6 @@ func (api *API) GetAccounts(ctx context.Context) ([]accounts.Account, error) {
 	return api.db.GetAccounts()
 }
 
-func (api *API) DeleteAccount(ctx context.Context, address common.Address) error {
+func (api *API) DeleteAccount(ctx context.Context, address types.Address) error {
 	return api.db.DeleteAccount(address)
 }

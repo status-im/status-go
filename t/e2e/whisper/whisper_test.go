@@ -5,10 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/whisper/v6"
@@ -25,9 +24,9 @@ type WhisperTestSuite struct {
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
 	return account.LoginParams{
-		ChatAddress: common.HexToAddress(chatAddress),
+		ChatAddress: types.HexToAddress(chatAddress),
 		Password:    password,
-		MainAccount: common.HexToAddress(mainAccountAddress),
+		MainAccount: types.HexToAddress(mainAccountAddress),
 	}
 }
 
@@ -170,7 +169,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	// make sure that no wallet account is selected by default
 	selectedWalletAccount, err := s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
-	s.Equal(common.Address{}, selectedWalletAccount)
+	s.Equal(types.Address{}, selectedWalletAccount)
 
 	// make sure that no chat account is selected by default
 	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
@@ -186,7 +185,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, TestConfig.Account1.Password)))
 	selectedChatAccount1, err := s.Backend.AccountManager().SelectedChatAccount()
 	s.NoError(err)
-	selectedChatPubKey1 := hexutil.Encode(crypto.FromECDSAPub(&selectedChatAccount1.AccountKey.PrivateKey.PublicKey))
+	selectedChatPubKey1 := types.EncodeHex(crypto.FromECDSAPub(&selectedChatAccount1.AccountKey.PrivateKey.PublicKey))
 	s.Equal(selectedChatPubKey1, accountInfo1.ChatPubKey)
 	s.True(whisperService.HasKeyPair(selectedChatPubKey1), "identity not injected into whisper")
 
@@ -195,7 +194,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, TestConfig.Account2.Password)))
 	selectedChatAccount2, err := s.Backend.AccountManager().SelectedChatAccount()
 	s.NoError(err)
-	selectedChatPubKey2 := hexutil.Encode(crypto.FromECDSAPub(&selectedChatAccount2.AccountKey.PrivateKey.PublicKey))
+	selectedChatPubKey2 := types.EncodeHex(crypto.FromECDSAPub(&selectedChatAccount2.AccountKey.PrivateKey.PublicKey))
 	s.Equal(selectedChatPubKey2, accountInfo2.ChatPubKey)
 	s.True(whisperService.HasKeyPair(selectedChatPubKey2), "identity not injected into whisper")
 	s.False(whisperService.HasKeyPair(selectedChatPubKey1), "identity should be removed, but it is still present in whisper")
@@ -241,7 +240,7 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 
 	selectedWalletAccount, err = s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
-	s.Equal(common.Address{}, selectedWalletAccount)
+	s.Equal(types.Address{}, selectedWalletAccount)
 
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
@@ -267,6 +266,6 @@ func (s *WhisperTestSuite) TestSelectedChatKeyIsUsedInWhisper() {
 	s.NoError(err)
 
 	// chat key should be injected in whisper
-	selectedChatPubKey := hexutil.Encode(crypto.FromECDSAPub(&selectedChatAccount.AccountKey.PrivateKey.PublicKey))
+	selectedChatPubKey := types.EncodeHex(crypto.FromECDSAPub(&selectedChatAccount.AccountKey.PrivateKey.PublicKey))
 	s.True(whisperService.HasKeyPair(selectedChatPubKey), "identity not injected in whisper")
 }

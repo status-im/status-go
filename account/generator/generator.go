@@ -9,9 +9,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 )
 
@@ -27,7 +27,7 @@ var (
 type AccountManager interface {
 	AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error)
 	ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error)
-	ImportAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error)
+	ImportAccount(privateKey *ecdsa.PrivateKey, password string) (types.Address, error)
 }
 
 type Generator struct {

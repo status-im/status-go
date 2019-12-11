@@ -121,9 +121,9 @@ func WatchAccountsChanges(ctx context.Context, feed *event.Feed, initial []commo
 			log.Debug("wallet received updated list of accounts", "accounts", n)
 			restart := false
 			for _, acc := range n {
-				_, exist := listen[acc.Address]
+				_, exist := listen[common.Address(acc.Address)]
 				if !exist {
-					listen[acc.Address] = struct{}{}
+					listen[common.Address(acc.Address)] = struct{}{}
 					restart = true
 				}
 			}

@@ -21,13 +21,13 @@ func (suite *AccountUtilsTestSuite) SetupTest() {
 	suite.validKey = "0xF35E0325dad87e2661c4eF951d58727e6d583d5c"
 }
 
-func (suite *AccountUtilsTestSuite) TestToAddress() {
-	addr := ToAddress(suite.validKey)
+func (suite *AccountUtilsTestSuite) TestGethToAddress() {
+	addr := GethToAddress(suite.validKey)
 	suite.Equal(suite.validKey, addr.String())
 }
 
-func (suite *AccountUtilsTestSuite) TestToAddressInvalidAddress() {
-	addr := ToAddress("foobar")
+func (suite *AccountUtilsTestSuite) TestGethToAddressInvalidAddress() {
+	addr := GethToAddress("foobar")
 	suite.Nil(addr)
 }
 
@@ -42,6 +42,21 @@ func (suite *AccountUtilsTestSuite) TestFromAddress() {
 
 	for _, tt := range flagtests {
 		addr := FromAddress(tt.in)
+		suite.Equal(tt.out, addr.String())
+	}
+}
+
+func (suite *AccountUtilsTestSuite) TestGethFromAddress() {
+	var flagtests = []struct {
+		in  string
+		out string
+	}{
+		{suite.validKey, suite.validKey},
+		{"foobar", "0x0000000000000000000000000000000000000000"},
+	}
+
+	for _, tt := range flagtests {
+		addr := GethFromAddress(tt.in)
 		suite.Equal(tt.out, addr.String())
 	}
 }

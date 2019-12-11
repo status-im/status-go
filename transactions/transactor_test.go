@@ -13,17 +13,17 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ens/contract"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/utils"
@@ -82,7 +82,7 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, 
 	// And also set the expected gas and gas price for RLP encoding the expected tx.
 	var usedGas hexutil.Uint64
 	var usedGasPrice *big.Int
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), account.Address, gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(account.Address)), gethrpc.PendingBlockNumber).Return(&returnNonce, nil)
 	if args.GasPrice == nil {
 		usedGasPrice = (*big.Int)(testGasPrice)
 		s.txServiceMock.EXPECT().GasPrice(gomock.Any()).Return(testGasPrice, nil)
@@ -98,11 +98,11 @@ func (s *TransactorSuite) setupTransactionPoolAPI(args SendTxArgs, returnNonce, 
 	// Prepare the transaction and RLP encode it.
 	data := s.rlpEncodeTx(args, s.nodeConfig, account, &resultNonce, usedGas, usedGasPrice)
 	// Expect the RLP encoded transaction.
-	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(gethcommon.Hash{}, txErr)
+	s.txServiceMock.EXPECT().SendRawTransaction(gomock.Any(), data).Return(common.Hash{}, txErr)
 }
 
 func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig, account *account.SelectedExtKey, nonce *hexutil.Uint64, gas hexutil.Uint64, gasPrice *big.Int) hexutil.Bytes {
-	newTx := types.NewTransaction(
+	newTx := gethtypes.NewTransaction(
 		uint64(*nonce),
 		*args.To,
 		args.Value.ToInt(),
@@ -111,7 +111,7 @@ func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig
 		[]byte(args.Input),
 	)
 	chainID := big.NewInt(int64(config.NetworkID))
-	signedTx, err := types.SignTx(newTx, types.NewEIP155Signer(chainID), account.AccountKey.PrivateKey)
+	signedTx, err := gethtypes.SignTx(newTx, gethtypes.NewEIP155Signer(chainID), account.AccountKey.PrivateKey)
 	s.NoError(err)
 	data, err := rlp.EncodeToBytes(signedTx)
 	s.NoError(err)
@@ -119,7 +119,7 @@ func (s *TransactorSuite) rlpEncodeTx(args SendTxArgs, config *params.NodeConfig
 }
 
 func (s *TransactorSuite) TestGasValues() {
-	key, _ := crypto.GenerateKey()
+	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &keystore.Key{PrivateKey: key},
@@ -155,8 +155,8 @@ func (s *TransactorSuite) TestGasValues() {
 		s.T().Run(testCase.name, func(t *testing.T) {
 			s.SetupTest()
 			args := SendTxArgs{
-				From:     account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-				To:       account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+				From:     account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+				To:       account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 				Gas:      testCase.gas,
 				GasPrice: testCase.gasPrice,
 			}
@@ -164,15 +164,15 @@ func (s *TransactorSuite) TestGasValues() {
 
 			hash, err := s.manager.SendTransaction(args, selectedAccount)
 			s.NoError(err)
-			s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
+			s.False(reflect.DeepEqual(hash, common.Hash{}))
 		})
 	}
 }
 
 func (s *TransactorSuite) TestArgsValidation() {
 	args := SendTxArgs{
-		From:  account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:    account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From:  account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:    account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 		Data:  hexutil.Bytes([]byte{0x01, 0x02}),
 		Input: hexutil.Bytes([]byte{0x02, 0x01}),
 	}
@@ -186,8 +186,8 @@ func (s *TransactorSuite) TestArgsValidation() {
 
 func (s *TransactorSuite) TestAccountMismatch() {
 	args := SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:   account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 	}
 
 	var err error
@@ -213,7 +213,7 @@ func (s *TransactorSuite) TestAccountMismatch() {
 // as the last step, we verify that if tx failed nonce is not updated
 func (s *TransactorSuite) TestLocalNonce() {
 	txCount := 3
-	key, _ := crypto.GenerateKey()
+	key, _ := gethcrypto.GenerateKey()
 	selectedAccount := &account.SelectedExtKey{
 		Address:    account.FromAddress(utils.TestConfig.Account1.WalletAddress),
 		AccountKey: &keystore.Key{PrivateKey: key},
@@ -222,8 +222,8 @@ func (s *TransactorSuite) TestLocalNonce() {
 
 	for i := 0; i < txCount; i++ {
 		args := SendTxArgs{
-			From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-			To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+			From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+			To:   account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 		}
 		s.setupTransactionPoolAPI(args, nonce, hexutil.Uint64(i), selectedAccount, nil)
 
@@ -235,8 +235,8 @@ func (s *TransactorSuite) TestLocalNonce() {
 
 	nonce = hexutil.Uint64(5)
 	args := SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:   account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 	}
 
 	s.setupTransactionPoolAPI(args, nonce, nonce, selectedAccount, nil)
@@ -248,10 +248,10 @@ func (s *TransactorSuite) TestLocalNonce() {
 	s.Equal(uint64(nonce)+1, resultNonce.(uint64))
 
 	testErr := errors.New("test")
-	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), selectedAccount.Address, gethrpc.PendingBlockNumber).Return(nil, testErr)
+	s.txServiceMock.EXPECT().GetTransactionCount(gomock.Any(), gomock.Eq(common.Address(selectedAccount.Address)), gethrpc.PendingBlockNumber).Return(nil, testErr)
 	args = SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:   account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:   account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 	}
 
 	_, err = s.manager.SendTransaction(args, selectedAccount)
@@ -261,14 +261,14 @@ func (s *TransactorSuite) TestLocalNonce() {
 }
 
 func (s *TransactorSuite) TestContractCreation() {
-	key, _ := crypto.GenerateKey()
-	testaddr := crypto.PubkeyToAddress(key.PublicKey)
+	key, _ := gethcrypto.GenerateKey()
+	testaddr := gethcrypto.PubkeyToAddress(key.PublicKey)
 	genesis := core.GenesisAlloc{
 		testaddr: {Balance: big.NewInt(100000000000)},
 	}
 	backend := backends.NewSimulatedBackend(genesis, math.MaxInt64)
 	selectedAccount := &account.SelectedExtKey{
-		Address:    testaddr,
+		Address:    types.Address(testaddr),
 		AccountKey: &keystore.Key{PrivateKey: key},
 	}
 	s.manager.sender = backend
@@ -276,7 +276,7 @@ func (s *TransactorSuite) TestContractCreation() {
 	s.manager.pendingNonceProvider = backend
 	tx := SendTxArgs{
 		From:  testaddr,
-		Input: hexutil.Bytes(gethcommon.FromHex(contract.ENSBin)),
+		Input: hexutil.Bytes(common.FromHex(contract.ENSBin)),
 	}
 
 	hash, err := s.manager.SendTransaction(tx, selectedAccount)
@@ -284,13 +284,13 @@ func (s *TransactorSuite) TestContractCreation() {
 	backend.Commit()
 	receipt, err := backend.TransactionReceipt(context.TODO(), common.Hash(hash))
 	s.NoError(err)
-	s.Equal(crypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
+	s.Equal(gethcrypto.CreateAddress(testaddr, 0), receipt.ContractAddress)
 }
 
 func (s *TransactorSuite) TestSendTransactionWithSignature() {
-	privKey, err := crypto.GenerateKey()
+	privKey, err := gethcrypto.GenerateKey()
 	s.Require().NoError(err)
-	address := crypto.PubkeyToAddress(privKey.PublicKey)
+	address := gethcrypto.PubkeyToAddress(privKey.PublicKey)
 
 	scenarios := []struct {
 		localNonce  hexutil.Uint64
@@ -339,10 +339,10 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			}
 
 			// simulate transaction signed externally
-			signer := types.NewEIP155Signer(chainID)
-			tx := types.NewTransaction(uint64(nonce), to, (*big.Int)(value), uint64(gas), (*big.Int)(gasPrice), data)
+			signer := gethtypes.NewEIP155Signer(chainID)
+			tx := gethtypes.NewTransaction(uint64(nonce), to, (*big.Int)(value), uint64(gas), (*big.Int)(gasPrice), data)
 			hash := signer.Hash(tx)
-			sig, err := crypto.Sign(hash[:], privKey)
+			sig, err := gethcrypto.Sign(hash[:], privKey)
 			s.Require().NoError(err)
 			txWithSig, err := tx.WithSignature(signer, sig)
 			s.Require().NoError(err)
@@ -356,7 +356,7 @@ func (s *TransactorSuite) TestSendTransactionWithSignature() {
 			if !scenario.expectError {
 				s.txServiceMock.EXPECT().
 					SendRawTransaction(gomock.Any(), hexutil.Bytes(expectedEncodedTx)).
-					Return(gethcommon.Hash{}, nil)
+					Return(common.Hash{}, nil)
 			}
 
 			_, err = s.manager.SendTransactionWithSignature(args, sig)
@@ -382,9 +382,9 @@ func (s *TransactorSuite) TestSendTransactionWithSignature_InvalidSignature() {
 }
 
 func (s *TransactorSuite) TestHashTransaction() {
-	privKey, err := crypto.GenerateKey()
+	privKey, err := gethcrypto.GenerateKey()
 	s.Require().NoError(err)
-	address := crypto.PubkeyToAddress(privKey.PublicKey)
+	address := gethcrypto.PubkeyToAddress(privKey.PublicKey)
 
 	remoteNonce := hexutil.Uint64(1)
 	txNonce := hexutil.Uint64(0)

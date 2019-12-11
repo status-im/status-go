@@ -7,9 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
 )
@@ -80,23 +79,23 @@ func TestSaveAccounts(t *testing.T) {
 		{
 			description: "NoError",
 			accounts: []Account{
-				{Address: common.Address{0x01}, Chat: true, Wallet: true},
-				{Address: common.Address{0x02}},
+				{Address: types.Address{0x01}, Chat: true, Wallet: true},
+				{Address: types.Address{0x02}},
 			},
 		},
 		{
 			description: "UniqueChat",
 			accounts: []Account{
-				{Address: common.Address{0x01}, Chat: true},
-				{Address: common.Address{0x02}, Chat: true},
+				{Address: types.Address{0x01}, Chat: true},
+				{Address: types.Address{0x02}, Chat: true},
 			},
 			err: ErrChatNotUnique,
 		},
 		{
 			description: "UniqueWallet",
 			accounts: []Account{
-				{Address: common.Address{0x01}, Wallet: true},
-				{Address: common.Address{0x02}, Wallet: true},
+				{Address: types.Address{0x01}, Wallet: true},
+				{Address: types.Address{0x02}, Wallet: true},
 			},
 			err: ErrWalletNotUnique,
 		},
@@ -113,8 +112,8 @@ func TestUpdateAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []Account{
-		{Address: common.Address{0x01}, Chat: true, Wallet: true},
-		{Address: common.Address{0x02}},
+		{Address: types.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types.Address{0x02}},
 	}
 	require.NoError(t, db.SaveAccounts(accounts))
 	accounts[0].Chat = false
@@ -129,13 +128,13 @@ func TestDeleteAccount(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []Account{
-		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 	}
 	require.NoError(t, db.SaveAccounts(accounts))
 	rst, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
-	require.NoError(t, db.DeleteAccount(common.Address{0x01}))
+	require.NoError(t, db.DeleteAccount(types.Address{0x01}))
 	rst2, err := db.GetAccounts()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst2))
@@ -145,19 +144,19 @@ func TestGetAddresses(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []Account{
-		{Address: common.Address{0x01}, Chat: true, Wallet: true},
-		{Address: common.Address{0x02}},
+		{Address: types.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types.Address{0x02}},
 	}
 	require.NoError(t, db.SaveAccounts(accounts))
 	addresses, err := db.GetAddresses()
 	require.NoError(t, err)
-	require.Equal(t, []common.Address{{0x01}, {0x02}}, addresses)
+	require.Equal(t, []types.Address{{0x01}, {0x02}}, addresses)
 }
 
 func TestGetWalletAddress(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	address := common.Address{0x01}
+	address := types.Address{0x01}
 	_, err := db.GetWalletAddress()
 	require.Equal(t, err, sql.ErrNoRows)
 	require.NoError(t, db.SaveAccounts([]Account{{Address: address, Wallet: true}}))
@@ -169,7 +168,7 @@ func TestGetWalletAddress(t *testing.T) {
 func TestGetChatAddress(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	address := common.Address{0x01}
+	address := types.Address{0x01}
 	_, err := db.GetChatAddress()
 	require.Equal(t, err, sql.ErrNoRows)
 	require.NoError(t, db.SaveAccounts([]Account{{Address: address, Chat: true}}))
@@ -182,9 +181,9 @@ func TestGetAccounts(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 	accounts := []Account{
-		{Address: common.Address{0x01}, Chat: true, Wallet: true},
-		{Address: common.Address{0x02}, PublicKey: hexutil.Bytes{0x01, 0x02}},
-		{Address: common.Address{0x03}, PublicKey: hexutil.Bytes{0x02, 0x03}},
+		{Address: types.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types.Address{0x02}, PublicKey: types.HexBytes{0x01, 0x02}},
+		{Address: types.Address{0x03}, PublicKey: types.HexBytes{0x02, 0x03}},
 	}
 	require.NoError(t, db.SaveAccounts(accounts))
 	rst, err := db.GetAccounts()
@@ -197,7 +196,7 @@ func TestAddressExists(t *testing.T) {
 	defer stop()
 
 	accounts := []Account{
-		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+		{Address: types.Address{0x01}, Chat: true, Wallet: true},
 	}
 	require.NoError(t, db.SaveAccounts(accounts))
 
@@ -209,7 +208,7 @@ func TestAddressExists(t *testing.T) {
 func TestAddressDoesntExist(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	exists, err := db.AddressExists(common.Address{1, 1, 1})
+	exists, err := db.AddressExists(types.Address{1, 1, 1})
 	require.NoError(t, err)
 	require.False(t, exists)
 }

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
@@ -245,8 +245,8 @@ func initNodeAndLogin(t *testing.T, backend *GethStatusBackend) (string, string)
 	require.NoError(t, err)
 
 	loginParams := account.LoginParams{
-		MainAccount: common.HexToAddress(info.WalletAddress),
-		ChatAddress: common.HexToAddress(info.ChatAddress),
+		MainAccount: types.HexToAddress(info.WalletAddress),
+		ChatAddress: types.HexToAddress(info.ChatAddress),
 		Password:    password,
 	}
 	require.NoError(t, backend.AccountManager().SelectAccount(loginParams))
