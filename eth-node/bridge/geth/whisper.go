@@ -90,12 +90,6 @@ func (w *gethWhisperWrapper) DeleteKeyPair(key string) bool {
 	return w.whisper.DeleteKeyPair(key)
 }
 
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (w *gethWhisperWrapper) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	return w.whisper.SelectKeyPair(key)
-}
-
 func (w *gethWhisperWrapper) AddSymKeyDirect(key []byte) (string, error) {
 	return w.whisper.AddSymKeyDirect(key)
 }

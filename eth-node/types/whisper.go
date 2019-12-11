@@ -53,9 +53,6 @@ type Whisper interface {
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	// DeleteKeyPair deletes the specified key if it exists.
 	DeleteKeyPair(key string) bool
-	// SelectKeyPair adds cryptographic identity, and makes sure
-	// that it is the only private key known to the node.
-	SelectKeyPair(key *ecdsa.PrivateKey) error
 	AddSymKeyDirect(key []byte) (string, error)
 	AddSymKeyFromPassword(password string) (string, error)
 	DeleteSymKey(id string) bool
