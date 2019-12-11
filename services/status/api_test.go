@@ -8,9 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -53,8 +53,8 @@ var logintests = []struct {
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("addressKey", nil)
 
 			loginParams := account.LoginParams{
-				MainAccount: common.HexToAddress("0x01"),
-				ChatAddress: common.HexToAddress("0x01"),
+				MainAccount: types.HexToAddress("0x01"),
+				ChatAddress: types.HexToAddress("0x01"),
 				Password:    "password",
 			}
 			s.am.EXPECT().SelectAccount(loginParams).Return(nil)
@@ -95,8 +95,8 @@ var logintests = []struct {
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", nil)
 
 			loginParams := account.LoginParams{
-				MainAccount: common.HexToAddress("0x01"),
-				ChatAddress: common.HexToAddress("0x01"),
+				MainAccount: types.HexToAddress("0x01"),
+				ChatAddress: types.HexToAddress("0x01"),
 				Password:    "password",
 			}
 			s.am.EXPECT().SelectAccount(loginParams).Return(errors.New("foo"))

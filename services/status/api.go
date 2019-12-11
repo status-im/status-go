@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/account"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // PublicAPI represents a set of APIs from the `web3.status` namespace.
@@ -42,9 +43,9 @@ func (api *PublicAPI) Login(context context.Context, req LoginRequest) (res Logi
 	}
 
 	loginParams := account.LoginParams{
-		ChatAddress: common.HexToAddress(req.Addr),
+		ChatAddress: types.HexToAddress(req.Addr),
 		Password:    req.Password,
-		MainAccount: common.HexToAddress(req.Addr),
+		MainAccount: types.HexToAddress(req.Addr),
 	}
 	if err = api.s.am.SelectAccount(loginParams); err != nil {
 		return

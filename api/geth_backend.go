@@ -655,7 +655,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	config := b.StatusNode().Config()
 
 	db := accounts.NewDB(b.appDB)
-	exists, err := db.AddressExists(common.HexToAddress(address))
+	exists, err := db.AddressExists(types.HexToAddress(address))
 	if err != nil {
 		b.log.Error("failed to query db for a given address", "address", address, "error", err)
 		return nil, err
@@ -673,7 +673,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	}
 
 	return &account.SelectedExtKey{
-		Address:    key.Address,
+		Address:    types.Address(key.Address),
 		AccountKey: key,
 	}, nil
 }
@@ -900,8 +900,10 @@ func (b *GethStatusBackend) startWallet() error {
 	}
 
 	allAddresses := make([]common.Address, len(watchAddresses)+1)
-	allAddresses[0] = mainAccountAddress
-	copy(allAddresses[1:], watchAddresses)
+	allAddresses[0] = common.Address(mainAccountAddress)
+	for i, addr := range watchAddresses {
+		allAddresses[1+i] = common.Address(addr)
+	}
 	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,

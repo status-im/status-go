@@ -9,13 +9,15 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/t/devtests/testchain"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 func TestReactorChanges(t *testing.T) {
@@ -34,9 +36,9 @@ type ReactorChangesSuite struct {
 	first, second common.Address
 }
 
-func (s *ReactorChangesSuite) txToAddress(nonce uint64, address common.Address) *types.Transaction {
-	tx := types.NewTransaction(nonce, address, big.NewInt(1e17), 21000, big.NewInt(1), nil)
-	tx, err := types.SignTx(tx, s.backend.Signer, s.backend.Faucet)
+func (s *ReactorChangesSuite) txToAddress(nonce uint64, address common.Address) *gethtypes.Transaction {
+	tx := gethtypes.NewTransaction(nonce, address, big.NewInt(1e17), 21000, big.NewInt(1), nil)
+	tx, err := gethtypes.SignTx(tx, s.backend.Signer, s.backend.Faucet)
 	s.Require().NoError(err)
 	return tx
 }
@@ -92,7 +94,7 @@ func (s *ReactorChangesSuite) TestWatchNewAccounts() {
 		}
 		return nil
 	}, 5*time.Second, 500*time.Millisecond))
-	s.feed.Send([]accounts.Account{{Address: s.first}, {Address: s.second}})
+	s.feed.Send([]accounts.Account{{Address: types.Address(s.first)}, {Address: types.Address(s.second)}})
 	s.Require().NoError(utils.Eventually(func() error {
 		transfers, err := s.db.GetTransfersByAddress(s.second, big.NewInt(0), nil)
 		if err != nil {

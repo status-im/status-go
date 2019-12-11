@@ -13,10 +13,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 )
@@ -32,7 +32,7 @@ var (
 	ErrAccountKeyStoreMissing         = errors.New("account key store is not set")
 )
 
-var zeroAddress = common.Address{}
+var zeroAddress = types.Address{}
 
 // Manager represents account manager interface.
 type Manager struct {
@@ -44,8 +44,8 @@ type Manager struct {
 	onboarding        *Onboarding
 
 	selectedChatAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
-	mainAccountAddress  common.Address
-	watchAddresses      []common.Address
+	mainAccountAddress  types.Address
+	watchAddresses      []types.Address
 }
 
 // NewManager returns new node account manager.
@@ -157,7 +157,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	var err error
 	var foundKeyFile []byte
 
-	addressObj := common.BytesToAddress(common.FromHex(address))
+	addressObj := types.BytesToAddress(types.FromHex(address))
 	checkAccountKey := func(path string, fileInfo os.FileInfo) error {
 		if len(foundKeyFile) > 0 || fileInfo.IsDir() {
 			return nil
@@ -175,7 +175,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 			return fmt.Errorf("failed to read key file: %s", e)
 		}
 
-		if common.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
+		if types.HexToAddress("0x"+accountKey.Address).Hex() == addressObj.Hex() {
 			foundKeyFile = rawKeyFile
 		}
 
@@ -202,7 +202,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	}
 
 	// avoid swap attack
-	if key.Address != addressObj {
+	if types.Address(key.Address) != addressObj {
 		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
 	}
 
@@ -227,8 +227,8 @@ func (m *Manager) SelectAccount(loginParams LoginParams) error {
 	return nil
 }
 
-func (m *Manager) SetAccountAddresses(main common.Address, secondary ...common.Address) {
-	m.watchAddresses = []common.Address{main}
+func (m *Manager) SetAccountAddresses(main types.Address, secondary ...types.Address) {
+	m.watchAddresses = []types.Address{main}
 	m.watchAddresses = append(m.watchAddresses, secondary...)
 	m.mainAccountAddress = main
 }
@@ -242,7 +242,7 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 	id := uuid.NewRandom()
 	key := &keystore.Key{
 		Id:         id,
-		Address:    address,
+		Address:    common.Address(address),
 		PrivateKey: privKey,
 	}
 
@@ -253,7 +253,7 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 }
 
 // MainAccountAddress returns currently selected watch addresses.
-func (m *Manager) MainAccountAddress() (common.Address, error) {
+func (m *Manager) MainAccountAddress() (types.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -265,7 +265,7 @@ func (m *Manager) MainAccountAddress() (common.Address, error) {
 }
 
 // WatchAddresses returns currently selected watch addresses.
-func (m *Manager) WatchAddresses() []common.Address {
+func (m *Manager) WatchAddresses() []types.Address {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -295,14 +295,14 @@ func (m *Manager) Logout() {
 }
 
 // ImportAccount imports the account specified with privateKey.
-func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (common.Address, error) {
+func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (types.Address, error) {
 	if m.keystore == nil {
-		return common.Address{}, ErrAccountKeyStoreMissing
+		return types.Address{}, ErrAccountKeyStoreMissing
 	}
 
 	account, err := m.keystore.ImportECDSA(privateKey, password)
 
-	return account.Address, err
+	return types.Address(account.Address), err
 }
 
 func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
@@ -355,10 +355,10 @@ func (m *Manager) importExtendedKey(keyPurpose extkeys.KeyPurpose, extKey *extke
 
 // Accounts returns list of addresses for selected account, including
 // subaccounts.
-func (m *Manager) Accounts() ([]common.Address, error) {
+func (m *Manager) Accounts() ([]types.Address, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	addresses := make([]common.Address, 0)
+	addresses := make([]types.Address, 0)
 	if m.mainAccountAddress != zeroAddress {
 		addresses = append(addresses, m.mainAccountAddress)
 	}
@@ -444,7 +444,7 @@ func (m *Manager) unlockExtendedKey(address, password string) (*SelectedExtKey, 
 	}
 
 	selectedExtendedKey := &SelectedExtKey{
-		Address:    account.Address,
+		Address:    types.Address(account.Address),
 		AccountKey: accountKey,
 	}
 

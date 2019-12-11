@@ -7,11 +7,11 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -29,7 +29,7 @@ type DevNodeSuite struct {
 	Eth               *ethclient.Client
 	Local             *statusrpc.Client
 	DevAccount        *ecdsa.PrivateKey
-	DevAccountAddress common.Address
+	DevAccountAddress types.Address
 
 	dir     string
 	backend *api.GethStatusBackend
@@ -42,7 +42,7 @@ func (s *DevNodeSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.DevAccount = account
 	s.DevAccountAddress = crypto.PubkeyToAddress(account.PublicKey)
-	s.miner, err = miner.NewDevNode(s.DevAccountAddress)
+	s.miner, err = miner.NewDevNode(common.Address(s.DevAccountAddress))
 	s.Require().NoError(err)
 	s.Require().NoError(miner.StartWithMiner(s.miner))
 

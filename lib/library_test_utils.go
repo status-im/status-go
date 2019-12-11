@@ -43,7 +43,6 @@ const initJS = `
 	};`
 
 var (
-	zeroHash       = common.Hash{}
 	testChainDir   string
 	keystoreDir    string
 	nodeConfigJSON string
@@ -61,7 +60,7 @@ func buildSubAccountData(chatAddress string) *C.char {
 		{
 			Wallet:  true,
 			Chat:    true,
-			Address: common.HexToAddress(chatAddress),
+			Address: types.HexToAddress(chatAddress),
 		},
 	}
 	data, _ := json.Marshal(accs)
@@ -70,9 +69,9 @@ func buildSubAccountData(chatAddress string) *C.char {
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
 	return account.LoginParams{
-		ChatAddress: common.HexToAddress(chatAddress),
+		ChatAddress: types.HexToAddress(chatAddress),
 		Password:    password,
-		MainAccount: common.HexToAddress(mainAccountAddress),
+		MainAccount: types.HexToAddress(mainAccountAddress),
 	}
 }
 
@@ -536,8 +535,8 @@ func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
-		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
+		From:  account.GethFromAddress(TestConfig.Account1.WalletAddress),
+		To:    account.GethToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -555,8 +554,8 @@ func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 		t.Errorf("failed to send transaction: %v", result.Error)
 		return false
 	}
-	hash := common.BytesToHash(result.Result)
-	if reflect.DeepEqual(hash, common.Hash{}) {
+	hash := types.BytesToHash(result.Result)
+	if reflect.DeepEqual(hash, types.Hash{}) {
 		t.Errorf("response hash empty: %s", hash.Hex())
 		return false
 	}
@@ -570,7 +569,7 @@ func testSendTransactionInvalidPassword(t *testing.T, feed *event.Feed) bool {
 
 	args, err := json.Marshal(transactions.SendTxArgs{
 		From:  common.HexToAddress(acc.WalletAddress),
-		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
+		To:    account.GethToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -597,8 +596,8 @@ func testFailedTransaction(t *testing.T, feed *event.Feed) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  *account.ToAddress(TestConfig.Account1.WalletAddress),
-		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
+		From:  *account.GethToAddress(TestConfig.Account1.WalletAddress),
+		To:    account.GethToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {

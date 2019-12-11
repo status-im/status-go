@@ -7,10 +7,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -24,9 +23,9 @@ type initFunc func([]byte, *transactions.SendTxArgs)
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
 	return account.LoginParams{
-		ChatAddress: common.HexToAddress(chatAddress),
+		ChatAddress: types.HexToAddress(chatAddress),
 		Password:    password,
-		MainAccount: common.HexToAddress(mainAccountAddress),
+		MainAccount: types.HexToAddress(mainAccountAddress),
 	}
 }
 
@@ -112,7 +111,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	s.Require().NoError(err)
 	defer os.Remove(tmpdir)
 
-	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
+	wallet := types.HexToAddress(utils.TestConfig.Account1.WalletAddress)
 	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithDataDir(tmpdir),
@@ -122,7 +121,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	utils.EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	args := transactions.SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
 	}
 
 	hash, err := s.Backend.SendTransaction(args, utils.TestConfig.Account1.Password)
@@ -185,7 +184,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	s.Require().NoError(err)
 	defer os.Remove(tmpdir)
 
-	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
+	wallet := types.HexToAddress(utils.TestConfig.Account1.WalletAddress)
 	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithDataDir(tmpdir),
@@ -195,14 +194,14 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 	utils.EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	// this call blocks, up until Complete Transaction is called
-	byteCode, err := hexutil.Decode(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
+	byteCode, err := types.DecodeHex(`0x6060604052341561000c57fe5b5b60a58061001b6000396000f30060606040526000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680636ffa1caa14603a575bfe5b3415604157fe5b60556004808035906020019091905050606b565b6040518082815260200191505060405180910390f35b60008160020290505b9190505600a165627a7a72305820ccdadd737e4ac7039963b54cee5e5afb25fa859a275252bdcf06f653155228210029`)
 	s.NoError(err)
 
 	gas := uint64(params.DefaultGas)
 	args := transactions.SendTxArgs{
-		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
 		To:   nil, // marker, contract creation is expected
-		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), gethcommon.Ether)),
+		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), common.Ether)),
 		Gas: (*hexutil.Uint64)(&gas),
 	}
 
@@ -213,7 +212,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 		return
 	}
 	s.NoError(err)
-	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
+	s.False(reflect.DeepEqual(hash, types.Hash{}))
 }
 
 func (s *TransactionsTestSuite) TestSendEther() {
@@ -222,7 +221,7 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	s.Require().NoError(err)
 	defer os.Remove(tmpdir)
 
-	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
+	wallet := types.HexToAddress(utils.TestConfig.Account1.WalletAddress)
 	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithDataDir(tmpdir),
@@ -232,12 +231,12 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	utils.EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
-		From:  account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:    account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From:  account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:    account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, utils.TestConfig.Account1.Password)
 	s.NoError(err)
-	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
+	s.False(reflect.DeepEqual(hash, types.Hash{}))
 }
 
 func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
@@ -249,7 +248,7 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	addr, err := utils.GetRemoteURL()
 	s.NoError(err)
 
-	wallet := common.HexToAddress(utils.TestConfig.Account1.WalletAddress)
+	wallet := types.HexToAddress(utils.TestConfig.Account1.WalletAddress)
 	s.StartTestBackendWithAccount(multiaccounts.Account{KeyUID: utils.TestConfig.Account1.WalletAddress}, utils.TestConfig.Account1.Password,
 		[]accounts.Account{{Address: wallet, Wallet: true, Chat: true}},
 		e2e.WithUpstream(addr),
@@ -258,11 +257,11 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	defer s.LogoutAndStop()
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
-		From:     account.FromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:       account.ToAddress(utils.TestConfig.Account2.WalletAddress),
+		From:     account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:       account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
 		Value:    (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, utils.TestConfig.Account1.Password)
 	s.NoError(err)
-	s.False(reflect.DeepEqual(hash, gethcommon.Hash{}))
+	s.False(reflect.DeepEqual(hash, types.Hash{}))
 }

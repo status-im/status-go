@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
 )
 
-func buildLoginParams(mainAccountAddress, chatAddress, password string, watchAddresses []common.Address) account.LoginParams {
+func buildLoginParams(mainAccountAddress, chatAddress, password string, watchAddresses []types.Address) account.LoginParams {
 	return account.LoginParams{
-		ChatAddress:    common.HexToAddress(chatAddress),
+		ChatAddress:    types.HexToAddress(chatAddress),
 		Password:       password,
-		MainAccount:    common.HexToAddress(mainAccountAddress),
+		MainAccount:    types.HexToAddress(mainAccountAddress),
 		WatchAddresses: watchAddresses,
 	}
 }
@@ -224,7 +224,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	// make sure that no account is selected by default
 	selectedWalletAccount, err := s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
-	s.Equal(common.Address{}, selectedWalletAccount)
+	s.Equal(types.Address{}, selectedWalletAccount)
 	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error(), "account selected, but should not be")
 	s.Nil(selectedChatAccount)
@@ -234,9 +234,9 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error())
 
-	watchAddresses := []common.Address{
-		common.HexToAddress("0x00000000000000000000000000000000000001"),
-		common.HexToAddress("0x00000000000000000000000000000000000002"),
+	watchAddresses := []types.Address{
+		types.HexToAddress("0x00000000000000000000000000000000000001"),
+		types.HexToAddress("0x00000000000000000000000000000000000002"),
 	}
 	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, watchAddresses)))
 
@@ -281,7 +281,7 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 
 	selectedWalletAccount, err = s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
-	s.Equal(common.Address{}, selectedWalletAccount)
+	s.Equal(types.Address{}, selectedWalletAccount)
 	selectedChatAccount, err = s.Backend.AccountManager().SelectedChatAccount()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
 	s.Nil(selectedChatAccount)

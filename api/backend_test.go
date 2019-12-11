@@ -12,9 +12,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -183,8 +183,8 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func(tuple [3]string) {
 			loginParams := account.LoginParams{
-				MainAccount: common.HexToAddress(tuple[0]),
-				ChatAddress: common.HexToAddress(tuple[1]),
+				MainAccount: types.HexToAddress(tuple[0]),
+				ChatAddress: types.HexToAddress(tuple[1]),
 				Password:    tuple[2],
 			}
 			assert.NoError(t, backend.SelectAccount(loginParams))
@@ -220,14 +220,14 @@ func TestBackendInjectChatAccount(t *testing.T) {
 		require.NoError(t, backend.StopNode())
 	}()
 
-	chatPrivKey, err := crypto.GenerateKey()
+	chatPrivKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
-	encryptionPrivKey, err := crypto.GenerateKey()
+	encryptionPrivKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
 
-	chatPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(chatPrivKey))
-	chatPubKeyHex := types.EncodeHex(crypto.FromECDSAPub(&chatPrivKey.PublicKey))
-	encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
+	chatPrivKeyHex := hex.EncodeToString(gethcrypto.FromECDSA(chatPrivKey))
+	chatPubKeyHex := types.EncodeHex(gethcrypto.FromECDSAPub(&chatPrivKey.PublicKey))
+	encryptionPrivKeyHex := hex.EncodeToString(gethcrypto.FromECDSA(encryptionPrivKey))
 
 	whisperService, err := backend.StatusNode().WhisperService()
 	require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestBackendInjectChatAccount(t *testing.T) {
 
 	// wallet account should not be selected
 	mainAccountAddress, err := backend.AccountManager().MainAccountAddress()
-	require.Equal(t, common.Address{}, mainAccountAddress)
+	require.Equal(t, types.Address{}, mainAccountAddress)
 	require.Equal(t, account.ErrNoAccountSelected, err)
 
 	// selected chat account should have the key injected previously
@@ -526,9 +526,9 @@ func TestBackendGetVerifiedAccount(t *testing.T) {
 	}()
 
 	t.Run("AccountDoesntExist", func(t *testing.T) {
-		pkey, err := crypto.GenerateKey()
+		pkey, err := gethcrypto.GenerateKey()
 		require.NoError(t, err)
-		address := crypto.PubkeyToAddress(pkey.PublicKey)
+		address := gethcrypto.PubkeyToAddress(pkey.PublicKey)
 		key, err := backend.getVerifiedWalletAccount(address.String(), password)
 		require.EqualError(t, err, transactions.ErrAccountDoesntExist.Error())
 		require.Nil(t, key)
@@ -565,11 +565,11 @@ func TestLoginWithKey(t *testing.T) {
 	utils.Init()
 
 	b := NewGethStatusBackend()
-	chatKey, err := crypto.GenerateKey()
+	chatKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
-	walletKey, err := crypto.GenerateKey()
+	walletKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
-	keyUIDHex := sha256.Sum256(crypto.FromECDSAPub(&chatKey.PublicKey))
+	keyUIDHex := sha256.Sum256(gethcrypto.FromECDSAPub(&chatKey.PublicKey))
 	keyUID := types.EncodeHex(keyUIDHex[:])
 	main := multiaccounts.Account{
 		KeyUID: keyUID,
@@ -579,7 +579,7 @@ func TestLoginWithKey(t *testing.T) {
 	defer os.Remove(tmpdir)
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
-	keyhex := hex.EncodeToString(crypto.FromECDSA(chatKey))
+	keyhex := hex.EncodeToString(gethcrypto.FromECDSA(chatKey))
 
 	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)

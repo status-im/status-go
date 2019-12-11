@@ -9,10 +9,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/utils"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -32,7 +32,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount1PKFile()))
 	require.NoError(t, utils.ImportTestAccount(keyStoreDir, utils.GetAccount2PKFile()))
 
-	account1Address := common.BytesToAddress(common.FromHex(utils.TestConfig.Account1.WalletAddress))
+	account1Address := types.BytesToAddress(types.FromHex(utils.TestConfig.Account1.WalletAddress))
 
 	testCases := []struct {
 		name          string
@@ -86,8 +86,8 @@ func TestVerifyAccountPassword(t *testing.T) {
 			if accountKey == nil {
 				require.Fail(t, "no error reported, but account key is missing")
 			}
-			accountAddress := common.BytesToAddress(common.FromHex(testCase.address))
-			if accountKey.Address != accountAddress {
+			accountAddress := types.BytesToAddress(types.FromHex(testCase.address))
+			if types.Address(accountKey.Address) != accountAddress {
 				require.Fail(t, "account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
 		}
@@ -108,7 +108,7 @@ func TestVerifyAccountPasswordWithAccountBeforeEIP55(t *testing.T) {
 
 	accManager := NewManager()
 
-	address := common.HexToAddress(utils.TestConfig.Account3.WalletAddress)
+	address := types.HexToAddress(utils.TestConfig.Account3.WalletAddress)
 	_, err = accManager.VerifyAccountPassword(keyStoreDir, address.Hex(), utils.TestConfig.Account3.Password)
 	require.NoError(t, err)
 }
@@ -220,18 +220,18 @@ func (s *ManagerTestSuite) TestOnboarding() {
 }
 
 func (s *ManagerTestSuite) TestSelectAccountSuccess() {
-	s.testSelectAccount(common.HexToAddress(s.testAccount.chatAddress), common.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, nil)
+	s.testSelectAccount(types.HexToAddress(s.testAccount.chatAddress), types.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, nil)
 }
 
 func (s *ManagerTestSuite) TestSelectAccountWrongAddress() {
-	s.testSelectAccount(common.HexToAddress("0x0000000000000000000000000000000000000001"), common.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, errors.New("cannot retrieve a valid key for a given account: no key for given address or file"))
+	s.testSelectAccount(types.HexToAddress("0x0000000000000000000000000000000000000001"), types.HexToAddress(s.testAccount.walletAddress), s.testAccount.password, errors.New("cannot retrieve a valid key for a given account: no key for given address or file"))
 }
 
 func (s *ManagerTestSuite) TestSelectAccountWrongPassword() {
-	s.testSelectAccount(common.HexToAddress(s.testAccount.chatAddress), common.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password"))
+	s.testSelectAccount(types.HexToAddress(s.testAccount.chatAddress), types.HexToAddress(s.testAccount.walletAddress), "wrong", errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password"))
 }
 
-func (s *ManagerTestSuite) testSelectAccount(chat, wallet common.Address, password string, expErr error) {
+func (s *ManagerTestSuite) testSelectAccount(chat, wallet types.Address, password string, expErr error) {
 	loginParams := LoginParams{
 		ChatAddress: chat,
 		MainAccount: wallet,
@@ -249,7 +249,7 @@ func (s *ManagerTestSuite) testSelectAccount(chat, wallet common.Address, passwo
 		s.Equal(wallet, selectedMainAccountAddress)
 		s.Equal(chat, crypto.PubkeyToAddress(selectedChatAccount.AccountKey.PrivateKey.PublicKey))
 	} else {
-		s.Equal(common.Address{}, selectedMainAccountAddress)
+		s.Equal(types.Address{}, selectedMainAccountAddress)
 		s.Nil(selectedChatAccount)
 		s.Equal(walletErr, ErrNoAccountSelected)
 		s.Equal(chatErr, ErrNoAccountSelected)
@@ -275,12 +275,12 @@ func (s *ManagerTestSuite) TestSetChatAccount() {
 
 	selectedMainAccountAddress, err := s.accManager.MainAccountAddress()
 	s.Error(err)
-	s.Equal(common.Address{}, selectedMainAccountAddress)
+	s.Equal(types.Address{}, selectedMainAccountAddress)
 }
 
 func (s *ManagerTestSuite) TestLogout() {
 	s.accManager.Logout()
-	s.Equal(common.Address{}, s.accManager.mainAccountAddress)
+	s.Equal(types.Address{}, s.accManager.mainAccountAddress)
 	s.Nil(s.accManager.selectedChatAccount)
 	s.Len(s.accManager.watchAddresses, 0)
 }
@@ -289,8 +289,8 @@ func (s *ManagerTestSuite) TestLogout() {
 func (s *ManagerTestSuite) TestAccounts() {
 	// Select the test account
 	loginParams := LoginParams{
-		MainAccount: common.HexToAddress(s.walletAddress),
-		ChatAddress: common.HexToAddress(s.chatAddress),
+		MainAccount: types.HexToAddress(s.walletAddress),
+		ChatAddress: types.HexToAddress(s.chatAddress),
 		Password:    s.password,
 	}
 	err := s.accManager.SelectAccount(loginParams)
@@ -301,7 +301,7 @@ func (s *ManagerTestSuite) TestAccounts() {
 	s.NoError(err)
 	s.NotNil(accs)
 	// Selected main account address is zero address but doesn't fail
-	s.accManager.mainAccountAddress = common.Address{}
+	s.accManager.mainAccountAddress = types.Address{}
 	accs, err = s.accManager.Accounts()
 	s.NoError(err)
 	s.NotNil(accs)

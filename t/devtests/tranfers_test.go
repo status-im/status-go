@@ -10,7 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/suite"
@@ -28,10 +29,10 @@ func (s *TransfersSuite) getAllTranfers() (rst []wallet.TransferView, err error)
 	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.DevAccountAddress, (*hexutil.Big)(big.NewInt(0)))
 }
 
-func (s *TransfersSuite) sendTx(nonce uint64, to common.Address) {
-	tx := types.NewTransaction(nonce, to, big.NewInt(1e18), 1e6, big.NewInt(10), nil)
+func (s *TransfersSuite) sendTx(nonce uint64, to types.Address) {
+	tx := gethtypes.NewTransaction(nonce, common.Address(to), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
 	// TODO move signer to DevNodeSuite
-	tx, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(1337)), s.DevAccount)
+	tx, err := gethtypes.SignTx(tx, gethtypes.NewEIP155Signer(big.NewInt(1337)), s.DevAccount)
 	s.Require().NoError(err)
 	s.Require().NoError(s.Eth.SendTransaction(context.Background(), tx))
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
