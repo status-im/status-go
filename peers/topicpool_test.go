@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -389,7 +389,7 @@ func TestServerIgnoresInboundPeer(t *testing.T) {
 	topicPool.running = 1
 	topicPool.maxCachedPeers = 0
 
-	whisper := whisperv6.New(nil)
+	whisper := whisper.New(nil)
 	srvkey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	server := &p2p.Server{

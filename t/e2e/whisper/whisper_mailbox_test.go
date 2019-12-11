@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/crypto/sha3"
 )

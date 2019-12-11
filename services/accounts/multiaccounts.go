@@ -23,12 +23,5 @@ type MultiAccountsAPI struct {
 }
 
 func (api *MultiAccountsAPI) UpdateAccount(account multiaccounts.Account) error {
-	expected, err := api.manager.MainAccountAddress()
-	if err != nil {
-		return err
-	}
-	if account.Address != expected {
-		return ErrUpdatingWrongAccount
-	}
 	return api.db.UpdateAccount(account)
 }

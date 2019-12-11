@@ -178,7 +178,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	if len(b.rootDataDir) == 0 {
 		return errors.New("root datadir wasn't provided")
 	}
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.Address))
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
 	b.appDB, err = appdatabase.InitializeDB(path, password)
 	if err != nil {
 		return err
@@ -235,7 +235,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
-	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.Address, time.Now().Unix())
+	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		return err
 	}

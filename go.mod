@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.13
 
-replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.6
+replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.7
 
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
@@ -15,6 +15,8 @@ replace github.com/status-im/status-go/protocol => ./protocol
 replace github.com/status-im/status-go/extkeys => ./extkeys
 
 replace github.com/status-im/status-go/eth-node => ./eth-node
+
+replace github.com/status-im/status-go/whisper/v6 => ./whisper
 
 require (
 	github.com/beevik/ntp v0.2.0
@@ -41,11 +43,11 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20191119114148-6dd40a46baa0 // indirect
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-go/eth-node v0.0.0-20191126161717-86bc127b3d0a
+	github.com/status-im/status-go/eth-node v1.0.0
 	github.com/status-im/status-go/extkeys v1.0.0
-	github.com/status-im/status-go/protocol v0.5.2
+	github.com/status-im/status-go/protocol v1.0.1
+	github.com/status-im/status-go/whisper/v6 v6.0.1
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
-	github.com/status-im/whisper v1.6.2
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.13.0

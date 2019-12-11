@@ -2,7 +2,7 @@ package gethbridge
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // NewGethMailServerResponseWrapper returns a types.MailServerResponse object that mimics Geth's MailServerResponse

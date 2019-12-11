@@ -326,13 +326,13 @@ func Login(accountData, password string) string {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("start a node with account", "address", account.Address)
+		log.Debug("start a node with account", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccount(account, password)
 		if err != nil {
-			log.Error("failed to start a node", "address", account.Address, "error", err)
+			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node with", "address", account.Address)
+		log.Debug("started a node with", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -356,13 +356,13 @@ func SaveAccountAndLogin(accountData, password, configJSON, subaccountData strin
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf, subaccs)
 		if err != nil {
-			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node, and saved account", "address", account.Address)
+		log.Debug("started a node, and saved account", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -387,13 +387,13 @@ func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, keyHex st
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, &conf, password, keyHex)
 		if err != nil {
-			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node, and saved account", "address", account.Address)
+		log.Debug("started a node, and saved account", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -408,13 +408,13 @@ func LoginWithKeycard(accountData, password, keyHex string) string {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("start a node with account", "address", account.Address)
+		log.Debug("start a node with account", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithKey(account, password, keyHex)
 		if err != nil {
-			log.Error("failed to start a node", "address", account.Address, "error", err)
+			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node with", "address", account.Address)
+		log.Debug("started a node with", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)

@@ -34,7 +34,7 @@ import (
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
