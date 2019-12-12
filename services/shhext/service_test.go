@@ -401,6 +401,14 @@ func (w *testNodeWrapper) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return w.w, nil
 }
 
+func (w *testNodeWrapper) AddPeer(url string) error {
+	panic("not implemented")
+}
+
+func (w *testNodeWrapper) RemovePeer(url string) error {
+	panic("not implemented")
+}
+
 type WhisperNodeMockSuite struct {
 	suite.Suite
 
