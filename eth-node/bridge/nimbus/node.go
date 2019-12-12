@@ -61,3 +61,17 @@ func (w *nimbusNodeWrapper) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
 func (w *nimbusNodeWrapper) GetWhisper(ctx interface{}) (types.Whisper, error) {
 	return w.w, nil
 }
+
+func (w *nimbusNodeWrapper) AddPeer(url string) error {
+	urlC := C.CString(url)
+	defer C.free(unsafe.Pointer(urlC))
+	if !C.nimbus_add_peer(urlC) {
+		return fmt.Errorf("failed to add peer: %s", url)
+	}
+
+	return nil
+}
+
+func (w *nimbusNodeWrapper) RemovePeer(url string) error {
+	panic("TODO: RemovePeer")
+}
