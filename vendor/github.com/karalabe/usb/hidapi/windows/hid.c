@@ -74,8 +74,6 @@ extern "C" {
 	#pragma warning(disable:4996)
 #endif
 
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -430,7 +428,7 @@ struct hid_device_info HID_API_EXPORT * HID_API_CALL hid_enumerate(unsigned shor
 			if (str) {
 				len = strlen(str);
 				cur_dev->path = (char*) calloc(len+1, sizeof(char));
-				strncpy(cur_dev->path, str, len+1);
+				strncpy(cur_dev->path, str, sizeof(cur_dev->path));
 				cur_dev->path[len] = '\0';
 			}
 			else
