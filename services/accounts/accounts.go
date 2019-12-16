@@ -3,8 +3,8 @@ package accounts
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
 
