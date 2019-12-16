@@ -26,7 +26,7 @@ ifeq (, $(shell which docker))
 	$(error No $(BOLD)docker$(RESET) in your $$PATH. Please install it)
 endif
 ifeq (, $(shell docker version | grep Server))
-	$(error No permissions to run $(BOLD)docker$(RESET) commands)
+	$(error No permissions to run $(BOLD)docker$(RESET). Add yourself to docker group)
 endif
 ifeq (, $(shell which docker-compose))
 	$(error No $(BOLD)docker-compose$(RESET) in your $$PATH. Please install it)

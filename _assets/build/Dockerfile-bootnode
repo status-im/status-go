@@ -21,4 +21,4 @@ LABEL description="bootnode is an Ethereum bootnode with patched Discovery V5."
 RUN apk add --no-cache ca-certificates bash
 
 COPY --from=builder /go/src/github.com/status-im/status-go/build/bin/bootnode /usr/local/bin/
-ENTRYPOINT /usr/local/bin/bootnode
+ENTRYPOINT ["/usr/local/bin/bootnode"]
