@@ -125,6 +125,22 @@ func TestUpdateAccounts(t *testing.T) {
 	require.Equal(t, accounts, rst)
 }
 
+func TestDeleteAccount(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	accounts := []Account{
+		{Address: common.Address{0x01}, Chat: true, Wallet: true},
+	}
+	require.NoError(t, db.SaveAccounts(accounts))
+	rst, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rst))
+	require.NoError(t, db.DeleteAccount(common.Address{0x01}))
+	rst2, err := db.GetAccounts()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(rst2))
+}
+
 func TestGetAddresses(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()

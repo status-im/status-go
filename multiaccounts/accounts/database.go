@@ -28,10 +28,10 @@ type Account struct {
 	Address   common.Address `json:"address"`
 	Wallet    bool           `json:"wallet"`
 	Chat      bool           `json:"chat"`
-	Type      string         `json:"type"`
-	Storage   string         `json:"storage"`
-	Path      string         `json:"path"`
-	PublicKey hexutil.Bytes  `json:"publicKey"`
+	Type      string         `json:"type,omitempty"`
+	Storage   string         `json:"storage,omitempty"`
+	Path      string         `json:"path,omitempty"`
+	PublicKey hexutil.Bytes  `json:"public-key,omitempty"`
 	Name      string         `json:"name"`
 	Color     string         `json:"color"`
 }
@@ -159,6 +159,11 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 		}
 	}
 	return
+}
+
+func (db *Database) DeleteAccount(address common.Address) error {
+	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
+	return err
 }
 
 func (db *Database) GetWalletAddress() (rst common.Address, err error) {
