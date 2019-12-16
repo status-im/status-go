@@ -22,7 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	whisperv6 "github.com/status-im/status-go/whisper"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // Client defines typed wrappers for the Whisper v6 RPC API.
@@ -52,8 +52,8 @@ func (sc *Client) Version(ctx context.Context) (string, error) {
 }
 
 // Info returns diagnostic information about the whisper node.
-func (sc *Client) Info(ctx context.Context) (whisperv6.Info, error) {
-	var info whisperv6.Info
+func (sc *Client) Info(ctx context.Context) (whisper.Info, error) {
+	var info whisper.Info
 	err := sc.c.CallContext(ctx, &info, "shh_info")
 	return info, err
 }
@@ -112,13 +112,13 @@ func (sc *Client) HasKeyPair(ctx context.Context, id string) (bool, error) {
 // PublicKey return the public key for a key ID.
 func (sc *Client) PublicKey(ctx context.Context, id string) ([]byte, error) {
 	var key hexutil.Bytes
-	return []byte(key), sc.c.CallContext(ctx, &key, "shh_getPublicKey", id)
+	return key, sc.c.CallContext(ctx, &key, "shh_getPublicKey", id)
 }
 
 // PrivateKey return the private key for a key ID.
 func (sc *Client) PrivateKey(ctx context.Context, id string) ([]byte, error) {
 	var key hexutil.Bytes
-	return []byte(key), sc.c.CallContext(ctx, &key, "shh_getPrivateKey", id)
+	return key, sc.c.CallContext(ctx, &key, "shh_getPrivateKey", id)
 }
 
 // NewSymmetricKey generates a random symmetric key and returns its identifier.
@@ -149,7 +149,7 @@ func (sc *Client) HasSymmetricKey(ctx context.Context, id string) (bool, error) 
 // GetSymmetricKey returns the symmetric key associated with the given identifier.
 func (sc *Client) GetSymmetricKey(ctx context.Context, id string) ([]byte, error) {
 	var key hexutil.Bytes
-	return []byte(key), sc.c.CallContext(ctx, &key, "shh_getSymKey", id)
+	return key, sc.c.CallContext(ctx, &key, "shh_getSymKey", id)
 }
 
 // DeleteSymmetricKey deletes the symmetric key associated with the given identifier.
@@ -159,7 +159,7 @@ func (sc *Client) DeleteSymmetricKey(ctx context.Context, id string) error {
 }
 
 // Post a message onto the network.
-func (sc *Client) Post(ctx context.Context, message whisperv6.NewMessage) (string, error) {
+func (sc *Client) Post(ctx context.Context, message whisper.NewMessage) (string, error) {
 	var hash string
 	return hash, sc.c.CallContext(ctx, &hash, "shh_post", message)
 }
@@ -167,14 +167,14 @@ func (sc *Client) Post(ctx context.Context, message whisperv6.NewMessage) (strin
 // SubscribeMessages subscribes to messages that match the given criteria. This method
 // is only supported on bi-directional connections such as websockets and IPC.
 // NewMessageFilter uses polling and is supported over HTTP.
-func (sc *Client) SubscribeMessages(ctx context.Context, criteria whisperv6.Criteria, ch chan<- *whisperv6.Message) (ethereum.Subscription, error) {
+func (sc *Client) SubscribeMessages(ctx context.Context, criteria whisper.Criteria, ch chan<- *whisper.Message) (ethereum.Subscription, error) {
 	return sc.c.ShhSubscribe(ctx, ch, "messages", criteria)
 }
 
 // NewMessageFilter creates a filter within the node. This filter can be used to poll
 // for new messages (see FilterMessages) that satisfy the given criteria. A filter can
 // timeout when it was polled for in whisper.filterTimeout.
-func (sc *Client) NewMessageFilter(ctx context.Context, criteria whisperv6.Criteria) (string, error) {
+func (sc *Client) NewMessageFilter(ctx context.Context, criteria whisper.Criteria) (string, error) {
 	var id string
 	return id, sc.c.CallContext(ctx, &id, "shh_newMessageFilter", criteria)
 }
@@ -187,7 +187,7 @@ func (sc *Client) DeleteMessageFilter(ctx context.Context, id string) error {
 
 // FilterMessages retrieves all messages that are received between the last call to
 // this function and match the criteria that where given when the filter was created.
-func (sc *Client) FilterMessages(ctx context.Context, id string) ([]*whisperv6.Message, error) {
-	var messages []*whisperv6.Message
+func (sc *Client) FilterMessages(ctx context.Context, id string) ([]*whisper.Message, error) {
+	var messages []*whisper.Message
 	return messages, sc.c.CallContext(ctx, &messages, "shh_getFilterMessages", id)
 }
