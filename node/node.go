@@ -499,12 +499,15 @@ func whisperRateLimiter(whisperConfig *params.WhisperConfig, clusterConfig *para
 		peerIDs = append(peerIDs, item.ID())
 	}
 	return whisper.NewPeerRateLimiter(
-		&whisper.MetricsRateLimiterHandler{},
 		&whisper.PeerRateLimiterConfig{
 			LimitPerSecIP:      whisperConfig.RateLimitIP,
 			LimitPerSecPeerID:  whisperConfig.RateLimitPeerID,
 			WhitelistedIPs:     ips,
 			WhitelistedPeerIDs: peerIDs,
+		},
+		&whisper.MetricsRateLimiterHandler{},
+		&whisper.DropPeerRateLimiterHandler{
+			Tolerance: whisperConfig.RateLimitTolerance,
 		},
 	)
 }

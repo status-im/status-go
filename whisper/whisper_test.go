@@ -1546,7 +1546,7 @@ func TestRateLimiterIntegration(t *testing.T) {
 		MaxMessageSize:     10 << 20,
 	}
 	w := New(conf)
-	w.SetRateLimiter(NewPeerRateLimiter(&MetricsRateLimiterHandler{}, nil))
+	w.SetRateLimiter(NewPeerRateLimiter(nil, &MetricsRateLimiterHandler{}))
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() {

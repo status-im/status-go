@@ -2,12 +2,12 @@ package whisper
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
-
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/tsenart/tb"
 )
 
@@ -22,6 +22,33 @@ type MetricsRateLimiterHandler struct{}
 
 func (MetricsRateLimiterHandler) ExceedPeerLimit() error { rateLimiterPeerExceeded.Inc(1); return nil }
 func (MetricsRateLimiterHandler) ExceedIPLimit() error   { rateLimiterIPExceeded.Inc(1); return nil }
+
+var ErrRateLimitExceeded = errors.New("rate limit has been exceeded")
+
+type DropPeerRateLimiterHandler struct {
+	// Tolerance is a number of how many a limit must be exceeded
+	// in order to drop a peer.
+	Tolerance int64
+
+	peerLimitExceeds int64
+	ipLimitExceeds   int64
+}
+
+func (h *DropPeerRateLimiterHandler) ExceedPeerLimit() error {
+	h.peerLimitExceeds++
+	if h.Tolerance > 0 && h.peerLimitExceeds >= h.Tolerance {
+		return ErrRateLimitExceeded
+	}
+	return nil
+}
+
+func (h *DropPeerRateLimiterHandler) ExceedIPLimit() error {
+	h.ipLimitExceeds++
+	if h.Tolerance > 0 && h.ipLimitExceeds >= h.Tolerance {
+		return ErrRateLimitExceeded
+	}
+	return nil
+}
 
 type PeerRateLimiterConfig struct {
 	LimitPerSecIP      int64
@@ -47,10 +74,10 @@ type PeerRateLimiter struct {
 	whitelistedPeerIDs []enode.ID
 	whitelistedIPs     []string
 
-	handler RateLimiterHandler
+	handlers []RateLimiterHandler
 }
 
-func NewPeerRateLimiter(handler RateLimiterHandler, cfg *PeerRateLimiterConfig) *PeerRateLimiter {
+func NewPeerRateLimiter(cfg *PeerRateLimiterConfig, handlers ...RateLimiterHandler) *PeerRateLimiter {
 	if cfg == nil {
 		copy := defaultPeerRateLimiterConfig
 		cfg = &copy
@@ -63,7 +90,7 @@ func NewPeerRateLimiter(handler RateLimiterHandler, cfg *PeerRateLimiterConfig) 
 		limitPerSecPeerID:  cfg.LimitPerSecPeerID,
 		whitelistedPeerIDs: cfg.WhitelistedPeerIDs,
 		whitelistedIPs:     cfg.WhitelistedIPs,
-		handler:            handler,
+		handlers:           handlers,
 	}
 }
 
@@ -89,9 +116,11 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				ip = p.peer.Node().IP().String()
 			}
 			if halted := r.throttleIP(ip); halted {
-				if err := r.handler.ExceedIPLimit(); err != nil {
-					errC <- fmt.Errorf("exceeded rate limit by IP: %v", err)
-					return
+				for _, h := range r.handlers {
+					if err := h.ExceedIPLimit(); err != nil {
+						errC <- fmt.Errorf("exceed rate limit by IP: %w", err)
+						return
+					}
 				}
 			}
 
@@ -100,9 +129,11 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 				peerID = p.ID()
 			}
 			if halted := r.throttlePeer(peerID); halted {
-				if err := r.handler.ExceedPeerLimit(); err != nil {
-					errC <- fmt.Errorf("exceeded rate limit by peer: %v", err)
-					return
+				for _, h := range r.handlers {
+					if err := h.ExceedPeerLimit(); err != nil {
+						errC <- fmt.Errorf("exceeded rate limit by peer: %w", err)
+						return
+					}
 				}
 			}
 
