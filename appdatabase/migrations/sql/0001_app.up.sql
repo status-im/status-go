@@ -12,11 +12,14 @@ storage TEXT,
 pubkey BLOB,
 path TEXT,
 name TEXT,
-color TEXT
+color TEXT,
+created_at DATETIME NOT NULL,
+updated_at DATETIME NOT NULL
 ) WITHOUT ROWID;
 
 CREATE UNIQUE INDEX unique_wallet_address ON accounts (wallet) WHERE (wallet);
 CREATE UNIQUE INDEX unique_chat_address ON accounts (chat) WHERE (chat);
+CREATE INDEX created_at_account ON accounts (created_at) WHERE (created_at);
 
 CREATE TABLE IF NOT EXISTS browsers (
 id TEXT PRIMARY KEY,
