@@ -22,6 +22,12 @@ export PUBLIC_IP      ?= $(shell curl -s https://ipecho.net/plain)
 all: checks start show info enode
 
 checks:
+ifeq (, $(shell which docker))
+	$(error No $(BOLD)docker$(RESET) in your $$PATH. Please install it)
+endif
+ifeq (, $(shell docker version | grep Server))
+	$(error No permissions to run $(BOLD)docker$(RESET) commands)
+endif
 ifeq (, $(shell which docker-compose))
 	$(error No $(BOLD)docker-compose$(RESET) in your $$PATH. Please install it)
 endif
