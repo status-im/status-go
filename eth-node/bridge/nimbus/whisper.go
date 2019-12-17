@@ -164,10 +164,10 @@ func (w *nimbusWhisperWrapper) AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	return retVal.(string), nil
 }
 
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *nimbusWhisperWrapper) DeleteKeyPair(key string) bool {
+// DeleteKeyPair deletes the key with the specified ID if it exists.
+func (w *nimbusWhisperWrapper) DeleteKeyPair(keyID string) bool {
 	return w.routineQueue.Send(func(c chan<- interface{}) {
-		keyC, err := decodeHexID(key)
+		keyC, err := decodeHexID(keyID)
 		if err != nil {
 			c <- err
 			return
