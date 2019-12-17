@@ -240,7 +240,7 @@ func (p *messageProcessor) processPairMessage(m v1protocol.PairMessage) error {
 // It returns an error only if the processing of required steps failed.
 func (p *messageProcessor) handleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
 	logger := p.logger.With(zap.String("site", "handleMessages"))
-	hlogger := logger.With(zap.Binary("hash", shhMessage.Hash))
+	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
 
 	err := statusMessage.HandleTransport(shhMessage)
