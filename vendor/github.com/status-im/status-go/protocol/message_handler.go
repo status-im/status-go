@@ -3,66 +3,44 @@ package protocol
 import (
 	"github.com/pkg/errors"
 
+	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
-
-type persistentMessageHandler struct {
-	persistence *sqlitePersistence
-}
-
-func newPersistentMessageHandler(persistence *sqlitePersistence) *persistentMessageHandler {
-	return &persistentMessageHandler{persistence: persistence}
-}
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
 // It retrieves chat, if exists, and merges membership updates from the message.
 // Finally, the Chat is updated with the new group events.
-func (h *persistentMessageHandler) HandleMembershipUpdate(m v1protocol.MembershipUpdateMessage) error {
-	chat, err := h.chatID(m.ChatID)
-	switch err {
-	case errChatNotFound:
-		group, err := v1protocol.NewGroupWithMembershipUpdates(m.ChatID, m.Updates)
+func HandleMembershipUpdate(chat *Chat, m *v1protocol.MembershipUpdateMessage, myIdentity string, translations map[protobuf.MembershipUpdateEvent_EventType]string) (*Chat, []*Message, error) {
+	if chat == nil {
+		if len(m.Events) == 0 {
+			return nil, nil, errors.New("can't create new group chat without events")
+		}
+		group, err := v1protocol.NewGroupWithEvents(m.ChatID, m.Events)
 		if err != nil {
-			return err
+			return nil, nil, err
+		}
+
+		// A new chat must contain us
+		if !group.IsMember(myIdentity) {
+			return nil, nil, errors.New("can't create a new group chat without us being a member")
 		}
 		newChat := createGroupChat()
 		newChat.updateChatFromProtocolGroup(group)
-		chat = &newChat
-	case nil:
-		existingGroup, err := newProtocolGroupFromChat(chat)
-		if err != nil {
-			return errors.Wrap(err, "failed to create a Group from Chat")
-		}
-		updateGroup, err := v1protocol.NewGroupWithMembershipUpdates(m.ChatID, m.Updates)
-		if err != nil {
-			return errors.Wrap(err, "invalid membership update")
-		}
-		merged := v1protocol.MergeFlatMembershipUpdates(existingGroup.Updates(), updateGroup.Updates())
-		newGroup, err := v1protocol.NewGroup(chat.ID, merged)
-		if err != nil {
-			return errors.Wrap(err, "failed to create a group with new membership updates")
-		}
-		chat.updateChatFromProtocolGroup(newGroup)
-	default:
-		return err
+		return &newChat, buildSystemMessages(m.Events, translations), nil
 	}
-	return h.persistence.SaveChat(*chat)
-}
-
-func (h *persistentMessageHandler) chatID(chatID string) (*Chat, error) {
-	var chat *Chat
-	chats, err := h.persistence.Chats()
+	existingGroup, err := newProtocolGroupFromChat(chat)
 	if err != nil {
-		return nil, err
+		return nil, nil, errors.Wrap(err, "failed to create a Group from Chat")
 	}
-	for _, ch := range chats {
-		if chat.ID == chatID {
-			chat = ch
-			break
-		}
+	updateGroup, err := v1protocol.NewGroupWithEvents(m.ChatID, m.Events)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "invalid membership update")
 	}
-	if chat == nil {
-		return nil, errChatNotFound
+	merged := v1protocol.MergeMembershipUpdateEvents(existingGroup.Events(), updateGroup.Events())
+	newGroup, err := v1protocol.NewGroup(chat.ID, merged)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create a group with new membership updates")
 	}
-	return chat, nil
+	chat.updateChatFromProtocolGroup(newGroup)
+	return chat, buildSystemMessages(m.Events, translations), nil
 }

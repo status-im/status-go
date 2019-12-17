@@ -13,12 +13,9 @@ GID = $(shell id -g)
 # Settings
 export LOG_LEVEL       ?= 3
 export LISTEN_PORT     ?= 30303
-export RPC_PORT        ?= 8545
 export API_MODULES     ?= eth,net,web3,admin
 export CONTAINER_NAME  ?= status-go-bootnode
 export CONTAINER_IMAGE ?= statusteam/bootnode:latest
-export TOOLS_IMAGE     ?= ethereum/client-go:alltools-latest
-export FLEET_NAME      ?= eth.beta
 # Necessary to make bootnode available publicly
 export PUBLIC_IP       ?= $(shell curl -s https://ipecho.net/plain)
 
@@ -55,7 +52,6 @@ info:
 	@echo "$(YELLOW)Make sure that address and UDP port are available from the internet!$(RESET)"
 	@echo "$(GREEN)Your enode address is:$(RESET)"
 
-
 keys:
 	@mkdir -p keys
 
@@ -64,7 +60,7 @@ keys/nodekey: keys ##@ Generate a node key
 		-u $(UID):$(GID) \
 		--entrypoint=bootnode \
 		-v $(PWD)/keys:/keys:rw \
-		$(TOOLS_IMAGE) \
+		$(CONTAINER_IMAGE) \
 		-genkey=/keys/nodekey
 	@echo "$(GREEN)Created key for Bootnode: keys/nodekey"
 
@@ -73,7 +69,7 @@ keys/nodeaddr: keys ##@ Save node address for given key
 		-u $(UID):$(GID) \
 		--entrypoint=sh \
 		-v $(PWD)/keys:/keys:rw \
-		$(TOOLS_IMAGE) \
+		$(CONTAINER_IMAGE) \
 		-c 'bootnode -writeaddress -nodekey=/keys/nodekey > /keys/nodeaddr'
 
 show:

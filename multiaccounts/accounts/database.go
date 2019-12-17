@@ -28,10 +28,10 @@ type Account struct {
 	Address   common.Address `json:"address"`
 	Wallet    bool           `json:"wallet"`
 	Chat      bool           `json:"chat"`
-	Type      string         `json:"type"`
-	Storage   string         `json:"storage"`
-	Path      string         `json:"path"`
-	PublicKey hexutil.Bytes  `json:"publicKey"`
+	Type      string         `json:"type,omitempty"`
+	Storage   string         `json:"storage,omitempty"`
+	Path      string         `json:"path,omitempty"`
+	PublicKey hexutil.Bytes  `json:"public-key,omitempty"`
 	Name      string         `json:"name"`
 	Color     string         `json:"color"`
 }
@@ -91,7 +91,7 @@ func (db *Database) GetConfigBlobs(types []string) (map[string]json.RawMessage, 
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, color FROM accounts")
+	rows, err := db.db.Query("SELECT address, wallet, chat, type, storage, pubkey, path, name, color FROM accounts ORDER BY created_at")
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +133,11 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	}()
 	// NOTE(dshulyak) replace all record values using address (primary key)
 	// can't use `insert or replace` because of the additional constraints (wallet and chat)
-	insert, err = tx.Prepare("INSERT OR IGNORE INTO accounts (address) VALUES (?)")
+	insert, err = tx.Prepare("INSERT OR IGNORE INTO accounts (address, created_at, updated_at) VALUES (?, datetime('now'), datetime('now'))")
 	if err != nil {
 		return err
 	}
-	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?, color = ? WHERE address = ?")
+	update, err = tx.Prepare("UPDATE accounts SET wallet = ?, chat = ?, type = ?, storage = ?, pubkey = ?, path = ?, name = ?, color = ?, updated_at = datetime('now') WHERE address = ?")
 	if err != nil {
 		return err
 	}
@@ -161,6 +161,11 @@ func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	return
 }
 
+func (db *Database) DeleteAccount(address common.Address) error {
+	_, err := db.db.Exec("DELETE FROM accounts WHERE address = ?", address)
+	return err
+}
+
 func (db *Database) GetWalletAddress() (rst common.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE wallet = 1").Scan(&rst)
 	return
@@ -172,7 +177,7 @@ func (db *Database) GetChatAddress() (rst common.Address, err error) {
 }
 
 func (db *Database) GetAddresses() (rst []common.Address, err error) {
-	rows, err := db.db.Query("SELECT address FROM accounts")
+	rows, err := db.db.Query("SELECT address FROM accounts ORDER BY created_at")
 	if err != nil {
 		return nil, err
 	}

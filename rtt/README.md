@@ -48,12 +48,12 @@ EOL
   "result": [
     {
       "address": "enode://c42f368a23fa98ee546fd247220759062323249ef657d26d357a777443aec04db1b29a3a22ef3e7c548e18493ddaf51a31b0aed6079bd6ebe5ae838fcfaf3a49@206.189.243.162:443",
-      "rtt_ms": 31,
+      "rttMs": 31,
       "error": null
     },
     {
       "address": "enode://c42f368a23fa98ee546fd247220759062323249ef657d26d357a777443aec04db1b29a3a22ef3e7c548e18493ddaf51a31b0aed6079bd6ebe5ae838fcfaf3a49@206.189.243.162:999",
-      "rtt_ms": null,
+      "rttMs": null,
       "error": "tcp check timeout: I/O timeout"
     }
   ]

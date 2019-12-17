@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +26,7 @@ var (
 
 type whisperFilter struct {
 	FilterID string
-	Topic    whispertypes.TopicType
+	Topic    types.TopicType
 	SymKeyID string
 }
 
@@ -44,7 +44,7 @@ type Filter struct {
 	// It's encoded using encoding/hex.
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic whispertypes.TopicType `json:"topic"`
+	Topic types.TopicType `json:"topic"`
 	// Discovery is whether this is a discovery topic
 	Discovery bool `json:"discovery"`
 	// Negotiated tells us whether is a negotiated topic
@@ -58,7 +58,7 @@ func (c *Filter) IsPublic() bool {
 }
 
 type filtersManager struct {
-	whisper     whispertypes.Whisper
+	whisper     types.Whisper
 	persistence *sqlitePersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
@@ -71,7 +71,7 @@ type filtersManager struct {
 }
 
 // newFiltersManager returns a new filtersManager.
-func newFiltersManager(db *sql.DB, w whispertypes.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
+func newFiltersManager(db *sql.DB, w types.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -96,13 +96,10 @@ func newFiltersManager(db *sql.DB, w whispertypes.Whisper, privateKey *ecdsa.Pri
 func (s *filtersManager) Init(
 	chatIDs []string,
 	publicKeys []*ecdsa.PublicKey,
-	genericDiscoveryTopicEnabled bool,
 ) ([]*Filter, error) {
 	logger := s.logger.With(zap.String("site", "Init"))
 
 	logger.Info("initializing")
-
-	s.genericDiscoveryTopicEnabled = genericDiscoveryTopicEnabled
 
 	// Load our contact code.
 	_, err := s.LoadContactCode(&s.privateKey.PublicKey)
@@ -148,7 +145,7 @@ func (s *filtersManager) Init(
 }
 
 // DEPRECATED
-func (s *filtersManager) InitWithFilters(filters []*Filter, genericDiscoveryTopicEnabled bool) ([]*Filter, error) {
+func (s *filtersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	var (
 		chatIDs    []string
 		publicKeys []*ecdsa.PublicKey
@@ -166,7 +163,7 @@ func (s *filtersManager) InitWithFilters(filters []*Filter, genericDiscoveryTopi
 		}
 	}
 
-	return s.Init(chatIDs, publicKeys, genericDiscoveryTopicEnabled)
+	return s.Init(chatIDs, publicKeys)
 }
 
 func (s *filtersManager) Reset() error {
@@ -283,7 +280,7 @@ func (s *filtersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool
 }
 
 // LoadNegotiated loads a negotiated secret as a filter.
-func (s *filtersManager) LoadNegotiated(secret whispertypes.NegotiatedSecret) (*Filter, error) {
+func (s *filtersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -315,8 +312,8 @@ func (s *filtersManager) LoadNegotiated(secret whispertypes.NegotiatedSecret) (*
 	return chat, nil
 }
 
-// LoadDiscovery adds 1-2 discovery filters: one for generic discovery topic (if enabled)
-// and one for the personal discovery topic.
+// LoadDiscovery adds 1 discovery filter
+// for the personal discovery topic.
 func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -328,12 +325,6 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 
 	expectedTopicCount := 1
 
-	if s.genericDiscoveryTopicEnabled {
-		expectedTopicCount = 2
-		if chat, ok := s.filters[discoveryTopic]; ok {
-			result = append(result, chat)
-		}
-	}
 	if chat, ok := s.filters[personalDiscoveryTopic]; ok {
 		result = append(result, chat)
 	}
@@ -364,29 +355,6 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 	personalDiscoveryChat.FilterID = discoveryResponse.FilterID
 
 	s.filters[personalDiscoveryChat.ChatID] = personalDiscoveryChat
-
-	if s.genericDiscoveryTopicEnabled {
-		// Load generic discovery topic.
-		discoveryChat := &Filter{
-			ChatID:    discoveryTopic,
-			Identity:  identityStr,
-			Discovery: true,
-			Listen:    true,
-			OneToOne:  true,
-		}
-
-		discoveryResponse, err = s.addAsymmetric(discoveryChat.ChatID, true)
-		if err != nil {
-			return nil, err
-		}
-
-		discoveryChat.Topic = discoveryResponse.Topic
-		discoveryChat.FilterID = discoveryResponse.FilterID
-
-		s.filters[discoveryChat.ChatID] = discoveryChat
-
-		return []*Filter{discoveryChat, personalDiscoveryChat}, nil
-	}
 
 	return []*Filter{personalDiscoveryChat}, nil
 }
@@ -478,7 +446,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 		}
 	}
 
-	id, err := s.whisper.Subscribe(&whispertypes.SubscriptionOptions{
+	id, err := s.whisper.Subscribe(&types.SubscriptionOptions{
 		SymKeyID: symKeyID,
 		PoW:      minPow,
 		Topics:   topics,
@@ -490,7 +458,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 	return &whisperFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
-		Topic:    whispertypes.BytesToTopic(topic),
+		Topic:    types.BytesToTopic(topic),
 	}, nil
 }
 
@@ -514,7 +482,7 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 		return nil, err
 	}
 
-	id, err := s.whisper.Subscribe(&whispertypes.SubscriptionOptions{
+	id, err := s.whisper.Subscribe(&types.SubscriptionOptions{
 		PrivateKeyID: privateKeyID,
 		PoW:          pow,
 		Topics:       topics,
@@ -522,7 +490,7 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 	if err != nil {
 		return nil, err
 	}
-	return &whisperFilter{FilterID: id, Topic: whispertypes.BytesToTopic(topic)}, nil
+	return &whisperFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity
@@ -534,7 +502,7 @@ func (s *filtersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 }
 
 func toTopic(s string) []byte {
-	return crypto.Keccak256([]byte(s))[:whispertypes.TopicLength]
+	return crypto.Keccak256([]byte(s))[:types.TopicLength]
 }
 
 // ToTopic converts a string to a whisper topic.

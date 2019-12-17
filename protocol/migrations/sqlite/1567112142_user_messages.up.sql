@@ -6,8 +6,8 @@ DROP TABLE user_messages;
 CREATE TABLE IF NOT EXISTS user_messages (
     id BLOB UNIQUE NOT NULL,
     chat_id VARCHAR NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
-    content_type VARCHAR,
-    message_type VARCHAR,
+    content_type INT,
+    message_type INT,
     text TEXT,
     clock BIGINT,
     timestamp BIGINT,

@@ -4,11 +4,11 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	statusproto "github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/shhext/dedup"
 
+	"github.com/status-im/status-go/eth-node/types"
 	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 const (
@@ -47,16 +47,16 @@ const (
 // EnvelopeSignal includes hash of the envelope.
 type EnvelopeSignal struct {
 	IDs     []hexutil.Bytes `json:"ids"`
-	Hash    protocol.Hash   `json:"hash"`
+	Hash    types.Hash      `json:"hash"`
 	Message string          `json:"message"`
 }
 
 // MailServerResponseSignal holds the data received in the response from the mailserver.
 type MailServerResponseSignal struct {
-	RequestID        protocol.Hash `json:"requestID"`
-	LastEnvelopeHash protocol.Hash `json:"lastEnvelopeHash"`
-	Cursor           string        `json:"cursor"`
-	ErrorMsg         string        `json:"errorMessage"`
+	RequestID        types.Hash `json:"requestID"`
+	LastEnvelopeHash types.Hash `json:"lastEnvelopeHash"`
+	Cursor           string     `json:"cursor"`
+	ErrorMsg         string     `json:"errorMessage"`
 }
 
 // DecryptMessageFailedSignal holds the sender of the message that could not be decrypted
@@ -82,16 +82,11 @@ type Filter struct {
 	// Identity is the public key of the other recipient for non-public chats
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
-	Topic whispertypes.TopicType `json:"topic"`
+	Topic types.TopicType `json:"topic"`
 }
 
 type WhisperFilterAddedSignal struct {
 	Filters []*Filter `json:"filters"`
-}
-
-// NewMessagesSignal notifies clients of new messages
-type NewMessagesSignal struct {
-	Messages []*Messages `json:"messages"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -121,7 +116,7 @@ func SendEnvelopeExpired(identifiers [][]byte, err error) {
 }
 
 // SendMailServerRequestCompleted triggered when mail server response has been received
-func SendMailServerRequestCompleted(requestID protocol.Hash, lastEnvelopeHash protocol.Hash, cursor []byte, err error) {
+func SendMailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
 	errorMsg := ""
 	if err != nil {
 		errorMsg = err.Error()
@@ -136,7 +131,7 @@ func SendMailServerRequestCompleted(requestID protocol.Hash, lastEnvelopeHash pr
 }
 
 // SendMailServerRequestExpired triggered when mail server request expires
-func SendMailServerRequestExpired(hash protocol.Hash) {
+func SendMailServerRequestExpired(hash types.Hash) {
 	send(EventMailServerRequestExpired, EnvelopeSignal{Hash: hash})
 }
 
@@ -173,6 +168,6 @@ func SendWhisperFilterAdded(filters []*Filter) {
 	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
 }
 
-func SendNewMessages(messages []*Messages) {
-	send(EventNewMessages, NewMessagesSignal{Messages: messages})
+func SendNewMessages(response *statusproto.MessengerResponse) {
+	send(EventNewMessages, response)
 }

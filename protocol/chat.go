@@ -4,11 +4,23 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
+	"math/rand"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
+
+var chatColors = []string{
+	"#fa6565", // red
+	"#887af9", // blue
+	"#FE8F59", // orange
+	"#7cda00", // green
+	"#51d0f0", // light-blue
+	"#d37ef4", // purple
+}
 
 type ChatType int
 
@@ -30,9 +42,6 @@ type Chat struct {
 
 	ChatType ChatType `json:"chatType"`
 
-	// Only filled for one to one chats
-	PublicKey *ecdsa.PublicKey `json:"-"`
-
 	// Timestamp indicates the last time this chat has received/sent a message
 	Timestamp int64 `json:"timestamp"`
 	// LastClockValue indicates the last clock value to be used when sending messages
@@ -42,17 +51,75 @@ type Chat struct {
 	DeletedAtClockValue uint64 `json:"deletedAtClockValue"`
 
 	// Denormalized fields
-	UnviewedMessagesCount  uint   `json:"unviewedMessagesCount"`
-	LastMessageContentType string `json:"lastMessageContentType"`
-	LastMessageContent     string `json:"lastMessageContent"`
-	LastMessageTimestamp   int64  `json:"lastMessageTimestamp"`
-	LastMessageClockValue  int64  `json:"lastMessageClockValue"`
+	UnviewedMessagesCount uint   `json:"unviewedMessagesCount"`
+	LastMessage           []byte `json:"lastMessage"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat
 	Members []ChatMember `json:"members"`
 	// MembershipUpdates is all the membership events in the chat
-	MembershipUpdates []ChatMembershipUpdate `json:"membershipUpdates"`
+	MembershipUpdates []v1protocol.MembershipUpdateEvent `json:"membershipUpdateEvents"`
+}
+
+func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
+	// For one to one chatID is an encoded public key
+	if c.ChatType != ChatTypeOneToOne {
+		return nil, nil
+	}
+	pkey, err := hex.DecodeString(c.ID[2:])
+	if err != nil {
+		return nil, err
+	}
+	// Safety check, make sure is well formed
+	return crypto.UnmarshalPubkey(pkey)
+
+}
+
+func (c *Chat) MarshalJSON() ([]byte, error) {
+	type ChatAlias Chat
+	item := struct {
+		*ChatAlias
+		LastMessage json.RawMessage `json:"lastMessage"`
+	}{
+		ChatAlias:   (*ChatAlias)(c),
+		LastMessage: c.LastMessage,
+	}
+
+	return json.Marshal(item)
+}
+
+func (c *Chat) UnmarshalJSON(data []byte) error {
+	type ChatAlias Chat
+	aux := struct {
+		*ChatAlias
+		LastMessage *Message `json:"lastMessage"`
+	}{
+		ChatAlias: (*ChatAlias)(c),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	c.ID = aux.ID
+	c.Name = aux.Name
+	c.Color = aux.Color
+	c.Active = aux.Active
+	c.ChatType = aux.ChatType
+	c.Timestamp = aux.Timestamp
+	c.LastClockValue = aux.LastClockValue
+	c.DeletedAtClockValue = aux.DeletedAtClockValue
+	c.UnviewedMessagesCount = aux.UnviewedMessagesCount
+	c.Members = aux.Members
+	c.MembershipUpdates = aux.MembershipUpdates
+
+	if aux.LastMessage != nil {
+		data, err := json.Marshal(aux.LastMessage)
+		if err != nil {
+			return err
+		}
+		c.LastMessage = data
+	}
+	return nil
 }
 
 func (c *Chat) MembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
@@ -86,30 +153,15 @@ func (c *Chat) updateChatFromProtocolGroup(g *v1protocol.Group) {
 	c.Members = chatMembers
 
 	// MembershipUpdates
-	updates := g.Updates()
-	membershipUpdates := make([]ChatMembershipUpdate, 0, len(updates))
-	for _, update := range updates {
-		membershipUpdate := ChatMembershipUpdate{
-			Type:       update.Type,
-			Name:       update.Name,
-			ClockValue: uint64(update.ClockValue), // TODO: get rid of type casting
-			Signature:  update.Signature,
-			From:       update.From,
-			Member:     update.Member,
-			Members:    update.Members,
-		}
-		membershipUpdate.setID()
-		membershipUpdates = append(membershipUpdates, membershipUpdate)
-	}
-	c.MembershipUpdates = membershipUpdates
+	c.MembershipUpdates = g.Events()
 }
 
 // ChatMembershipUpdate represent an event on membership of the chat
 type ChatMembershipUpdate struct {
 	// Unique identifier for the event
 	ID string `json:"id"`
-	// Type indicates the kind of event (i.e changed-name, added-member, etc)
-	Type string `json:"type"`
+	// Type indicates the kind of event
+	Type protobuf.MembershipUpdateEvent_EventType `json:"type"`
 	// Name represents the name in the event of changing name events
 	Name string `json:"name,omitempty"`
 	// Clock value of the event
@@ -140,7 +192,7 @@ type ChatMember struct {
 }
 
 func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
-	b, err := protocol.DecodeHex(c.ID)
+	b, err := types.DecodeHex(c.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -148,16 +200,15 @@ func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
 }
 
 func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
-	return protocol.EncodeHex(crypto.FromECDSAPub(publicKey))
+	return types.EncodeHex(crypto.FromECDSAPub(publicKey))
 }
 
 func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey) Chat {
 	return Chat{
-		ID:        oneToOneChatID(publicKey),
-		Name:      name,
-		Active:    true,
-		ChatType:  ChatTypeOneToOne,
-		PublicKey: publicKey,
+		ID:       oneToOneChatID(publicKey),
+		Name:     name,
+		Active:   true,
+		ChatType: ChatTypeOneToOne,
 	}
 }
 
@@ -166,14 +217,17 @@ func CreatePublicChat(name string) Chat {
 		ID:       name,
 		Name:     name,
 		Active:   true,
+		Color:    chatColors[rand.Intn(len(chatColors))],
 		ChatType: ChatTypePublic,
 	}
 }
 
 func createGroupChat() Chat {
 	return Chat{
-		Active:   true,
-		ChatType: ChatTypePrivateGroupChat,
+		Active:    true,
+		Color:     chatColors[rand.Intn(len(chatColors))],
+		Timestamp: int64(timestampInMs()),
+		ChatType:  ChatTypePrivateGroupChat,
 	}
 }
 
@@ -194,7 +248,7 @@ func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey,
 			err error
 		)
 		if prefixed {
-			b, err = protocol.DecodeHex(item)
+			b, err = types.DecodeHex(item)
 		} else {
 			b, err = hex.DecodeString(item)
 		}

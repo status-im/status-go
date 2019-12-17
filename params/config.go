@@ -17,7 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/status-im/status-go/static"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
@@ -99,6 +99,11 @@ type WhisperConfig struct {
 	// RateLimitPeerID sets the limit on the number of messages per second
 	// from a given peer ID.
 	RateLimitPeerID int64
+
+	// RateLimitTolerance is a number of how many a limit must be exceeded
+	// in order to drop a peer.
+	// If equal to 0, the peers are never dropped.
+	RateLimitTolerance int64
 }
 
 type DatabaseConfig struct {

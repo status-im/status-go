@@ -32,10 +32,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -46,7 +45,7 @@ var seed = time.Now().Unix()
 var testPayload = []byte("test payload")
 
 type ServerTestParams struct {
-	topic whispertypes.TopicType
+	topic types.TopicType
 	birth uint32
 	low   uint32
 	upp   uint32
@@ -259,7 +258,7 @@ func (s *MailserverSuite) TestArchive() {
 	s.NoError(err)
 
 	s.server.Archive(env)
-	key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), protocol.Hash(env.Hash()))
+	key := NewDBKey(env.Expiry-env.TTL, types.TopicType(env.Topic), types.Hash(env.Hash()))
 	archivedEnvelope, err := s.server.db.GetEnvelope(key)
 	s.NoError(err)
 
@@ -279,8 +278,8 @@ func (s *MailserverSuite) TestManageLimits() {
 }
 
 func (s *MailserverSuite) TestDBKey() {
-	var h protocol.Hash
-	var emptyTopic whispertypes.TopicType
+	var h types.Hash
+	var emptyTopic types.TopicType
 	i := uint32(time.Now().Unix())
 	k := NewDBKey(i, emptyTopic, h)
 	s.Equal(len(k.Bytes()), DBKeyLength, "wrong DB key length")
@@ -307,7 +306,7 @@ func (s *MailserverSuite) TestRequestPaginationLimit() {
 		env, err := generateEnvelope(sentTime)
 		s.NoError(err)
 		s.server.Archive(env)
-		key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), protocol.Hash(env.Hash()))
+		key := NewDBKey(env.Expiry-env.TTL, types.TopicType(env.Topic), types.Hash(env.Hash()))
 		archiveKeys = append(archiveKeys, fmt.Sprintf("%x", key.Cursor()))
 		sentEnvelopes = append(sentEnvelopes, env)
 		sentHashes = append(sentHashes, env.Hash())
@@ -423,7 +422,7 @@ func (s *MailserverSuite) TestMailServer() {
 				s.Equal(tc.params.low, lower)
 				s.Equal(tc.params.upp, upper)
 				s.Equal(tc.params.limit, limit)
-				s.Equal(whispertypes.TopicToBloom(tc.params.topic), bloom)
+				s.Equal(types.TopicToBloom(tc.params.topic), bloom)
 				s.Equal(tc.expect, s.messageExists(env, tc.params.low, tc.params.upp, bloom, tc.params.limit))
 
 				src[0]++
@@ -454,7 +453,7 @@ func (s *MailserverSuite) TestDecodeRequest() {
 	srcKey, err := s.shh.GetPrivateKey(id)
 	s.Require().NoError(err)
 
-	env := s.createEnvelope(whispertypes.TopicType{0x01}, data, srcKey)
+	env := s.createEnvelope(types.TopicType{0x01}, data, srcKey)
 
 	decodedPayload, err := s.server.decodeRequest(nil, env)
 	s.Require().NoError(err)
@@ -480,7 +479,7 @@ func (s *MailserverSuite) TestDecodeRequestNoUpper() {
 	srcKey, err := s.shh.GetPrivateKey(id)
 	s.Require().NoError(err)
 
-	env := s.createEnvelope(whispertypes.TopicType{0x01}, data, srcKey)
+	env := s.createEnvelope(types.TopicType{0x01}, data, srcKey)
 
 	decodedPayload, err := s.server.decodeRequest(nil, env)
 	s.Require().NoError(err)
@@ -686,7 +685,7 @@ func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTest
 	birth := env.Expiry - env.TTL
 
 	return &ServerTestParams{
-		topic: whispertypes.TopicType(env.Topic),
+		topic: types.TopicType(env.Topic),
 		birth: birth,
 		low:   birth - 1,
 		upp:   birth + 1,
@@ -696,7 +695,7 @@ func (s *MailserverSuite) defaultServerParams(env *whisper.Envelope) *ServerTest
 }
 
 func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
-	bloom := whispertypes.TopicToBloom(p.topic)
+	bloom := types.TopicToBloom(p.topic)
 	data := make([]byte, 8)
 	binary.BigEndian.PutUint32(data, p.low)
 	binary.BigEndian.PutUint32(data[4:], p.upp)
@@ -711,7 +710,7 @@ func (s *MailserverSuite) createRequest(p *ServerTestParams) *whisper.Envelope {
 	return s.createEnvelope(p.topic, data, p.key)
 }
 
-func (s *MailserverSuite) createEnvelope(topic whispertypes.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *whisper.Envelope {
+func (s *MailserverSuite) createEnvelope(topic types.TopicType, data []byte, srcKey *ecdsa.PrivateKey) *whisper.Envelope {
 	key, err := s.shh.GetSymKey(keyID)
 	if err != nil {
 		s.T().Fatalf("failed to retrieve sym key with seed %d: %s.", seed, err)
@@ -771,7 +770,7 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 
 func processRequestAndCollectHashes(
 	server *WMailServer, lower, upper uint32, cursor []byte, bloom []byte, limit int,
-) ([]common.Hash, []byte, protocol.Hash) {
+) ([]common.Hash, []byte, types.Hash) {
 	iter, _ := server.createIterator(lower, upper, cursor, nil, 0)
 	defer iter.Release()
 	bundles := make(chan []rlp.RawValue, 10)

@@ -10,13 +10,13 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 )
 
@@ -81,7 +81,7 @@ func (t *Transactor) SetRPC(rpcClient *rpc.Client, timeout time.Duration) {
 }
 
 // SendTransaction is an implementation of eth_sendTransaction. It queues the tx to the sign queue.
-func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash gethcommon.Hash, err error) {
+func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *account.SelectedExtKey) (hash types.Hash, err error) {
 	hash, err = t.validateAndPropagate(verifiedAccount, sendArgs)
 	return
 }
@@ -89,7 +89,7 @@ func (t *Transactor) SendTransaction(sendArgs SendTxArgs, verifiedAccount *accou
 // SendTransactionWithSignature receive a transaction and a signature, serialize them together and propage it to the network.
 // It's different from eth_sendRawTransaction because it receives a signature and not a serialized transaction with signature.
 // Since the transactions is already signed, we assume it was validated and used the right nonce.
-func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash gethcommon.Hash, err error) {
+func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (hash types.Hash, err error) {
 	if !args.Valid() {
 		return hash, ErrInvalidSendTxArgs
 	}
@@ -99,7 +99,7 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 	}
 
 	chainID := big.NewInt(int64(t.networkID))
-	signer := types.NewEIP155Signer(chainID)
+	signer := gethtypes.NewEIP155Signer(chainID)
 
 	tx := t.buildTransaction(args)
 	t.addrLock.LockAddr(args.From)
@@ -133,10 +133,10 @@ func (t *Transactor) SendTransactionWithSignature(args SendTxArgs, sig []byte) (
 		return hash, err
 	}
 
-	return signedTx.Hash(), nil
+	return types.Hash(signedTx.Hash()), nil
 }
 
-func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash gethcommon.Hash, err error) {
+func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs, hash types.Hash, err error) {
 	if !args.Valid() {
 		return validatedArgs, hash, ErrInvalidSendTxArgs
 	}
@@ -195,7 +195,7 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	validatedArgs.Gas = &newGas
 
 	tx := t.buildTransaction(validatedArgs)
-	hash = types.NewEIP155Signer(chainID).Hash(tx)
+	hash = types.Hash(gethtypes.NewEIP155Signer(chainID).Hash(tx))
 
 	return validatedArgs, hash, nil
 }
@@ -213,7 +213,7 @@ func (t *Transactor) validateAccount(args SendTxArgs, selectedAccount *account.S
 	return nil
 }
 
-func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash gethcommon.Hash, err error) {
+func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKey, args SendTxArgs) (hash types.Hash, err error) {
 	if err = t.validateAccount(args, selectedAccount); err != nil {
 		return hash, err
 	}
@@ -282,16 +282,16 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		gas = uint64(*args.Gas)
 	}
 
-	var tx *types.Transaction
+	var tx *gethtypes.Transaction
 	if args.To != nil {
-		tx = types.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
+		tx = gethtypes.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
 		t.logNewTx(args, gas, gasPrice, value)
 	} else {
-		tx = types.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+		tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
 		t.logNewContract(args, gas, gasPrice, value, nonce)
 	}
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
+	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
 		return hash, err
 	}
@@ -301,22 +301,22 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	if err := t.sender.SendTransaction(ctx, signedTx); err != nil {
 		return hash, err
 	}
-	return signedTx.Hash(), nil
+	return types.Hash(signedTx.Hash()), nil
 }
 
-func (t *Transactor) buildTransaction(args SendTxArgs) *types.Transaction {
+func (t *Transactor) buildTransaction(args SendTxArgs) *gethtypes.Transaction {
 	nonce := uint64(*args.Nonce)
 	value := (*big.Int)(args.Value)
 	gas := uint64(*args.Gas)
 	gasPrice := (*big.Int)(args.GasPrice)
 
-	var tx *types.Transaction
+	var tx *gethtypes.Transaction
 
 	if args.To != nil {
-		tx = types.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
+		tx = gethtypes.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
 		t.logNewTx(args, gas, gasPrice, value)
 	} else {
-		tx = types.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
+		tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
 		t.logNewContract(args, gas, gasPrice, value, nonce)
 	}
 

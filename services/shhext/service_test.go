@@ -18,18 +18,19 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/types"
+	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
-	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+	"go.uber.org/zap"
 )
 
 const (
@@ -47,18 +48,18 @@ func newHandlerMock(buf int) handlerMock {
 	return handlerMock{
 		confirmations:     make(chan [][]byte, buf),
 		expirations:       make(chan failureMessage, buf),
-		requestsCompleted: make(chan protocol.Hash, buf),
-		requestsExpired:   make(chan protocol.Hash, buf),
-		requestsFailed:    make(chan protocol.Hash, buf),
+		requestsCompleted: make(chan types.Hash, buf),
+		requestsExpired:   make(chan types.Hash, buf),
+		requestsFailed:    make(chan types.Hash, buf),
 	}
 }
 
 type handlerMock struct {
 	confirmations     chan [][]byte
 	expirations       chan failureMessage
-	requestsCompleted chan protocol.Hash
-	requestsExpired   chan protocol.Hash
-	requestsFailed    chan protocol.Hash
+	requestsCompleted chan types.Hash
+	requestsExpired   chan types.Hash
+	requestsFailed    chan types.Hash
 }
 
 func (t handlerMock) EnvelopeSent(ids [][]byte) {
@@ -69,7 +70,7 @@ func (t handlerMock) EnvelopeExpired(ids [][]byte, err error) {
 	t.expirations <- failureMessage{IDs: ids, Error: err}
 }
 
-func (t handlerMock) MailServerRequestCompleted(requestID protocol.Hash, lastEnvelopeHash protocol.Hash, cursor []byte, err error) {
+func (t handlerMock) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
 	if err == nil {
 		t.requestsCompleted <- requestID
 	} else {
@@ -77,7 +78,7 @@ func (t handlerMock) MailServerRequestCompleted(requestID protocol.Hash, lastEnv
 	}
 }
 
-func (t handlerMock) MailServerRequestExpired(hash protocol.Hash) {
+func (t handlerMock) MailServerRequestExpired(hash types.Hash) {
 	t.requestsExpired <- hash
 }
 
@@ -90,13 +91,13 @@ type ShhExtSuite struct {
 
 	nodes    []*node.Node
 	services []*Service
-	whisper  []whispertypes.Whisper
+	whisper  []types.Whisper
 }
 
 func (s *ShhExtSuite) SetupTest() {
 	s.nodes = make([]*node.Node, 2)
 	s.services = make([]*Service, 2)
-	s.whisper = make([]whispertypes.Whisper, 2)
+	s.whisper = make([]types.Whisper, 2)
 
 	directory, err := ioutil.TempDir("", "status-go-testing")
 	s.Require().NoError(err)
@@ -134,7 +135,8 @@ func (s *ShhExtSuite) SetupTest() {
 		}
 		db, err := leveldb.Open(storage.NewMemStorage(), nil)
 		s.Require().NoError(err)
-		s.services[i] = New(s.whisper[i], nil, db, config)
+		nodeWrapper := &testNodeWrapper{w: s.whisper[i]}
+		s.services[i] = New(nodeWrapper, nil, nil, db, config)
 
 		tmpdir, err := ioutil.TempDir("", "test-shhext-service")
 		s.Require().NoError(err)
@@ -171,7 +173,8 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	err = shh.SelectKeyPair(privateKey)
 	s.Require().NoError(err)
 
-	service := New(shh, nil, db, config)
+	nodeWrapper := &testNodeWrapper{w: shh}
+	service := New(nodeWrapper, nil, nil, db, config)
 
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
 	s.Require().NoError(err)
@@ -210,7 +213,8 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 		BackupDisabledDataDir: os.TempDir(),
 		PFSEnabled:            true,
 	}
-	service := New(shh, mock, nil, config)
+	nodeWrapper := &testNodeWrapper{w: shh}
+	service := New(nodeWrapper, nil, mock, nil, config)
 	api := NewPublicAPI(service)
 
 	const (
@@ -259,15 +263,15 @@ func (s *ShhExtSuite) TestMultipleRequestMessagesWithoutForce() {
 	s.NoError(err)
 	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
 		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []whispertypes.TopicType{{1}},
+		Topics:         []types.TopicType{{1}},
 	}))
 	s.EqualError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
 		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []whispertypes.TopicType{{1}},
+		Topics:         []types.TopicType{{1}},
 	}), "another request with the same topics was sent less than 3s ago. Please wait for a bit longer, or set `force` to true in request parameters")
 	s.NoError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
 		MailServerPeer: s.nodes[1].Server().Self().URLv4(),
-		Topics:         []whispertypes.TopicType{{2}},
+		Topics:         []types.TopicType{{2}},
 	}))
 }
 
@@ -276,7 +280,7 @@ func (s *ShhExtSuite) TestFailedRequestUnregistered() {
 	s.nodes[0].Server().AddPeer(s.nodes[1].Server().Self())
 	s.Require().NoError(<-waitErr)
 	client, err := s.nodes[0].Attach()
-	topics := []whispertypes.TopicType{{1}}
+	topics := []types.TopicType{{1}}
 	s.NoError(err)
 	s.EqualError(client.Call(nil, "shhext_requestMessages", MessagesRequest{
 		MailServerPeer: "enode://19872f94b1e776da3a13e25afa71b47dfa99e658afd6427ea8d6e03c22a99f13590205a8826443e95a37eee1d815fc433af7a8ca9a8d0df7943d1f55684045b7@0.0.0.0:30305",
@@ -317,7 +321,8 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		BackupDisabledDataDir: os.TempDir(),
 		PFSEnabled:            true,
 	}
-	service := New(shh, mock, nil, config)
+	nodeWrapper := &testNodeWrapper{w: shh}
+	service := New(nodeWrapper, nil, mock, nil, config)
 
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-request-messages")
 	s.Require().NoError(err)
@@ -381,6 +386,18 @@ func (s *ShhExtSuite) TearDown() {
 	}
 }
 
+type testNodeWrapper struct {
+	w types.Whisper
+}
+
+func (w *testNodeWrapper) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
+	panic("not implemented")
+}
+
+func (w *testNodeWrapper) GetWhisper(_ interface{}) (types.Whisper, error) {
+	return w.w, nil
+}
+
 type WhisperNodeMockSuite struct {
 	suite.Suite
 
@@ -412,10 +429,28 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 		errorc <- err
 	}()
 	whisperWrapper := gethbridge.NewGethWhisperWrapper(w)
-	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{whisper.ProtocolVersion, math.Float64bits(whisperWrapper.MinPow()), whisperWrapper.BloomFilter(), false, true}))
-	s.Require().NoError(p2p.SendItems(rw1, statusCode, whisper.ProtocolVersion, whisper.ProtocolVersion, math.Float64bits(whisperWrapper.MinPow()), whisperWrapper.BloomFilter(), true, true))
+	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{
+		whisper.ProtocolVersion,
+		math.Float64bits(whisperWrapper.MinPow()),
+		whisperWrapper.BloomFilter(),
+		false,
+		true,
+		whisper.RateLimits{},
+	}))
+	s.Require().NoError(p2p.SendItems(
+		rw1,
+		statusCode,
+		whisper.ProtocolVersion,
+		whisper.ProtocolVersion,
+		math.Float64bits(whisperWrapper.MinPow()),
+		whisperWrapper.BloomFilter(),
+		true,
+		true,
+		whisper.RateLimits{},
+	))
 
-	s.localService = New(whisperWrapper, nil, db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
+	nodeWrapper := &testNodeWrapper{w: whisperWrapper}
+	s.localService = New(nodeWrapper, nil, nil, db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
 	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
 
 	s.localWhisperAPI = whisper.NewPublicWhisperAPI(w)
@@ -451,7 +486,7 @@ func (s *RequestMessagesSyncSuite) TestExpired() {
 }
 
 func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
-	const cursorSize = 36 // taken from mailserver_response.go from whisperv6 package
+	const cursorSize = 36 // taken from mailserver_response.go from whisper package
 	cursor := [cursorSize]byte{}
 	cursor[0] = 0x01
 
@@ -518,7 +553,7 @@ type RequestWithTrackingHistorySuite struct {
 	envelopeSymkey   string
 	envelopeSymkeyID string
 
-	localWhisperAPI whispertypes.PublicWhisperAPI
+	localWhisperAPI types.PublicWhisperAPI
 	localAPI        *PublicAPI
 	localService    *Service
 	localContext    Context
@@ -541,7 +576,8 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	s.Require().NoError(localSHH.Start(nil))
 
 	s.localWhisperAPI = local.PublicWhisperAPI()
-	s.localService = New(local, nil, db, params.ShhextConfig{})
+	nodeWrapper := &testNodeWrapper{w: local}
+	s.localService = New(nodeWrapper, nil, nil, db, params.ShhextConfig{})
 	s.localContext = NewContextFromService(context.Background(), s.localService, s.localService.storage)
 	localPkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -593,13 +629,13 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	s.Require().NoError(err)
 }
 
-func (s *RequestWithTrackingHistorySuite) postEnvelopes(topics ...whispertypes.TopicType) []hexutil.Bytes {
+func (s *RequestWithTrackingHistorySuite) postEnvelopes(topics ...types.TopicType) []hexutil.Bytes {
 	var (
 		rst = make([]hexutil.Bytes, len(topics))
 		err error
 	)
 	for i, t := range topics {
-		rst[i], err = s.localWhisperAPI.Post(context.Background(), whispertypes.NewMessage{
+		rst[i], err = s.localWhisperAPI.Post(context.Background(), types.NewMessage{
 			SymKeyID: s.envelopeSymkeyID,
 			TTL:      10,
 			Topic:    t,
@@ -617,8 +653,8 @@ func (s *RequestWithTrackingHistorySuite) waitForArchival(hexes []hexutil.Bytes)
 	s.Require().NoError(waitForArchival(events, 2*time.Second, hexes...))
 }
 
-func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...whispertypes.TopicType) string {
-	filterid, err := s.localWhisperAPI.NewMessageFilter(whispertypes.Criteria{
+func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...types.TopicType) string {
+	filterid, err := s.localWhisperAPI.NewMessageFilter(types.Criteria{
 		SymKeyID: s.envelopeSymkeyID,
 		Topics:   topics,
 		AllowP2P: true,
@@ -632,7 +668,7 @@ func (s *RequestWithTrackingHistorySuite) createEmptyFilter(topics ...whispertyp
 	return filterid
 }
 
-func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []protocol.HexBytes {
+func (s *RequestWithTrackingHistorySuite) initiateHistoryRequest(topics ...TopicRequest) []types.HexBytes {
 	requests, err := s.localAPI.InitiateHistoryRequests(context.Background(), InitiateHistoryRequestParams{
 		Peer:     s.remoteNode.String(),
 		SymKeyID: s.mailSymKey,
@@ -673,9 +709,9 @@ func (s *RequestWithTrackingHistorySuite) waitNoRequests() {
 }
 
 func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
-	topic1 := whispertypes.TopicType{1, 1, 1, 1}
-	topic2 := whispertypes.TopicType{2, 2, 2, 2}
-	topic3 := whispertypes.TopicType{3, 3, 3, 3}
+	topic1 := types.TopicType{1, 1, 1, 1}
+	topic2 := types.TopicType{2, 2, 2, 2}
+	topic3 := types.TopicType{3, 3, 3, 3}
 	hexes := s.postEnvelopes(topic1, topic2, topic3)
 	s.waitForArchival(hexes)
 
@@ -707,8 +743,8 @@ func (s *RequestWithTrackingHistorySuite) TestMultipleMergeIntoOne() {
 }
 
 func (s *RequestWithTrackingHistorySuite) TestSingleRequest() {
-	topic1 := whispertypes.TopicType{1, 1, 1, 1}
-	topic2 := whispertypes.TopicType{255, 255, 255, 255}
+	topic1 := types.TopicType{1, 1, 1, 1}
+	topic2 := types.TopicType{255, 255, 255, 255}
 	hexes := s.postEnvelopes(topic1, topic2)
 	s.waitForArchival(hexes)
 
@@ -722,8 +758,8 @@ func (s *RequestWithTrackingHistorySuite) TestSingleRequest() {
 }
 
 func (s *RequestWithTrackingHistorySuite) TestPreviousRequestReplaced() {
-	topic1 := whispertypes.TopicType{1, 1, 1, 1}
-	topic2 := whispertypes.TopicType{255, 255, 255, 255}
+	topic1 := types.TopicType{1, 1, 1, 1}
+	topic2 := types.TopicType{255, 255, 255, 255}
 
 	requests := s.initiateHistoryRequest(
 		TopicRequest{Topic: topic1, Duration: time.Hour},

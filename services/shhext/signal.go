@@ -1,7 +1,8 @@
 package shhext
 
 import (
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -19,12 +20,12 @@ func (h EnvelopeSignalHandler) EnvelopeExpired(identifiers [][]byte, err error) 
 }
 
 // MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
-func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID protocol.Hash, lastEnvelopeHash protocol.Hash, cursor []byte, err error) {
+func (h EnvelopeSignalHandler) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
 	signal.SendMailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
 }
 
 // MailServerRequestExpired triggered when the mailserver request expires
-func (h EnvelopeSignalHandler) MailServerRequestExpired(hash protocol.Hash) {
+func (h EnvelopeSignalHandler) MailServerRequestExpired(hash types.Hash) {
 	signal.SendMailServerRequestExpired(hash)
 }
 
@@ -43,6 +44,6 @@ func (h PublisherSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
 	signal.SendWhisperFilterAdded(filters)
 }
 
-func (h PublisherSignalHandler) NewMessages(messages []*signal.Messages) {
-	signal.SendNewMessages(messages)
+func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
+	signal.SendNewMessages(response)
 }

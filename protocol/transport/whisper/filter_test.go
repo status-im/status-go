@@ -8,13 +8,13 @@ import (
 	"os"
 	"testing"
 
-	gethbridge "github.com/status-im/status-go/protocol/bridge/geth"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	_ "github.com/mutecomm/go-sqlcipher"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 )
@@ -85,21 +85,8 @@ func (s *FiltersManagerSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *FiltersManagerSuite) TestDiscoveryAndPartitionedTopic() {
-	_, err := s.chats.Init(nil, nil, true)
-	s.Require().NoError(err)
-
-	s.Require().Equal(4, len(s.chats.filters), "It creates four filters")
-
-	discoveryFilter := s.chats.filters[discoveryTopic]
-	s.Require().NotNil(discoveryFilter, "It adds the discovery filter")
-	s.Require().True(discoveryFilter.Listen)
-
-	s.assertRequiredFilters()
-}
-
 func (s *FiltersManagerSuite) TestPartitionedTopicWithDiscoveryDisabled() {
-	_, err := s.chats.Init(nil, nil, false)
+	_, err := s.chats.Init(nil, nil)
 	s.Require().NoError(err)
 
 	s.Require().Equal(3, len(s.chats.filters), "It creates three filters")

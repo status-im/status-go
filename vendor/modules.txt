@@ -3,7 +3,7 @@ github.com/BurntSushi/toml
 # github.com/allegro/bigcache v1.2.0
 github.com/allegro/bigcache
 github.com/allegro/bigcache/queue
-# github.com/aristanetworks/goarista v0.0.0-20190704150520-f44d68189fd7
+# github.com/aristanetworks/goarista v0.0.0-20190502180301-283422fc1708
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
 github.com/beevik/ntp
@@ -31,7 +31,7 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.10.4
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.6
+# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.7
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -111,10 +111,10 @@ github.com/fjl/memsize
 github.com/fjl/memsize/memsizeui
 # github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff
 github.com/gballet/go-libpcsclite
-# github.com/go-playground/locales v0.12.1
+# github.com/go-playground/locales v0.13.0
 github.com/go-playground/locales
 github.com/go-playground/locales/currency
-# github.com/go-playground/universal-translator v0.16.0
+# github.com/go-playground/universal-translator v0.17.0
 github.com/go-playground/universal-translator
 # github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
@@ -133,7 +133,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
 # github.com/golang/snappy v0.0.1
 github.com/golang/snappy
-# github.com/gomarkdown/markdown v0.0.0-20191113114344-af599402d015 => github.com/status-im/markdown v0.0.0-20191113114344-af599402d015
+# github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
 github.com/gomarkdown/markdown
 github.com/gomarkdown/markdown/ast
 github.com/gomarkdown/markdown/parser
@@ -178,11 +178,11 @@ github.com/jbenet/goprocess/periodic
 github.com/jbenet/goprocess/ratelimit
 # github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 github.com/jinzhu/copier
-# github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356
+# github.com/karalabe/usb v0.0.0-20190819132248-550797b1cad8
 github.com/karalabe/usb
 # github.com/koron/go-ssdp v0.0.0-20180514024734-4a0ed625a78b
 github.com/koron/go-ssdp
-# github.com/leodido/go-urn v1.1.0
+# github.com/leodido/go-urn v1.2.0
 github.com/leodido/go-urn
 # github.com/lib/pq v1.2.0
 github.com/lib/pq
@@ -369,13 +369,17 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-go/extkeys v0.0.0-00010101000000-000000000000 => ./extkeys
+# github.com/status-im/status-go/eth-node v1.0.0 => ./eth-node
+github.com/status-im/status-go/eth-node/bridge/geth
+github.com/status-im/status-go/eth-node/bridge/geth/ens
+github.com/status-im/status-go/eth-node/crypto
+github.com/status-im/status-go/eth-node/crypto/ecies
+github.com/status-im/status-go/eth-node/types
+github.com/status-im/status-go/eth-node/types/ens
+# github.com/status-im/status-go/extkeys v1.0.0 => ./extkeys
 github.com/status-im/status-go/extkeys
-# github.com/status-im/status-go/protocol v0.5.2 => ./protocol
+# github.com/status-im/status-go/protocol v1.0.1 => ./protocol
 github.com/status-im/status-go/protocol
-github.com/status-im/status-go/protocol/applicationmetadata
-github.com/status-im/status-go/protocol/bridge/geth
-github.com/status-im/status-go/protocol/crypto
 github.com/status-im/status-go/protocol/datasync
 github.com/status-im/status-go/protocol/datasync/peer
 github.com/status-im/status-go/protocol/encryption
@@ -383,21 +387,19 @@ github.com/status-im/status-go/protocol/encryption/migrations
 github.com/status-im/status-go/protocol/encryption/multidevice
 github.com/status-im/status-go/protocol/encryption/publisher
 github.com/status-im/status-go/protocol/encryption/sharedsecret
-github.com/status-im/status-go/protocol/ens
 github.com/status-im/status-go/protocol/identity/alias
 github.com/status-im/status-go/protocol/identity/identicon
 github.com/status-im/status-go/protocol/migrations
+github.com/status-im/status-go/protocol/protobuf
 github.com/status-im/status-go/protocol/sqlite
 github.com/status-im/status-go/protocol/transport/whisper
 github.com/status-im/status-go/protocol/transport/whisper/migrations
-github.com/status-im/status-go/protocol/transport/whisper/types
-github.com/status-im/status-go/protocol/types
 github.com/status-im/status-go/protocol/v1
 github.com/status-im/status-go/protocol/zaputil
+# github.com/status-im/status-go/whisper/v6 v6.0.1 => ./whisper
+github.com/status-im/status-go/whisper/v6
 # github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 github.com/status-im/tcp-shaker
-# github.com/status-im/whisper v1.6.1
-github.com/status-im/whisper/whisperv6
 # github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
 github.com/steakknife/bloomfilter
 # github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3
@@ -436,7 +438,7 @@ github.com/vacp2p/mvds/state/migrations
 github.com/vacp2p/mvds/store
 github.com/vacp2p/mvds/store/migrations
 github.com/vacp2p/mvds/transport
-# github.com/wealdtech/go-ens/v3 v3.0.7
+# github.com/wealdtech/go-ens/v3 v3.0.9
 github.com/wealdtech/go-ens/v3
 github.com/wealdtech/go-ens/v3/contracts/auctionregistrar
 github.com/wealdtech/go-ens/v3/contracts/baseregistrar
@@ -535,7 +537,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/tools v0.0.0-20191109212701-97ad0ed33101
+# golang.org/x/tools v0.0.0-20191213032237-7093a17b0467
 golang.org/x/tools/go/analysis
 golang.org/x/tools/go/analysis/passes/inspect
 golang.org/x/tools/go/ast/astutil
@@ -550,7 +552,6 @@ golang.org/x/tools/go/types/typeutil
 golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/semver
-golang.org/x/tools/internal/span
 # gopkg.in/go-playground/validator.v9 v9.29.1
 gopkg.in/go-playground/validator.v9
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0

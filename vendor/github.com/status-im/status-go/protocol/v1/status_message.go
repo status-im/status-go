@@ -2,69 +2,80 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
 	"log"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
-	"github.com/status-im/status-go/protocol/applicationmetadata"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/datasync"
 	"github.com/status-im/status-go/protocol/encryption"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type StatusMessageT int
 
-const (
-	MessageT StatusMessageT = iota + 1
-	MembershipUpdateMessageT
-	PairMessageT
-)
-
 // StatusMessage is any Status Protocol message.
 type StatusMessage struct {
 	// TransportMessage is the parsed message received from the transport layer, i.e the input
-	TransportMessage *whispertypes.Message
-	// MessageType is the type of application message contained
-	MessageType StatusMessageT
+	TransportMessage *types.Message `json:"transportMessage"`
+	// Type is the type of application message contained
+	Type protobuf.ApplicationMetadataMessage_Type `json:"-"`
 	// ParsedMessage is the parsed message by the application layer, i.e the output
-	ParsedMessage interface{}
+	ParsedMessage interface{} `json:"-"`
 
 	// TransportPayload is the payload as received from the transport layer
-	TransportPayload []byte
+	TransportPayload []byte `json:"-"`
 	// DecryptedPayload is the payload after having been processed by the encryption layer
-	DecryptedPayload []byte
+	DecryptedPayload []byte `json:"decryptedPayload"`
 
 	// ID is the canonical ID of the message
-	ID protocol.HexBytes
+	ID types.HexBytes `json:"id"`
 	// Hash is the transport layer hash
-	Hash []byte
+	Hash []byte `json:"-"`
 
 	// TransportLayerSigPubKey contains the public key provided by the transport layer
-	TransportLayerSigPubKey *ecdsa.PublicKey
+	TransportLayerSigPubKey *ecdsa.PublicKey `json:"-"`
 	// ApplicationMetadataLayerPubKey contains the public key provided by the application metadata layer
-	ApplicationMetadataLayerSigPubKey *ecdsa.PublicKey
+	ApplicationMetadataLayerSigPubKey *ecdsa.PublicKey `json:"-"`
+}
+
+// Temporary JSON marshaling for those messages that are not yet processed
+// by the go code
+func (m *StatusMessage) MarshalJSON() ([]byte, error) {
+	item := struct {
+		ID        types.HexBytes `json:"id"`
+		Payload   string         `json:"payload"`
+		From      types.HexBytes `json:"from"`
+		Timestamp uint32         `json:"timestamp"`
+	}{
+		ID:        m.ID,
+		Payload:   string(m.DecryptedPayload),
+		Timestamp: m.TransportMessage.Timestamp,
+		From:      m.TransportMessage.Sig,
+	}
+	return json.Marshal(item)
 }
 
 // SigPubKey returns the most important signature, from the application layer to transport
-func (s *StatusMessage) SigPubKey() *ecdsa.PublicKey {
-	if s.ApplicationMetadataLayerSigPubKey != nil {
-		return s.ApplicationMetadataLayerSigPubKey
+func (m *StatusMessage) SigPubKey() *ecdsa.PublicKey {
+	if m.ApplicationMetadataLayerSigPubKey != nil {
+		return m.ApplicationMetadataLayerSigPubKey
 	}
 
-	return s.TransportLayerSigPubKey
+	return m.TransportLayerSigPubKey
 }
 
-func (s *StatusMessage) Clone() (*StatusMessage, error) {
+func (m *StatusMessage) Clone() (*StatusMessage, error) {
 	copy := &StatusMessage{}
 
-	err := copier.Copy(&copy, s)
+	err := copier.Copy(&copy, m)
 	return copy, err
 }
 
-func (m *StatusMessage) HandleTransport(shhMessage *whispertypes.Message) error {
+func (m *StatusMessage) HandleTransport(shhMessage *types.Message) error {
 	publicKey, err := crypto.UnmarshalPubkey(shhMessage.Sig)
 	if err != nil {
 		return errors.Wrap(err, "failed to get signature")
@@ -127,12 +138,9 @@ func (m *StatusMessage) HandleDatasync(datasync *datasync.DataSync) ([]*StatusMe
 }
 
 func (m *StatusMessage) HandleApplicationMetadata() error {
-	message, err := applicationmetadata.Unmarshal(m.DecryptedPayload)
-	// Not an applicationmetadata message, calculate ID using the previous
-	// signature
+	message, err := protobuf.Unmarshal(m.DecryptedPayload)
 	if err != nil {
-		m.ID = MessageID(m.SigPubKey(), m.DecryptedPayload)
-		return nil
+		return err
 	}
 
 	recoveredKey, err := message.RecoverKey()
@@ -143,31 +151,37 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 	// Calculate ID using the wrapped record
 	m.ID = MessageID(recoveredKey, m.DecryptedPayload)
 	m.DecryptedPayload = message.Payload
+	m.Type = message.Type
 	return nil
 
 }
 
 func (m *StatusMessage) HandleApplication() error {
-	value, err := decodeTransitMessage(m.DecryptedPayload)
-	if err != nil {
-		log.Printf("[message::DecodeMessage] could not decode message: %#x, err: %v", m.Hash, err.Error())
-		return err
-	}
-	m.ParsedMessage = value
-	switch m.ParsedMessage.(type) {
-	case Message:
-		m.MessageType = MessageT
-	case MembershipUpdateMessage:
-		m.MessageType = MembershipUpdateMessageT
-	case PairMessage:
-		m.MessageType = PairMessageT
-		// By default we null the parsed message field, as
-		// otherwise is populated with the raw transit and we are
-		// unable to marshal in case it contains maps
-		// as they have type map[interface{}]interface{}
-	default:
-		m.ParsedMessage = nil
+	switch m.Type {
+	case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
+		var message protobuf.ChatMessage
 
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode ChatMessage: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE:
+		var message protobuf.MembershipUpdateMessage
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode MembershipUpdateMessage: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
 	}
+
 	return nil
 }

@@ -1,8 +1,9 @@
 package mailserver
 
 import (
-	whisper "github.com/status-im/whisper/whisperv6"
 	"time"
+
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // DB is an interface to abstract interactions with the db so that the mailserver
@@ -10,7 +11,7 @@ import (
 type DB interface {
 	Close() error
 	// SaveEnvelope stores an envelope
-	SaveEnvelope(*whisper.Envelope) error // TODO: Migrate to whispertypes.Envelope
+	SaveEnvelope(*whisper.Envelope) error // TODO: Migrate to types.Envelope
 	// GetEnvelope returns an rlp encoded envelope from the datastore
 	GetEnvelope(*DBKey) ([]byte, error)
 	// Prune removes envelopes older than time

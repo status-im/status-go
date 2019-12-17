@@ -6,8 +6,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
-	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 // OnboardingAccount is returned during onboarding and contains its ID and the mnemonic to re-generate the same account Info keys.
@@ -107,7 +107,7 @@ func (o *Onboarding) deriveAccount(masterExtendedKey *extkeys.ExtendedKey, purpo
 
 	privateKeyECDSA := extendedKey.ToECDSA()
 	address := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey)
-	publicKeyHex := protocol.EncodeHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
+	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&privateKeyECDSA.PublicKey))
 
 	return address.Hex(), publicKeyHex, nil
 }

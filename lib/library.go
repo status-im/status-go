@@ -10,8 +10,8 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/multiaccounts"
@@ -485,7 +485,7 @@ func HashTransaction(txArgsJSON *C.char) *C.char {
 
 	result := struct {
 		Transaction transactions.SendTxArgs `json:"transaction"`
-		Hash        common.Hash             `json:"hash"`
+		Hash        types.Hash              `json:"hash"`
 	}{
 		Transaction: newTxArgs,
 		Hash:        hash,

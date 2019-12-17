@@ -8,12 +8,11 @@ import (
 	"sync"
 	"time"
 
-	ecrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/crypto/ecies"
 	dr "github.com/status-im/doubleratchet"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/protocol/crypto"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
 
@@ -144,7 +143,7 @@ func (s *encryptor) ConfirmMessageProcessed(messageID []byte) error {
 
 // CreateBundle retrieves or creates an X3DH bundle given a private key
 func (s *encryptor) CreateBundle(privateKey *ecdsa.PrivateKey, installations []*multidevice.Installation) (*Bundle, error) {
-	ourIdentityKeyC := ecrypto.CompressPubkey(&privateKey.PublicKey)
+	ourIdentityKeyC := crypto.CompressPubkey(&privateKey.PublicKey)
 
 	bundleContainer, err := s.persistence.GetAnyPrivateBundle(ourIdentityKeyC, installations)
 	if err != nil {
@@ -208,7 +207,7 @@ func (s *encryptor) keyFromPassiveX3DH(myIdentityKey *ecdsa.PrivateKey, theirIde
 		return nil, errSessionNotFound
 	}
 
-	signedPreKey, err := ecrypto.ToECDSA(bundlePrivateKey)
+	signedPreKey, err := crypto.ToECDSA(bundlePrivateKey)
 	if err != nil {
 		s.logger.Error("could not convert to ecdsa", zap.Error(err))
 		return nil, err
@@ -253,7 +252,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 
 	if x3dhHeader := msg.GetX3DHHeader(); x3dhHeader != nil {
 		bundleID := x3dhHeader.GetId()
-		theirEphemeralKey, err := ecrypto.DecompressPubkey(x3dhHeader.GetKey())
+		theirEphemeralKey, err := crypto.DecompressPubkey(x3dhHeader.GetKey())
 
 		if err != nil {
 			return nil, err
@@ -264,7 +263,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 			return nil, err
 		}
 
-		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
 		err = s.persistence.AddRatchetInfo(symmetricKey, theirIdentityKeyC, bundleID, nil, theirInstallationID)
 		if err != nil {
 			return nil, err
@@ -281,7 +280,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 			Ciphertext: msg.GetPayload(),
 		}
 
-		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
 
 		drInfo, err := s.persistence.GetRatchetInfo(drHeader.GetId(), theirIdentityKeyC, theirInstallationID)
 		if err != nil {
@@ -311,7 +310,7 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 
 	// Try DH
 	if header := msg.GetDHHeader(); header != nil {
-		decompressedKey, err := ecrypto.DecompressPubkey(header.GetKey())
+		decompressedKey, err := crypto.DecompressPubkey(header.GetKey())
 		if err != nil {
 			return nil, err
 		}
@@ -435,7 +434,7 @@ func (s *encryptor) encryptWithDH(theirIdentityKey *ecdsa.PublicKey, payload []b
 
 	return &DirectMessageProtocol{
 		DHHeader: &DHHeader{
-			Key: ecrypto.CompressPubkey(ourEphemeralKey),
+			Key: crypto.CompressPubkey(ourEphemeralKey),
 		},
 		Payload: encryptedPayload,
 	}, nil
@@ -461,7 +460,7 @@ func (s *encryptor) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, installat
 func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*DirectMessageProtocol, []*multidevice.Installation, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptPayload"),
-		zap.Binary("their-identity-key", ecrypto.FromECDSAPub(theirIdentityKey)))
+		zap.Binary("their-identity-key", crypto.FromECDSAPub(theirIdentityKey)))
 
 	logger.Debug("encrypting payload")
 	// Which installations we are sending the message to
@@ -477,7 +476,7 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 		return encryptedPayload, targetedInstallations, err
 	}
 
-	theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
+	theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
 	response := make(map[string]*DirectMessageProtocol)
 
 	for _, installation := range installations {
@@ -541,8 +540,8 @@ func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentity
 		if err != nil {
 			return nil, nil, err
 		}
-		theirIdentityKeyC := ecrypto.CompressPubkey(theirIdentityKey)
-		ourEphemeralKeyC := ecrypto.CompressPubkey(ourEphemeralKey)
+		theirIdentityKeyC := crypto.CompressPubkey(theirIdentityKey)
+		ourEphemeralKeyC := crypto.CompressPubkey(ourEphemeralKey)
 
 		err = s.persistence.AddRatchetInfo(sharedKey, theirIdentityKeyC, theirSignedPreKey, ourEphemeralKeyC, installationID)
 		if err != nil {

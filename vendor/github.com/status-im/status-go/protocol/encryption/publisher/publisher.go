@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"go.uber.org/zap"
 )
 

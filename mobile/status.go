@@ -8,10 +8,11 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
+	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -24,7 +25,7 @@ import (
 	validator "gopkg.in/go-playground/validator.v9"
 )
 
-var statusBackend = api.NewStatusBackend()
+var statusBackend = api.NewGethStatusBackend()
 
 // OpenAccounts opens database and returns accounts list.
 func OpenAccounts(datadir string) string {
@@ -326,13 +327,13 @@ func Login(accountData, password string) string {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("start a node with account", "address", account.Address)
+		log.Debug("start a node with account", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccount(account, password)
 		if err != nil {
-			log.Error("failed to start a node", "address", account.Address, "error", err)
+			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node with", "address", account.Address)
+		log.Debug("started a node with", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -356,13 +357,13 @@ func SaveAccountAndLogin(accountData, password, configJSON, subaccountData strin
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf, subaccs)
 		if err != nil {
-			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node, and saved account", "address", account.Address)
+		log.Debug("started a node, and saved account", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -387,13 +388,13 @@ func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, keyHex st
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("starting a node, and saving account with configuration", "address", account.Address)
+		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
 		err := statusBackend.SaveAccountAndStartNodeWithKey(account, &conf, password, keyHex)
 		if err != nil {
-			log.Error("failed to start node and save account", "address", account.Address, "error", err)
+			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node, and saved account", "address", account.Address)
+		log.Debug("started a node, and saved account", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -408,13 +409,13 @@ func LoginWithKeycard(accountData, password, keyHex string) string {
 		return makeJSONResponse(err)
 	}
 	api.RunAsync(func() error {
-		log.Debug("start a node with account", "address", account.Address)
+		log.Debug("start a node with account", "key-uid", account.KeyUID)
 		err := statusBackend.StartNodeWithKey(account, password, keyHex)
 		if err != nil {
-			log.Error("failed to start a node", "address", account.Address, "error", err)
+			log.Error("failed to start a node", "key-uid", account.KeyUID, "error", err)
 			return err
 		}
-		log.Debug("started a node with", "address", account.Address)
+		log.Debug("started a node with", "key-uid", account.KeyUID)
 		return nil
 	})
 	return makeJSONResponse(nil)
@@ -535,7 +536,7 @@ func HashTransaction(txArgsJSON string) string {
 
 	result := struct {
 		Transaction transactions.SendTxArgs `json:"transaction"`
-		Hash        common.Hash             `json:"hash"`
+		Hash        types.Hash              `json:"hash"`
 	}{
 		Transaction: newTxArgs,
 		Hash:        hash,
@@ -704,4 +705,10 @@ func Identicon(pk string) string {
 	// We ignore any error, empty string is considered an error
 	identicon, _ := protocol.Identicon(pk)
 	return identicon
+}
+
+func ValidateMnemonic(mnemonic string) string {
+	m := extkeys.NewMnemonic()
+	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
+	return makeJSONResponse(err)
 }

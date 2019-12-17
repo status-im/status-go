@@ -32,7 +32,7 @@ go get github.com/wealdtech/go-ens
 
 ### Resolution
 
-The most commonly-used feature of ENS is resolution: converting an ENS name to an address.  `go-ens` provides a simple call to allow this:
+The most commonly-used feature of ENS is resolution: converting an ENS name to an Ethereum address.  `go-ens` provides a simple call to allow this:
 
 ```go
 address, err := ens.Resolve(client, domain)
@@ -64,6 +64,15 @@ Starting out with names in `go-ens` is easy:
 ```go
 name, err := ens.Name("mydomain.eth")
 ```
+
+Addresses can be set and obtained using the address functions, for example to get an address:
+
+```go
+COIN_TYPE_ETHEREUM := uint64(60)
+address, err := name.Address(COIN_TYPE_ETHEREUM)
+```
+
+ENS supports addresses for multiple coin types; values of coin types can be found at https://github.com/satoshilabs/slips/blob/master/slip-0044.md
 
 ### Registering and extending names
 

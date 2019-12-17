@@ -5,16 +5,16 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
-	protocol "github.com/status-im/status-go/protocol/types"
 )
 
 const (
-	contactBlocked         = "contact/blocked"
-	contactAdded           = "contact/added"
-	contactRequestReceived = "contact/request-received"
+	contactBlocked         = ":contact/blocked"
+	contactAdded           = ":contact/added"
+	contactRequestReceived = ":contact/request-received"
 )
 
 // ContactDeviceInfo is a struct containing information about a particular device owned by a contact
@@ -58,7 +58,7 @@ type Contact struct {
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
-	b, err := protocol.DecodeHex(c.ID)
+	b, err := types.DecodeHex(c.ID)
 	if err != nil {
 		return nil, err
 	}

@@ -6,10 +6,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol "github.com/status-im/status-go/protocol/types"
-	whisper "github.com/status-im/whisper/whisperv6"
+	"github.com/status-im/status-go/whisper/v6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -48,9 +47,9 @@ func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 			return nil, err
 		}
 	} else {
-		envelopeBloom = whispertypes.TopicToBloom(key.Topic())
+		envelopeBloom = types.TopicToBloom(key.Topic())
 	}
-	if !whispertypes.BloomFilterMatch(bloom, envelopeBloom) {
+	if !types.BloomFilterMatch(bloom, envelopeBloom) {
 		return nil, nil
 	}
 	return rawValue, nil
@@ -90,8 +89,8 @@ func (db *LevelDB) GetEnvelope(key *DBKey) ([]byte, error) {
 func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	defer recoverLevelDBPanics("Prune")
 
-	var zero protocol.Hash
-	var emptyTopic whispertypes.TopicType
+	var zero types.Hash
+	var emptyTopic types.TopicType
 	kl := NewDBKey(0, emptyTopic, zero)
 	ku := NewDBKey(uint32(t.Unix()), emptyTopic, zero)
 	query := CursorQuery{
@@ -140,7 +139,7 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 func (db *LevelDB) SaveEnvelope(env *whisper.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
-	key := NewDBKey(env.Expiry-env.TTL, whispertypes.TopicType(env.Topic), protocol.Hash(env.Hash()))
+	key := NewDBKey(env.Expiry-env.TTL, types.TopicType(env.Topic), types.Hash(env.Hash()))
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))

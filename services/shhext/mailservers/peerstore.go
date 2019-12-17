@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 var (
@@ -22,7 +22,7 @@ type PeersProvider interface {
 // NewPeerStore returns an instance of PeerStore.
 func NewPeerStore(cache *Cache) *PeerStore {
 	return &PeerStore{
-		nodes: map[whispertypes.EnodeID]*enode.Node{},
+		nodes: map[types.EnodeID]*enode.Node{},
 		cache: cache,
 	}
 }
@@ -30,13 +30,13 @@ func NewPeerStore(cache *Cache) *PeerStore {
 // PeerStore stores list of selected mail servers and keeps N of them connected.
 type PeerStore struct {
 	mu    sync.RWMutex
-	nodes map[whispertypes.EnodeID]*enode.Node
+	nodes map[types.EnodeID]*enode.Node
 
 	cache *Cache
 }
 
 // Exist confirms that peers was added to a store.
-func (ps *PeerStore) Exist(nodeID whispertypes.EnodeID) bool {
+func (ps *PeerStore) Exist(nodeID types.EnodeID) bool {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	_, exist := ps.nodes[nodeID]
@@ -44,7 +44,7 @@ func (ps *PeerStore) Exist(nodeID whispertypes.EnodeID) bool {
 }
 
 // Get returns instance of the node with requested ID or nil if ID is not found.
-func (ps *PeerStore) Get(nodeID whispertypes.EnodeID) *enode.Node {
+func (ps *PeerStore) Get(nodeID types.EnodeID) *enode.Node {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	return ps.nodes[nodeID]
@@ -53,9 +53,9 @@ func (ps *PeerStore) Get(nodeID whispertypes.EnodeID) *enode.Node {
 // Update updates peers locally.
 func (ps *PeerStore) Update(nodes []*enode.Node) error {
 	ps.mu.Lock()
-	ps.nodes = map[whispertypes.EnodeID]*enode.Node{}
+	ps.nodes = map[types.EnodeID]*enode.Node{}
 	for _, n := range nodes {
-		ps.nodes[whispertypes.EnodeID(n.ID())] = n
+		ps.nodes[types.EnodeID(n.ID())] = n
 	}
 	ps.mu.Unlock()
 	return ps.cache.Replace(nodes)

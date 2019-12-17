@@ -8,8 +8,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/publisher"
@@ -381,6 +382,11 @@ func (p *Protocol) DisableInstallation(myIdentityKey *ecdsa.PublicKey, installat
 // GetOurInstallations returns all the installations available given an identity
 func (p *Protocol) GetOurInstallations(myIdentityKey *ecdsa.PublicKey) ([]*multidevice.Installation, error) {
 	return p.multidevice.GetOurInstallations(myIdentityKey)
+}
+
+// GetOurActiveInstallations returns all the active installations available given an identity
+func (p *Protocol) GetOurActiveInstallations(myIdentityKey *ecdsa.PublicKey) ([]*multidevice.Installation, error) {
+	return p.multidevice.GetOurActiveInstallations(myIdentityKey)
 }
 
 // SetInstallationMetadata sets the metadata for our own installation

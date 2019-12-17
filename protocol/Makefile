@@ -16,12 +16,6 @@ lint:
 	golangci-lint run -v
 .PHONY: lint
 
-vendor:
-	go mod tidy
-	go mod vendor
-	modvendor -copy="**/*.c **/*.h" -v
-.PHONY: vendor
-
 install-linter:
 	# install linter
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.21.0

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/status-im/status-go/logutils"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -25,10 +23,9 @@ import (
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
 
+	"github.com/status-im/status-go/eth-node/types"
 	protocol "github.com/status-im/status-go/protocol"
 	protocolwhisper "github.com/status-im/status-go/protocol/transport/whisper"
-	whispertypes "github.com/status-im/status-go/protocol/transport/whisper/types"
-	protocol_types "github.com/status-im/status-go/protocol/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"go.uber.org/zap"
 )
@@ -44,8 +41,8 @@ const (
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
 	EnvelopeExpired([][]byte, error)
-	MailServerRequestCompleted(protocol_types.Hash, protocol_types.Hash, []byte, error)
-	MailServerRequestExpired(protocol_types.Hash)
+	MailServerRequestCompleted(types.Hash, types.Hash, []byte, error)
+	MailServerRequestExpired(types.Hash)
 }
 
 // Service is a service that provides some additional Whisper API.
@@ -54,7 +51,8 @@ type Service struct {
 	cancelMessenger chan struct{}
 
 	storage          db.TransactionalStorage
-	w                whispertypes.Whisper
+	n                types.Node
+	w                types.Whisper
 	config           params.ShhextConfig
 	mailMonitor      *MailRequestMonitor
 	requestsRegistry *RequestsRegistry
@@ -71,8 +69,12 @@ type Service struct {
 // Make sure that Service implements node.Service interface.
 var _ node.Service = (*Service)(nil)
 
-// New returns a new Service.
-func New(w whispertypes.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
+// New returns a new shhext Service.
+func New(n types.Node, ctx interface{}, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
+	w, err := n.GetWhisper(ctx)
+	if err != nil {
+		panic(err)
+	}
 	cache := mailservers.NewCache(ldb)
 	ps := mailservers.NewPeerStore(cache)
 	delay := defaultRequestsDelay
@@ -84,11 +86,12 @@ func New(w whispertypes.Whisper, handler EnvelopeEventsHandler, ldb *leveldb.DB,
 	mailMonitor := &MailRequestMonitor{
 		w:                w,
 		handler:          handler,
-		cache:            map[protocol_types.Hash]EnvelopeState{},
+		cache:            map[types.Hash]EnvelopeState{},
 		requestsRegistry: requestsRegistry,
 	}
 	return &Service{
 		storage:          db.NewLevelDBStorage(ldb),
+		n:                n,
 		w:                w,
 		config:           config,
 		mailMonitor:      mailMonitor,
@@ -120,7 +123,7 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 	envelopesMonitorConfig := &protocolwhisper.EnvelopesMonitorConfig{
 		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
 		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
-		IsMailserver: func(peer whispertypes.EnodeID) bool {
+		IsMailserver: func(peer types.EnodeID) bool {
 			return s.peerStore.Exist(peer)
 		},
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
@@ -136,7 +139,7 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 
 	messenger, err := protocol.NewMessenger(
 		identity,
-		s.w,
+		s.n,
 		s.config.InstallationID,
 		options...,
 	)
@@ -148,7 +151,7 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 	s.cancelMessenger = make(chan struct{})
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 
-	return nil
+	return s.messenger.Init()
 }
 
 func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
@@ -158,87 +161,14 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 	for {
 		select {
 		case <-ticker.C:
-			chatWithMessages, err := s.messenger.RetrieveRawAll()
+			response, err := s.messenger.RetrieveAll()
 			if err != nil {
 				log.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
-			var messageIDs []string
-
-			for _, messages := range chatWithMessages {
-				for _, message := range messages {
-					messageIDs = append(messageIDs, message.ID.String())
-				}
+			if !response.IsEmpty() {
+				PublisherSignalHandler{}.NewMessages(response)
 			}
-
-			existingMessages, err := s.messenger.MessagesExist(messageIDs)
-			if err != nil {
-				log.Error("failed to check existing messages", "err", err)
-				continue
-			}
-
-			var signalMessages []*signal.Messages
-
-			for chat, messages := range chatWithMessages {
-
-				var dedupMessages []*dedup.DeduplicateMessage
-				// Filter out already saved messages
-				for _, message := range messages {
-					if !existingMessages[message.ID.String()] {
-						id := fmt.Sprintf("0x%s", hex.EncodeToString(crypto.FromECDSAPub(message.SigPubKey())))
-
-						identicon, err := protocol.Identicon(id)
-						if err != nil {
-							log.Error("failed to generate identicon", "err", err)
-							continue
-
-						}
-						alias, err := protocol.GenerateAlias(id)
-						if err != nil {
-							log.Error("failed to generate identicon", "err", err)
-							continue
-
-						}
-
-						dedupMessage := &dedup.DeduplicateMessage{
-							Metadata: dedup.Metadata{
-								Author: dedup.Author{
-									PublicKey: crypto.FromECDSAPub(message.SigPubKey()),
-									Alias:     alias,
-									Identicon: identicon,
-								},
-								MessageID:    message.ID,
-								EncryptionID: message.Hash,
-							},
-							Message: message.TransportMessage,
-						}
-						dedupMessage.Message.Payload = message.DecryptedPayload
-						dedupMessage.Payload = string(message.DecryptedPayload)
-						dedupMessage.ParsedMessage = message.ParsedMessage
-						dedupMessage.MessageType = message.MessageType
-						dedupMessages = append(dedupMessages, dedupMessage)
-					}
-				}
-				dedupMessages = s.deduplicator.Deduplicate(dedupMessages)
-
-				if len(dedupMessages) != 0 {
-					signalMessage := &signal.Messages{
-						Chat:     chat,
-						Error:    nil, // TODO: what is it needed for?
-						Messages: dedupMessages,
-					}
-
-					signalMessages = append(signalMessages, signalMessage)
-				}
-			}
-
-			log.Debug("retrieve messages loop", "messages", len(signalMessages))
-
-			if len(signalMessages) == 0 {
-				continue
-			}
-
-			PublisherSignalHandler{}.NewMessages(signalMessages)
 		case <-cancel:
 			return
 		}
@@ -347,7 +277,7 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whispertypes.SyncMailRequest) (resp whispertypes.SyncEventResponse, err error) {
+func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r types.SyncMailRequest) (resp types.SyncEventResponse, err error) {
 	err = s.w.SyncMessages(mailServerID, r)
 	if err != nil {
 		return
@@ -355,7 +285,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 
 	// Wait for the response which is received asynchronously as a p2p packet.
 	// This packet handler will send an event which contains the response payload.
-	events := make(chan whispertypes.EnvelopeEvent, 1024)
+	events := make(chan types.EnvelopeEvent, 1024)
 	sub := s.w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 
@@ -369,7 +299,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 	for {
 		select {
 		case event := <-events:
-			if event.Event != whispertypes.EventMailServerSyncFinished {
+			if event.Event != types.EventMailServerSyncFinished {
 				continue
 			}
 
@@ -377,7 +307,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r whisp
 
 			var ok bool
 
-			resp, ok = event.Data.(whispertypes.SyncEventResponse)
+			resp, ok = event.Data.(types.SyncEventResponse)
 			if !ok {
 				err = fmt.Errorf("did not understand the response event data")
 				return
@@ -420,16 +350,9 @@ func buildMessengerOptions(config params.ShhextConfig, db *sql.DB, envelopesMoni
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
 	}
 
-	if !config.DisableGenericDiscoveryTopic {
-		options = append(options, protocol.WithGenericDiscoveryTopicSupport())
-	}
-
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
 
-	if config.SendV1Messages {
-		options = append(options, protocol.WithSendV1Messages())
-	}
 	return options
 }
