@@ -262,11 +262,6 @@ func (a *WhisperServiceTransport) RetrieveRawAll() (map[Filter][]*types.Message,
 
 	allFilters := a.filters.Filters()
 	for _, filter := range allFilters {
-		f := a.shh.GetFilter(filter.FilterID)
-		if f == nil {
-			return nil, errors.New("failed to return a filter")
-		}
-
 		msgs, err := a.shhAPI.GetFilterMessages(filter.FilterID)
 		if err != nil {
 			continue
