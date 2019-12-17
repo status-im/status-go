@@ -51,8 +51,8 @@ type Whisper interface {
 
 	// AddKeyPair imports a asymmetric private key and returns a deterministic identifier.
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
-	// DeleteKeyPair deletes the specified key if it exists.
-	DeleteKeyPair(key string) bool
+	// DeleteKeyPair deletes the key with the specified ID if it exists.
+	DeleteKeyPair(keyID string) bool
 	AddSymKeyDirect(key []byte) (string, error)
 	AddSymKeyFromPassword(password string) (string, error)
 	DeleteSymKey(id string) bool

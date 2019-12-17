@@ -85,9 +85,9 @@ func (w *gethWhisperWrapper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	return w.whisper.AddKeyPair(key)
 }
 
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *gethWhisperWrapper) DeleteKeyPair(key string) bool {
-	return w.whisper.DeleteKeyPair(key)
+// DeleteKeyPair deletes the key with the specified ID if it exists.
+func (w *gethWhisperWrapper) DeleteKeyPair(keyID string) bool {
+	return w.whisper.DeleteKeyPair(keyID)
 }
 
 func (w *gethWhisperWrapper) AddSymKeyDirect(key []byte) (string, error) {

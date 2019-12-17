@@ -597,7 +597,7 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
 	return id, nil
 }
 
-// DeleteKeyPair deletes the specified key if it exists.
+// DeleteKeyPair deletes the key with the specified ID if it exists.
 func (whisper *Whisper) DeleteKeyPair(key string) bool {
 	deterministicID, err := toDeterministicID(key, keyIDSize)
 	if err != nil {
