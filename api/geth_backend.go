@@ -186,7 +186,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, conf *params.NodeConfig, password string, keyHex string) error {
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
 		return err
@@ -196,6 +196,10 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Acc
 		return err
 	}
 	err = b.saveNodeConfig(conf)
+	if err != nil {
+		return err
+	}
+	err = accounts.NewDB(b.appDB).SaveAccounts(subaccs)
 	if err != nil {
 		return err
 	}

@@ -583,7 +583,8 @@ func TestLoginWithKey(t *testing.T) {
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
 
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, conf, "test-pass", keyhex))
+	address := crypto.PubkeyToAddress(pkey.PublicKey)
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", conf, []accounts.Account{{Address: address}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 

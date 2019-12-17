@@ -27,7 +27,7 @@ type StatusBackend interface {
 	OpenAccounts() error
 	GetAccounts() ([]multiaccounts.Account, error)
 	// SaveAccount(account multiaccounts.Account) error
-	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, conf *params.NodeConfig, password string, keyHex string) error
+	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error
 	Recover(rpcParams personal.RecoverParams) (types.Address, error)
 	Logout() error
 
