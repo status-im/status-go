@@ -14,11 +14,12 @@ import (
 )
 
 type ethHistoricalCommand struct {
-	db      *Database
-	eth     TransferDownloader
-	address common.Address
-	client  reactorClient
-	feed    *event.Feed
+	db           *Database
+	eth          TransferDownloader
+	address      common.Address
+	client       reactorClient
+	balanceCache *BalanceCache
+	feed         *event.Feed
 
 	from, to *big.Int
 }
@@ -47,7 +48,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	defer cancel()
 	concurrent := NewConcurrentDownloader(ctx)
 	start := time.Now()
-	downloadEthConcurrently(concurrent, c.client, c.eth, c.address, c.from, c.to)
+	downloadEthConcurrently(concurrent, c.client, c.balanceCache, c.eth, c.address, c.from, c.to)
 	select {
 	case <-concurrent.WaitAsync():
 	case <-ctx.Done():
@@ -59,7 +60,7 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 		return concurrent.Error()
 	}
 	transfers := concurrent.Get()
-	log.Info("eth historical downloader finished successfully", "total transfers", len(transfers), "time", time.Since(start))
+	log.Info("eth historical downloader finished successfully", "address", c.address, "total transfers", len(transfers), "time", time.Since(start))
 	err = c.db.ProcessTranfers(transfers, []common.Address{c.address}, headersFromTransfers(transfers), nil, ethSync)
 	if err != nil {
 		log.Error("failed to save downloaded erc20 transfers", "error", err)
@@ -310,6 +311,7 @@ type controlCommand struct {
 func (c *controlCommand) fastIndex(ctx context.Context, to *DBHeader) error {
 	start := time.Now()
 	group := NewGroup(ctx)
+
 	for _, address := range c.accounts {
 		erc20 := &erc20HistoricalCommand{
 			db:      c.db,
@@ -321,9 +323,10 @@ func (c *controlCommand) fastIndex(ctx context.Context, to *DBHeader) error {
 		}
 		group.Add(erc20.Command())
 		eth := &ethHistoricalCommand{
-			db:      c.db,
-			client:  c.client,
-			address: address,
+			db:           c.db,
+			client:       c.client,
+			balanceCache: NewBalanceCache(),
+			address:      address,
 			eth: &ETHTransferDownloader{
 				client:   c.client,
 				accounts: []common.Address{address},
