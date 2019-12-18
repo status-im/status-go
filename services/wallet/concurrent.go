@@ -45,23 +45,43 @@ type TransferDownloader interface {
 	GetTransfersByNumber(context.Context, *big.Int) ([]Transfer, error)
 }
 
-func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, downloader TransferDownloader, account common.Address, low, high *big.Int) {
+func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, cache *balanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int) {
 	c.Add(func(ctx context.Context) error {
 		if low.Cmp(high) >= 0 {
 			return nil
 		}
 		log.Debug("eth transfers comparing blocks", "low", low, "high", high)
-		lb, err := client.BalanceAt(ctx, account, low)
+		lb, err := cache.BalanceAt(client, ctx, account, low)
+		//lb, err := client.BalanceAt(ctx, account, low)
 		if err != nil {
 			return err
 		}
-		hb, err := client.BalanceAt(ctx, account, high)
+		hb, err := cache.BalanceAt(client, ctx, account, high)
+		//hb, err := client.BalanceAt(ctx, account, high)
 		if err != nil {
 			return err
 		}
 		if lb.Cmp(hb) == 0 {
 			log.Debug("balances are equal", "low", low, "high", high)
-			return nil
+			// In case if balances are equal but non zero we want to check if
+			// eth_getTransactionCount return different values, because there
+			// still might be transactions
+			if lb.Cmp(zero) != 0 {
+				return nil
+			}
+
+			ln, err := client.NonceAt(ctx, account, low)
+			if err != nil {
+				return err
+			}
+			hn, err := client.NonceAt(ctx, account, high)
+			if err != nil {
+				return err
+			}
+			if ln == hn {
+				log.Debug("transaction count is also equal", "low", low, "high", high)
+				return nil
+			}
 		}
 		if new(big.Int).Sub(high, low).Cmp(one) == 0 {
 			transfers, err := downloader.GetTransfersByNumber(ctx, high)
@@ -73,9 +93,10 @@ func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, down
 		}
 		mid := new(big.Int).Add(low, high)
 		mid = mid.Div(mid, two)
+		cache.BalanceAt(client, ctx, account, mid)
 		log.Debug("balances are not equal. spawn two concurrent downloaders", "low", low, "mid", mid, "high", high)
-		downloadEthConcurrently(c, client, downloader, account, low, mid)
-		downloadEthConcurrently(c, client, downloader, account, mid, high)
+		downloadEthConcurrently(c, client, cache, downloader, account, low, mid)
+		downloadEthConcurrently(c, client, cache, downloader, account, mid, high)
 		return nil
 	})
 }

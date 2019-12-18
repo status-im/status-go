@@ -907,11 +907,20 @@ func (b *GethStatusBackend) startWallet() error {
 	for i, addr := range watchAddresses {
 		allAddresses[1+i] = common.Address(addr)
 	}
+
+	uniqAddressesMap := map[common.Address]struct{}{}
+	uniqAddresses := []common.Address{}
+	for _, address := range allAddresses {
+		if _, ok := uniqAddressesMap[address]; !ok {
+			uniqAddressesMap[address] = struct{}{}
+			uniqAddresses = append(uniqAddresses, address)
+		}
+	}
+
 	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
-		allAddresses,
-		new(big.Int).SetUint64(b.statusNode.Config().NetworkID),
-	)
+		uniqAddresses,
+		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
 }
 
 // InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.

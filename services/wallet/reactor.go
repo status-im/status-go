@@ -42,6 +42,7 @@ type HeaderReader interface {
 // BalanceReader interface for reading balance at a specifeid address.
 type BalanceReader interface {
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 }
 
 type reactorClient interface {

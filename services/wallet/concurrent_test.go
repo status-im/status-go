@@ -109,7 +109,7 @@ func TestConcurrentEthDownloader(t *testing.T) {
 			defer cancel()
 			concurrent := NewConcurrentDownloader(ctx)
 			downloadEthConcurrently(
-				concurrent, tc.options.balances, tc.options.batches,
+				concurrent, tc.options.balances, newBalanceCache(), tc.options.batches,
 				common.Address{}, zero, tc.options.last)
 			concurrent.Wait()
 			require.NoError(t, concurrent.Error())
