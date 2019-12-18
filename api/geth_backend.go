@@ -186,26 +186,6 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
-	err := b.SaveAccount(acc)
-	if err != nil {
-		return err
-	}
-	err = b.ensureAppDBOpened(acc, password)
-	if err != nil {
-		return err
-	}
-	err = b.saveNodeConfig(conf)
-	if err != nil {
-		return err
-	}
-	err = accounts.NewDB(b.appDB).SaveAccounts(subaccs)
-	if err != nil {
-		return err
-	}
-	return b.StartNodeWithKey(acc, password, keyHex)
-}
-
 // StartNodeWithKey instead of loading addresses from database this method derives address from key
 // and uses it in application.
 // TODO: we should use a proper struct with optional values instead of duplicating the regular functions
@@ -322,10 +302,26 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 	return err
 }
 
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
+	err := b.SaveAccount(acc)
+	if err != nil {
+		return err
+	}
+	err = b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+	err = b.saveAccountsAndSettings(settings, nodecfg, subaccs)
+	if err != nil {
+		return err
+	}
+	return b.StartNodeWithKey(acc, password, keyHex)
+}
+
 // StartNodeWithAccountAndConfig is used after account and config was generated.
 // In current setup account name and config is generated on the client side. Once/if it will be generated on
 // status-go side this flow can be simplified.
-func (b *GethStatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account) error {
+func (b *GethStatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account) error {
 	err := b.SaveAccount(account)
 	if err != nil {
 		return err
@@ -334,28 +330,29 @@ func (b *GethStatusBackend) StartNodeWithAccountAndConfig(account multiaccounts.
 	if err != nil {
 		return err
 	}
-	err = b.saveNodeConfig(conf)
-	if err != nil {
-		return err
-	}
-	err = accounts.NewDB(b.appDB).SaveAccounts(subaccs)
+	err = b.saveAccountsAndSettings(settings, nodecfg, subaccs)
 	if err != nil {
 		return err
 	}
 	return b.StartNodeWithAccount(account, password)
 }
 
-func (b *GethStatusBackend) saveNodeConfig(config *params.NodeConfig) error {
+func (b *GethStatusBackend) saveAccountsAndSettings(settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return accounts.NewDB(b.appDB).SaveConfig(accounts.NodeConfigTag, config)
+	accdb := accounts.NewDB(b.appDB)
+	err := accdb.CreateSettings(settings, *nodecfg)
+	if err != nil {
+		return err
+	}
+	return accdb.SaveAccounts(subaccs)
 }
 
 func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	conf := params.NodeConfig{}
-	err := accounts.NewDB(b.appDB).GetConfig(accounts.NodeConfigTag, &conf)
+	var conf params.NodeConfig
+	err := accounts.NewDB(b.appDB).GetNodeConfig(&conf)
 	if err != nil {
 		return nil, err
 	}

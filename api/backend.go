@@ -16,7 +16,7 @@ type StatusBackend interface {
 	StartNode(config *params.NodeConfig) error // NOTE: Only used in canary
 	StartNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error
 	StartNodeWithAccount(acc multiaccounts.Account, password string) error
-	StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account) error
+	StartNodeWithAccountAndConfig(account multiaccounts.Account, password string, settings accounts.Settings, conf *params.NodeConfig, subaccs []accounts.Account) error
 	StopNode() error
 	// RestartNode() error // NOTE: Only used in tests
 
@@ -27,7 +27,7 @@ type StatusBackend interface {
 	OpenAccounts() error
 	GetAccounts() ([]multiaccounts.Account, error)
 	// SaveAccount(account multiaccounts.Account) error
-	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error
+	SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error
 	Recover(rpcParams personal.RecoverParams) (types.Address, error)
 	Logout() error
 

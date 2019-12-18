@@ -55,6 +55,25 @@ func buildAccountData(name, chatAddress string) *C.char {
 	}`, name, chatAddress))
 }
 
+func buildAccountSettings(name string) *C.char {
+	return C.CString(fmt.Sprintf(`{
+"address": "0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472",
+"current-network": "mainnet_rpc",
+"dapps-address": "0xD1300f99fDF7346986CbC766903245087394ecd0",
+"eip1581-address": "0xB1DDDE9235a541d1344550d969715CF43982de9f",
+"installation-id": "d3efcff6-cffa-560e-a547-21d3858cbc51",
+"key-uid": "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
+"last-derived-path": 0,
+"name": "%s",
+"networks": {},
+"photo-path": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+"preview-privacy": false,
+"public-key": "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
+"signing-phrase": "yurt joey vibe",
+"wallet-root-address": "0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6"
+}`, name))
+}
+
 func buildSubAccountData(chatAddress string) *C.char {
 	accs := []accounts.Account{
 		{
@@ -99,7 +118,7 @@ func createAccountAndLogin(t *testing.T, feed *event.Feed) account.Info {
 
 	// select account
 	loginResponse := APIResponse{}
-	rawResponse := SaveAccountAndLogin(buildAccountData("test", account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON), buildSubAccountData(account1.WalletAddress))
+	rawResponse := SaveAccountAndLogin(buildAccountData("test", account1.WalletAddress), C.CString(TestConfig.Account1.Password), buildAccountSettings("test"), C.CString(nodeConfigJSON), buildSubAccountData(account1.WalletAddress))
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))
@@ -420,7 +439,7 @@ func testRecoverAccount(t *testing.T, feed *event.Feed) bool { //nolint: gocyclo
 	}
 
 	loginResponse := APIResponse{}
-	rawResponse = SaveAccountAndLogin(buildAccountData("test", walletAddressCheck), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON), buildSubAccountData(walletAddressCheck))
+	rawResponse = SaveAccountAndLogin(buildAccountData("test", walletAddressCheck), C.CString(TestConfig.Account1.Password), buildAccountSettings("test"), C.CString(nodeConfigJSON), buildSubAccountData(walletAddressCheck))
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))
@@ -528,7 +547,7 @@ type jsonrpcAnyResponse struct {
 
 func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 	loginResponse := APIResponse{}
-	rawResponse := SaveAccountAndLogin(buildAccountData("test", TestConfig.Account1.WalletAddress), C.CString(TestConfig.Account1.Password), C.CString(nodeConfigJSON), buildSubAccountData(TestConfig.Account1.WalletAddress))
+	rawResponse := SaveAccountAndLogin(buildAccountData("test", TestConfig.Account1.WalletAddress), C.CString(TestConfig.Account1.Password), buildAccountSettings("test"), C.CString(nodeConfigJSON), buildSubAccountData(TestConfig.Account1.WalletAddress))
 	require.NoError(t, json.Unmarshal([]byte(C.GoString(rawResponse)), &loginResponse))
 	require.Empty(t, loginResponse.Error)
 	require.NoError(t, waitSignal(feed, signal.EventLoggedIn, 5*time.Second))

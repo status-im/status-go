@@ -28,6 +28,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	networks = json.RawMessage("{}")
+	settings = accounts.Settings{
+		Address:           types.HexToAddress("0xeC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		CurrentNetwork:    "mainnet_rpc",
+		DappsAddress:      types.HexToAddress("0xe1300f99fDF7346986CbC766903245087394ecd0"),
+		EIP1581Address:    types.HexToAddress("0xe1DDDE9235a541d1344550d969715CF43982de9f"),
+		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
+		KeyUID:            "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
+		LatestDerivedPath: 0,
+		Name:              "Jittery Cornflowerblue Kingbird",
+		Networks:          &networks,
+		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+		PreviewPrivacy:    false,
+		PublicKey:         "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
+		SigningPhrase:     "yurt joey vibe",
+		WalletRootAddress: types.HexToAddress("0xeB591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
+)
+
 func TestBackendStartNodeConcurrently(t *testing.T) {
 	utils.Init()
 
@@ -586,7 +605,7 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, b.OpenAccounts())
 
 	address := crypto.PubkeyToAddress(walletKey.PublicKey)
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", settings, conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 

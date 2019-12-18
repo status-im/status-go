@@ -13,60 +13,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	config = params.NodeConfig{
+		NetworkID: 10,
+		DataDir:   "test",
+	}
+
+	networks = json.RawMessage("{}")
+	settings = Settings{
+		Address:           types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		CurrentNetwork:    "mainnet_rpc",
+		DappsAddress:      types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
+		EIP1581Address:    types.HexToAddress("0xB1DDDE9235a541d1344550d969715CF43982de9f"),
+		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
+		KeyUID:            "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
+		LatestDerivedPath: 0,
+		Name:              "Jittery Cornflowerblue Kingbird",
+		Networks:          &networks,
+		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+		PreviewPrivacy:    false,
+		PublicKey:         "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
+		SigningPhrase:     "yurt joey vibe",
+		WalletRootAddress: types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
+)
+
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "settings-tests-")
 	require.NoError(t, err)
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "settings-tests")
 	require.NoError(t, err)
+
 	return NewDB(db), func() {
 		require.NoError(t, db.Close())
 		require.NoError(t, os.Remove(tmpfile.Name()))
 	}
 }
 
-func TestConfig(t *testing.T) {
+func TestCreateSettings(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
-	conf := params.NodeConfig{
-		NetworkID: 10,
-		DataDir:   "test",
-	}
-	require.NoError(t, db.SaveConfig("node-config", conf))
-	var rst params.NodeConfig
-	require.NoError(t, db.GetConfig("node-config", &rst))
-	require.Equal(t, conf, rst)
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	s, err := db.GetSettings()
+	require.NoError(t, err)
+	require.Equal(t, settings, s)
 }
 
-func TestConfigBlob(t *testing.T) {
+func TestSaveSetting(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	tag := "random-param"
-	param := 10
-	require.NoError(t, db.SaveConfig(tag, param))
-	expected, err := json.Marshal(param)
+
+	require.NoError(t, db.CreateSettings(settings, config))
+	require.NoError(t, db.SaveSetting("currency", "usd"))
+
+	_, err := db.GetSettings()
 	require.NoError(t, err)
-	rst, err := db.GetConfigBlob(tag)
-	require.NoError(t, err)
-	require.Equal(t, json.RawMessage(expected), rst)
 }
 
-func TestGetConfigBlobs(t *testing.T) {
+func TestGetNodeConfig(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	expected := map[string]json.RawMessage{
-		"tag1": json.RawMessage("1"),
-		"tag2": json.RawMessage("2"),
-		"tag3": json.RawMessage("3"),
-	}
-	types := make([]string, 0, len(expected))
-	for k, v := range expected {
-		require.NoError(t, db.SaveConfig(k, v))
-		types = append(types, k)
-	}
-	rst, err := db.GetConfigBlobs(types)
+
+	require.NoError(t, db.CreateSettings(settings, config))
+
+	_, err := db.GetSettings()
 	require.NoError(t, err)
-	require.Equal(t, expected, rst)
 }
 
 func TestSaveAccounts(t *testing.T) {
