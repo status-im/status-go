@@ -565,9 +565,11 @@ func TestLoginWithKey(t *testing.T) {
 	utils.Init()
 
 	b := NewGethStatusBackend()
-	pkey, err := crypto.GenerateKey()
+	chatKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	keyUIDHex := sha256.Sum256(crypto.FromECDSAPub(&pkey.PublicKey))
+	walletKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	keyUIDHex := sha256.Sum256(crypto.FromECDSAPub(&chatKey.PublicKey))
 	keyUID := types.EncodeHex(keyUIDHex[:])
 	main := multiaccounts.Account{
 		KeyUID: keyUID,
@@ -577,13 +579,14 @@ func TestLoginWithKey(t *testing.T) {
 	defer os.Remove(tmpdir)
 	conf, err := params.NewNodeConfig(tmpdir, 1777)
 	require.NoError(t, err)
-	keyhex := hex.EncodeToString(crypto.FromECDSA(pkey))
+	keyhex := hex.EncodeToString(crypto.FromECDSA(chatKey))
 
 	require.NoError(t, b.AccountManager().InitKeystore(conf.KeyStoreDir))
 	b.UpdateRootDataDir(conf.DataDir)
 	require.NoError(t, b.OpenAccounts())
 
-	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, conf, "test-pass", keyhex))
+	address := crypto.PubkeyToAddress(walletKey.PublicKey)
+	require.NoError(t, b.SaveAccountAndStartNodeWithKey(main, "test-pass", conf, []accounts.Account{{Address: address, Wallet: true}}, keyhex))
 	require.NoError(t, b.Logout())
 	require.NoError(t, b.StopNode())
 
@@ -594,5 +597,5 @@ func TestLoginWithKey(t *testing.T) {
 	}()
 	extkey, err := b.accountManager.SelectedChatAccount()
 	require.NoError(t, err)
-	require.Equal(t, crypto.PubkeyToAddress(pkey.PublicKey), extkey.Address)
+	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), extkey.Address)
 }

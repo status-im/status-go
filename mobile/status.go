@@ -376,7 +376,7 @@ func InitKeystore(keydir string) string {
 }
 
 // SaveAccountAndLoginWithKeycard saves account in status-go database..
-func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, keyHex string) string {
+func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, subaccountData string, keyHex string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
 	if err != nil {
@@ -387,9 +387,14 @@ func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, keyHex st
 	if err != nil {
 		return makeJSONResponse(err)
 	}
+	var subaccs []accounts.Account
+	err = json.Unmarshal([]byte(subaccountData), &subaccs)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.SaveAccountAndStartNodeWithKey(account, &conf, password, keyHex)
+		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, &conf, subaccs, keyHex)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err

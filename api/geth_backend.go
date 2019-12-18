@@ -186,7 +186,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	return nil
 }
 
-func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, conf *params.NodeConfig, password string, keyHex string) error {
+func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, conf *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
 		return err
@@ -199,11 +199,17 @@ func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Acc
 	if err != nil {
 		return err
 	}
+	err = accounts.NewDB(b.appDB).SaveAccounts(subaccs)
+	if err != nil {
+		return err
+	}
 	return b.StartNodeWithKey(acc, password, keyHex)
 }
 
 // StartNodeWithKey instead of loading addresses from database this method derives address from key
 // and uses it in application.
+// TODO: we should use a proper struct with optional values instead of duplicating the regular functions
+// with small variants for keycard, this created too many bugs
 func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password string, keyHex string) error {
 	err := b.ensureAppDBOpened(acc, password)
 	if err != nil {
@@ -216,7 +222,15 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
-
+	accountsDB := accounts.NewDB(b.appDB)
+	walletAddr, err := accountsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+	watchAddrs, err := accountsDB.GetAddresses()
+	if err != nil {
+		return err
+	}
 	chatKey, err := ethcrypto.HexToECDSA(keyHex)
 	if err != nil {
 		return err
@@ -226,11 +240,11 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 	b.accountManager.SetChatAccount(chatKey)
-	chatAcc, err := b.accountManager.SelectedChatAccount()
+	_, err = b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
 	}
-	b.accountManager.SetAccountAddresses(chatAcc.Address)
+	b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
 	err = b.injectAccountIntoServices()
 	if err != nil {
 		return err
