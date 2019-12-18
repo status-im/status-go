@@ -1,6 +1,8 @@
 package waku
 
-import prom "github.com/prometheus/client_golang/prometheus"
+import (
+	prom "github.com/prometheus/client_golang/prometheus"
+)
 
 var (
 	envelopesReceivedCounter = prom.NewCounter(prom.CounterOpts{

@@ -268,6 +268,24 @@ func (w *Waku) LightClientModeConnectionRestricted() bool {
 	return w.settings.RestrictLightClientsConn
 }
 
+// RateLimiting returns RateLimits information.
+func (w *Waku) RateLimits() RateLimits {
+	if w.rateLimiter == nil {
+		return RateLimits{}
+	}
+	return RateLimits{
+		IPLimits:     uint64(w.rateLimiter.limitPerSecIP),
+		PeerIDLimits: uint64(w.rateLimiter.limitPerSecPeerID),
+	}
+}
+
+// ConfirmationsEnabled returns true if message confirmations are enabled.
+func (w *Waku) ConfirmationsEnabled() bool {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	return w.settings.EnableConfirmations
+}
+
 // CurrentTime returns current time.
 func (w *Waku) CurrentTime() time.Time {
 	return w.timeSource()
@@ -788,7 +806,7 @@ func (w *Waku) Stop() error {
 // connection is negotiated.
 func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	// Create the new peer and start tracking it
-	wakuPeer := newPeer(w, peer, rw)
+	wakuPeer := newPeer(w, peer, rw, w.logger.Named("waku/peer"))
 
 	w.peerMu.Lock()
 	w.peers[wakuPeer] = struct{}{}
@@ -813,18 +831,13 @@ func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	return w.runMessageLoop(wakuPeer, rw)
 }
 
-// TODO
-//func (waku *Waku) sendConfirmation(peer enode.ID, rw p2p.MsgReadWriter, data []byte,
-//	envelopeErrors []EnvelopeError) {
-//	batchHash := crypto.Keccak256Hash(data)
-//	if err := p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors)); err != nil {
-//		log.Warn("failed to deliver messages response", "hash", batchHash, "envelopes errors", envelopeErrors,
-//			"peer", peer, "error", err)
-//	}
-//	if err := p2p.Send(rw, batchAcknowledgedCode, batchHash); err != nil {
-//		log.Warn("failed to deliver confirmation", "hash", batchHash, "peer", peer, "error", err)
-//	}
-//}
+// sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.
+func (w *Waku) sendConfirmation(rw p2p.MsgReadWriter, data []byte, envelopeErrors []EnvelopeError) (err error) {
+	batchHash := crypto.Keccak256Hash(data)
+	err = p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
+	err = p2p.Send(rw, batchAcknowledgedCode, batchHash) // DEPRECATED
+	return
+}
 
 // runMessageLoop reads and processes inbound messages directly to merge into client-global state.
 func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
@@ -840,51 +853,25 @@ func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		}
 
 		if packet.Size > w.MaxMessageSize() {
-			logger.Warn("oversized message received", zap.Binary("peer", peerID[:]), zap.Uint32("size", packet.Size))
-			return errors.New("oversized message received")
+			logger.Warn("oversize message received", zap.Binary("peer", peerID[:]), zap.Uint32("size", packet.Size))
+			return errors.New("oversize message received")
 		}
 
 		switch packet.Code {
 		case messagesCode:
-			if err := w.handleMessagesCode(p, packet, logger); err != nil {
+			if err := w.handleMessagesCode(p, rw, packet, logger); err != nil {
 				logger.Warn("failed to handle messagesCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
 				return err
 			}
-		//case messageResponseCode:
-		// TODO
-		//	var multiResponse MultiVersionResponse
-		//	if err := packet.Decode(&multiResponse); err != nil {
-		//		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		//		log.Error("failed to decode messages response", "peer", p.peer.ID(), "error", err)
-		//		return errors.New("invalid response message")
-		//	}
-		//	if multiResponse.Version == 1 {
-		//		response, err := multiResponse.DecodeResponse1()
-		//		if err != nil {
-		//			envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		//			log.Error("failed to decode messages response into first version of response", "peer", p.peer.ID(), "error", err)
-		//		}
-		//		w.envelopeFeed.Send(EnvelopeEvent{
-		//			Batch: response.Hash,
-		//			Event: EventBatchAcknowledged,
-		//			Peer:  p.peer.ID(),
-		//			Data:  response.Errors,
-		//		})
-		//	} else {
-		//		log.Warn("unknown version of the messages response was received. response is ignored", "peer", p.peer.ID(), "version", multiResponse.Version)
-		//	}
-		//case batchAcknowledgedCode:
-		// TODO
-		//	var batchHash common.Hash
-		//	if err := packet.Decode(&batchHash); err != nil {
-		//		log.Error("failed to decode confirmation into common.Hash", "peer", p.peer.ID(), "error", err)
-		//		return errors.New("invalid confirmation message")
-		//	}
-		//	w.envelopeFeed.Send(EnvelopeEvent{
-		//		Batch: batchHash,
-		//		Event: EventBatchAcknowledged,
-		//		Peer:  p.peer.ID(),
-		//	})
+		case messageResponseCode:
+			if err := w.handleMessageResponseCode(p, packet, logger); err != nil {
+				logger.Warn("failed to handle messageResponseCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
+				return err
+			}
+		case batchAcknowledgedCode:
+			if err := w.handleBatchAcknowledgeCode(p, packet, logger); err != nil {
+
+			}
 		case powRequirementCode:
 			if err := w.handlePowRequirementCode(p, packet, logger); err != nil {
 				logger.Warn("failed to handle powRequirementCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
@@ -920,7 +907,7 @@ func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	}
 }
 
-func (w *Waku) handleMessagesCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
+func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg, logger *zap.Logger) error {
 	peerID := p.peer.ID()
 
 	// decode the contained envelopes
@@ -936,6 +923,7 @@ func (w *Waku) handleMessagesCode(p *Peer, packet p2p.Msg, logger *zap.Logger) e
 		return fmt.Errorf("invalid payload: %w", err)
 	}
 
+	envelopeErrors := make([]EnvelopeError, 0)
 	trouble := false
 	for _, env := range envelopes {
 		cached, err := w.add(env, w.LightClientMode())
@@ -945,6 +933,7 @@ func (w *Waku) handleMessagesCode(p *Peer, packet p2p.Msg, logger *zap.Logger) e
 				trouble = true
 				logger.Info("invalid envelope received", zap.Binary("peer", peerID[:]), zap.Error(err))
 			}
+			envelopeErrors = append(envelopeErrors, ErrorToEnvelopeError(env.Hash(), err))
 		} else if cached {
 			p.mark(env)
 		}
@@ -956,6 +945,10 @@ func (w *Waku) handleMessagesCode(p *Peer, packet p2p.Msg, logger *zap.Logger) e
 			Peer:  p.peer.ID(),
 		})
 		envelopesValidatedCounter.Inc()
+	}
+
+	if w.ConfirmationsEnabled() {
+		go w.sendConfirmation(rw, data, envelopeErrors)
 	}
 
 	if trouble {
@@ -1078,6 +1071,46 @@ func (w *Waku) handleP2PRequestCompleteCode(p *Peer, packet p2p.Msg, logger *zap
 	}
 
 	w.postP2P(*event)
+	return nil
+}
+
+func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
+	var resp MultiVersionResponse
+	if err := packet.Decode(&resp); err != nil {
+		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
+		return fmt.Errorf("invalid response message: %w", err)
+	}
+	if resp.Version != 1 {
+		logger.Info("received unsupported version of MultiVersionResponse for messageResponseCode packet", zap.Uint("version", resp.Version))
+		return nil
+	}
+
+	response, err := resp.DecodeResponse1()
+	if err != nil {
+		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
+		return fmt.Errorf("failed to decode response message: %w", err)
+	}
+
+	w.envelopeFeed.Send(EnvelopeEvent{
+		Batch: response.Hash,
+		Event: EventBatchAcknowledged,
+		Peer:  p.peer.ID(),
+		Data:  response.Errors,
+	})
+
+	return nil
+}
+
+func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
+	var batchHash common.Hash
+	if err := packet.Decode(&batchHash); err != nil {
+		return fmt.Errorf("invalid batch ack message: %w", err)
+	}
+	w.envelopeFeed.Send(EnvelopeEvent{
+		Batch: batchHash,
+		Event: EventBatchAcknowledged,
+		Peer:  p.peer.ID(),
+	})
 	return nil
 }
 

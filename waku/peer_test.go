@@ -391,7 +391,7 @@ func TestPeerBasic(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d.", seed)
 	}
 
-	p := newPeer(nil, nil, nil)
+	p := newPeer(nil, nil, nil, nil)
 	p.mark(env)
 	if !p.marked(env) {
 		t.Fatalf("failed mark with seed %d.", seed)
@@ -493,7 +493,12 @@ func waitForServersToStart(t *testing.T) {
 //two generic waku node handshake
 func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
 	w1 := Waku{}
-	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), false}})
+	p1 := newPeer(
+		&w1,
+		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		&rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), false}},
+		nil,
+	)
 	err := p1.handshake()
 	if err != nil {
 		t.Fatal()
@@ -503,7 +508,12 @@ func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
 //two generic waku node handshake. one don't send light flag
 func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
 	w1 := Waku{}
-	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize)}})
+	p1 := newPeer(
+		&w1,
+		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		&rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize)}},
+		nil,
+	)
 	err := p1.handshake()
 	if err != nil {
 		t.Fatal()
@@ -515,7 +525,12 @@ func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 	w1 := Waku{}
 	w1.settings.RestrictLightClientsConn = false
 	w1.SetLightClientMode(true)
-	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}})
+	p1 := newPeer(
+		&w1,
+		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		&rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}},
+		nil,
+	)
 	err := p1.handshake()
 	if err != nil {
 		t.FailNow()
@@ -527,7 +542,12 @@ func TestTwoLightPeerHandshakeError(t *testing.T) {
 	w1 := Waku{}
 	w1.settings.RestrictLightClientsConn = true
 	w1.SetLightClientMode(true)
-	p1 := newPeer(&w1, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), &rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}})
+	p1 := newPeer(
+		&w1,
+		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		&rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}},
+		nil,
+	)
 	err := p1.handshake()
 	if err == nil {
 		t.FailNow()

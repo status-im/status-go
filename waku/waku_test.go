@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -892,7 +893,7 @@ func TestSendP2PDirect(t *testing.T) {
 	defer w.Stop()
 
 	rwStub := &rwP2PMessagesStub{}
-	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub)
+	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub, nil)
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -959,7 +960,7 @@ func TestHandleP2PMessageCode(t *testing.T) {
 	rwStub := &rwP2PMessagesStub{}
 	rwStub.payload = []interface{}{[]*Envelope{env}}
 
-	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), nil)
+	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), nil, nil)
 	peer.trusted = true
 
 	err = w.runMessageLoop(peer, rwStub)
@@ -1028,110 +1029,32 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations}))
+	require.NoError(
+		t,
+		p2p.ExpectMsg(
+			rw1,
+			statusCode,
+			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations, RateLimits{}},
+		),
+	)
 }
 
-// TODO
-//func TestConfirmationHadnshakeExtension(t *testing.T) {
-//	testConfirmationsHandshake(t, true)
-//}
+func TestConfirmationHadnshakeExtension(t *testing.T) {
+	testConfirmationsHandshake(t, true)
+}
 
 func TestHandshakeWithConfirmationsDisabled(t *testing.T) {
 	testConfirmationsHandshake(t, false)
 }
 
-// TODO
-//func TestConfirmationReceived(t *testing.T) {
-//	conf := &Config{
-//		MinimumAcceptedPOW: 0,
-//		MaxMessageSize:     10 << 20,
-//	}
-//	w := New(conf)
-//	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-//	rw1, rw2 := p2p.MsgPipe()
-//	errorc := make(chan error, 1)
-//	go func() {
-//		err := w.HandlePeer(p, rw2)
-//		errorc <- err
-//	}()
-//	time.AfterFunc(5*time.Second, func() {
-//		rw1.Close()
-//	})
-//	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
-//	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
-//
-//	e := Envelope{
-//		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//	//data, err := rlp.EncodeToBytes([]*Envelope{&e})
-//	//require.NoError(t, err)
-//	//hash := crypto.Keccak256Hash(data)
-//	require.NoError(t, p2p.SendItems(rw1, messagesCode, &e))
-//	//require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, nil))
-//	//require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
-//}
-
-// TODO
-//func TestMessagesResponseWithError(t *testing.T) {
-//	conf := &Config{
-//		MinimumAcceptedPOW: 0,
-//		MaxMessageSize:     10 << 20,
-//	}
-//	w := New(conf)
-//	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-//	rw1, rw2 := p2p.MsgPipe()
-//	defer func() {
-//		rw1.Close()
-//		rw2.Close()
-//	}()
-//	errorc := make(chan error, 1)
-//	go func() {
-//		err := w.HandlePeer(p, rw2)
-//		errorc <- err
-//	}()
-//	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
-//	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
-//
-//	failed := Envelope{
-//		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//	normal := Envelope{
-//		Expiry: uint32(time.Now().Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//
-//	//data, err := rlp.EncodeToBytes([]*Envelope{&failed, &normal})
-//	//require.NoError(t, err)
-//	//hash := crypto.Keccak256Hash(data)
-//	require.NoError(t, p2p.SendItems(rw1, messagesCode, &failed, &normal))
-//	//require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, NewMessagesResponse(hash, []EnvelopeError{
-//	//	{Hash: failed.Hash(), Code: EnvelopeTimeNotSynced, Description: "envelope from future"},
-//	//})))
-//	//require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
-//}
-
-func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []EnvelopeError) {
+func TestConfirmationReceived(t *testing.T) {
 	conf := &Config{
-		MinimumAcceptedPoW: 0,
-		MaxMessageSize:     10 << 20,
+		MinimumAcceptedPoW:  0,
+		MaxMessageSize:      10 << 20,
+		EnableConfirmations: true,
 	}
 	w := New(conf, nil)
-	events := make(chan EnvelopeEvent, 2)
-	sub := w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
@@ -1141,7 +1064,128 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(
+		t,
+		p2p.ExpectMsg(
+			rw1,
+			statusCode,
+			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+		),
+	)
+	require.NoError(
+		t,
+		p2p.SendItems(
+			rw1,
+			statusCode,
+			ProtocolVersion,
+			math.Float64bits(w.MinPow()),
+			w.BloomFilter(),
+			true,
+			true,
+		),
+	)
+
+	e := Envelope{
+		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	data, err := rlp.EncodeToBytes([]*Envelope{&e})
+	require.NoError(t, err)
+	hash := crypto.Keccak256Hash(data)
+	require.NoError(t, p2p.SendItems(rw1, messagesCode, &e))
+	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, nil))
+	require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
+}
+
+func TestMessagesResponseWithError(t *testing.T) {
+	conf := &Config{
+		MinimumAcceptedPoW:  0,
+		MaxMessageSize:      10 << 20,
+		EnableConfirmations: true,
+	}
+	w := New(conf, nil)
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
+	rw1, rw2 := p2p.MsgPipe()
+	defer func() {
+		rw1.Close()
+		rw2.Close()
+	}()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
+	}()
+	require.NoError(
+		t,
+		p2p.ExpectMsg(
+			rw1,
+			statusCode,
+			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+		),
+	)
+	require.NoError(
+		t,
+		p2p.SendItems(
+			rw1,
+			statusCode,
+			ProtocolVersion,
+			math.Float64bits(w.MinPow()), w.BloomFilter(),
+			true,
+			true,
+			RateLimits{},
+		),
+	)
+
+	failed := Envelope{
+		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	normal := Envelope{
+		Expiry: uint32(time.Now().Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+
+	data, err := rlp.EncodeToBytes([]*Envelope{&failed, &normal})
+	require.NoError(t, err)
+	hash := crypto.Keccak256Hash(data)
+	require.NoError(t, p2p.SendItems(rw1, messagesCode, &failed, &normal))
+	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, NewMessagesResponse(hash, []EnvelopeError{
+		{Hash: failed.Hash(), Code: EnvelopeTimeNotSynced, Description: "envelope from future"},
+	})))
+	require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
+}
+
+func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []EnvelopeError) {
+	conf := &Config{
+		MinimumAcceptedPoW:  0,
+		MaxMessageSize:      10 << 20,
+		EnableConfirmations: true,
+	}
+	w := New(conf, nil)
+	events := make(chan EnvelopeEvent, 2)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
+	rw1, rw2 := p2p.MsgPipe()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
+	}()
+	time.AfterFunc(5*time.Second, func() {
+		rw1.Close()
+	})
+	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}}))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
 	require.NoError(t, w.Send(&envelope))
@@ -1157,8 +1201,8 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	case <-time.After(5 * time.Second):
 		require.FailNow(t, "timed out waiting for an envelope.sent event")
 	}
-	//require.NoError(t, p2p.Send(rw1, messageResponseCode, NewMessagesResponse(hash, envelopeErrors)))
-	//require.NoError(t, p2p.Send(rw1, batchAcknowledgedCode, hash))
+	require.NoError(t, p2p.Send(rw1, messageResponseCode, NewMessagesResponse(hash, envelopeErrors)))
+	require.NoError(t, p2p.Send(rw1, batchAcknowledgedCode, hash))
 	select {
 	case ev := <-events:
 		require.Equal(t, EventBatchAcknowledged, ev.Event)
@@ -1170,78 +1214,95 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	}
 }
 
-// TODO
-//func TestConfirmationEventsReceived(t *testing.T) {
-//	e := Envelope{
-//		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//	testConfirmationEvents(t, e, []EnvelopeError{})
-//}
+func TestConfirmationEventsReceived(t *testing.T) {
+	e := Envelope{
+		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	testConfirmationEvents(t, e, []EnvelopeError{})
+}
 
-// TODO
-//func TestConfirmationEventsExtendedWithErrors(t *testing.T) {
-//	e := Envelope{
-//		Expiry: uint32(time.Now().Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//	testConfirmationEvents(t, e, []EnvelopeError{
-//		{
-//			Hash:        e.Hash(),
-//			Code:        EnvelopeTimeNotSynced,
-//			Description: "test error",
-//		}})
-//}
+func TestConfirmationEventsExtendedWithErrors(t *testing.T) {
+	e := Envelope{
+		Expiry: uint32(time.Now().Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	testConfirmationEvents(t, e, []EnvelopeError{
+		{
+			Hash:        e.Hash(),
+			Code:        EnvelopeTimeNotSynced,
+			Description: "test error",
+		}},
+	)
+}
 
-// TODO
-//func TestEventsWithoutConfirmation(t *testing.T) {
-//	conf := &Config{
-//		MinimumAcceptedPOW: 0,
-//		MaxMessageSize:     10 << 20,
-//	}
-//	w := New(conf)
-//	events := make(chan EnvelopeEvent, 2)
-//	sub := w.SubscribeEnvelopeEvents(events)
-//	defer sub.Unsubscribe()
-//
-//	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-//	rw1, rw2 := p2p.MsgPipe()
-//	errorc := make(chan error, 1)
-//	go func() {
-//		err := w.HandlePeer(p, rw2)
-//		errorc <- err
-//	}()
-//	time.AfterFunc(5*time.Second, func() {
-//		rw1.Close()
-//	})
-//	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
-//	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, false))
-//
-//	e := Envelope{
-//		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//	require.NoError(t, w.Send(&e))
-//	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&e}))
-//
-//	select {
-//	case ev := <-events:
-//		require.Equal(t, EventEnvelopeSent, ev.Event)
-//		require.Equal(t, p.ID(), ev.Peer)
-//		require.Equal(t, common.Hash{}, ev.Batch)
-//	case <-time.After(5 * time.Second):
-//		require.FailNow(t, "timed out waiting for an envelope.sent event")
-//	}
-//}
+func TestEventsWithoutConfirmation(t *testing.T) {
+	conf := &Config{
+		MinimumAcceptedPoW: 0,
+		MaxMessageSize:     10 << 20,
+	}
+	w := New(conf, nil)
+	events := make(chan EnvelopeEvent, 2)
+	sub := w.SubscribeEnvelopeEvents(events)
+	defer sub.Unsubscribe()
+
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
+	rw1, rw2 := p2p.MsgPipe()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
+	}()
+	time.AfterFunc(5*time.Second, func() {
+		rw1.Close()
+	})
+	require.NoError(
+		t,
+		p2p.ExpectMsg(
+			rw1,
+			statusCode,
+			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, false, RateLimits{}},
+		),
+	)
+	require.NoError(
+		t,
+		p2p.SendItems(
+			rw1,
+			statusCode,
+			ProtocolVersion,
+			math.Float64bits(w.MinPow()),
+			w.BloomFilter(),
+			true,
+			false,
+			RateLimits{},
+		),
+	)
+
+	e := Envelope{
+		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
+		TTL:    10,
+		Topic:  TopicType{1},
+		Data:   make([]byte, 1<<10),
+		Nonce:  1,
+	}
+	require.NoError(t, w.Send(&e))
+	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&e}))
+
+	select {
+	case ev := <-events:
+		require.Equal(t, EventEnvelopeSent, ev.Event)
+		require.Equal(t, p.ID(), ev.Peer)
+		require.Equal(t, common.Hash{}, ev.Batch)
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "timed out waiting for an envelope.sent event")
+	}
+}
 
 func discardPipe() *p2p.MsgPipeRW {
 	rw1, rw2 := p2p.MsgPipe()
@@ -1306,7 +1367,7 @@ func TestRequestSentEventWithExpiry(t *testing.T) {
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	rw := discardPipe()
 	defer rw.Close()
-	w.peers[newPeer(w, p, rw)] = struct{}{}
+	w.peers[newPeer(w, p, rw, nil)] = struct{}{}
 	events := make(chan EnvelopeEvent, 1)
 	sub := w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
@@ -1350,7 +1411,7 @@ func TestSendMessagesRequest(t *testing.T) {
 		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 		rw1, rw2 := p2p.MsgPipe()
 		w := New(nil, nil)
-		w.peers[newPeer(w, p, rw1)] = struct{}{}
+		w.peers[newPeer(w, p, rw1, nil)] = struct{}{}
 
 		go func() {
 			err := w.SendMessagesRequest(p.ID().Bytes(), validMessagesRequest)
@@ -1361,42 +1422,41 @@ func TestSendMessagesRequest(t *testing.T) {
 	})
 }
 
-// TODO
-//func TestRateLimiterIntegration(t *testing.T) {
-//	conf := &Config{
-//		MinimumAcceptedPOW: 0,
-//		MaxMessageSize:     10 << 20,
-//	}
-//	w := New(conf)
-//	w.SetRateLimiter(NewPeerRateLimiter(&MetricsRateLimiterHandler{}, nil))
-//	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-//	rw1, rw2 := p2p.MsgPipe()
-//	defer func() {
-//		rw1.Close()
-//		rw2.Close()
-//	}()
-//	errorc := make(chan error, 1)
-//	go func() {
-//		err := w.HandlePeer(p, rw2)
-//		errorc <- err
-//	}()
-//	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
-//	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
-//
-//	envelope := Envelope{
-//		Expiry: uint32(time.Now().Unix()),
-//		TTL:    10,
-//		Topic:  TopicType{1},
-//		Data:   make([]byte, 1<<10),
-//		Nonce:  1,
-//	}
-//
-//	data, err := rlp.EncodeToBytes([]*Envelope{&envelope})
-//	require.NoError(t, err)
-//	hash := crypto.Keccak256Hash(data)
-//	require.NoError(t, p2p.SendItems(rw1, messagesCode, &envelope))
-//	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, NewMessagesResponse(hash, nil)))
-//}
+func TestRateLimiterIntegration(t *testing.T) {
+	conf := &Config{
+		MinimumAcceptedPoW: 0,
+		MaxMessageSize:     10 << 20,
+	}
+	w := New(conf, nil)
+	w.RegisterRateLimiter(NewPeerRateLimiter(nil, &MetricsRateLimiterHandler{}))
+	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
+	rw1, rw2 := p2p.MsgPipe()
+	defer func() {
+		rw1.Close()
+		rw2.Close()
+	}()
+	errorc := make(chan error, 1)
+	go func() {
+		err := w.HandlePeer(p, rw2)
+		errorc <- err
+	}()
+	require.NoError(
+		t,
+		p2p.ExpectMsg(
+			rw1,
+			statusCode,
+			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, false, RateLimits{
+				IPLimits:     10,
+				PeerIDLimits: 5,
+			}},
+		),
+	)
+	select {
+	case err := <-errorc:
+		require.NoError(t, err)
+	default:
+	}
+}
 
 type stubMailServer struct{}
 
@@ -1426,7 +1486,7 @@ func TestMailserverCompletionEvent(t *testing.T) {
 	defer w.Stop()
 
 	rw1, rw2 := p2p.MsgPipe()
-	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1)
+	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
 	peer.trusted = true
 	w.peers[peer] = struct{}{}
 

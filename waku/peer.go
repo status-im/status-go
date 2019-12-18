@@ -10,16 +10,17 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
+	"go.uber.org/zap"
 )
 
 // Peer represents a waku protocol peer connection.
 type Peer struct {
-	host *Waku
-	peer *p2p.Peer
-	ws   p2p.MsgReadWriter
+	host   *Waku
+	peer   *p2p.Peer
+	ws     p2p.MsgReadWriter
+	logger *zap.Logger
 
 	trusted              bool
 	powRequirement       float64
@@ -27,6 +28,8 @@ type Peer struct {
 	bloomFilter          []byte
 	fullNode             bool
 	confirmationsEnabled bool
+	rateLimitsMu         sync.Mutex
+	rateLimits           RateLimits
 
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 
@@ -34,11 +37,16 @@ type Peer struct {
 }
 
 // newPeer creates a new waku peer object, but does not run the handshake itself.
-func newPeer(host *Waku, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
+func newPeer(host *Waku, remote *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger) *Peer {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	return &Peer{
 		host:           host,
 		peer:           remote,
 		ws:             rw,
+		logger:         logger,
 		trusted:        false,
 		powRequirement: 0.0,
 		known:          mapset.NewSet(),
@@ -50,53 +58,53 @@ func newPeer(host *Waku, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 
 // start initiates the peer updater, periodically broadcasting the waku packets
 // into the network.
-func (peer *Peer) start() {
-	go peer.update()
-	log.Trace("start", "peer", peer.ID())
+func (p *Peer) start() {
+	go p.update()
+	p.logger.Debug("starting peer", zap.Binary("peerID", p.ID()))
 }
 
 // stop terminates the peer updater, stopping message forwarding to it.
-func (peer *Peer) stop() {
-	close(peer.quit)
-	log.Trace("stop", "peer", peer.ID())
+func (p *Peer) stop() {
+	close(p.quit)
+	p.logger.Debug("stopping peer", zap.Binary("peerID", p.ID()))
 }
 
 // handshake sends the protocol initiation status message to the remote peer and
 // verifies the remote status too.
-func (peer *Peer) handshake() error {
+func (p *Peer) handshake() error {
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
-	isLightNode := peer.host.LightClientMode()
-	isRestrictedLightNodeConnection := peer.host.LightClientModeConnectionRestricted()
+	isLightNode := p.host.LightClientMode()
+	isRestrictedLightNodeConnection := p.host.LightClientModeConnectionRestricted()
 	go func() {
-		pow := peer.host.MinPow()
+		pow := p.host.MinPow()
 		powConverted := math.Float64bits(pow)
-		bloom := peer.host.BloomFilter()
-		// TODO
-		confirmationsEnabled := false
+		bloom := p.host.BloomFilter()
+		confirmationsEnabled := p.host.ConfirmationsEnabled()
+		rateLimits := p.host.RateLimits()
 
-		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled)
+		errc <- p2p.SendItems(p.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled, rateLimits)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
-	packet, err := peer.ws.ReadMsg()
+	packet, err := p.ws.ReadMsg()
 	if err != nil {
 		return err
 	}
 	if packet.Code != statusCode {
-		return fmt.Errorf("peer [%x] sent packet %x before status packet", peer.ID(), packet.Code)
+		return fmt.Errorf("p [%x] sent packet %x before status packet", p.ID(), packet.Code)
 	}
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 	_, err = s.List()
 	if err != nil {
-		return fmt.Errorf("peer [%x] sent bad status message: %v", peer.ID(), err)
+		return fmt.Errorf("p [%x] sent bad status message: %v", p.ID(), err)
 	}
 	peerVersion, err := s.Uint()
 	if err != nil {
-		return fmt.Errorf("peer [%x] sent bad status message (unable to decode version): %v", peer.ID(), err)
+		return fmt.Errorf("p [%x] sent bad status message (unable to decode version): %v", p.ID(), err)
 	}
 	if peerVersion != ProtocolVersion {
-		return fmt.Errorf("peer [%x]: protocol version mismatch %d != %d", peer.ID(), peerVersion, ProtocolVersion)
+		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerVersion, ProtocolVersion)
 	}
 
 	// only version is mandatory, subsequent parameters are optional
@@ -104,41 +112,48 @@ func (peer *Peer) handshake() error {
 	if err == nil {
 		pow := math.Float64frombits(powRaw)
 		if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
-			return fmt.Errorf("peer [%x] sent bad status message: invalid pow", peer.ID())
+			return fmt.Errorf("p [%x] sent bad status message: invalid pow", p.ID())
 		}
-		peer.powRequirement = pow
+		p.powRequirement = pow
 
 		var bloom []byte
 		err = s.Decode(&bloom)
 		if err == nil {
 			sz := len(bloom)
 			if sz != BloomFilterSize && sz != 0 {
-				return fmt.Errorf("peer [%x] sent bad status message: wrong bloom filter size %d", peer.ID(), sz)
+				return fmt.Errorf("p [%x] sent bad status message: wrong bloom filter size %d", p.ID(), sz)
 			}
-			peer.setBloomFilter(bloom)
+			p.setBloomFilter(bloom)
 		}
 	}
 
 	isRemotePeerLightNode, _ := s.Bool()
 	if isRemotePeerLightNode && isLightNode && isRestrictedLightNodeConnection {
-		return fmt.Errorf("peer [%x] is useless: two light client communication restricted", peer.ID())
+		return fmt.Errorf("p [%x] is useless: two light client communication restricted", p.ID())
 	}
 	confirmationsEnabled, err := s.Bool()
 	if err != nil || !confirmationsEnabled {
-		log.Warn("confirmations are disabled", "peer", peer.ID())
+		p.logger.Info("confirmations are disabled for peer", zap.Binary("peer", p.ID()))
 	} else {
-		peer.confirmationsEnabled = confirmationsEnabled
+		p.confirmationsEnabled = confirmationsEnabled
+	}
+
+	var rateLimits RateLimits
+	if err := s.Decode(&rateLimits); err != nil {
+		p.logger.Info("rate limiting is disabled for peer", zap.Binary("peer", p.ID()))
+	} else {
+		p.setRateLimits(rateLimits)
 	}
 
 	if err := <-errc; err != nil {
-		return fmt.Errorf("peer [%x] failed to send status packet: %v", peer.ID(), err)
+		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
 	}
 	return nil
 }
 
 // update executes periodic operations on the peer, including message transmission
 // and expiration.
-func (peer *Peer) update() {
+func (p *Peer) update() {
 	// Start the tickers for the updates
 	expire := time.NewTicker(expirationCycle)
 	transmit := time.NewTicker(transmissionCycle)
@@ -147,112 +162,119 @@ func (peer *Peer) update() {
 	for {
 		select {
 		case <-expire.C:
-			peer.expire()
+			p.expire()
 
 		case <-transmit.C:
-			if err := peer.broadcast(); err != nil {
-				log.Trace("broadcast failed", "reason", err, "peer", peer.ID())
+			if err := p.broadcast(); err != nil {
+				p.logger.Debug("broadcasting failed", zap.Binary("peer", p.ID()), zap.Error(err))
 				return
 			}
 
-		case <-peer.quit:
+		case <-p.quit:
 			return
 		}
 	}
 }
 
 // mark marks an envelope known to the peer so that it won't be sent back.
-func (peer *Peer) mark(envelope *Envelope) {
-	peer.known.Add(envelope.Hash())
+func (p *Peer) mark(envelope *Envelope) {
+	p.known.Add(envelope.Hash())
 }
 
 // marked checks if an envelope is already known to the remote peer.
-func (peer *Peer) marked(envelope *Envelope) bool {
-	return peer.known.Contains(envelope.Hash())
+func (p *Peer) marked(envelope *Envelope) bool {
+	return p.known.Contains(envelope.Hash())
 }
 
 // expire iterates over all the known envelopes in the host and removes all
 // expired (unknown) ones from the known list.
-func (peer *Peer) expire() {
+func (p *Peer) expire() {
 	unmark := make(map[common.Hash]struct{})
-	peer.known.Each(func(v interface{}) bool {
-		if !peer.host.isEnvelopeCached(v.(common.Hash)) {
+	p.known.Each(func(v interface{}) bool {
+		if !p.host.isEnvelopeCached(v.(common.Hash)) {
 			unmark[v.(common.Hash)] = struct{}{}
 		}
 		return true
 	})
 	// Dump all known but no longer cached
 	for hash := range unmark {
-		peer.known.Remove(hash)
+		p.known.Remove(hash)
 	}
 }
 
 // broadcast iterates over the collection of envelopes and transmits yet unknown
 // ones over the network.
-func (peer *Peer) broadcast() error {
-	envelopes := peer.host.Envelopes()
+func (p *Peer) broadcast() error {
+	envelopes := p.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
-		if !peer.marked(envelope) && envelope.PoW() >= peer.powRequirement && peer.bloomMatch(envelope) {
+		if !p.marked(envelope) && envelope.PoW() >= p.powRequirement && p.bloomMatch(envelope) {
 			bundle = append(bundle, envelope)
 		}
 	}
 
-	if len(bundle) > 0 {
-		batchHash, err := sendBundle(peer.ws, bundle)
-		if err != nil {
-			log.Warn("failed to deliver envelopes", "peer", peer.peer.ID(), "error", err)
-			return err
-		}
-
-		// mark envelopes only if they were successfully sent
-		for _, e := range bundle {
-			peer.mark(e)
-			event := EnvelopeEvent{
-				Event: EventEnvelopeSent,
-				Hash:  e.Hash(),
-				Peer:  peer.peer.ID(),
-			}
-			if peer.confirmationsEnabled {
-				event.Batch = batchHash
-			}
-			peer.host.envelopeFeed.Send(event)
-		}
-
-		log.Trace("broadcast", "num. messages", len(bundle))
+	if len(bundle) == 0 {
+		return nil
 	}
+
+	batchHash, err := sendBundle(p.ws, bundle)
+	if err != nil {
+		p.logger.Debug("failed to deliver envelopes", zap.Binary("peer", p.ID()), zap.Error(err))
+		return err
+	}
+
+	// mark envelopes only if they were successfully sent
+	for _, e := range bundle {
+		p.mark(e)
+		event := EnvelopeEvent{
+			Event: EventEnvelopeSent,
+			Hash:  e.Hash(),
+			Peer:  p.peer.ID(),
+		}
+		if p.confirmationsEnabled {
+			event.Batch = batchHash
+		}
+		p.host.envelopeFeed.Send(event)
+	}
+	p.logger.Debug("broadcasted bundles successfully", zap.Binary("peer", p.ID()), zap.Int("count", len(bundle)))
 	return nil
 }
 
 // ID returns a peer's id
-func (peer *Peer) ID() []byte {
-	id := peer.peer.ID()
+func (p *Peer) ID() []byte {
+	id := p.peer.ID()
 	return id[:]
 }
 
-func (peer *Peer) notifyAboutPowRequirementChange(pow float64) error {
+func (p *Peer) notifyAboutPowRequirementChange(pow float64) error {
 	i := math.Float64bits(pow)
-	return p2p.Send(peer.ws, powRequirementCode, i)
+	return p2p.Send(p.ws, powRequirementCode, i)
 }
 
-func (peer *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
-	return p2p.Send(peer.ws, bloomFilterExCode, bloom)
+func (p *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
+	return p2p.Send(p.ws, bloomFilterExCode, bloom)
 }
 
-func (peer *Peer) bloomMatch(env *Envelope) bool {
-	peer.bloomMu.Lock()
-	defer peer.bloomMu.Unlock()
-	return peer.fullNode || BloomFilterMatch(peer.bloomFilter, env.Bloom())
+func (p *Peer) bloomMatch(env *Envelope) bool {
+	p.bloomMu.Lock()
+	defer p.bloomMu.Unlock()
+	return p.fullNode || BloomFilterMatch(p.bloomFilter, env.Bloom())
 }
 
-func (peer *Peer) setBloomFilter(bloom []byte) {
-	peer.bloomMu.Lock()
-	defer peer.bloomMu.Unlock()
-	peer.bloomFilter = bloom
-	peer.fullNode = isFullNode(bloom)
-	if peer.fullNode && peer.bloomFilter == nil {
-		peer.bloomFilter = MakeFullNodeBloom()
+func (p *Peer) setBloomFilter(bloom []byte) {
+	p.bloomMu.Lock()
+	defer p.bloomMu.Unlock()
+	p.bloomFilter = bloom
+	p.fullNode = isFullNode(bloom)
+	if p.fullNode && p.bloomFilter == nil {
+		p.bloomFilter = MakeFullNodeBloom()
 	}
+}
+
+func (p *Peer) setRateLimits(r RateLimits) {
+	p.rateLimitsMu.Lock()
+	p.rateLimits = r
+	p.rateLimitsMu.Unlock()
 }
 
 func MakeFullNodeBloom() []byte {

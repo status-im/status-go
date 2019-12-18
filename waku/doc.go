@@ -17,12 +17,13 @@ const (
 	ProtocolName       = "waku"    // Nickname of the protocol
 
 	// Waku protocol message codes, according to https://github.com/vacp2p/specs/blob/master/waku.md
-	statusCode         = 0 // used in the handshake
-	messagesCode       = 1 // regular message
-	powRequirementCode = 2 // node's PoW requirement
-	bloomFilterExCode  = 3 // bloom filter exchange
-	// TODO: add rate limiting code
-	// TODO: message confirm
+	statusCode             = 0   // used in the handshake
+	messagesCode           = 1   // regular message
+	powRequirementCode     = 2   // node's PoW requirement
+	bloomFilterExCode      = 3   // bloom filter exchange
+	batchAcknowledgedCode  = 11  // confirmation that batch of envelopes was received
+	messageResponseCode    = 12  // includes confirmation for delivery and information about errors
+	rateLimitingCode       = 20  // includes peer's rate limiting settings
 	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
 	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
 	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
@@ -179,4 +180,16 @@ type MailServerResponse struct {
 	LastEnvelopeHash common.Hash
 	Cursor           []byte
 	Error            error
+}
+
+// RateLimits contains information about rate limit settings.
+// It is exchanged using rateLimitingCode packet or in the handshake.
+type RateLimits struct {
+	IPLimits     uint64 // messages per second from a single IP (default 0, no limits)
+	PeerIDLimits uint64 // messages per second from a single peer ID (default 0, no limits)
+	TopicLimits  uint64 // messages per second from a single topic (default 0, no limits)
+}
+
+func (r RateLimits) IsZero() bool {
+	return r == (RateLimits{})
 }
