@@ -19,7 +19,6 @@ import (
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/shhext/dedup"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
 
@@ -48,6 +47,7 @@ type EnvelopeEventsHandler interface {
 // Service is a service that provides some additional Whisper API.
 type Service struct {
 	messenger       *protocol.Messenger
+	identity        *ecdsa.PrivateKey
 	cancelMessenger chan struct{}
 
 	storage          db.TransactionalStorage
@@ -59,7 +59,6 @@ type Service struct {
 	historyUpdates   *HistoryUpdateReactor
 	server           *p2p.Server
 	nodeID           *ecdsa.PrivateKey
-	deduplicator     *dedup.Deduplicator
 	peerStore        *mailservers.PeerStore
 	cache            *mailservers.Cache
 	connManager      *mailservers.ConnectionManager
@@ -97,16 +96,26 @@ func New(n types.Node, ctx interface{}, handler EnvelopeEventsHandler, ldb *leve
 		mailMonitor:      mailMonitor,
 		requestsRegistry: requestsRegistry,
 		historyUpdates:   historyUpdates,
-		deduplicator:     dedup.NewDeduplicator(w, ldb),
 		peerStore:        ps,
 		cache:            cache,
 	}
 }
 
-func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
+func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { // nolint: gocyclo
 	if !s.config.PFSEnabled {
 		return nil
 	}
+
+	// If Messenger has been already set up, we need to shut it down
+	// before we init it again. Otherwise, it will lead to goroutines leakage
+	// due to not stopped filters.
+	if s.messenger != nil {
+		if err := s.messenger.Shutdown(); err != nil {
+			return err
+		}
+	}
+
+	s.identity = identity
 
 	dataDir := filepath.Clean(s.config.BackupDisabledDataDir)
 
@@ -130,12 +139,6 @@ func (s *Service) InitProtocol(db *sql.DB) error { // nolint: gocyclo
 		Logger:                zapLogger,
 	}
 	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, zapLogger)
-
-	selectedKeyID := s.w.SelectedKeyPairID()
-	identity, err := s.w.GetPrivateKey(selectedKeyID)
-	if err != nil {
-		return err
-	}
 
 	messenger, err := protocol.NewMessenger(
 		identity,

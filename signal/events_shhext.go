@@ -5,10 +5,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	statusproto "github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/services/shhext/dedup"
 
 	"github.com/status-im/status-go/eth-node/types"
-	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
 )
 
 const (
@@ -139,12 +137,6 @@ func SendMailServerRequestExpired(hash types.Hash) {
 type EnodeDiscoveredSignal struct {
 	Enode string `json:"enode"`
 	Topic string `json:"topic"`
-}
-
-type Messages struct {
-	Error    error                       `json:"error"`
-	Messages []*dedup.DeduplicateMessage `json:"messages"`
-	Chat     statustransp.Filter         `json:"chat"` // not a mistake, it's called chat in status-react
 }
 
 // SendEnodeDiscovered tiggered when an enode is discovered.
