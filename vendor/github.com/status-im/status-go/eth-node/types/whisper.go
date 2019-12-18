@@ -26,9 +26,6 @@ type SubscriptionOptions struct {
 type Whisper interface {
 	PublicWhisperAPI() PublicWhisperAPI
 
-	// Poll must be run periodically on the main thread by the host application
-	Poll()
-
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
 	// BloomFilter returns the aggregated bloom filter for all the topics of interest.
