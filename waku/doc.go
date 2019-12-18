@@ -1,3 +1,21 @@
+// Copyright 2019 The Waku Library Authors.
+//
+// The Waku library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The Waku library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty off
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the Waku library. If not, see <http://www.gnu.org/licenses/>.
+//
+// This software uses the go-ethereum library, which is licensed
+// under the GNU Lesser General Public Library, version 3 or any later.
+
 package waku
 
 import (
@@ -13,7 +31,7 @@ import (
 // Waku protocol parameters
 const (
 	ProtocolVersion    = uint64(0) // Protocol version number
-	ProtocolVersionStr = "0.1"     // The same, as a string
+	ProtocolVersionStr = "0"       // The same, as a string
 	ProtocolName       = "waku"    // Nickname of the protocol
 
 	// Waku protocol message codes, according to https://github.com/vacp2p/specs/blob/master/waku.md
