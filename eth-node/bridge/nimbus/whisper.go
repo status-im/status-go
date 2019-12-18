@@ -91,12 +91,6 @@ func (w *nimbusWhisperWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.
 	panic("not implemented")
 }
 
-// SelectedKeyPairID returns the id of currently selected key pair.
-// It helps distinguish between different users w/o exposing the user identity itself.
-func (w *nimbusWhisperWrapper) SelectedKeyPairID() string {
-	return ""
-}
-
 func (w *nimbusWhisperWrapper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 	retVal := w.routineQueue.Send(func(c chan<- callReturn) {
 		idC, err := decodeHexID(id)

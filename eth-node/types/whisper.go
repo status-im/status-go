@@ -38,9 +38,6 @@ type Whisper interface {
 	// GetCurrentTime returns current time.
 	GetCurrentTime() time.Time
 
-	// SelectedKeyPairID returns the id of currently selected key pair.
-	// It helps distinguish between different users w/o exposing the user identity itself.
-	SelectedKeyPairID() string
 	// GetPrivateKey retrieves the private key of the specified identity.
 	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)
 

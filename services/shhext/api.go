@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/status-im/status-go/services/shhext/dedup"
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
@@ -403,24 +402,31 @@ func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (
 	}
 }
 
+type Author struct {
+	PublicKey types.HexBytes `json:"publicKey"`
+	Alias     string         `json:"alias"`
+	Identicon string         `json:"identicon"`
+}
+
+type Metadata struct {
+	DedupID      []byte         `json:"dedupId"`
+	EncryptionID types.HexBytes `json:"encryptionId"`
+	MessageID    types.HexBytes `json:"messageId"`
+	Author       Author         `json:"author"`
+}
+
 // ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
 // the client side.
 // TODO: this is broken now as it requires dedup ID while a message hash should be used.
-func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*dedup.Metadata) error {
+func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*Metadata) error {
 	confirmationCount := len(messageConfirmations)
 	dedupIDs := make([][]byte, confirmationCount)
 	encryptionIDs := make([][]byte, confirmationCount)
-
 	for i, confirmation := range messageConfirmations {
 		dedupIDs[i] = confirmation.DedupID
 		encryptionIDs[i] = confirmation.EncryptionID
 	}
-
-	if err := api.service.ConfirmMessagesProcessed(encryptionIDs); err != nil {
-		return err
-	}
-
-	return api.service.deduplicator.AddMessageByID(dedupIDs)
+	return api.service.ConfirmMessagesProcessed(encryptionIDs)
 }
 
 // Post is used to send one-to-one for those who did not enabled device-to-device sync,

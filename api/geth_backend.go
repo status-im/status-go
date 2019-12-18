@@ -64,18 +64,19 @@ var _ StatusBackend = (*GethStatusBackend)(nil)
 type GethStatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
-	rootDataDir     string
-	appDB           *sql.DB
-	statusNode      *node.StatusNode
-	personalAPI     *personal.PublicAPI
-	rpcFilters      *rpcfilters.Service
-	multiaccountsDB *multiaccounts.Database
-	accountManager  *account.Manager
-	transactor      *transactions.Transactor
-	connectionState connectionState
-	appState        appState
-	log             log.Logger
-	allowAllRPC     bool // used only for tests, disables api method restrictions
+	rootDataDir             string
+	appDB                   *sql.DB
+	statusNode              *node.StatusNode
+	personalAPI             *personal.PublicAPI
+	rpcFilters              *rpcfilters.Service
+	multiaccountsDB         *multiaccounts.Database
+	accountManager          *account.Manager
+	transactor              *transactions.Transactor
+	connectionState         connectionState
+	appState                appState
+	selectedAccountShhKeyID string
+	log                     log.Logger
+	allowAllRPC             bool // used only for tests, disables api method restrictions
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -112,6 +113,11 @@ func (b *GethStatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
 }
 
+// SelectedAccountShhKeyID returns a Whisper key ID of the selected chat key pair.
+func (b *GethStatusBackend) SelectedAccountShhKeyID() string {
+	return b.selectedAccountShhKeyID
+}
+
 // IsNodeRunning confirm that node is running
 func (b *GethStatusBackend) IsNodeRunning() bool {
 	return b.statusNode.IsRunning()
@@ -121,13 +127,10 @@ func (b *GethStatusBackend) IsNodeRunning() bool {
 func (b *GethStatusBackend) StartNode(config *params.NodeConfig) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-
 	if err := b.startNode(config); err != nil {
 		signal.SendNodeCrashed(err)
-
 		return err
 	}
-
 	return nil
 }
 
@@ -458,18 +461,22 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}
 	b.log.Info("Handlers registered")
 
-	if err = b.reSelectAccount(); err != nil {
-		b.log.Error("Reselect account failed", "err", err)
-		return
-	}
-	b.log.Info("Account reselected")
-
 	if st, err := b.statusNode.StatusService(); err == nil {
 		st.SetAccountManager(b.accountManager)
 	}
 
 	if st, err := b.statusNode.PeerService(); err == nil {
 		st.SetDiscoverer(b.StatusNode())
+	}
+
+	// Handle a case when a node is stopped and resumed.
+	// If there is no account selected, an error is returned.
+	if _, err := b.accountManager.SelectedChatAccount(); err == nil {
+		if err := b.injectAccountIntoServices(); err != nil {
+			return err
+		}
+	} else if err != account.ErrNoAccountSelected {
+		return err
 	}
 
 	signal.SendNodeReady()
@@ -786,6 +793,7 @@ func (b *GethStatusBackend) cleanupServices() error {
 		if err := whisperService.DeleteKeyPairs(); err != nil {
 			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 		}
+		b.selectedAccountShhKeyID = ""
 	default:
 		return err
 	}
@@ -817,28 +825,6 @@ func (b *GethStatusBackend) closeAppDB() error {
 	return nil
 }
 
-// reSelectAccount selects previously selected account, often, after node restart.
-func (b *GethStatusBackend) reSelectAccount() error {
-	b.AccountManager().RemoveOnboarding()
-
-	selectedChatAccount, err := b.accountManager.SelectedChatAccount()
-	if selectedChatAccount == nil || err == account.ErrNoAccountSelected {
-		return nil
-	}
-
-	whisperService, err := b.statusNode.WhisperService()
-	switch err {
-	case node.ErrServiceUnknown: // Whisper was never registered
-	case nil:
-		if err := whisperService.SelectKeyPair(selectedChatAccount.AccountKey.PrivateKey); err != nil {
-			return ErrWhisperIdentityInjectionFailure
-		}
-	default:
-		return err
-	}
-	return nil
-}
-
 // SelectAccount selects current wallet and chat accounts, by verifying that each address has corresponding account which can be decrypted
 // using provided password. Once verification is done, the decrypted chat key is injected into Whisper (as a single identity,
 // all previous identities are removed).
@@ -853,7 +839,15 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 		return err
 	}
 
-	return b.injectAccountIntoServices()
+	if err := b.injectAccountIntoServices(); err != nil {
+		return err
+	}
+
+	if err := b.startWallet(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (b *GethStatusBackend) injectAccountIntoServices() error {
@@ -862,11 +856,17 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 		return err
 	}
 
+	identity := chatAccount.AccountKey.PrivateKey
 	whisperService, err := b.statusNode.WhisperService()
+
 	switch err {
 	case node.ErrServiceUnknown: // Whisper was never registered
 	case nil:
-		if err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey); err != nil {
+		if err := whisperService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
+			return err
+		}
+		b.selectedAccountShhKeyID, err = whisperService.AddKeyPair(identity)
+		if err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
 	default:
@@ -879,11 +879,11 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 			return err
 		}
 
-		if err := st.InitProtocol(b.appDB); err != nil {
+		if err := st.InitProtocol(identity, b.appDB); err != nil {
 			return err
 		}
 	}
-	return b.startWallet()
+	return nil
 }
 
 func (b *GethStatusBackend) startWallet() error {
@@ -910,11 +910,13 @@ func (b *GethStatusBackend) startWallet() error {
 	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,
-		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
+		new(big.Int).SetUint64(b.statusNode.Config().NetworkID),
+	)
 }
 
 // InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.
-func (b *GethStatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex string) error {
+// TODO: change the interface and omit the last argument.
+func (b *GethStatusBackend) InjectChatAccount(chatKeyHex, _ string) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -924,36 +926,9 @@ func (b *GethStatusBackend) InjectChatAccount(chatKeyHex, encryptionKeyHex strin
 	if err != nil {
 		return err
 	}
-
 	b.accountManager.SetChatAccount(chatKey)
-	chatAccount, err := b.accountManager.SelectedChatAccount()
-	if err != nil {
-		return err
-	}
 
-	whisperService, err := b.statusNode.WhisperService()
-	switch err {
-	case node.ErrServiceUnknown: // Whisper was never registered
-	case nil:
-		if err := whisperService.SelectKeyPair(chatAccount.AccountKey.PrivateKey); err != nil {
-			return ErrWhisperIdentityInjectionFailure
-		}
-	default:
-		return err
-	}
-
-	if whisperService != nil {
-		st, err := b.statusNode.ShhExtService()
-		if err != nil {
-			return err
-		}
-
-		if err := st.InitProtocol(b.appDB); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return b.injectAccountIntoServices()
 }
 
 func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {

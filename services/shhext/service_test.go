@@ -122,8 +122,6 @@ func (s *ShhExtSuite) SetupTest() {
 
 		privateKey, err := crypto.GenerateKey()
 		s.NoError(err)
-		err = s.whisper[i].SelectKeyPair(privateKey)
-		s.NoError(err)
 
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return gethbridge.GetGethWhisperFrom(s.whisperWrapper[i]), nil
@@ -147,7 +145,7 @@ func (s *ShhExtSuite) SetupTest() {
 		sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/%d", tmpdir, i), "password")
 		s.Require().NoError(err)
 
-		s.Require().NoError(s.services[i].InitProtocol(sqlDB))
+		s.Require().NoError(s.services[i].InitProtocol(privateKey, sqlDB))
 		s.NoError(stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 			return s.services[i], nil
 		}))
@@ -173,8 +171,6 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	shh := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	err = gethbridge.GetGethWhisperFrom(shh).SelectKeyPair(privateKey)
-	s.Require().NoError(err)
 
 	nodeWrapper := &testNodeWrapper{w: shh}
 	service := New(nodeWrapper, nil, nil, db, config)
@@ -185,7 +181,7 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	s.Require().NoError(err)
 
-	err = service.InitProtocol(sqlDB)
+	err = service.InitProtocol(privateKey, sqlDB)
 	s.NoError(err)
 }
 
@@ -301,8 +297,6 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	shh := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	err = gethbridge.GetGethWhisperFrom(shh).SelectKeyPair(privateKey)
-	s.Require().NoError(err)
 	aNode, err := node.New(&node.Config{
 		P2P: p2p.Config{
 			MaxPeers:    math.MaxInt32,
@@ -333,7 +327,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	s.Require().NoError(err)
 
-	s.Require().NoError(service.InitProtocol(sqlDB))
+	s.Require().NoError(service.InitProtocol(privateKey, sqlDB))
 	s.Require().NoError(service.Start(aNode.Server()))
 	api := NewPublicAPI(service)
 
@@ -599,7 +593,7 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	s.Require().NoError(err)
 
-	s.Require().NoError(s.localService.InitProtocol(sqlDB))
+	s.Require().NoError(s.localService.InitProtocol(nil, sqlDB))
 	s.Require().NoError(s.localService.Start(&p2p.Server{Config: p2p.Config{PrivateKey: localPkey}}))
 	s.localAPI = NewPublicAPI(s.localService)
 

@@ -212,12 +212,6 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 		wg.Add(1)
 		go func() {
-			assert.NoError(t, backend.reSelectAccount())
-			wg.Done()
-		}()
-
-		wg.Add(1)
-		go func() {
 			assert.NoError(t, backend.Logout())
 			wg.Done()
 		}()
