@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"syscall"
 	"time"
 	"unsafe"
 
@@ -35,32 +34,20 @@ type nimbusWhisperWrapper struct {
 	filterMessagesMu sync.Mutex
 	filterMessages   map[string]*list.List
 	routineQueue     *RoutineQueue
-	tid              int
 }
 
 // NewNimbusWhisperWrapper returns an object that wraps Nimbus' Whisper in a types interface
-func NewNimbusWhisperWrapper() types.Whisper {
+func NewNimbusWhisperWrapper(routineQueue *RoutineQueue) types.Whisper {
 	return &nimbusWhisperWrapper{
 		timesource:     func() time.Time { return time.Now() },
 		filters:        map[string]types.Filter{},
 		filterMessages: map[string]*list.List{},
-		routineQueue:   NewRoutineQueue(),
-		tid:            syscall.Gettid(),
+		routineQueue:   routineQueue,
 	}
 }
 
 func (w *nimbusWhisperWrapper) PublicWhisperAPI() types.PublicWhisperAPI {
 	return NewNimbusPublicWhisperAPIWrapper(&w.filterMessagesMu, &w.filterMessages, w.routineQueue)
-}
-
-func (w *nimbusWhisperWrapper) Poll() {
-	if syscall.Gettid() != w.tid {
-		panic("Poll called from wrong thread")
-	}
-
-	C.nimbus_poll()
-
-	w.routineQueue.HandleEvent()
 }
 
 // MinPow returns the PoW value required by this node.
@@ -80,7 +67,7 @@ func (w *nimbusWhisperWrapper) BloomFilter() []byte {
 		dataC := C.malloc(C.size_t(C.BLOOM_LEN))
 		defer C.free(unsafe.Pointer(dataC))
 
-		C.nimbus_get_bloom_filter((*C.uchar)(unsafe.Pointer(dataC)))
+		C.nimbus_get_bloom_filter((*C.uchar)(dataC))
 
 		// Move the returned data into a Go array
 		data := make([]byte, C.BLOOM_LEN)
@@ -121,7 +108,7 @@ func (w *nimbusWhisperWrapper) GetPrivateKey(id string) (*ecdsa.PrivateKey, erro
 		privKeyC := C.malloc(types.AesKeyLength)
 		defer C.free(unsafe.Pointer(privKeyC))
 
-		if ok := C.nimbus_get_private_key(idC, (*C.uchar)(unsafe.Pointer(privKeyC))); !ok {
+		if !C.nimbus_get_private_key(idC, (*C.uchar)(privKeyC)) {
 			c <- errors.New("failed to get private key from Nimbus")
 			return
 		}
@@ -150,7 +137,7 @@ func (w *nimbusWhisperWrapper) AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 
 		idC := C.malloc(C.size_t(C.ID_LEN))
 		defer C.free(idC)
-		if !C.nimbus_add_keypair((*C.uchar)(unsafe.Pointer(privKeyC)), (*C.uchar)(idC)) {
+		if !C.nimbus_add_keypair((*C.uchar)(privKeyC), (*C.uchar)(idC)) {
 			c <- errors.New("failed to add keypair to Nimbus")
 			return
 		}
@@ -185,7 +172,7 @@ func (w *nimbusWhisperWrapper) AddSymKeyDirect(key []byte) (string, error) {
 
 		idC := C.malloc(C.size_t(C.ID_LEN))
 		defer C.free(idC)
-		if !C.nimbus_add_symkey((*C.uchar)(unsafe.Pointer(keyC)), (*C.uchar)(idC)) {
+		if !C.nimbus_add_symkey((*C.uchar)(keyC), (*C.uchar)(idC)) {
 			c <- errors.New("failed to add symkey to Nimbus")
 			return
 		}
@@ -245,7 +232,7 @@ func (w *nimbusWhisperWrapper) GetSymKey(id string) ([]byte, error) {
 		// Allocate a buffer for Nimbus to return the symkey on
 		dataC := C.malloc(C.size_t(C.SYMKEY_LEN))
 		defer C.free(unsafe.Pointer(dataC))
-		if ok := C.nimbus_get_symkey(idC, (*C.uchar)(unsafe.Pointer(dataC))); !ok {
+		if !C.nimbus_get_symkey(idC, (*C.uchar)(dataC)) {
 			c <- errors.New("symkey not found")
 			return
 		}
@@ -329,7 +316,7 @@ func (w *nimbusWhisperWrapper) GetFilter(id string) types.Filter {
 }
 
 func (w *nimbusWhisperWrapper) Unsubscribe(id string) error {
-	return w.routineQueue.Send(func(c chan<- interface{}) {
+	retVal := w.routineQueue.Send(func(c chan<- interface{}) {
 		idC, err := decodeHexID(id)
 		if err != nil {
 			c <- err
@@ -355,7 +342,11 @@ func (w *nimbusWhisperWrapper) Unsubscribe(id string) error {
 		}
 
 		c <- nil
-	}).(error)
+	})
+	if err, ok := retVal.(error); ok {
+		return err
+	}
+	return nil
 }
 
 func decodeHexID(id string) (*C.uint8_t, error) {

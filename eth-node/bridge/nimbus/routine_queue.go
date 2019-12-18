@@ -31,6 +31,10 @@ type event struct {
 }
 
 func (q *RoutineQueue) HandleEvent() {
+	if syscall.Gettid() != q.tid {
+		panic("HandleEvent called from wrong thread")
+	}
+
 	select {
 	case ev := <-q.events:
 		ev.f(ev.done)

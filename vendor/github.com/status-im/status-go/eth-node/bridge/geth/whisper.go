@@ -32,10 +32,6 @@ func (w *gethWhisperWrapper) PublicWhisperAPI() types.PublicWhisperAPI {
 	return NewGethPublicWhisperAPIWrapper(whisper.NewPublicWhisperAPI(w.whisper))
 }
 
-func (w *gethWhisperWrapper) Poll() {
-	// noop
-}
-
 // MinPow returns the PoW value required by this node.
 func (w *gethWhisperWrapper) MinPow() float64 {
 	return w.whisper.MinPow()
