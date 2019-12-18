@@ -75,14 +75,10 @@ func NewNodeBridge() Node {
 }
 
 func (n *nimbusNodeWrapper) StartNimbus(privateKey *ecdsa.PrivateKey, listenAddr string, staging bool) error {
-	retVal := n.routineQueue.Send(func(c chan<- interface{}) {
-		c <- startNimbus(privateKey, listenAddr, staging)
+	return n.routineQueue.Send(func(c chan<- callReturn) {
+		c <- callReturn{err: startNimbus(privateKey, listenAddr, staging)}
 		n.nodeStarted = true
-	})
-	if err, ok := retVal.(error); ok {
-		return err
-	}
-	return nil
+	}).err
 }
 
 func (n *nimbusNodeWrapper) Stop() {

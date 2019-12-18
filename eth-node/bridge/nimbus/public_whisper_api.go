@@ -40,63 +40,63 @@ func NewNimbusPublicWhisperAPIWrapper(filterMessagesMu *sync.Mutex, filterMessag
 
 // AddPrivateKey imports the given private key.
 func (w *nimbusPublicWhisperAPIWrapper) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
-	retVal := w.routineQueue.Send(func(c chan<- interface{}) {
+	retVal := w.routineQueue.Send(func(c chan<- callReturn) {
 		privKeyC := C.CBytes(privateKey)
 		defer C.free(unsafe.Pointer(privKeyC))
 
 		idC := C.malloc(C.size_t(C.ID_LEN))
 		defer C.free(idC)
 		if C.nimbus_add_keypair((*C.uchar)(privKeyC), (*C.uchar)(idC)) {
-			c <- types.EncodeHex(C.GoBytes(idC, C.ID_LEN))
+			c <- callReturn{value: types.EncodeHex(C.GoBytes(idC, C.ID_LEN))}
 		} else {
-			c <- errors.New("failed to add private key to Nimbus")
+			c <- callReturn{err: errors.New("failed to add private key to Nimbus")}
 		}
 	})
-	if err, ok := retVal.(error); ok {
-		return "", err
+	if retVal.err != nil {
+		return "", retVal.err
 	}
 
-	return retVal.(string), nil
+	return retVal.value.(string), nil
 }
 
 // GenerateSymKeyFromPassword derives a key from the given password, stores it, and returns its ID.
 func (w *nimbusPublicWhisperAPIWrapper) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
-	retVal := w.routineQueue.Send(func(c chan<- interface{}) {
+	retVal := w.routineQueue.Send(func(c chan<- callReturn) {
 		passwordC := C.CString(passwd)
 		defer C.free(unsafe.Pointer(passwordC))
 
 		idC := C.malloc(C.size_t(C.ID_LEN))
 		defer C.free(idC)
 		if C.nimbus_add_symkey_from_password(passwordC, (*C.uchar)(idC)) {
-			c <- types.EncodeHex(C.GoBytes(idC, C.ID_LEN))
+			c <- callReturn{value: types.EncodeHex(C.GoBytes(idC, C.ID_LEN))}
 		} else {
-			c <- errors.New("failed to add symkey to Nimbus")
+			c <- callReturn{err: errors.New("failed to add symkey to Nimbus")}
 		}
 	})
-	if err, ok := retVal.(error); ok {
-		return "", err
+	if retVal.err != nil {
+		return "", retVal.err
 	}
 
-	return retVal.(string), nil
+	return retVal.value.(string), nil
 }
 
 // DeleteKeyPair removes the key with the given key if it exists.
 func (w *nimbusPublicWhisperAPIWrapper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
-	retVal := w.routineQueue.Send(func(c chan<- interface{}) {
+	retVal := w.routineQueue.Send(func(c chan<- callReturn) {
 		keyC, err := decodeHexID(key)
 		if err != nil {
-			c <- err
+			c <- callReturn{err: err}
 			return
 		}
 		defer C.free(unsafe.Pointer(keyC))
 
-		c <- C.nimbus_delete_keypair(keyC)
+		c <- callReturn{value: C.nimbus_delete_keypair(keyC)}
 	})
-	if err, ok := retVal.(error); ok {
-		return false, err
+	if retVal.err != nil {
+		return false, retVal.err
 	}
 
-	return retVal.(bool), nil
+	return retVal.value.(bool), nil
 }
 
 // NewMessageFilter creates a new filter that can be used to poll for
@@ -156,7 +156,7 @@ func (w *nimbusPublicWhisperAPIWrapper) GetFilterMessages(id string) ([]*types.M
 // Post posts a message on the Whisper network.
 // returns the hash of the message in case of success.
 func (w *nimbusPublicWhisperAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
-	retVal := w.routineQueue.Send(func(c chan<- interface{}) {
+	retVal := w.routineQueue.Send(func(c chan<- callReturn) {
 		msg := C.post_message{
 			ttl:       C.uint32_t(req.TTL),
 			powTime:   C.double(req.PowTime),
@@ -165,7 +165,7 @@ func (w *nimbusPublicWhisperAPIWrapper) Post(ctx context.Context, req types.NewM
 		if req.SigID != "" {
 			sourceID, err := decodeHexID(req.SigID)
 			if err != nil {
-				c <- err
+				c <- callReturn{err: err}
 				return
 			}
 			msg.sourceID = sourceID
@@ -174,7 +174,7 @@ func (w *nimbusPublicWhisperAPIWrapper) Post(ctx context.Context, req types.NewM
 		if req.SymKeyID != "" {
 			symKeyID, err := decodeHexID(req.SymKeyID)
 			if err != nil {
-				c <- err
+				c <- callReturn{err: err}
 				return
 			}
 			msg.symKeyID = symKeyID
@@ -194,19 +194,19 @@ func (w *nimbusPublicWhisperAPIWrapper) Post(ctx context.Context, req types.NewM
 
 		// TODO: return envelope hash once nimbus_post is improved to return it
 		if C.nimbus_post(&msg) {
-			c <- make([]byte, 0)
+			c <- callReturn{value: make([]byte, 0)}
 			return
 		}
-		c <- fmt.Errorf("failed to post message symkeyid=%s pubkey=%#x topic=%#x", req.SymKeyID, req.PublicKey, req.Topic[:])
+		c <- callReturn{err: fmt.Errorf("failed to post message symkeyid=%s pubkey=%#x topic=%#x", req.SymKeyID, req.PublicKey, req.Topic[:])}
 		// hashC := C.nimbus_post(&msg)
 		// if hashC == nil {
 		// 	return nil, errors.New("Nimbus failed to post message")
 		// }
 		// return hex.DecodeString(C.GoString(hashC))
 	})
-	if err, ok := retVal.(error); ok {
-		return nil, err
+	if retVal.err != nil {
+		return nil, retVal.err
 	}
 
-	return retVal.([]byte), nil
+	return retVal.value.([]byte), nil
 }
