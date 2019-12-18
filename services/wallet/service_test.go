@@ -80,14 +80,14 @@ func (s *ReactorChangesSuite) TestWatchNewAccounts() {
 	})
 	s.Require().NoError(s.reactor.Start([]common.Address{s.first}))
 	s.Require().NoError(utils.Eventually(func() error {
-		transfers, err := s.db.GetTransfersByAddress(s.first, big.NewInt(0), nil)
+		transfers, err := s.db.GetTransfersInRange(s.first, big.NewInt(0), nil)
 		if err != nil {
 			return err
 		}
 		if len(transfers) != 1 {
 			return fmt.Errorf("expect to get 1 transfer for first address %x, got %d", s.first, len(transfers))
 		}
-		transfers, err = s.db.GetTransfersByAddress(s.second, big.NewInt(0), nil)
+		transfers, err = s.db.GetTransfersInRange(s.second, big.NewInt(0), nil)
 		if err != nil {
 			return err
 		}
@@ -98,7 +98,7 @@ func (s *ReactorChangesSuite) TestWatchNewAccounts() {
 	}, 5*time.Second, 500*time.Millisecond))
 	s.feed.Send([]accounts.Account{{Address: types.Address(s.first)}, {Address: types.Address(s.second)}})
 	s.Require().NoError(utils.Eventually(func() error {
-		transfers, err := s.db.GetTransfersByAddress(s.second, big.NewInt(0), nil)
+		transfers, err := s.db.GetTransfersInRange(s.second, big.NewInt(0), nil)
 		if err != nil {
 			return err
 		}

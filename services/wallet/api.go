@@ -43,20 +43,112 @@ func (api *API) GetTransfers(ctx context.Context, start, end *hexutil.Big) ([]Tr
 	return castToTransferViews(rst), nil
 }
 
-// GetTransfersByAddress returns transfers for a single address between two blocks.
-func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, start, end *hexutil.Big) ([]TransferView, error) {
-	log.Debug("call to get transfers for an address", "address", address, "start", start, "end", end)
-	if start == nil {
-		return nil, errors.New("start of the query must be provided. use 0 if you want to load all transfers")
-	}
+type StatsView struct {
+	BlocksStats    map[int64]int64 `json:"blocksStats"`
+	TransfersCount int64           `json:"transfersCount"`
+}
+
+// GetTransfersFromBlock
+func (api *API) GetTransfersFromBlock(ctx context.Context, address common.Address, block *hexutil.Big) ([]TransferView, error) {
+	log.Debug("[WalletAPI:: GetTransfersFromBlock] get transfers from block", "address", address, "block", block)
 	if api.s.db == nil {
 		return nil, ErrServiceNotInitialized
 	}
-	rst, err := api.s.db.GetTransfersByAddress(address, (*big.Int)(start), (*big.Int)(end))
+
+	blocksByAddress := make(map[common.Address][]*big.Int)
+	blocksByAddress[address] = []*big.Int{block.ToInt()}
+
+	txCommand := &loadTransfersCommand{
+		accounts:        []common.Address{address},
+		db:              api.s.db,
+		chain:           api.s.reactor.chain,
+		client:          api.s.client,
+		blocksByAddress: blocksByAddress,
+	}
+
+	err := txCommand.Command()(ctx)
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("result from database for address", "address", address, "start", start, "end", end, "len", len(rst))
+
+	rst, err := api.s.db.GetTransfersInRange(address, block.ToInt(), block.ToInt())
+	if err != nil {
+		return nil, err
+	}
+
+	return castToTransferViews(rst), nil
+}
+
+// GetTransfersByAddress returns transfers for a single address
+func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, beforeBlock, limit *hexutil.Big) ([]TransferView, error) {
+	log.Info("call to get transfers for an address", "address", address, "block", beforeBlock, "limit", limit)
+	if api.s.db == nil {
+		return nil, ErrServiceNotInitialized
+	}
+	rst, err := api.s.db.GetTransfersByAddress(address, beforeBlock.ToInt(), limit.ToInt().Int64())
+	if err != nil {
+		return nil, err
+	}
+
+	transfersCount := big.NewInt(int64(len(rst)))
+	if limit.ToInt().Cmp(transfersCount) == 1 {
+		block, err := api.s.db.GetFirstKnownBlock(address)
+		if err != nil {
+			return nil, err
+		}
+
+		if block == nil {
+			return castToTransferViews(rst), nil
+		}
+
+		from, err := findFirstRange(ctx, address, block, api.s.client)
+		if err != nil {
+			return nil, err
+		}
+		fromByAddress := map[common.Address]*big.Int{address: from}
+		toByAddress := map[common.Address]*big.Int{address: block}
+
+		balanceCache := newBalanceCache()
+		blocksCommand := &findAndCheckBlockRangeCommand{
+			accounts:      []common.Address{address},
+			db:            api.s.db,
+			chain:         api.s.reactor.chain,
+			client:        api.s.client,
+			balanceCache:  balanceCache,
+			feed:          api.s.feed,
+			fromByAddress: fromByAddress,
+			toByAddress:   toByAddress,
+		}
+
+		if err = blocksCommand.Command()(ctx); err != nil {
+			return nil, err
+		}
+
+		blocks, err := api.s.db.GetBlocksByAddress(address, numberOfBlocksCheckedPerIteration)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Info("checking blocks again", "blocks", len(blocks))
+		if len(blocks) > 0 {
+			txCommand := &loadTransfersCommand{
+				accounts: []common.Address{address},
+				db:       api.s.db,
+				chain:    api.s.reactor.chain,
+				client:   api.s.client,
+			}
+
+			err = txCommand.Command()(ctx)
+			if err != nil {
+				return nil, err
+			}
+			rst, err = api.s.db.GetTransfersByAddress(address, beforeBlock.ToInt(), limit.ToInt().Int64())
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return castToTransferViews(rst), nil
 }
 

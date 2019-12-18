@@ -400,6 +400,23 @@ func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 	return
 }
 
+func (db *Database) GetWalletAddresses() (rst []types.Address, err error) {
+	rows, err := db.db.Query("SELECT address FROM accounts WHERE chat = 0 ORDER BY created_at")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		addr := types.Address{}
+		err = rows.Scan(&addr)
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, addr)
+	}
+	return rst, nil
+}
+
 func (db *Database) GetChatAddress() (rst types.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE chat = 1").Scan(&rst)
 	return

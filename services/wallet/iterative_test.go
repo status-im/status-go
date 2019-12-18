@@ -14,11 +14,11 @@ import (
 
 type transfersFixture []Transfer
 
-func (f transfersFixture) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error) {
-	rst := []Transfer{}
+func (f transfersFixture) GetHeadersInRange(ctx context.Context, from, to *big.Int) ([]*DBHeader, error) {
+	rst := []*DBHeader{}
 	for _, t := range f {
 		if t.BlockNumber.Cmp(from) >= 0 && t.BlockNumber.Cmp(to) <= 0 {
-			rst = append(rst, t)
+			rst = append(rst, &DBHeader{Number: t.BlockNumber})
 		}
 	}
 	return rst, nil
@@ -26,25 +26,25 @@ func (f transfersFixture) GetTransfersInRange(ctx context.Context, from, to *big
 
 func TestIterFinished(t *testing.T) {
 	iterator := IterativeDownloader{
-		from: &DBHeader{Number: big.NewInt(10)},
-		to:   &DBHeader{Number: big.NewInt(10)},
+		from: big.NewInt(10),
+		to:   big.NewInt(10),
 	}
 	require.True(t, iterator.Finished())
 }
 
 func TestIterNotFinished(t *testing.T) {
 	iterator := IterativeDownloader{
-		from: &DBHeader{Number: big.NewInt(2)},
-		to:   &DBHeader{Number: big.NewInt(5)},
+		from: big.NewInt(2),
+		to:   big.NewInt(5),
 	}
 	require.False(t, iterator.Finished())
 }
 
 func TestIterRevert(t *testing.T) {
 	iterator := IterativeDownloader{
-		from:     &DBHeader{Number: big.NewInt(12)},
-		to:       &DBHeader{Number: big.NewInt(12)},
-		previous: &DBHeader{Number: big.NewInt(9)},
+		from:     big.NewInt(12),
+		to:       big.NewInt(12),
+		previous: big.NewInt(9),
 	}
 	require.True(t, iterator.Finished())
 	iterator.Revert()
@@ -66,13 +66,13 @@ func TestIterProgress(t *testing.T) {
 		client:     chain,
 		downloader: transfers,
 		batchSize:  big.NewInt(5),
-		from:       &DBHeader{Number: big.NewInt(0)},
-		to:         &DBHeader{Number: big.NewInt(9)},
+		from:       big.NewInt(0),
+		to:         big.NewInt(9),
 	}
-	batch, err := iter.Next(context.TODO())
+	batch, _, _, err := iter.Next(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, batch, 6)
-	batch, err = iter.Next(context.TODO())
+	batch, _, _, err = iter.Next(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, batch, 5)
 	require.True(t, iter.Finished())

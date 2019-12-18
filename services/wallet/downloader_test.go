@@ -30,6 +30,7 @@ type ETHTransferSuite struct {
 	identity, secondary *ecdsa.PrivateKey
 	faucet              *ecdsa.PrivateKey
 	signer              types.Signer
+	dbStop              func()
 
 	downloader *ETHTransferDownloader
 }
@@ -51,13 +52,20 @@ func (s *ETHTransferSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.ethclient = ethclient.NewClient(client)
 	s.signer = types.NewEIP155Signer(big.NewInt(1337))
+	db, stop := setupTestDB(s.Suite.T())
+	s.dbStop = stop
 	s.downloader = &ETHTransferDownloader{
 		signer: s.signer,
 		client: s.ethclient,
+		db:     db,
 		accounts: []common.Address{
 			crypto.PubkeyToAddress(s.identity.PublicKey),
 			crypto.PubkeyToAddress(s.secondary.PublicKey)},
 	}
+}
+
+func (s *ETHTransferSuite) TearDownTest() {
+	s.dbStop()
 }
 
 // signAndMineTx signs transaction with provided key and waits for it to be mined.
@@ -256,7 +264,7 @@ func (s *ERC20TransferSuite) TestInRange() {
 		_, err = bind.WaitMined(timeout, s.ethclient, tx)
 		s.Require().NoError(err)
 	}
-	transfers, err := s.downloader.GetTransfersInRange(context.TODO(), big.NewInt(1), nil)
+	transfers, err := s.downloader.GetHeadersInRange(context.TODO(), big.NewInt(1), nil)
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 5)
 }

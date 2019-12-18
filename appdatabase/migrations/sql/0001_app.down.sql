@@ -6,7 +6,6 @@ DROP TABLE dapps;
 DROP TABLE permissions;
 DROP TABLE transfers;
 DROP TABLE blocks;
-DROP TABLE accounts_to_blocks;
 DROP TABLE mailservers;
 DROP TABLE mailserver_request_gaps;
 DROP INDEX mailserver_request_gaps_chat_id_idx;
