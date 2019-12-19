@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/whisper/v6"
 	validator "gopkg.in/go-playground/validator.v9"
@@ -890,11 +890,11 @@ func (c *NodeConfig) AddAPIModule(m string) {
 func LesTopic(netid int) string {
 	switch netid {
 	case 1:
-		return LESDiscoveryIdentifier + common.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
+		return LESDiscoveryIdentifier + types.Bytes2Hex(params.MainnetGenesisHash.Bytes()[:8])
 	case 3:
-		return LESDiscoveryIdentifier + common.Bytes2Hex(params.TestnetGenesisHash.Bytes()[:8])
+		return LESDiscoveryIdentifier + types.Bytes2Hex(params.TestnetGenesisHash.Bytes()[:8])
 	case 4:
-		return LESDiscoveryIdentifier + common.Bytes2Hex(params.RinkebyGenesisHash.Bytes()[:8])
+		return LESDiscoveryIdentifier + types.Bytes2Hex(params.RinkebyGenesisHash.Bytes()[:8])
 	default:
 		return ""
 	}
