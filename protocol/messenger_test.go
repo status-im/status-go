@@ -1097,17 +1097,17 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		ChatType:  ChatTypePrivateGroupChat,
 		Timestamp: 10,
 		Members: []ChatMember{
-			ChatMember{
+			{
 				ID:     "1",
 				Admin:  false,
 				Joined: true,
 			},
-			ChatMember{
+			{
 				ID:     "2",
 				Admin:  true,
 				Joined: false,
 			},
-			ChatMember{
+			{
 				ID:     "3",
 				Admin:  true,
 				Joined: true,
@@ -1157,12 +1157,12 @@ func (s *MessengerSuite) TestBlockContact() {
 		LastUpdated: 20,
 		SystemTags:  []string{"1", "2"},
 		DeviceInfo: []ContactDeviceInfo{
-			ContactDeviceInfo{
+			{
 				InstallationID: "1",
 				Timestamp:      2,
 				FCMToken:       "token",
 			},
-			ContactDeviceInfo{
+			{
 				InstallationID: "2",
 				Timestamp:      3,
 				FCMToken:       "token-2",
@@ -1216,7 +1216,7 @@ func (s *MessengerSuite) TestBlockContact() {
 	contact.Name = "blocked"
 
 	messages := []*Message{
-		&Message{
+		{
 			ID:          "test-1",
 			LocalChatID: chat2.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1226,7 +1226,7 @@ func (s *MessengerSuite) TestBlockContact() {
 			},
 			From: contact.ID,
 		},
-		&Message{
+		{
 			ID:          "test-2",
 			LocalChatID: chat2.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1236,7 +1236,7 @@ func (s *MessengerSuite) TestBlockContact() {
 			},
 			From: contact.ID,
 		},
-		&Message{
+		{
 			ID:          "test-3",
 			LocalChatID: chat2.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1247,7 +1247,7 @@ func (s *MessengerSuite) TestBlockContact() {
 			Seen: false,
 			From: "test",
 		},
-		&Message{
+		{
 			ID:          "test-4",
 			LocalChatID: chat2.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1258,7 +1258,7 @@ func (s *MessengerSuite) TestBlockContact() {
 			Seen: false,
 			From: "test",
 		},
-		&Message{
+		{
 			ID:          "test-5",
 			LocalChatID: chat2.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1269,7 +1269,7 @@ func (s *MessengerSuite) TestBlockContact() {
 			Seen: true,
 			From: "test",
 		},
-		&Message{
+		{
 			ID:          "test-6",
 			LocalChatID: chat3.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1280,7 +1280,7 @@ func (s *MessengerSuite) TestBlockContact() {
 			Seen: false,
 			From: contact.ID,
 		},
-		&Message{
+		{
 			ID:          "test-7",
 			LocalChatID: chat3.ID,
 			ChatMessage: protobuf.ChatMessage{
@@ -1346,12 +1346,12 @@ func (s *MessengerSuite) TestContactPersistence() {
 		LastUpdated: 20,
 		SystemTags:  []string{"1", "2"},
 		DeviceInfo: []ContactDeviceInfo{
-			ContactDeviceInfo{
+			{
 				InstallationID: "1",
 				Timestamp:      2,
 				FCMToken:       "token",
 			},
-			ContactDeviceInfo{
+			{
 				InstallationID: "2",
 				Timestamp:      3,
 				FCMToken:       "token-2",
@@ -1388,17 +1388,17 @@ func (s *MessengerSuite) TestVerifyENSNames() {
 			PublicKeyString: pk1,
 		},
 		// Not matching pk -> name
-		enstypes.ENSDetails{
+		{
 			Name:            "pedro.stateofus.eth",
 			PublicKeyString: pk2,
 		},
 		// Not existing name
-		enstypes.ENSDetails{
+		{
 			Name:            "definitelynotpedro.stateofus.eth",
 			PublicKeyString: pk3,
 		},
 		// Malformed pk
-		enstypes.ENSDetails{
+		{
 			Name:            "pedro.stateofus.eth",
 			PublicKeyString: pk4,
 		},
@@ -1454,12 +1454,12 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 		LastUpdated: 20,
 		SystemTags:  []string{"1", "2"},
 		DeviceInfo: []ContactDeviceInfo{
-			ContactDeviceInfo{
+			{
 				InstallationID: "1",
 				Timestamp:      2,
 				FCMToken:       "token",
 			},
-			ContactDeviceInfo{
+			{
 				InstallationID: "2",
 				Timestamp:      3,
 				FCMToken:       "token-2",

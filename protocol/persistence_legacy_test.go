@@ -364,7 +364,7 @@ func openTestDB() (*sql.DB, error) {
 }
 
 func insertMinimalMessage(p sqlitePersistence, id string) error {
-	return p.SaveMessagesLegacy([]*Message{&Message{
+	return p.SaveMessagesLegacy([]*Message{{
 		ID:          id,
 		LocalChatID: "chat-id",
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},

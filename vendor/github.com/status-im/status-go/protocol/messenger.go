@@ -1468,11 +1468,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
-	for id, _ := range modifiedChats {
+	for id := range modifiedChats {
 		response.Chats = append(response.Chats, m.allChats[id])
 	}
 
-	for id, _ := range modifiedContacts {
+	for id := range modifiedContacts {
 		response.Contacts = append(response.Contacts, m.allContacts[id])
 	}
 

@@ -190,7 +190,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 
 	dataSyncMessage := datasyncproto.Payload{
 		Messages: []*datasyncproto.Message{
-			&datasyncproto.Message{Body: wrappedPayload},
+			{Body: wrappedPayload},
 		},
 	}
 	marshalledDataSyncMessage, err := proto.Marshal(&dataSyncMessage)
