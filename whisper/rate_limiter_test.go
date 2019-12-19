@@ -99,7 +99,7 @@ func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
 		LimitPerSecIP:      1,
 		LimitPerSecPeerID:  1,
 		WhitelistedIPs:     []string{"<nil>"}, // no IP is represented as <nil> string
-		WhitelistedPeerIDs: []enode.ID{enode.ID{0xaa, 0xbb, 0xcc}},
+		WhitelistedPeerIDs: []enode.ID{{0xaa, 0xbb, 0xcc}},
 	}, h)
 	p := &Peer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),

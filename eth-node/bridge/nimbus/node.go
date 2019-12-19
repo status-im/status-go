@@ -33,12 +33,12 @@ import (
 type nimbusNodeWrapper struct {
 	mu sync.Mutex
 
-	routineQueue     	*RoutineQueue
-	tid              	int
+	routineQueue      *RoutineQueue
+	tid               int
 	nodeStarted       bool
 	cancelPollingChan chan struct{}
 
-	w	types.Whisper
+	w types.Whisper
 }
 
 type Node interface {
@@ -122,7 +122,7 @@ func (n *nimbusNodeWrapper) poll() {
 		panic("poll called from wrong thread")
 	}
 
-	if (n.nodeStarted) {
+	if n.nodeStarted {
 		C.nimbus_poll()
 	}
 
