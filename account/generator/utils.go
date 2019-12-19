@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 )
 
@@ -21,7 +21,7 @@ var (
 
 // ValidateKeystoreExtendedKey validates the keystore keys, checking that
 // ExtendedKey is the extended key of PrivateKey.
-func ValidateKeystoreExtendedKey(key *keystore.Key) error {
+func ValidateKeystoreExtendedKey(key *types.Key) error {
 	if key.ExtendedKey.IsZeroed() {
 		return nil
 	}

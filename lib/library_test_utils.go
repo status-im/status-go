@@ -23,12 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/signal"
@@ -592,8 +591,8 @@ func testSendTransactionWithLogin(t *testing.T, feed *event.Feed) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  account.GethFromAddress(TestConfig.Account1.WalletAddress),
-		To:    account.GethToAddress(TestConfig.Account2.WalletAddress),
+		From:  account.FromAddress(TestConfig.Account1.WalletAddress),
+		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -625,8 +624,8 @@ func testSendTransactionInvalidPassword(t *testing.T, feed *event.Feed) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  common.HexToAddress(acc.WalletAddress),
-		To:    account.GethToAddress(TestConfig.Account2.WalletAddress),
+		From:  types.HexToAddress(acc.WalletAddress),
+		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {
@@ -653,8 +652,8 @@ func testFailedTransaction(t *testing.T, feed *event.Feed) bool {
 	EnsureNodeSync(statusBackend.StatusNode().EnsureSync)
 
 	args, err := json.Marshal(transactions.SendTxArgs{
-		From:  *account.GethToAddress(TestConfig.Account1.WalletAddress),
-		To:    account.GethToAddress(TestConfig.Account2.WalletAddress),
+		From:  *account.ToAddress(TestConfig.Account1.WalletAddress),
+		To:    account.ToAddress(TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	})
 	if err != nil {

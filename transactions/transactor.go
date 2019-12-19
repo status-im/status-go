@@ -10,12 +10,13 @@ import (
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/rpc"
 )
@@ -170,9 +171,18 @@ func (t *Transactor) HashTransaction(args SendTxArgs) (validatedArgs SendTxArgs,
 	if args.Gas == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
+
+		var (
+			gethTo    common.Address
+			gethToPtr *common.Address
+		)
+		if args.To != nil {
+			gethTo = common.Address(*args.To)
+			gethToPtr = &gethTo
+		}
 		gas, err = t.gasCalculator.EstimateGas(ctx, ethereum.CallMsg{
-			From:     args.From,
-			To:       args.To,
+			From:     common.Address(args.From),
+			To:       gethToPtr,
 			GasPrice: gasPrice,
 			Value:    value,
 			Data:     args.GetInput(),
@@ -238,7 +248,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
-	nonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	nonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, common.Address(args.From))
 	if err != nil {
 		return hash, err
 	}
@@ -264,9 +274,18 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	if args.Gas == nil {
 		ctx, cancel = context.WithTimeout(context.Background(), t.rpcCallTimeout)
 		defer cancel()
+
+		var (
+			gethTo    common.Address
+			gethToPtr *common.Address
+		)
+		if args.To != nil {
+			gethTo = common.Address(*args.To)
+			gethToPtr = &gethTo
+		}
 		gas, err = t.gasCalculator.EstimateGas(ctx, ethereum.CallMsg{
-			From:     args.From,
-			To:       args.To,
+			From:     common.Address(args.From),
+			To:       gethToPtr,
 			GasPrice: gasPrice,
 			Value:    value,
 			Data:     args.GetInput(),
@@ -282,14 +301,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 		gas = uint64(*args.Gas)
 	}
 
-	var tx *gethtypes.Transaction
-	if args.To != nil {
-		tx = gethtypes.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
-		t.logNewTx(args, gas, gasPrice, value)
-	} else {
-		tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
-		t.logNewContract(args, gas, gasPrice, value, nonce)
-	}
+	tx := t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
 
 	signedTx, err := gethtypes.SignTx(tx, gethtypes.NewEIP155Signer(chainID), selectedAccount.AccountKey.PrivateKey)
 	if err != nil {
@@ -310,10 +322,14 @@ func (t *Transactor) buildTransaction(args SendTxArgs) *gethtypes.Transaction {
 	gas := uint64(*args.Gas)
 	gasPrice := (*big.Int)(args.GasPrice)
 
+	return t.buildTransactionWithOverrides(nonce, value, gas, gasPrice, args)
+}
+
+func (t *Transactor) buildTransactionWithOverrides(nonce uint64, value *big.Int, gas uint64, gasPrice *big.Int, args SendTxArgs) *gethtypes.Transaction {
 	var tx *gethtypes.Transaction
 
 	if args.To != nil {
-		tx = gethtypes.NewTransaction(nonce, *args.To, value, gas, gasPrice, args.GetInput())
+		tx = gethtypes.NewTransaction(nonce, common.Address(*args.To), value, gas, gasPrice, args.GetInput())
 		t.logNewTx(args, gas, gasPrice, value)
 	} else {
 		tx = gethtypes.NewContractCreation(nonce, value, gas, gasPrice, args.GetInput())
@@ -337,7 +353,7 @@ func (t *Transactor) getTransactionNonce(args SendTxArgs) (newNonce uint64, err 
 	// get the remote nonce
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
-	remoteNonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, args.From)
+	remoteNonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, common.Address(args.From))
 	if err != nil {
 		return newNonce, err
 	}

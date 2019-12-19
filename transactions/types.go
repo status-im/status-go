@@ -8,6 +8,7 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 var (
@@ -36,8 +37,8 @@ type GasCalculator interface {
 // This struct is based on go-ethereum's type in internal/ethapi/api.go, but we have freedom
 // over the exact layout of this struct.
 type SendTxArgs struct {
-	From     common.Address  `json:"from"`
-	To       *common.Address `json:"to"`
+	From     types.Address   `json:"from"`
+	To       *types.Address  `json:"to"`
 	Gas      *hexutil.Uint64 `json:"gas"`
 	GasPrice *hexutil.Big    `json:"gasPrice"`
 	Value    *hexutil.Big    `json:"value"`
@@ -45,8 +46,8 @@ type SendTxArgs struct {
 	// We keep both "input" and "data" for backward compatibility.
 	// "input" is a preferred field.
 	// see `vendor/github.com/ethereum/go-ethereum/internal/ethapi/api.go:1107`
-	Input hexutil.Bytes `json:"input"`
-	Data  hexutil.Bytes `json:"data"`
+	Input types.HexBytes `json:"input"`
+	Data  types.HexBytes `json:"data"`
 }
 
 // Valid checks whether this structure is filled in correctly.
@@ -61,7 +62,7 @@ func (args SendTxArgs) Valid() bool {
 }
 
 // GetInput returns either Input or Data field's value dependent on what is filled.
-func (args SendTxArgs) GetInput() hexutil.Bytes {
+func (args SendTxArgs) GetInput() types.HexBytes {
 	if !isNilOrEmpty(args.Input) {
 		return args.Input
 	}
@@ -69,6 +70,6 @@ func (args SendTxArgs) GetInput() hexutil.Bytes {
 	return args.Data
 }
 
-func isNilOrEmpty(bytes hexutil.Bytes) bool {
+func isNilOrEmpty(bytes types.HexBytes) bool {
 	return bytes == nil || len(bytes) == 0
 }
