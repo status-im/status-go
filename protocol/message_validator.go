@@ -39,10 +39,6 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage) error {
 		if sticker == nil {
 			return errors.New("No sticker content")
 		}
-
-		if sticker.Pack == 0 {
-			return errors.New("Sticker pack not set")
-		}
 		if len(sticker.Hash) == 0 {
 			return errors.New("Sticker hash not set")
 		}
