@@ -3,12 +3,11 @@ package status
 import (
 	"crypto/ecdsa"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // Make sure that Service implements node.Service interface.
@@ -21,7 +20,7 @@ type WhisperService interface {
 
 // AccountManager interface to manage account actions
 type AccountManager interface {
-	AddressToDecryptedAccount(string, string) (accounts.Account, *keystore.Key, error)
+	AddressToDecryptedAccount(string, string) (types.Account, *types.Key, error)
 	SelectAccount(account.LoginParams) error
 	CreateAccount(password string) (accountInfo account.Info, mnemonic string, err error)
 }

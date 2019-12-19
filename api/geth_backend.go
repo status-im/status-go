@@ -70,7 +70,7 @@ type GethStatusBackend struct {
 	personalAPI             *personal.PublicAPI
 	rpcFilters              *rpcfilters.Service
 	multiaccountsDB         *multiaccounts.Database
-	accountManager          *account.Manager
+	accountManager          *account.GethManager
 	transactor              *transactions.Transactor
 	connectionState         connectionState
 	appState                appState
@@ -104,7 +104,7 @@ func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 }
 
 // AccountManager returns reference to account manager
-func (b *GethStatusBackend) AccountManager() *account.Manager {
+func (b *GethStatusBackend) AccountManager() *account.GethManager {
 	return b.accountManager
 }
 
@@ -386,7 +386,7 @@ func (b *GethStatusBackend) subscriptionService() gethnode.ServiceConstructor {
 
 func (b *GethStatusBackend) accountsService(accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, b.accountManager, accountsFeed), nil
+		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, &b.accountManager.Manager, accountsFeed), nil
 	}
 }
 
@@ -683,7 +683,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 	}
 
 	return &account.SelectedExtKey{
-		Address:    types.Address(key.Address),
+		Address:    key.Address,
 		AccountKey: key,
 	}, nil
 }

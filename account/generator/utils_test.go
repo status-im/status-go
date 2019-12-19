@@ -3,7 +3,7 @@ package generator
 import (
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func TestValidateKeystoreExtendedKey(t *testing.T) {
 	extendedKey2 := generateTestKey(t)
 
 	// new keystore file format
-	key := &keystore.Key{
+	key := &types.Key{
 		PrivateKey:  extendedKey1.ToECDSA(),
 		ExtendedKey: extendedKey1,
 	}
@@ -33,14 +33,14 @@ func TestValidateKeystoreExtendedKey(t *testing.T) {
 
 	// old keystore file format where the extended key was
 	// from another derivation path and not the same of the private key
-	oldKey := &keystore.Key{
+	oldKey := &types.Key{
 		PrivateKey:  extendedKey1.ToECDSA(),
 		ExtendedKey: extendedKey2,
 	}
 	assert.Error(t, ValidateKeystoreExtendedKey(oldKey))
 
 	// normal key where we don't have an extended key
-	normalKey := &keystore.Key{
+	normalKey := &types.Key{
 		PrivateKey:  extendedKey1.ToECDSA(),
 		ExtendedKey: nil,
 	}

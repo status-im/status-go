@@ -121,7 +121,7 @@ func (s *TransactionsTestSuite) TestEmptyToFieldPreserved() {
 	utils.EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	args := transactions.SendTxArgs{
-		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
 	}
 
 	hash, err := s.Backend.SendTransaction(args, utils.TestConfig.Account1.Password)
@@ -135,7 +135,7 @@ func (s *TransactionsTestSuite) TestSendContractTxCompat() {
 	utils.CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
 
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
-		args.Data = (hexutil.Bytes)(byteCode)
+		args.Data = (types.HexBytes)(byteCode)
 	}
 	s.testSendContractTx(initFunc, nil, "")
 }
@@ -148,8 +148,8 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 
 	// Scenario 1: Both fields are filled and have the same value, expect success
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
-		args.Input = (hexutil.Bytes)(byteCode)
-		args.Data = (hexutil.Bytes)(byteCode)
+		args.Input = (types.HexBytes)(byteCode)
+		args.Data = (types.HexBytes)(byteCode)
 	}
 	s.testSendContractTx(initFunc, nil, "")
 
@@ -164,8 +164,8 @@ func (s *TransactionsTestSuite) TestSendContractTxCollision() {
 	}
 
 	initFunc2 := func(byteCode []byte, args *transactions.SendTxArgs) {
-		args.Input = (hexutil.Bytes)(byteCode)
-		args.Data = (hexutil.Bytes)(inverted(byteCode))
+		args.Input = (types.HexBytes)(byteCode)
+		args.Data = (types.HexBytes)(inverted(byteCode))
 	}
 	s.testSendContractTx(initFunc2, transactions.ErrInvalidSendTxArgs, "expected error when invalid tx args are sent")
 }
@@ -174,7 +174,7 @@ func (s *TransactionsTestSuite) TestSendContractTx() {
 	utils.CheckTestSkipForNetworks(s.T(), params.MainNetworkID)
 
 	initFunc := func(byteCode []byte, args *transactions.SendTxArgs) {
-		args.Input = (hexutil.Bytes)(byteCode)
+		args.Input = (types.HexBytes)(byteCode)
 	}
 	s.testSendContractTx(initFunc, nil, "")
 }
@@ -199,7 +199,7 @@ func (s *TransactionsTestSuite) testSendContractTx(setInputAndDataValue initFunc
 
 	gas := uint64(params.DefaultGas)
 	args := transactions.SendTxArgs{
-		From: account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
+		From: account.FromAddress(utils.TestConfig.Account1.WalletAddress),
 		To:   nil, // marker, contract creation is expected
 		//Value: (*hexutil.Big)(new(big.Int).Mul(big.NewInt(1), common.Ether)),
 		Gas: (*hexutil.Uint64)(&gas),
@@ -231,8 +231,8 @@ func (s *TransactionsTestSuite) TestSendEther() {
 	utils.EnsureNodeSync(s.Backend.StatusNode().EnsureSync)
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
-		From:  account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:    account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
+		From:  account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:    account.ToAddress(utils.TestConfig.Account2.WalletAddress),
 		Value: (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, utils.TestConfig.Account1.Password)
 	s.NoError(err)
@@ -257,8 +257,8 @@ func (s *TransactionsTestSuite) TestSendEtherTxUpstream() {
 	defer s.LogoutAndStop()
 
 	hash, err := s.Backend.SendTransaction(transactions.SendTxArgs{
-		From:     account.GethFromAddress(utils.TestConfig.Account1.WalletAddress),
-		To:       account.GethToAddress(utils.TestConfig.Account2.WalletAddress),
+		From:     account.FromAddress(utils.TestConfig.Account1.WalletAddress),
+		To:       account.ToAddress(utils.TestConfig.Account2.WalletAddress),
 		GasPrice: (*hexutil.Big)(big.NewInt(28000000000)),
 		Value:    (*hexutil.Big)(big.NewInt(1000000000000)),
 	}, utils.TestConfig.Account1.Password)

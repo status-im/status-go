@@ -6,8 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/golang/mock/gomock"
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
@@ -46,10 +44,10 @@ var logintests = []struct {
 		expectedAddressKey: "addressKey",
 		expectedError:      nil,
 		prepareExpectations: func(s *StatusSuite) {
-			key := keystore.Key{
+			key := types.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, nil)
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(types.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("addressKey", nil)
 
 			loginParams := account.LoginParams{
@@ -65,10 +63,10 @@ var logintests = []struct {
 		expectedAddressKey: "",
 		expectedError:      errors.New("foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			key := keystore.Key{
+			key := types.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, errors.New("foo"))
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(types.Account{}, &key, errors.New("foo"))
 		},
 	},
 	{
@@ -76,10 +74,10 @@ var logintests = []struct {
 		expectedAddressKey: "",
 		expectedError:      errors.New("foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			key := keystore.Key{
+			key := types.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, nil)
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(types.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", errors.New("foo"))
 		},
 	},
@@ -88,10 +86,10 @@ var logintests = []struct {
 		expectedAddressKey: "",
 		expectedError:      errors.New("foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			key := keystore.Key{
+			key := types.Key{
 				PrivateKey: &ecdsa.PrivateKey{},
 			}
-			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(accounts.Account{}, &key, nil)
+			s.am.EXPECT().AddressToDecryptedAccount("0x01", "password").Return(types.Account{}, &key, nil)
 			s.w.EXPECT().AddKeyPair(key.PrivateKey).Return("", nil)
 
 			loginParams := account.LoginParams{
