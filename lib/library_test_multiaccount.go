@@ -6,7 +6,7 @@ import (
 	"C"
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/eth-node/crypto"
 	mobile "github.com/status-im/status-go/mobile"
 )
 import (
