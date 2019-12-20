@@ -11,6 +11,11 @@ MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
 DATA_PATH="${DATA_PATH:-/var/tmp/status-go-mail}"
 CONFIG_PATH="${CONFIG_PATH:-${DATA_PATH}/config.json}"
 
+if ! [[ -x $(command -v jq) ]]; then
+  echo "Cannot generate config. jq utility is not installed."
+  exit 1
+fi
+
 if [[ -e "${CONFIG_PATH}" ]]; then
   echo "Config already exits. Remove it to generate a new one."
   exit 0

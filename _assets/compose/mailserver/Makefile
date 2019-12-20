@@ -1,10 +1,10 @@
 export GIT_ROOT = $(shell git rev-parse --show-toplevel)
 
-RED    := $(shell tput -Txterm setaf 1)
-GREEN  := $(shell tput -Txterm setaf 2)
-YELLOW := $(shell tput -Txterm setaf 3)
-RESET  := $(shell tput -Txterm sgr0)
-BOLD   := $(shell tput bold)
+RED := $(shell tput -Txterm setaf 1)
+GRN := $(shell tput -Txterm setaf 2)
+YLW := $(shell tput -Txterm setaf 3)
+RST := $(shell tput -Txterm sgr0)
+BLD := $(shell tput bold)
 
 # Settings
 export LOG_LEVEL      ?= INFO
@@ -23,22 +23,22 @@ all: checks start show info enode
 
 checks:
 ifeq (, $(shell which docker))
-	$(error No $(BOLD)docker$(RESET) in your $$PATH. Please install it)
+	$(error $(RED)No 'docker' in your $$PATH. Please install it$(RST))
 endif
 ifeq (, $(shell docker version | grep Server))
-	$(error No permissions to run $(BOLD)docker$(RESET). Add yourself to docker group)
+	$(error $(RED)No permissions to run 'docker'. Add yourself to docker group$(RST))
 endif
 ifeq (, $(shell which docker-compose))
-	$(error No $(BOLD)docker-compose$(RESET) in your $$PATH. Please install it)
+	$(error $(RED)No 'docker-compose' in your $$PATH. Please install it$(RST))
 endif
 ifeq (, $(shell which jq))
-	$(error No $(BOLD)jq$(RESET) in your $$PATH. Please install it)
+	$(error $(RED)No 'jq' in your $$PATH. Please install it$(RST))
 endif
 ifndef PUBLIC_IP
-	$(error PUBLIC_IP not set! Export it as environment variable)
+	$(error $(RED)$$PUBLIC_IP not set! Export it as environment variable$(RST))
 endif
 ifndef CONTAINER_NAME
-	$(error CONTAINER_NAME not set! Export it as environment variable)
+	$(error $(RED)$$CONTAINER_NAME not set! Export it as environment variable$(RST))
 endif
 
 start: config
@@ -57,9 +57,9 @@ config:
 	@$(GIT_ROOT)/_assets/scripts/gen_config.sh
 
 info:
-	@echo "$(GREEN)Your mailserver is listening on:$(RESET) $(BOLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RESET)"
-	@echo "$(YELLOW)Make sure that address and TCP port are available from the internet!$(RESET)"
-	@echo "$(GREEN)Your enode address is:$(RESET)"
+	@echo "$(GRN)Your mailserver is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)"
+	@echo "$(YLW)Make sure that address and TCP port are available from the internet!$(RST)"
+	@echo "$(GRN)Your enode address is:$(RST)"
 
 show:
 	@docker ps \

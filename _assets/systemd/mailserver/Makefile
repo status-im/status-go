@@ -32,6 +32,9 @@ all: checks build config service enable restart info
 clean: stop disable rm-service forget 
 
 checks:
+ifeq (, $(shell which jq))
+	$(error $(RED)No 'jq' in your $$PATH. please install it$(RST))
+endif
 # this setup wont work without an os with systemd
 ifeq (, $(shell which systemctl))
 	$(error $(RED)Your system does not have systemd$(RST))
