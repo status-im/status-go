@@ -357,8 +357,6 @@ func Login(accountData, password *C.char) *C.char {
 // SaveAccountAndLogin saves account in status-go database..
 //export SaveAccountAndLogin
 func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData *C.char) *C.char {
-	fmt.Printf("================ SaveAccountAndLogin %s\n", C.GoString(subaccountData))
-
 	data, setJSON, confJSON, subData := C.GoString(accountData), C.GoString(settingsJSON), C.GoString(configJSON), C.GoString(subaccountData)
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(data), &account)

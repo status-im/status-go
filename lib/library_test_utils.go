@@ -155,66 +155,66 @@ func testExportedAPI(t *testing.T) {
 		name string
 		fn   func(t *testing.T, feed *event.Feed) bool
 	}{
-		//{
-		//	"StopResumeNode",
-		//	testStopResumeNode,
-		//},
-		//{
-		//	"RPCInProc",
-		//	testCallRPC,
-		//},
-		//{
-		//	"RPCPrivateAPI",
-		//	testCallRPCWithPrivateAPI,
-		//},
-		//{
-		//	"RPCPrivateClient",
-		//	testCallPrivateRPCWithPrivateAPI,
-		//},
-		//{
-		//	"VerifyAccountPassword",
-		//	testVerifyAccountPassword,
-		//},
-		//{
-		//	"RecoverAccount",
-		//	testRecoverAccount,
-		//},
-		//{
-		//	"LoginKeycard",
-		//	testLoginWithKeycard,
-		//},
-		//{
-		//	"AccountLogout",
-		//	testAccountLogout,
-		//},
+		{
+			"StopResumeNode",
+			testStopResumeNode,
+		},
+		{
+			"RPCInProc",
+			testCallRPC,
+		},
+		{
+			"RPCPrivateAPI",
+			testCallRPCWithPrivateAPI,
+		},
+		{
+			"RPCPrivateClient",
+			testCallPrivateRPCWithPrivateAPI,
+		},
+		{
+			"VerifyAccountPassword",
+			testVerifyAccountPassword,
+		},
+		{
+			"RecoverAccount",
+			testRecoverAccount,
+		},
+		{
+			"LoginKeycard",
+			testLoginWithKeycard,
+		},
+		{
+			"AccountLogout",
+			testAccountLogout,
+		},
 		{
 			"SendTransactionWithLogin",
 			testSendTransactionWithLogin,
 		},
-		//{
-		//	"SendTransactionInvalidPassword",
-		//	testSendTransactionInvalidPassword,
-		//},
-		//{
-		//	"SendTransactionFailed",
-		//	testFailedTransaction,
-		//},
-		//{
-		//	"MultiAccount/Generate/Derive/StoreDerived/Load/Reset",
-		//	testMultiAccountGenerateDeriveStoreLoadReset,
-		//},
-		//{
-		//	"MultiAccount/ImportMnemonic/Derive",
-		//	testMultiAccountImportMnemonicAndDerive,
-		//},
-		//{
-		//	"MultiAccount/GenerateAndDerive",
-		//	testMultiAccountGenerateAndDerive,
-		//},
-		//{
-		//	"MultiAccount/Import/Store",
-		//	testMultiAccountImportStore,
-		//},
+		{
+			"SendTransactionInvalidPassword",
+			testSendTransactionInvalidPassword,
+		},
+		{
+			"SendTransactionFailed",
+			testFailedTransaction,
+		},
+		{
+			"MultiAccount/Generate/Derive/StoreDerived/Load/Reset",
+			testMultiAccountGenerateDeriveStoreLoadReset,
+		},
+		{
+			"MultiAccount/ImportMnemonic/Derive",
+			testMultiAccountImportMnemonicAndDerive,
+		},
+		{
+			"MultiAccount/GenerateAndDerive",
+			testMultiAccountGenerateAndDerive,
+		},
+		{
+			"MultiAccount/Import/Store",
+			testMultiAccountImportStore,
+		},
 	}
 
 	for _, tc := range tests {
