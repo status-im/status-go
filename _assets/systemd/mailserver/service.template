@@ -10,7 +10,7 @@ ExecStart=${GIT_ROOT}/build/bin/statusd \
     -log-without-color \
     -log "${LOG_LEVEL}" \
     -dir "${DATA_PATH}" \
-    -c "./config.json" \
+    -c "${DATA_PATH}/config.json" \
     -metrics
 
 [Install]

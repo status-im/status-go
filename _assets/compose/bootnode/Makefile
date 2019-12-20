@@ -1,14 +1,13 @@
 GIT_ROOT = $(shell git rev-parse --show-toplevel)
 
-RED    := $(shell tput -Txterm setaf 1)
-GREEN  := $(shell tput -Txterm setaf 2)
-YELLOW := $(shell tput -Txterm setaf 3)
-RESET  := $(shell tput -Txterm sgr0)
-BOLD   := $(shell tput bold)
+RED := $(shell tput -Txterm setaf 1)
+GRN := $(shell tput -Txterm setaf 2)
+YLW := $(shell tput -Txterm setaf 3)
+RST := $(shell tput -Txterm sgr0)
+BLD := $(shell tput bold)
 
 UID = $(shell id -u)
 GID = $(shell id -g)
-
 
 # Settings
 export LOG_LEVEL       ?= 3
@@ -23,22 +22,22 @@ all: checks start show info enode
 
 checks:
 ifeq (, $(shell which docker))
-	$(error No $(BOLD)docker$(RESET) in your $$PATH. Please install it)
+	$(error $(RED)No 'docker' in your $$PATH. Please install it$(RST))
 endif
 ifeq (, $(shell docker version | grep Server))
-	$(error No permissions to run $(BOLD)docker$(RESET). Add yourself to docker group)
+	$(error $(RED)No permissions to run 'docker'. Add yourself to docker group$(RST))
 endif
 ifeq (, $(shell which docker-compose))
-	$(error No $(BOLD)docker-compose$(RESET) in your $$PATH. Please install it)
+	$(error $(RED)No 'docker-compose' in your $$PATH. Please install it$(RST))
 endif
 ifeq (, $(shell which jq))
-	$(error No $(BOLD)jq$(RESET) in your $$PATH. Please install it)
+	$(error $(RED)No 'jq' in your $$PATH. Please install it$(RST))
 endif
 ifndef PUBLIC_IP
-	$(error PUBLIC_IP not set! Export it as environment variable)
+	$(error $(RED)$$PUBLIC_IP not set! Export it as environment variable$(RST))
 endif
 ifndef CONTAINER_NAME
-	$(error CONTAINER_NAME not set! Export it as environment variable)
+	$(error $(RED)$$CONTAINER_NAME not set! Export it as environment variable$(RST))
 endif
 
 start: keys/nodekey keys/nodeaddr
@@ -54,9 +53,9 @@ enode: keys/nodeaddr
 	@echo "enode://$(shell cat keys/nodeaddr)@$(PUBLIC_IP):$(LISTEN_PORT)"
 
 info:
-	@echo "$(GREEN)Your bootnode is listening on:$(RESET) $(BOLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RESET)"
-	@echo "$(YELLOW)Make sure that address and UDP port are available from the internet!$(RESET)"
-	@echo "$(GREEN)Your enode address is:$(RESET)"
+	@echo "$(GRN)Your bootnode is listening on:$(RST) $(BLD)$(PUBLIC_IP):$(LISTEN_PORT)$(RST)"
+	@echo "$(YLW)Make sure that address and UDP port are available from the internet!$(RST)"
+	@echo "$(GRN)Your enode address is:$(RST)"
 
 keys:
 	@mkdir -p keys
@@ -68,7 +67,7 @@ keys/nodekey: keys ##@ Generate a node key
 		-v $(PWD)/keys:/keys:rw \
 		$(CONTAINER_IMAGE) \
 		-genkey=/keys/nodekey
-	@echo "$(GREEN)Created key for Bootnode: keys/nodekey"
+	@echo "$(GRN)Created key for Bootnode: keys/nodekey$(RST)"
 
 keys/nodeaddr: keys ##@ Save node address for given key
 	@docker run --rm \
