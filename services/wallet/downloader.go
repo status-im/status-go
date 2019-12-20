@@ -111,12 +111,16 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 				if err != nil {
 					return nil, err
 				}
-				if isTokenTransfer(receipt.Logs) {
-					log.Debug("eth downloader found token transfer", "hash", tx.Hash())
-					continue
+				transactionLog := getTokenLog(receipt.Logs)
+				transactionType := ethTransfer
+
+				log.Info("eth downloader found transfer", "block", blk.Number(), "hash", tx.Hash())
+				if transactionLog != nil {
+					log.Info("eth downloader found token transfer", "hash", tx.Hash())
+					transactionType = erc20Transfer
 				}
 				rst = append(rst, Transfer{
-					Type:        ethTransfer,
+					Type:        transactionType,
 					ID:          tx.Hash(),
 					Address:     address,
 					BlockNumber: blk.Number(),
@@ -124,11 +128,13 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 					Timestamp:   blk.Time(),
 					Transaction: tx,
 					From:        from,
-					Receipt:     receipt})
+					Receipt:     receipt,
+					Log:         transactionLog})
 
 			}
 		}
 	}
+	log.Info("getTransfersInBlock found", "len", len(rst))
 	// TODO(dshulyak) test that balance difference was covered by transactions
 	return rst, nil
 }
@@ -234,6 +240,26 @@ func (d *ERC20TransfersDownloader) transfersFromLogs(parent context.Context, log
 	return concurrent.Get(), concurrent.Error()
 }
 
+func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs []types.Log, address common.Address) ([]*big.Int, error) {
+	concurrent := NewConcurrentDownloader(parent)
+	for i := range logs {
+		l := logs[i]
+		if l.Removed {
+			continue
+		}
+		concurrent.Add(func(ctx context.Context) error {
+			concurrent.PushBlock(big.NewInt(int64(l.BlockNumber)))
+			return nil
+		})
+	}
+	select {
+	case <-concurrent.WaitAsync():
+	case <-parent.Done():
+		return nil, errors.New("logs downloader stuck")
+	}
+	return concurrent.GetBlocks(), concurrent.Error()
+}
+
 // GetTransfers for erc20 uses eth_getLogs rpc with Transfer event signature and our address acount.
 func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBHeader) ([]Transfer, error) {
 	hash := header.Hash
@@ -268,10 +294,10 @@ func (d *ERC20TransfersDownloader) GetTransfers(ctx context.Context, header *DBH
 
 // GetTransfersInRange returns transfers between two blocks.
 // time to get logs for 100000 blocks = 1.144686979s. with 249 events in the result set.
-func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, from, to *big.Int) ([]Transfer, error) {
+func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, from, to *big.Int) ([]*big.Int, error) {
 	start := time.Now()
 	log.Debug("get erc20 transfers in range", "from", from, "to", to)
-	transfers := []Transfer{}
+	blocks := []*big.Int{}
 	for _, address := range d.accounts {
 		ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 		outbound, err := d.client.FilterLogs(ctx, ethereum.FilterQuery{
@@ -297,14 +323,14 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, f
 		if len(logs) == 0 {
 			continue
 		}
-		rst, err := d.transfersFromLogs(parent, logs, address)
+		rst, err := d.blocksFromLogs(parent, logs, address)
 		if err != nil {
 			return nil, err
 		}
-		transfers = append(transfers, rst...)
+		blocks = append(blocks, rst...)
 	}
-	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "lth", len(transfers), "took", time.Since(start))
-	return transfers, nil
+	log.Debug("found erc20 transfers between two blocks", "from", from, "to", to, "blocks", len(blocks), "took", time.Since(start))
+	return blocks, nil
 }
 
 func isTokenTransfer(logs []*types.Log) bool {
@@ -315,4 +341,14 @@ func isTokenTransfer(logs []*types.Log) bool {
 		}
 	}
 	return false
+}
+
+func getTokenLog(logs []*types.Log) *types.Log {
+	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
+	for _, l := range logs {
+		if len(l.Topics) > 0 && l.Topics[0] == signature {
+			return l
+		}
+	}
+	return nil
 }

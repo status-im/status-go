@@ -3,7 +3,6 @@ package wallet
 import (
 	"io/ioutil"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -15,11 +14,12 @@ import (
 func setupTestDB(t *testing.T) (*Database, func()) {
 	tmpfile, err := ioutil.TempFile("", "wallet-tests-")
 	require.NoError(t, err)
+	t.Log(tmpfile.Name())
 	db, err := appdatabase.InitializeDB(tmpfile.Name(), "wallet-tests")
 	require.NoError(t, err)
 	return NewDB(db, 1777), func() {
 		require.NoError(t, db.Close())
-		require.NoError(t, os.Remove(tmpfile.Name()))
+		//require.NoError(t, os.Remove(tmpfile.Name()))
 	}
 }
 
@@ -66,6 +66,29 @@ func TestDBHeaderDoesntExist(t *testing.T) {
 	rst, err := db.HeaderExists(common.Hash{1})
 	require.NoError(t, err)
 	require.False(t, rst)
+}
+
+func TestDBProcessBlocks(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	from := big.NewInt(0)
+	to := big.NewInt(10)
+	blocks := []*big.Int{big.NewInt(1), big.NewInt(2)}
+	t.Log(blocks)
+	require.NoError(t, db.ProcessBlocks(common.Address{1}, from, to, blocks, ethTransfer))
+	t.Log(db.GetLastBlockByAddress(common.Address{1}, 40))
+	/*transfers := []Transfer{
+		{
+			ID:          common.Hash{1},
+			Type:        ethTransfer,
+			BlockHash:   common.Hash{2},
+			BlockNumber: big.NewInt(1),
+			Address:     common.Address{1},
+			Timestamp:   123,
+			From:        common.Address{1},
+		},
+	}*/
+	t.Log(db.GetTransfersStats(common.Address{1}))
 }
 
 func TestDBProcessTransfer(t *testing.T) {

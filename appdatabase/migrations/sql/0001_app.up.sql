@@ -56,8 +56,8 @@ sender VARCHAR NOT NULL,
 receipt BLOB,
 log BLOB,
 type VARCHAR NOT NULL,
-FOREIGN KEY(network_id,blk_hash) REFERENCES blocks(network_id,hash) ON DELETE CASCADE,
-CONSTRAINT unique_transfer_per_address_per_network UNIQUE (hash,address,network_id)
+blk_number BIGINT NOT NULL,
+timestamp UNSIGNED BIGINT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS blocks (
@@ -68,6 +68,23 @@ timestamp UNSIGNED BIGINT NOT NULL,
 head BOOL DEFAULT FALSE,
 CONSTRAINT unique_block_per_network UNIQUE (network_id,hash)
 CONSTRAINT unique_block_number_per_network UNIQUE (network_id,number)
+);
+
+CREATE TABLE IF NOT EXISTS blocks_with_transactions (
+network_id UNSIGNED BIGINT NOT NULL,
+address VARCHAR NOT NULL,
+blk_number BIGINT NOT NULL,
+blk_hash VARCHAR,
+loaded BOOL DEFAULT FALSE,
+CONSTRAINT unique_mapping_for_account_to_block_per_network UNIQUE (address,blk_number,network_id)
+);
+
+CREATE TABLE IF NOT EXISTS blocks_ranges (
+network_id UNSIGNED BIGINT NOT NULL,
+address VARCHAR NOT NULL,
+blk_from BIGINT NOT NULL,
+blk_to BIGINT NOT NULL,
+type VARCHAR NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS accounts_to_blocks (

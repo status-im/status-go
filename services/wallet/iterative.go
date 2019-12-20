@@ -12,16 +12,12 @@ import (
 // SetupIterativeDownloader configures IterativeDownloader with last known synced block.
 func SetupIterativeDownloader(
 	db *Database, client HeaderReader, address common.Address, option SyncOption,
-	downloader BatchDownloader, size *big.Int, to *DBHeader) (*IterativeDownloader, error) {
-	from, err := db.GetLatestSynced(address, option)
-	if err != nil {
-		log.Error("failed to get latest synced block", "error", err)
-		return nil, err
+	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int) (*IterativeDownloader, error) {
+	adjustedSize := big.NewInt(0).Div(big.NewInt(0).Sub(to, from), big.NewInt(10))
+	if adjustedSize.Cmp(size) == 1 {
+		size = adjustedSize
 	}
-	if from == nil {
-		from = &DBHeader{Number: zero}
-	}
-	log.Debug("iterative downloader", "address", address, "from", from.Number, "to", to.Number)
+	log.Info("iterative downloader", "address", address, "from", from, "to", to, "size", size)
 	d := &IterativeDownloader{
 		client:     client,
 		batchSize:  size,
@@ -34,7 +30,7 @@ func SetupIterativeDownloader(
 
 // BatchDownloader interface for loading transfers in batches in speificed range of blocks.
 type BatchDownloader interface {
-	GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error)
+	GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]*big.Int, error)
 }
 
 // IterativeDownloader downloads batches of transfers in a specified size.
@@ -45,42 +41,46 @@ type IterativeDownloader struct {
 
 	downloader BatchDownloader
 
-	from, to *DBHeader
-	previous *DBHeader
+	from, to *big.Int
+	previous *big.Int
 }
 
 // Finished true when earliest block with given sync option is zero.
 func (d *IterativeDownloader) Finished() bool {
-	return d.from.Number.Cmp(d.to.Number) == 0
+	return d.from.Cmp(d.to) == 0
 }
 
 // Header return last synced header.
-func (d *IterativeDownloader) Header() *DBHeader {
+func (d *IterativeDownloader) Header() *big.Int {
 	return d.previous
 }
 
 // Next moves closer to the end on every new iteration.
-func (d *IterativeDownloader) Next(parent context.Context) ([]Transfer, error) {
-	to := new(big.Int).Add(d.from.Number, d.batchSize)
+func (d *IterativeDownloader) Next(parent context.Context) ([]*big.Int, *big.Int, *big.Int, error) {
+	//to := new(big.Int).Add(d.from.Number, d.batchSize)
+	to := d.to
+	from := new(big.Int).Sub(to, d.batchSize)
 	// if start < 0; start = 0
-	if to.Cmp(d.to.Number) == 1 {
-		to = d.to.Number
+	if from.Cmp(d.from) == -1 {
+		from = d.from
 	}
-	transfers, err := d.downloader.GetTransfersInRange(parent, d.from.Number, to)
+	log.Info("load erc20 transfers in range", "from", from, "to", to)
+	blocks, err := d.downloader.GetTransfersInRange(parent, from, to)
 	if err != nil {
-		log.Error("failed to get transfer in between two bloks", "from", d.from.Number, "to", to, "error", err)
-		return nil, err
+		log.Error("failed to get transfer in between two bloks", "from", from, "to", to, "error", err)
+		return nil, nil, nil, err
 	}
 	// use integers instead of DBHeader
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	header, err := d.client.HeaderByNumber(ctx, to)
+	header, err := d.client.HeaderByNumber(ctx, from)
 	cancel()
 	if err != nil {
-		log.Error("failed to get header by number", "from", d.from.Number, "to", to, "error", err)
-		return nil, err
+		log.Error("failed to get header by number", "from", d.from, "to", to, "error", err)
+		return nil, nil, nil, err
 	}
-	d.previous, d.from = d.from, toDBHeader(header)
-	return transfers, nil
+
+	d.previous, d.to = d.to, header.Number
+	return blocks, d.from, to, nil
 }
 
 // Revert reverts last step progress. Should be used if application failed to process transfers.

@@ -24,6 +24,7 @@ type ConcurrentDownloader struct {
 type Result struct {
 	mu        sync.Mutex
 	transfers []Transfer
+	blocks    []*big.Int
 }
 
 func (r *Result) Push(transfers ...Transfer) {
@@ -40,23 +41,38 @@ func (r *Result) Get() []Transfer {
 	return rst
 }
 
+func (r *Result) PushBlock(block *big.Int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.blocks = append(r.blocks, block)
+}
+
+func (r *Result) GetBlocks() []*big.Int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rst := make([]*big.Int, len(r.blocks))
+	copy(rst, r.blocks)
+	return rst
+}
+
 // TransferDownloader downloads transfers from single block using number.
 type TransferDownloader interface {
 	GetTransfersByNumber(context.Context, *big.Int) ([]Transfer, error)
 }
 
-func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, balanceCache *BalanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int) {
+func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, cache *balanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int) {
 	c.Add(func(ctx context.Context) error {
 		if low.Cmp(high) >= 0 {
 			return nil
 		}
 		log.Debug("eth transfers comparing blocks", "low", low, "high", high)
-		lb, err := balanceCache.BalanceAt(client, ctx, account, low)
+		lb, err := cache.BalanceAt(client, ctx, account, low)
 		//lb, err := client.BalanceAt(ctx, account, low)
 		if err != nil {
 			return err
 		}
-		hb, err := balanceCache.BalanceAt(client, ctx, account, high)
+		hb, err := cache.BalanceAt(client, ctx, account, high)
 		//hb, err := client.BalanceAt(ctx, account, high)
 		if err != nil {
 			return err
@@ -84,19 +100,20 @@ func downloadEthConcurrently(c *ConcurrentDownloader, client BalanceReader, bala
 			}
 		}
 		if new(big.Int).Sub(high, low).Cmp(one) == 0 {
-			transfers, err := downloader.GetTransfersByNumber(ctx, high)
+			c.PushBlock(high)
+			/*transfers, err := downloader.GetTransfersByNumber(ctx, high)
 			if err != nil {
 				return err
 			}
-			c.Push(transfers...)
+			c.Push(transfers...)*/
 			return nil
 		}
 		mid := new(big.Int).Add(low, high)
 		mid = mid.Div(mid, two)
-		balanceCache.BalanceAt(client, ctx, account, mid)
+		cache.BalanceAt(client, ctx, account, mid)
 		log.Debug("balances are not equal. spawn two concurrent downloaders", "low", low, "mid", mid, "high", high)
-		downloadEthConcurrently(c, client, balanceCache, downloader, account, low, mid)
-		downloadEthConcurrently(c, client, balanceCache, downloader, account, mid, high)
+		downloadEthConcurrently(c, client, cache, downloader, account, low, mid)
+		downloadEthConcurrently(c, client, cache, downloader, account, mid, high)
 		return nil
 	})
 }

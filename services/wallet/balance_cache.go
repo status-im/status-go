@@ -8,20 +8,20 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-type BalanceCache struct {
+type balanceCache struct {
+	// cache maps an address to a map of a block number and the balance of this particular address
 	cache map[common.Address]map[*big.Int]*big.Int
 	lock  sync.RWMutex
 }
 
-func (b *BalanceCache) readCachedBalance(account common.Address, blockNumber *big.Int) (*big.Int, bool) {
+func (b *balanceCache) readCachedBalance(account common.Address, blockNumber *big.Int) *big.Int {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	balance, exists := b.cache[account][blockNumber]
-	return balance, exists
+	return b.cache[account][blockNumber]
 }
 
-func (b *BalanceCache) addBalanceToCache(account common.Address, blockNumber *big.Int, balance *big.Int) {
+func (b *balanceCache) addBalanceToCache(account common.Address, blockNumber *big.Int, balance *big.Int) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -32,24 +32,22 @@ func (b *BalanceCache) addBalanceToCache(account common.Address, blockNumber *bi
 	b.cache[account][blockNumber] = balance
 }
 
-func (b *BalanceCache) BalanceAt(client BalanceReader, ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	cachedBalance, exists := b.readCachedBalance(account, blockNumber)
-	if exists {
+func (b *balanceCache) BalanceAt(client BalanceReader, ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	cachedBalance := b.readCachedBalance(account, blockNumber)
+	if cachedBalance != nil {
 		return cachedBalance, nil
-	} else {
-		balance, err := client.BalanceAt(ctx, account, blockNumber)
-		if err != nil {
-			return nil, err
-		}
-		b.addBalanceToCache(account, blockNumber, balance)
-
-		return balance, nil
 	}
+	balance, err := client.BalanceAt(ctx, account, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	b.addBalanceToCache(account, blockNumber, balance)
+
+	return balance, nil
 }
 
-func NewBalanceCache() *BalanceCache {
-	return &BalanceCache{
+func newBalanceCache() *balanceCache {
+	return &balanceCache{
 		cache: make(map[common.Address]map[*big.Int]*big.Int),
-		lock:  sync.RWMutex{},
 	}
 }

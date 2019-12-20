@@ -9,7 +9,7 @@ import (
 
 // InitializeDB creates db file at a given path and applies migrations.
 func InitializeDB(path, password string) (*sql.DB, error) {
-	db, err := sqlite.OpenDB(path, password)
+	db, err := sqlite.OpenUnecryptedDB(path)
 	if err != nil {
 		return nil, err
 	}

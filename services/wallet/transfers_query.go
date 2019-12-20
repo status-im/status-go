@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const baseTransfersQuery = "SELECT transfers.hash, type, blocks.hash, blocks.number, blocks.timestamp, address, tx, sender, receipt, log FROM transfers JOIN blocks ON blk_hash = blocks.hash"
+const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log FROM transfers"
 
 func newTransfersQuery() *transfersQuery {
 	buf := bytes.NewBuffer(nil)
@@ -21,6 +21,7 @@ type transfersQuery struct {
 	buf   *bytes.Buffer
 	args  []interface{}
 	added bool
+	plain bool
 }
 
 func (q *transfersQuery) andOrWhere() {
@@ -35,7 +36,7 @@ func (q *transfersQuery) FilterStart(start *big.Int) *transfersQuery {
 	if start != nil {
 		q.andOrWhere()
 		q.added = true
-		q.buf.WriteString(" blocks.number >= ?")
+		q.buf.WriteString(" blk_number >= ?")
 		q.args = append(q.args, (*SQLBigInt)(start))
 	}
 	return q
@@ -45,7 +46,7 @@ func (q *transfersQuery) FilterEnd(end *big.Int) *transfersQuery {
 	if end != nil {
 		q.andOrWhere()
 		q.added = true
-		q.buf.WriteString(" blocks.number <= ?")
+		q.buf.WriteString(" blk_number <= ?")
 		q.args = append(q.args, (*SQLBigInt)(end))
 	}
 	return q
@@ -54,7 +55,7 @@ func (q *transfersQuery) FilterEnd(end *big.Int) *transfersQuery {
 func (q *transfersQuery) FilterNetwork(network uint64) *transfersQuery {
 	q.andOrWhere()
 	q.added = true
-	q.buf.WriteString(" blocks.network_id = ?")
+	q.buf.WriteString(" network_id = ?")
 	q.args = append(q.args, network)
 	return q
 }
@@ -64,6 +65,15 @@ func (q *transfersQuery) FilterAddress(address common.Address) *transfersQuery {
 	q.added = true
 	q.buf.WriteString(" address = ?")
 	q.args = append(q.args, address)
+	return q
+}
+
+func (q *transfersQuery) Page(page, pageSize int64) *transfersQuery {
+	q.buf.WriteString(" ORDER BY blk_number DESC ")
+	from := pageSize * (page - 1)
+	q.buf.WriteString(" LIMIT ?,?")
+	q.args = append(q.args, from)
+	q.args = append(q.args, pageSize)
 	return q
 }
 

@@ -13,11 +13,11 @@ import (
 
 type transfersFixture []Transfer
 
-func (f transfersFixture) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]Transfer, error) {
-	rst := []Transfer{}
+func (f transfersFixture) GetTransfersInRange(ctx context.Context, from, to *big.Int) ([]*big.Int, error) {
+	rst := []*big.Int{}
 	for _, t := range f {
 		if t.BlockNumber.Cmp(from) >= 0 && t.BlockNumber.Cmp(to) <= 0 {
-			rst = append(rst, t)
+			rst = append(rst, t.BlockNumber)
 		}
 	}
 	return rst, nil
@@ -68,10 +68,10 @@ func TestIterProgress(t *testing.T) {
 		from:       &DBHeader{Number: big.NewInt(0)},
 		to:         &DBHeader{Number: big.NewInt(9)},
 	}
-	batch, err := iter.Next(context.TODO())
+	batch, _, _, err := iter.Next(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, batch, 6)
-	batch, err = iter.Next(context.TODO())
+	batch, _, _, err = iter.Next(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, batch, 5)
 	require.True(t, iter.Finished())

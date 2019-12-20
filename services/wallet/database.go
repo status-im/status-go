@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // DBHeader fields from header that are stored in database.
@@ -111,6 +112,35 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
+func (db Database) ProcessBlocks(account common.Address, from *big.Int, to *big.Int, blocks []*big.Int, transferType TransferType) (err error) {
+	var (
+		tx *sql.Tx
+	)
+	tx, err = db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	err = insertBlocksWithTransactions(tx, account, db.network, blocks)
+	if err != nil {
+		return
+	}
+
+	err = insertRange(tx, account, db.network, from, to, transferType)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // ProcessTranfers atomically adds/removes blocks and adds new tranfers.
 func (db Database) ProcessTranfers(transfers []Transfer, accounts []common.Address, added, removed []*DBHeader, option SyncOption) (err error) {
 	var (
@@ -143,6 +173,36 @@ func (db Database) ProcessTranfers(transfers []Transfer, accounts []common.Addre
 	return
 }
 
+// SaveTranfers
+func (db Database) SaveTranfers(address common.Address, transfers []Transfer) (err error) {
+	var (
+		tx *sql.Tx
+	)
+	tx, err = db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	err = insertTransfers(tx, db.network, transfers)
+	if err != nil {
+		return
+	}
+
+	err = markBlocksAsLoaded(tx, address, db.network, transfers)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 // GetTransfersByAddress loads transfers for a given address between two blocks.
 func (db *Database) GetTransfersByAddress(address common.Address, start, end *big.Int) (rst []Transfer, err error) {
 	query := newTransfersQuery().FilterNetwork(db.network).FilterAddress(address).FilterStart(start).FilterEnd(end)
@@ -152,6 +212,152 @@ func (db *Database) GetTransfersByAddress(address common.Address, start, end *bi
 	}
 	defer rows.Close()
 	return query.Scan(rows)
+}
+
+// GetTransfersByAddressAndPage loads transfers for a given address between two blocks.
+func (db *Database) GetTransfersByAddressAndPage(address common.Address, page, pageSize int64) (rst []Transfer, err error) {
+	query := newTransfersQuery().FilterNetwork(db.network).FilterAddress(address).Page(page, pageSize)
+	rows, err := db.db.Query(query.String(), query.Args()...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	return query.Scan(rows)
+}
+
+// GetTransfersByAddress loads transfers for a given address between two blocks.
+func (db *Database) GetBlocksByAddress(address common.Address, limit int) (rst []*big.Int, err error) {
+	query := `SELECT blk_number FROM blocks_with_transactions 
+	WHERE address = ? AND network_id = ? AND loaded = 0
+	ORDER BY blk_number DESC 
+	LIMIT ?`
+	rows, err := db.db.Query(query, address, db.network, limit)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		block := &big.Int{}
+		err = rows.Scan((*SQLBigInt)(block))
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, block)
+	}
+	return rst, nil
+}
+
+func (db *Database) RemoveBlockWithTransfer(address common.Address, block *big.Int) error {
+	query := `DELETE FROM blocks_with_transactions 
+	WHERE address = ? 
+	AND blk_number = ? 
+	AND network_id = ?`
+
+	_, err := db.db.Exec(query, address, (*SQLBigInt)(block), db.network)
+
+	if err != nil {
+		log.Info("block wasn't removed", "block", block, "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (db *Database) GetLastBlockByAddress(address common.Address, limit int) (rst *big.Int, err error) {
+	query := `SELECT * FROM 
+	(SELECT blk_number FROM blocks_with_transactions WHERE address = ? AND network_id = ? ORDER BY blk_number DESC LIMIT ?)
+	ORDER BY blk_number LIMIT 1`
+	rows, err := db.db.Query(query, address, db.network, limit)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		block := &big.Int{}
+		err = rows.Scan((*SQLBigInt)(block))
+		if err != nil {
+			return nil, err
+		}
+
+		return block, nil
+	}
+
+	return nil, nil
+}
+
+func (db *Database) GetFirstKnownBlock(address common.Address, transferType TransferType) (rst *big.Int, err error) {
+	query := `SELECT blk_from FROM blocks_ranges
+	WHERE address = ?
+	AND network_id = ?
+	AND type = ?
+	ORDER BY blk_from
+	LIMIT 1`
+
+	rows, err := db.db.Query(query, address, db.network, transferType)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		block := &big.Int{}
+		err = rows.Scan((*SQLBigInt)(block))
+		if err != nil {
+			return nil, err
+		}
+
+		return block, nil
+	}
+
+	return nil, nil
+}
+
+func (db *Database) GetLastKnownBlockByAddress(address common.Address, transferType TransferType) (rst *big.Int, err error) {
+	query := `SELECT blk_to FROM blocks_ranges
+	WHERE address = ?
+	AND network_id = ?
+	AND type = ?
+	ORDER BY blk_to DESC
+	LIMIT 1`
+
+	rows, err := db.db.Query(query, address, db.network, transferType)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		block := &big.Int{}
+		err = rows.Scan((*SQLBigInt)(block))
+		if err != nil {
+			return nil, err
+		}
+
+		return block, nil
+	}
+
+	return nil, nil
+}
+
+func (db *Database) GetLastKnownBlockByAddresses(addresses []common.Address, transferType TransferType) (map[common.Address]*big.Int, []common.Address, error) {
+	res := map[common.Address]*big.Int{}
+	accountsWithoutHistory := []common.Address{}
+	for _, address := range addresses {
+		block, err := db.GetLastKnownBlockByAddress(address, transferType)
+		if err != nil {
+			log.Info("Can't get last block", "error", err)
+			return nil, nil, err
+		}
+
+		if block != nil {
+			res[address] = block
+		} else {
+			accountsWithoutHistory = append(accountsWithoutHistory, address)
+		}
+	}
+
+	return res, accountsWithoutHistory, nil
 }
 
 // GetTransfers load transfers transfer betweeen two blocks.
@@ -320,6 +526,63 @@ func (db *Database) DeleteCustomToken(address common.Address) error {
 	return err
 }
 
+func (db *Database) getBlocksStats(address common.Address) (map[int64]int64, error) {
+	query := `SELECT loaded, COUNT(blk_number) 
+	FROM blocks_with_transactions 
+	WHERE network_id = ?
+	AND address = ?
+	GROUP BY loaded`
+
+	rows, err := db.db.Query(query, db.network, address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := map[int64]int64{}
+	for rows.Next() {
+		var loaded, count int64
+		err = rows.Scan(&loaded, &count)
+		if err != nil {
+			return nil, err
+		}
+
+		res[loaded] = count
+	}
+
+	return res, nil
+}
+
+func (db *Database) getTransfersStats(address common.Address) int64 {
+	query := `SELECT COUNT(blk_number) 
+	FROM transfers 
+	WHERE network_id = ?
+	AND address = ?`
+
+	rows, err := db.db.Query(query, db.network, address)
+	if err != nil {
+		return 0
+	}
+	defer rows.Close()
+
+	res := int64(0)
+	if rows.Next() {
+		err = rows.Scan(&res)
+		if err != nil {
+			return 0
+		}
+	}
+
+	return res
+}
+
+func (db *Database) GetTransfersStats(address common.Address) (map[int64]int64, int64) {
+	blockStats, _ := db.getBlocksStats(address)
+	transfersCount := db.getTransfersStats(address)
+
+	return blockStats, transfersCount
+}
+
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
@@ -353,13 +616,66 @@ func insertHeaders(creator statementCreator, network uint64, headers []*DBHeader
 	return nil
 }
 
+func insertBlocksWithTransactions(creator statementCreator, account common.Address, network uint64, blocks []*big.Int) error {
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO blocks_with_transactions(network_id, address, blk_number, loaded) VALUES (?, ?, ?, 0)")
+	if err != nil {
+		return err
+	}
+	for _, block := range blocks {
+		_, err = insert.Exec(network, account, (*SQLBigInt)(block))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *big.Int, transferType TransferType) (err error) {
+	insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, type) VALUES (?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+
+	_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to), transferType)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
 func insertTransfers(creator statementCreator, network uint64, transfers []Transfer) error {
-	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(network_id, hash, blk_hash, address, tx, sender, receipt, log, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	insert, err := creator.Prepare("INSERT OR IGNORE INTO transfers(network_id, hash, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	for _, t := range transfers {
-		_, err = insert.Exec(network, t.ID, t.BlockHash, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type)
+		_, err = insert.Exec(network, t.ID, t.BlockHash, (*SQLBigInt)(t.BlockNumber), t.Timestamp, t.Address, &JSONBlob{t.Transaction}, t.From, &JSONBlob{t.Receipt}, &JSONBlob{t.Log}, t.Type)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//markBlocksAsLoaded(tx, address, db.network, blocks)
+func markBlocksAsLoaded(creator statementCreator, address common.Address, network uint64, transfers []Transfer) error {
+	update, err := creator.Prepare("UPDATE blocks_with_transactions SET loaded=? WHERE address=? AND blk_number=? AND network_id=?")
+	if err != nil {
+		return err
+	}
+
+	blocks := []*big.Int{}
+	uniqBlocksMap := map[*big.Int]struct{}{}
+	for _, t := range transfers {
+		if _, ok := uniqBlocksMap[t.BlockNumber]; !ok {
+			uniqBlocksMap[t.BlockNumber] = struct{}{}
+			blocks = append(blocks, t.BlockNumber)
+		}
+	}
+
+	for _, block := range blocks {
+		_, err := update.Exec(true, address, (*SQLBigInt)(block), network)
 		if err != nil {
 			return err
 		}

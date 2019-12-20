@@ -71,14 +71,7 @@ type Reactor struct {
 	group *Group
 }
 
-// Start runs reactor loop in background.
-func (r *Reactor) Start(accounts []common.Address) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.group != nil {
-		return errors.New("already running")
-	}
-	r.group = NewGroup(context.Background())
+func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 	signer := types.NewEIP155Signer(r.chain)
 	ctl := &controlCommand{
 		db:       r.db,
@@ -94,6 +87,19 @@ func (r *Reactor) Start(accounts []common.Address) error {
 		feed:        r.feed,
 		safetyDepth: reorgSafetyDepth,
 	}
+
+	return ctl
+}
+
+// Start runs reactor loop in background.
+func (r *Reactor) Start(accounts []common.Address) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.group != nil {
+		return errors.New("already running")
+	}
+	r.group = NewGroup(context.Background())
+	ctl := r.newControlCommand(accounts)
 	r.group.Add(ctl.Command())
 	return nil
 }
