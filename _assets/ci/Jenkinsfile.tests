@@ -39,8 +39,13 @@ pipeline {
     } } }
 
     stage('Setup') { steps { dir(env.STATUS_PATH) {
-      sh 'make setup-build'
+      sh 'GO111MODULE=off make setup-build modvendor-install'
     } } }
+
+    stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
+      /* fail build if vendoring hasn't been done */
+      sh 'GO111MODULE=on make vendor && git diff --exit-code --no-color --stat vendor/'
+    } } } // stage(Vendoring check)
 
     stage('Lint') { steps { dir(env.STATUS_PATH) {
       sh 'make lint'
