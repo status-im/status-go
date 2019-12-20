@@ -10,7 +10,6 @@ extern void SetEventCallback(void *cb);
 import "C"
 import (
 	"encoding/json"
-
 	"unsafe"
 
 	"sync"
