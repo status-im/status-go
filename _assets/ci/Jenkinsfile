@@ -47,8 +47,13 @@ pipeline {
 
     stage('Setup') { steps { dir(env.STATUS_PATH) {
       /* install release tools */
-      sh 'make release-install'
+      sh 'make release-install modvendor-install'
     } } } // stage(Setup)
+
+    stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
+      /* fail build if vendoring hasn't been done */
+      sh 'GO111MODULE=on make vendor && git diff --exit-code --no-color --stat vendor/'
+    } } } // stage(Vendoring check)
 
     stage('Build') {
       parallel {
