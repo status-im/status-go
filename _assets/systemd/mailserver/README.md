@@ -38,11 +38,17 @@ All settings are passed through environment variables:
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).
 * `API_MODULES` - API modules to be made available via the `RPC_PORT`.
 * `DATA_PATH` - Location of Mailserver storage and keys. (Default: `/var/tmp/status-go-mail`)
-* `REGISTER_TOPIC` - Mynamic mailserver discovery topic. (Default: `whispermail`)
-* `MAIL_PASSWORD` - Basic HTTP auth password for mailserver. (Default: `status-offline-inbox`)
+* `REGISTER_TOPIC` - Mynamic Mailserver discovery topic. (Default: `whispermail`)
+* `MAIL_PASSWORD` - Basic HTTP auth password for Mailserver. (Default: `status-offline-inbox`)
 * `LOG_LEVEL` - Set level of log messages to show. (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)
 
 The generated configuration file end up under `${DATA_PATH}/config.json`.
+
+# System Service
+
+By default this `Makefile` configures the Mailserver as a [systemd user service](https://www.freedesktop.org/software/systemd/man/user@.service.html). This is done to simplify the proces and remove the need for `sudo`. The disadvantage of this solution is that the service is stopped when the user logs out.
+
+In order to make your service a system service use `sudo make`.
 
 # Known Issues
 

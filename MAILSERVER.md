@@ -1,6 +1,6 @@
 # Description
 
-This document describes the two easiest ways to start a Status Mailserver:
+This document describes the two alternative ways to start a Status Mailserver:
 
 * [Docker Compose](https://docs.docker.com/compose/) - More self-contained and portable
 * [Systemd Service](https://www.freedesktop.org/wiki/Software/systemd/) - More local and configurable
@@ -21,6 +21,7 @@ The other way is to run the `mailserver` under `systemd`:
 ```
 make run-mailserver-systemd
 ```
-This will generate the necessary config, define and then start the service.
+This will generate the necessary config, define and then start a user service.
+Use `sudo` if you want it to be a system service.
 
 For more details read the [README](_assets/systemd/mailserver/README.md).

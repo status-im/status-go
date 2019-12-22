@@ -6,9 +6,19 @@ YLW := $(shell tput -Txterm setaf 3)
 RST := $(shell tput -Txterm sgr0)
 BLD := $(shell tput bold)
 
+# by default we run the service as user
+SCTL_OPTS   := --user
+JRNL_OPTS   := --user-unit
+SERVICE_DIR := $(HOME)/.config/systemd/user/
+# with sudo it will run as a system service
+ifeq ($(USER), root)
+SCTL_OPTS   := 
+JRNL_OPTS   := --unit
+SERVICE_DIR := /etc/systemd/system/
+endif
+
 # Settings
 export SERVICE_NAME ?= bootnode
-export SERVICE_DIR  ?= $(HOME)/.config/systemd/user/
 export SERVICE_PATH ?= $(SERVICE_DIR)/$(SERVICE_NAME).service
 export LOG_LEVEL    ?= 3
 export LISTEN_PORT  ?= 30303
@@ -19,7 +29,7 @@ export ADDR_PATH    ?= $(DATA_PATH)/nodeaddr
 export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 
 # Info
-STATUS    = $(shell systemctl --user is-active $(SERVICE_NAME))
+STATUS    = $(shell systemctl $(SCTL_OPTS) is-active $(SERVICE_NAME))
 NODE_ADDR = $(shell cat $(ADDR_PATH))
 ENODE     = enode://$(NODE_ADDR)@$(PUBLIC_IP):$(LISTEN_PORT)
 
@@ -62,35 +72,35 @@ save-address:
 	@$(GIT_ROOT)/build/bin/bootnode -nodekey=$(KEY_PATH) -writeaddress > $(ADDR_PATH)
 
 status:
-	systemctl --user status --no-pager $(SERVICE_NAME)
+	systemctl $(SCTL_OPTS) status --no-pager $(SERVICE_NAME)
 
 logs:
-	journalctl --user-unit statusd
+	journalctl $(JRNL_OPTS) statusd
 
 enable:
 	@echo "* $(BLD)Enabling '$(SERVICE_NAME)' service...$(RST)"
-	systemctl --user enable $(SERVICE_NAME)
+	systemctl $(SCTL_OPTS) enable $(SERVICE_NAME)
 
 disable:
 	@echo "* $(BLD)Disabling '$(SERVICE_NAME)' service...$(RST)"
-	systemctl --user disable "${SERVICE_NAME}"
+	systemctl $(SCTL_OPTS) disable "${SERVICE_NAME}"
 
 start:
 	@echo "* $(BLD)Starting '$(SERVICE_NAME)' service...$(RST)"
-	systemctl --user start $(SERVICE_NAME)
+	systemctl $(SCTL_OPTS) start $(SERVICE_NAME)
 
 restart:
 	@echo "* $(BLD)Restarting '$(SERVICE_NAME)' service...$(RST)"
-	systemctl --user restart $(SERVICE_NAME)
+	systemctl $(SCTL_OPTS) restart $(SERVICE_NAME)
 
 stop:
 	@echo "* $(BLD)Stopping '$(SERVICE_NAME)' service...$(RST)"
-	systemctl --user stop "${SERVICE_NAME}"
+	systemctl $(SCTL_OPTS) stop "${SERVICE_NAME}"
 
 forget:
 	@echo "* $(BLD)Stopping '$(SERVICE_NAME)' service...$(RST)"
-	systemctl --user daemon-reload
-	systemctl --user reset-failed
+	systemctl $(SCTL_OPTS) daemon-reload
+	systemctl $(SCTL_OPTS) reset-failed
 
 $(GIT_ROOT)/build/bin/bootnode:
 	@echo "* $(BLD)Building bootnode binary...$(RST)"
