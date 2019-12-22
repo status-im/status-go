@@ -147,10 +147,9 @@ func loginUsingAccount(t *testing.T, feed *event.Feed, addr string) {
 
 // nolint: deadcode
 func testExportedAPI(t *testing.T) {
-	// FIXME(tiabc): All of that is done because usage of cgo is not supported in tests.
+	// All of that is done because usage of cgo is not supported in tests.
 	// Probably, there should be a cleaner way, for example, test cgo bindings in e2e tests
 	// separately from other internal tests.
-	// NOTE(dshulyak) tests are using same backend with same keystore. but after every test we explicitly logging out.
 	tests := []struct {
 		name string
 		fn   func(t *testing.T, feed *event.Feed) bool
@@ -222,14 +221,18 @@ func testExportedAPI(t *testing.T) {
 			testDir := filepath.Join(TestDataDir, TestNetworkNames[GetNetworkID()])
 			defer os.RemoveAll(testDir)
 
-			// Inject test accounts.
+			err := os.MkdirAll(testDir, os.ModePerm)
+			require.NoError(t, err)
+
 			testKeyDir := filepath.Join(testDir, "keystore")
+			require.NoError(t, ImportTestAccount(testKeyDir, GetAccount1PKFile()))
+			require.NoError(t, ImportTestAccount(testKeyDir, GetAccount2PKFile()))
+
+			// Inject test accounts.
 			response := InitKeystore(C.CString(testKeyDir))
 			if C.GoString(response) != `{"error":""}` {
 				t.Fatalf("failed to InitKeystore: %v", C.GoString(response))
 			}
-			require.NoError(t, ImportTestAccount(testKeyDir, GetAccount1PKFile()))
-			require.NoError(t, ImportTestAccount(testKeyDir, GetAccount2PKFile()))
 
 			// Initialize the accounts database. It must be called
 			// after the test account got injected.
