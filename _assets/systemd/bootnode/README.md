@@ -39,6 +39,12 @@ All settings are passed through environment variables:
 * `KEY_PATH` - Location of Bootnode private key file. (Default: `/var/tmp/status-go-boot/nodekey`)
 * `LOG_LEVEL` - Set level of log messages to show. (Values:`0-9`, Default: `3`)`
 
+# System Service
+
+By default this `Makefile` configures the Bootnode as a [systemd user service](https://www.freedesktop.org/software/systemd/man/user@.service.html). This is done to simplify the proces and remove the need for `sudo`. The disadvantage of this solution is that the service is stopped when the user logs out.
+
+In order to make your service a system service use `sudo make`.
+
 # Known Issues
 
 * `No journal files were opened due to insufficient permissions.` from `systemctl`
