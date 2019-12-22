@@ -53,7 +53,8 @@ func (s *DevNodeSuite) SetupTest() {
 		s.dir,
 		1337,
 	)
-	settings := accounts.Settings{Networks: json.RawMessage("{}")}
+	networks := json.RawMessage("{}")
+	settings := accounts.Settings{Networks: &networks}
 	s.Require().NoError(err)
 	config.WhisperConfig.Enabled = false
 	config.LightEthConfig.Enabled = false
