@@ -486,7 +486,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	publicChatSymKey, err := mailboxWhisperService.GetSymKey(symKeyID)
 	s.Require().NoError(err)
 
-	var mailServer mailserver.WMailServer
+	var mailServer mailserver.WhisperMailServer
 	err = mailServer.Init(mailboxWhisperService, &mailbox.StatusNode().Config().WhisperConfig)
 	s.Require().NoError(err)
 	mailboxWhisperService.RegisterServer(&mailServer)

@@ -89,8 +89,8 @@ const (
 // in order to bypass the expiry checks.
 type MailServer interface {
 	Archive(env *Envelope)
-	DeliverMail(wakuPeer *Peer, request *Envelope) // DEPRECATED
-	Deliver(wakuPeer *Peer, request MessagesRequest)
+	DeliverMail(peerID []byte, request *Envelope) // DEPRECATED; use Deliver()
+	Deliver(peerID []byte, request MessagesRequest)
 }
 
 // MessagesRequest contains details of a request of historic messages.

@@ -1,5 +1,20 @@
 package mailserver
 
+import (
+	"errors"
+	"time"
+)
+
+const (
+	maxMessagesRequestPayloadLimit = 1000
+)
+
+type request struct {
+	ID             []byte
+	MaxMessageSize int
+	Payload        MessagesRequestPayload
+}
+
 // MessagesRequestPayload is a payload sent to the Mail Server.
 type MessagesRequestPayload struct {
 	// Lower is a lower bound of time range for which messages are requested.
@@ -14,4 +29,27 @@ type MessagesRequestPayload struct {
 	Cursor []byte
 	// Batch set to true indicates that the client supports batched response.
 	Batch bool
+}
+
+func (r *MessagesRequestPayload) SetDefaults() {
+	if r.Limit == 0 {
+		r.Limit = defaultLimit
+	}
+
+	if r.Upper == 0 {
+		r.Upper = uint32(time.Now().Unix() + whisperTTLSafeThreshold)
+	}
+}
+
+func (r MessagesRequestPayload) Validate() error {
+	if r.Upper < r.Lower {
+		return errors.New("query range is invalid: lower > upper")
+	}
+	if len(r.Bloom) == 0 {
+		return errors.New("bloom filter is empty")
+	}
+	if r.Limit > maxMessagesRequestPayloadLimit {
+		return errors.New("limit exceeds the maximum allowed value")
+	}
+	return nil
 }

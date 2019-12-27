@@ -86,7 +86,7 @@ type Waku struct {
 	settings   settings     // Holds configuration settings that can be dynamically changed
 	settingsMu sync.RWMutex // Mutex to sync the settings access
 
-	mailServer MailServer // MailServer interface
+	mailServer MailServer
 
 	rateLimiter *PeerRateLimiter
 
@@ -479,8 +479,12 @@ func (w *Waku) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, ti
 	}
 }
 
-func (w *Waku) SendHistoricMessageResponse(peer *Peer, payload []byte) error {
+func (w *Waku) SendHistoricMessageResponse(peerID []byte, payload []byte) error {
 	size, r, err := rlp.EncodeToReader(payload)
+	if err != nil {
+		return err
+	}
+	peer, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
@@ -499,13 +503,21 @@ func (w *Waku) SendP2PMessages(peerID []byte, envelopes ...*Envelope) error {
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 // It sends one or more envelopes in a single batch.
-func (w *Waku) SendP2PDirect(peer *Peer, envelopes ...*Envelope) error {
+func (w *Waku) SendP2PDirect(peerID []byte, envelopes ...*Envelope) error {
+	peer, err := w.getPeer(peerID)
+	if err != nil {
+		return err
+	}
 	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
 // SendRawP2PDirect sends a peer-to-peer message to a specific peer.
 // It sends one or more envelopes in a single batch.
-func (w *Waku) SendRawP2PDirect(peer *Peer, envelopes ...rlp.RawValue) error {
+func (w *Waku) SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error {
+	peer, err := w.getPeer(peerID)
+	if err != nil {
+		return err
+	}
 	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
 }
 
@@ -1049,7 +1061,7 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	var requestDeprecated Envelope
 	errDepReq := packet.Decode(&requestDeprecated)
 	if errDepReq == nil {
-		w.mailServer.DeliverMail(p, &requestDeprecated)
+		w.mailServer.DeliverMail(p.ID(), &requestDeprecated)
 		return nil
 	} else {
 		logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
@@ -1064,7 +1076,7 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	var request MessagesRequest
 	errReq := packet.Decode(&request)
 	if errReq == nil {
-		w.mailServer.Deliver(p, request)
+		w.mailServer.Deliver(p.ID(), request)
 		return nil
 	} else {
 		logger.Info("failed to decode p2p request message", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))

@@ -17,23 +17,23 @@
 package mailserver
 
 import (
+	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"sync"
-
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+	prom "github.com/prometheus/client_golang/prometheus"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/whisper/v6"
-
-	prom "github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -56,95 +56,130 @@ const (
 	processRequestTimeout  = time.Minute
 )
 
-// WMailServer whisper mailserver.
-type WMailServer struct {
-	db         DB
-	w          *whisper.Whisper
-	pow        float64
-	symFilter  *whisper.Filter
-	asymFilter *whisper.Filter
-
-	muRateLimiter sync.RWMutex
-	rateLimiter   *rateLimiter
-
-	cleaner *dbCleaner // removes old envelopes
+type Config struct {
+	// DataDir points to a directory where mailserver's data is stored.
+	DataDir string
+	// Password is used to create a symmetric key to decrypt requests.
+	Password string
+	// AsymKey is an asymmetric key to decrypt requests.
+	AsymKey string
+	// MininumPoW is a minimum PoW for requests.
+	MinimumPoW float64
+	// RateLimit is a maximum number of requests per second from a peer.
+	RateLimit int
+	// DataRetention specifies a number of days an envelope should be stored for.
+	DataRetention   int
+	PostgresEnabled bool
+	PostgresURI     string
 }
 
-var _ whisper.MailServer = (*WMailServer)(nil)
+// -----------------
+// WhisperMailServer
+// -----------------
 
-// Init initializes mailServer.
-func (s *WMailServer) Init(shh *whisper.Whisper, config *params.WhisperConfig) error {
-	if len(config.DataDir) == 0 {
-		return errDirectoryNotProvided
+type WhisperMailServer struct {
+	ms            *mailServer
+	shh           *whisper.Whisper
+	minRequestPoW float64
+
+	symFilter  *whisper.Filter
+	asymFilter *whisper.Filter
+}
+
+func (s *WhisperMailServer) Init(shh *whisper.Whisper, cfg *params.WhisperConfig) error {
+	s.shh = shh
+	s.minRequestPoW = cfg.MinimumPoW
+
+	config := Config{
+		DataDir:         cfg.DataDir,
+		Password:        cfg.MailServerPassword,
+		AsymKey:         cfg.MailServerAsymKey,
+		MinimumPoW:      cfg.MinimumPoW,
+		DataRetention:   cfg.MailServerDataRetention,
+		RateLimit:       cfg.MailServerRateLimit,
+		PostgresEnabled: cfg.DatabaseConfig.PGConfig.Enabled,
+		PostgresURI:     cfg.DatabaseConfig.PGConfig.URI,
 	}
-
-	if len(config.MailServerPassword) == 0 && len(config.MailServerAsymKey) == 0 {
-		return errDecryptionMethodNotProvided
-	}
-
-	s.w = shh
-	s.pow = config.MinimumPoW
-
-	if err := s.setupRequestMessageDecryptor(config); err != nil {
+	var err error
+	s.ms, err = newMailServer(
+		config,
+		&whisperAdapter{},
+		shh,
+	)
+	if err != nil {
 		return err
 	}
 
-	if config.MailServerRateLimit > 0 {
-		s.setupRateLimiter(time.Duration(config.MailServerRateLimit) * time.Second)
-	}
-
-	// Open database in the last step in order not to init with error
-	// and leave the database open by accident.
-	if config.DatabaseConfig.PGConfig.Enabled {
-		log.Info("Connecting to postgres database")
-		database, err := NewPostgresDB(config)
-		if err != nil {
-			return fmt.Errorf("open DB: %s", err)
-		}
-		s.db = database
-		log.Info("Connected to postgres database")
-	} else {
-		// Defaults to LevelDB
-		database, err := NewLevelDB(config)
-		if err != nil {
-			return fmt.Errorf("open DB: %s", err)
-		}
-		s.db = database
-	}
-
-	if config.MailServerDataRetention > 0 {
-		// MailServerDataRetention is a number of days.
-		s.setupCleaner(time.Duration(config.MailServerDataRetention) * time.Hour * 24)
+	if err := s.setupDecryptor(config.Password, config.AsymKey); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// setupRateLimiter in case limit is bigger than 0 it will setup an automated
-// limit db cleanup.
-func (s *WMailServer) setupRateLimiter(limit time.Duration) {
-	s.rateLimiter = newRateLimiter(limit)
-	s.rateLimiter.Start()
+func (s *WhisperMailServer) Close() {
+	if s.ms != nil {
+		s.ms.Close()
+	}
 }
 
-func (s *WMailServer) setupCleaner(retention time.Duration) {
-	s.cleaner = newDBCleaner(s.db, retention)
-	s.cleaner.Start()
+func (s *WhisperMailServer) Archive(env *whisper.Envelope) {
+	s.ms.Archive(gethbridge.NewWhisperEnvelopeWrapper(env))
 }
 
-// setupRequestMessageDecryptor setup a Whisper filter to decrypt
-// incoming Whisper requests.
-func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig) error {
+// DEPRECATED; user Deliver instead
+func (s *WhisperMailServer) DeliverMail(peerID []byte, req *whisper.Envelope) {
+	payload, err := s.decodeRequest(peerID, req)
+	if err != nil {
+		log.Debug(
+			"[mailserver:DeliverMail] failed to decode request",
+			"err", err,
+			"peerID", peerID,
+			"requestID", req.Hash().String(),
+		)
+		payload, err = s.decompositeRequest(peerID, req)
+	}
+	if err != nil {
+		deliveryFailuresCounter.WithLabelValues("validation").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] request failed validaton",
+			"peerID", peerID,
+			"requestID", req.Hash().String(),
+			"err", err,
+		)
+		s.ms.sendHistoricMessageErrorResponse(types.BytesToHash(peerID), types.Hash(req.Hash()), err)
+		return
+	}
+
+	s.ms.DeliverMail(types.BytesToHash(peerID), types.Hash(req.Hash()), payload)
+}
+
+func (s *WhisperMailServer) Deliver(peerID []byte, req whisper.MessagesRequest) {
+	s.ms.DeliverMail(types.BytesToHash(peerID), types.BytesToHash(req.ID), MessagesRequestPayload{
+		Lower:  req.From,
+		Upper:  req.To,
+		Bloom:  req.Bloom,
+		Limit:  req.Limit,
+		Cursor: req.Cursor,
+		Batch:  true,
+	})
+}
+
+func (s *WhisperMailServer) SyncMail(peerID []byte, req whisper.SyncMailRequest) error {
+	return s.SyncMail(peerID, req)
+}
+
+func (s *WhisperMailServer) setupDecryptor(password, asymKey string) error {
 	s.symFilter = nil
 	s.asymFilter = nil
 
-	if config.MailServerPassword != "" {
-		keyID, err := s.w.AddSymKeyFromPassword(config.MailServerPassword)
+	if password != "" {
+		keyID, err := s.shh.AddSymKeyFromPassword(password)
 		if err != nil {
 			return fmt.Errorf("create symmetric key: %v", err)
 		}
 
-		symKey, err := s.w.GetSymKey(keyID)
+		symKey, err := s.shh.GetSymKey(keyID)
 		if err != nil {
 			return fmt.Errorf("save symmetric key: %v", err)
 		}
@@ -152,8 +187,8 @@ func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig)
 		s.symFilter = &whisper.Filter{KeySym: symKey}
 	}
 
-	if config.MailServerAsymKey != "" {
-		keyAsym, err := crypto.HexToECDSA(config.MailServerAsymKey)
+	if asymKey != "" {
+		keyAsym, err := crypto.HexToECDSA(asymKey)
 		if err != nil {
 			return err
 		}
@@ -163,11 +198,533 @@ func (s *WMailServer) setupRequestMessageDecryptor(config *params.WhisperConfig)
 	return nil
 }
 
+func (s *WhisperMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (MessagesRequestPayload, error) {
+	var payload MessagesRequestPayload
+
+	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
+		return payload, errors.New("PoW too low")
+	}
+
+	decrypted := s.openEnvelope(request)
+	if decrypted == nil {
+		log.Warn("Failed to decrypt p2p request")
+		return payload, errors.New("failed to decrypt p2p request")
+	}
+
+	if err := checkMsgSignature(decrypted.Src, peerID); err != nil {
+		log.Warn("Check message signature failed", "err", err.Error())
+		return payload, fmt.Errorf("check message signature failed: %v", err)
+	}
+
+	if err := rlp.DecodeBytes(decrypted.Payload, &payload); err != nil {
+		return payload, fmt.Errorf("failed to decode data: %v", err)
+	}
+
+	if payload.Upper == 0 {
+		payload.Upper = uint32(time.Now().Unix() + whisperTTLSafeThreshold)
+	}
+
+	if payload.Upper < payload.Lower {
+		log.Error("Query range is invalid: lower > upper", "lower", payload.Lower, "upper", payload.Upper)
+		return payload, errors.New("query range is invalid: lower > upper")
+	}
+
+	return payload, nil
+}
+
+// openEnvelope tries to decrypt an envelope, first based on asymmetric key (if
+// provided) and second on the symmetric key (if provided)
+func (s *WhisperMailServer) openEnvelope(request *whisper.Envelope) *whisper.ReceivedMessage {
+	if s.asymFilter != nil {
+		if d := request.Open(s.asymFilter); d != nil {
+			return d
+		}
+	}
+	if s.symFilter != nil {
+		if d := request.Open(s.symFilter); d != nil {
+			return d
+		}
+	}
+	return nil
+}
+
+func (s *WhisperMailServer) decompositeRequest(peerID []byte, request *whisper.Envelope) (MessagesRequestPayload, error) {
+	var (
+		payload MessagesRequestPayload
+		err     error
+	)
+
+	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
+		return payload, fmt.Errorf("PoW() is too low")
+	}
+
+	decrypted := s.openEnvelope(request)
+	if decrypted == nil {
+		return payload, fmt.Errorf("failed to decrypt p2p request")
+	}
+
+	if err := checkMsgSignature(decrypted.Src, peerID); err != nil {
+		return payload, err
+	}
+
+	payload.Bloom, err = s.bloomFromReceivedMessage(decrypted)
+	if err != nil {
+		return payload, err
+	}
+
+	payload.Lower = binary.BigEndian.Uint32(decrypted.Payload[:4])
+	payload.Upper = binary.BigEndian.Uint32(decrypted.Payload[4:8])
+
+	if payload.Upper < payload.Lower {
+		err := fmt.Errorf("query range is invalid: from > to (%d > %d)", payload.Lower, payload.Upper)
+		return payload, err
+	}
+
+	lowerTime := time.Unix(int64(payload.Lower), 0)
+	upperTime := time.Unix(int64(payload.Upper), 0)
+	if upperTime.Sub(lowerTime) > maxQueryRange {
+		err := fmt.Errorf("query range too big for peer %s", string(peerID))
+		return payload, err
+	}
+
+	if len(decrypted.Payload) >= requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength {
+		payload.Limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize:])
+	}
+
+	if len(decrypted.Payload) == requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength+DBKeyLength {
+		payload.Cursor = decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength:]
+	}
+
+	return payload, nil
+}
+
+// bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
+// used bloom filter.
+func (s *WhisperMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]byte, error) {
+	payloadSize := len(msg.Payload)
+
+	if payloadSize < 8 {
+		return nil, errors.New("Undersized p2p request")
+	} else if payloadSize == 8 {
+		return whisper.MakeFullNodeBloom(), nil
+	} else if payloadSize < 8+whisper.BloomFilterSize {
+		return nil, errors.New("Undersized bloom filter in p2p request")
+	}
+
+	return msg.Payload[8 : 8+whisper.BloomFilterSize], nil
+}
+
+// --------------
+// WakuMailServer
+// --------------
+
+type WakuMailServer struct {
+	ms            *mailServer
+	shh           *waku.Waku
+	minRequestPoW float64
+
+	symFilter  *waku.Filter
+	asymFilter *waku.Filter
+}
+
+func (s *WakuMailServer) Init(waku *waku.Waku, cfg *params.WakuConfig) error {
+	s.shh = waku
+	s.minRequestPoW = cfg.MinimumPoW
+
+	config := Config{
+		DataDir:         cfg.DataDir,
+		Password:        cfg.MailServerPassword,
+		MinimumPoW:      cfg.MinimumPoW,
+		DataRetention:   cfg.MailServerDataRetention,
+		RateLimit:       cfg.MailServerRateLimit,
+		PostgresEnabled: cfg.DatabaseConfig.PGConfig.Enabled,
+		PostgresURI:     cfg.DatabaseConfig.PGConfig.URI,
+	}
+	var err error
+	s.ms, err = newMailServer(
+		config,
+		&wakuAdapter{},
+		waku,
+	)
+	if err != nil {
+		return err
+	}
+
+	if err := s.setupDecryptor(config.Password, config.AsymKey); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *WakuMailServer) Close() {
+	s.ms.Close()
+}
+
+func (s *WakuMailServer) Archive(env *waku.Envelope) {
+	s.ms.Archive(gethbridge.NewWakuEnvelopeWrapper(env))
+}
+
+func (s *WakuMailServer) Deliver(peerID []byte, req waku.MessagesRequest) {
+	s.ms.DeliverMail(types.BytesToHash(peerID), types.BytesToHash(req.ID), MessagesRequestPayload{
+		Lower:  req.From,
+		Upper:  req.To,
+		Bloom:  req.Bloom,
+		Limit:  req.Limit,
+		Cursor: req.Cursor,
+		Batch:  true,
+	})
+}
+
+// DEPRECATED; user Deliver instead
+func (s *WakuMailServer) DeliverMail(peerID []byte, req *waku.Envelope) {
+	payload, err := s.decodeRequest(peerID, req)
+	if err != nil {
+		deliveryFailuresCounter.WithLabelValues("validation").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] request failed validaton",
+			"peerID", peerID,
+			"requestID", req.Hash().String(),
+			"err", err,
+		)
+		s.ms.sendHistoricMessageErrorResponse(types.BytesToHash(peerID), types.Hash(req.Hash()), err)
+		return
+	}
+
+	s.ms.DeliverMail(types.BytesToHash(peerID), types.Hash(req.Hash()), payload)
+}
+
+func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
+	s.symFilter = nil
+	s.asymFilter = nil
+
+	if password != "" {
+		keyID, err := s.shh.AddSymKeyFromPassword(password)
+		if err != nil {
+			return fmt.Errorf("create symmetric key: %v", err)
+		}
+
+		symKey, err := s.shh.GetSymKey(keyID)
+		if err != nil {
+			return fmt.Errorf("save symmetric key: %v", err)
+		}
+
+		s.symFilter = &waku.Filter{KeySym: symKey}
+	}
+
+	if asymKey != "" {
+		keyAsym, err := crypto.HexToECDSA(asymKey)
+		if err != nil {
+			return err
+		}
+		s.asymFilter = &waku.Filter{KeyAsym: keyAsym}
+	}
+
+	return nil
+}
+
+// openEnvelope tries to decrypt an envelope, first based on asymetric key (if
+// provided) and second on the symetric key (if provided)
+func (s *WakuMailServer) openEnvelope(request *waku.Envelope) *waku.ReceivedMessage {
+	if s.asymFilter != nil {
+		if d := request.Open(s.asymFilter); d != nil {
+			return d
+		}
+	}
+	if s.symFilter != nil {
+		if d := request.Open(s.symFilter); d != nil {
+			return d
+		}
+	}
+	return nil
+}
+
+func (s *WakuMailServer) decodeRequest(peerID []byte, request *waku.Envelope) (MessagesRequestPayload, error) {
+	var payload MessagesRequestPayload
+
+	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
+		return payload, errors.New("PoW too low")
+	}
+
+	decrypted := s.openEnvelope(request)
+	if decrypted == nil {
+		log.Warn("Failed to decrypt p2p request")
+		return payload, errors.New("failed to decrypt p2p request")
+	}
+
+	if err := checkMsgSignature(decrypted.Src, peerID); err != nil {
+		log.Warn("Check message signature failed", "err", err.Error())
+		return payload, fmt.Errorf("check message signature failed: %v", err)
+	}
+
+	if err := rlp.DecodeBytes(decrypted.Payload, &payload); err != nil {
+		return payload, fmt.Errorf("failed to decode data: %v", err)
+	}
+
+	if payload.Upper == 0 {
+		payload.Upper = uint32(time.Now().Unix() + whisperTTLSafeThreshold)
+	}
+
+	if payload.Upper < payload.Lower {
+		log.Error("Query range is invalid: lower > upper", "lower", payload.Lower, "upper", payload.Upper)
+		return payload, errors.New("query range is invalid: lower > upper")
+	}
+
+	return payload, nil
+}
+
+// -------
+// adapter
+// -------
+
+type adapter interface {
+	CreateRequestFailedPayload(reqID types.Hash, err error) []byte
+	CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte
+}
+
+// --------------
+// whisperAdapter
+// --------------
+
+type whisperAdapter struct{}
+
+var _ adapter = (*whisperAdapter)(nil)
+
+func (whisperAdapter) CreateRequestFailedPayload(reqID types.Hash, err error) []byte {
+	return whisper.CreateMailServerRequestFailedPayload(common.Hash(reqID), err)
+}
+
+func (whisperAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte {
+	return whisper.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
+}
+
+// -----------
+// wakuAdapter
+// -----------
+
+type wakuAdapter struct{}
+
+var _ adapter = (*wakuAdapter)(nil)
+
+func (wakuAdapter) CreateRequestFailedPayload(reqID types.Hash, err error) []byte {
+	return waku.CreateMailServerRequestFailedPayload(common.Hash(reqID), err)
+}
+
+func (wakuAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte {
+	return waku.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
+}
+
+// -------
+// service
+// -------
+
+type service interface {
+	SendHistoricMessageResponse(peerID []byte, payload []byte) error
+	SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error
+	MaxMessageSize() uint32
+}
+
+// ----------
+// mailServer
+// ----------
+
+type mailServer struct {
+	adapter       adapter
+	service       service
+	db            DB
+	cleaner       *dbCleaner // removes old envelopes
+	muRateLimiter sync.RWMutex
+	rateLimiter   *rateLimiter
+}
+
+func newMailServer(cfg Config, adapter adapter, service service) (*mailServer, error) {
+	if len(cfg.DataDir) == 0 {
+		return nil, errDirectoryNotProvided
+	}
+
+	// TODO: move out
+	if len(cfg.Password) == 0 && len(cfg.AsymKey) == 0 {
+		return nil, errDecryptionMethodNotProvided
+	}
+
+	s := mailServer{
+		adapter: adapter,
+		service: service,
+	}
+
+	if cfg.RateLimit > 0 {
+		s.setupRateLimiter(time.Duration(cfg.RateLimit) * time.Second)
+	}
+
+	// Open database in the last step in order not to init with error
+	// and leave the database open by accident.
+	if cfg.PostgresEnabled {
+		log.Info("Connecting to postgres database")
+		database, err := NewPostgresDB(cfg.PostgresURI)
+		if err != nil {
+			return nil, fmt.Errorf("open DB: %s", err)
+		}
+		s.db = database
+		log.Info("Connected to postgres database")
+	} else {
+		// Defaults to LevelDB
+		database, err := NewLevelDB(cfg.DataDir)
+		if err != nil {
+			return nil, fmt.Errorf("open DB: %s", err)
+		}
+		s.db = database
+	}
+
+	if cfg.DataRetention > 0 {
+		// MailServerDataRetention is a number of days.
+		s.setupCleaner(time.Duration(cfg.DataRetention) * time.Hour * 24)
+	}
+
+	return &s, nil
+}
+
+// setupRateLimiter in case limit is bigger than 0 it will setup an automated
+// limit db cleanup.
+func (s *mailServer) setupRateLimiter(limit time.Duration) {
+	s.rateLimiter = newRateLimiter(limit)
+	s.rateLimiter.Start()
+}
+
+func (s *mailServer) setupCleaner(retention time.Duration) {
+	s.cleaner = newDBCleaner(s.db, retention)
+	s.cleaner.Start()
+}
+
+func (s *mailServer) Archive(env types.Envelope) {
+	err := s.db.SaveEnvelope(env)
+	if err != nil {
+		log.Error("Could not save envelope", "hash", env.Hash().String())
+	}
+}
+
+func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPayload) {
+	timer := prom.NewTimer(mailDeliveryDuration)
+	defer timer.ObserveDuration()
+
+	deliveryAttemptsCounter.Inc()
+	log.Info(
+		"[mailserver:DeliverMail] delivering mail",
+		"peerID", peerID.String(),
+		"requestID", reqID.String(),
+	)
+
+	if s.exceedsPeerRequests(peerID) {
+		deliveryFailuresCounter.WithLabelValues("peer_req_limit").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] peer exceeded the limit",
+			"peerID", peerID.String(),
+			"requestID", reqID.String(),
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, fmt.Errorf("rate limit exceeded"))
+		return
+	}
+
+	log.Info(
+		"[mailserver:DeliverMail] processing request",
+		"peerID", peerID.String(),
+		"requestID", reqID.String(),
+		"lower", req.Lower,
+		"upper", req.Upper,
+		"bloom", req.Bloom,
+		"limit", req.Limit,
+		"cursor", req.Cursor,
+		"batch", req.Batch,
+	)
+	if req.Batch {
+		requestsBatchedCounter.Inc()
+	}
+
+	iter, err := s.createIterator(req)
+	if err != nil {
+		log.Error(
+			"[mailserver:DeliverMail] request failed",
+			"peerID", peerID.String(),
+			"requestID", reqID.String(),
+		)
+		return
+	}
+	defer iter.Release()
+
+	bundles := make(chan []rlp.RawValue, 5)
+	errCh := make(chan error)
+	cancelProcessing := make(chan struct{})
+
+	go func() {
+		counter := 0
+		for bundle := range bundles {
+			if err := s.sendRawEnvelopes(peerID, bundle, req.Batch); err != nil {
+				close(cancelProcessing)
+				errCh <- err
+				break
+			}
+			counter++
+		}
+		close(errCh)
+		log.Info(
+			"[mailserver:DeliverMail] finished sending bundles",
+			"peerID", peerID,
+			"requestID", reqID.String(),
+			"counter", counter,
+		)
+	}()
+
+	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
+		iter,
+		req.Bloom,
+		int(req.Limit),
+		processRequestTimeout,
+		reqID.String(),
+		bundles,
+		cancelProcessing,
+	)
+
+	// Wait for the goroutine to finish the work. It may return an error.
+	if err := <-errCh; err != nil {
+		deliveryFailuresCounter.WithLabelValues("process").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] error while processing",
+			"err", err,
+			"peerID", peerID,
+			"requestID", reqID,
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, err)
+		return
+	}
+
+	// Processing of the request could be finished earlier due to iterator error.
+	if err := iter.Error(); err != nil {
+		deliveryFailuresCounter.WithLabelValues("iterator").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] iterator failed",
+			"err", err,
+			"peerID", peerID,
+			"requestID", reqID,
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, err)
+		return
+	}
+
+	log.Info(
+		"[mailserver:DeliverMail] sending historic message response",
+		"peerID", peerID,
+		"requestID", reqID,
+		"last", lastEnvelopeHash,
+		"next", nextPageCursor,
+	)
+
+	s.sendHistoricMessageResponse(peerID, reqID, lastEnvelopeHash, nextPageCursor)
+}
+
 // Close the mailserver and its associated db connection.
-func (s *WMailServer) Close() {
+func (s *mailServer) Close() {
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
-			log.Error(fmt.Sprintf("s.db.Close failed: %s", err))
+			log.Error("closing database failed", "err", err)
 		}
 	}
 	if s.rateLimiter != nil {
@@ -178,400 +735,7 @@ func (s *WMailServer) Close() {
 	}
 }
 
-// Archive a whisper envelope.
-func (s *WMailServer) Archive(env *whisper.Envelope) {
-	if err := s.db.SaveEnvelope(env); err != nil {
-		log.Error("Could not save envelope", "hash", env.Hash())
-	}
-}
-
-// DeliverMail sends mail to specified whisper peer.
-func (s *WMailServer) DeliverMail(peer *whisper.Peer, request *whisper.Envelope) {
-	timer := prom.NewTimer(mailDeliveryDuration)
-	defer timer.ObserveDuration()
-
-	deliveryAttemptsCounter.Inc()
-
-	if peer == nil {
-		deliveryFailuresCounter.WithLabelValues("no_peer_set").Inc()
-		log.Error("[mailserver:DeliverMail] peer is nil")
-		return
-	}
-
-	requestID := types.Hash(request.Hash())
-	peerID := peerIDString(peer)
-
-	log.Info("[mailserver:DeliverMail] delivering mail",
-		"peerID", peerID,
-		"requestID", requestID.String())
-
-	if s.exceedsPeerRequests(peer.ID()) {
-		deliveryFailuresCounter.WithLabelValues("peer_req_limit").Inc()
-		log.Error("[mailserver:DeliverMail] peer exceeded the limit",
-			"peerID", peerID,
-			"requestID", requestID.String())
-		s.trySendHistoricMessageErrorResponse(peer, requestID, fmt.Errorf("rate limit exceeded"))
-		return
-	}
-
-	var (
-		lower, upper uint32
-		bloom        []byte
-		limit        uint32
-		cursor       []byte
-		batch        bool
-		err          error
-	)
-
-	payload, err := s.decodeRequest(peer.ID(), request)
-	if err == nil {
-		lower, upper = payload.Lower, payload.Upper
-		bloom = payload.Bloom
-		cursor = payload.Cursor
-		limit = payload.Limit
-		batch = payload.Batch
-	} else {
-		log.Debug("[mailserver:DeliverMail] failed to decode request",
-			"err", err,
-			"peerID", peerID,
-			"requestID", requestID.String())
-		lower, upper, bloom, limit, cursor, err = s.validateRequest(peer.ID(), request)
-	}
-
-	if limit == 0 {
-		limit = defaultLimit
-	}
-
-	if err != nil {
-		deliveryFailuresCounter.WithLabelValues("validation").Inc()
-		log.Error("[mailserver:DeliverMail] request failed validaton",
-			"peerID", peerID,
-			"requestID", requestID.String(),
-			"err", err)
-		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
-		return
-	}
-
-	log.Info("[mailserver:DeliverMail] processing request",
-		"peerID", peerID,
-		"requestID", requestID.String(),
-		"lower", lower,
-		"upper", upper,
-		"bloom", bloom,
-		"limit", limit,
-		"cursor", cursor,
-		"batch", batch,
-	)
-
-	if batch {
-		requestsBatchedCounter.Inc()
-	}
-
-	iter, err := s.createIterator(lower, upper, cursor, bloom, limit)
-	if err != nil {
-		log.Error("[mailserver:DeliverMail] request failed",
-			"peerID", peerID,
-			"requestID", requestID)
-
-		return
-	}
-
-	defer iter.Release()
-
-	bundles := make(chan []rlp.RawValue, 5)
-	errCh := make(chan error)
-	cancelProcessing := make(chan struct{})
-
-	go func() {
-		counter := 0
-		for bundle := range bundles {
-			if err := s.sendRawEnvelopes(peer, bundle, batch); err != nil {
-				close(cancelProcessing)
-				errCh <- err
-				break
-			}
-			counter++
-		}
-		close(errCh)
-		log.Info("[mailserver:DeliverMail] finished sending bundles",
-			"peerID", peerID,
-			"requestID", requestID.String(),
-			"counter", counter)
-	}()
-
-	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
-		iter,
-		bloom,
-		int(limit),
-		processRequestTimeout,
-		requestID.String(),
-		bundles,
-		cancelProcessing,
-	)
-
-	// Wait for the goroutine to finish the work. It may return an error.
-	if err := <-errCh; err != nil {
-		deliveryFailuresCounter.WithLabelValues("process").Inc()
-		log.Error("[mailserver:DeliverMail] error while processing",
-			"err", err,
-			"peerID", peerID,
-			"requestID", requestID)
-		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
-		return
-	}
-
-	// Processing of the request could be finished earlier due to iterator error.
-	if err := iter.Error(); err != nil {
-		deliveryFailuresCounter.WithLabelValues("iterator").Inc()
-		log.Error("[mailserver:DeliverMail] iterator failed",
-			"err", err,
-			"peerID", peerID,
-			"requestID", requestID)
-		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
-		return
-	}
-
-	log.Info("[mailserver:DeliverMail] sending historic message response",
-		"peerID", peerID,
-		"requestID", requestID,
-		"last", lastEnvelopeHash,
-		"next", nextPageCursor)
-
-	if err := s.sendHistoricMessageResponse(peer, requestID, lastEnvelopeHash, nextPageCursor); err != nil {
-		deliveryFailuresCounter.WithLabelValues("historic_msg_resp").Inc()
-		log.Error("[mailserver:DeliverMail] error sending historic message response",
-			"err", err,
-			"peerID", peerID,
-			"requestID", requestID)
-		// we still want to try to report error even it it is a p2p error and it is unlikely
-		s.trySendHistoricMessageErrorResponse(peer, requestID, err)
-	}
-}
-
-func (s *WMailServer) Deliver(peer *whisper.Peer, r whisper.MessagesRequest) {
-	timer := prom.NewTimer(mailDeliveryDuration)
-	defer timer.ObserveDuration()
-
-	deliveryAttemptsCounter.Inc()
-
-	var (
-		requestIDHash = types.BytesToHash(r.ID)
-		requestIDStr  = requestIDHash.String()
-		peerID        = peerIDString(peer)
-		err           error
-	)
-
-	defer func() {
-		if err != nil {
-			log.Error("[mailserver:DeliverMail] failed to process",
-				"err", err,
-				"peerID", peerID,
-				"requestID", requestIDStr,
-			)
-			s.trySendHistoricMessageErrorResponse(peer, requestIDHash, err)
-		}
-	}()
-
-	log.Info("[mailserver:Deliver] delivering mail", "peerID", peerID, "requestID", requestIDStr)
-
-	if peer == nil {
-		deliveryFailuresCounter.WithLabelValues("no_peer_set").Inc()
-		log.Error("[mailserver:Deliver] peer is nil")
-		return
-	}
-
-	if s.exceedsPeerRequests(peer.ID()) {
-		deliveryFailuresCounter.WithLabelValues("peer_req_limit").Inc()
-		err = errors.New("exceeded the number of requests limit")
-		return
-	}
-
-	err = r.Validate()
-	if err != nil {
-		deliveryFailuresCounter.WithLabelValues("validation").Inc()
-		err = fmt.Errorf("invalid request: %v", err)
-		return
-	}
-
-	var (
-		lower, upper = r.From, r.To
-		bloom        = r.Bloom
-		limit        = r.Limit
-		cursor       = r.Cursor
-		batch        = true // batch requests are default
-	)
-
-	log.Info("[mailserver:Deliver] processing request",
-		"peerID", peerID,
-		"requestID", requestIDStr,
-		"lower", lower,
-		"upper", upper,
-		"bloom", bloom,
-		"limit", limit,
-		"cursor", cursor,
-		"batch", batch,
-	)
-	requestsBatchedCounter.Inc()
-
-	iter, err := s.createIterator(lower, upper, cursor, bloom, limit)
-	if err != nil {
-		err = fmt.Errorf("failed to create an iterator: %v", err)
-		return
-	}
-	defer iter.Release()
-
-	bundles := make(chan []rlp.RawValue, 5)
-	errCh := make(chan error, 1)
-	cancelProcessing := make(chan struct{})
-
-	go func() {
-		counter := 0
-		for bundle := range bundles {
-			if err := s.sendRawEnvelopes(peer, bundle, batch); err != nil {
-				close(cancelProcessing)
-				errCh <- err
-				break
-			}
-			counter++
-		}
-		close(errCh)
-		log.Info("[mailserver:DeliverMail] finished sending bundles",
-			"peerID", peerID,
-			"requestID", requestIDStr,
-			"counter", counter,
-		)
-	}()
-
-	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
-		iter,
-		bloom,
-		int(limit),
-		processRequestTimeout,
-		requestIDStr,
-		bundles,
-		cancelProcessing,
-	)
-
-	// Wait for the goroutine to finish the work. It may return an error.
-	err = <-errCh
-	if err != nil {
-		deliveryFailuresCounter.WithLabelValues("process").Inc()
-		err = fmt.Errorf("failed to send envelopes: %v", err)
-		return
-	}
-
-	// Processing of the request could be finished earlier due to iterator error.
-	err = iter.Error()
-	if err != nil {
-		deliveryFailuresCounter.WithLabelValues("iterator").Inc()
-		err = fmt.Errorf("failed to read all envelopes: %v", err)
-		return
-	}
-
-	log.Info("[mailserver:Deliver] sending historic message response",
-		"peerID", peerID,
-		"requestID", requestIDStr,
-		"last", lastEnvelopeHash,
-		"next", nextPageCursor,
-	)
-
-	err = s.sendHistoricMessageResponse(peer, requestIDHash, lastEnvelopeHash, nextPageCursor)
-	if err != nil {
-		deliveryFailuresCounter.WithLabelValues("historic_msg_resp").Inc()
-		err = fmt.Errorf("failed to send response: %v", err)
-		return
-	}
-}
-
-// SyncMail syncs mail servers between two Mail Servers.
-func (s *WMailServer) SyncMail(peer *whisper.Peer, request whisper.SyncMailRequest) error {
-	log.Info("Started syncing envelopes", "peer", peerIDString(peer), "req", request)
-
-	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000))
-
-	syncAttemptsCounter.Inc()
-
-	// Check rate limiting for a requesting peer.
-	if s.exceedsPeerRequests(peer.ID()) {
-		syncFailuresCounter.WithLabelValues("req_per_sec_limit").Inc()
-		log.Error("Peer exceeded request per seconds limit", "peerID", peerIDString(peer))
-		return fmt.Errorf("requests per seconds limit exceeded")
-	}
-
-	if err := request.Validate(); err != nil {
-		syncFailuresCounter.WithLabelValues("req_invalid").Inc()
-		return fmt.Errorf("request is invalid: %v", err)
-	}
-
-	iter, err := s.createIterator(request.Lower, request.Upper, request.Cursor, nil, 0)
-	if err != nil {
-		syncFailuresCounter.WithLabelValues("iterator").Inc()
-		return err
-	}
-	defer iter.Release()
-
-	bundles := make(chan []rlp.RawValue, 5)
-	errCh := make(chan error)
-	cancelProcessing := make(chan struct{})
-
-	go func() {
-		for bundle := range bundles {
-			resp := whisper.RawSyncResponse{Envelopes: bundle}
-			if err := s.w.SendRawSyncResponse(peer, resp); err != nil {
-				close(cancelProcessing)
-				errCh <- fmt.Errorf("failed to send sync response: %v", err)
-				break
-			}
-		}
-		close(errCh)
-	}()
-
-	nextCursor, _ := s.processRequestInBundles(
-		iter,
-		request.Bloom,
-		int(request.Limit),
-		processRequestTimeout,
-		requestID,
-		bundles,
-		cancelProcessing,
-	)
-
-	// Wait for the goroutine to finish the work. It may return an error.
-	if err := <-errCh; err != nil {
-		syncFailuresCounter.WithLabelValues("routine").Inc()
-		_ = s.w.SendSyncResponse(
-			peer,
-			whisper.SyncResponse{Error: "failed to send a response"},
-		)
-		return err
-	}
-
-	// Processing of the request could be finished earlier due to iterator error.
-	if err := iter.Error(); err != nil {
-		syncFailuresCounter.WithLabelValues("iterator").Inc()
-		_ = s.w.SendSyncResponse(
-			peer,
-			whisper.SyncResponse{Error: "failed to process all envelopes"},
-		)
-		return fmt.Errorf("LevelDB iterator failed: %v", err)
-	}
-
-	log.Info("Finished syncing envelopes", "peer", peerIDString(peer))
-
-	if err := s.w.SendSyncResponse(peer, whisper.SyncResponse{
-		Cursor: nextCursor,
-		Final:  true,
-	}); err != nil {
-		syncFailuresCounter.WithLabelValues("response_send").Inc()
-		return fmt.Errorf("failed to send the final sync response: %v", err)
-	}
-
-	return nil
-}
-
-// exceedsPeerRequests in case limit its been setup on the current server and limit
-// allows the query, it will store/update new query time for the current peer.
-func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
+func (s *mailServer) exceedsPeerRequests(peerID types.Hash) bool {
 	s.muRateLimiter.RLock()
 	defer s.muRateLimiter.RUnlock()
 
@@ -579,39 +743,36 @@ func (s *WMailServer) exceedsPeerRequests(peer []byte) bool {
 		return false
 	}
 
-	peerID := string(peer)
-	if s.rateLimiter.IsAllowed(peerID) {
-		s.rateLimiter.Add(peerID)
+	if s.rateLimiter.IsAllowed(peerID.String()) {
+		s.rateLimiter.Add(peerID.String())
 		return false
 	}
 
-	log.Info("peerID exceeded the number of requests per second")
+	log.Info("peerID exceeded the number of requests per second", "peerID", peerID.String())
 	return true
 }
 
-func (s *WMailServer) createIterator(lower, upper uint32, cursor []byte, bloom []byte, limit uint32) (Iterator, error) {
+func (s *mailServer) createIterator(req MessagesRequestPayload) (Iterator, error) {
 	var (
 		emptyHash  types.Hash
 		emptyTopic types.TopicType
 		ku, kl     *DBKey
 	)
 
-	ku = NewDBKey(upper+1, emptyTopic, emptyHash)
-	kl = NewDBKey(lower, emptyTopic, emptyHash)
+	ku = NewDBKey(req.Upper+1, emptyTopic, emptyHash)
+	kl = NewDBKey(req.Lower, emptyTopic, emptyHash)
 
 	query := CursorQuery{
 		start:  kl.Bytes(),
 		end:    ku.Bytes(),
-		cursor: cursor,
-		bloom:  bloom,
-		limit:  limit,
+		cursor: req.Cursor,
+		bloom:  req.Bloom,
+		limit:  req.Limit,
 	}
 	return s.db.BuildIterator(query)
 }
 
-// processRequestInBundles processes envelopes using an iterator and passes them
-// to the output channel in bundles.
-func (s *WMailServer) processRequestInBundles(
+func (s *mailServer) processRequestInBundles(
 	iter Iterator,
 	bloom []byte,
 	limit int,
@@ -633,9 +794,11 @@ func (s *WMailServer) processRequestInBundles(
 		lastEnvelopeHash       types.Hash
 	)
 
-	log.Info("[mailserver:processRequestInBundles] processing request",
+	log.Info(
+		"[mailserver:processRequestInBundles] processing request",
 		"requestID", requestID,
-		"limit", limit)
+		"limit", limit,
+	)
 
 	// We iterate over the envelopes.
 	// We collect envelopes in batches.
@@ -644,25 +807,25 @@ func (s *WMailServer) processRequestInBundles(
 	// Otherwise publish what you have so far, reset the bundle to the
 	// current envelope, and leave if we hit the limit
 	for iter.Next() {
-
 		rawValue, err := iter.GetEnvelope(bloom)
-
 		if err != nil {
-			log.Error("Failed to get envelope from iterator",
+			log.Error(
+				"[mailserver:processRequestInBundles]Failed to get envelope from iterator",
 				"err", err,
-				"requestID", requestID)
+				"requestID", requestID,
+			)
 			continue
-
 		}
-
 		if rawValue == nil {
 			continue
 		}
 
 		key, err := iter.DBKey()
 		if err != nil {
-			log.Error("[mailserver:processRequestInBundles] failed getting key",
-				"requestID", requestID)
+			log.Error(
+				"[mailserver:processRequestInBundles] failed getting key",
+				"requestID", requestID,
+			)
 			break
 
 		}
@@ -676,7 +839,7 @@ func (s *WMailServer) processRequestInBundles(
 		newSize := bundleSize + envelopeSize
 
 		// If we still have some room for messages, add and continue
-		if !limitReached && newSize < s.w.MaxMessageSize() {
+		if !limitReached && newSize < s.service.MaxMessageSize() {
 			bundle = append(bundle, rawValue)
 			bundleSize = newSize
 			continue
@@ -705,12 +868,14 @@ func (s *WMailServer) processRequestInBundles(
 		processedEnvelopesSize += int64(bundleSize)
 	}
 
-	log.Info("[mailserver:processRequestInBundles] publishing envelopes",
+	log.Info(
+		"[mailserver:processRequestInBundles] publishing envelopes",
 		"requestID", requestID,
 		"batchesCount", len(batches),
 		"envelopeCount", processedEnvelopes,
 		"processedEnvelopesSize", processedEnvelopesSize,
-		"cursor", nextCursor)
+		"cursor", nextCursor,
+	)
 
 	// Publish
 batchLoop:
@@ -722,12 +887,16 @@ batchLoop:
 		// the consumer of `output` channel exits prematurely.
 		// In such a case, we should stop pushing batches and exit.
 		case <-cancel:
-			log.Info("[mailserver:processRequestInBundles] failed to push all batches",
-				"requestID", requestID)
+			log.Info(
+				"[mailserver:processRequestInBundles] failed to push all batches",
+				"requestID", requestID,
+			)
 			break batchLoop
 		case <-time.After(timeout):
-			log.Error("[mailserver:processRequestInBundles] timed out pushing a batch",
-				"requestID", requestID)
+			log.Error(
+				"[mailserver:processRequestInBundles] timed out pushing a batch",
+				"requestID", requestID,
+			)
 			break batchLoop
 		}
 	}
@@ -735,23 +904,25 @@ batchLoop:
 	envelopesCounter.Inc()
 	sentEnvelopeBatchSizeMeter.Observe(float64(processedEnvelopesSize))
 
-	log.Info("[mailserver:processRequestInBundles] envelopes published",
-		"requestID", requestID)
+	log.Info(
+		"[mailserver:processRequestInBundles] envelopes published",
+		"requestID", requestID,
+	)
 	close(output)
 
 	return nextCursor, lastEnvelopeHash
 }
 
-func (s *WMailServer) sendRawEnvelopes(peer *whisper.Peer, envelopes []rlp.RawValue, batch bool) error {
+func (s *mailServer) sendRawEnvelopes(peerID types.Hash, envelopes []rlp.RawValue, batch bool) error {
 	timer := prom.NewTimer(sendRawEnvelopeDuration)
 	defer timer.ObserveDuration()
 
 	if batch {
-		return s.w.SendRawP2PDirect(peer, envelopes...)
+		return s.service.SendRawP2PDirect(peerID.Bytes(), envelopes...)
 	}
 
 	for _, env := range envelopes {
-		if err := s.w.SendRawP2PDirect(peer, env); err != nil {
+		if err := s.service.SendRawP2PDirect(peerID.Bytes(), env); err != nil {
 			return err
 		}
 	}
@@ -759,172 +930,28 @@ func (s *WMailServer) sendRawEnvelopes(peer *whisper.Peer, envelopes []rlp.RawVa
 	return nil
 }
 
-func (s *WMailServer) sendHistoricMessageResponse(peer *whisper.Peer, requestID, lastEnvelopeHash types.Hash, cursor []byte) error {
-	payload := whisper.CreateMailServerRequestCompletedPayload(common.Hash(requestID), common.Hash(lastEnvelopeHash), cursor)
-	return s.w.SendHistoricMessageResponse(peer, payload)
+func (s *mailServer) sendHistoricMessageResponse(peerID, reqID, lastEnvelopeHash types.Hash, cursor []byte) {
+	payload := s.adapter.CreateRequestCompletedPayload(reqID, lastEnvelopeHash, cursor)
+	err := s.service.SendHistoricMessageResponse(peerID.Bytes(), payload)
+	if err != nil {
+		deliveryFailuresCounter.WithLabelValues("historic_msg_resp").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] error sending historic message response",
+			"err", err,
+			"peerID", peerID,
+			"requestID", reqID,
+		)
+	}
 }
 
-// this method doesn't return an error because it is already in the error handling chain
-func (s *WMailServer) trySendHistoricMessageErrorResponse(peer *whisper.Peer, requestID types.Hash, errorToReport error) {
-	payload := whisper.CreateMailServerRequestFailedPayload(common.Hash(requestID), errorToReport)
-
-	err := s.w.SendHistoricMessageResponse(peer, payload)
+func (s *mailServer) sendHistoricMessageErrorResponse(peerID, reqID types.Hash, errorToReport error) {
+	payload := s.adapter.CreateRequestFailedPayload(reqID, errorToReport)
+	err := s.service.SendHistoricMessageResponse(peerID.Bytes(), payload)
 	// if we can't report an error, probably something is wrong with p2p connection,
 	// so we just print a log entry to document this sad fact
 	if err != nil {
-		log.Error("Error while reporting error response", "err", err, "peerID", peerIDString(peer))
+		log.Error("Error while reporting error response", "err", err, "peerID", peerID.String())
 	}
-}
-
-// openEnvelope tries to decrypt an envelope, first based on asymetric key (if
-// provided) and second on the symetric key (if provided)
-func (s *WMailServer) openEnvelope(request *whisper.Envelope) *whisper.ReceivedMessage {
-	if s.asymFilter != nil {
-		if d := request.Open(s.asymFilter); d != nil {
-			return d
-		}
-	}
-	if s.symFilter != nil {
-		if d := request.Open(s.symFilter); d != nil {
-			return d
-		}
-	}
-	return nil
-}
-
-func (s *WMailServer) decodeRequest(peerID []byte, request *whisper.Envelope) (MessagesRequestPayload, error) {
-	var payload MessagesRequestPayload
-
-	if s.pow > 0.0 && request.PoW() < s.pow {
-		return payload, errors.New("PoW too low")
-	}
-
-	decrypted := s.openEnvelope(request)
-	if decrypted == nil {
-		log.Warn("Failed to decrypt p2p request")
-		return payload, errors.New("failed to decrypt p2p request")
-	}
-
-	if err := s.checkMsgSignature(decrypted, peerID); err != nil {
-		log.Warn("Check message signature failed: %s", "err", err.Error())
-		return payload, fmt.Errorf("check message signature failed: %v", err)
-	}
-
-	if err := rlp.DecodeBytes(decrypted.Payload, &payload); err != nil {
-		return payload, fmt.Errorf("failed to decode data: %v", err)
-	}
-
-	if payload.Upper == 0 {
-		payload.Upper = uint32(time.Now().Unix() + whisperTTLSafeThreshold)
-	}
-
-	if payload.Upper < payload.Lower {
-		log.Error("Query range is invalid: lower > upper", "lower", payload.Lower, "upper", payload.Upper)
-		return payload, errors.New("query range is invalid: lower > upper")
-	}
-
-	return payload, nil
-}
-
-// validateRequest runs different validations on the current request.
-// DEPRECATED
-func (s *WMailServer) validateRequest(
-	peerID []byte,
-	request *whisper.Envelope,
-) (uint32, uint32, []byte, uint32, []byte, error) {
-	if s.pow > 0.0 && request.PoW() < s.pow {
-		return 0, 0, nil, 0, nil, fmt.Errorf("PoW() is too low")
-	}
-
-	decrypted := s.openEnvelope(request)
-	if decrypted == nil {
-		return 0, 0, nil, 0, nil, fmt.Errorf("failed to decrypt p2p request")
-	}
-
-	if err := s.checkMsgSignature(decrypted, peerID); err != nil {
-		return 0, 0, nil, 0, nil, err
-	}
-
-	bloom, err := s.bloomFromReceivedMessage(decrypted)
-	if err != nil {
-		return 0, 0, nil, 0, nil, err
-	}
-
-	lower := binary.BigEndian.Uint32(decrypted.Payload[:4])
-	upper := binary.BigEndian.Uint32(decrypted.Payload[4:8])
-
-	if upper < lower {
-		err := fmt.Errorf("query range is invalid: from > to (%d > %d)", lower, upper)
-		return 0, 0, nil, 0, nil, err
-	}
-
-	lowerTime := time.Unix(int64(lower), 0)
-	upperTime := time.Unix(int64(upper), 0)
-	if upperTime.Sub(lowerTime) > maxQueryRange {
-		err := fmt.Errorf("query range too big for peer %s", string(peerID))
-		return 0, 0, nil, 0, nil, err
-	}
-
-	var limit uint32
-	if len(decrypted.Payload) >= requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength {
-		limit = binary.BigEndian.Uint32(decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize:])
-	}
-
-	var cursor []byte
-	if len(decrypted.Payload) == requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength+DBKeyLength {
-		cursor = decrypted.Payload[requestTimeRangeLength+whisper.BloomFilterSize+requestLimitLength:]
-	}
-
-	err = nil
-	return lower, upper, bloom, limit, cursor, err
-}
-
-// checkMsgSignature returns an error in case the message is not correcly signed
-func (s *WMailServer) checkMsgSignature(msg *whisper.ReceivedMessage, id []byte) error {
-	src := crypto.FromECDSAPub(msg.Src)
-	if len(src)-len(id) == 1 {
-		src = src[1:]
-	}
-
-	// if you want to check the signature, you can do it here. e.g.:
-	// if !bytes.Equal(peerID, src) {
-	if src == nil {
-		return errors.New("Wrong signature of p2p request")
-	}
-
-	return nil
-}
-
-// bloomFromReceivedMessage for a given whisper.ReceivedMessage it extracts the
-// used bloom filter.
-func (s *WMailServer) bloomFromReceivedMessage(msg *whisper.ReceivedMessage) ([]byte, error) {
-	payloadSize := len(msg.Payload)
-
-	if payloadSize < 8 {
-		return nil, errors.New("Undersized p2p request")
-	} else if payloadSize == 8 {
-		return whisper.MakeFullNodeBloom(), nil
-	} else if payloadSize < 8+whisper.BloomFilterSize {
-		return nil, errors.New("Undersized bloom filter in p2p request")
-	}
-
-	return msg.Payload[8 : 8+whisper.BloomFilterSize], nil
-}
-
-// peerWithID is a generalization of whisper.Peer.
-// whisper.Peer has all fields and methods, except for ID(), unexported.
-// It makes it impossible to create an instance of it
-// outside of whisper package and test properly.
-type peerWithID interface {
-	ID() []byte
-}
-
-func peerIDString(peer peerWithID) string {
-	return fmt.Sprintf("%x", peer.ID())
-}
-
-func peerIDBytesString(id []byte) string {
-	return fmt.Sprintf("%x", id)
 }
 
 func extractBloomFromEncodedEnvelope(rawValue rlp.RawValue) ([]byte, error) {
@@ -934,4 +961,20 @@ func extractBloomFromEncodedEnvelope(rawValue rlp.RawValue) ([]byte, error) {
 		return nil, decodeErr
 	}
 	return envelope.Bloom(), nil
+}
+
+// checkMsgSignature returns an error in case the message is not correctly signed.
+func checkMsgSignature(reqSrc *ecdsa.PublicKey, id []byte) error {
+	src := crypto.FromECDSAPub(reqSrc)
+	if len(src)-len(id) == 1 {
+		src = src[1:]
+	}
+
+	// if you want to check the signature, you can do it here. e.g.:
+	// if !bytes.Equal(peerID, src) {
+	if src == nil {
+		return errors.New("wrong signature of p2p request")
+	}
+
+	return nil
 }

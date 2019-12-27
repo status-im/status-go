@@ -5,6 +5,11 @@ package types
 type Envelope interface {
 	Hash() Hash // Cached hash of the envelope to avoid rehashing every time.
 	Bloom() []byte
+	PoW() float64
+	Expiry() uint32
+	TTL() uint32
+	Topic() TopicType
+	Size() int
 }
 
 // EventType used to define known envelope events.

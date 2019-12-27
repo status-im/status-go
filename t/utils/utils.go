@@ -289,10 +289,10 @@ func MakeTestNodeConfigWithDataDir(name, dataDir string, networkID uint64) (*par
 	} else {
 		cfg.Name = name
 	}
+	cfg.EnableNTPSync = true
 	cfg.NoDiscovery = true
 	cfg.LightEthConfig.Enabled = false
 	cfg.WhisperConfig.Enabled = true
-	cfg.WhisperConfig.EnableNTPSync = false
 	if dataDir != "" {
 		cfg.KeyStoreDir = path.Join(dataDir, "keystore")
 		cfg.WhisperConfig.DataDir = path.Join(dataDir, "wnode")
