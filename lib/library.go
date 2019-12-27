@@ -356,14 +356,19 @@ func Login(accountData, password *C.char) *C.char {
 
 // SaveAccountAndLogin saves account in status-go database..
 //export SaveAccountAndLogin
-func SaveAccountAndLogin(accountData, password, configJSON, subaccountData *C.char) *C.char {
-	data, confJSON, subData := C.GoString(accountData), C.GoString(configJSON), C.GoString(subaccountData)
+func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData *C.char) *C.char {
+	data, setJSON, confJSON, subData := C.GoString(accountData), C.GoString(settingsJSON), C.GoString(configJSON), C.GoString(subaccountData)
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(data), &account)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	conf := params.NodeConfig{}
+	var settings accounts.Settings
+	err = json.Unmarshal([]byte(setJSON), &settings)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var conf params.NodeConfig
 	err = json.Unmarshal([]byte(confJSON), &conf)
 	if err != nil {
 		return makeJSONResponse(err)
@@ -373,10 +378,10 @@ func SaveAccountAndLogin(accountData, password, configJSON, subaccountData *C.ch
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	api.RunAsync(func() error {
-		return statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), &conf, subaccs)
+	err = <-api.RunAsync(func() error {
+		return statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), settings, &conf, subaccs)
 	})
-	return makeJSONResponse(nil)
+	return makeJSONResponse(err)
 }
 
 // InitKeystore initialize keystore before doing any operations with keys.
@@ -563,7 +568,7 @@ func WriteHeapProfile(dataDir *C.char) *C.char { //nolint: deadcode
 func makeJSONResponse(err error) *C.char {
 	errString := ""
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "makeJSONResponse with an error: %v\n", err)
 		errString = err.Error()
 	}
 

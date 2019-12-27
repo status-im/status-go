@@ -2,10 +2,8 @@ package accounts
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
 )
 
 func NewSettingsAPI(db *accounts.Database) *SettingsAPI {
@@ -17,18 +15,10 @@ type SettingsAPI struct {
 	db *accounts.Database
 }
 
-func (api *SettingsAPI) SaveConfig(ctx context.Context, typ string, conf json.RawMessage) error {
-	return api.db.SaveConfig(typ, conf)
+func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interface{}) error {
+	return api.db.SaveSetting(typ, val)
 }
 
-func (api *SettingsAPI) GetConfig(ctx context.Context, typ string) (json.RawMessage, error) {
-	return api.db.GetConfigBlob(typ)
-}
-
-func (api *SettingsAPI) GetConfigs(ctx context.Context, types []string) (map[string]json.RawMessage, error) {
-	return api.db.GetConfigBlobs(types)
-}
-
-func (api *SettingsAPI) SaveNodeConfig(ctx context.Context, conf *params.NodeConfig) error {
-	return api.db.SaveConfig(accounts.NodeConfigTag, conf)
+func (api *SettingsAPI) GetSettings(ctx context.Context) (accounts.Settings, error) {
+	return api.db.GetSettings()
 }

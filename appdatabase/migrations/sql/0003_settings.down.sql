@@ -1,0 +1,6 @@
+DROP TABLE settings;
+CREATE TABLE IF NOT EXISTS settings (
+  type VARCHAR PRIMARY KEY,
+  value BLOB
+) WITHOUT ROWID;
+

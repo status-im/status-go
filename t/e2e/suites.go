@@ -1,18 +1,20 @@
 package e2e
 
 import (
-	"github.com/ethereum/go-ethereum/log"
+	"encoding/json"
 
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
-	"github.com/stretchr/testify/suite"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // StatusNodeTestSuite defines a test suite with StatusNode.
@@ -21,8 +23,28 @@ type StatusNodeTestSuite struct {
 	StatusNode *node.StatusNode
 }
 
-// All general log messages in this package should be routed through this logger.
-var logger = log.New("package", "status-go/t/e2e")
+var (
+	// All general log messages in this package should be routed through this logger.
+	logger = log.New("package", "status-go/t/e2e")
+
+	// Settings for testing
+	networks = json.RawMessage("{}")
+	settings = accounts.Settings{
+		Address:           types.HexToAddress("0xaC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		CurrentNetwork:    "mainnet_rpc",
+		DappsAddress:      types.HexToAddress("0xa1300f99fDF7346986CbC766903245087394ecd0"),
+		EIP1581Address:    types.HexToAddress("0xa1DDDE9235a541d1344550d969715CF43982de9f"),
+		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
+		KeyUID:            "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
+		LatestDerivedPath: 0,
+		Name:              "Jittery Cornflowerblue Kingbird",
+		Networks:          &networks,
+		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+		PreviewPrivacy:    false,
+		PublicKey:         "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
+		SigningPhrase:     "yurt joey vibe",
+		WalletRootAddress: types.HexToAddress("0xaB591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
+)
 
 func Init() {
 	utils.Init()
@@ -117,7 +139,7 @@ func (s *BackendTestSuite) StartTestBackendWithAccount(account multiaccounts.Acc
 	s.NoError(s.Backend.OpenAccounts())
 	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
 
-	s.Require().NoError(s.Backend.StartNodeWithAccountAndConfig(account, password, nodeConfig, subaccs))
+	s.Require().NoError(s.Backend.StartNodeWithAccountAndConfig(account, password, settings, nodeConfig, subaccs))
 }
 
 func (s *BackendTestSuite) LogoutAndStop() {

@@ -3,6 +3,7 @@ package devtests
 import (
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"encoding/json"
 	"io/ioutil"
 	"os"
 
@@ -52,6 +53,8 @@ func (s *DevNodeSuite) SetupTest() {
 		s.dir,
 		1337,
 	)
+	networks := json.RawMessage("{}")
+	settings := accounts.Settings{Networks: &networks}
 	s.Require().NoError(err)
 	config.WhisperConfig.Enabled = false
 	config.LightEthConfig.Enabled = false
@@ -69,7 +72,7 @@ func (s *DevNodeSuite) SetupTest() {
 	s.Require().NoError(s.backend.StartNodeWithAccountAndConfig(multiaccounts.Account{
 		Name:   "main",
 		KeyUID: keyUID,
-	}, "test", config, []accounts.Account{{Address: s.DevAccountAddress, Wallet: true, Chat: true}}))
+	}, "test", settings, config, []accounts.Account{{Address: s.DevAccountAddress, Wallet: true, Chat: true}}))
 	s.Remote, err = s.miner.Attach()
 	s.Require().NoError(err)
 	s.Eth = ethclient.NewClient(s.Remote)

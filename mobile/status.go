@@ -340,9 +340,14 @@ func Login(accountData, password string) string {
 }
 
 // SaveAccountAndLogin saves account in status-go database..
-func SaveAccountAndLogin(accountData, password, configJSON, subaccountData string) string {
+func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subaccountData string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var settings accounts.Settings
+	err = json.Unmarshal([]byte(settingsJSON), &settings)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -358,7 +363,7 @@ func SaveAccountAndLogin(accountData, password, configJSON, subaccountData strin
 	}
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.StartNodeWithAccountAndConfig(account, password, &conf, subaccs)
+		err := statusBackend.StartNodeWithAccountAndConfig(account, password, settings, &conf, subaccs)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
@@ -376,9 +381,14 @@ func InitKeystore(keydir string) string {
 }
 
 // SaveAccountAndLoginWithKeycard saves account in status-go database..
-func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, subaccountData string, keyHex string) string {
+func SaveAccountAndLoginWithKeycard(accountData, password, settingsJSON, configJSON, subaccountData string, keyHex string) string {
 	var account multiaccounts.Account
 	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	var settings accounts.Settings
+	err = json.Unmarshal([]byte(settingsJSON), &settings)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -394,7 +404,7 @@ func SaveAccountAndLoginWithKeycard(accountData, password, configJSON, subaccoun
 	}
 	api.RunAsync(func() error {
 		log.Debug("starting a node, and saving account with configuration", "key-uid", account.KeyUID)
-		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, &conf, subaccs, keyHex)
+		err := statusBackend.SaveAccountAndStartNodeWithKey(account, password, settings, &conf, subaccs, keyHex)
 		if err != nil {
 			log.Error("failed to start node and save account", "key-uid", account.KeyUID, "error", err)
 			return err
