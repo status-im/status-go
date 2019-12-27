@@ -24,7 +24,6 @@ var (
 		Address:           types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
-		EIP1581Address:    types.HexToAddress("0xB1DDDE9235a541d1344550d969715CF43982de9f"),
 		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
 		KeyUID:            "0x4e8129f3edfc004875be17bf468a784098a9f69b53c095be1f52deff286935ab",
 		LatestDerivedPath: 0,
