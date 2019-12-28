@@ -1,21 +1,31 @@
-package types
+// Copyright 2019 The Waku Library Authors.
+//
+// The Waku library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The Waku library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty off
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the Waku library. If not, see <http://www.gnu.org/licenses/>.
+//
+// This software uses the go-ethereum library, which is licensed
+// under the GNU Lesser General Public Library, version 3 or any later.
 
-// Envelope represents a clear-text data packet to transmit through the Whisper
-// network. Its contents may or may not be encrypted and signed.
-type Envelope interface {
-	Hash() Hash // Cached hash of the envelope to avoid rehashing every time.
-	Bloom() []byte
-	PoW() float64
-	Expiry() uint32
-	TTL() uint32
-	Topic() TopicType
-	Size() int
-}
+package waku
+
+import (
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/p2p/enode"
+)
 
 // EventType used to define known envelope events.
 type EventType string
 
-// NOTE: This list of event names is extracted from Geth. It must be kept in sync, or otherwise a mapping layer needs to be created
 const (
 	// EventEnvelopeSent fires when envelope was sent to a peer.
 	EventEnvelopeSent EventType = "envelope.sent"
@@ -43,44 +53,12 @@ const (
 	EventMailServerSyncFinished EventType = "mailserver.sync.finished"
 )
 
-const (
-	// EnvelopeTimeNotSynced represents the code passed to notify of a clock skew situation
-	EnvelopeTimeNotSynced uint = 1000
-	// EnvelopeOtherError represents the code passed to notify of a generic error situation
-	EnvelopeOtherError
-)
-
 // EnvelopeEvent used for envelopes events.
 type EnvelopeEvent struct {
 	Event EventType
-	Hash  Hash
-	Batch Hash
-	Peer  EnodeID
+	Topic TopicType
+	Hash  common.Hash
+	Batch common.Hash
+	Peer  enode.ID
 	Data  interface{}
-}
-
-// EnvelopeError code and optional description of the error.
-type EnvelopeError struct {
-	Hash        Hash
-	Code        uint
-	Description string
-}
-
-// Subscription represents a stream of events. The carrier of the events is typically a
-// channel, but isn't part of the interface.
-//
-// Subscriptions can fail while established. Failures are reported through an error
-// channel. It receives a value if there is an issue with the subscription (e.g. the
-// network connection delivering the events has been closed). Only one value will ever be
-// sent.
-//
-// The error channel is closed when the subscription ends successfully (i.e. when the
-// source of events is closed). It is also closed when Unsubscribe is called.
-//
-// The Unsubscribe method cancels the sending of events. You must call Unsubscribe in all
-// cases to ensure that resources related to the subscription are released. It can be
-// called any number of times.
-type Subscription interface {
-	Err() <-chan error // returns the error channel
-	Unsubscribe()      // cancels sending of events, closing the error channel
 }
