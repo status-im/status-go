@@ -21,6 +21,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand"
+	"reflect"
 	"sync"
 	"time"
 
@@ -38,7 +40,7 @@ import (
 
 const (
 	maxQueryRange = 24 * time.Hour
-	defaultLimit  = 2000
+	defaultLimit  = 1000
 	// When we default the upper limit, we want to extend the range a bit
 	// to accommodate for envelopes with slightly higher timestamp, in seconds
 	whisperTTLSafeThreshold = 60
@@ -104,7 +106,7 @@ func (s *WhisperMailServer) Init(shh *whisper.Whisper, cfg *params.WhisperConfig
 	s.ms, err = newMailServer(
 		config,
 		&whisperAdapter{},
-		shh,
+		&whisperService{Whisper: shh},
 	)
 	if err != nil {
 		return err
@@ -166,7 +168,13 @@ func (s *WhisperMailServer) Deliver(peerID []byte, req whisper.MessagesRequest) 
 }
 
 func (s *WhisperMailServer) SyncMail(peerID []byte, req whisper.SyncMailRequest) error {
-	return s.SyncMail(peerID, req)
+	return s.ms.SyncMail(types.BytesToHash(peerID), MessagesRequestPayload{
+		Lower:  req.Lower,
+		Upper:  req.Upper,
+		Bloom:  req.Bloom,
+		Limit:  req.Limit,
+		Cursor: req.Cursor,
+	})
 }
 
 func (s *WhisperMailServer) setupDecryptor(password, asymKey string) error {
@@ -344,7 +352,7 @@ func (s *WakuMailServer) Init(waku *waku.Waku, cfg *params.WakuConfig) error {
 	s.ms, err = newMailServer(
 		config,
 		&wakuAdapter{},
-		waku,
+		&wakuService{Waku: waku},
 	)
 	if err != nil {
 		return err
@@ -480,6 +488,8 @@ func (s *WakuMailServer) decodeRequest(peerID []byte, request *waku.Envelope) (M
 type adapter interface {
 	CreateRequestFailedPayload(reqID types.Hash, err error) []byte
 	CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.Hash, cursor []byte) []byte
+	CreateSyncResponse(envelopes []types.Envelope, cursor []byte, final bool, err string) interface{}
+	CreateRawSyncResponse(envelopes []rlp.RawValue, cursor []byte, final bool, err string) interface{}
 }
 
 // --------------
@@ -498,6 +508,28 @@ func (whisperAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash type
 	return whisper.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
 }
 
+func (whisperAdapter) CreateSyncResponse(envelopes []types.Envelope, cursor []byte, final bool, err string) interface{} {
+	whisperEnvelopes := make([]*whisper.Envelope, len(envelopes))
+	for i, env := range envelopes {
+		whisperEnvelopes[i] = gethbridge.GetWhisperEnvelopeFrom(env)
+	}
+	return whisper.SyncResponse{
+		Envelopes: whisperEnvelopes,
+		Cursor:    cursor,
+		Final:     final,
+		Error:     err,
+	}
+}
+
+func (whisperAdapter) CreateRawSyncResponse(envelopes []rlp.RawValue, cursor []byte, final bool, err string) interface{} {
+	return whisper.RawSyncResponse{
+		Envelopes: envelopes,
+		Cursor:    cursor,
+		Final:     final,
+		Error:     err,
+	}
+}
+
 // -----------
 // wakuAdapter
 // -----------
@@ -514,6 +546,14 @@ func (wakuAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash types.H
 	return waku.CreateMailServerRequestCompletedPayload(common.Hash(reqID), common.Hash(lastEnvelopeHash), cursor)
 }
 
+func (wakuAdapter) CreateSyncResponse(_ []types.Envelope, _ []byte, _ bool, _ string) interface{} {
+	return nil
+}
+
+func (wakuAdapter) CreateRawSyncResponse(_ []rlp.RawValue, _ []byte, _ bool, _ string) interface{} {
+	return nil
+}
+
 // -------
 // service
 // -------
@@ -522,6 +562,48 @@ type service interface {
 	SendHistoricMessageResponse(peerID []byte, payload []byte) error
 	SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error
 	MaxMessageSize() uint32
+	SendRawSyncResponse(peerID []byte, data interface{}) error // optional
+	SendSyncResponse(peerID []byte, data interface{}) error    // optional
+}
+
+// --------------
+// whisperService
+// --------------
+
+type whisperService struct {
+	*whisper.Whisper
+}
+
+func (s *whisperService) SendRawSyncResponse(peerID []byte, data interface{}) error {
+	resp, ok := data.(whisper.RawSyncResponse)
+	if !ok {
+		panic(fmt.Sprintf("invalid data type, got %s", reflect.TypeOf(data)))
+	}
+	return s.Whisper.SendRawSyncResponse(peerID, resp)
+}
+
+func (s *whisperService) SendSyncResponse(peerID []byte, data interface{}) error {
+	resp, ok := data.(whisper.SyncResponse)
+	if !ok {
+		panic(fmt.Sprintf("invalid data type, got %s", reflect.TypeOf(data)))
+	}
+	return s.Whisper.SendSyncResponse(peerID, resp)
+}
+
+// -----------
+// wakuService
+// -----------
+
+type wakuService struct {
+	*waku.Waku
+}
+
+func (s *wakuService) SendRawSyncResponse(peerID []byte, data interface{}) error {
+	return errors.New("syncing mailservers is not support by Waku")
+}
+
+func (s *wakuService) SendSyncResponse(peerID []byte, data interface{}) error {
+	return errors.New("syncing mailservers is not support by Waku")
 }
 
 // ----------
@@ -612,6 +694,20 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 		"peerID", peerID.String(),
 		"requestID", reqID.String(),
 	)
+
+	req.SetDefaults()
+
+	if err := req.Validate(); err != nil {
+		syncFailuresCounter.WithLabelValues("req_invalid").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] request invalid",
+			"peerID", peerID.String(),
+			"requestID", reqID.String(),
+			"err", err,
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, fmt.Errorf("request is invalid: %v", err))
+		return
+	}
 
 	if s.exceedsPeerRequests(peerID) {
 		deliveryFailuresCounter.WithLabelValues("peer_req_limit").Inc()
@@ -718,6 +814,94 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 	)
 
 	s.sendHistoricMessageResponse(peerID, reqID, lastEnvelopeHash, nextPageCursor)
+}
+
+func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) error {
+	log.Info("Started syncing envelopes", "peer", peerID.String(), "req", req)
+
+	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000))
+
+	syncAttemptsCounter.Inc()
+
+	// Check rate limiting for a requesting peer.
+	if s.exceedsPeerRequests(peerID) {
+		syncFailuresCounter.WithLabelValues("req_per_sec_limit").Inc()
+		log.Error("Peer exceeded request per seconds limit", "peerID", peerID.String())
+		return fmt.Errorf("requests per seconds limit exceeded")
+	}
+
+	req.SetDefaults()
+
+	if err := req.Validate(); err != nil {
+		syncFailuresCounter.WithLabelValues("req_invalid").Inc()
+		return fmt.Errorf("request is invalid: %v", err)
+	}
+
+	iter, err := s.createIterator(req)
+	if err != nil {
+		syncFailuresCounter.WithLabelValues("iterator").Inc()
+		return err
+	}
+	defer iter.Release()
+
+	bundles := make(chan []rlp.RawValue, 5)
+	errCh := make(chan error)
+	cancelProcessing := make(chan struct{})
+
+	go func() {
+		for bundle := range bundles {
+			resp := s.adapter.CreateRawSyncResponse(bundle, nil, false, "")
+			if err := s.service.SendRawSyncResponse(peerID.Bytes(), resp); err != nil {
+				close(cancelProcessing)
+				errCh <- fmt.Errorf("failed to send sync response: %v", err)
+				break
+			}
+		}
+		close(errCh)
+	}()
+
+	nextCursor, _ := s.processRequestInBundles(
+		iter,
+		req.Bloom,
+		int(req.Limit),
+		processRequestTimeout,
+		requestID,
+		bundles,
+		cancelProcessing,
+	)
+
+	// Wait for the goroutine to finish the work. It may return an error.
+	if err := <-errCh; err != nil {
+		syncFailuresCounter.WithLabelValues("routine").Inc()
+		_ = s.service.SendSyncResponse(
+			peerID.Bytes(),
+			s.adapter.CreateSyncResponse(nil, nil, false, "failed to send a response"),
+		)
+		return err
+	}
+
+	// Processing of the request could be finished earlier due to iterator error.
+	if err := iter.Error(); err != nil {
+		syncFailuresCounter.WithLabelValues("iterator").Inc()
+		_ = s.service.SendSyncResponse(
+			peerID.Bytes(),
+			s.adapter.CreateSyncResponse(nil, nil, false, "failed to process all envelopes"),
+		)
+		return fmt.Errorf("LevelDB iterator failed: %v", err)
+	}
+
+	log.Info("Finished syncing envelopes", "peer", peerID.String())
+
+	err = s.service.SendSyncResponse(
+		peerID.Bytes(),
+		s.adapter.CreateSyncResponse(nil, nextCursor, true, ""),
+	)
+	if err != nil {
+		syncFailuresCounter.WithLabelValues("response_send").Inc()
+		return fmt.Errorf("failed to send the final sync response: %v", err)
+	}
+
+	return nil
 }
 
 // Close the mailserver and its associated db connection.

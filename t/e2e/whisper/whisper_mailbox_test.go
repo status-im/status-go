@@ -489,7 +489,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	var mailServer mailserver.WhisperMailServer
 	err = mailServer.Init(mailboxWhisperService, &mailbox.StatusNode().Config().WhisperConfig)
 	s.Require().NoError(err)
-	mailboxWhisperService.RegisterServer(&mailServer)
+	mailboxWhisperService.RegisterMailServer(&mailServer)
 
 	// envelopes to archive
 	envelopesCount := 5
