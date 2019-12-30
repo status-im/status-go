@@ -9,12 +9,6 @@ const (
 	maxMessagesRequestPayloadLimit = 1000
 )
 
-type request struct {
-	ID             []byte
-	MaxMessageSize int
-	Payload        MessagesRequestPayload
-}
-
 // MessagesRequestPayload is a payload sent to the Mail Server.
 type MessagesRequestPayload struct {
 	// Lower is a lower bound of time range for which messages are requested.
