@@ -386,7 +386,7 @@ func (b *GethStatusBackend) subscriptionService() gethnode.ServiceConstructor {
 
 func (b *GethStatusBackend) accountsService(accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, &b.accountManager.Manager, accountsFeed), nil
+		return accountssvc.NewService(accounts.NewDB(b.appDB), b.multiaccountsDB, b.accountManager.Manager, accountsFeed), nil
 	}
 }
 

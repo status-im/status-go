@@ -9,15 +9,15 @@ import (
 
 // GethManager represents account manager interface.
 type GethManager struct {
-	Manager
+	*Manager
 
-	manager *accounts.Manager
+	gethAccManager *accounts.Manager
 }
 
 // NewManager returns new node account manager.
 func NewManager() *GethManager {
 	m := &GethManager{}
-	m.accountsGenerator = generator.New(m)
+	m.Manager = &Manager{accountsGenerator: generator.New(m)}
 	return m
 }
 
@@ -27,16 +27,16 @@ func (m *GethManager) InitKeystore(keydir string) error {
 	defer m.mu.Unlock()
 
 	var err error
-	m.manager, err = makeAccountManager(keydir)
+	m.gethAccManager, err = makeAccountManager(keydir)
 	if err != nil {
 		return err
 	}
-	m.keystore, err = makeKeyStore(m.manager)
+	m.keystore, err = makeKeyStore(m.gethAccManager)
 	return err
 }
 
 func (m *GethManager) GetManager() *accounts.Manager {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.manager
+	return m.gethAccManager
 }
