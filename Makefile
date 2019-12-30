@@ -176,6 +176,9 @@ prepare-release: clean-release
 clean-release:
 	rm -rf $(RELEASE_DIR)
 
+gofmt:
+	find . -name '*.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec gofmt -s -w {} \;
+
 check-existing-release:
 	@git ls-remote --exit-code origin "v$(RELEASE_TAG)" >/dev/null || exit 0; \
 	echo "$(YELLOW)Release tag already exists: v$(RELEASE_TAG)$(RESET)"; \
