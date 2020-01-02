@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -19,7 +22,7 @@ import (
 	gethparams "github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/golang/mock/gomock"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/contracts/ens/contract"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -28,7 +31,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions/fake"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestTransactorSuite(t *testing.T) {

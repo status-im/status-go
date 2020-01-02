@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/signal"
 )
 

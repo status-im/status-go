@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/protocol/protobuf"
 	"strings"
+
+	"github.com/status-im/status-go/protocol/protobuf"
 
 	"github.com/pkg/errors"
 )

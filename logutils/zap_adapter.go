@@ -2,12 +2,14 @@ package logutils
 
 import (
 	"fmt"
-	"github.com/ethereum/go-ethereum/log"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"math"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/protocol/zaputil"
 )

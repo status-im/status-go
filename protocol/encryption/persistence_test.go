@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/sqlite"

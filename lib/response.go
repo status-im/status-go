@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/transactions"
 )

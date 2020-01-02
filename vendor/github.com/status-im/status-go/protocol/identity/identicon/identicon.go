@@ -2,8 +2,9 @@ package identicon
 
 import (
 	"crypto/md5"
-	colorful "github.com/lucasb-eyer/go-colorful"
 	"image/color"
+
+	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
 const (

@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 var transactionHashes = []types.Hash{types.HexToHash("0xAA"), types.HexToHash("0xBB"), types.HexToHash("0xCC")}

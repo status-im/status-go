@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/storage"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 func newInMemCache(t *testing.T) *Cache {

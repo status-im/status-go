@@ -24,6 +24,7 @@ import (
 	"unsafe"
 
 	gopointer "github.com/mattn/go-pointer"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )

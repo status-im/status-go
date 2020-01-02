@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	datasyncproto "github.com/vacp2p/mvds/protobuf"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -22,7 +24,6 @@ import (
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/whisper/v6"
-	datasyncproto "github.com/vacp2p/mvds/protobuf"
 )
 
 func TestMessageProcessorSuite(t *testing.T) {

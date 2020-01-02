@@ -1,8 +1,9 @@
 package logutils
 
 import (
-	"github.com/ethereum/go-ethereum/log"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // FileOptions are all options supported by internal rotation module.

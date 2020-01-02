@@ -8,11 +8,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/status-im/status-go/eth-node/crypto"
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	ens "github.com/wealdtech/go-ens/v3"
 	"go.uber.org/zap"
+
+	"github.com/ethereum/go-ethereum/ethclient"
+
+	"github.com/status-im/status-go/eth-node/crypto"
+	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 )
 
 const (

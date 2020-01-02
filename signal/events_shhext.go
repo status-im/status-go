@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	statusproto "github.com/status-im/status-go/protocol"
 
 	"github.com/status-im/status-go/eth-node/types"

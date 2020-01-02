@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestMailServiceSuite(t *testing.T) {

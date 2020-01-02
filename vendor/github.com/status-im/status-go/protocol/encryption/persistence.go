@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	dr "github.com/status-im/doubleratchet"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"

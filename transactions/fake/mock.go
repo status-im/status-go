@@ -6,11 +6,13 @@ package fake
 
 import (
 	context "context"
+	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
+
 	common "github.com/ethereum/go-ethereum/common"
 	hexutil "github.com/ethereum/go-ethereum/common/hexutil"
 	rpc "github.com/ethereum/go-ethereum/rpc"
-	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
 
 // MockPublicTransactionPoolAPI is a mock of PublicTransactionPoolAPI interface

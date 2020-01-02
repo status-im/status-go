@@ -3,8 +3,9 @@ package transactions
 import (
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 func TestSendTxArgsValidity(t *testing.T) {

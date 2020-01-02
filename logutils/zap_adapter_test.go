@@ -3,10 +3,12 @@ package logutils
 import (
 	"bytes"
 	"errors"
-	"github.com/ethereum/go-ethereum/log"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"testing"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func TestNewZapAdapter(t *testing.T) {

@@ -5,8 +5,9 @@
 package peer
 
 import (
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockDiscoverer is a mock of Discoverer interface

@@ -1,13 +1,15 @@
 package gethbridge
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/whisper/v6"
-	"go.uber.org/zap"
 )
 
 type gethNodeWrapper struct {

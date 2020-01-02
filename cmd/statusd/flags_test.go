@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/params"
 )
 
 // nolint: deadcode

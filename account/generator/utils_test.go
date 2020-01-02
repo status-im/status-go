@@ -3,10 +3,11 @@ package generator
 import (
 	"testing"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/extkeys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/extkeys"
 )
 
 func generateTestKey(t *testing.T) *extkeys.ExtendedKey {

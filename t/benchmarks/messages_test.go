@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/status-im/status-go/whisper/v6"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/node"
+
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // TestSendMessages sends messages to a peer.

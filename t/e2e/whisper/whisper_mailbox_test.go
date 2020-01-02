@@ -13,10 +13,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+	"golang.org/x/crypto/sha3"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
@@ -25,8 +29,6 @@ import (
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/stretchr/testify/suite"
-	"golang.org/x/crypto/sha3"
 )
 
 const mailboxPassword = "status-offline-inbox"

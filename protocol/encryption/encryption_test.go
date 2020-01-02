@@ -14,9 +14,10 @@ import (
 
 	"github.com/status-im/status-go/protocol/sqlite"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"

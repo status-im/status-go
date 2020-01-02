@@ -6,12 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/t/devtests/eventer"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestLogsSuite(t *testing.T) {

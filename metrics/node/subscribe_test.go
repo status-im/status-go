@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/node"
 )
 
 func TestSubscribeServerEventsWithoutServer(t *testing.T) {

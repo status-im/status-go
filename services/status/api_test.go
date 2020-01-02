@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestStatusSuite(t *testing.T) {

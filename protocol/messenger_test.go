@@ -14,6 +14,9 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -23,8 +26,6 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 )
 
 func TestMessengerSuite(t *testing.T) {

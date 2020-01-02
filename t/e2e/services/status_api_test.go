@@ -6,11 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 type statusTestParams struct {

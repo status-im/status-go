@@ -5,8 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var testAccount = struct {

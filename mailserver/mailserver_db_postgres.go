@@ -10,11 +10,13 @@ import (
 	"github.com/status-im/migrate/v4"
 	"github.com/status-im/migrate/v4/database/postgres"
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
 	"github.com/status-im/status-go/mailserver/migrations"
 	"github.com/status-im/status-go/params"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/whisper/v6"
 )

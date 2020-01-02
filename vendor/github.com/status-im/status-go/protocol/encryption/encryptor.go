@@ -9,9 +9,10 @@ import (
 	"time"
 
 	dr "github.com/status-im/doubleratchet"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )

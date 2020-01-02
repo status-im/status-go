@@ -7,14 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/node"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/stretchr/testify/require"
 )
 
 const (

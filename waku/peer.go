@@ -26,11 +26,12 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"go.uber.org/zap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
-	"go.uber.org/zap"
 )
 
 // Peer represents a waku protocol peer connection.
