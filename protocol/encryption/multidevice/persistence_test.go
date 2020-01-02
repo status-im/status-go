@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/protocol/sqlite"
 )
 
 const (

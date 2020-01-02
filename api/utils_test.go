@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestHashMessage(t *testing.T) {

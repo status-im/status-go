@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"

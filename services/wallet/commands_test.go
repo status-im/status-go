@@ -6,13 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/t/devtests/testchain"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestNewBlocksSuite(t *testing.T) {

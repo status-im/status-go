@@ -8,6 +8,10 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	datasyncnode "github.com/vacp2p/mvds/node"
+	datasyncproto "github.com/vacp2p/mvds/protobuf"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/datasync"
@@ -17,9 +21,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	datasyncnode "github.com/vacp2p/mvds/node"
-	datasyncproto "github.com/vacp2p/mvds/protobuf"
-	"go.uber.org/zap"
 )
 
 // Whisper message properties.

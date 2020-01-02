@@ -21,9 +21,10 @@ package waku
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEncodeDecodeVersionedResponse(t *testing.T) {

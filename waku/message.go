@@ -29,10 +29,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/prometheus/common/log"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
-	"github.com/prometheus/common/log"
 )
 
 // MessageParams specifies the exact way a message should be wrapped

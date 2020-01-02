@@ -3,11 +3,13 @@ package mailservers
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/stretchr/testify/require"
 )
 
 func RandomNode() (*enode.Node, error) {

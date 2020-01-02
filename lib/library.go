@@ -10,6 +10,8 @@ import (
 	"os"
 	"unsafe"
 
+	validator "gopkg.in/go-playground/validator.v9"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
@@ -23,7 +25,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
-	validator "gopkg.in/go-playground/validator.v9"
 )
 
 // OpenAccounts opens database and returns accounts list.

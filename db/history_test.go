@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 func TestTopicHistoryStoreLoadFromKey(t *testing.T) {

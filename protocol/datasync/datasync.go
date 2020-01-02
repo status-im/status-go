@@ -4,11 +4,12 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	datasynctransport "github.com/vacp2p/mvds/transport"
 	"go.uber.org/zap"
+
+	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 )
 
 type DataSync struct {

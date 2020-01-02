@@ -7,14 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestTransfersSuite(t *testing.T) {

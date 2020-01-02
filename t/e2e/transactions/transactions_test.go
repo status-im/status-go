@@ -7,7 +7,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
@@ -16,7 +19,6 @@ import (
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
-	"github.com/stretchr/testify/suite"
 )
 
 type initFunc func([]byte, *transactions.SendTxArgs)

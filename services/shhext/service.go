@@ -22,11 +22,12 @@ import (
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/signal"
 
+	"github.com/syndtr/goleveldb/leveldb"
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/types"
 	protocol "github.com/status-im/status-go/protocol"
 	protocolwhisper "github.com/status-im/status-go/protocol/transport/whisper"
-	"github.com/syndtr/goleveldb/leveldb"
-	"go.uber.org/zap"
 )
 
 const (

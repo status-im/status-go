@@ -7,10 +7,13 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -19,7 +22,6 @@ import (
 	"github.com/status-im/status-go/params"
 	statusrpc "github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/devtests/miner"
-	"github.com/stretchr/testify/suite"
 )
 
 // DevNodeSuite provides convenient wrapper for starting node with clique backend for mining.

@@ -2,6 +2,7 @@ package applicationmetadata
 
 import (
 	"crypto/ecdsa"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 )
 

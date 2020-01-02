@@ -6,9 +6,10 @@ import (
 	"database/sql"
 	"errors"
 
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"go.uber.org/zap"
 )
 
 const sskLen = 16

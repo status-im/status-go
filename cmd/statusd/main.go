@@ -13,9 +13,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/okzk/sdnotify"
+	"golang.org/x/crypto/ssh/terminal"
+
 	"github.com/ethereum/go-ethereum/log"
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
-	"github.com/okzk/sdnotify"
+
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/metrics"
@@ -23,7 +26,6 @@ import (
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 const (

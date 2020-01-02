@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/account/generator"
 )
 

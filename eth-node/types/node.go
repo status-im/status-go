@@ -3,8 +3,9 @@ package types
 import (
 	"fmt"
 
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"go.uber.org/zap"
+
+	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 )
 
 // EnodeID is a unique identifier for each node.

@@ -7,8 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/pborman/uuid"
+
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"

@@ -2,13 +2,14 @@ run:
   concurrency: 4
   deadline: 1m
   issues-exit-code: 1
+  modules-download-mode: vendor
   tests: true
   skip-dirs:
     - static
+    - vendor
   skip-files:
     - bindata.go
     - .*_mock.go
-    - jail/doc.go
     - contracts/
 
 output:
@@ -26,6 +27,8 @@ linters-settings:
     min-confidence: 0.8
   gofmt:
     simplify: true
+  goimports:
+    local-prefixes: github.com/ethereum/go-ethereum,github.com/status-im/status-go
   gocyclo:
     min-complexity: 16
   maligned:
@@ -44,7 +47,7 @@ linters:
     - gosec
     - goconst
     - gocyclo
-    - gofmt
+    - goimports
     - golint
     - govet
     - ineffassign

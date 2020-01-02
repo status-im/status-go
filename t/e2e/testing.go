@@ -5,6 +5,7 @@ import (
 	"path"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 )

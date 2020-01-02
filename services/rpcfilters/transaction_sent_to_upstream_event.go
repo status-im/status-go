@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/status-im/status-go/eth-node/types"
 )
 

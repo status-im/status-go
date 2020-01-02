@@ -4,6 +4,7 @@ package account
 
 import (
 	"github.com/ethereum/go-ethereum/accounts"
+
 	"github.com/status-im/status-go/account/generator"
 )
 

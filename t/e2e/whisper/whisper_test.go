@@ -5,13 +5,15 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestWhisperTestSuite(t *testing.T) {

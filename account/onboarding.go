@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pborman/uuid"
+
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"

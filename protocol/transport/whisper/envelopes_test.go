@@ -5,10 +5,12 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/stretchr/testify/suite"
 )
 
 var (

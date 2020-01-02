@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
+
 	"github.com/ethereum/go-ethereum/crypto"
 )
 

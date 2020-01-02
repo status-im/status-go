@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/signal"
 	"github.com/stretchr/testify/require"
+
+	"github.com/status-im/status-go/signal"
 )
 
 const (

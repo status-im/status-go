@@ -3,8 +3,9 @@ package topics
 import (
 	"testing"
 
-	"github.com/status-im/status-go/params"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/status-im/status-go/params"
 )
 
 func TestTopicFlags(t *testing.T) {

@@ -28,11 +28,13 @@ import (
 	"math/big"
 	"os"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/status-im/status-go/eth-node/types"
-	"golang.org/x/crypto/sha3"
 )
 
 //SignatureLength indicates the byte length required to carry a signature with recovery id.

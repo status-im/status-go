@@ -9,11 +9,13 @@ import (
 
 	validator "gopkg.in/go-playground/validator.v9"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/t/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/p2p/discv5"
+
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/t/utils"
 )
 
 func TestNewNodeConfigWithDefaults(t *testing.T) {

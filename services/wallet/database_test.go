@@ -6,10 +6,12 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/status-im/status-go/appdatabase"
-	"github.com/stretchr/testify/require"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {

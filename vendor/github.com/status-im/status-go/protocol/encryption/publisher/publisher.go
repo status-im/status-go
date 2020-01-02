@@ -5,8 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 const (

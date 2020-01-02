@@ -7,15 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/t/devtests/testchain"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/types"
 )

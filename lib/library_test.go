@@ -13,9 +13,10 @@ import (
 	"strconv"
 	"testing"
 
-	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	. "github.com/status-im/status-go/t/utils" //nolint: golint
 )
 
 func TestMain(m *testing.M) {

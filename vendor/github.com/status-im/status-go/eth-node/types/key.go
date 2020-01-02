@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/pborman/uuid"
+
 	"github.com/status-im/status-go/extkeys"
 )
 
