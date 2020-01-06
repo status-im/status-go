@@ -23,11 +23,7 @@ func (m *Manager) InitKeystore(keydir string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// TODO: Wire with the Nimbus keystore
-	manager, err := makeAccountManager(keydir)
-	if err != nil {
-		return err
-	}
-	m.keystore, err = makeKeyStore(manager)
+	var err error
+	m.keystore, err = makeKeyStore(keydir)
 	return err
 }
