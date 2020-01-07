@@ -24,6 +24,7 @@ import (
 	"unsafe"
 
 	gopointer "github.com/mattn/go-pointer"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -89,12 +90,6 @@ func (w *nimbusWhisperWrapper) SetTimeSource(timesource func() time.Time) {
 func (w *nimbusWhisperWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.EnvelopeEvent) types.Subscription {
 	// TODO: when mailserver support is implemented
 	panic("not implemented")
-}
-
-// SelectedKeyPairID returns the id of currently selected key pair.
-// It helps distinguish between different users w/o exposing the user identity itself.
-func (w *nimbusWhisperWrapper) SelectedKeyPairID() string {
-	return ""
 }
 
 func (w *nimbusWhisperWrapper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {

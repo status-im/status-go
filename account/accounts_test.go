@@ -87,7 +87,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 				require.Fail(t, "no error reported, but account key is missing")
 			}
 			accountAddress := types.BytesToAddress(types.FromHex(testCase.address))
-			if types.Address(accountKey.Address) != accountAddress {
+			if accountKey.Address != accountAddress {
 				require.Fail(t, "account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
 		}
@@ -120,7 +120,7 @@ func TestManagerTestSuite(t *testing.T) {
 type ManagerTestSuite struct {
 	suite.Suite
 	testAccount
-	accManager *Manager
+	accManager *GethManager
 	keydir     string
 }
 

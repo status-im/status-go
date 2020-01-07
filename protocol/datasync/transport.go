@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+
 	"github.com/golang/protobuf/proto"
-	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/vacp2p/mvds/protobuf"
 	"github.com/vacp2p/mvds/state"
 	"github.com/vacp2p/mvds/transport"
+
+	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 )
 
 var errNotInitialized = errors.New("Datasync transport not initialized")

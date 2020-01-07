@@ -7,12 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pborman/uuid"
+
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/filters"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/pborman/uuid"
 )
 
 const (

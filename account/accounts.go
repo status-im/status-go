@@ -10,13 +10,11 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/accounts"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pborman/uuid"
 
 	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/keystore"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 )
@@ -37,8 +35,7 @@ var zeroAddress = types.Address{}
 // Manager represents account manager interface.
 type Manager struct {
 	mu       sync.RWMutex
-	keystore *keystore.KeyStore
-	manager  *accounts.Manager
+	keystore types.KeyStore
 
 	accountsGenerator *generator.Generator
 	onboarding        *Onboarding
@@ -48,44 +45,11 @@ type Manager struct {
 	watchAddresses      []types.Address
 }
 
-// NewManager returns new node account manager.
-func NewManager() *Manager {
-	m := &Manager{}
-	m.accountsGenerator = generator.New(m)
-	return m
-}
-
-// InitKeystore sets key manager and key store.
-func (m *Manager) InitKeystore(keydir string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	manager, err := makeAccountManager(keydir)
-	if err != nil {
-		return err
-	}
-	m.manager = manager
-	backends := manager.Backends(keystore.KeyStoreType)
-	if len(backends) == 0 {
-		return ErrAccountKeyStoreMissing
-	}
-	keyStore, ok := backends[0].(*keystore.KeyStore)
-	if !ok {
-		return ErrAccountKeyStoreMissing
-	}
-	m.keystore = keyStore
-	return nil
-}
-
-func (m *Manager) GetKeystore() *keystore.KeyStore {
+// GetKeystore is only used in tests
+func (m *Manager) GetKeystore() types.KeyStore {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.keystore
-}
-
-func (m *Manager) GetManager() *accounts.Manager {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.manager
 }
 
 // AccountsGenerator returns accountsGenerator.
@@ -153,7 +117,7 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (Info, error) {
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
-func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*keystore.Key, error) {
+func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*types.Key, error) {
 	var err error
 	var foundKeyFile []byte
 
@@ -202,7 +166,7 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	}
 
 	// avoid swap attack
-	if types.Address(key.Address) != addressObj {
+	if key.Address != addressObj {
 		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
 	}
 
@@ -240,9 +204,9 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 	id := uuid.NewRandom()
-	key := &keystore.Key{
+	key := &types.Key{
 		Id:         id,
-		Address:    common.Address(address),
+		Address:    address,
 		PrivateKey: privKey,
 	}
 
@@ -302,9 +266,13 @@ func (m *Manager) ImportAccount(privateKey *ecdsa.PrivateKey, password string) (
 
 	account, err := m.keystore.ImportECDSA(privateKey, password)
 
-	return types.Address(account.Address), err
+	return account.Address, err
 }
 
+// ImportSingleExtendedKey imports an extended key setting it in both the PrivateKey and ExtendedKey fields
+// of the Key struct.
+// ImportExtendedKey is used in older version of Status where PrivateKey is set to be the BIP44 key at index 0,
+// and ExtendedKey is the extended key of the BIP44 key at index 1.
 func (m *Manager) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, password string) (address, pubKey string, err error) {
 	if m.keystore == nil {
 		return "", "", ErrAccountKeyStoreMissing
@@ -418,18 +386,17 @@ func (m *Manager) ImportOnboardingAccount(id string, password string) (Info, str
 // AddressToDecryptedAccount tries to load decrypted key for a given account.
 // The running node, has a keystore directory which is loaded on start. Key file
 // for a given address is expected to be in that directory prior to node start.
-func (m *Manager) AddressToDecryptedAccount(address, password string) (accounts.Account, *keystore.Key, error) {
+func (m *Manager) AddressToDecryptedAccount(address, password string) (types.Account, *types.Key, error) {
 	if m.keystore == nil {
-		return accounts.Account{}, nil, ErrAccountKeyStoreMissing
+		return types.Account{}, nil, ErrAccountKeyStoreMissing
 	}
 
 	account, err := ParseAccountString(address)
 	if err != nil {
-		return accounts.Account{}, nil, ErrAddressToAccountMappingFailure
+		return types.Account{}, nil, ErrAddressToAccountMappingFailure
 	}
 
-	var key *keystore.Key
-	account, key, err = m.keystore.AccountDecryptedKey(account, password)
+	account, key, err := m.keystore.AccountDecryptedKey(account, password)
 	if err != nil {
 		err = fmt.Errorf("%s: %s", ErrAccountToKeyMappingFailure, err)
 	}
@@ -444,7 +411,7 @@ func (m *Manager) unlockExtendedKey(address, password string) (*SelectedExtKey, 
 	}
 
 	selectedExtendedKey := &SelectedExtKey{
-		Address:    types.Address(account.Address),
+		Address:    account.Address,
 		AccountKey: accountKey,
 	}
 

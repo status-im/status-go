@@ -6,10 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestUsedConnectionPersisted(t *testing.T) {

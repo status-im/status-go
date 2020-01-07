@@ -10,8 +10,9 @@ import (
 	"io"
 
 	dr "github.com/status-im/doubleratchet"
-	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"golang.org/x/crypto/hkdf"
+
+	"github.com/status-im/status-go/eth-node/crypto/ecies"
 )
 
 // EthereumCrypto is an implementation of Crypto with cryptographic primitives recommended

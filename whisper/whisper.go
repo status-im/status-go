@@ -30,6 +30,9 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
+	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/sync/syncmap"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
@@ -38,8 +41,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/sync/syncmap"
 )
 
 // TimeSyncError error for clock skew errors.
@@ -646,24 +647,6 @@ func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
 
 	return id, nil
-}
-
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (whisper *Whisper) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
-	if err != nil {
-		return err
-	}
-
-	whisper.keyMu.Lock()
-	defer whisper.keyMu.Unlock()
-
-	whisper.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	whisper.privateKeys[id] = key
-
-	log.Info("Whisper identity selected", "id", id, "key", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
-	return nil
 }
 
 // DeleteKeyPairs removes all cryptographic identities known to the node
@@ -1622,16 +1605,4 @@ func addBloom(a, b []byte) []byte {
 		c[i] = a[i] | b[i]
 	}
 	return c
-}
-
-// SelectedKeyPairID returns the id of currently selected key pair.
-// It helps distinguish between different users w/o exposing the user identity itself.
-func (whisper *Whisper) SelectedKeyPairID() string {
-	whisper.keyMu.RLock()
-	defer whisper.keyMu.RUnlock()
-
-	for id := range whisper.privateKeys {
-		return id
-	}
-	return ""
 }

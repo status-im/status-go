@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 func buildLoginParams(mainAccountAddress, chatAddress, password string, watchAddresses []types.Address) account.LoginParams {

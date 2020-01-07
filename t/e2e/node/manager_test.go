@@ -8,13 +8,15 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
+
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/whisper/v6"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestManagerTestSuite(t *testing.T) {

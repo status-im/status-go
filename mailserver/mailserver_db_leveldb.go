@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"time"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper/v6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
+
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
+
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 type LevelDB struct {

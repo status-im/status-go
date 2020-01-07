@@ -23,9 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPeerRateLimiterDecorator(t *testing.T) {
@@ -116,7 +117,7 @@ func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
 		LimitPerSecIP:      1,
 		LimitPerSecPeerID:  1,
 		WhitelistedIPs:     []string{"<nil>"}, // no IP is represented as <nil> string
-		WhitelistedPeerIDs: []enode.ID{enode.ID{0xaa, 0xbb, 0xcc}},
+		WhitelistedPeerIDs: []enode.ID{{0xaa, 0xbb, 0xcc}},
 	}, h)
 	p := &Peer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),

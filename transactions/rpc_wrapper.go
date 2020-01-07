@@ -7,8 +7,10 @@ import (
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/status-im/status-go/eth-node/types"
 
 	"github.com/status-im/status-go/rpc"
 )
@@ -57,12 +59,12 @@ func (w *rpcWrapper) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uin
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
-func (w *rpcWrapper) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+func (w *rpcWrapper) SendTransaction(ctx context.Context, tx *gethtypes.Transaction) error {
 	data, err := rlp.EncodeToBytes(tx)
 	if err != nil {
 		return err
 	}
-	return w.rpcClient.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
+	return w.rpcClient.CallContext(ctx, nil, "eth_sendRawTransaction", types.EncodeHex(data))
 }
 
 func toCallArg(msg ethereum.CallMsg) interface{} {
@@ -71,7 +73,7 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 		"to":   msg.To,
 	}
 	if len(msg.Data) > 0 {
-		arg["data"] = hexutil.Bytes(msg.Data)
+		arg["data"] = types.HexBytes(msg.Data)
 	}
 	if msg.Value != nil {
 		arg["value"] = (*hexutil.Big)(msg.Value)

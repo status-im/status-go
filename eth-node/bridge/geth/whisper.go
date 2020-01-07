@@ -66,12 +66,6 @@ func (w *gethWhisperWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.En
 	return NewGethSubscriptionWrapper(w.whisper.SubscribeEnvelopeEvents(events))
 }
 
-// SelectedKeyPairID returns the id of currently selected key pair.
-// It helps distinguish between different users w/o exposing the user identity itself.
-func (w *gethWhisperWrapper) SelectedKeyPairID() string {
-	return w.whisper.SelectedKeyPairID()
-}
-
 func (w *gethWhisperWrapper) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 	return w.whisper.GetPrivateKey(id)
 }

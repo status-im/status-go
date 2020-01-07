@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/status-im/status-go/db"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
+
+	"github.com/status-im/status-go/db"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // NewPeerRecord returns instance of the peer record.

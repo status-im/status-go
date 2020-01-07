@@ -6,11 +6,12 @@ package status
 
 import (
 	ecdsa "crypto/ecdsa"
-	accounts "github.com/ethereum/go-ethereum/accounts"
-	keystore "github.com/ethereum/go-ethereum/accounts/keystore"
-	gomock "github.com/golang/mock/gomock"
-	account "github.com/status-im/status-go/account"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
+
+	account "github.com/status-im/status-go/account"
+	types "github.com/status-im/status-go/eth-node/types"
 )
 
 // MockWhisperService is a mock of WhisperService interface
@@ -75,11 +76,11 @@ func (m *MockAccountManager) EXPECT() *MockAccountManagerMockRecorder {
 }
 
 // AddressToDecryptedAccount mocks base method
-func (m *MockAccountManager) AddressToDecryptedAccount(arg0, arg1 string) (accounts.Account, *keystore.Key, error) {
+func (m *MockAccountManager) AddressToDecryptedAccount(arg0, arg1 string) (types.Account, *types.Key, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddressToDecryptedAccount", arg0, arg1)
-	ret0, _ := ret[0].(accounts.Account)
-	ret1, _ := ret[1].(*keystore.Key)
+	ret0, _ := ret[0].(types.Account)
+	ret1, _ := ret[1].(*types.Key)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }

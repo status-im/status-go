@@ -2,8 +2,9 @@ package protocol
 
 import (
 	"errors"
-	"github.com/status-im/status-go/protocol/protobuf"
 	"strings"
+
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 func ValidateReceivedChatMessage(message *protobuf.ChatMessage) error {

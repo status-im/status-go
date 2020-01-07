@@ -3,11 +3,12 @@ package rpc
 import (
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
-	"github.com/stretchr/testify/suite"
 )
 
 type RPCClientTestSuite struct {

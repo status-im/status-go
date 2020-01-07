@@ -1,9 +1,11 @@
 package protocol
 
 import (
-	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/stretchr/testify/suite"
 	"testing"
+
+	"github.com/stretchr/testify/suite"
+
+	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
 func TestEventToSystemMessageSuite(t *testing.T) {

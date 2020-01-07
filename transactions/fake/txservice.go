@@ -3,10 +3,11 @@ package fake
 import (
 	"context"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/golang/mock/gomock"
 )
 
 // NewTestServer returns a mocked test server

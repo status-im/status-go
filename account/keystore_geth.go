@@ -1,3 +1,5 @@
+// TODO: Make independent version for Nimbus
+
 package account
 
 import (
@@ -6,6 +8,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 // makeAccountManager creates ethereum accounts.Manager with single disk backend and lightweight kdf.
@@ -23,4 +28,17 @@ func makeAccountManager(keydir string) (manager *accounts.Manager, err error) {
 	}
 	config := accounts.Config{InsecureUnlockAllowed: false}
 	return accounts.NewManager(&config, keystore.NewKeyStore(keydir, keystore.LightScryptN, keystore.LightScryptP)), nil
+}
+
+func makeKeyStore(manager *accounts.Manager) (types.KeyStore, error) {
+	backends := manager.Backends(keystore.KeyStoreType)
+	if len(backends) == 0 {
+		return nil, ErrAccountKeyStoreMissing
+	}
+	keyStore, ok := backends[0].(*keystore.KeyStore)
+	if !ok {
+		return nil, ErrAccountKeyStoreMissing
+	}
+
+	return gethbridge.WrapKeyStore(keyStore), nil
 }

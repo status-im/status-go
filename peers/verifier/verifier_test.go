@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 func TestLocalVerifierForNodeIDTypes(t *testing.T) {

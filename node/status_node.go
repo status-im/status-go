@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	ma "github.com/multiformats/go-multiaddr"
+	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
@@ -19,9 +22,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-	ma "github.com/multiformats/go-multiaddr"
+
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"

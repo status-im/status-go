@@ -3,9 +3,10 @@ package node
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/stretchr/testify/require"
 
 	prom "github.com/prometheus/client_golang/prometheus"
 )

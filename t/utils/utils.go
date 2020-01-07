@@ -18,11 +18,12 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/stretchr/testify/suite" // required to register testify flags
+
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/t"
-	_ "github.com/stretchr/testify/suite" // required to register testify flags
 )
 
 var (

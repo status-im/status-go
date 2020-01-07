@@ -7,8 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/p2p"
 )
 
 func TestPeerRateLimiterDecorator(t *testing.T) {

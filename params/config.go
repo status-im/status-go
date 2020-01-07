@@ -11,14 +11,16 @@ import (
 	"strings"
 	"time"
 
+	validator "gopkg.in/go-playground/validator.v9"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/whisper/v6"
-	validator "gopkg.in/go-playground/validator.v9"
 )
 
 // ----------

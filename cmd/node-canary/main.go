@@ -12,9 +12,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"golang.org/x/crypto/sha3"
+	"golang.org/x/crypto/ssh/terminal"
+
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/api"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
@@ -23,8 +27,6 @@ import (
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
-	"golang.org/x/crypto/sha3"
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 const (

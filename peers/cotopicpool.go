@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/signal"
 )

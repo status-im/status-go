@@ -6,13 +6,15 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+
 	"github.com/status-im/status-go/services/wallet/erc20"
 	"github.com/status-im/status-go/t/devtests/miner"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestBalancesSuite(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 
 var (
 	// ErrUpdatingWrongAccount raised if caller tries to update any other account except one used for login.
-	ErrUpdatingWrongAccount = errors.New("failed to updating wrong account. please login with that account first")
+	ErrUpdatingWrongAccount = errors.New("failed to update wrong account. Please login with that account first")
 )
 
 func NewMultiAccountsAPI(db *multiaccounts.Database, manager *account.Manager) *MultiAccountsAPI {

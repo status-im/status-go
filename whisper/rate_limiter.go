@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tsenart/tb"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/tsenart/tb"
 )
 
 type runLoop func(p *Peer, rw p2p.MsgReadWriter) error

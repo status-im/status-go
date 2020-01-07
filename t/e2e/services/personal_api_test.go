@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/params"
 	. "github.com/status-im/status-go/t/utils"
-	"github.com/stretchr/testify/suite"
 )
 
 const (

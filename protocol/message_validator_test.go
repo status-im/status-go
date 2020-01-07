@@ -3,8 +3,9 @@ package protocol
 import (
 	"testing"
 
-	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type MessageValidatorSuite struct {

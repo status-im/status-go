@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -24,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
+
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
@@ -37,7 +39,6 @@ import (
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Errors related to node and services creation.

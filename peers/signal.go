@@ -2,6 +2,7 @@ package peers
 
 import (
 	"github.com/ethereum/go-ethereum/p2p"
+
 	"github.com/status-im/status-go/signal"
 )
 

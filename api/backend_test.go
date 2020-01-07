@@ -12,7 +12,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -24,8 +28,6 @@ import (
 	"github.com/status-im/status-go/services/typeddata"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -209,12 +211,6 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 			assert.NoError(t, backend.SelectAccount(loginParams))
 			wg.Done()
 		}(tuple)
-
-		wg.Add(1)
-		go func() {
-			assert.NoError(t, backend.reSelectAccount())
-			wg.Done()
-		}()
 
 		wg.Add(1)
 		go func() {

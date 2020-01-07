@@ -36,6 +36,8 @@ import (
 	"go.uber.org/zap"
 
 	mapset "github.com/deckarep/golang-set"
+	"golang.org/x/crypto/pbkdf2"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
@@ -44,7 +46,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"golang.org/x/crypto/pbkdf2"
 )
 
 // TimeSyncError error for clock skew errors.

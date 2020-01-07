@@ -42,8 +42,8 @@ type Settings struct {
 	ChaosMode              bool             `json:"chaos-mode?,omitempty"`
 	Currency               string           `json:"currency,omitempty"`
 	CurrentNetwork         string           `json:"networks/current-network"`
-	CustomBootnodes        *json.RawMessage `json:"custom-boot-nodes,omitempty"`
-	CustomBootnodesEnabled *json.RawMessage `json:"custom-boot-nodes-enabled,omitempty"`
+	CustomBootnodes        *json.RawMessage `json:"custom-bootnodes,omitempty"`
+	CustomBootnodesEnabled *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
 	DappsAddress           types.Address    `json:"dapps-address"`
 	EIP1581Address         types.Address    `json:"eip1581-address"`
 	Fleet                  *string          `json:"fleet,omitempty"`
@@ -54,7 +54,7 @@ type Settings struct {
 	KeycardPAiredOn        int64            `json:"keycard-paired-on,omitempty"`
 	KeycardPairing         string           `json:"keycard-pairing,omitempty"`
 	LastUpdated            *int64           `json:"last-updated,omitempty"`
-	LatestDerivedPath      uint             `json:"last-derived-path"`
+	LatestDerivedPath      uint             `json:"latest-derived-path"`
 	LogLevel               *string          `json:"log-level,omitempty"`
 	Mnemonic               string           `json:"mnemonic,omitempty"`
 	Name                   string           `json:"name,omitempty"`
@@ -66,14 +66,13 @@ type Settings struct {
 	PreviewPrivacy         bool             `json:"preview-privacy?"`
 	PublicKey              string           `json:"public-key"`
 	RememberSyncingChoice  bool             `json:"remember-syncing-choice?,omitempty"`
-	ShowName               *bool            `json:"show-name?,omitempty"`
 	SigningPhrase          string           `json:"signing-phrase"`
 	StickerPacksInstalled  *json.RawMessage `json:"stickers-packs-installed,omitempty"`
 	StickersRecentStickers *json.RawMessage `json:"stickers-recent-stickers,omitempty"`
 	SyncingOnMobileNetwork bool             `json:"syncing-on-mobile-network?,omitempty"`
-	Usernames              *[]string        `json:"usernames,omitempty"`
+	Usernames              *json.RawMessage `json:"usernames,omitempty"`
 	WalletRootAddress      types.Address    `json:"wallet-root-address,omitempty"`
-	WalletSetupPassed      bool             `json:"wallet-setup-passed?,omitempty"`
+	WalletSetUpPassed      bool             `json:"wallet-set-up-passed?,omitempty"`
 	WalletVisibleTokens    *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
 }
 
@@ -152,13 +151,17 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 
 	switch setting {
 	case "chaos-mode?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET chaos_mode = ? WHERE synthetic_id = 'id'")
 	case "currency":
 		update, err = db.db.Prepare("UPDATE settings SET currency = ? WHERE synthetic_id = 'id'")
 	case "custom-bootnodes":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes = ? WHERE synthetic_id = 'id'")
-	case "custom-bootnodes-enabled":
+	case "custom-bootnodes-enabled?":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes_enabled = ? WHERE synthetic_id = 'id'")
 	case "dapps-address":
@@ -168,6 +171,10 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "fleet":
 		update, err = db.db.Prepare("UPDATE settings SET fleet = ? WHERE synthetic_id = 'id'")
 	case "hide-home-tooltip?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET hide_home_tooltip = ? WHERE synthetic_id = 'id'")
 	case "keycard-instance_uid":
 		update, err = db.db.Prepare("UPDATE settings SET keycard_instance_uid = ? WHERE synthetic_id = 'id'")
@@ -194,6 +201,10 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET node_config = ? WHERE synthetic_id = 'id'")
 	case "notifications-enabled?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET notifications_enabled = ? WHERE synthetic_id = 'id'")
 	case "photo-path":
 		update, err = db.db.Prepare("UPDATE settings SET photo_path = ? WHERE synthetic_id = 'id'")
@@ -203,13 +214,19 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "preferred-name":
 		update, err = db.db.Prepare("UPDATE settings SET preferred_name = ? WHERE synthetic_id = 'id'")
 	case "preview-privacy?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET preview_privacy = ? WHERE synthetic_id = 'id'")
 	case "public-key":
 		update, err = db.db.Prepare("UPDATE settings SET public_key = ? WHERE synthetic_id = 'id'")
 	case "remember-syncing-choice?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET remember_syncing_choice = ? WHERE synthetic_id = 'id'")
-	case "show-name?":
-		update, err = db.db.Prepare("UPDATE settings SET show_name = ? WHERE synthetic_id = 'id'")
 	case "stickers-packs-installed":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_installed = ? WHERE synthetic_id = 'id'")
@@ -217,11 +234,19 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_recent_stickers = ? WHERE synthetic_id = 'id'")
 	case "syncing-on-mobile-network?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET syncing_on_mobile_network = ? WHERE synthetic_id = 'id'")
 	case "usernames":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET usernames = ? WHERE synthetic_id = 'id'")
 	case "wallet-set-up-passed?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET wallet_set_up_passed = ? WHERE synthetic_id = 'id'")
 	case "wallet/visible-tokens":
 		value = &sqlite.JSONBlob{value}
@@ -242,7 +267,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, show_name, signing_phrase, stickers_packs_installed, stickers_recent_stickers, syncing_on_mobile_network, usernames, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_recent_stickers, syncing_on_mobile_network, usernames, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -271,14 +296,13 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.PreviewPrivacy,
 		&s.PublicKey,
 		&s.RememberSyncingChoice,
-		&s.ShowName,
 		&s.SigningPhrase,
 		&s.StickerPacksInstalled,
 		&s.StickersRecentStickers,
 		&s.SyncingOnMobileNetwork,
 		&s.Usernames,
 		&s.WalletRootAddress,
-		&s.WalletSetupPassed,
+		&s.WalletSetUpPassed,
 		&s.WalletVisibleTokens)
 	return s, err
 }

@@ -4,10 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGetFirstConnected(t *testing.T) {

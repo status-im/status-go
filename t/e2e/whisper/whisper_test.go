@@ -5,16 +5,19 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/eth-node/types"
 	e2e "github.com/status-im/status-go/t/e2e"
 	. "github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestWhisperTestSuite(t *testing.T) {
+	e2e.Init()
 	suite.Run(t, new(WhisperTestSuite))
 }
 
@@ -144,6 +147,7 @@ func (s *WhisperTestSuite) TestLogout() {
 
 	// make sure that identity doesn't exist (yet) in Whisper
 	s.False(whisperService.HasKeyPair(accountInfo.ChatPubKey), "identity already present in whisper")
+	// it should exist only after selecting an account
 	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo.WalletAddress, accountInfo.ChatAddress, TestConfig.Account1.Password)))
 	s.True(whisperService.HasKeyPair(accountInfo.ChatPubKey), "identity not injected into whisper")
 
@@ -187,17 +191,17 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	s.NoError(err)
 	selectedChatPubKey1 := types.EncodeHex(crypto.FromECDSAPub(&selectedChatAccount1.AccountKey.PrivateKey.PublicKey))
 	s.Equal(selectedChatPubKey1, accountInfo1.ChatPubKey)
-	s.True(whisperService.HasKeyPair(selectedChatPubKey1), "identity not injected into whisper")
+	s.True(whisperService.HasKeyPair(s.Backend.SelectedAccountShhKeyID()), "identity not injected into whisper")
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	s.False(whisperService.HasKeyPair(accountInfo2.ChatPubKey), "identity already present in whisper")
+	previousKeyID := s.Backend.SelectedAccountShhKeyID()
 	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, TestConfig.Account2.Password)))
 	selectedChatAccount2, err := s.Backend.AccountManager().SelectedChatAccount()
 	s.NoError(err)
 	selectedChatPubKey2 := types.EncodeHex(crypto.FromECDSAPub(&selectedChatAccount2.AccountKey.PrivateKey.PublicKey))
 	s.Equal(selectedChatPubKey2, accountInfo2.ChatPubKey)
-	s.True(whisperService.HasKeyPair(selectedChatPubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(selectedChatPubKey1), "identity should be removed, but it is still present in whisper")
+	s.True(whisperService.HasKeyPair(s.Backend.SelectedAccountShhKeyID()), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(previousKeyID), "identity should be removed, but it is still present in whisper")
 
 	// stop node (and all of its sub-protocols)
 	nodeConfig := s.Backend.StatusNode().Config()
@@ -220,23 +224,23 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 
 	// make sure that Whisper gets identity re-injected
 	whisperService = s.WhisperService()
-	s.True(whisperService.HasKeyPair(selectedChatPubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(selectedChatPubKey1), "identity should not be present, but it is still present in whisper")
+	s.True(whisperService.HasKeyPair(s.Backend.SelectedAccountShhKeyID()), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(previousKeyID), "identity should not be present, but it is still present in whisper")
 
 	// now restart node using RestartNode() method, and make sure that account is still available
 	s.RestartTestNode()
 	defer s.StopTestBackend()
 
 	whisperService = s.WhisperService()
-	s.True(whisperService.HasKeyPair(selectedChatPubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(selectedChatPubKey1), "identity should not be present, but it is still present in whisper")
+	s.True(whisperService.HasKeyPair(s.Backend.SelectedAccountShhKeyID()), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(previousKeyID), "identity should not be present, but it is still present in whisper")
 
 	// now logout, and make sure that on restart no account is selected (i.e. logout works properly)
 	s.NoError(s.Backend.Logout())
 	s.RestartTestNode()
 	whisperService = s.WhisperService()
-	s.False(whisperService.HasKeyPair(selectedChatPubKey2), "identity not injected into whisper")
-	s.False(whisperService.HasKeyPair(selectedChatPubKey1), "identity should not be present, but it is still present in whisper")
+	s.False(whisperService.HasKeyPair(s.Backend.SelectedAccountShhKeyID()), "identity not injected into whisper")
+	s.False(whisperService.HasKeyPair(previousKeyID), "identity should not be present, but it is still present in whisper")
 
 	selectedWalletAccount, err = s.Backend.AccountManager().MainAccountAddress()
 	s.EqualError(account.ErrNoAccountSelected, err.Error())
