@@ -26,10 +26,11 @@ import (
 	"sync"
 	"time"
 
+	prom "github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	prom "github.com/prometheus/client_golang/prometheus"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
