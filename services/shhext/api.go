@@ -731,7 +731,7 @@ func makeEnvelop(
 	if err != nil {
 		return nil, err
 	}
-	return gethbridge.NewWhisperEnvelopeWrapper(envelope), nil
+	return gethbridge.NewWhisperEnvelope(envelope), nil
 }
 
 // makeMessagesRequestPayload makes a specific payload for MailServer

@@ -27,7 +27,7 @@ type MessagesRequestPayload struct {
 
 func (r *MessagesRequestPayload) SetDefaults() {
 	if r.Limit == 0 {
-		r.Limit = defaultLimit
+		r.Limit = maxQueryLimit
 	}
 
 	if r.Upper == 0 {
@@ -38,6 +38,9 @@ func (r *MessagesRequestPayload) SetDefaults() {
 func (r MessagesRequestPayload) Validate() error {
 	if r.Upper < r.Lower {
 		return errors.New("query range is invalid: lower > upper")
+	}
+	if r.Upper-r.Lower > uint32(maxQueryRange.Seconds()) {
+		return errors.New("query range must be smaller or equal to 24 hours")
 	}
 	if len(r.Bloom) == 0 {
 		return errors.New("bloom filter is empty")

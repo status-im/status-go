@@ -141,8 +141,18 @@ func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
 	key := NewDBKey(env.Expiry()-env.TTL(), env.Topic(), env.Hash())
-	// TODO: handle Waku envelope as well
-	rawEnvelope, err := rlp.EncodeToBytes(gethbridge.GetWhisperEnvelopeFrom(env))
+
+	var (
+		rawEnvelope []byte
+		err         error
+	)
+	if whisperEnv, ok := gethbridge.UnwrapWhisperEnvelope(env); ok {
+		rawEnvelope, err = rlp.EncodeToBytes(whisperEnv)
+	} else if wakuEnv, ok := gethbridge.UnwrapWakuEnvelope(env); ok {
+		rawEnvelope, err = rlp.EncodeToBytes(wakuEnv)
+	} else {
+		return errors.New("unsupported underlying types.Envelope type")
+	}
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
 		archivedErrorsCounter.Inc()

@@ -6,108 +6,98 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
-type gethEnvelopeWrapper struct {
-	shhEnvelope  *whisper.Envelope
-	wakuEnvelope *waku.Envelope
+type whisperEnvelope struct {
+	env *whisper.Envelope
 }
 
-// NewWhisperEnvelopeWrapper returns an object that wraps Geth's Whisper Envelope in a types interface.
-func NewWhisperEnvelopeWrapper(e *whisper.Envelope) types.Envelope {
-	return &gethEnvelopeWrapper{
-		shhEnvelope: e,
+// NewWhisperEnvelope returns an object that wraps Geth's Whisper Envelope in a types interface.
+func NewWhisperEnvelope(e *whisper.Envelope) types.Envelope {
+	return &whisperEnvelope{env: e}
+}
+
+func UnwrapWhisperEnvelope(e types.Envelope) (*whisper.Envelope, bool) {
+	if env, ok := e.(*whisperEnvelope); ok {
+		return env.env, true
 	}
+	return nil, false
 }
 
-// NewWakuEnvelopeWrapper returns an object that wraps Geth's Waku Envelope in a types interface.
-func NewWakuEnvelopeWrapper(e *waku.Envelope) types.Envelope {
-	return &gethEnvelopeWrapper{
-		wakuEnvelope: e,
+func MustUnwrapWhisperEnvelope(e types.Envelope) *whisper.Envelope {
+	return e.(*whisperEnvelope).env
+}
+
+func (w *whisperEnvelope) Hash() types.Hash {
+	return types.Hash(w.env.Hash())
+}
+
+func (w *whisperEnvelope) Bloom() []byte {
+	return w.env.Bloom()
+}
+
+func (w *whisperEnvelope) PoW() float64 {
+	return w.env.PoW()
+}
+
+func (w *whisperEnvelope) Expiry() uint32 {
+	return w.env.Expiry
+}
+
+func (w *whisperEnvelope) TTL() uint32 {
+	return w.env.TTL
+}
+
+func (w *whisperEnvelope) Topic() types.TopicType {
+	return types.TopicType(w.env.Topic)
+}
+
+func (w *whisperEnvelope) Size() int {
+	return len(w.env.Data)
+}
+
+type wakuEnvelope struct {
+	env *waku.Envelope
+}
+
+// NewWakuEnvelope returns an object that wraps Geth's Waku Envelope in a types interface.
+func NewWakuEnvelope(e *waku.Envelope) types.Envelope {
+	return &wakuEnvelope{env: e}
+}
+
+func UnwrapWakuEnvelope(e types.Envelope) (*waku.Envelope, bool) {
+	if env, ok := e.(*wakuEnvelope); ok {
+		return env.env, true
 	}
+	return nil, false
 }
 
-// GetWhisperEnvelopeFrom retrieves the underlying Whisper Envelope struct from a wrapped Envelope interface.
-func GetWhisperEnvelopeFrom(f types.Envelope) *whisper.Envelope {
-	return f.(*gethEnvelopeWrapper).shhEnvelope
+func MustUnwrapWakuEnvelope(e types.Envelope) *waku.Envelope {
+	return e.(*wakuEnvelope).env
 }
 
-// GetWakuEnvelopeFrom retrieves the underlying Waku Envelope struct from a wrapped Envelope interface.
-func GetWakuEnvelopeFrom(f types.Envelope) *waku.Envelope {
-	return f.(*gethEnvelopeWrapper).wakuEnvelope
+func (w *wakuEnvelope) Hash() types.Hash {
+	return types.Hash(w.env.Hash())
 }
 
-func (w *gethEnvelopeWrapper) Hash() types.Hash {
-	switch {
-	case w.shhEnvelope != nil:
-		return types.Hash(w.shhEnvelope.Hash())
-	case w.wakuEnvelope != nil:
-		return types.Hash(w.wakuEnvelope.Hash())
-	default:
-		return types.Hash{}
-	}
+func (w *wakuEnvelope) Bloom() []byte {
+	return w.env.Bloom()
 }
 
-func (w *gethEnvelopeWrapper) Bloom() []byte {
-	switch {
-	case w.shhEnvelope != nil:
-		return w.shhEnvelope.Bloom()
-	case w.wakuEnvelope != nil:
-		return w.wakuEnvelope.Bloom()
-	default:
-		return nil
-	}
+func (w *wakuEnvelope) PoW() float64 {
+	return w.env.PoW()
 }
 
-func (w *gethEnvelopeWrapper) PoW() float64 {
-	switch {
-	case w.shhEnvelope != nil:
-		return w.shhEnvelope.PoW()
-	case w.wakuEnvelope != nil:
-		return w.wakuEnvelope.PoW()
-	default:
-		return 0
-	}
+func (w *wakuEnvelope) Expiry() uint32 {
+	return w.env.Expiry
 }
 
-func (w *gethEnvelopeWrapper) Expiry() uint32 {
-	switch {
-	case w.shhEnvelope != nil:
-		return w.shhEnvelope.Expiry
-	case w.wakuEnvelope != nil:
-		return w.wakuEnvelope.Expiry
-	default:
-		return 0
-	}
+func (w *wakuEnvelope) TTL() uint32 {
+	return w.env.TTL
 }
 
-func (w *gethEnvelopeWrapper) TTL() uint32 {
-	switch {
-	case w.shhEnvelope != nil:
-		return w.shhEnvelope.TTL
-	case w.wakuEnvelope != nil:
-		return w.wakuEnvelope.TTL
-	default:
-		return 0
-	}
+func (w *wakuEnvelope) Topic() types.TopicType {
+	return types.TopicType(w.env.Topic)
 }
 
-func (w *gethEnvelopeWrapper) Topic() types.TopicType {
-	switch {
-	case w.shhEnvelope != nil:
-		return types.TopicType(w.shhEnvelope.Topic)
-	case w.wakuEnvelope != nil:
-		return types.TopicType(w.wakuEnvelope.Topic)
-	default:
-		return types.TopicType{}
-	}
-}
-
-func (w *gethEnvelopeWrapper) Size() int {
-	switch {
-	case w.shhEnvelope != nil:
-		return len(w.shhEnvelope.Data)
-	case w.wakuEnvelope != nil:
-		return len(w.wakuEnvelope.Data)
-	default:
-		return 0
-	}
+func (w *wakuEnvelope) Size() int {
+	return len(w.env.Data)
 }

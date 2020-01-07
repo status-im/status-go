@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -22,7 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
@@ -127,6 +128,14 @@ func activateServices(stack *node.Node, config *params.NodeConfig, accs *account
 }
 
 func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) error {
+	// Register eth-node node bridge
+	err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return &nodebridge.NodeService{Node: gethbridge.NewNodeBridge(stack)}, nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to register NodeBridhe: %v", err)
+	}
+
 	// start Whisper service.
 	if err := activateShhService(stack, config, db); err != nil {
 		return fmt.Errorf("%v: %v", ErrWhisperServiceRegistrationFailure, err)
@@ -331,14 +340,6 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		return
 	}
 
-	// Register eth-node node bridge
-	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return &nodebridge.NodeService{Node: gethbridge.NewNodeBridge(stack)}, nil
-	})
-	if err != nil {
-		return
-	}
-
 	// Register Whisper eth-node bridge
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var ethnode *nodebridge.NodeService
@@ -378,32 +379,6 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 	if err != nil {
 		return
 	}
-
-	// Register eth-node node bridge
-	// TODO: what to do with it? Shouldn't it be configured when a node is created?
-	//err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-	//	return &nodebridge.NodeService{Node: gethbridge.NewNodeBridge(stack)}, nil
-	//})
-	//if err != nil {
-	//	return
-	//}
-
-	// Register Whisper eth-node bridge
-	// TODO: create a proper Waku eth-node bridge.
-	//err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-	//	var ethnode *nodebridge.NodeService
-	//	if err := ctx.Service(&ethnode); err != nil {
-	//		return nil, err
-	//	}
-	//	w, err := ethnode.Node.GetWhisper(ctx)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	return &nodebridge.WhisperService{Whisper: w}, nil
-	//})
-	//if err != nil {
-	//	return
-	//}
 
 	// TODO: what to do with shhext?
 

@@ -40,7 +40,7 @@ import (
 
 const (
 	maxQueryRange = 24 * time.Hour
-	defaultLimit  = 1000
+	maxQueryLimit = 1000
 	// When we default the upper limit, we want to extend the range a bit
 	// to accommodate for envelopes with slightly higher timestamp, in seconds
 	whisperTTLSafeThreshold = 60
@@ -126,7 +126,7 @@ func (s *WhisperMailServer) Close() {
 }
 
 func (s *WhisperMailServer) Archive(env *whisper.Envelope) {
-	s.ms.Archive(gethbridge.NewWhisperEnvelopeWrapper(env))
+	s.ms.Archive(gethbridge.NewWhisperEnvelope(env))
 }
 
 // DEPRECATED; user Deliver instead
@@ -370,7 +370,7 @@ func (s *WakuMailServer) Close() {
 }
 
 func (s *WakuMailServer) Archive(env *waku.Envelope) {
-	s.ms.Archive(gethbridge.NewWakuEnvelopeWrapper(env))
+	s.ms.Archive(gethbridge.NewWakuEnvelope(env))
 }
 
 func (s *WakuMailServer) Deliver(peerID []byte, req waku.MessagesRequest) {
@@ -511,7 +511,7 @@ func (whisperAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash type
 func (whisperAdapter) CreateSyncResponse(envelopes []types.Envelope, cursor []byte, final bool, err string) interface{} {
 	whisperEnvelopes := make([]*whisper.Envelope, len(envelopes))
 	for i, env := range envelopes {
-		whisperEnvelopes[i] = gethbridge.GetWhisperEnvelopeFrom(env)
+		whisperEnvelopes[i] = gethbridge.MustUnwrapWhisperEnvelope(env)
 	}
 	return whisper.SyncResponse{
 		Envelopes: whisperEnvelopes,
