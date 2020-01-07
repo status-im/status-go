@@ -176,7 +176,7 @@ prepare-release: clean-release
 clean-release:
 	rm -rf $(RELEASE_DIR)
 
-gofmt:
+lint-fix:
 	find . -name '*.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec goimports -local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go' -w {} \;
 	$(MAKE) vendor
 
