@@ -18,6 +18,8 @@ replace github.com/status-im/status-go/eth-node => ./eth-node
 
 replace github.com/status-im/status-go/whisper/v6 => ./whisper
 
+replace github.com/status-im/status-go/waku => ./waku
+
 require (
 	github.com/beevik/ntp v0.2.0
 	github.com/ethereum/go-ethereum v1.9.5
@@ -41,14 +43,14 @@ require (
 	github.com/status-im/status-go/eth-node v1.0.0
 	github.com/status-im/status-go/extkeys v1.0.0
 	github.com/status-im/status-go/protocol v1.0.1
+	github.com/status-im/status-go/waku v1.0.0
 	github.com/status-im/status-go/whisper/v6 v6.0.1
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	go.uber.org/zap v1.13.0
-	golang.org/x/crypto v0.0.0-20191119213627-4f8c1d86b1ba
+	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3 // indirect
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
 	golang.org/x/tools v0.0.0-20191213032237-7093a17b0467 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.29.1

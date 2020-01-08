@@ -12,7 +12,6 @@ import (
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
 
 	"github.com/status-im/status-go/mailserver/migrations"
-	"github.com/status-im/status-go/params"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -21,8 +20,8 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
-func NewPostgresDB(config *params.WhisperConfig) (*PostgresDB, error) {
-	db, err := sql.Open("postgres", config.DatabaseConfig.PGConfig.URI)
+func NewPostgresDB(uri string) (*PostgresDB, error) {
+	db, err := sql.Open("postgres", uri)
 	if err != nil {
 		return nil, err
 	}
@@ -179,9 +178,9 @@ func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 	return 0, nil
 }
 
-func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
-	topic := types.TopicType(env.Topic)
-	key := NewDBKey(env.Expiry-env.TTL, topic, types.Hash(env.Hash()))
+func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
+	topic := env.Topic()
+	key := NewDBKey(env.Expiry()-env.TTL(), topic, env.Hash())
 	rawEnvelope, err := rlp.EncodeToBytes(env)
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
@@ -210,7 +209,7 @@ func (i *PostgresDB) SaveEnvelope(env *whisper.Envelope) error {
 	}
 
 	archivedEnvelopesCounter.Inc()
-	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + len(env.Data)))
+	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + env.Size()))
 
 	return nil
 }

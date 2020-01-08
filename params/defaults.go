@@ -27,6 +27,12 @@ const (
 	// WhisperTTL is time to live for messages, in seconds
 	WhisperTTL = 120
 
+	// WakuMinimumPoW amount of work for Whisper message to be added to sending queue
+	WakuMinimumPoW = 0.001
+
+	// WakuTTL is time to live for messages, in seconds
+	WakuTTL = 120
+
 	// MainnetEthereumNetworkURL is URL where the upstream ethereum network is loaded to
 	// allow us avoid syncing node.
 	MainnetEthereumNetworkURL = "https://mainnet.infura.io/nKmXgiFgc2KqtoQ8BCGJ"

@@ -44,6 +44,25 @@ type LightEthConfig struct {
 }
 
 // ----------
+// DatabaseConfig
+// ----------
+
+type DatabaseConfig struct {
+	PGConfig PGConfig
+}
+
+// ----------
+// PGConfig
+// ----------
+
+type PGConfig struct {
+	// Enabled whether we should use a Postgres instance
+	Enabled bool
+	// The URI of the server
+	URI string
+}
+
+// ----------
 // WhisperConfig
 // ----------
 
@@ -81,9 +100,6 @@ type WhisperConfig struct {
 	// TTL time to live for messages, in seconds
 	TTL int
 
-	// EnableNTPSync enables NTP synchronizations
-	EnableNTPSync bool
-
 	// MaxMessageSize is a maximum size of a devp2p packet handled by the Whisper protocol,
 	// not only the size of envelopes sent in that packet.
 	MaxMessageSize uint32
@@ -108,21 +124,69 @@ type WhisperConfig struct {
 	RateLimitTolerance int64
 }
 
-type DatabaseConfig struct {
-	PGConfig PGConfig
-}
-
-type PGConfig struct {
-	// Enabled whether we should use a Postgres instance
-	Enabled bool
-	// The URI of the server
-	URI string
-}
-
 // String dumps config object as nicely indented JSON
 func (c *WhisperConfig) String() string {
 	data, _ := json.MarshalIndent(c, "", "    ") // nolint: gas
 	return string(data)
+}
+
+// ----------
+// WakuConfig
+// ----------
+
+// WakuConfig provides a configuration for Waku service.
+type WakuConfig struct {
+	// Enabled set to true enables Waku subprotocol.
+	Enabled bool
+
+	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
+	LightClient bool
+
+	// EnableMailServer is mode when node is capable of delivering expired messages on demand
+	EnableMailServer bool
+
+	// DataDir is the file system folder Whisper should use for any data storage needs.
+	// For instance, MailServer will use this directory to store its data.
+	DataDir string
+
+	// MinimumPoW minimum PoW for Whisper messages
+	MinimumPoW float64
+
+	// MailServerPassword for symmetric encryption of whisper message history requests.
+	// (if no account file selected, then this password is used for symmetric encryption).
+	MailServerPassword string
+
+	// MailServerRateLimit minimum time between queries to mail server per peer.
+	MailServerRateLimit int
+
+	// MailServerDataRetention is a number of days data should be stored by MailServer.
+	MailServerDataRetention int
+
+	// TTL time to live for messages, in seconds
+	TTL int
+
+	// MaxMessageSize is a maximum size of a devp2p packet handled by the Whisper protocol,
+	// not only the size of envelopes sent in that packet.
+	MaxMessageSize uint32
+
+	// DatabaseConfig is configuration for which data store we use.
+	DatabaseConfig DatabaseConfig
+
+	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
+	EnableRateLimiter bool
+
+	// RateLimitIP sets the limit on the number of messages per second
+	// from a given IP.
+	RateLimitIP int64
+
+	// RateLimitPeerID sets the limit on the number of messages per second
+	// from a given peer ID.
+	RateLimitPeerID int64
+
+	// RateLimitTolerance is a number of how many a limit must be exceeded
+	// in order to drop a peer.
+	// If equal to 0, the peers are never dropped.
+	RateLimitTolerance int64
 }
 
 // IncentivisationConfig holds incentivisation-related configuration
@@ -343,6 +407,9 @@ type NodeConfig struct {
 	// EnableStatusService should be true to enable methods under status namespace.
 	EnableStatusService bool
 
+	// EnableNTPSync enables NTP synchronizations
+	EnableNTPSync bool
+
 	// UpstreamConfig extra config for providing upstream infura server.
 	UpstreamConfig UpstreamRPCConfig `json:"UpstreamConfig"`
 
@@ -354,6 +421,9 @@ type NodeConfig struct {
 
 	// WhisperConfig extra configuration for SHH
 	WhisperConfig WhisperConfig `json:"WhisperConfig," validate:"structonly"`
+
+	// WakuConfig provides a configuration for Waku subprotocol.
+	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
 
 	// IncentivisationConfig extra configuration for incentivisation service
 	IncentivisationConfig IncentivisationConfig `json:"IncentivisationConfig," validate:"structonly"`
@@ -505,8 +575,8 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	c.LogCompressRotated = true
 	c.LogMaxBackups = 3
 	c.LogToStderr = true
+	c.EnableNTPSync = true
 	c.WhisperConfig.Enabled = true
-	c.WhisperConfig.EnableNTPSync = true
 
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
@@ -591,6 +661,7 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		LogFile:          "",
 		LogLevel:         "ERROR",
 		NoDiscovery:      true,
+		EnableNTPSync:    true,
 		UpstreamConfig: UpstreamRPCConfig{
 			URL: getUpstreamURL(networkID),
 		},
@@ -689,6 +760,10 @@ func (c *NodeConfig) Validate() error {
 
 	if err := c.validateChildStructs(validate); err != nil {
 		return err
+	}
+
+	if c.WhisperConfig.Enabled && c.WakuConfig.Enabled && c.WhisperConfig.DataDir == c.WakuConfig.DataDir {
+		return fmt.Errorf("both Whisper and Waku are enabled and use the same data dir")
 	}
 
 	// Whisper's data directory must be relative to the main data directory

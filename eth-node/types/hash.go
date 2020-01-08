@@ -50,7 +50,7 @@ func (h Hash) Bytes() []byte { return h[:] }
 
 // String implements the stringer interface and is used also by the logger when
 // doing full logging into a file.
-func (h *Hash) String() string {
+func (h Hash) String() string {
 	return h.Hex()
 }
 

@@ -105,10 +105,9 @@ const (
 // in order to bypass the expiry checks.
 type MailServer interface {
 	Archive(env *Envelope)
-	// DEPRECATED
-	DeliverMail(whisperPeer *Peer, request *Envelope)
-	Deliver(whisperPeer *Peer, request MessagesRequest)
-	SyncMail(*Peer, SyncMailRequest) error
+	DeliverMail(peerID []byte, req *Envelope) // DEPRECATED; user Deliver instead
+	Deliver(peerID []byte, req MessagesRequest)
+	SyncMail(peerID []byte, req SyncMailRequest) error
 }
 
 // MessagesRequest contains details of a request of historic messages.

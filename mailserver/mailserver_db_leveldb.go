@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -58,12 +58,12 @@ func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 
 }
 
-func NewLevelDB(config *params.WhisperConfig) (*LevelDB, error) {
+func NewLevelDB(dataDir string) (*LevelDB, error) {
 	// Open opens an existing leveldb database
-	db, err := leveldb.OpenFile(config.DataDir, nil)
-	if _, iscorrupted := err.(*errors.ErrCorrupted); iscorrupted {
-		log.Info("database is corrupted trying to recover", "path", config.DataDir)
-		db, err = leveldb.RecoverFile(config.DataDir, nil)
+	db, err := leveldb.OpenFile(dataDir, nil)
+	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
+		log.Info("database is corrupted trying to recover", "path", dataDir)
+		db, err = leveldb.RecoverFile(dataDir, nil)
 	}
 	return &LevelDB{ldb: db}, err
 }
@@ -138,11 +138,22 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 }
 
 // SaveEnvelope stores an envelope in leveldb and increments the metrics
-func (db *LevelDB) SaveEnvelope(env *whisper.Envelope) error {
+func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
-	key := NewDBKey(env.Expiry-env.TTL, types.TopicType(env.Topic), types.Hash(env.Hash()))
-	rawEnvelope, err := rlp.EncodeToBytes(env)
+	key := NewDBKey(env.Expiry()-env.TTL(), env.Topic(), env.Hash())
+
+	var (
+		rawEnvelope []byte
+		err         error
+	)
+	if whisperEnv, ok := gethbridge.UnwrapWhisperEnvelope(env); ok {
+		rawEnvelope, err = rlp.EncodeToBytes(whisperEnv)
+	} else if wakuEnv, ok := gethbridge.UnwrapWakuEnvelope(env); ok {
+		rawEnvelope, err = rlp.EncodeToBytes(wakuEnv)
+	} else {
+		return errors.New("unsupported underlying types.Envelope type")
+	}
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
 		archivedErrorsCounter.Inc()
@@ -154,7 +165,7 @@ func (db *LevelDB) SaveEnvelope(env *whisper.Envelope) error {
 		archivedErrorsCounter.Inc()
 	}
 	archivedEnvelopesCounter.Inc()
-	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + len(env.Data)))
+	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + env.Size()))
 	return err
 }
 

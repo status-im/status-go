@@ -19,7 +19,7 @@ func TestCleaner(t *testing.T) {
 	now := time.Now()
 	server := setupTestServer(t)
 	defer server.Close()
-	cleaner := newDBCleaner(server.db, time.Hour)
+	cleaner := newDBCleaner(server.ms.db, time.Hour)
 
 	archiveEnvelope(t, now.Add(-10*time.Second), server)
 	archiveEnvelope(t, now.Add(-3*time.Second), server)
@@ -27,9 +27,9 @@ func TestCleaner(t *testing.T) {
 
 	testMessagesCount(t, 3, server)
 
-	testPrune(t, now.Add(-5*time.Second), 1, cleaner, server)
-	testPrune(t, now.Add(-2*time.Second), 1, cleaner, server)
-	testPrune(t, now, 1, cleaner, server)
+	testPrune(t, now.Add(-5*time.Second), 1, cleaner)
+	testPrune(t, now.Add(-2*time.Second), 1, cleaner)
+	testPrune(t, now, 1, cleaner)
 
 	testMessagesCount(t, 0, server)
 }
@@ -39,7 +39,7 @@ func TestCleanerSchedule(t *testing.T) {
 	server := setupTestServer(t)
 	defer server.Close()
 
-	cleaner := newDBCleaner(server.db, time.Hour)
+	cleaner := newDBCleaner(server.ms.db, time.Hour)
 	cleaner.period = time.Millisecond * 10
 	cleaner.Start()
 	defer cleaner.Stop()
@@ -60,7 +60,7 @@ func benchmarkCleanerPrune(b *testing.B, messages int, batchSize int) {
 	server := setupTestServer(t)
 	defer server.Close()
 
-	cleaner := newDBCleaner(server.db, time.Hour)
+	cleaner := newDBCleaner(server.ms.db, time.Hour)
 	cleaner.batchSize = batchSize
 
 	for i := 0; i < messages; i++ {
@@ -68,7 +68,7 @@ func benchmarkCleanerPrune(b *testing.B, messages int, batchSize int) {
 	}
 
 	for i := 0; i < b.N; i++ {
-		testPrune(t, now, 0, cleaner, server)
+		testPrune(t, now, 0, cleaner)
 	}
 }
 
@@ -88,16 +88,19 @@ func BenchmarkCleanerPruneM100_000_B100(b *testing.B) {
 	benchmarkCleanerPrune(b, 100000, 100)
 }
 
-func setupTestServer(t *testing.T) *WMailServer {
-	var s WMailServer
+func setupTestServer(t *testing.T) *WhisperMailServer {
+	var s WhisperMailServer
 	db, _ := leveldb.Open(storage.NewMemStorage(), nil)
 
-	s.db = &LevelDB{ldb: db}
-	s.pow = powRequirement
+	s.ms = &mailServer{
+		db:      &LevelDB{ldb: db},
+		adapter: &whisperAdapter{},
+	}
+	s.minRequestPoW = powRequirement
 	return &s
 }
 
-func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whisper.Envelope {
+func archiveEnvelope(t *testing.T, sentTime time.Time, server *WhisperMailServer) *whisper.Envelope {
 	env, err := generateEnvelope(sentTime)
 	require.NoError(t, err)
 	server.Archive(env)
@@ -105,14 +108,14 @@ func archiveEnvelope(t *testing.T, sentTime time.Time, server *WMailServer) *whi
 	return env
 }
 
-func testPrune(t *testing.T, u time.Time, expected int, c *dbCleaner, s *WMailServer) {
+func testPrune(t *testing.T, u time.Time, expected int, c *dbCleaner) {
 	n, err := c.PruneEntriesOlderThan(u)
 	require.NoError(t, err)
 	require.Equal(t, expected, n)
 }
 
-func testMessagesCount(t *testing.T, expected int, s *WMailServer) {
-	count := countMessages(t, s.db)
+func testMessagesCount(t *testing.T, expected int, s *WhisperMailServer) {
+	count := countMessages(t, s.ms.db)
 	require.Equal(t, expected, count, fmt.Sprintf("expected %d message, got: %d", expected, count))
 }
 
