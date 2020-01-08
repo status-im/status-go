@@ -18,12 +18,12 @@ SERVICE_DIR := /etc/systemd/system/
 endif
 
 # Settings
-export SERVICE_NAME ?= statusd
+export SERVICE_NAME ?= status-go-mailserver
 export SERVICE_DIR  ?= $(HOME)/.config/systemd/user/
 export SERVICE_PATH ?= $(SERVICE_DIR)/$(SERVICE_NAME).service
+export DATA_PATH    ?= /var/tmp/$(SERVICE_NAME)
 export LOG_LEVEL    ?= INFO
 export LISTEN_PORT  ?= 30303
-export DATA_PATH    ?= /var/tmp/status-go-mail
 # Necessary to make mailserver available publicly
 export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 

@@ -18,13 +18,13 @@ SERVICE_DIR := /etc/systemd/system/
 endif
 
 # Settings
-export SERVICE_NAME ?= bootnode
+export SERVICE_NAME ?= status-go-bootnode
 export SERVICE_PATH ?= $(SERVICE_DIR)/$(SERVICE_NAME).service
-export LOG_LEVEL    ?= 3
-export LISTEN_PORT  ?= 30303
-export DATA_PATH    ?= /var/tmp/status-go-boot
+export DATA_PATH    ?= /var/tmp/$(SERVICE_NAME)
 export KEY_PATH     ?= $(DATA_PATH)/nodekey
 export ADDR_PATH    ?= $(DATA_PATH)/nodeaddr
+export LOG_LEVEL    ?= 3
+export LISTEN_PORT  ?= 30303
 # Necessary to make bootnode available publicly
 export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 
