@@ -550,6 +550,7 @@ github.com/status-im/status-go v0.36.0 h1:91qDMJjHv+T3Li9FwxsWQ2JBVcYtvVDT0nGFSM
 github.com/status-im/status-go v0.36.1 h1:nb9eTq0UQJ57YyTZSl5U05emFT+R4AW8/Bga6ocgOks=
 github.com/status-im/status-go v0.37.3 h1:94/bOA8qrEIgWd23mSLN39SwUJwCu2TPQFV2HzSI2ZE=
 github.com/status-im/status-go v0.37.3/go.mod h1:9qHQ2+8NS6ivPJS5YbsI3gWkr0t6DWmJzKnr4M7vudw=
+github.com/status-im/status-go v0.38.5 h1:vnbGgk5+X5ZUmn3/gJ88GlaNaAO9kGVgm8E5mR0umiQ=
 github.com/status-im/status-go/extkeys v1.0.0 h1:Qyirsoi5Ye5UFfisgPtCjPb/RkBxyK+UsSiEcr2PVlM=
 github.com/status-im/status-go/extkeys v1.0.0/go.mod h1:GdqJbrcpkNm5ZsSCpp+PdMxnXx+OcRBdm3PI0rs1FpU=
 github.com/status-im/status-go/protocol v1.0.1/go.mod h1:LpA7BsaNmj6EOdq7BwuqncewjPqIRHCletZOb2wlWrY=
