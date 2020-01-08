@@ -68,21 +68,15 @@ If you want your node to relay Whisper(SHH) protocol messages you'll want to inc
 The `MailServerPassword` is used for symmetric encryption of history requests.
 
 By default it will use `leveldb` embedded database. To use postgres instead you need to 
-pass a config of this kind:
+add this to your config:
 
 ```json
 {
-    "WhisperConfig": {
+    "DatabaseConfig": {
+      "PGConfig": {
         "Enabled": true,
-        "EnableMailServer": true,
-        "LightClient": false,
-        "MailServerPassword": "status-offline-inbox"
-        "DatabaseConfig": {
-          "PGConfig": {
-            "Enabled": true,
-            "URI": "postgres://user:password@host:port?options"
-          }
-        }
+        "URI": "postgres://user:password@host:port?options"
+      }
     }
 }
 ```
