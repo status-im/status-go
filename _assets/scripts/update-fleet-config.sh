@@ -4,9 +4,13 @@ DIR="$(cd $(dirname "$0")/../../config/cli; pwd)"
 
 echo "Downloading https://fleets.status.im/"
 json=$(curl --silent https://fleets.status.im/)
-fleets=('eth.beta'
-        'eth.staging'
-        'eth.test')
+fleets=(
+    'eth.prod'
+    'eth.beta'
+    'eth.staging'
+    'eth.test'
+)
+
 for fleet in ${fleets[@]}; do 
     echo "Processing $fleet fleet..."
     fleetJSON=$(echo $json | jq ".fleets.\"$fleet\"")

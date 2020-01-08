@@ -5,7 +5,7 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 # Settings & defaults
 RPC_PORT="${RPC_PORT:-8545}"
 API_MODULES="${API_MODULES:-eth,net,web3,admin,mailserver}"
-FLEET_NAME="${FLEET_NAME:-eth.beta}"
+FLEET_NAME="${FLEET_NAME:-eth.prod}"
 REGISTER_TOPIC="${REGISTER_TOPIC:-whispermail}"
 MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
 DATA_PATH="${DATA_PATH:-/var/tmp/status-go-mail}"

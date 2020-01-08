@@ -13,7 +13,6 @@ export RPC_PORT       ?= 8545
 export API_MODULES    ?= eth,net,web3,admin,mailserver
 export CONTAINER_NAME ?= status-go-mailserver
 export DATA_PATH      ?= /var/tmp/status-go-mail
-export FLEET_NAME     ?= eth.beta
 export REGISTER_TOPIC ?= whispermail
 export MAIL_PASSWORD  ?= status-offline-inbox
 # Necessary to make mailserver available publicly
