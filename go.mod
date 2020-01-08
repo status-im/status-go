@@ -40,7 +40,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-go/eth-node v1.0.0
+	github.com/status-im/status-go/eth-node v1.0.1
 	github.com/status-im/status-go/extkeys v1.0.0
 	github.com/status-im/status-go/protocol v1.0.1
 	github.com/status-im/status-go/waku v1.0.0
