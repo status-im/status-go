@@ -548,7 +548,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 		"shhext_syncMessages",
 		shhext.SyncMessagesRequest{
 			MailServerPeer: mailbox.StatusNode().Server().Self().URLv4(),
-			From:           0,
+			From:           uint32(time.Now().Add(-time.Hour).Unix()),
 			To:             uint32(time.Now().Unix()),
 			Limit:          1,
 		},
@@ -567,7 +567,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 		"shhext_syncMessages",
 		shhext.SyncMessagesRequest{
 			MailServerPeer: mailbox.StatusNode().Server().Self().URLv4(),
-			From:           0,
+			From:           uint32(time.Now().Add(-time.Hour).Unix()),
 			To:             uint32(time.Now().Unix()),
 			Limit:          10,
 			Cursor:         syncMessagesResponse.Cursor,
