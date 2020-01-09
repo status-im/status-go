@@ -1,5 +1,3 @@
-// +build !nimbus
-
 package account
 
 import (
