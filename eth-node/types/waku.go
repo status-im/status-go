@@ -5,19 +5,10 @@ import (
 	"time"
 )
 
-// SubscriptionOptions represents the parameters passed to Whisper.Subscribe
-// to customize the subscription behavior
-type SubscriptionOptions struct {
-	PrivateKeyID string
-	SymKeyID     string
-	PoW          float64
-	Topics       [][]byte
-}
-
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
-type Whisper interface {
-	PublicWhisperAPI() PublicWhisperAPI
+type Waku interface {
+	PublicWakuAPI() PublicWakuAPI
 
 	// MinPow returns the PoW value required by this node.
 	MinPow() float64
@@ -59,6 +50,4 @@ type Whisper interface {
 	// SendMessagesRequest sends a MessagesRequest. This is an equivalent to RequestHistoricMessages
 	// in terms of the functionality.
 	SendMessagesRequest(peerID []byte, request MessagesRequest) error
-	// SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
-	SyncMessages(peerID []byte, req SyncMailRequest) error
 }

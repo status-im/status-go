@@ -1,4 +1,4 @@
-package whisper
+package waku
 
 import (
 	"crypto/ecdsa"
@@ -26,14 +26,14 @@ var (
 	minPow      = 0.0
 )
 
-type whisperFilter struct {
+type rawFilter struct {
 	FilterID string
 	Topic    types.TopicType
 	SymKeyID string
 }
 
 type filtersManager struct {
-	whisper     types.Whisper
+	waku        types.Waku
 	persistence *sqlitePersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
@@ -46,7 +46,7 @@ type filtersManager struct {
 }
 
 // newFiltersManager returns a new filtersManager.
-func newFiltersManager(db *sql.DB, w types.Whisper, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
+func newFiltersManager(db *sql.DB, w types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
@@ -60,7 +60,7 @@ func newFiltersManager(db *sql.DB, w types.Whisper, privateKey *ecdsa.PrivateKey
 
 	return &filtersManager{
 		privateKey:  privateKey,
-		whisper:     w,
+		waku:        w,
 		persistence: persistence,
 		keys:        keys,
 		filters:     make(map[string]*Filter),
@@ -203,11 +203,11 @@ func (s *filtersManager) Remove(filters ...*Filter) error {
 	defer s.mutex.Unlock()
 
 	for _, f := range filters {
-		if err := s.whisper.Unsubscribe(f.FilterID); err != nil {
+		if err := s.waku.Unsubscribe(f.FilterID); err != nil {
 			return err
 		}
 		if f.SymKeyID != "" {
-			s.whisper.DeleteSymKey(f.SymKeyID)
+			s.waku.DeleteSymKey(f.SymKeyID)
 		}
 		delete(s.filters, f.ChatID)
 	}
@@ -308,8 +308,6 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 		return result, nil
 	}
 
-	var discoveryResponse *whisperFilter
-	var err error
 	identityStr := transport.PublicKeyToStr(&s.privateKey.PublicKey)
 
 	// Load personal discovery
@@ -321,7 +319,7 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 		OneToOne:  true,
 	}
 
-	discoveryResponse, err = s.addAsymmetric(personalDiscoveryChat.ChatID, true)
+	discoveryResponse, err := s.addAsymmetric(personalDiscoveryChat.ChatID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +390,7 @@ func (s *filtersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 }
 
 // addSymmetric adds a symmetric key filter
-func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
+func (s *filtersManager) addSymmetric(chatID string) (*rawFilter, error) {
 	var symKeyID string
 	var err error
 
@@ -401,16 +399,16 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 
 	symKey, ok := s.keys[chatID]
 	if ok {
-		symKeyID, err = s.whisper.AddSymKeyDirect(symKey)
+		symKeyID, err = s.waku.AddSymKeyDirect(symKey)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		symKeyID, err = s.whisper.AddSymKeyFromPassword(chatID)
+		symKeyID, err = s.waku.AddSymKeyFromPassword(chatID)
 		if err != nil {
 			return nil, err
 		}
-		if symKey, err = s.whisper.GetSymKey(symKeyID); err != nil {
+		if symKey, err = s.waku.GetSymKey(symKeyID); err != nil {
 			return nil, err
 		}
 		s.keys[chatID] = symKey
@@ -421,7 +419,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 		}
 	}
 
-	id, err := s.whisper.Subscribe(&types.SubscriptionOptions{
+	id, err := s.waku.Subscribe(&types.SubscriptionOptions{
 		SymKeyID: symKeyID,
 		PoW:      minPow,
 		Topics:   topics,
@@ -430,7 +428,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 		return nil, err
 	}
 
-	return &whisperFilter{
+	return &rawFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
 		Topic:    types.BytesToTopic(topic),
@@ -439,7 +437,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*whisperFilter, error) {
 
 // addAsymmetricFilter adds a filter with our private key
 // and set minPow according to the listen parameter.
-func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilter, error) {
+func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*rawFilter, error) {
 	var (
 		err error
 		pow = 1.0 // use PoW high enough to discard all messages for the filter
@@ -452,12 +450,12 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 	topic := transport.ToTopic(chatID)
 	topics := [][]byte{topic}
 
-	privateKeyID, err := s.whisper.AddKeyPair(s.privateKey)
+	privateKeyID, err := s.waku.AddKeyPair(s.privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := s.whisper.Subscribe(&types.SubscriptionOptions{
+	id, err := s.waku.Subscribe(&types.SubscriptionOptions{
 		PrivateKeyID: privateKeyID,
 		PoW:          pow,
 		Topics:       topics,
@@ -465,7 +463,7 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*whisperFilt
 	if err != nil {
 		return nil, err
 	}
-	return &whisperFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
+	return &rawFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity

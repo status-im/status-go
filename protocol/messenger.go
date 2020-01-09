@@ -25,7 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	transport "github.com/status-im/status-go/protocol/transport/whisper"
+	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -49,7 +49,7 @@ type Messenger struct {
 	node                       types.Node
 	identity                   *ecdsa.PrivateKey
 	persistence                *sqlitePersistence
-	transport                  *transport.WhisperServiceTransport
+	transport                  transport.Transport
 	encryptor                  *encryption.Protocol
 	processor                  *messageProcessor
 	logger                     *zap.Logger
