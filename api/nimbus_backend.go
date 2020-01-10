@@ -377,7 +377,7 @@ func (b *nimbusStatusBackend) rpcFiltersService() nimbussvc.ServiceConstructor {
 
 func (b *nimbusStatusBackend) subscriptionService() nimbussvc.ServiceConstructor {
 	return func(*nimbussvc.ServiceContext) (nimbussvc.Service, error) {
-		return subscriptions.New(b.statusNode), nil
+		return subscriptions.New(func() *rpc.Client { return b.statusNode.RPCPrivateClient() }), nil
 	}
 }
 

@@ -383,7 +383,7 @@ func (b *GethStatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 
 func (b *GethStatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return subscriptions.New(b.statusNode), nil
+		return subscriptions.New(func() *rpc.Client { return b.statusNode.RPCPrivateClient() }), nil
 	}
 }
 
