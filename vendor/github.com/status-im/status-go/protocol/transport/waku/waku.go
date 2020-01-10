@@ -1,4 +1,4 @@
-package whisper
+package waku
 
 import (
 	"github.com/status-im/status-go/eth-node/types"

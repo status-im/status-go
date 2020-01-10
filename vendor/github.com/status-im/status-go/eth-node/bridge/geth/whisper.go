@@ -59,7 +59,7 @@ func (w *gethWhisperWrapper) SubscribeEnvelopeEvents(eventsProxy chan<- types.En
 	events := make(chan whisper.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
 	go func() {
 		for e := range events {
-			eventsProxy <- *NewGethEnvelopeEventWrapper(&e)
+			eventsProxy <- *NewWhisperEnvelopeEventWrapper(&e)
 		}
 	}()
 
@@ -121,17 +121,17 @@ func (w *gethWhisperWrapper) Subscribe(opts *types.SubscriptionOptions) (string,
 		return "", err
 	}
 
-	id, err := w.whisper.Subscribe(GetGethFilterFrom(f))
+	id, err := w.whisper.Subscribe(GetWhisperFilterFrom(f))
 	if err != nil {
 		return "", err
 	}
 
-	f.(*gethFilterWrapper).id = id
+	f.(*whisperFilterWrapper).id = id
 	return id, nil
 }
 
 func (w *gethWhisperWrapper) GetFilter(id string) types.Filter {
-	return NewGethFilterWrapper(w.whisper.GetFilter(id), id)
+	return NewWhisperFilterWrapper(w.whisper.GetFilter(id), id)
 }
 
 func (w *gethWhisperWrapper) Unsubscribe(id string) error {
@@ -139,7 +139,7 @@ func (w *gethWhisperWrapper) Unsubscribe(id string) error {
 }
 
 func (w *gethWhisperWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (types.Filter, error) {
-	return NewGethFilterWrapper(&whisper.Filter{
+	return NewWhisperFilterWrapper(&whisper.Filter{
 		KeyAsym:  keyAsym,
 		KeySym:   keySym,
 		PoW:      pow,
@@ -172,4 +172,31 @@ func (w *gethWhisperWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, e
 // SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
 func (w *gethWhisperWrapper) SyncMessages(peerID []byte, req types.SyncMailRequest) error {
 	return w.whisper.SyncMessages(peerID, *GetGethSyncMailRequestFrom(&req))
+}
+
+type whisperFilterWrapper struct {
+	filter *whisper.Filter
+	id     string
+}
+
+// NewWhisperFilterWrapper returns an object that wraps Geth's Filter in a types interface
+func NewWhisperFilterWrapper(f *whisper.Filter, id string) types.Filter {
+	if f.Messages == nil {
+		panic("Messages should not be nil")
+	}
+
+	return &whisperFilterWrapper{
+		filter: f,
+		id:     id,
+	}
+}
+
+// GetWhisperFilterFrom retrieves the underlying whisper Filter struct from a wrapped Filter interface
+func GetWhisperFilterFrom(f types.Filter) *whisper.Filter {
+	return f.(*whisperFilterWrapper).filter
+}
+
+// ID returns the filter ID
+func (w *whisperFilterWrapper) ID() string {
+	return w.id
 }

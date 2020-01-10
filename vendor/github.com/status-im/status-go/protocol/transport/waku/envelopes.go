@@ -1,4 +1,4 @@
-package whisper
+package waku
 
 import (
 	"context"
@@ -18,7 +18,7 @@ type EnvelopeState int
 const (
 	// NotRegistered returned if asked hash wasn't registered in the tracker.
 	NotRegistered EnvelopeState = -1
-	// EnvelopePosted is set when envelope was added to a local whisper queue.
+	// EnvelopePosted is set when envelope was added to a local waku queue.
 	EnvelopePosted EnvelopeState = iota
 	// EnvelopeSent is set when envelope is sent to at least one peer.
 	EnvelopeSent
@@ -33,21 +33,21 @@ type EnvelopeEventsHandler interface {
 }
 
 // NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
-func NewEnvelopesMonitor(w types.Whisper, config transport.EnvelopesMonitorConfig) *EnvelopesMonitor {
+func NewEnvelopesMonitor(w types.Waku, config transport.EnvelopesMonitorConfig) *EnvelopesMonitor {
 	logger := config.Logger
 
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
-	var whisperAPI types.PublicWhisperAPI
+	var api types.PublicWakuAPI
 	if w != nil {
-		whisperAPI = w.PublicWhisperAPI()
+		api = w.PublicWakuAPI()
 	}
 
 	return &EnvelopesMonitor{
 		w:                      w,
-		whisperAPI:             whisperAPI,
+		api:                    api,
 		handler:                config.EnvelopeEventsHandler,
 		mailServerConfirmation: config.MailserverConfirmationsEnabled,
 		maxAttempts:            config.MaxAttempts,
@@ -65,10 +65,10 @@ func NewEnvelopesMonitor(w types.Whisper, config transport.EnvelopesMonitorConfi
 	}
 }
 
-// EnvelopesMonitor is responsible for monitoring whisper envelopes state.
+// EnvelopesMonitor is responsible for monitoring waku envelopes state.
 type EnvelopesMonitor struct {
-	w                      types.Whisper
-	whisperAPI             types.PublicWhisperAPI
+	w                      types.Waku
+	api                    types.PublicWakuAPI
 	handler                EnvelopeEventsHandler
 	mailServerConfirmation bool
 	maxAttempts            int
@@ -124,9 +124,9 @@ func (m *EnvelopesMonitor) GetState(hash types.Hash) EnvelopeState {
 	return state
 }
 
-// handleEnvelopeEvents processes whisper envelope events
+// handleEnvelopeEvents processes waku envelope events
 func (m *EnvelopesMonitor) handleEnvelopeEvents() {
-	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
+	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking waku
 	sub := m.w.SubscribeEnvelopeEvents(events)
 	defer func() {
 		close(events)
@@ -260,7 +260,7 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types.Hash, err error) {
 		}
 		if attempt < m.maxAttempts {
 			m.logger.Debug("retrying to send a message", zap.String("hash", hash.String()), zap.Int("attempt", attempt+1))
-			hex, err := m.whisperAPI.Post(context.TODO(), *message)
+			hex, err := m.api.Post(context.TODO(), *message)
 			if err != nil {
 				m.logger.Error("failed to retry sending message", zap.String("hash", hash.String()), zap.Int("attempt", attempt+1), zap.Error(err))
 				if m.handler != nil {

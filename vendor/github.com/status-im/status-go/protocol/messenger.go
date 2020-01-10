@@ -25,7 +25,9 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	transport "github.com/status-im/status-go/protocol/transport/whisper"
+	"github.com/status-im/status-go/protocol/transport"
+	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
+	shhtransp "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -49,7 +51,7 @@ type Messenger struct {
 	node                       types.Node
 	identity                   *ecdsa.PrivateKey
 	persistence                *sqlitePersistence
-	transport                  *transport.WhisperServiceTransport
+	transport                  transport.Transport
 	encryptor                  *encryption.Protocol
 	processor                  *messageProcessor
 	logger                     *zap.Logger
@@ -189,11 +191,6 @@ func NewMessenger(
 ) (*Messenger, error) {
 	var messenger *Messenger
 
-	shh, err := node.GetWhisper(nil)
-	if err != nil {
-		return nil, err
-	}
-
 	c := config{}
 
 	for _, opt := range opts {
@@ -273,22 +270,42 @@ func NewMessenger(
 	}
 
 	// Apply migrations for all components.
-	err = sqlite.Migrate(database)
+	err := sqlite.Migrate(database)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to apply migrations")
 	}
 
 	// Initialize transport layer.
-	t, err := transport.NewWhisperServiceTransport(
-		shh,
-		identity,
-		database,
-		nil,
-		c.envelopesMonitorConfig,
-		logger,
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create a WhisperServiceTransport")
+	var transp transport.Transport
+	if shh, err := node.GetWhisper(nil); err == nil {
+		transp, err = shhtransp.NewWhisperServiceTransport(
+			shh,
+			identity,
+			database,
+			nil,
+			c.envelopesMonitorConfig,
+			logger,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create WhisperServiceTransport")
+		}
+	} else if err != nil {
+		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
+		waku, err := node.GetWaku(nil)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to find Whisper or Waku services")
+		}
+		transp, err = wakutransp.NewWakuServiceTransport(
+			waku,
+			identity,
+			database,
+			nil,
+			c.envelopesMonitorConfig,
+			logger,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create  WakuServiceTransport")
+		}
 	}
 
 	// Initialize encryption layer.
@@ -305,7 +322,7 @@ func NewMessenger(
 		identity,
 		database,
 		encryptionProtocol,
-		t,
+		transp,
 		logger,
 		c.featureFlags,
 	)
@@ -317,7 +334,7 @@ func NewMessenger(
 		node:                       node,
 		identity:                   identity,
 		persistence:                &sqlitePersistence{db: database},
-		transport:                  t,
+		transport:                  transp,
 		encryptor:                  encryptionProtocol,
 		processor:                  processor,
 		featureFlags:               c.featureFlags,
@@ -327,8 +344,8 @@ func NewMessenger(
 		messagesPersistenceEnabled: c.messagesPersistenceEnabled,
 		shutdownTasks: []func() error{
 			database.Close,
-			t.Reset,
-			t.Stop,
+			transp.ResetFilters,
+			transp.Stop,
 			func() error { processor.Stop(); return nil },
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328
