@@ -48,7 +48,6 @@ message ChatMessage {
     STICKER = 2;
     STATUS = 3;
     EMOJI = 4;
-    COMMAND = 5;
-    COMMAND_REQUEST = 6;
+    TRANSACTION_COMMAND = 5;
   }
 }

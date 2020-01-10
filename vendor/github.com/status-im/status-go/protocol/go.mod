@@ -23,6 +23,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/migrate/v4 v4.6.2-status.2
+	github.com/status-im/status-go v0.38.5 // indirect
 	github.com/status-im/status-go/eth-node v1.0.0
 	github.com/status-im/status-go/whisper/v6 v6.0.1
 	github.com/stretchr/testify v1.4.0

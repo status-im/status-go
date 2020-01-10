@@ -118,7 +118,7 @@ github.com/go-playground/locales/currency
 github.com/go-playground/universal-translator
 # github.com/go-stack/stack v1.8.0
 github.com/go-stack/stack
-# github.com/gogo/protobuf v1.3.0
+# github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
 # github.com/golang-migrate/migrate/v4 v4.6.2
@@ -175,12 +175,11 @@ github.com/jbenet/go-temp-err-catcher
 github.com/jbenet/goprocess
 github.com/jbenet/goprocess/context
 github.com/jbenet/goprocess/periodic
-github.com/jbenet/goprocess/ratelimit
 # github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 github.com/jinzhu/copier
 # github.com/karalabe/usb v0.0.0-20190819132248-550797b1cad8
 github.com/karalabe/usb
-# github.com/koron/go-ssdp v0.0.0-20180514024734-4a0ed625a78b
+# github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d
 github.com/koron/go-ssdp
 # github.com/leodido/go-urn v1.2.0
 github.com/leodido/go-urn
@@ -198,7 +197,7 @@ github.com/libp2p/go-conn-security-multistream
 github.com/libp2p/go-eventbus
 # github.com/libp2p/go-flow-metrics v0.0.1
 github.com/libp2p/go-flow-metrics
-# github.com/libp2p/go-libp2p v0.4.0
+# github.com/libp2p/go-libp2p v0.4.2
 github.com/libp2p/go-libp2p
 github.com/libp2p/go-libp2p/config
 github.com/libp2p/go-libp2p/p2p/host/basic
@@ -207,13 +206,13 @@ github.com/libp2p/go-libp2p/p2p/host/routed
 github.com/libp2p/go-libp2p/p2p/protocol/identify
 github.com/libp2p/go-libp2p/p2p/protocol/identify/pb
 github.com/libp2p/go-libp2p/p2p/protocol/ping
-# github.com/libp2p/go-libp2p-autonat v0.1.0
+# github.com/libp2p/go-libp2p-autonat v0.1.1
 github.com/libp2p/go-libp2p-autonat
 github.com/libp2p/go-libp2p-autonat/pb
-# github.com/libp2p/go-libp2p-circuit v0.1.3
+# github.com/libp2p/go-libp2p-circuit v0.1.4
 github.com/libp2p/go-libp2p-circuit
 github.com/libp2p/go-libp2p-circuit/pb
-# github.com/libp2p/go-libp2p-core v0.2.3
+# github.com/libp2p/go-libp2p-core v0.2.4
 github.com/libp2p/go-libp2p-core/connmgr
 github.com/libp2p/go-libp2p-core/crypto
 github.com/libp2p/go-libp2p-core/crypto/pb
@@ -239,13 +238,13 @@ github.com/libp2p/go-libp2p-discovery
 github.com/libp2p/go-libp2p-loggables
 # github.com/libp2p/go-libp2p-mplex v0.2.1
 github.com/libp2p/go-libp2p-mplex
-# github.com/libp2p/go-libp2p-nat v0.0.4
+# github.com/libp2p/go-libp2p-nat v0.0.5
 github.com/libp2p/go-libp2p-nat
-# github.com/libp2p/go-libp2p-peerstore v0.1.3
+# github.com/libp2p/go-libp2p-peerstore v0.1.4
 github.com/libp2p/go-libp2p-peerstore
 github.com/libp2p/go-libp2p-peerstore/addr
 github.com/libp2p/go-libp2p-peerstore/pstoremem
-# github.com/libp2p/go-libp2p-secio v0.2.0
+# github.com/libp2p/go-libp2p-secio v0.2.1
 github.com/libp2p/go-libp2p-secio
 github.com/libp2p/go-libp2p-secio/pb
 # github.com/libp2p/go-libp2p-swarm v0.2.2
@@ -260,9 +259,9 @@ github.com/libp2p/go-maddr-filter
 github.com/libp2p/go-mplex
 # github.com/libp2p/go-msgio v0.0.4
 github.com/libp2p/go-msgio
-# github.com/libp2p/go-nat v0.0.3
+# github.com/libp2p/go-nat v0.0.4
 github.com/libp2p/go-nat
-# github.com/libp2p/go-openssl v0.0.2
+# github.com/libp2p/go-openssl v0.0.3
 github.com/libp2p/go-openssl
 github.com/libp2p/go-openssl/utils
 # github.com/libp2p/go-reuseport v0.0.1
@@ -297,11 +296,11 @@ github.com/mr-tron/base58/base58
 github.com/multiformats/go-base32
 # github.com/multiformats/go-multiaddr v0.1.1
 github.com/multiformats/go-multiaddr
-# github.com/multiformats/go-multiaddr-dns v0.1.0
+# github.com/multiformats/go-multiaddr-dns v0.2.0
 github.com/multiformats/go-multiaddr-dns
 # github.com/multiformats/go-multiaddr-fmt v0.1.0
 github.com/multiformats/go-multiaddr-fmt
-# github.com/multiformats/go-multiaddr-net v0.1.0
+# github.com/multiformats/go-multiaddr-net v0.1.1
 github.com/multiformats/go-multiaddr-net
 # github.com/multiformats/go-multibase v0.0.1
 github.com/multiformats/go-multibase
@@ -372,6 +371,7 @@ github.com/status-im/rendezvous/server
 # github.com/status-im/status-go/eth-node v1.1.0 => ./eth-node
 github.com/status-im/status-go/eth-node/bridge/geth
 github.com/status-im/status-go/eth-node/bridge/geth/ens
+github.com/status-im/status-go/eth-node/core/types
 github.com/status-im/status-go/eth-node/crypto
 github.com/status-im/status-go/eth-node/crypto/ecies
 github.com/status-im/status-go/eth-node/keystore
@@ -459,8 +459,6 @@ github.com/wealdtech/go-ens/v3/util
 github.com/wealdtech/go-multicodec
 # github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 github.com/whyrusleeping/go-logging
-# github.com/whyrusleeping/go-notifier v0.0.0-20170827234753-097c5d47330f
-github.com/whyrusleeping/go-notifier
 # github.com/whyrusleeping/mafmt v1.2.8
 github.com/whyrusleeping/mafmt
 # github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7

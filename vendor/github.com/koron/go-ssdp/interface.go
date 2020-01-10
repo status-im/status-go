@@ -1,23 +1,40 @@
 package ssdp
 
-import "net"
+import (
+	"net"
+	"sync"
+)
 
 // Interfaces specify target interfaces to multicast.  If no interfaces are
 // specified, all interfaces will be used.
 var Interfaces []net.Interface
 
-func interfaces() []net.Interface {
-	if Interfaces == nil {
-		Interfaces = interfacesIPv4()
+var ifLock sync.Mutex
+var ifList []net.Interface
+
+// interfaces gets list of net.Interface to multicast UDP packet.
+func interfaces() ([]net.Interface, error) {
+	ifLock.Lock()
+	defer ifLock.Unlock()
+	if len(Interfaces) > 0 {
+		return Interfaces, nil
 	}
-	return Interfaces
+	if len(ifList) > 0 {
+		return ifList, nil
+	}
+	l, err := interfacesIPv4()
+	if err != nil {
+		return nil, err
+	}
+	ifList = l
+	return ifList, nil
 }
 
-func interfacesIPv4() []net.Interface {
+// interfacesIPv4 lists net.Interface on IPv4.
+func interfacesIPv4() ([]net.Interface, error) {
 	iflist, err := net.Interfaces()
 	if err != nil {
-		logf("failed to list interfaces: %s", err)
-		return make([]net.Interface, 0)
+		return nil, err
 	}
 	list := make([]net.Interface, 0, len(iflist))
 	for _, ifi := range iflist {
@@ -26,7 +43,7 @@ func interfacesIPv4() []net.Interface {
 		}
 		list = append(list, ifi)
 	}
-	return list
+	return list, nil
 }
 
 // hasLinkUp checks an I/F have link-up or not.

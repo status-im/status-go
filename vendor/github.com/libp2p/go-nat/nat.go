@@ -44,9 +44,6 @@ func DiscoverNATs(ctx context.Context) <-chan NAT {
 	go func() {
 		defer close(nats)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
 		upnpIg1 := discoverUPNP_IG1(ctx)
 		upnpIg2 := discoverUPNP_IG2(ctx)
 		natpmp := discoverNATPMP(ctx)

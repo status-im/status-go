@@ -19,13 +19,49 @@ type QuotedMessage struct {
 	Text string `json:"text"`
 }
 
+type CommandState int
+
+const (
+	CommandStateRequestAddressForTransaction CommandState = iota + 1
+	CommandStateRequestAddressForTransactionDeclined
+	CommandStateRequestAddressForTransactionAccepted
+	CommandStateRequestTransaction
+	CommandStateRequestTransactionDeclined
+	CommandStateTransactionPending
+	CommandStateTransactionSent
+)
+
+type CommandParameters struct {
+	// ID is the ID of the initial message
+	ID string `json:"id"`
+	// From is the address we are sending the command from
+	From string `json:"from"`
+	// Address is the address sent with the command
+	Address string `json:"address"`
+	// Contract is the contract address for ERC20 tokens
+	Contract string `json:"contract"`
+	// Value is the value as a string sent
+	Value string `json:"value"`
+	// TransactionHash is the hash of the transaction
+	TransactionHash string `json:"transactionHash"`
+	// CommandState is the state of the command
+	CommandState CommandState `json:"commandState"`
+	// The Signature of the pk-bytes+transaction-hash from the wallet
+	// address originating
+	Signature []byte `json:"signature"`
+}
+
+func (c *CommandParameters) IsTokenTransfer() bool {
+	return len(c.Contract) != 0
+}
+
 const (
 	OutgoingStatusSending = "sending"
 	OutgoingStatusSent    = "sent"
 )
 
 // Message represents a message record in the database,
-// more specifically in user_messages_legacy table.
+// more specifically in user_messages table.
 type Message struct {
 	protobuf.ChatMessage
 
@@ -42,70 +78,89 @@ type Message struct {
 	// The chat id to be stored locally
 	LocalChatID string `json:"localChatId"`
 
-	RetryCount     int    `json:"retryCount"`
 	Seen           bool   `json:"seen"`
 	OutgoingStatus string `json:"outgoingStatus,omitempty"`
 
 	QuotedMessage *QuotedMessage `json:"quotedMessage"`
+
+	// CommandParameters is the parameters sent with the message
+	CommandParameters *CommandParameters `json:"commandParameters"`
 
 	// Computed fields
 	RTL        bool   `json:"rtl"`
 	ParsedText []byte `json:"parsedText"`
 	LineCount  int    `json:"lineCount"`
 
+	// Replace indicates that this is a replacement of a message
+	// that has been updated
+	Replace   string           `json:"replace,omitEmpty"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
-	// RawPayload is the marshaled payload, used for resending the message
-	RawPayload []byte `json:"-"`
+}
+
+// RawMessage represent a sent or received message, kept for being able
+// to re-send/propagate
+type RawMessage struct {
+	ID                  string
+	LocalChatID         string
+	LastSent            uint64
+	SendCount           int
+	Sent                bool
+	ResendAutomatically bool
+	MessageType         protobuf.ApplicationMetadataMessage_Type
+	Payload             []byte
+	Recipients          []*ecdsa.PublicKey
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
 	type MessageAlias Message
 	item := struct {
-		ID               string                           `json:"id"`
-		WhisperTimestamp uint64                           `json:"whisperTimestamp"`
-		From             string                           `json:"from"`
-		Alias            string                           `json:"alias"`
-		Identicon        string                           `json:"identicon"`
-		RetryCount       int                              `json:"retryCount"`
-		Seen             bool                             `json:"seen"`
-		OutgoingStatus   string                           `json:"outgoingStatus,omitempty"`
-		QuotedMessage    *QuotedMessage                   `json:"quotedMessage"`
-		RTL              bool                             `json:"rtl"`
-		ParsedText       json.RawMessage                  `json:"parsedText"`
-		LineCount        int                              `json:"lineCount"`
-		Text             string                           `json:"text"`
-		ChatId           string                           `json:"chatId"`
-		LocalChatID      string                           `json:"localChatId"`
-		Clock            uint64                           `json:"clock"`
-		ResponseTo       string                           `json:"responseTo"`
-		EnsName          string                           `json:"ensName"`
-		Sticker          *protobuf.StickerMessage         `json:"sticker"`
-		Timestamp        uint64                           `json:"timestamp"`
-		ContentType      protobuf.ChatMessage_ContentType `json:"contentType"`
-		MessageType      protobuf.ChatMessage_MessageType `json:"messageType"`
+		ID                string                           `json:"id"`
+		WhisperTimestamp  uint64                           `json:"whisperTimestamp"`
+		From              string                           `json:"from"`
+		Alias             string                           `json:"alias"`
+		Identicon         string                           `json:"identicon"`
+		Seen              bool                             `json:"seen"`
+		OutgoingStatus    string                           `json:"outgoingStatus,omitempty"`
+		QuotedMessage     *QuotedMessage                   `json:"quotedMessage"`
+		RTL               bool                             `json:"rtl"`
+		ParsedText        json.RawMessage                  `json:"parsedText"`
+		LineCount         int                              `json:"lineCount"`
+		Text              string                           `json:"text"`
+		ChatId            string                           `json:"chatId"`
+		LocalChatID       string                           `json:"localChatId"`
+		Clock             uint64                           `json:"clock"`
+		Replace           string                           `json:"replace,omitEmpty"`
+		ResponseTo        string                           `json:"responseTo"`
+		EnsName           string                           `json:"ensName"`
+		Sticker           *protobuf.StickerMessage         `json:"sticker"`
+		CommandParameters *CommandParameters               `json:"commandParameters"`
+		Timestamp         uint64                           `json:"timestamp"`
+		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
+		MessageType       protobuf.ChatMessage_MessageType `json:"messageType"`
 	}{
-		ID:               m.ID,
-		WhisperTimestamp: m.WhisperTimestamp,
-		From:             m.From,
-		Alias:            m.Alias,
-		Identicon:        m.Identicon,
-		RetryCount:       m.RetryCount,
-		Seen:             m.Seen,
-		OutgoingStatus:   m.OutgoingStatus,
-		QuotedMessage:    m.QuotedMessage,
-		RTL:              m.RTL,
-		ParsedText:       m.ParsedText,
-		LineCount:        m.LineCount,
-		Text:             m.Text,
-		ChatId:           m.ChatId,
-		LocalChatID:      m.LocalChatID,
-		Clock:            m.Clock,
-		ResponseTo:       m.ResponseTo,
-		EnsName:          m.EnsName,
-		Timestamp:        m.Timestamp,
-		ContentType:      m.ContentType,
-		MessageType:      m.MessageType,
-		Sticker:          m.GetSticker(),
+		ID:                m.ID,
+		WhisperTimestamp:  m.WhisperTimestamp,
+		From:              m.From,
+		Alias:             m.Alias,
+		Identicon:         m.Identicon,
+		Seen:              m.Seen,
+		OutgoingStatus:    m.OutgoingStatus,
+		QuotedMessage:     m.QuotedMessage,
+		RTL:               m.RTL,
+		ParsedText:        m.ParsedText,
+		LineCount:         m.LineCount,
+		Text:              m.Text,
+		Replace:           m.Replace,
+		ChatId:            m.ChatId,
+		LocalChatID:       m.LocalChatID,
+		Clock:             m.Clock,
+		ResponseTo:        m.ResponseTo,
+		EnsName:           m.EnsName,
+		Timestamp:         m.Timestamp,
+		ContentType:       m.ContentType,
+		MessageType:       m.MessageType,
+		Sticker:           m.GetSticker(),
+		CommandParameters: m.CommandParameters,
 	}
 
 	return json.Marshal(item)

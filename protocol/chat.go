@@ -203,6 +203,13 @@ func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(publicKey))
 }
 
+func OneToOneFromPublicKey(pk *ecdsa.PublicKey) *Chat {
+	chatID := types.EncodeHex(crypto.FromECDSAPub(pk))
+	newChat := CreateOneToOneChat(chatID[:8], pk)
+
+	return &newChat
+}
+
 func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey) Chat {
 	return Chat{
 		ID:       oneToOneChatID(publicKey),
@@ -261,6 +268,33 @@ func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey,
 		}
 	}
 	return result, nil
+}
+
+// NextClockAndTimestamp returns the next clock value
+// and the current timestamp
+func (c *Chat) NextClockAndTimestamp() (uint64, uint64) {
+	clock := c.LastClockValue
+	timestamp := timestampInMs()
+	if clock == 0 || clock < timestamp {
+		clock = timestamp
+	} else {
+		clock = clock + 1
+	}
+	return clock, timestamp
+}
+
+func (c *Chat) UpdateFromMessage(message *Message) error {
+	c.Timestamp = int64(timestampInMs())
+	if c.LastClockValue <= message.Clock {
+		jsonMessage, err := json.Marshal(message)
+		if err != nil {
+			return err
+		}
+
+		c.LastClockValue = message.Clock
+		c.LastMessage = jsonMessage
+	}
+	return nil
 }
 
 func stringSliceContains(slice []string, item string) bool {

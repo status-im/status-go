@@ -88,6 +88,9 @@ type PublicKey interface {
 	// Equal compares the key with the passed in key.
 	Equal(key PublicKey) bool
 
+	// Size returns the size (in bytes) of signatures created with this key.
+	Size() int
+
 	evpPKey() *C.EVP_PKEY
 }
 
@@ -118,6 +121,10 @@ func (key *pKey) Equal(other PublicKey) bool {
 
 func (key *pKey) KeyType() NID {
 	return NID(C.EVP_PKEY_id(key.key))
+}
+
+func (key *pKey) Size() int {
+	return int(C.EVP_PKEY_size(key.key))
 }
 
 func (key *pKey) BaseType() NID {

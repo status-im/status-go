@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 
 	"github.com/pkg/errors"
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 var (
@@ -347,6 +348,99 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
+func (db sqlitePersistence) SaveRawMessage(message *RawMessage) error {
+	var pubKeys [][]byte
+	for _, pk := range message.Recipients {
+		pubKeys = append(pubKeys, crypto.CompressPubkey(pk))
+	}
+	// Encode recipients
+	var encodedRecipients bytes.Buffer
+	encoder := gob.NewEncoder(&encodedRecipients)
+
+	if err := encoder.Encode(pubKeys); err != nil {
+		return err
+	}
+
+	_, err := db.db.Exec(`
+		 INSERT INTO
+		 raw_messages
+		 (
+		   id,
+		   local_chat_id,
+		   last_sent,
+		   send_count,
+		   sent,
+		   message_type,
+		   resend_automatically,
+		   recipients,
+		   payload
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		message.ID,
+		message.LocalChatID,
+		message.LastSent,
+		message.SendCount,
+		message.Sent,
+		message.MessageType,
+		message.ResendAutomatically,
+		encodedRecipients.Bytes(),
+		message.Payload)
+	return err
+}
+
+func (db sqlitePersistence) RawMessageByID(id string) (*RawMessage, error) {
+	var rawPubKeys [][]byte
+	var encodedRecipients []byte
+	message := &RawMessage{}
+
+	err := db.db.QueryRow(`
+			SELECT
+			  id,
+			  local_chat_id,
+			  last_sent,
+			  send_count,
+			  sent,
+			  message_type,
+			  resend_automatically,
+			  recipients,
+			  payload
+			FROM
+				raw_messages
+			WHERE
+				id = ?`,
+		id,
+	).Scan(
+		&message.ID,
+		&message.LocalChatID,
+		&message.LastSent,
+		&message.SendCount,
+		&message.Sent,
+		&message.MessageType,
+		&message.ResendAutomatically,
+		&encodedRecipients,
+		&message.Payload,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Restore recipients
+	decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
+	err = decoder.Decode(&rawPubKeys)
+	if err != nil {
+		return nil, err
+	}
+	for _, pkBytes := range rawPubKeys {
+		pubkey, err := crypto.UnmarshalPubkey(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+		message.Recipients = append(message.Recipients, pubkey)
+	}
+
+	return message, nil
+}
+
 func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error) {
 	if tx == nil {
 		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
@@ -416,4 +510,90 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.TributeToTalk,
 	)
 	return
+}
+
+func (db sqlitePersistence) SaveTransactionToValidate(transaction *TransactionToValidate) error {
+	compressedKey := crypto.CompressPubkey(transaction.From)
+
+	_, err := db.db.Exec(`INSERT INTO messenger_transactions_to_validate(
+		command_id,
+                message_id,
+		transaction_hash,
+		retry_count,
+		first_seen,
+		public_key,
+		signature,
+		to_validate)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		transaction.CommandID,
+		transaction.MessageID,
+		transaction.TransactionHash,
+		transaction.RetryCount,
+		transaction.FirstSeen,
+		compressedKey,
+		transaction.Signature,
+		transaction.Validate,
+	)
+
+	return err
+}
+
+func (db sqlitePersistence) UpdateTransactionToValidate(transaction *TransactionToValidate) error {
+	_, err := db.db.Exec(`UPDATE messenger_transactions_to_validate
+			      SET retry_count = ?, to_validate = ?
+			      WHERE transaction_hash = ?`,
+		transaction.RetryCount,
+		transaction.Validate,
+		transaction.TransactionHash,
+	)
+	return err
+}
+
+func (db sqlitePersistence) TransactionsToValidate() ([]*TransactionToValidate, error) {
+	var transactions []*TransactionToValidate
+	rows, err := db.db.Query(`
+		SELECT
+		command_id,
+			message_id,
+			transaction_hash,
+			retry_count,
+			first_seen,
+			public_key,
+			signature,
+			to_validate
+		FROM messenger_transactions_to_validate
+		WHERE to_validate = 1;
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var t TransactionToValidate
+		var pkBytes []byte
+		err = rows.Scan(
+			&t.CommandID,
+			&t.MessageID,
+			&t.TransactionHash,
+			&t.RetryCount,
+			&t.FirstSeen,
+			&pkBytes,
+			&t.Signature,
+			&t.Validate,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		publicKey, err := crypto.DecompressPubkey(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+		t.From = publicKey
+
+		transactions = append(transactions, &t)
+	}
+
+	return transactions, nil
 }

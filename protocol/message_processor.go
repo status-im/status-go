@@ -171,13 +171,40 @@ func (p *messageProcessor) sendPrivate(
 	return messageID, nil
 }
 
-func (p *messageProcessor) SendMembershipUpdate(
+// sendPairInstallation sends data to the recipients, using DH
+func (p *messageProcessor) SendPairInstallation(
 	ctx context.Context,
-	recipients []*ecdsa.PublicKey,
+	recipient *ecdsa.PublicKey,
+	data []byte,
+	messageType protobuf.ApplicationMetadataMessage_Type,
+) ([]byte, error) {
+	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
+
+	wrappedMessage, err := p.wrapMessageV1(data, messageType)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap message")
+	}
+
+	messageSpec, err := p.protocol.BuildDHMessage(p.identity, recipient, wrappedMessage)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to encrypt message")
+	}
+
+	hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to send a message spec")
+	}
+
+	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+	p.transport.Track([][]byte{messageID}, hash, newMessage)
+
+	return messageID, nil
+}
+
+func (p *messageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatMessage *protobuf.ChatMessage,
 ) ([]byte, error) {
-	p.logger.Debug("sending a membership update", zap.Int("membersCount", len(recipients)))
 
 	message := v1protocol.MembershipUpdateMessage{
 		ChatID:  group.ChatID(),
@@ -189,7 +216,7 @@ func (p *messageProcessor) SendMembershipUpdate(
 		return nil, errors.Wrap(err, "failed to encode membership update message")
 	}
 
-	return p.SendGroupRaw(ctx, recipients, encodedMessage, protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE)
+	return encodedMessage, nil
 }
 
 // SendPublicRaw takes encoded data, encrypts it and sends through the wire.

@@ -48,7 +48,7 @@ type Contact struct {
 	Photo string `json:"photoPath,omitempty"`
 	// LastUpdated is the last time we received an update from the contact
 	// updates should be discarded if last updated is less than the one stored
-	LastUpdated int64 `json:"lastUpdated"`
+	LastUpdated uint64 `json:"lastUpdated"`
 	// SystemTags contains information about whether we blocked/added/have been
 	// added.
 	SystemTags []string `json:"systemTags"`

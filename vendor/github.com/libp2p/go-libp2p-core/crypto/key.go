@@ -181,6 +181,8 @@ type StretchedKeys struct {
 	CipherKey []byte
 }
 
+// PENDING DEPRECATION:  KeyStretcher() will be deprecated with secio; for new
+// code, please use PBKDF2 (golang.org/x/crypto/pbkdf2) instead.
 // KeyStretcher returns a set of keys for each party by stretching the shared key.
 // (myIV, theirIV, myCipherKey, theirCipherKey, myMACKey, theirMACKey).
 // This function accepts the following cipher types:

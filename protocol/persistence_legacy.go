@@ -26,15 +26,21 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllFields() string {
     		timestamp,
     		chat_id,
 		local_chat_id,
-    		retry_count,
     		message_type,
     		clock_value,
     		seen,
     		outgoing_status,
 		parsed_text,
-		raw_payload,
 		sticker_pack,
 		sticker_hash,
+		command_id,
+		command_value,
+		command_from,
+		command_address,
+		command_contract,
+		command_transaction_hash,
+		command_state,
+		command_signature,
 		response_to`
 }
 
@@ -48,15 +54,21 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsJoin() string {
     		m1.timestamp,
     		m1.chat_id,
 		m1.local_chat_id,
-    		m1.retry_count,
     		m1.message_type,
     		m1.clock_value,
     		m1.seen,
     		m1.outgoing_status,
 		m1.parsed_text,
-		m1.raw_payload,
 		m1.sticker_pack,
 		m1.sticker_hash,
+		m1.command_id,
+		m1.command_value,
+		m1.command_from,
+		m1.command_address,
+		m1.command_contract,
+		m1.command_transaction_hash,
+		m1.command_state,
+		m1.command_signature,
 		m1.response_to,
 		m2.source,
 		m2.text,
@@ -79,6 +91,7 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 	var identicon sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
+	command := &CommandParameters{}
 
 	args := []interface{}{
 		&message.ID,
@@ -90,15 +103,21 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 		&message.Timestamp,
 		&message.ChatId,
 		&message.LocalChatID,
-		&message.RetryCount,
 		&message.MessageType,
 		&message.Clock,
 		&message.Seen,
 		&message.OutgoingStatus,
 		&message.ParsedText,
-		&message.RawPayload,
 		&sticker.Pack,
 		&sticker.Hash,
+		&command.ID,
+		&command.Value,
+		&command.From,
+		&command.Address,
+		&command.Contract,
+		&command.TransactionHash,
+		&command.CommandState,
+		&command.Signature,
 		&message.ResponseTo,
 		&quotedFrom,
 		&quotedText,
@@ -122,6 +141,10 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 		message.Payload = &protobuf.ChatMessage_Sticker{Sticker: sticker}
 	}
 
+	if message.ContentType == protobuf.ChatMessage_TRANSACTION_COMMAND {
+		message.CommandParameters = command
+	}
+
 	return nil
 }
 
@@ -129,6 +152,10 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllValues(message *Message) (
 	sticker := message.GetSticker()
 	if sticker == nil {
 		sticker = &protobuf.StickerMessage{}
+	}
+	command := message.CommandParameters
+	if command == nil {
+		command = &CommandParameters{}
 	}
 	return []interface{}{
 		message.ID,
@@ -140,15 +167,21 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllValues(message *Message) (
 		message.Timestamp,
 		message.ChatId,
 		message.LocalChatID,
-		message.RetryCount,
 		message.MessageType,
 		message.Clock,
 		message.Seen,
 		message.OutgoingStatus,
 		message.ParsedText,
-		message.RawPayload,
 		sticker.Pack,
 		sticker.Hash,
+		command.ID,
+		command.Value,
+		command.From,
+		command.Address,
+		command.Contract,
+		command.TransactionHash,
+		command.CommandState,
+		command.Signature,
 		message.ResponseTo,
 	}, nil
 }
@@ -178,9 +211,9 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 			SELECT
 				%s
 			FROM
-				user_messages_legacy m1
+				user_messages m1
 			LEFT JOIN
-				user_messages_legacy m2
+				user_messages m2
 			ON
 			m1.response_to = m2.id
 
@@ -194,6 +227,44 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 		id,
 	)
 	err = db.tableUserMessagesLegacyScanAllFields(row, &message)
+	switch err {
+	case sql.ErrNoRows:
+		return nil, errRecordNotFound
+	case nil:
+		return &message, nil
+	default:
+		return nil, err
+	}
+}
+
+func (db sqlitePersistence) MessageByCommandID(id string) (*Message, error) {
+
+	var message Message
+
+	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
+	row := db.db.QueryRow(
+		fmt.Sprintf(`
+			SELECT
+				%s
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			        contacts c
+		        ON
+			m1.source = c.id
+			WHERE
+				m1.command_id = ?
+				ORDER BY m1.clock_value DESC
+				LIMIT 1
+		`, allFields),
+		id,
+	)
+	err := db.tableUserMessagesLegacyScanAllFields(row, &message)
 	switch err {
 	case sql.ErrNoRows:
 		return nil, errRecordNotFound
@@ -220,7 +291,7 @@ func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error)
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := fmt.Sprintf(`SELECT id FROM user_messages_legacy WHERE id IN (%s)`, inVector)
+	query := fmt.Sprintf(`SELECT id FROM user_messages WHERE id IN (%s)`, inVector)
 	rows, err := db.db.Query(query, idsArgs...)
 	if err != nil {
 		return nil, err
@@ -261,9 +332,9 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 				%s,
 				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
 			FROM
-				user_messages_legacy m1
+				user_messages m1
 			LEFT JOIN
-				user_messages_legacy m2
+				user_messages m2
 			ON
 			m1.response_to = m2.id
 
@@ -273,7 +344,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 
 			m1.source = c.id
 			WHERE
-				m1.local_chat_id = ? %s
+				m1.hide != 1 AND m1.local_chat_id = ? %s
 			ORDER BY cursor DESC
 			LIMIT ?
 		`, allFields, cursorWhere),
@@ -324,7 +395,7 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) 
 
 	allFields := db.tableUserMessagesLegacyAllFields()
 	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
-	query := fmt.Sprintf(`INSERT INTO user_messages_legacy(%s) VALUES (%s)`, allFields, valuesVector)
+	query := fmt.Sprintf(`INSERT INTO user_messages(%s) VALUES (%s)`, allFields, valuesVector)
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -346,12 +417,17 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) 
 }
 
 func (db sqlitePersistence) DeleteMessage(id string) error {
-	_, err := db.db.Exec(`DELETE FROM user_messages_legacy WHERE id = ?`, id)
+	_, err := db.db.Exec(`DELETE FROM user_messages WHERE id = ?`, id)
+	return err
+}
+
+func (db sqlitePersistence) HideMessage(id string) error {
+	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1 WHERE id = ?`, id)
 	return err
 }
 
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
-	_, err := db.db.Exec(`DELETE FROM user_messages_legacy WHERE local_chat_id = ?`, id)
+	_, err := db.db.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
 	return err
 }
 
@@ -377,7 +453,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	_, err = tx.Exec(
 		fmt.Sprintf(`
-			UPDATE user_messages_legacy
+			UPDATE user_messages
 			SET seen = 1
 			WHERE id IN (%s)
 		`, inVector),
@@ -391,7 +467,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error 
 		`UPDATE chats
               	SET unviewed_message_count =
 		   (SELECT COUNT(1)
-		   FROM user_messages_legacy
+		   FROM user_messages
 		   WHERE local_chat_id = ? AND seen = 0)
 		WHERE id = ?`, chatID, chatID)
 	return err
@@ -399,7 +475,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error 
 
 func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingStatus string) error {
 	_, err := db.db.Exec(`
-		UPDATE user_messages_legacy
+		UPDATE user_messages
 		SET outgoing_status = ?
 		WHERE id = ?
 	`, newOutgoingStatus, id)
@@ -425,7 +501,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 	// Delete messages
 	_, err = tx.Exec(
 		`DELETE
-		 FROM user_messages_legacy
+		 FROM user_messages
 		 WHERE source = ?`,
 		contact.ID,
 	)
@@ -449,7 +525,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 	_, err = tx.Exec(`
 		UPDATE chats
 		SET
-			unviewed_message_count = (SELECT COUNT(1) FROM user_messages_legacy WHERE seen = 0 AND local_chat_id = chats.id)`)
+			unviewed_message_count = (SELECT COUNT(1) FROM user_messages WHERE seen = 0 AND local_chat_id = chats.id)`)
 	if err != nil {
 		return nil, err
 	}
@@ -461,7 +537,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 	}
 	for _, c := range chats {
 		var lastMessageID string
-		row := tx.QueryRow(`SELECT id FROM user_messages_legacy WHERE local_chat_id = ? ORDER BY clock_value DESC LIMIT 1`, c.ID)
+		row := tx.QueryRow(`SELECT id FROM user_messages WHERE local_chat_id = ? ORDER BY clock_value DESC LIMIT 1`, c.ID)
 		switch err := row.Scan(&lastMessageID); err {
 
 		case nil:

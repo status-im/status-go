@@ -68,7 +68,7 @@ func (k *Ed25519PrivateKey) pubKeyBytes() []byte {
 func (k *Ed25519PrivateKey) Equals(o Key) bool {
 	edk, ok := o.(*Ed25519PrivateKey)
 	if !ok {
-		return false
+		return basicEquals(k, o)
 	}
 
 	return subtle.ConstantTimeCompare(k.k, edk.k) == 1
@@ -103,7 +103,7 @@ func (k *Ed25519PublicKey) Raw() ([]byte, error) {
 func (k *Ed25519PublicKey) Equals(o Key) bool {
 	edk, ok := o.(*Ed25519PublicKey)
 	if !ok {
-		return false
+		return basicEquals(k, o)
 	}
 
 	return bytes.Equal(k.k, edk.k)

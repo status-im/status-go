@@ -43,6 +43,9 @@ func UnmarshalRsaPrivateKey(b []byte) (PrivKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	if 8*key.key.Size() < MinRsaKeyBits {
+		return nil, ErrRsaKeyTooSmall
+	}
 	if key.Type() != RSA {
 		return nil, errors.New("not actually an rsa public key")
 	}
@@ -54,6 +57,9 @@ func UnmarshalRsaPublicKey(b []byte) (PubKey, error) {
 	key, err := unmarshalOpensslPublicKey(b)
 	if err != nil {
 		return nil, err
+	}
+	if 8*key.key.Size() < MinRsaKeyBits {
+		return nil, ErrRsaKeyTooSmall
 	}
 	if key.Type() != RSA {
 		return nil, errors.New("not actually an rsa public key")
