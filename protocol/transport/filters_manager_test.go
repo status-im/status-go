@@ -1,4 +1,4 @@
-package whisper
+package transport
 
 import (
 	"crypto/ecdsa"
@@ -26,7 +26,7 @@ func TestFiltersManagerSuite(t *testing.T) {
 
 type FiltersManagerSuite struct {
 	suite.Suite
-	chats   *filtersManager
+	chats   *FiltersManager
 	dbPath  string
 	manager []*testKey
 	logger  *zap.Logger
@@ -77,7 +77,7 @@ func (s *FiltersManagerSuite) SetupTest() {
 
 	whisper := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
 
-	s.chats, err = newFiltersManager(db, whisper, s.manager[0].privateKey, s.logger)
+	s.chats, err = NewFiltersManager(db, whisper, s.manager[0].privateKey, s.logger)
 	s.Require().NoError(err)
 }
 

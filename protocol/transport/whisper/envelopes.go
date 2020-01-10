@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/status-im/status-go/protocol/transport"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -22,14 +24,6 @@ const (
 	EnvelopeSent
 )
 
-type EnvelopesMonitorConfig struct {
-	EnvelopeEventsHandler          EnvelopeEventsHandler
-	MaxAttempts                    int
-	MailserverConfirmationsEnabled bool
-	IsMailserver                   func(types.EnodeID) bool
-	Logger                         *zap.Logger
-}
-
 // EnvelopeEventsHandler used for two different event types.
 type EnvelopeEventsHandler interface {
 	EnvelopeSent([][]byte)
@@ -39,7 +33,7 @@ type EnvelopeEventsHandler interface {
 }
 
 // NewEnvelopesMonitor returns a pointer to an instance of the EnvelopesMonitor.
-func NewEnvelopesMonitor(w types.Whisper, config EnvelopesMonitorConfig) *EnvelopesMonitor {
+func NewEnvelopesMonitor(w types.Whisper, config transport.EnvelopesMonitorConfig) *EnvelopesMonitor {
 	logger := config.Logger
 
 	if logger == nil {

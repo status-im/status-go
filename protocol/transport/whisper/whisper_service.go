@@ -7,12 +7,16 @@ import (
 	"database/sql"
 	"sync"
 
+	"github.com/status-im/status-go/protocol/transport"
+
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
+
+const discoveryTopic = "contact-discovery"
 
 var (
 	// ErrNoMailservers returned if there is no configured mailservers that can be used.
@@ -63,7 +67,7 @@ type WhisperServiceTransport struct {
 	shh         types.Whisper
 	shhAPI      types.PublicWhisperAPI // only PublicWhisperAPI implements logic to send messages
 	keysManager *whisperServiceKeysManager
-	filters     *filtersManager
+	filters     *transport.FiltersManager
 	logger      *zap.Logger
 
 	mailservers      []string
@@ -79,11 +83,11 @@ func NewWhisperServiceTransport(
 	privateKey *ecdsa.PrivateKey,
 	db *sql.DB,
 	mailservers []string,
-	envelopesMonitorConfig *EnvelopesMonitorConfig,
+	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*WhisperServiceTransport, error) {
-	filtersManager, err := newFiltersManager(db, shh, privateKey, logger)
+	filtersManager, err := transport.NewFiltersManager(newSQLitePersistence(db), shh, privateKey, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -121,29 +125,29 @@ func NewWhisperServiceTransport(
 	return t, nil
 }
 
-func (a *WhisperServiceTransport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
+func (a *WhisperServiceTransport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*transport.Filter, error) {
 	return a.filters.Init(chatIDs, publicKeys)
 }
 
-func (a *WhisperServiceTransport) Filters() []*Filter {
+func (a *WhisperServiceTransport) Filters() []*transport.Filter {
 	return a.filters.Filters()
 }
 
 // DEPRECATED
-func (a *WhisperServiceTransport) LoadFilters(filters []*Filter) ([]*Filter, error) {
+func (a *WhisperServiceTransport) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return a.filters.InitWithFilters(filters)
 }
 
 // DEPRECATED
-func (a *WhisperServiceTransport) RemoveFilters(filters []*Filter) error {
+func (a *WhisperServiceTransport) RemoveFilters(filters []*transport.Filter) error {
 	return a.filters.Remove(filters...)
 }
 
-func (a *WhisperServiceTransport) Reset() error {
+func (a *WhisperServiceTransport) ResetFilters() error {
 	return a.filters.Reset()
 }
 
-func (a *WhisperServiceTransport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error) {
+func (a *WhisperServiceTransport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*transport.Filter, error) {
 	filter, err := a.filters.LoadNegotiated(secret)
 	if err != nil {
 		return nil, err
@@ -257,8 +261,8 @@ func (a *WhisperServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.Publi
 	return result, nil
 }
 
-func (a *WhisperServiceTransport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
-	result := make(map[Filter][]*types.Message)
+func (a *WhisperServiceTransport) RetrieveRawAll() (map[transport.Filter][]*types.Message, error) {
+	result := make(map[transport.Filter][]*types.Message)
 
 	allFilters := a.filters.Filters()
 	for _, filter := range allFilters {
@@ -338,9 +342,7 @@ func (a *WhisperServiceTransport) SendPrivateOnDiscovery(ctx context.Context, ne
 	// TODO: change this anyway, it should be explicit
 	// and idempotent.
 
-	newMessage.Topic = types.BytesToTopic(
-		ToTopic(discoveryTopic),
-	)
+	newMessage.Topic = types.BytesToTopic(transport.ToTopic(discoveryTopic))
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return a.shhAPI.Post(ctx, *newMessage)

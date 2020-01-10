@@ -397,6 +397,10 @@ func (w *testNodeWrapper) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return w.w, nil
 }
 
+func (w *testNodeWrapper) GetWaku(_ interface{}) (types.Waku, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (w *testNodeWrapper) AddPeer(url string) error {
 	panic("not implemented")
 }
@@ -457,7 +461,14 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 	))
 
 	nodeWrapper := &testNodeWrapper{w: whisperWrapper}
-	s.localService = New(nodeWrapper, nil, "shhext", db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
+	s.localService = New(
+		nodeWrapper,
+		nil,
+		"shhext",
+		nil,
+		db,
+		params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3},
+	)
 	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
 
 	s.localWhisperAPI = whisper.NewPublicWhisperAPI(w)

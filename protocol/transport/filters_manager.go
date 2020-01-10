@@ -1,40 +1,48 @@
-package waku
+package transport
 
 import (
 	"crypto/ecdsa"
-	"database/sql"
 	"encoding/hex"
-	"math/big"
 	"sync"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/transport"
 )
-
-type Filter = transport.Filter
 
 const (
 	discoveryTopic = "contact-discovery"
+	minPow         = 0.0
 )
 
-var (
-	// The number of partitions.
-	nPartitions = big.NewInt(5000)
-	minPow      = 0.0
-)
-
-type rawFilter struct {
+type RawFilter struct {
 	FilterID string
 	Topic    types.TopicType
 	SymKeyID string
 }
 
-type filtersManager struct {
-	waku        types.Waku
-	persistence *sqlitePersistence
+type KeysPersistence interface {
+	All() (map[string][]byte, error)
+	Add(chatID string, key []byte) error
+}
+
+type FiltersService interface {
+	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
+	DeleteKeyPair(keyID string) bool
+
+	AddSymKeyDirect(key []byte) (string, error)
+	AddSymKeyFromPassword(password string) (string, error)
+	GetSymKey(id string) ([]byte, error)
+	DeleteSymKey(id string) bool
+
+	Subscribe(opts *types.SubscriptionOptions) (string, error)
+	Unsubscribe(id string) error
+}
+
+type FiltersManager struct {
+	service     FiltersService
+	persistence KeysPersistence
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
 	logger      *zap.Logger
@@ -45,22 +53,20 @@ type filtersManager struct {
 	filters map[string]*Filter
 }
 
-// newFiltersManager returns a new filtersManager.
-func newFiltersManager(db *sql.DB, w types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*filtersManager, error) {
+// NewFiltersManager returns a new filtersManager.
+func NewFiltersManager(persistence KeysPersistence, service FiltersService, privateKey *ecdsa.PrivateKey, logger *zap.Logger) (*FiltersManager, error) {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-
-	persistence := newSQLitePersistence(db)
 
 	keys, err := persistence.All()
 	if err != nil {
 		return nil, err
 	}
 
-	return &filtersManager{
+	return &FiltersManager{
 		privateKey:  privateKey,
-		waku:        w,
+		service:     service,
 		persistence: persistence,
 		keys:        keys,
 		filters:     make(map[string]*Filter),
@@ -68,7 +74,7 @@ func newFiltersManager(db *sql.DB, w types.Waku, privateKey *ecdsa.PrivateKey, l
 	}, nil
 }
 
-func (s *filtersManager) Init(
+func (s *FiltersManager) Init(
 	chatIDs []string,
 	publicKeys []*ecdsa.PublicKey,
 ) ([]*Filter, error) {
@@ -120,7 +126,7 @@ func (s *filtersManager) Init(
 }
 
 // DEPRECATED
-func (s *filtersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
+func (s *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	var (
 		chatIDs    []string
 		publicKeys []*ecdsa.PublicKey
@@ -128,7 +134,7 @@ func (s *filtersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 
 	for _, filter := range filters {
 		if filter.Identity != "" && filter.OneToOne {
-			publicKey, err := transport.StrToPublicKey(filter.Identity)
+			publicKey, err := StrToPublicKey(filter.Identity)
 			if err != nil {
 				return nil, err
 			}
@@ -141,7 +147,7 @@ func (s *filtersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	return s.Init(chatIDs, publicKeys)
 }
 
-func (s *filtersManager) Reset() error {
+func (s *FiltersManager) Reset() error {
 	var filters []*Filter
 
 	s.mutex.Lock()
@@ -153,7 +159,7 @@ func (s *filtersManager) Reset() error {
 	return s.Remove(filters...)
 }
 
-func (s *filtersManager) Filters() (result []*Filter) {
+func (s *FiltersManager) Filters() (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -164,14 +170,14 @@ func (s *filtersManager) Filters() (result []*Filter) {
 	return
 }
 
-func (s *filtersManager) Filter(chatID string) *Filter {
+func (s *FiltersManager) Filter(chatID string) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	return s.filters[chatID]
 }
 
 // FilterByFilterID returns a Filter with a given Whisper filter ID.
-func (s *filtersManager) FilterByFilterID(filterID string) *Filter {
+func (s *FiltersManager) FilterByFilterID(filterID string) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for _, f := range s.filters {
@@ -182,11 +188,11 @@ func (s *filtersManager) FilterByFilterID(filterID string) *Filter {
 	return nil
 }
 
-func (s *filtersManager) FiltersByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
+func (s *FiltersManager) FiltersByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	identityStr := transport.PublicKeyToStr(publicKey)
+	identityStr := PublicKeyToStr(publicKey)
 
 	for _, f := range s.filters {
 		if f.Identity == identityStr {
@@ -198,16 +204,16 @@ func (s *filtersManager) FiltersByPublicKey(publicKey *ecdsa.PublicKey) (result 
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (s *filtersManager) Remove(filters ...*Filter) error {
+func (s *FiltersManager) Remove(filters ...*Filter) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	for _, f := range filters {
-		if err := s.waku.Unsubscribe(f.FilterID); err != nil {
+		if err := s.service.Unsubscribe(f.FilterID); err != nil {
 			return err
 		}
 		if f.SymKeyID != "" {
-			s.waku.DeleteSymKey(f.SymKeyID)
+			s.service.DeleteSymKey(f.SymKeyID)
 		}
 		delete(s.filters, f.ChatID)
 	}
@@ -216,19 +222,19 @@ func (s *filtersManager) Remove(filters ...*Filter) error {
 }
 
 // LoadPartitioned creates a filter for a partitioned topic.
-func (s *filtersManager) LoadPartitioned(publicKey *ecdsa.PublicKey) (*Filter, error) {
+func (s *FiltersManager) LoadPartitioned(publicKey *ecdsa.PublicKey) (*Filter, error) {
 	return s.loadPartitioned(publicKey, false)
 }
 
-func (s *filtersManager) loadMyPartitioned() (*Filter, error) {
+func (s *FiltersManager) loadMyPartitioned() (*Filter, error) {
 	return s.loadPartitioned(&s.privateKey.PublicKey, true)
 }
 
-func (s *filtersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) (*Filter, error) {
+func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	chatID := transport.PartitionedTopic(publicKey)
+	chatID := PartitionedTopic(publicKey)
 	if _, ok := s.filters[chatID]; ok {
 		return s.filters[chatID], nil
 	}
@@ -244,7 +250,7 @@ func (s *filtersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool
 		ChatID:   chatID,
 		FilterID: filter.FilterID,
 		Topic:    filter.Topic,
-		Identity: transport.PublicKeyToStr(publicKey),
+		Identity: PublicKeyToStr(publicKey),
 		Listen:   listen,
 		OneToOne: true,
 	}
@@ -255,11 +261,11 @@ func (s *filtersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool
 }
 
 // LoadNegotiated loads a negotiated secret as a filter.
-func (s *filtersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter, error) {
+func (s *FiltersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	chatID := transport.NegotiatedTopic(secret.PublicKey)
+	chatID := NegotiatedTopic(secret.PublicKey)
 
 	if _, ok := s.filters[chatID]; ok {
 		return s.filters[chatID], nil
@@ -276,7 +282,7 @@ func (s *filtersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 		Topic:      filter.Topic,
 		SymKeyID:   filter.SymKeyID,
 		FilterID:   filter.FilterID,
-		Identity:   transport.PublicKeyToStr(secret.PublicKey),
+		Identity:   PublicKeyToStr(secret.PublicKey),
 		Negotiated: true,
 		Listen:     true,
 		OneToOne:   true,
@@ -289,11 +295,11 @@ func (s *filtersManager) LoadNegotiated(secret types.NegotiatedSecret) (*Filter,
 
 // LoadDiscovery adds 1 discovery filter
 // for the personal discovery topic.
-func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
+func (s *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	personalDiscoveryTopic := transport.PersonalDiscoveryTopic(&s.privateKey.PublicKey)
+	personalDiscoveryTopic := PersonalDiscoveryTopic(&s.privateKey.PublicKey)
 
 	// Check if filters are already loaded.
 	var result []*Filter
@@ -308,7 +314,7 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 		return result, nil
 	}
 
-	identityStr := transport.PublicKeyToStr(&s.privateKey.PublicKey)
+	identityStr := PublicKeyToStr(&s.privateKey.PublicKey)
 
 	// Load personal discovery
 	personalDiscoveryChat := &Filter{
@@ -333,7 +339,7 @@ func (s *filtersManager) LoadDiscovery() ([]*Filter, error) {
 }
 
 // LoadPublic adds a filter for a public chat.
-func (s *filtersManager) LoadPublic(chatID string) (*Filter, error) {
+func (s *FiltersManager) LoadPublic(chatID string) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -361,11 +367,11 @@ func (s *filtersManager) LoadPublic(chatID string) (*Filter, error) {
 }
 
 // LoadContactCode creates a filter for the advertise topic for a given public key.
-func (s *filtersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, error) {
+func (s *FiltersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	chatID := transport.ContactCodeTopic(pubKey)
+	chatID := ContactCodeTopic(pubKey)
 
 	if _, ok := s.filters[chatID]; ok {
 		return s.filters[chatID], nil
@@ -381,7 +387,7 @@ func (s *filtersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 		FilterID: contactCodeFilter.FilterID,
 		Topic:    contactCodeFilter.Topic,
 		SymKeyID: contactCodeFilter.SymKeyID,
-		Identity: transport.PublicKeyToStr(pubKey),
+		Identity: PublicKeyToStr(pubKey),
 		Listen:   true,
 	}
 
@@ -390,25 +396,25 @@ func (s *filtersManager) LoadContactCode(pubKey *ecdsa.PublicKey) (*Filter, erro
 }
 
 // addSymmetric adds a symmetric key filter
-func (s *filtersManager) addSymmetric(chatID string) (*rawFilter, error) {
+func (s *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 	var symKeyID string
 	var err error
 
-	topic := transport.ToTopic(chatID)
+	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
 	symKey, ok := s.keys[chatID]
 	if ok {
-		symKeyID, err = s.waku.AddSymKeyDirect(symKey)
+		symKeyID, err = s.service.AddSymKeyDirect(symKey)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		symKeyID, err = s.waku.AddSymKeyFromPassword(chatID)
+		symKeyID, err = s.service.AddSymKeyFromPassword(chatID)
 		if err != nil {
 			return nil, err
 		}
-		if symKey, err = s.waku.GetSymKey(symKeyID); err != nil {
+		if symKey, err = s.service.GetSymKey(symKeyID); err != nil {
 			return nil, err
 		}
 		s.keys[chatID] = symKey
@@ -419,7 +425,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*rawFilter, error) {
 		}
 	}
 
-	id, err := s.waku.Subscribe(&types.SubscriptionOptions{
+	id, err := s.service.Subscribe(&types.SubscriptionOptions{
 		SymKeyID: symKeyID,
 		PoW:      minPow,
 		Topics:   topics,
@@ -428,7 +434,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*rawFilter, error) {
 		return nil, err
 	}
 
-	return &rawFilter{
+	return &RawFilter{
 		FilterID: id,
 		SymKeyID: symKeyID,
 		Topic:    types.BytesToTopic(topic),
@@ -437,7 +443,7 @@ func (s *filtersManager) addSymmetric(chatID string) (*rawFilter, error) {
 
 // addAsymmetricFilter adds a filter with our private key
 // and set minPow according to the listen parameter.
-func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*rawFilter, error) {
+func (s *FiltersManager) addAsymmetric(chatID string, listen bool) (*RawFilter, error) {
 	var (
 		err error
 		pow = 1.0 // use PoW high enough to discard all messages for the filter
@@ -447,15 +453,15 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*rawFilter, 
 		pow = minPow
 	}
 
-	topic := transport.ToTopic(chatID)
+	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
-	privateKeyID, err := s.waku.AddKeyPair(s.privateKey)
+	privateKeyID, err := s.service.AddKeyPair(s.privateKey)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := s.waku.Subscribe(&types.SubscriptionOptions{
+	id, err := s.service.Subscribe(&types.SubscriptionOptions{
 		PrivateKeyID: privateKeyID,
 		PoW:          pow,
 		Topics:       topics,
@@ -463,13 +469,13 @@ func (s *filtersManager) addAsymmetric(chatID string, listen bool) (*rawFilter, 
 	if err != nil {
 		return nil, err
 	}
-	return &rawFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
+	return &RawFilter{FilterID: id, Topic: types.BytesToTopic(topic)}, nil
 }
 
 // GetNegotiated returns a negotiated chat given an identity
-func (s *filtersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
+func (s *FiltersManager) GetNegotiated(identity *ecdsa.PublicKey) *Filter {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.filters[transport.NegotiatedTopic(identity)]
+	return s.filters[NegotiatedTopic(identity)]
 }

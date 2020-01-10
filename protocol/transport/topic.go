@@ -15,13 +15,9 @@ var (
 	nPartitions = big.NewInt(5000)
 )
 
-func toTopic(s string) []byte {
-	return crypto.Keccak256([]byte(s))[:types.TopicLength]
-}
-
 // ToTopic converts a string to a whisper topic.
 func ToTopic(s string) []byte {
-	return toTopic(s)
+	return crypto.Keccak256([]byte(s))[:types.TopicLength]
 }
 
 func StrToPublicKey(str string) (*ecdsa.PublicKey, error) {
@@ -37,7 +33,7 @@ func PublicKeyToStr(publicKey *ecdsa.PublicKey) string {
 }
 
 func PersonalDiscoveryTopic(publicKey *ecdsa.PublicKey) string {
-	return "contact-discovery-" + publicKeyToStr(publicKey)
+	return "contact-discovery-" + PublicKeyToStr(publicKey)
 }
 
 // PartitionedTopic returns the associated partitioned topic string
@@ -49,13 +45,9 @@ func PartitionedTopic(publicKey *ecdsa.PublicKey) string {
 }
 
 func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {
-	return contactCodeTopic(publicKey)
-}
-
-func contactCodeTopic(publicKey *ecdsa.PublicKey) string {
-	return "0x" + publicKeyToStr(publicKey) + "-contact-code"
+	return "0x" + PublicKeyToStr(publicKey) + "-contact-code"
 }
 
 func NegotiatedTopic(publicKey *ecdsa.PublicKey) string {
-	return "0x" + publicKeyToStr(publicKey) + "-negotiated"
+	return "0x" + PublicKeyToStr(publicKey) + "-negotiated"
 }
