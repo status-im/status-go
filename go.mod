@@ -8,7 +8,7 @@ replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
-replace github.com/gomarkdown/markdown => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
+replace github.com/gomarkdown/markdown v0.0.0-20191104174740-4d42851d4d5a => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
 
 replace github.com/status-im/status-go/protocol => ./protocol
 
