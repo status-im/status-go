@@ -133,7 +133,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
 # github.com/golang/snappy v0.0.1
 github.com/golang/snappy
-# github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
+# github.com/gomarkdown/markdown v0.0.0-20191104174740-4d42851d4d5a => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
 github.com/gomarkdown/markdown
 github.com/gomarkdown/markdown/ast
 github.com/gomarkdown/markdown/parser
