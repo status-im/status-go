@@ -67,8 +67,8 @@ type Settings struct {
 	PublicKey              string           `json:"public-key"`
 	RememberSyncingChoice  bool             `json:"remember-syncing-choice?,omitempty"`
 	SigningPhrase          string           `json:"signing-phrase"`
-	StickerPacksInstalled  *json.RawMessage `json:"stickers-packs-installed,omitempty"`
-	StickersRecentStickers *json.RawMessage `json:"stickers-recent-stickers,omitempty"`
+	StickerPacksInstalled  *json.RawMessage `json:"stickers/packs-installed,omitempty"`
+	StickersRecentStickers *json.RawMessage `json:"stickers/recent-stickers,omitempty"`
 	SyncingOnMobileNetwork bool             `json:"syncing-on-mobile-network?,omitempty"`
 	Usernames              *json.RawMessage `json:"usernames,omitempty"`
 	WalletRootAddress      types.Address    `json:"wallet-root-address,omitempty"`
@@ -227,10 +227,10 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET remember_syncing_choice = ? WHERE synthetic_id = 'id'")
-	case "stickers-packs-installed":
+	case "stickers/packs-installed":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_installed = ? WHERE synthetic_id = 'id'")
-	case "stickers-recent-stickers":
+	case "stickers/recent-stickers":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_recent_stickers = ? WHERE synthetic_id = 'id'")
 	case "syncing-on-mobile-network?":
