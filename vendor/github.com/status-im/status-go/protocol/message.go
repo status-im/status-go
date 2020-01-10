@@ -113,6 +113,10 @@ type RawMessage struct {
 
 func (m *Message) MarshalJSON() ([]byte, error) {
 	type MessageAlias Message
+	type StickerAlias struct {
+		Hash string `json:"hash"`
+		Pack int32  `json:"pack"`
+	}
 	item := struct {
 		ID                string                           `json:"id"`
 		WhisperTimestamp  uint64                           `json:"whisperTimestamp"`
@@ -132,7 +136,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Replace           string                           `json:"replace,omitEmpty"`
 		ResponseTo        string                           `json:"responseTo"`
 		EnsName           string                           `json:"ensName"`
-		Sticker           *protobuf.StickerMessage         `json:"sticker"`
+		Sticker           *StickerAlias                    `json:"sticker"`
 		CommandParameters *CommandParameters               `json:"commandParameters"`
 		Timestamp         uint64                           `json:"timestamp"`
 		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
@@ -159,10 +163,15 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Timestamp:         m.Timestamp,
 		ContentType:       m.ContentType,
 		MessageType:       m.MessageType,
-		Sticker:           m.GetSticker(),
 		CommandParameters: m.CommandParameters,
 	}
 
+	if sticker := m.GetSticker(); sticker != nil {
+		item.Sticker = &StickerAlias{
+			Pack: sticker.Pack,
+			Hash: sticker.Hash,
+		}
+	}
 	return json.Marshal(item)
 }
 
