@@ -5,12 +5,11 @@ package nimbusbridge
 // https://golang.org/cmd/cgo/
 
 /*
-#cgo LDFLAGS: -Wl,-rpath,'$ORIGIN' -L${SRCDIR} -lnimbus -lpcre -lm
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <libnimbus.h>
-void onMessageHandler_cgo(received_message * msg, void* udata); // Forward declaration.
+void onMessageHandler_cgo(received_message* msg, void* udata); // Forward declaration.
 */
 import "C"
 

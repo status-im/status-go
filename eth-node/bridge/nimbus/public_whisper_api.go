@@ -181,7 +181,7 @@ func (w *nimbusPublicWhisperAPIWrapper) Post(ctx context.Context, req types.NewM
 			defer C.free(unsafe.Pointer(symKeyID))
 		}
 		if req.PublicKey != nil && len(req.PublicKey) > 0 {
-			msg.pubKey = (*C.uchar)(C.CBytes(req.PublicKey))
+			msg.pubKey = (*C.uchar)(C.CBytes(req.PublicKey[1:]))
 			defer C.free(unsafe.Pointer(msg.pubKey))
 		}
 		msg.payloadLen = C.size_t(len(req.Payload))
