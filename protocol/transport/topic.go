@@ -10,6 +10,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
+const discoveryTopic = "contact-discovery"
+
 var (
 	// The number of partitions.
 	nPartitions = big.NewInt(5000)
@@ -50,4 +52,8 @@ func ContactCodeTopic(publicKey *ecdsa.PublicKey) string {
 
 func NegotiatedTopic(publicKey *ecdsa.PublicKey) string {
 	return "0x" + PublicKeyToStr(publicKey) + "-negotiated"
+}
+
+func DiscoveryTopic() string {
+	return discoveryTopic
 }

@@ -293,7 +293,7 @@ func NewMessenger(
 		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
 		waku, err := node.GetWaku(nil)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to find Whisper or Waku services")
+			return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
 		}
 		transp, err = wakutransp.NewWakuServiceTransport(
 			waku,

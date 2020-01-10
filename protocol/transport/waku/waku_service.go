@@ -15,8 +15,6 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 )
 
-const discoveryTopic = "contact-discovery"
-
 var (
 	// ErrNoMailservers returned if there is no configured mailservers that can be used.
 	ErrNoMailservers = errors.New("no configured mailservers")
@@ -341,7 +339,7 @@ func (a *WakuServiceTransport) SendPrivateOnDiscovery(ctx context.Context, newMe
 	// TODO: change this anyway, it should be explicit
 	// and idempotent.
 
-	newMessage.Topic = types.BytesToTopic(transport.ToTopic(discoveryTopic))
+	newMessage.Topic = types.BytesToTopic(transport.ToTopic(transport.DiscoveryTopic()))
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return a.api.Post(ctx, *newMessage)

@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	discoveryTopic = "contact-discovery"
-	minPow         = 0.0
+	minPow = 0.0
 )
 
 type RawFilter struct {
