@@ -40,11 +40,11 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-go/eth-node v1.0.0
+	github.com/status-im/status-go/eth-node v1.1.0
 	github.com/status-im/status-go/extkeys v1.0.0
-	github.com/status-im/status-go/protocol v1.0.1
+	github.com/status-im/status-go/protocol v1.1.0
 	github.com/status-im/status-go/waku v1.0.0
-	github.com/status-im/status-go/whisper/v6 v6.0.1
+	github.com/status-im/status-go/whisper/v6 v6.1.0
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
