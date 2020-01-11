@@ -11,9 +11,22 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-const ActivationThresh = 4
+// ActivationThresh sets how many times an address must be seen as "activated"
+// and therefore advertised to other peers as an address that the local peer
+// can be contacted on. The "seen" events expire by default after 40 minutes
+// (OwnObservedAddressTTL * ActivationThreshold). The are cleaned up during
+// the GC rounds set by GCInterval.
+var ActivationThresh = 4
 
+// GCInterval specicies how often to make a round cleaning seen events and
+// observed addresses. An address will be cleaned if it has not been seen in
+// OwnObservedAddressTTL (10 minutes). A "seen" event will be cleaned up if
+// it is older than OwnObservedAddressTTL * ActivationThresh (40 minutes).
 var GCInterval = 10 * time.Minute
+
+// observedAddrSetWorkerChannelSize defines how many addresses can be enqueued
+// for adding to an ObservedAddrSet.
+var observedAddrSetWorkerChannelSize = 16
 
 type observation struct {
 	seenTime      time.Time
@@ -22,8 +35,8 @@ type observation struct {
 
 // ObservedAddr is an entry for an address reported by our peers.
 // We only use addresses that:
-// - have been observed at least 4 times in last 1h. (counter symmetric nats)
-// - have been observed at least once recently (1h), because our position in the
+// - have been observed at least 4 times in last 40 minutes. (counter symmetric nats)
+// - have been observed at least once recently (10 minutes), because our position in the
 //   network, or network port mapppings, may have changed.
 type ObservedAddr struct {
 	Addr     ma.Multiaddr
@@ -32,8 +45,9 @@ type ObservedAddr struct {
 }
 
 func (oa *ObservedAddr) activated(ttl time.Duration) bool {
-	// We only activate if in the TTL other peers observed the same address
-	// of ours at least 4 times.
+	// We only activate if other peers observed the same address
+	// of ours at least 4 times. SeenBy peers are removed by GC if
+	// they say the address more than ttl*ActivationThresh
 	return len(oa.SeenBy) >= ActivationThresh
 }
 
@@ -55,11 +69,13 @@ type ObservedAddrSet struct {
 	wch chan newObservation
 }
 
+// NewObservedAddrSet returns a new set using peerstore.OwnObservedAddressTTL
+// as the TTL.
 func NewObservedAddrSet(ctx context.Context) *ObservedAddrSet {
 	oas := &ObservedAddrSet{
 		addrs: make(map[string][]*ObservedAddr),
 		ttl:   peerstore.OwnObservedAddrTTL,
-		wch:   make(chan newObservation, 16),
+		wch:   make(chan newObservation, observedAddrSetWorkerChannelSize),
 	}
 	go oas.worker(ctx)
 	return oas
@@ -111,6 +127,7 @@ func (oas *ObservedAddrSet) Addrs() (addrs []ma.Multiaddr) {
 	return addrs
 }
 
+// Add attemps to queue a new observed address to be added to the set.
 func (oas *ObservedAddrSet) Add(observed, local, observer ma.Multiaddr,
 	direction network.Direction) {
 	select {
@@ -150,7 +167,7 @@ func (oas *ObservedAddrSet) gc() {
 		for _, a := range observedAddrs {
 			// clean up SeenBy set
 			for k, ob := range a.SeenBy {
-				if now.Sub(ob.seenTime) > oas.ttl*ActivationThresh {
+				if now.Sub(ob.seenTime) > oas.ttl*time.Duration(ActivationThresh) {
 					delete(a.SeenBy, k)
 				}
 			}
@@ -217,12 +234,14 @@ func observerGroup(m ma.Multiaddr) string {
 	return string(first.Bytes())
 }
 
+// SetTTL sets the TTL of an observed address-set.
 func (oas *ObservedAddrSet) SetTTL(ttl time.Duration) {
 	oas.Lock()
 	defer oas.Unlock()
 	oas.ttl = ttl
 }
 
+// TTL gets the TTL of an observed address-set.
 func (oas *ObservedAddrSet) TTL() time.Duration {
 	oas.RLock()
 	defer oas.RUnlock()

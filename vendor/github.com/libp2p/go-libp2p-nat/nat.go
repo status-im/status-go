@@ -74,8 +74,6 @@ type NAT struct {
 
 	mappingmu sync.RWMutex // guards mappings
 	mappings  map[*mapping]struct{}
-
-	Notifier
 }
 
 func newNAT(realNAT nat.NAT) *NAT {
@@ -186,25 +184,14 @@ func (nat *NAT) establishMapping(m *mapping) {
 		m.setExternalPort(0) // clear mapping
 		// TODO: log.Event
 		log.Warningf("failed to establish port mapping: %s", err)
-		nat.Notifier.notifyAll(func(n Notifiee) {
-			n.MappingFailed(nat, m, oldport, err)
-		})
-
 		// we do not close if the mapping failed,
 		// because it may work again next time.
 		return
 	}
 
 	m.setExternalPort(newport)
-	log.Debugf("NAT Mapping: %s --> %s (%s)", m.ExternalPort(), m.InternalPort(), m.Protocol())
+	log.Debugf("NAT Mapping: %d --> %d (%s)", m.ExternalPort(), m.InternalPort(), m.Protocol())
 	if oldport != 0 && newport != oldport {
 		log.Debugf("failed to renew same port mapping: ch %d -> %d", oldport, newport)
-		nat.Notifier.notifyAll(func(n Notifiee) {
-			n.MappingChanged(nat, m, oldport, newport)
-		})
 	}
-
-	nat.Notifier.notifyAll(func(n Notifiee) {
-		n.MappingSuccess(nat, m)
-	})
 }

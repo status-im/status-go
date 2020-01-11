@@ -4,8 +4,8 @@ import (
 	"bytes"
 
 	ma "github.com/multiformats/go-multiaddr"
+	mafmt "github.com/multiformats/go-multiaddr-fmt"
 	manet "github.com/multiformats/go-multiaddr-net"
-	mafmt "github.com/whyrusleeping/mafmt"
 )
 
 func isFDCostlyTransport(a ma.Multiaddr) bool {

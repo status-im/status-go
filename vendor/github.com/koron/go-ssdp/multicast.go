@@ -27,7 +27,11 @@ func multicastListen(localAddr string) (*multicastConn, error) {
 		return nil, err
 	}
 	// configure socket to use with multicast.
-	iflist := interfaces()
+	iflist, err := interfaces()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
 	pconn, err := joinGroupIPv4(conn, iflist, ssdpAddrIPv4)
 	if err != nil {
 		conn.Close()

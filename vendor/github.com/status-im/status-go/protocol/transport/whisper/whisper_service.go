@@ -7,16 +7,13 @@ import (
 	"database/sql"
 	"sync"
 
-	"github.com/status-im/status-go/protocol/transport"
-
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/transport"
 )
-
-const discoveryTopic = "contact-discovery"
 
 var (
 	// ErrNoMailservers returned if there is no configured mailservers that can be used.
@@ -342,7 +339,7 @@ func (a *WhisperServiceTransport) SendPrivateOnDiscovery(ctx context.Context, ne
 	// TODO: change this anyway, it should be explicit
 	// and idempotent.
 
-	newMessage.Topic = types.BytesToTopic(transport.ToTopic(discoveryTopic))
+	newMessage.Topic = types.BytesToTopic(transport.ToTopic(transport.DiscoveryTopic()))
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return a.shhAPI.Post(ctx, *newMessage)

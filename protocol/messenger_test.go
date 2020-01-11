@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,11 +20,11 @@ import (
 	"go.uber.org/zap"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/whisper/v6"
@@ -36,8 +38,8 @@ func TestMessengerWithDataSyncEnabledSuite(t *testing.T) {
 	suite.Run(t, &MessengerSuite{enableDataSync: true})
 }
 
-func TestPostProcessorSuite(t *testing.T) {
-	suite.Run(t, new(PostProcessorSuite))
+func TestMessageHandlerSuite(t *testing.T) {
+	suite.Run(t, new(MessageHandlerSuite))
 }
 
 type MessengerSuite struct {
@@ -59,6 +61,14 @@ type testNode struct {
 }
 
 func (n *testNode) NewENSVerifier(_ *zap.Logger) enstypes.ENSVerifier {
+	panic("not implemented")
+}
+
+func (n *testNode) AddPeer(_ string) error {
+	panic("not implemented")
+}
+
+func (n *testNode) RemovePeer(_ string) error {
 	panic("not implemented")
 }
 
@@ -582,10 +592,8 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 
 	sentMessage := sendResponse1.Messages[0]
 
-	sendResponse2, err := theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
+	err = theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
 	s.Require().NoError(err)
-
-	s.Require().Equal(sendResponse1.Messages[0].ID, sendResponse2.Messages[0].ID)
 
 	// Wait for the message to reach its destination
 	var response *MessengerResponse
@@ -610,7 +618,7 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	s.Require().NotNil(actualChat.LastMessage)
 
 	// We send the messag again
-	_, err = theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
+	err = theirMessenger.ReSendChatMessage(context.Background(), sentMessage.ID)
 	s.Require().NoError(err)
 
 	// It should not be retrieved anymore
@@ -701,90 +709,6 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	s.Require().NotNil(actualChat.LastMessage)
 	// It sets the chat as active
 	s.Require().True(actualChat.Active)
-}
-
-// Test retrieve paired message
-func (s *MessengerSuite) TestRetrieveOurPairedMessage() {
-	pairedMessenger := s.newMessengerWithKey(s.shh, s.privateKey)
-	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey)
-	err := pairedMessenger.SaveChat(&chat)
-	s.NoError(err)
-
-	inputMessage := buildTestMessage(chat)
-
-	// Send a message so we now of the installation
-	sendResponse, err := pairedMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
-
-	sentMessage := sendResponse.Messages[0]
-
-	// Wait for the message to reach its destination
-
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
-	s.Require().NoError(err)
-	// Check message is received
-	s.Require().Len(response.Messages, 1)
-
-	actualChat := response.Chats[0]
-	// It does not update the unviewed message count
-	s.Require().Equal(uint(0), actualChat.UnviewedMessagesCount)
-	// It updates the last message clock value
-	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
-	// It sets the last message
-	s.Require().NotNil(actualChat.LastMessage)
-
-	// Get installations
-	installations, err := s.m.Installations()
-	s.Require().NoError(err)
-	s.Require().Len(installations, 2)
-
-	// Enable installations
-	err = s.m.EnableInstallation(installations[0].ID)
-	s.Require().NoError(err)
-	err = s.m.EnableInstallation(installations[1].ID)
-	s.Require().NoError(err)
-
-	// We create new one to one chat
-	key, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	chat = CreateOneToOneChat("new-chat", &key.PublicKey)
-	err = s.m.SaveChat(&chat)
-	s.NoError(err)
-
-	inputMessage = buildTestMessage(chat)
-	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-
-	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = pairedMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
-	s.Require().NoError(err)
-
-	// Check message is received
-	s.Require().Len(response.Messages, 1)
-
-	message := response.Messages[0]
-
-	// The chatID is the same chatID as the received one
-	s.Require().Equal(message.LocalChatID, chat.ID)
-
-	// Sets the outgoing status
-	s.Equal(message.OutgoingStatus, OutgoingStatusSent)
 }
 
 // Test receiving a message on an non-existing public chat
@@ -1535,9 +1459,649 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 	s.EqualValues([]string{publicKeyHex, keyHex}, []string{chat.Members[0].ID, chat.Members[1].ID})
 }
 
+func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
+	value := "0.01"
+	contract := "some-contract"
+	theirMessenger := s.newMessenger(s.shh)
+	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey)
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
+
+	response, err := s.m.RequestAddressForTransaction(context.Background(), theirPkString, myAddress.Hex(), value, contract)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	initialCommandID := senderMessage.ID
+
+	s.Require().Equal("Request address for transaction", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = theirMessenger.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+	s.Require().Equal("Request address for transaction", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
+
+	// We decline the request
+	response, err = theirMessenger.DeclineRequestAddressForTransaction(context.Background(), receiverMessage.ID)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	s.Require().Equal("Request address for transaction declined", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(CommandStateRequestAddressForTransactionDeclined, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+	s.Require().Equal("Request address for transaction declined", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(CommandStateRequestAddressForTransactionDeclined, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(initialCommandID, receiverMessage.Replace)
+}
+
+func (s *MessengerSuite) TestSendEthTransaction() {
+	value := "2000"
+
+	theirMessenger := s.newMessenger(s.shh)
+	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
+	receiverAddressString := strings.ToLower(receiverAddress.Hex())
+
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey)
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
+	s.Require().NoError(err)
+
+	response, err := s.m.SendTransaction(context.Background(), theirPkString, transactionHash, signature)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	s.Require().Equal("Transaction sent", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(transactionHash, senderMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
+	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
+	s.Require().NotEmpty(senderMessage.ID)
+	s.Require().Equal("", senderMessage.Replace)
+
+	var transactions []*TransactionToValidate
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+
+		_, err = theirMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		transactions, err = theirMessenger.persistence.TransactionsToValidate()
+		if err == nil && len(transactions) == 0 {
+			err = errors.New("no transactions")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	actualTransaction := transactions[0]
+
+	s.Require().Equal(&s.m.identity.PublicKey, actualTransaction.From)
+	s.Require().Equal(transactionHash, actualTransaction.TransactionHash)
+	s.Require().True(actualTransaction.Validate)
+
+	senderAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
+
+	client := MockEthClient{}
+	valueBig, ok := big.NewInt(0).SetString(value, 10)
+	s.Require().True(ok)
+	client.messages = make(map[string]MockTransaction)
+	client.messages[transactionHash] = MockTransaction{
+		Message: coretypes.NewMessage(
+			senderAddress,
+			&receiverAddress,
+			1,
+			valueBig,
+			0,
+			nil,
+			nil,
+			false,
+		),
+	}
+	theirMessenger.verifyTransactionClient = client
+	response, err = theirMessenger.ValidateTransactions(context.Background(), []types.Address{receiverAddress})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+
+	s.Require().Equal("Transaction received", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(strings.ToLower(receiverAddress.Hex()), receiverMessage.CommandParameters.Address)
+	s.Require().Equal(transactionHash, receiverMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
+	s.Require().Equal("", receiverMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(senderMessage.ID, receiverMessage.ID)
+	s.Require().Equal("", receiverMessage.Replace)
+}
+
+func (s *MessengerSuite) TestSendTokenTransaction() {
+	value := "2000"
+	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+
+	theirMessenger := s.newMessenger(s.shh)
+	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
+	receiverAddressString := strings.ToLower(receiverAddress.Hex())
+
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey)
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
+	s.Require().NoError(err)
+
+	response, err := s.m.SendTransaction(context.Background(), theirPkString, transactionHash, signature)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	s.Require().Equal("Transaction sent", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(transactionHash, senderMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
+	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
+	s.Require().NotEmpty(senderMessage.ID)
+
+	var transactions []*TransactionToValidate
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+
+		_, err = theirMessenger.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		transactions, err = theirMessenger.persistence.TransactionsToValidate()
+		if err == nil && len(transactions) == 0 {
+			err = errors.New("no transactions")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	actualTransaction := transactions[0]
+
+	s.Require().Equal(&s.m.identity.PublicKey, actualTransaction.From)
+	s.Require().Equal(transactionHash, actualTransaction.TransactionHash)
+	s.Require().True(actualTransaction.Validate)
+
+	senderAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
+
+	contractAddress := types.HexToAddress(contract)
+	client := MockEthClient{}
+	valueBig, ok := big.NewInt(0).SetString(value, 10)
+	s.Require().True(ok)
+	client.messages = make(map[string]MockTransaction)
+	client.messages[transactionHash] = MockTransaction{
+		Message: coretypes.NewMessage(
+			senderAddress,
+			&contractAddress,
+			1,
+			nil,
+			0,
+			nil,
+			buildData(transferFunction, receiverAddress, valueBig),
+			false,
+		),
+	}
+	theirMessenger.verifyTransactionClient = client
+	response, err = theirMessenger.ValidateTransactions(context.Background(), []types.Address{receiverAddress})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+
+	s.Require().Equal("Transaction received", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(transactionHash, receiverMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
+	s.Require().Equal("", receiverMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(senderMessage.ID, receiverMessage.ID)
+	s.Require().Equal(senderMessage.Replace, senderMessage.Replace)
+}
+
+func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
+	value := "0.01"
+	contract := "some-contract"
+	theirMessenger := s.newMessenger(s.shh)
+	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
+
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey)
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	response, err := s.m.RequestAddressForTransaction(context.Background(), theirPkString, myAddress.Hex(), value, contract)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	initialCommandID := senderMessage.ID
+
+	s.Require().Equal("Request address for transaction", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = theirMessenger.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+	s.Require().Equal("Request address for transaction", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
+
+	// We accept the request
+	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	s.Require().Equal("Request address for transaction accepted", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(CommandStateRequestAddressForTransactionAccepted, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal("some-address", senderMessage.CommandParameters.Address)
+	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+	s.Require().Equal("Request address for transaction accepted", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(CommandStateRequestAddressForTransactionAccepted, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal("some-address", receiverMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, receiverMessage.Replace)
+}
+
+func (s *MessengerSuite) TestDeclineRequestTransaction() {
+	value := "2000"
+	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
+	receiverAddressString := strings.ToLower(receiverAddress.Hex())
+	theirMessenger := s.newMessenger(s.shh)
+	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey)
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	response, err := s.m.RequestTransaction(context.Background(), theirPkString, value, contract, receiverAddressString)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	initialCommandID := senderMessage.ID
+
+	s.Require().Equal("Request transaction", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(receiverAddressString, senderMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = theirMessenger.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+	s.Require().Equal("Request transaction", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestTransaction, receiverMessage.CommandParameters.CommandState)
+
+	response, err = theirMessenger.DeclineRequestTransaction(context.Background(), initialCommandID)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+
+	s.Require().Equal("Transaction request declined", senderMessage.Text)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
+	s.Require().Equal(CommandStateRequestTransactionDeclined, senderMessage.CommandParameters.CommandState)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+
+	s.Require().Equal("Transaction request declined", receiverMessage.Text)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(initialCommandID, receiverMessage.Replace)
+	s.Require().Equal(CommandStateRequestTransactionDeclined, receiverMessage.CommandParameters.CommandState)
+}
+
+func (s *MessengerSuite) TestRequestTransaction() {
+	value := "2000"
+	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
+	receiverAddressString := strings.ToLower(receiverAddress.Hex())
+	theirMessenger := s.newMessenger(s.shh)
+	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
+
+	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey)
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	response, err := s.m.RequestTransaction(context.Background(), theirPkString, value, contract, receiverAddressString)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+	initialCommandID := senderMessage.ID
+
+	s.Require().Equal("Request transaction", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(receiverAddressString, senderMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
+
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = theirMessenger.RetrieveAll()
+		if err == nil && len(response.Messages) == 0 {
+			err = errors.New("no messages")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage := response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+	s.Require().Equal("Request transaction", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(CommandStateRequestTransaction, receiverMessage.CommandParameters.CommandState)
+
+	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	signature, err := buildSignature(theirMessenger.identity, &theirMessenger.identity.PublicKey, transactionHash)
+	s.Require().NoError(err)
+	response, err = theirMessenger.AcceptRequestTransaction(context.Background(), transactionHash, initialCommandID, signature)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	senderMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, senderMessage.ContentType)
+
+	s.Require().Equal("Transaction sent", senderMessage.Text)
+	s.Require().NotNil(senderMessage.CommandParameters)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(transactionHash, senderMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(receiverAddressString, senderMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
+	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
+	s.Require().NotEmpty(senderMessage.ID)
+	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
+	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
+
+	var transactions []*TransactionToValidate
+	// Wait for the message to reach its destination
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+
+		_, err = s.m.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		transactions, err = s.m.persistence.TransactionsToValidate()
+		if err == nil && len(transactions) == 0 {
+			err = errors.New("no transactions")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	actualTransaction := transactions[0]
+
+	s.Require().Equal(&theirMessenger.identity.PublicKey, actualTransaction.From)
+	s.Require().Equal(transactionHash, actualTransaction.TransactionHash)
+	s.Require().True(actualTransaction.Validate)
+	s.Require().Equal(initialCommandID, actualTransaction.CommandID)
+
+	senderAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
+
+	contractAddress := types.HexToAddress(contract)
+	client := MockEthClient{}
+	valueBig, ok := big.NewInt(0).SetString(value, 10)
+	s.Require().True(ok)
+	client.messages = make(map[string]MockTransaction)
+	client.messages[transactionHash] = MockTransaction{
+		Message: coretypes.NewMessage(
+			senderAddress,
+			&contractAddress,
+			1,
+			nil,
+			0,
+			nil,
+			buildData(transferFunction, receiverAddress, valueBig),
+			false,
+		),
+	}
+	s.m.verifyTransactionClient = client
+	response, err = s.m.ValidateTransactions(context.Background(), []types.Address{receiverAddress})
+	s.Require().NoError(err)
+
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Messages, 1)
+
+	receiverMessage = response.Messages[0]
+	s.Require().Equal(protobuf.ChatMessage_TRANSACTION_COMMAND, receiverMessage.ContentType)
+
+	s.Require().Equal("Transaction received", receiverMessage.Text)
+	s.Require().NotNil(receiverMessage.CommandParameters)
+	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
+	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
+	s.Require().Equal(transactionHash, receiverMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
+	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
+	s.Require().Equal(signature, receiverMessage.CommandParameters.Signature)
+	s.Require().Equal(CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(senderMessage.ID, receiverMessage.ID)
+	s.Require().Equal(senderMessage.Replace, senderMessage.Replace)
+}
+
+type MockTransaction struct {
+	Pending bool
+	Message coretypes.Message
+}
+
+type MockEthClient struct {
+	messages map[string]MockTransaction
+}
+
 type mockSendMessagesRequest struct {
 	types.Whisper
 	req types.MessagesRequest
+}
+
+func (m MockEthClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, bool, error) {
+	mockTransaction, ok := m.messages[hash.Hex()]
+	if !ok {
+		return coretypes.Message{}, false, nil
+	} else {
+		return mockTransaction.Message, mockTransaction.Pending, nil
+	}
 }
 
 func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request types.MessagesRequest) error {
@@ -1559,7 +2123,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 		From: "from-field",
 	}
 
-	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","retryCount":0,"seen":false,"quotedMessage":null,"rtl":false,"parsedText":null,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"responseTo":"","ensName":"","sticker":null,"timestamp":0,"contentType":0,"messageType":0}`
+	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","seen":false,"quotedMessage":null,"rtl":false,"parsedText":null,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"replace":"","responseTo":"","ensName":"","sticker":null,"commandParameters":null,"timestamp":0,"contentType":0,"messageType":0}`
 
 	messageJSON, err := json.Marshal(message)
 	s.Require().NoError(err)
@@ -1591,39 +2155,30 @@ func (s *MessengerSuite) testRequestHistoricMessagesRequest() {
 	s.NotEmpty(shh.req.Bloom)
 }
 
-type PostProcessorSuite struct {
+type MessageHandlerSuite struct {
 	suite.Suite
 
-	postProcessor *postProcessor
-	logger        *zap.Logger
+	messageHandler *MessageHandler
+	logger         *zap.Logger
 }
 
-func (s *PostProcessorSuite) SetupTest() {
+func (s *MessageHandlerSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	db, err := sqlite.OpenInMemory()
-	s.Require().NoError(err)
-
-	s.postProcessor = &postProcessor{
-		myPublicKey: &privateKey.PublicKey,
-		persistence: &sqlitePersistence{db: db},
-		logger:      s.logger,
-		config: postProcessorConfig{
-			MatchChat: true,
-			Persist:   true,
-			Parse:     true,
-		},
+	s.messageHandler = &MessageHandler{
+		identity: privateKey,
+		logger:   s.logger,
 	}
 }
 
-func (s *PostProcessorSuite) TearDownTest() {
+func (s *MessageHandlerSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *PostProcessorSuite) TestRun() {
+func (s *MessageHandlerSuite) TestRun() {
 	key1, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	key2, err := crypto.GenerateKey()
@@ -1721,12 +2276,6 @@ func (s *PostProcessorSuite) TestRun() {
 			chatsMap := make(map[string]*Chat)
 			if tc.Chat.ID != "" {
 				chatsMap[tc.Chat.ID] = &tc.Chat
-				err := s.postProcessor.persistence.SaveChat(tc.Chat)
-				s.Require().NoError(err)
-				defer func() {
-					err := s.postProcessor.persistence.DeleteChat(tc.Chat.ID)
-					s.Require().NoError(err)
-				}()
 			}
 
 			message := tc.Message
@@ -1735,7 +2284,7 @@ func (s *PostProcessorSuite) TestRun() {
 			s.Empty(message.LocalChatID)
 
 			message.ID = strconv.Itoa(idx) // manually set the ID because messages does not go through messageProcessor
-			chat, err := s.postProcessor.matchMessage(&message, chatsMap)
+			chat, err := s.messageHandler.matchMessage(&message, chatsMap)
 			if tc.Error {
 				s.Require().Error(err)
 			} else {

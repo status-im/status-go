@@ -5,11 +5,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/status-im/status-go/protocol/transport"
-
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 // EnvelopeState in local tracker
