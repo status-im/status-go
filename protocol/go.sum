@@ -560,17 +560,8 @@ github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba/go.mod h1:tmG2b
 github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T60IS9z4/rYCCbI8=
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
-github.com/status-im/status-go v0.36.0 h1:91qDMJjHv+T3Li9FwxsWQ2JBVcYtvVDT0nGFSMnmM+8=
-github.com/status-im/status-go v0.36.1 h1:nb9eTq0UQJ57YyTZSl5U05emFT+R4AW8/Bga6ocgOks=
-github.com/status-im/status-go v0.37.3 h1:94/bOA8qrEIgWd23mSLN39SwUJwCu2TPQFV2HzSI2ZE=
-github.com/status-im/status-go v0.37.3/go.mod h1:9qHQ2+8NS6ivPJS5YbsI3gWkr0t6DWmJzKnr4M7vudw=
-github.com/status-im/status-go v0.38.0 h1:3toC1ToY48wbRBVt7CMWSSG5FZAcPPMlnt0+G6iCbcE=
-github.com/status-im/status-go v0.38.0/go.mod h1:u3tlXqVkxAW35dui3LjHajIkbOaF4d4CnriJ8zhntOw=
-github.com/status-im/status-go v0.38.5 h1:vnbGgk5+X5ZUmn3/gJ88GlaNaAO9kGVgm8E5mR0umiQ=
-github.com/status-im/status-go v0.38.5/go.mod h1:UKxySGdqFuVPvCyPSYD0+zKeV2OzDijZqICvR+tZ3uM=
 github.com/status-im/status-go/extkeys v1.0.0 h1:Qyirsoi5Ye5UFfisgPtCjPb/RkBxyK+UsSiEcr2PVlM=
 github.com/status-im/status-go/extkeys v1.0.0/go.mod h1:GdqJbrcpkNm5ZsSCpp+PdMxnXx+OcRBdm3PI0rs1FpU=
-github.com/status-im/status-go/protocol v1.0.1/go.mod h1:LpA7BsaNmj6EOdq7BwuqncewjPqIRHCletZOb2wlWrY=
 github.com/status-im/status-go/waku v1.0.0 h1:XFcJ9Am1cK657dpUP/ysyCp+A99MWSvb1DVTtjo1fE8=
 github.com/status-im/status-go/waku v1.0.0/go.mod h1:1bjvQAL4cJYtxCsm6DnKdJbxcZwnvvZmxb6pmoUDtuY=
 github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
@@ -697,6 +688,7 @@ golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6/go.mod h1:t9HGtf8HONx5eT2rtn
 golang.org/x/net v0.0.0-20190613194153-d28f0bde5980/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20190620200207-3b0461eec859 h1:R/3boaszxrf1GEUWTVDzSKVwLmSJpwZ1yqXm8j0v2QI=
 golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
+golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 h1:4dVFTC832rPn4pomLSz1vA+are2+dU19w1H8OngV7nc=
 golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3 h1:6KET3Sqa7fkVfD63QnAM81ZeYg5n4HwApOJkufONnHA=
 golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
