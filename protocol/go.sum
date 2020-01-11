@@ -560,6 +560,7 @@ github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba/go.mod h1:tmG2b
 github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T60IS9z4/rYCCbI8=
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/rendezvous v1.3.0/go.mod h1:+hzjuP+j/XzLPeF6E50b88pWOTLdTcwjvNYt+Gh1W1s=
+github.com/status-im/status-go v0.39.2 h1:mlcEtzUGnZgT4u2/CE3XLna2Y3GyP7uxvTD/CIjiXlw=
 github.com/status-im/status-go/extkeys v1.0.0 h1:Qyirsoi5Ye5UFfisgPtCjPb/RkBxyK+UsSiEcr2PVlM=
 github.com/status-im/status-go/extkeys v1.0.0/go.mod h1:GdqJbrcpkNm5ZsSCpp+PdMxnXx+OcRBdm3PI0rs1FpU=
 github.com/status-im/status-go/waku v1.0.0 h1:XFcJ9Am1cK657dpUP/ysyCp+A99MWSvb1DVTtjo1fE8=
