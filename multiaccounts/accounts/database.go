@@ -56,7 +56,7 @@ type Settings struct {
 	LastUpdated            *int64           `json:"last-updated,omitempty"`
 	LatestDerivedPath      uint             `json:"latest-derived-path"`
 	LogLevel               *string          `json:"log-level,omitempty"`
-	Mnemonic               string           `json:"mnemonic,omitempty"`
+	Mnemonic               *string          `json:"mnemonic,omitempty"`
 	Name                   string           `json:"name,omitempty"`
 	Networks               *json.RawMessage `json:"networks/networks"`
 	NotificationsEnabled   bool             `json:"notifications-enabled?,omitempty"`
