@@ -5,22 +5,6 @@ import (
 	"time"
 )
 
-const (
-	// PubKeyLength represents the length (in bytes) of an uncompressed public key
-	PubKeyLength = 512 / 8
-	// AesKeyLength represents the length (in bytes) of an private key
-	AesKeyLength = 256 / 8
-)
-
-// SubscriptionOptions represents the parameters passed to Whisper.Subscribe
-// to customize the subscription behavior
-type SubscriptionOptions struct {
-	PrivateKeyID string
-	SymKeyID     string
-	PoW          float64
-	Topics       [][]byte
-}
-
 // Whisper represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Whisper interface {

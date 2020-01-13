@@ -32,8 +32,8 @@ import (
 
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
-	protocol "github.com/status-im/status-go/protocol"
-	protocolwhisper "github.com/status-im/status-go/protocol/transport/whisper"
+	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 const (
@@ -53,10 +53,10 @@ type EnvelopeEventsHandler interface {
 
 // Service is a service that provides some additional Whisper API.
 type Service struct {
-	messenger       *protocol.Messenger
-	identity        *ecdsa.PrivateKey
-	cancelMessenger chan struct{}
-
+	apiName          string
+	messenger        *protocol.Messenger
+	identity         *ecdsa.PrivateKey
+	cancelMessenger  chan struct{}
 	storage          db.TransactionalStorage
 	n                types.Node
 	w                types.Whisper
@@ -77,7 +77,7 @@ type Service struct {
 var _ node.Service = (*Service)(nil)
 
 // New returns a new shhext Service.
-func New(n types.Node, ctx interface{}, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
+func New(n types.Node, ctx interface{}, apiName string, handler EnvelopeEventsHandler, ldb *leveldb.DB, config params.ShhextConfig) *Service {
 	w, err := n.GetWhisper(ctx)
 	if err != nil {
 		panic(err)
@@ -97,6 +97,7 @@ func New(n types.Node, ctx interface{}, handler EnvelopeEventsHandler, ldb *leve
 		requestsRegistry: requestsRegistry,
 	}
 	return &Service{
+		apiName:          apiName,
 		storage:          db.NewLevelDBStorage(ldb),
 		n:                n,
 		w:                w,
@@ -137,7 +138,7 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { /
 		return err
 	}
 
-	envelopesMonitorConfig := &protocolwhisper.EnvelopesMonitorConfig{
+	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
 		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
 		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
 		IsMailserver: func(peer types.EnodeID) bool {
@@ -297,7 +298,7 @@ func (s *Service) Protocols() []p2p.Protocol {
 func (s *Service) APIs() []rpc.API {
 	apis := []rpc.API{
 		{
-			Namespace: "shhext",
+			Namespace: s.apiName,
 			Version:   "1.0",
 			Service:   NewPublicAPI(s),
 			Public:    true,
@@ -409,7 +410,7 @@ func (s *Service) syncMessages(ctx context.Context, mailServerID []byte, r types
 	}
 }
 
-func onNegotiatedFilters(filters []*protocolwhisper.Filter) {
+func onNegotiatedFilters(filters []*transport.Filter) {
 	var signalFilters []*signal.Filter
 	for _, filter := range filters {
 
@@ -430,8 +431,12 @@ func onNegotiatedFilters(filters []*protocolwhisper.Filter) {
 	}
 }
 
-func buildMessengerOptions(config params.ShhextConfig, db *sql.DB, envelopesMonitorConfig *protocolwhisper.EnvelopesMonitorConfig, logger *zap.Logger) []protocol.Option {
-
+func buildMessengerOptions(
+	config params.ShhextConfig,
+	db *sql.DB,
+	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
+	logger *zap.Logger,
+) []protocol.Option {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithDatabase(db),

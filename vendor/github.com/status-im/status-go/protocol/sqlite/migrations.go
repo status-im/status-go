@@ -7,7 +7,8 @@ import (
 
 	encryptmigrations "github.com/status-im/status-go/protocol/encryption/migrations"
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
-	transpmigrations "github.com/status-im/status-go/protocol/transport/whisper/migrations"
+	wakumigrations "github.com/status-im/status-go/protocol/transport/waku/migrations"
+	whispermigrations "github.com/status-im/status-go/protocol/transport/whisper/migrations"
 )
 
 type getter func(string) ([]byte, error)
@@ -19,8 +20,12 @@ type migrationsWithGetter struct {
 
 var defaultMigrations = []migrationsWithGetter{
 	{
-		Names:  transpmigrations.AssetNames(),
-		Getter: transpmigrations.Asset,
+		Names:  whispermigrations.AssetNames(),
+		Getter: whispermigrations.Asset,
+	},
+	{
+		Names:  wakumigrations.AssetNames(),
+		Getter: wakumigrations.Asset,
 	},
 	{
 		Names:  encryptmigrations.AssetNames(),

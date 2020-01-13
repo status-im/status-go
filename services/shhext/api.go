@@ -24,7 +24,7 @@ import (
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 const (
@@ -601,7 +601,7 @@ func (api *PublicAPI) CompleteRequest(parent context.Context, hex string) (err e
 	return err
 }
 
-func (api *PublicAPI) LoadFilters(parent context.Context, chats []*statustransp.Filter) ([]*statustransp.Filter, error) {
+func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {
 	return api.service.messenger.LoadFilters(chats)
 }
 
@@ -631,7 +631,7 @@ func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
 	return api.service.messenger.Contacts()
 }
 
-func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*statustransp.Filter) error {
+func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
 
@@ -752,6 +752,7 @@ func makeEnvelop(
 	pow float64,
 	now time.Time,
 ) (types.Envelope, error) {
+	// TODO: replace with an types.Envelope creator passed to the API struct
 	params := whisper.MessageParams{
 		PoW:      pow,
 		Payload:  payload,

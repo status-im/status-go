@@ -1,6 +1,9 @@
 package gethbridge
 
 import (
+	"errors"
+
+	"github.com/status-im/status-go/waku"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/node"
@@ -41,10 +44,33 @@ func (w *gethNodeWrapper) GetWhisper(ctx interface{}) (types.Whisper, error) {
 		}
 	}
 	if nativeWhisper == nil {
-		panic("Whisper service is not available")
+		return nil, errors.New("whisper service is not available")
 	}
 
 	return NewGethWhisperWrapper(nativeWhisper), nil
+}
+
+func (w *gethNodeWrapper) GetWaku(ctx interface{}) (types.Waku, error) {
+	var nativeWaku *waku.Waku
+	if ctx == nil || ctx == w {
+		err := w.stack.Service(&nativeWaku)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		switch serviceProvider := ctx.(type) {
+		case *node.ServiceContext:
+			err := serviceProvider.Service(&nativeWaku)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if nativeWaku == nil {
+		return nil, errors.New("waku service is not available")
+	}
+
+	return NewGethWakuWrapper(nativeWaku), nil
 }
 
 func (w *gethNodeWrapper) AddPeer(url string) error {

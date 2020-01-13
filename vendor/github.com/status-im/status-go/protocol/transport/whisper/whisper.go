@@ -11,17 +11,3 @@ type RequestOptions struct {
 	From     int64 // in seconds
 	To       int64 // in seconds
 }
-
-const (
-	defaultPowTime = 1
-)
-
-func DefaultWhisperMessage() types.NewMessage {
-	msg := types.NewMessage{}
-
-	msg.TTL = 10
-	msg.PowTarget = 0.002
-	msg.PowTime = defaultPowTime
-
-	return msg
-}

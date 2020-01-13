@@ -393,6 +393,9 @@ github.com/status-im/status-go/protocol/identity/identicon
 github.com/status-im/status-go/protocol/migrations
 github.com/status-im/status-go/protocol/protobuf
 github.com/status-im/status-go/protocol/sqlite
+github.com/status-im/status-go/protocol/transport
+github.com/status-im/status-go/protocol/transport/waku
+github.com/status-im/status-go/protocol/transport/waku/migrations
 github.com/status-im/status-go/protocol/transport/whisper
 github.com/status-im/status-go/protocol/transport/whisper/migrations
 github.com/status-im/status-go/protocol/v1

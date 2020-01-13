@@ -363,7 +363,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		if err := ctx.Service(&ethnode); err != nil {
 			return nil, err
 		}
-		return shhext.New(ethnode.Node, ctx, shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+		return shhext.New(ethnode.Node, ctx, "shhext", shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
 	})
 }
 
@@ -381,9 +381,14 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 		return
 	}
 
-	// TODO: what to do with shhext?
-
-	return nil
+	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		return shhext.New(ethnode.Node, ctx, "wakuext", shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+	})
 }
 
 func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperConfig, clusterConfig *params.ClusterConfig) (*whisper.Whisper, error) {

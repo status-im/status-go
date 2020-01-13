@@ -139,7 +139,7 @@ func (s *ShhExtSuite) SetupTest() {
 		db, err := leveldb.Open(storage.NewMemStorage(), nil)
 		s.Require().NoError(err)
 		nodeWrapper := &testNodeWrapper{w: s.whisperWrapper[i]}
-		s.services[i] = New(nodeWrapper, nil, nil, db, config)
+		s.services[i] = New(nodeWrapper, nil, "shhext", nil, db, config)
 
 		tmpdir, err := ioutil.TempDir("", "test-shhext-service")
 		s.Require().NoError(err)
@@ -175,7 +175,7 @@ func (s *ShhExtSuite) TestInitProtocol() {
 	s.Require().NoError(err)
 
 	nodeWrapper := &testNodeWrapper{w: shh}
-	service := New(nodeWrapper, nil, nil, db, config)
+	service := New(nodeWrapper, nil, "shhext", nil, db, config)
 
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
 	s.Require().NoError(err)
@@ -215,7 +215,7 @@ func (s *ShhExtSuite) TestRequestMessagesErrors() {
 		PFSEnabled:            true,
 	}
 	nodeWrapper := &testNodeWrapper{w: shh}
-	service := New(nodeWrapper, nil, mock, nil, config)
+	service := New(nodeWrapper, nil, "shhext", mock, nil, config)
 	api := NewPublicAPI(service)
 
 	const (
@@ -321,7 +321,7 @@ func (s *ShhExtSuite) TestRequestMessagesSuccess() {
 		PFSEnabled:            true,
 	}
 	nodeWrapper := &testNodeWrapper{w: shh}
-	service := New(nodeWrapper, nil, mock, nil, config)
+	service := New(nodeWrapper, nil, "shhext", mock, nil, config)
 
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-request-messages")
 	s.Require().NoError(err)
@@ -397,6 +397,10 @@ func (w *testNodeWrapper) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return w.w, nil
 }
 
+func (w *testNodeWrapper) GetWaku(_ interface{}) (types.Waku, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (w *testNodeWrapper) AddPeer(url string) error {
 	panic("not implemented")
 }
@@ -457,7 +461,14 @@ func (s *WhisperNodeMockSuite) SetupTest() {
 	))
 
 	nodeWrapper := &testNodeWrapper{w: whisperWrapper}
-	s.localService = New(nodeWrapper, nil, nil, db, params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3})
+	s.localService = New(
+		nodeWrapper,
+		nil,
+		"shhext",
+		nil,
+		db,
+		params.ShhextConfig{MailServerConfirmations: true, MaxMessageDeliveryAttempts: 3},
+	)
 	s.Require().NoError(s.localService.UpdateMailservers([]*enode.Node{node}))
 
 	s.localWhisperAPI = whisper.NewPublicWhisperAPI(w)
@@ -584,7 +595,7 @@ func (s *RequestWithTrackingHistorySuite) SetupTest() {
 
 	s.localWhisperAPI = local.PublicWhisperAPI()
 	nodeWrapper := &testNodeWrapper{w: local}
-	s.localService = New(nodeWrapper, nil, nil, db, params.ShhextConfig{})
+	s.localService = New(nodeWrapper, nil, "shhext", nil, db, params.ShhextConfig{})
 	s.localContext = NewContextFromService(context.Background(), s.localService, s.localService.storage)
 	localPkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)

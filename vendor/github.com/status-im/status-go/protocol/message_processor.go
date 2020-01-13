@@ -19,7 +19,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
-	transport "github.com/status-im/status-go/protocol/transport/whisper"
+	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
@@ -34,7 +34,7 @@ type messageProcessor struct {
 	identity  *ecdsa.PrivateKey
 	datasync  *datasync.DataSync
 	protocol  *encryption.Protocol
-	transport *transport.WhisperServiceTransport
+	transport transport.Transport
 	logger    *zap.Logger
 
 	featureFlags featureFlags
@@ -44,7 +44,7 @@ func newMessageProcessor(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
 	enc *encryption.Protocol,
-	transport *transport.WhisperServiceTransport,
+	transport transport.Transport,
 	logger *zap.Logger,
 	features featureFlags,
 ) (*messageProcessor, error) {

@@ -21,7 +21,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	statustransp "github.com/status-im/status-go/protocol/transport/whisper"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 const (
@@ -429,7 +429,7 @@ func (s *Service) addressString() string {
 
 // postPing publishes a whisper message
 func (s *Service) postPing() (types.HexBytes, error) {
-	msg := statustransp.DefaultWhisperMessage()
+	msg := transport.DefaultMessage()
 
 	msg.Topic = toWhisperTopic(defaultTopic)
 
