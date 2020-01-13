@@ -171,11 +171,15 @@ func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 	}
 	defer stmt.Close()
 
-	if _, err = stmt.Exec(kl.Bytes(), ku.Bytes()); err != nil {
+	result, err := stmt.Exec(kl.Bytes(), ku.Bytes())
+	if err != nil {
 		return 0, err
 	}
-
-	return 0, nil
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return int(rows), nil
 }
 
 func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
