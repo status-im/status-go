@@ -7,7 +7,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -49,7 +48,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		}
 
 		// A new chat must contain us
-		if !group.IsMember(types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))) {
+		if !group.IsMember(contactIDFromPublicKey(&m.identity.PublicKey)) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
 		newChat := createGroupChat()
@@ -198,6 +197,21 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 	return nil
 }
 
+func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) error {
+	chatID := message.Id
+	_, ok := state.AllChats[chatID]
+	if ok {
+		return nil
+	}
+
+	chat := CreatePublicChat(chatID)
+
+	state.AllChats[chat.ID] = &chat
+	state.ModifiedChats[chat.ID] = true
+
+	return nil
+}
+
 func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
 	contact := state.CurrentMessageState.Contact
@@ -212,7 +226,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 
 	if contact.LastUpdated < message.Clock {
 		logger.Info("Updating contact")
-		if !contact.HasBeenAdded() {
+		if !contact.HasBeenAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
 			contact.SystemTags = append(contact.SystemTags, contactRequestReceived)
 		}
 		if contact.Name != message.EnsName {
@@ -333,7 +347,7 @@ func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *Receiv
 			Clock:       command.Clock,
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 			Text:        "Request address for transaction",
-			ChatId:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
 			MessageType: protobuf.ChatMessage_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
@@ -357,7 +371,7 @@ func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageS
 			Clock:       command.Clock,
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 			Text:        "Request transaction",
-			ChatId:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
 			MessageType: protobuf.ChatMessage_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
@@ -563,7 +577,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat) 
 	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE:
 		// It's an incoming private message. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
-		chatID := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
+		chatID := contactIDFromPublicKey(message.SigPubKey)
 		chat := chats[chatID]
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
@@ -580,8 +594,8 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat) 
 			return nil, errors.New("received group chat message for non-existing chat")
 		}
 
-		theirKeyHex := types.EncodeHex(crypto.FromECDSAPub(message.SigPubKey))
-		myKeyHex := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+		theirKeyHex := contactIDFromPublicKey(message.SigPubKey)
+		myKeyHex := contactIDFromPublicKey(&m.identity.PublicKey)
 		var theyJoined bool
 		var iJoined bool
 		for _, member := range chat.Members {

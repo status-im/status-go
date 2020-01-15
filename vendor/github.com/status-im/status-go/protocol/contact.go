@@ -106,3 +106,8 @@ func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
 
 	return contact, nil
 }
+
+func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
+	return types.EncodeHex(crypto.FromECDSAPub(key))
+
+}

@@ -75,6 +75,10 @@ func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
 
 }
 
+func (c *Chat) Public() bool {
+	return c.ChatType == ChatTypePublic
+}
+
 func (c *Chat) MarshalJSON() ([]byte, error) {
 	type ChatAlias Chat
 	item := struct {
@@ -212,20 +216,22 @@ func OneToOneFromPublicKey(pk *ecdsa.PublicKey) *Chat {
 
 func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey) Chat {
 	return Chat{
-		ID:       oneToOneChatID(publicKey),
-		Name:     name,
-		Active:   true,
-		ChatType: ChatTypeOneToOne,
+		ID:        oneToOneChatID(publicKey),
+		Name:      name,
+		Timestamp: int64(timestampInMs()),
+		Active:    true,
+		ChatType:  ChatTypeOneToOne,
 	}
 }
 
 func CreatePublicChat(name string) Chat {
 	return Chat{
-		ID:       name,
-		Name:     name,
-		Active:   true,
-		Color:    chatColors[rand.Intn(len(chatColors))],
-		ChatType: ChatTypePublic,
+		ID:        name,
+		Name:      name,
+		Active:    true,
+		Timestamp: int64(timestampInMs()),
+		Color:     chatColors[rand.Intn(len(chatColors))],
+		ChatType:  ChatTypePublic,
 	}
 }
 

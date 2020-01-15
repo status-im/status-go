@@ -1014,6 +1014,19 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 }
 
 func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
+
+	member1Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	member1ID := types.EncodeHex(crypto.FromECDSAPub(&member1Key.PublicKey))
+
+	member2Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	member2ID := types.EncodeHex(crypto.FromECDSAPub(&member2Key.PublicKey))
+
+	member3Key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	member3ID := types.EncodeHex(crypto.FromECDSAPub(&member3Key.PublicKey))
+
 	chat := Chat{
 		ID:        "chat-id",
 		Name:      "chat-id",
@@ -1023,17 +1036,17 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		Timestamp: 10,
 		Members: []ChatMember{
 			{
-				ID:     "1",
+				ID:     member1ID,
 				Admin:  false,
 				Joined: true,
 			},
 			{
-				ID:     "2",
+				ID:     member2ID,
 				Admin:  true,
 				Joined: false,
 			},
 			{
-				ID:     "3",
+				ID:     member3ID,
 				Admin:  true,
 				Joined: true,
 			},
@@ -1554,6 +1567,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 
 func (s *MessengerSuite) TestSendEthTransaction() {
 	value := "2000"
+	contract := "some-contract"
 
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1569,7 +1583,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
 	s.Require().NoError(err)
 
-	response, err := s.m.SendTransaction(context.Background(), theirPkString, transactionHash, signature)
+	response, err := s.m.SendTransaction(context.Background(), theirPkString, value, contract, transactionHash, signature)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats, 1)
@@ -1580,6 +1594,8 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	s.Require().Equal("Transaction sent", senderMessage.Text)
 	s.Require().NotNil(senderMessage.CommandParameters)
 	s.Require().Equal(transactionHash, senderMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
 	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
 	s.Require().NotEmpty(senderMessage.ID)
@@ -1667,7 +1683,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
 	s.Require().NoError(err)
 
-	response, err := s.m.SendTransaction(context.Background(), theirPkString, transactionHash, signature)
+	response, err := s.m.SendTransaction(context.Background(), theirPkString, value, contract, transactionHash, signature)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Chats, 1)
@@ -1678,6 +1694,8 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	s.Require().Equal("Transaction sent", senderMessage.Text)
 	s.Require().NotNil(senderMessage.CommandParameters)
 	s.Require().Equal(transactionHash, senderMessage.CommandParameters.TransactionHash)
+	s.Require().Equal(value, senderMessage.CommandParameters.Value)
+	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
 	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
 	s.Require().NotEmpty(senderMessage.ID)

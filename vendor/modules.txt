@@ -133,7 +133,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
 # github.com/golang/snappy v0.0.1
 github.com/golang/snappy
-# github.com/gomarkdown/markdown v0.0.0-20191104174740-4d42851d4d5a => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
+# github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
 github.com/gomarkdown/markdown
 github.com/gomarkdown/markdown/ast
 github.com/gomarkdown/markdown/parser
@@ -504,7 +504,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20190930134127-c5a3c61f89f3
+# golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
@@ -541,7 +541,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/tools v0.0.0-20191213032237-7093a17b0467
+# golang.org/x/tools v0.0.0-20191109212701-97ad0ed33101
 golang.org/x/tools/go/analysis
 golang.org/x/tools/go/analysis/passes/inspect
 golang.org/x/tools/go/ast/astutil
@@ -556,7 +556,8 @@ golang.org/x/tools/go/types/typeutil
 golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/semver
-# gopkg.in/go-playground/validator.v9 v9.29.1
+golang.org/x/tools/internal/span
+# gopkg.in/go-playground/validator.v9 v9.31.0
 gopkg.in/go-playground/validator.v9
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2

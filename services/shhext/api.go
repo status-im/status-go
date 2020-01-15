@@ -721,8 +721,8 @@ func (api *PublicAPI) AcceptRequestAddressForTransaction(ctx context.Context, me
 	return api.service.messenger.AcceptRequestAddressForTransaction(ctx, messageID, address)
 }
 
-func (api *PublicAPI) SendTransaction(ctx context.Context, chatID, transactionHash string, signature types.HexBytes) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendTransaction(ctx, chatID, transactionHash, signature)
+func (api *PublicAPI) SendTransaction(ctx context.Context, chatID, value, contract, transactionHash string, signature types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendTransaction(ctx, chatID, value, contract, transactionHash, signature)
 }
 
 func (api *PublicAPI) AcceptRequestTransaction(ctx context.Context, transactionHash, messageID string, signature types.HexBytes) (*protocol.MessengerResponse, error) {
@@ -735,6 +735,14 @@ func (api *PublicAPI) SendContactUpdates(ctx context.Context, name, picture stri
 
 func (api *PublicAPI) SendContactUpdate(ctx context.Context, contactID, name, picture string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendContactUpdate(ctx, contactID, name, picture)
+}
+
+func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendPairInstallation(ctx)
+}
+
+func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
+	return api.service.messenger.SyncDevices(ctx, name, picture)
 }
 
 // -----

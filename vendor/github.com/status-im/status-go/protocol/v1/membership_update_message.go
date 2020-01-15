@@ -342,10 +342,6 @@ func (g Group) LastClockValue() uint64 {
 	return g.events[len(g.events)-1].ClockValue
 }
 
-func (g Group) NextClockValue() uint64 {
-	return g.LastClockValue() + 1
-}
-
 func (g Group) creator() (string, error) {
 	if len(g.events) == 0 {
 		return "", errors.New("no events in the group")

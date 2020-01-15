@@ -83,7 +83,7 @@ type MessengerResponse struct {
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.RawMessages) == 0
+	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.RawMessages) == 0 && len(m.Installations) == 0
 }
 
 type featureFlags struct {
@@ -216,7 +216,7 @@ func NewMessenger(
 	onNewInstallationsHandler := func(installations []*multidevice.Installation) {
 
 		for _, installation := range installations {
-			if installation.Identity == types.EncodeHex(crypto.FromECDSAPub(&messenger.identity.PublicKey)) {
+			if installation.Identity == contactIDFromPublicKey(&messenger.identity.PublicKey) {
 				if _, ok := messenger.allInstallations[installation.ID]; !ok {
 					messenger.allInstallations[installation.ID] = installation
 					messenger.modifiedInstallations[installation.ID] = true
@@ -595,7 +595,7 @@ func (m *Messenger) Join(chat Chat) error {
 		}
 		return m.transport.JoinGroup(members)
 	case ChatTypePublic:
-		return m.transport.JoinPublic(chat.Name)
+		return m.transport.JoinPublic(chat.ID)
 	default:
 		return errors.New("chat is neither public nor private")
 	}
@@ -638,8 +638,9 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	}
 	chat.updateChatFromProtocolGroup(group)
 
+	clock, _ := chat.NextClockAndTimestamp()
 	// Add members
-	event := v1protocol.NewMembersAddedEvent(members, group.NextClockValue())
+	event := v1protocol.NewMembersAddedEvent(members, clock)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
 	if err != nil {
@@ -704,8 +705,9 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 		return nil, err
 	}
 
+	clock, _ := chat.NextClockAndTimestamp()
 	// Remove member
-	event := v1protocol.NewMemberRemovedEvent(member, group.NextClockValue())
+	event := v1protocol.NewMemberRemovedEvent(member, clock)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
 	if err != nil {
@@ -755,8 +757,9 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		return nil, err
 	}
 
+	clock, _ := chat.NextClockAndTimestamp()
 	// Add members
-	event := v1protocol.NewMembersAddedEvent(members, group.NextClockValue())
+	event := v1protocol.NewMembersAddedEvent(members, clock)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
 	if err != nil {
@@ -815,8 +818,9 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 		return nil, err
 	}
 
+	clock, _ := chat.NextClockAndTimestamp()
 	// Add members
-	event := v1protocol.NewAdminsAddedEvent(members, group.NextClockValue())
+	event := v1protocol.NewAdminsAddedEvent(members, clock)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
 	if err != nil {
@@ -877,8 +881,9 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	if err != nil {
 		return nil, err
 	}
+	clock, _ := chat.NextClockAndTimestamp()
 	event := v1protocol.NewMemberJoinedEvent(
-		group.NextClockValue(),
+		clock,
 	)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
@@ -939,9 +944,10 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 	if err != nil {
 		return nil, err
 	}
+	clock, _ := chat.NextClockAndTimestamp()
 	event := v1protocol.NewMemberRemovedEvent(
-		types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
-		group.NextClockValue(),
+		contactIDFromPublicKey(&m.identity.PublicKey),
+		clock,
 	)
 	event.ChatID = chat.ID
 	err = event.Sign(m.identity)
@@ -983,6 +989,14 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 }
 
 func (m *Messenger) saveChat(chat *Chat) error {
+	_, ok := m.allChats[chat.ID]
+	// Sync chat if it's a new active public chat
+	if !ok && chat.Active && chat.Public() {
+		if err := m.syncPublicChat(context.Background(), chat); err != nil {
+			return err
+		}
+	}
+
 	err := m.persistence.SaveChat(*chat)
 	if err != nil {
 		return err
@@ -1008,12 +1022,7 @@ func (m *Messenger) saveChats(chats []*Chat) error {
 func (m *Messenger) SaveChat(chat *Chat) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	err := m.saveChat(chat)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m.saveChat(chat)
 }
 
 func (m *Messenger) Chats() []*Chat {
@@ -1345,6 +1354,13 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	myID := contactIDFromPublicKey(&m.identity.PublicKey)
+
+	if _, err := m.sendContactUpdate(ctx, myID, ensName, profileImage); err != nil {
+		return err
+	}
+
+	// TODO: This should not be sending paired messages, as we do it above
 	for _, contact := range m.allContacts {
 		if contact.IsAdded() {
 			if _, err := m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
@@ -1353,7 +1369,6 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 		}
 	}
 	return nil
-
 }
 
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
@@ -1417,7 +1432,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		return nil, err
 	}
 
-	if !contact.IsAdded() {
+	if !contact.IsAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
 		contact.SystemTags = append(contact.SystemTags, contactAdded)
 	}
 
@@ -1430,6 +1445,36 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		return nil, err
 	}
 	return &response, m.saveContact(contact)
+}
+
+// SyncDevices sends all public chats and contacts to paired devices
+func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	myID := contactIDFromPublicKey(&m.identity.PublicKey)
+
+	if _, err := m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
+		return err
+	}
+
+	for _, chat := range m.allChats {
+		if chat.Public() && chat.Active {
+			if err := m.syncPublicChat(ctx, chat); err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, contact := range m.allContacts {
+		if contact.IsAdded() && contact.ID != myID {
+			if err := m.syncContact(ctx, contact); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // SendPairInstallation sends a pair installation message
@@ -1449,7 +1494,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 		return nil, errors.New("no installation metadata")
 	}
 
-	chatID := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
@@ -1491,13 +1536,54 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 	return &response, nil
 }
 
+// syncPublicChat sync a public chat with paired devices
+func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error {
+	var err error
+	if !m.hasPairedDevices() {
+		return nil
+	}
+	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
+
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		chat = OneToOneFromPublicKey(&m.identity.PublicKey)
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	m.allChats[chat.ID] = chat
+	clock, _ := chat.NextClockAndTimestamp()
+
+	syncMessage := &protobuf.SyncInstallationPublicChat{
+		Clock: clock,
+		Id:    publicChat.ID,
+	}
+	encodedMessage, err := proto.Marshal(syncMessage)
+	if err != nil {
+		return err
+	}
+
+	_, err = m.dispatchMessage(ctx, &RawMessage{
+		LocalChatID:         chatID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	chat.LastClockValue = clock
+	return m.saveChat(chat)
+}
+
 // syncContact sync as contact with paired devices
 func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	var err error
 	if !m.hasPairedDevices() {
 		return nil
 	}
-	chatID := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
@@ -1624,7 +1710,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				publicKey := msg.SigPubKey()
 
 				// Check for messages from blocked users
-				senderID := types.EncodeHex(crypto.FromECDSAPub(publicKey))
+				senderID := contactIDFromPublicKey(publicKey)
 				if _, ok := messageState.AllContacts[senderID]; ok && messageState.AllContacts[senderID].IsBlocked() {
 					continue
 				}
@@ -1704,6 +1790,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handler.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
+							continue
+						}
+					case protobuf.SyncInstallationPublicChat:
+						if !isPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+							logger.Warn("not coming from us, ignoring")
+							continue
+						}
+
+						p := msg.ParsedMessage.(protobuf.SyncInstallationPublicChat)
+						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
+						err = m.handler.HandleSyncInstallationPublicChat(messageState, p)
+						if err != nil {
+							logger.Warn("failed to handle SyncInstallationPublicChat", zap.Error(err))
 							continue
 						}
 					case protobuf.RequestAddressForTransaction:
@@ -2479,7 +2578,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	return &response, m.saveChat(chat)
 }
 
-func (m *Messenger) SendTransaction(ctx context.Context, chatID, transactionHash string, signature []byte) (*MessengerResponse, error) {
+func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract, transactionHash string, signature []byte) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -2534,6 +2633,8 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, transactionHash
 	message.ID = types.EncodeHex(newMessageID)
 	message.CommandParameters = &CommandParameters{
 		TransactionHash: transactionHash,
+		Value:           value,
+		Contract:        contract,
 		Signature:       signature,
 		CommandState:    CommandStateTransactionSent,
 	}
@@ -2584,7 +2685,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	}
 	for _, validationResult := range responses {
 		var message *Message
-		chatID := types.EncodeHex(crypto.FromECDSAPub(validationResult.Transaction.From))
+		chatID := contactIDFromPublicKey(validationResult.Transaction.From)
 		chat, ok := m.allChats[chatID]
 		if !ok {
 			chat = OneToOneFromPublicKey(validationResult.Transaction.From)
