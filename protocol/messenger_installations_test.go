@@ -9,14 +9,15 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/zap"
+
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/whisper/v6"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/zap"
 )
 
 func TestMessengerInstallationSuite(t *testing.T) {

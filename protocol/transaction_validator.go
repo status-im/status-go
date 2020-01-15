@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"time"
 
+	"math/big"
+	"strings"
+
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"go.uber.org/zap"
-	"math/big"
-	"strings"
 )
 
 const (

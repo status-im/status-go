@@ -3,6 +3,7 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
