@@ -1,0 +1,3 @@
+{
+  "go.formatFlags": [ "-local", "github.com/ethereum/go-ethereum,github.com/status-im/status-go", "-w"],
+}
