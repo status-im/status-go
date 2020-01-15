@@ -165,8 +165,20 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET custom_bootnodes_enabled = ? WHERE synthetic_id = 'id'")
 	case "dapps-address":
+		str, ok := value.(string)
+		if ok {
+			value = types.HexToAddress(str)
+		} else {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET dapps_address = ? WHERE synthetic_id = 'id'")
 	case "eip1581-address":
+		str, ok := value.(string)
+		if ok {
+			value = types.HexToAddress(str)
+		} else {
+			return ErrInvalidConfig
+		}
 		update, err = db.db.Prepare("UPDATE settings SET eip1581_address = ? WHERE synthetic_id = 'id'")
 	case "fleet":
 		update, err = db.db.Prepare("UPDATE settings SET fleet = ? WHERE synthetic_id = 'id'")
