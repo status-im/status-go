@@ -1,8 +1,9 @@
 package types
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
 	"math/big"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 type Message struct {

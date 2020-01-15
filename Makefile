@@ -177,7 +177,7 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 lint-fix:
-	find . -name '*.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec goimports -local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go' -w {} \;
+	find . -name '*.go' -and -not -name '*.pb.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec goimports -local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go' -w {} \;
 	$(MAKE) vendor
 
 check-existing-release:
