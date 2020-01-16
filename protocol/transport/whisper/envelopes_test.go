@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 var (
@@ -31,7 +32,7 @@ func TestEnvelopesMonitorSuite(t *testing.T) {
 func (s *EnvelopesMonitorSuite) SetupTest() {
 	s.monitor = NewEnvelopesMonitor(
 		nil,
-		EnvelopesMonitorConfig{
+		transport.EnvelopesMonitorConfig{
 			EnvelopeEventsHandler:          nil,
 			MaxAttempts:                    0,
 			MailserverConfirmationsEnabled: false,

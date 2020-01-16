@@ -237,7 +237,7 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 	}
 }
 
-func (db sqlitePersistence) MessageByCommandID(id string) (*Message, error) {
+func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*Message, error) {
 
 	var message Message
 
@@ -259,10 +259,13 @@ func (db sqlitePersistence) MessageByCommandID(id string) (*Message, error) {
 			m1.source = c.id
 			WHERE
 				m1.command_id = ?
+				AND
+				m1.local_chat_id = ?
 				ORDER BY m1.clock_value DESC
 				LIMIT 1
 		`, allFields),
 		id,
+		chatID,
 	)
 	err := db.tableUserMessagesLegacyScanAllFields(row, &message)
 	switch err {

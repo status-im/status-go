@@ -678,6 +678,11 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 
 	response.Chats = []*Chat{&chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, m.saveChat(&chat)
 }
 
@@ -737,6 +742,11 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	chat.updateChatFromProtocolGroup(group)
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, m.saveChat(chat)
 }
 
@@ -796,6 +806,10 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -857,6 +871,10 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -920,6 +938,10 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -985,6 +1007,11 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, m.saveChat(chat)
 }
 
@@ -2042,6 +2069,7 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 			contact.ENSVerifiedAt = details.VerifiedAt
 			contact.Name = details.Name
 
+			m.allContacts[contact.ID] = contact
 			contacts = append(contacts, contact)
 		} else {
 			m.logger.Warn("Failed to resolve ens name",
@@ -2254,7 +2282,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	message.OutgoingStatus = OutgoingStatusSending
 
 	// Hide previous message
-	previousMessage, err := m.persistence.MessageByCommandID(messageID)
+	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
 	if err != nil {
 		return nil, err
 	}
@@ -2513,7 +2541,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.OutgoingStatus = OutgoingStatusSending
 
 	// Hide previous message
-	previousMessage, err := m.persistence.MessageByCommandID(messageID)
+	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
 	if err != nil && err != errRecordNotFound {
 		return nil, err
 	}
@@ -2734,18 +2762,20 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			return nil, err
 		}
 
-		// Hide previous message
-		previousMessage, err := m.persistence.MessageByCommandID(message.CommandParameters.ID)
-		if err != nil && err != errRecordNotFound {
-			return nil, err
-		}
-
-		if previousMessage != nil {
-			err = m.persistence.HideMessage(previousMessage.ID)
-			if err != nil {
+		if len(message.CommandParameters.ID) != 0 {
+			// Hide previous message
+			previousMessage, err := m.persistence.MessageByCommandID(chatID, message.CommandParameters.ID)
+			if err != nil && err != errRecordNotFound {
 				return nil, err
 			}
-			message.Replace = previousMessage.ID
+
+			if previousMessage != nil {
+				err = m.persistence.HideMessage(previousMessage.ID)
+				if err != nil {
+					return nil, err
+				}
+				message.Replace = previousMessage.ID
+			}
 		}
 
 		response.Messages = append(response.Messages, message)
