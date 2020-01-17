@@ -22,7 +22,7 @@ replace github.com/status-im/status-go/waku => ./waku
 
 require (
 	github.com/beevik/ntp v0.2.0
-	github.com/ethereum/go-ethereum v1.9.5
+	github.com/ethereum/go-ethereum v1.9.9
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang/mock v1.3.1
 	github.com/leodido/go-urn v1.2.0 // indirect
