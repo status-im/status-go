@@ -17,6 +17,8 @@ type MessagesRequestPayload struct {
 	Upper uint32
 	// Bloom is a bloom filter to filter envelopes.
 	Bloom []byte
+	// Topics is a list of topics to filter envelopes.
+	Topics [][]byte
 	// Limit is the max number of envelopes to return.
 	Limit uint32
 	// Cursor is used for pagination of the results.

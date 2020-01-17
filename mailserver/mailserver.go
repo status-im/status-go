@@ -379,6 +379,7 @@ func (s *WakuMailServer) Deliver(peerID []byte, req waku.MessagesRequest) {
 		Lower:  req.From,
 		Upper:  req.To,
 		Bloom:  req.Bloom,
+		Topics: req.Topics,
 		Limit:  req.Limit,
 		Cursor: req.Cursor,
 		Batch:  true,
@@ -698,6 +699,19 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 
 	req.SetDefaults()
 
+	log.Info(
+		"[mailserver:DeliverMail] processing request",
+		"peerID", peerID.String(),
+		"requestID", reqID.String(),
+		"lower", req.Lower,
+		"upper", req.Upper,
+		"bloom", req.Bloom,
+		"topics", req.Topics,
+		"limit", req.Limit,
+		"cursor", req.Cursor,
+		"batch", req.Batch,
+	)
+
 	if err := req.Validate(); err != nil {
 		syncFailuresCounter.WithLabelValues("req_invalid").Inc()
 		log.Error(
@@ -721,17 +735,6 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 		return
 	}
 
-	log.Info(
-		"[mailserver:DeliverMail] processing request",
-		"peerID", peerID.String(),
-		"requestID", reqID.String(),
-		"lower", req.Lower,
-		"upper", req.Upper,
-		"bloom", req.Bloom,
-		"limit", req.Limit,
-		"cursor", req.Cursor,
-		"batch", req.Batch,
-	)
 	if req.Batch {
 		requestsBatchedCounter.Inc()
 	}
@@ -773,6 +776,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
 		iter,
 		req.Bloom,
+		req.Topics,
 		int(req.Limit),
 		processRequestTimeout,
 		reqID.String(),
@@ -864,6 +868,7 @@ func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) err
 	nextCursor, _ := s.processRequestInBundles(
 		iter,
 		req.Bloom,
+		req.Topics,
 		int(req.Limit),
 		processRequestTimeout,
 		requestID,
@@ -960,6 +965,7 @@ func (s *mailServer) createIterator(req MessagesRequestPayload) (Iterator, error
 func (s *mailServer) processRequestInBundles(
 	iter Iterator,
 	bloom []byte,
+	topics [][]byte,
 	limit int,
 	timeout time.Duration,
 	requestID string,

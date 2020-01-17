@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/whisper/v6"
 )
@@ -55,7 +54,11 @@ func (i *LevelDBIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 		return nil, nil
 	}
 	return rawValue, nil
+}
 
+func (i *LevelDBIterator) Release() error {
+	i.Iterator.Release()
+	return nil
 }
 
 func NewLevelDB(dataDir string) (*LevelDB, error) {
@@ -142,18 +145,7 @@ func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
 
 	key := NewDBKey(env.Expiry()-env.TTL(), env.Topic(), env.Hash())
-
-	var (
-		rawEnvelope []byte
-		err         error
-	)
-	if whisperEnv, ok := gethbridge.UnwrapWhisperEnvelope(env); ok {
-		rawEnvelope, err = rlp.EncodeToBytes(whisperEnv)
-	} else if wakuEnv, ok := gethbridge.UnwrapWakuEnvelope(env); ok {
-		rawEnvelope, err = rlp.EncodeToBytes(wakuEnv)
-	} else {
-		return errors.New("unsupported underlying types.Envelope type")
-	}
+	rawEnvelope, err := rlp.EncodeToBytes(env.Unwrap())
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
 		archivedErrorsCounter.Inc()
