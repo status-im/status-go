@@ -398,6 +398,11 @@ func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) err
 	return api.service.messenger.SyncDevices(ctx, name, picture)
 }
 
+// Echo is a method for testing purposes.
+func (api *PublicAPI) Echo(ctx context.Context, message string) (string, error) {
+	return message, nil
+}
+
 // -----
 // HELPER
 // -----
