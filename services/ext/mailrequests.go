@@ -1,4 +1,4 @@
-package shhext
+package ext
 
 import (
 	"sync"
@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/services/ext/mailservers"
 )
 
 // EnvelopeState in local tracker
@@ -24,8 +25,8 @@ const (
 
 // MailRequestMonitor is responsible for monitoring history request to mailservers.
 type MailRequestMonitor struct {
-	w       types.Whisper
-	handler EnvelopeEventsHandler
+	eventSub mailservers.EnvelopeEventSubscriber
+	handler  EnvelopeEventsHandler
 
 	mu    sync.Mutex
 	cache map[types.Hash]EnvelopeState
@@ -34,6 +35,15 @@ type MailRequestMonitor struct {
 
 	wg   sync.WaitGroup
 	quit chan struct{}
+}
+
+func NewMailRequestMonitor(eventSub mailservers.EnvelopeEventSubscriber, h EnvelopeEventsHandler, reg *RequestsRegistry) *MailRequestMonitor {
+	return &MailRequestMonitor{
+		eventSub:         eventSub,
+		handler:          h,
+		cache:            make(map[types.Hash]EnvelopeState),
+		requestsRegistry: reg,
+	}
 }
 
 // Start processing events.
@@ -65,7 +75,7 @@ func (m *MailRequestMonitor) GetState(hash types.Hash) EnvelopeState {
 // handleEnvelopeEvents processes whisper envelope events
 func (m *MailRequestMonitor) handleEnvelopeEvents() {
 	events := make(chan types.EnvelopeEvent, 100) // must be buffered to prevent blocking whisper
-	sub := m.w.SubscribeEnvelopeEvents(events)
+	sub := m.eventSub.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
 	for {
 		select {

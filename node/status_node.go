@@ -23,8 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 
-	"github.com/status-im/status-go/whisper/v6"
-
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
 	"github.com/status-im/status-go/params"
@@ -35,7 +33,10 @@ import (
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.
@@ -583,8 +584,34 @@ func (n *StatusNode) WhisperService() (w *whisper.Whisper, err error) {
 	return
 }
 
+// WakuService exposes reference to Whisper service running on top of the node
+func (n *StatusNode) WakuService() (w *waku.Waku, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&w)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
 // ShhExtService exposes reference to shh extension service running on top of the node
 func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// WakuExtService exposes reference to shh extension service running on top of the node
+func (n *StatusNode) WakuExtService() (s *wakuext.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 

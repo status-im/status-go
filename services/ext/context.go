@@ -1,4 +1,4 @@
-package shhext
+package ext
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/db"
 )
 
-// ContextKey is a type used for keys in shhext Context.
+// ContextKey is a type used for keys in ext Context.
 type ContextKey struct {
 	Name string
 }
@@ -22,11 +22,6 @@ var (
 	requestRegistryKey = NewContextKey("request_registry")
 	timeKey            = NewContextKey("time")
 )
-
-// NewContextFromService creates new context instance using Service fileds directly and Storage.
-func NewContextFromService(ctx context.Context, service *Service, storage db.Storage) Context {
-	return NewContext(ctx, service.w.GetCurrentTime, service.requestsRegistry, storage)
-}
 
 // NewContext creates Context with all required fields.
 func NewContext(ctx context.Context, source TimeSource, registry *RequestsRegistry, storage db.Storage) Context {

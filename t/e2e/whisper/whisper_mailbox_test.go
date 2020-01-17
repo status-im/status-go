@@ -25,7 +25,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/whisper/v6"
@@ -541,12 +541,12 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	var syncMessagesResponse shhext.SyncMessagesResponse
+	var syncMessagesResponse ext.SyncMessagesResponse
 	err = emptyMailboxRPCClient.CallContext(
 		ctx,
 		&syncMessagesResponse,
 		"shhext_syncMessages",
-		shhext.SyncMessagesRequest{
+		ext.SyncMessagesRequest{
 			MailServerPeer: mailbox.StatusNode().Server().Self().URLv4(),
 			From:           uint32(time.Now().Add(-time.Hour).Unix()),
 			To:             uint32(time.Now().Unix()),
@@ -565,7 +565,7 @@ func (s *WhisperMailboxSuite) TestSyncBetweenTwoMailServers() {
 		ctx,
 		&syncMessagesResponse,
 		"shhext_syncMessages",
-		shhext.SyncMessagesRequest{
+		ext.SyncMessagesRequest{
 			MailServerPeer: mailbox.StatusNode().Server().Self().URLv4(),
 			From:           uint32(time.Now().Add(-time.Hour).Unix()),
 			To:             uint32(time.Now().Unix()),

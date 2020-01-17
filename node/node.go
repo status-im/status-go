@@ -29,12 +29,14 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/incentivisation"
 	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
+	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
@@ -363,7 +365,7 @@ func activateShhService(stack *node.Node, config *params.NodeConfig, db *leveldb
 		if err := ctx.Service(&ethnode); err != nil {
 			return nil, err
 		}
-		return shhext.New(ethnode.Node, ctx, "shhext", shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+		return shhext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
 	})
 }
 
@@ -387,7 +389,7 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 		if err := ctx.Service(&ethnode); err != nil {
 			return nil, err
 		}
-		return shhext.New(ethnode.Node, ctx, "wakuext", shhext.EnvelopeSignalHandler{}, db, config.ShhextConfig), nil
+		return wakuext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
 	})
 }
 

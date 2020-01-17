@@ -283,7 +283,7 @@ func NewMessenger(
 
 	// Initialize transport layer.
 	var transp transport.Transport
-	if shh, err := node.GetWhisper(nil); err == nil {
+	if shh, err := node.GetWhisper(nil); err == nil && shh != nil {
 		transp, err = shhtransp.NewWhisperServiceTransport(
 			shh,
 			identity,
@@ -295,10 +295,10 @@ func NewMessenger(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create WhisperServiceTransport")
 		}
-	} else if err != nil {
+	} else {
 		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
 		waku, err := node.GetWaku(nil)
-		if err != nil {
+		if err != nil || waku == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
 		}
 		transp, err = wakutransp.NewWakuServiceTransport(
