@@ -111,7 +111,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 				if err != nil {
 					return nil, err
 				}
-				if isTokenTransfer(receipt.Logs) {
+				if IsTokenTransfer(receipt.Logs) {
 					log.Debug("eth downloader found token transfer", "hash", tx.Hash())
 					continue
 				}
@@ -307,7 +307,7 @@ func (d *ERC20TransfersDownloader) GetTransfersInRange(parent context.Context, f
 	return transfers, nil
 }
 
-func isTokenTransfer(logs []*types.Log) bool {
+func IsTokenTransfer(logs []*types.Log) bool {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
 	for _, l := range logs {
 		if len(l.Topics) > 0 && l.Topics[0] == signature {

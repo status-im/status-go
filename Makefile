@@ -244,7 +244,7 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /lib | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags) && cd ./protocol && $(MAKE) test
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

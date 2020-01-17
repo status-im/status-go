@@ -33,6 +33,7 @@ type Transport interface {
 	LoadFilters(filters []*Filter) ([]*Filter, error)
 	RemoveFilters(filters []*Filter) error
 	ResetFilters() error
+	Filters() []*Filter
 	ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error)
 	RetrieveRawAll() (map[Filter][]*types.Message, error)
 }

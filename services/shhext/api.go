@@ -15,7 +15,6 @@ import (
 
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/shhext/mailservers"
 	"github.com/status-im/status-go/whisper/v6"
 
@@ -657,7 +656,7 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 
 // VerifyENSNames takes a list of ensdetails and returns whether they match the public key specified
 func (api *PublicAPI) VerifyENSNames(details []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
-	return api.service.messenger.VerifyENSNames(params.MainnetEthereumNetworkURL, ensContractAddress, details)
+	return api.service.messenger.VerifyENSNames(api.service.config.VerifyENSURL, ensContractAddress, details)
 }
 
 type ApplicationMessagesResponse struct {

@@ -6,6 +6,14 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
+type TransactionStatus uint64
+
+const (
+	TransactionStatusFailed  = 0
+	TransactionStatusSuccess = 1
+	TransactionStatusPending = 2
+)
+
 type Message struct {
 	to         *types.Address
 	from       types.Address
