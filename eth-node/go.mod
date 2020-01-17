@@ -18,7 +18,7 @@ require (
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/status-go/extkeys v1.0.0
 	github.com/status-im/status-go/waku v1.0.0
-	github.com/status-im/status-go/whisper/v6 v6.0.1 // indirect
+	github.com/status-im/status-go/whisper/v6 v6.0.1
 	github.com/stretchr/testify v1.4.0
 	github.com/wealdtech/go-ens/v3 v3.0.9
 	go.uber.org/zap v1.13.0

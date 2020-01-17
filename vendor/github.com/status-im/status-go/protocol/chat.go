@@ -207,39 +207,39 @@ func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(publicKey))
 }
 
-func OneToOneFromPublicKey(pk *ecdsa.PublicKey) *Chat {
+func OneToOneFromPublicKey(pk *ecdsa.PublicKey, timesource ClockValueTimesource) *Chat {
 	chatID := types.EncodeHex(crypto.FromECDSAPub(pk))
-	newChat := CreateOneToOneChat(chatID[:8], pk)
+	newChat := CreateOneToOneChat(chatID[:8], pk, timesource)
 
 	return &newChat
 }
 
-func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey) Chat {
+func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource ClockValueTimesource) Chat {
 	return Chat{
 		ID:        oneToOneChatID(publicKey),
 		Name:      name,
-		Timestamp: int64(timestampInMs()),
+		Timestamp: int64(timesource.GetCurrentTime()),
 		Active:    true,
 		ChatType:  ChatTypeOneToOne,
 	}
 }
 
-func CreatePublicChat(name string) Chat {
+func CreatePublicChat(name string, timesource ClockValueTimesource) Chat {
 	return Chat{
 		ID:        name,
 		Name:      name,
 		Active:    true,
-		Timestamp: int64(timestampInMs()),
+		Timestamp: int64(timesource.GetCurrentTime()),
 		Color:     chatColors[rand.Intn(len(chatColors))],
 		ChatType:  ChatTypePublic,
 	}
 }
 
-func createGroupChat() Chat {
+func createGroupChat(timesource ClockValueTimesource) Chat {
 	return Chat{
 		Active:    true,
 		Color:     chatColors[rand.Intn(len(chatColors))],
-		Timestamp: int64(timestampInMs()),
+		Timestamp: int64(timesource.GetCurrentTime()),
 		ChatType:  ChatTypePrivateGroupChat,
 	}
 }
@@ -276,11 +276,15 @@ func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey,
 	return result, nil
 }
 
+type ClockValueTimesource interface {
+	GetCurrentTime() uint64
+}
+
 // NextClockAndTimestamp returns the next clock value
 // and the current timestamp
-func (c *Chat) NextClockAndTimestamp() (uint64, uint64) {
+func (c *Chat) NextClockAndTimestamp(timesource ClockValueTimesource) (uint64, uint64) {
 	clock := c.LastClockValue
-	timestamp := timestampInMs()
+	timestamp := timesource.GetCurrentTime()
 	if clock == 0 || clock < timestamp {
 		clock = timestamp
 	} else {
@@ -289,8 +293,8 @@ func (c *Chat) NextClockAndTimestamp() (uint64, uint64) {
 	return clock, timestamp
 }
 
-func (c *Chat) UpdateFromMessage(message *Message) error {
-	c.Timestamp = int64(timestampInMs())
+func (c *Chat) UpdateFromMessage(message *Message, timesource ClockValueTimesource) error {
+	c.Timestamp = int64(timesource.GetCurrentTime())
 	if c.LastClockValue <= message.Clock {
 		jsonMessage, err := json.Marshal(message)
 		if err != nil {
