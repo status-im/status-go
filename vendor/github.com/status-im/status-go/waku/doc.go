@@ -114,6 +114,10 @@ type MessagesRequest struct {
 
 	// Bloom is a filter to match requested messages.
 	Bloom []byte `json:"bloom"`
+
+	// Topics is a list of topics. A returned message should
+	// belong to one of the topics from the list.
+	Topics [][]byte `json:"topics"`
 }
 
 func (r MessagesRequest) Validate() error {
@@ -129,8 +133,8 @@ func (r MessagesRequest) Validate() error {
 		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInMessagesRequest)
 	}
 
-	if len(r.Bloom) == 0 {
-		return errors.New("invalid 'Bloom' provided")
+	if len(r.Bloom) == 0 && len(r.Topics) == 0 {
+		return errors.New("invalid 'Bloom' or 'Topics', one must be non-empty")
 	}
 
 	return nil

@@ -1,6 +1,9 @@
 package gethbridge
 
 import (
+	"io"
+
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
 	"github.com/status-im/status-go/whisper/v6"
@@ -24,6 +27,10 @@ func UnwrapWhisperEnvelope(e types.Envelope) (*whisper.Envelope, bool) {
 
 func MustUnwrapWhisperEnvelope(e types.Envelope) *whisper.Envelope {
 	return e.(*whisperEnvelope).env
+}
+
+func (w *whisperEnvelope) Unwrap() interface{} {
+	return w.env
 }
 
 func (w *whisperEnvelope) Hash() types.Hash {
@@ -54,6 +61,14 @@ func (w *whisperEnvelope) Size() int {
 	return len(w.env.Data)
 }
 
+func (w *whisperEnvelope) DecodeRLP(s *rlp.Stream) error {
+	return w.env.DecodeRLP(s)
+}
+
+func (w *whisperEnvelope) EncodeRLP(writer io.Writer) error {
+	return rlp.Encode(writer, w.env)
+}
+
 type wakuEnvelope struct {
 	env *waku.Envelope
 }
@@ -72,6 +87,10 @@ func UnwrapWakuEnvelope(e types.Envelope) (*waku.Envelope, bool) {
 
 func MustUnwrapWakuEnvelope(e types.Envelope) *waku.Envelope {
 	return e.(*wakuEnvelope).env
+}
+
+func (w *wakuEnvelope) Unwrap() interface{} {
+	return w.env
 }
 
 func (w *wakuEnvelope) Hash() types.Hash {
@@ -100,4 +119,12 @@ func (w *wakuEnvelope) Topic() types.TopicType {
 
 func (w *wakuEnvelope) Size() int {
 	return len(w.env.Data)
+}
+
+func (w *wakuEnvelope) DecodeRLP(s *rlp.Stream) error {
+	return w.env.DecodeRLP(s)
+}
+
+func (w *wakuEnvelope) EncodeRLP(writer io.Writer) error {
+	return rlp.Encode(writer, w.env)
 }
