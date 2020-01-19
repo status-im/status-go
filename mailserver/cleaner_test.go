@@ -136,7 +136,7 @@ func countMessages(t *testing.T, db DB) int {
 	}
 
 	i, _ := db.BuildIterator(query)
-	defer i.Release()
+	defer func() { _ = i.Release() }()
 
 	for i.Next() {
 		var env whisper.Envelope

@@ -513,7 +513,7 @@ func (whisperAdapter) CreateRequestCompletedPayload(reqID, lastEnvelopeHash type
 func (whisperAdapter) CreateSyncResponse(envelopes []types.Envelope, cursor []byte, final bool, err string) interface{} {
 	whisperEnvelopes := make([]*whisper.Envelope, len(envelopes))
 	for i, env := range envelopes {
-		whisperEnvelopes[i] = gethbridge.MustUnwrapWhisperEnvelope(env)
+		whisperEnvelopes[i] = env.Unwrap().(*whisper.Envelope)
 	}
 	return whisper.SyncResponse{
 		Envelopes: whisperEnvelopes,
@@ -748,7 +748,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 		)
 		return
 	}
-	defer iter.Release()
+	defer func() { _ = iter.Release() }()
 
 	bundles := make(chan []rlp.RawValue, 5)
 	errCh := make(chan error)
@@ -847,7 +847,7 @@ func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) err
 		syncFailuresCounter.WithLabelValues("iterator").Inc()
 		return err
 	}
-	defer iter.Release()
+	defer func() { _ = iter.Release() }()
 
 	bundles := make(chan []rlp.RawValue, 5)
 	errCh := make(chan error)

@@ -106,7 +106,7 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer i.Release()
+	defer func() { _ = i.Release() }()
 
 	batch := leveldb.Batch{}
 	removed := 0

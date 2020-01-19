@@ -573,7 +573,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 			iter, err := s.server.ms.createIterator(payload)
 			s.Require().NoError(err)
 
-			defer iter.Release()
+			defer func() { _ = iter.Release() }()
 
 			// Nothing reads from this unbuffered channel which simulates a situation
 			// when a connection between a peer and mail server was dropped.
@@ -773,7 +773,7 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 
 func processRequestAndCollectHashes(server *WhisperMailServer, payload MessagesRequestPayload) ([]common.Hash, []byte, types.Hash) {
 	iter, _ := server.ms.createIterator(payload)
-	defer iter.Release()
+	defer func() { _ = iter.Release() }()
 	bundles := make(chan []rlp.RawValue, 10)
 	done := make(chan struct{})
 
