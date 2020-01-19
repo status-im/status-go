@@ -73,42 +73,37 @@ func (i *postgresIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 }
 
 func (i *PostgresDB) BuildIterator(query CursorQuery) (Iterator, error) {
-	var upperLimit []byte
-	var stmtString string
-	if len(query.cursor) > 0 {
-		// If we have a cursor, we don't want to include that envelope in the result set
-		upperLimit = query.cursor
+	var args []interface{}
 
-		// We disable security checks as we need to use string interpolation
-		// for this, but it's converted to 0s and 1s so no injection should be possible
-		/* #nosec */
-		stmtString = fmt.Sprintf(`
-			SELECT id, data 
-			FROM envelopes 
-			WHERE id >= $1 AND id < $2 AND (bloom & b'%s'::bit(512) = bloom OR topic = any($3)) 
-			ORDER BY ID DESC LIMIT $4`,
-			toBitString(query.bloom),
-		)
+	stmtString := "SELECT id, data FROM envelopes"
+
+	if len(query.cursor) > 0 {
+		args = append(args, query.start, query.cursor)
+		// If we have a cursor, we don't want to include that envelope in the result set
+		stmtString += " " + "WHERE id >= $1 AND id < $2"
 	} else {
-		upperLimit = query.end
-		// We disable security checks as we need to use string interpolation
-		// for this, but it's converted to 0s and 1s so no injection should be possible
-		/* #nosec */
-		stmtString = fmt.Sprintf(`
-			SELECT id, data 
-			FROM envelopes 
-			WHERE id >= $1 AND id <= $2 AND (bloom & b'%s'::bit(512) = bloom OR topic = any($3)) 
-			ORDER BY ID DESC LIMIT $4`,
-			toBitString(query.bloom),
-		)
+		args = append(args, query.start, query.end)
+		stmtString += " " + "WHERE id >= $1 AND id <= $2"
 	}
+
+	if len(query.topics) > 0 {
+		args = append(args, pq.Array(query.topics))
+		stmtString += " " + "AND topic = any($3)"
+	} else {
+		stmtString += " " + fmt.Sprintf("AND bloom & b'%s'::bit(512) = bloom", toBitString(query.bloom))
+	}
+
+	// Positional argument depends on the fact whether the query uses topics or bloom filter.
+	// If topic is used, the list of topics is passed as an argument to the query.
+	// If bloom filter is used, it is included into the query statement.
+	args = append(args, query.limit)
+	stmtString += " " + fmt.Sprintf("ORDER BY ID DESC LIMIT $%d", len(args))
 
 	stmt, err := i.db.Prepare(stmtString)
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := stmt.Query(query.start, upperLimit, pq.Array(query.topics), query.limit)
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
