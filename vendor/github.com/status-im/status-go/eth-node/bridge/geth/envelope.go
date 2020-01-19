@@ -18,17 +18,6 @@ func NewWhisperEnvelope(e *whisper.Envelope) types.Envelope {
 	return &whisperEnvelope{env: e}
 }
 
-func UnwrapWhisperEnvelope(e types.Envelope) (*whisper.Envelope, bool) {
-	if env, ok := e.(*whisperEnvelope); ok {
-		return env.env, true
-	}
-	return nil, false
-}
-
-func MustUnwrapWhisperEnvelope(e types.Envelope) *whisper.Envelope {
-	return e.(*whisperEnvelope).env
-}
-
 func (w *whisperEnvelope) Unwrap() interface{} {
 	return w.env
 }
@@ -76,17 +65,6 @@ type wakuEnvelope struct {
 // NewWakuEnvelope returns an object that wraps Geth's Waku Envelope in a types interface.
 func NewWakuEnvelope(e *waku.Envelope) types.Envelope {
 	return &wakuEnvelope{env: e}
-}
-
-func UnwrapWakuEnvelope(e types.Envelope) (*waku.Envelope, bool) {
-	if env, ok := e.(*wakuEnvelope); ok {
-		return env.env, true
-	}
-	return nil, false
-}
-
-func MustUnwrapWakuEnvelope(e types.Envelope) *waku.Envelope {
-	return e.(*wakuEnvelope).env
 }
 
 func (w *wakuEnvelope) Unwrap() interface{} {
