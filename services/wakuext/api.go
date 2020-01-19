@@ -37,14 +37,6 @@ func NewPublicAPI(s *Service) *PublicAPI {
 	}
 }
 
-// Post is used to send one-to-one for those who did not enabled device-to-device sync,
-// in other words don't use PFS-enabled messages. Otherwise, SendDirectMessage is used.
-// It's important to call PublicAPI.afterSend() so that the client receives a signal
-// with confirmation that the message left the device.
-func (api *PublicAPI) Post(ctx context.Context, newMessage types.NewMessage) (types.HexBytes, error) {
-	return api.publicAPI.Post(ctx, newMessage)
-}
-
 // makeEnvelop makes an envelop for a historic messages request.
 // Symmetric key is used to authenticate to MailServer.
 // PK is the current node ID.
