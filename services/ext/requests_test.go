@@ -1,4 +1,4 @@
-package shhext
+package ext
 
 import (
 	"testing"

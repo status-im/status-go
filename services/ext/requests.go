@@ -1,4 +1,4 @@
-package shhext
+package ext
 
 import (
 	"fmt"
@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	// defaultRequestsDelay will be used in RequestsRegistry if no other was provided.
-	defaultRequestsDelay = 3 * time.Second
+	// DefaultRequestsDelay will be used in RequestsRegistry if no other was provided.
+	DefaultRequestsDelay = 3 * time.Second
 )
 
 type requestMeta struct {

@@ -1,6 +1,6 @@
 // +build !nimbus
 
-package shhext
+package ext
 
 import (
 	"errors"
@@ -34,7 +34,7 @@ func (s *MailRequestMonitorSuite) SetupTest() {
 }
 
 func (s *MailRequestMonitorSuite) TestRequestCompleted() {
-	mock := newHandlerMock(1)
+	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
 	s.monitor.handleEvent(types.EnvelopeEvent{
@@ -52,7 +52,7 @@ func (s *MailRequestMonitorSuite) TestRequestCompleted() {
 }
 
 func (s *MailRequestMonitorSuite) TestRequestFailed() {
-	mock := newHandlerMock(1)
+	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
 	s.monitor.handleEvent(types.EnvelopeEvent{
@@ -70,7 +70,7 @@ func (s *MailRequestMonitorSuite) TestRequestFailed() {
 }
 
 func (s *MailRequestMonitorSuite) TestRequestExpiration() {
-	mock := newHandlerMock(1)
+	mock := NewHandlerMock(1)
 	s.monitor.handler = mock
 	s.monitor.cache[testHash] = MailServerRequestSent
 	s.monitor.handleEvent(types.EnvelopeEvent{

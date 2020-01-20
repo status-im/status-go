@@ -1,4 +1,4 @@
-package shhext
+package ext
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/status-im/status-go/db"
 )
 
-// ContextKey is a type used for keys in shhext Context.
+// ContextKey is a type used for keys in ext Context.
 type ContextKey struct {
 	Name string
 }

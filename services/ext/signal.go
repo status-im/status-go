@@ -1,4 +1,4 @@
-package shhext
+package ext
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
@@ -40,7 +40,8 @@ func (h PublisherSignalHandler) BundleAdded(identity string, installationID stri
 	signal.SendBundleAdded(identity, installationID)
 }
 
-func (h PublisherSignalHandler) WhisperFilterAdded(filters []*signal.Filter) {
+func (h PublisherSignalHandler) FilterAdded(filters []*signal.Filter) {
+	// TODO(waku): change the name of the filter to generic one.
 	signal.SendWhisperFilterAdded(filters)
 }
 

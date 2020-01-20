@@ -14,7 +14,7 @@ import (
 
 const (
 	peerEventsBuffer    = 10 // sufficient buffer to avoid blocking a p2p feed.
-	whisperEventsBuffer = 20 // sufficient buffer to avod blocking a whisper envelopes feed.
+	whisperEventsBuffer = 20 // sufficient buffer to avod blocking a eventSub envelopes feed.
 )
 
 // PeerAdderRemover is an interface for adding or removing peers.
@@ -39,10 +39,10 @@ type p2pServer interface {
 }
 
 // NewConnectionManager creates an instance of ConnectionManager.
-func NewConnectionManager(server p2pServer, whisper EnvelopeEventSubscriber, target, maxFailures int, timeout time.Duration) *ConnectionManager {
+func NewConnectionManager(server p2pServer, eventSub EnvelopeEventSubscriber, target, maxFailures int, timeout time.Duration) *ConnectionManager {
 	return &ConnectionManager{
 		server:           server,
-		whisper:          whisper,
+		eventSub:         eventSub,
 		connectedTarget:  target,
 		maxFailures:      maxFailures,
 		notifications:    make(chan []*enode.Node),
@@ -55,8 +55,8 @@ type ConnectionManager struct {
 	wg   sync.WaitGroup
 	quit chan struct{}
 
-	server  p2pServer
-	whisper EnvelopeEventSubscriber
+	server   p2pServer
+	eventSub EnvelopeEventSubscriber
 
 	notifications    chan []*enode.Node
 	connectedTarget  int
@@ -86,7 +86,7 @@ func (ps *ConnectionManager) Start() {
 		events := make(chan *p2p.PeerEvent, peerEventsBuffer)
 		sub := ps.server.SubscribeEvents(events)
 		whisperEvents := make(chan types.EnvelopeEvent, whisperEventsBuffer)
-		whisperSub := ps.whisper.SubscribeEnvelopeEvents(whisperEvents)
+		whisperSub := ps.eventSub.SubscribeEnvelopeEvents(whisperEvents)
 		requests := map[types.Hash]struct{}{}
 		failuresPerServer := map[types.EnodeID]int{}
 
@@ -101,7 +101,7 @@ func (ps *ConnectionManager) Start() {
 				log.Error("retry after error subscribing to p2p events", "error", err)
 				return
 			case err := <-whisperSub.Err():
-				log.Error("retry after error suscribing to whisper events", "error", err)
+				log.Error("retry after error suscribing to eventSub events", "error", err)
 				return
 			case newNodes := <-ps.notifications:
 				state.processReplacement(newNodes, events)

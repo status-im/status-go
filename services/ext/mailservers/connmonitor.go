@@ -10,11 +10,11 @@ import (
 )
 
 // NewLastUsedConnectionMonitor returns pointer to the instance of LastUsedConnectionMonitor.
-func NewLastUsedConnectionMonitor(ps *PeerStore, cache *Cache, whisper EnvelopeEventSubscriber) *LastUsedConnectionMonitor {
+func NewLastUsedConnectionMonitor(ps *PeerStore, cache *Cache, eventSub EnvelopeEventSubscriber) *LastUsedConnectionMonitor {
 	return &LastUsedConnectionMonitor{
-		ps:      ps,
-		cache:   cache,
-		whisper: whisper,
+		ps:       ps,
+		cache:    cache,
+		eventSub: eventSub,
 	}
 }
 
@@ -23,7 +23,7 @@ type LastUsedConnectionMonitor struct {
 	ps    *PeerStore
 	cache *Cache
 
-	whisper EnvelopeEventSubscriber
+	eventSub EnvelopeEventSubscriber
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -35,7 +35,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 	mon.wg.Add(1)
 	go func() {
 		events := make(chan types.EnvelopeEvent, whisperEventsBuffer)
-		sub := mon.whisper.SubscribeEnvelopeEvents(events)
+		sub := mon.eventSub.SubscribeEnvelopeEvents(events)
 		defer sub.Unsubscribe()
 		defer mon.wg.Done()
 		for {
@@ -43,7 +43,7 @@ func (mon *LastUsedConnectionMonitor) Start() {
 			case <-mon.quit:
 				return
 			case err := <-sub.Err():
-				log.Error("retry after error suscribing to whisper events", "error", err)
+				log.Error("retry after error suscribing to eventSub events", "error", err)
 				return
 			case ev := <-events:
 				node := mon.ps.Get(ev.Peer)

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/services/shhext"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/node"
@@ -14,8 +16,8 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/nodebridge"
-	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -73,7 +75,7 @@ func testMailserverPeer(t *testing.T) {
 	require.NoError(t, err)
 	// register mail service as well
 	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		mailService := shhext.New(gethbridge.NewNodeBridge(n), ctx, nil, nil, config)
+		mailService := shhext.New(config, gethbridge.NewNodeBridge(n), ctx, nil, nil)
 		return mailService, nil
 	})
 	require.NoError(t, err)
@@ -109,7 +111,7 @@ func testMailserverPeer(t *testing.T) {
 	ok, err := shhAPI.MarkTrustedPeer(context.TODO(), *peerURL)
 	require.NoError(t, err)
 	require.True(t, ok)
-	requestID, err := shhextAPI.RequestMessages(context.TODO(), shhext.MessagesRequest{
+	requestID, err := shhextAPI.RequestMessages(context.TODO(), ext.MessagesRequest{
 		MailServerPeer: *peerURL,
 		SymKeyID:       symKeyID,
 		Topic:          types.TopicType(topic),

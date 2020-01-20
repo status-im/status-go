@@ -1,6 +1,4 @@
-// +build !nimbus
-
-package shhext
+package wakuext
 
 import (
 	"context"
@@ -10,12 +8,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/waku"
 )
 
 const (
@@ -23,12 +19,11 @@ const (
 	defaultWorkTime = 5
 )
 
-// PublicAPI extends whisper public API.
+// PublicAPI extends waku public API.
 type PublicAPI struct {
 	*ext.PublicAPI
-
 	service   *Service
-	publicAPI types.PublicWhisperAPI
+	publicAPI types.PublicWakuAPI
 	log       log.Logger
 }
 
@@ -37,8 +32,8 @@ func NewPublicAPI(s *Service) *PublicAPI {
 	return &PublicAPI{
 		PublicAPI: ext.NewPublicAPI(s.Service, s.w),
 		service:   s,
-		publicAPI: s.w.PublicWhisperAPI(),
-		log:       log.New("package", "status-go/services/sshext.PublicAPI"),
+		publicAPI: s.w.PublicWakuAPI(),
+		log:       log.New("package", "status-go/services/wakuext.PublicAPI"),
 	}
 }
 
@@ -54,8 +49,7 @@ func makeEnvelop(
 	pow float64,
 	now time.Time,
 ) (types.Envelope, error) {
-	// TODO: replace with an types.Envelope creator passed to the API struct
-	params := whisper.MessageParams{
+	params := waku.MessageParams{
 		PoW:      pow,
 		Payload:  payload,
 		WorkTime: defaultWorkTime,
@@ -68,7 +62,7 @@ func makeEnvelop(
 	} else if publicKey != nil {
 		params.Dst = publicKey
 	}
-	message, err := whisper.NewSentMessage(&params)
+	message, err := waku.NewSentMessage(&params)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +70,7 @@ func makeEnvelop(
 	if err != nil {
 		return nil, err
 	}
-	return gethbridge.NewWhisperEnvelope(envelope), nil
+	return gethbridge.NewWakuEnvelope(envelope), nil
 }
 
 // RequestMessages sends a request for historic messages to a MailServer.
@@ -176,111 +170,4 @@ func (api *PublicAPI) RequestMessagesSync(conf ext.RetryConfig, r ext.MessagesRe
 		api.log.Error("[RequestMessagesSync] failed", "err", err, "retries", retries)
 	}
 	return resp, fmt.Errorf("failed to request messages after %d retries", retries)
-}
-
-// SyncMessagesRequest is a SyncMessages() request payload.
-type SyncMessagesRequest struct {
-	// MailServerPeer is MailServer's enode address.
-	MailServerPeer string `json:"mailServerPeer"`
-
-	// From is a lower bound of time range (optional).
-	// Default is 24 hours back from now.
-	From uint32 `json:"from"`
-
-	// To is a upper bound of time range (optional).
-	// Default is now.
-	To uint32 `json:"to"`
-
-	// Limit determines the number of messages sent by the mail server
-	// for the current paginated request
-	Limit uint32 `json:"limit"`
-
-	// Cursor is used as starting point for paginated requests
-	Cursor string `json:"cursor"`
-
-	// FollowCursor if true loads messages until cursor is empty.
-	FollowCursor bool `json:"followCursor"`
-
-	// Topics is a list of Whisper topics.
-	// If empty, a full bloom filter will be used.
-	Topics []types.TopicType `json:"topics"`
-}
-
-// SyncMessagesResponse is a response from the mail server
-// to which SyncMessagesRequest was sent.
-type SyncMessagesResponse struct {
-	// Cursor from the response can be used to retrieve more messages
-	// for the previous request.
-	Cursor string `json:"cursor"`
-
-	// Error indicates that something wrong happened when sending messages
-	// to the requester.
-	Error string `json:"error"`
-}
-
-// createSyncMailRequest creates SyncMailRequest. It uses a full bloom filter
-// if no topics are given.
-func createSyncMailRequest(r SyncMessagesRequest) (types.SyncMailRequest, error) {
-	var bloom []byte
-	if len(r.Topics) > 0 {
-		bloom = ext.TopicsToBloom(r.Topics...)
-	} else {
-		bloom = types.MakeFullNodeBloom()
-	}
-
-	cursor, err := hex.DecodeString(r.Cursor)
-	if err != nil {
-		return types.SyncMailRequest{}, err
-	}
-
-	return types.SyncMailRequest{
-		Lower:  r.From,
-		Upper:  r.To,
-		Bloom:  bloom,
-		Limit:  r.Limit,
-		Cursor: cursor,
-	}, nil
-}
-
-func createSyncMessagesResponse(r types.SyncEventResponse) SyncMessagesResponse {
-	return SyncMessagesResponse{
-		Cursor: hex.EncodeToString(r.Cursor),
-		Error:  r.Error,
-	}
-}
-
-// SyncMessages sends a request to a given MailServerPeer to sync historic messages.
-// MailServerPeers needs to be added as a trusted peer first.
-func (api *PublicAPI) SyncMessages(ctx context.Context, r SyncMessagesRequest) (SyncMessagesResponse, error) {
-	log.Info("SyncMessages start", "request", r)
-
-	var response SyncMessagesResponse
-
-	mailServerEnode, err := enode.ParseV4(r.MailServerPeer)
-	if err != nil {
-		return response, fmt.Errorf("invalid MailServerPeer: %v", err)
-	}
-	mailServerID := mailServerEnode.ID().Bytes()
-
-	request, err := createSyncMailRequest(r)
-	if err != nil {
-		return response, fmt.Errorf("failed to create a sync mail request: %v", err)
-	}
-
-	for {
-		log.Info("Sending a request to sync messages", "request", request)
-
-		resp, err := api.service.SyncMessages(ctx, mailServerID, request)
-		if err != nil {
-			return response, err
-		}
-
-		log.Info("Syncing messages response", "error", resp.Error, "cursor", fmt.Sprintf("%#x", resp.Cursor))
-
-		if resp.Error != "" || len(resp.Cursor) == 0 || !r.FollowCursor {
-			return createSyncMessagesResponse(resp), nil
-		}
-
-		request.Cursor = resp.Cursor
-	}
 }
