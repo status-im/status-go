@@ -3,8 +3,9 @@ package gethbridge
 import (
 	"errors"
 
-	"github.com/status-im/status-go/waku"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/waku"
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/enode"

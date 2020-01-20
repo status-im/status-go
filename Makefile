@@ -177,7 +177,7 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 lint-fix:
-	find . -name '*.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec goimports -local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go' -w {} \;
+	find . -name '*.go' -and -not -name '*.pb.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec goimports -local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go' -w {} \;
 	$(MAKE) vendor
 
 check-existing-release:
@@ -244,7 +244,7 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /lib | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags) && cd ./protocol && $(MAKE) test
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag

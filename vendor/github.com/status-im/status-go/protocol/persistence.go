@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 
 	"github.com/pkg/errors"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 )
 

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/status-im/status-go/services/wallet"
+
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/status-im/status-go/logutils"
@@ -197,26 +199,44 @@ type verifyTransactionClient struct {
 	url     string
 }
 
-func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, bool, error) {
+func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, coretypes.TransactionStatus, error) {
 	signer := gethtypes.NewEIP155Signer(c.chainID)
 	client, err := ethclient.Dial(c.url)
 	if err != nil {
-		return coretypes.Message{}, false, err
+		return coretypes.Message{}, coretypes.TransactionStatusPending, err
 	}
 
 	transaction, pending, err := client.TransactionByHash(ctx, commongethtypes.BytesToHash(hash.Bytes()))
 	if err != nil {
-		return coretypes.Message{}, false, err
+		return coretypes.Message{}, coretypes.TransactionStatusPending, err
 	}
 
 	message, err := transaction.AsMessage(signer)
 	if err != nil {
-		return coretypes.Message{}, false, err
+		return coretypes.Message{}, coretypes.TransactionStatusPending, err
 	}
 	from := types.BytesToAddress(message.From().Bytes())
 	to := types.BytesToAddress(message.To().Bytes())
 
-	return coretypes.NewMessage(
+	if pending {
+		return coretypes.NewMessage(
+			from,
+			&to,
+			message.Nonce(),
+			message.Value(),
+			message.Gas(),
+			message.GasPrice(),
+			message.Data(),
+			message.CheckNonce(),
+		), coretypes.TransactionStatusPending, nil
+	}
+
+	receipt, err := client.TransactionReceipt(ctx, commongethtypes.BytesToHash(hash.Bytes()))
+	if err != nil {
+		return coretypes.Message{}, coretypes.TransactionStatusPending, err
+	}
+
+	coremessage := coretypes.NewMessage(
 		from,
 		&to,
 		message.Nonce(),
@@ -225,7 +245,19 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 		message.GasPrice(),
 		message.Data(),
 		message.CheckNonce(),
-	), pending, nil
+	)
+
+	// Token transfer, check the logs
+	if len(coremessage.Data()) != 0 {
+		if wallet.IsTokenTransfer(receipt.Logs) {
+			return coremessage, coretypes.TransactionStatus(receipt.Status), nil
+		} else {
+			return coremessage, coretypes.TransactionStatusFailed, nil
+		}
+
+	}
+
+	return coremessage, coretypes.TransactionStatus(receipt.Status), nil
 }
 
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {

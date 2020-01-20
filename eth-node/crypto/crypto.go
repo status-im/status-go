@@ -9,8 +9,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	types "github.com/status-im/status-go/eth-node/types"
+
 	"golang.org/x/crypto/sha3"
+
+	types "github.com/status-im/status-go/eth-node/types"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 )

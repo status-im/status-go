@@ -518,7 +518,12 @@ type ShhextConfig struct {
 
 	// VerifyTransactionURL is the URL for verifying transactions.
 	// IMPORTANT: It should always be mainnet unless used for testing
-	VerifyTransactionURL     string
+	VerifyTransactionURL string
+
+	// VerifyENSURL is the URL for verifying ens names.
+	// IMPORTANT: It should always be mainnet unless used for testing
+	VerifyENSURL string
+
 	VerifyTransactionChainID int64
 }
 

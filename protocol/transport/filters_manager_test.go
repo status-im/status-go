@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 
 	_ "github.com/mutecomm/go-sqlcipher"
@@ -19,6 +18,23 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/whisper/v6"
 )
+
+type testKeysPersistence struct {
+	keys map[string][]byte
+}
+
+func newTestKeysPersistence() *testKeysPersistence {
+	return &testKeysPersistence{keys: make(map[string][]byte)}
+}
+
+func (s *testKeysPersistence) Add(chatID string, key []byte) error {
+	s.keys[chatID] = key
+	return nil
+}
+
+func (s *testKeysPersistence) All() (map[string][]byte, error) {
+	return s.keys, nil
+}
 
 func TestFiltersManagerSuite(t *testing.T) {
 	suite.Run(t, new(FiltersManagerSuite))
@@ -72,12 +88,11 @@ func (s *FiltersManagerSuite) SetupTest() {
 		s.manager = append(s.manager, testKey)
 	}
 
-	db, err := sqlite.Open(s.dbPath, "filter-key")
-	s.Require().NoError(err)
+	keysPersistence := newTestKeysPersistence()
 
 	whisper := gethbridge.NewGethWhisperWrapper(whisper.New(nil))
 
-	s.chats, err = NewFiltersManager(db, whisper, s.manager[0].privateKey, s.logger)
+	s.chats, err = NewFiltersManager(keysPersistence, whisper, s.manager[0].privateKey, s.logger)
 	s.Require().NoError(err)
 }
 
@@ -101,7 +116,7 @@ func (s *FiltersManagerSuite) TestPartitionedTopicWithDiscoveryDisabled() {
 func (s *FiltersManagerSuite) assertRequiredFilters() {
 	partitionedTopic := fmt.Sprintf("contact-discovery-%d", s.manager[0].partitionedTopic)
 	personalDiscoveryTopic := fmt.Sprintf("contact-discovery-%s", s.manager[0].publicKeyString())
-	contactCodeTopic := contactCodeTopic(&s.manager[0].privateKey.PublicKey)
+	contactCodeTopic := ContactCodeTopic(&s.manager[0].privateKey.PublicKey)
 
 	personalDiscoveryFilter := s.chats.filters[personalDiscoveryTopic]
 	s.Require().NotNil(personalDiscoveryFilter, "It adds the discovery filter")

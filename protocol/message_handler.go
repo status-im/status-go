@@ -3,6 +3,7 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -418,7 +419,7 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 	initialMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionAccepted
 
 	// Hide previous message
-	previousMessage, err := m.persistence.MessageByCommandID(command.Id)
+	previousMessage, err := m.persistence.MessageByCommandID(messageState.CurrentMessageState.Contact.ID, command.Id)
 	if err != nil && err != errRecordNotFound {
 		return err
 	}

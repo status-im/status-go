@@ -1,8 +1,9 @@
 package transport
 
 import (
-	"github.com/status-im/status-go/eth-node/types"
 	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 type EnvelopesMonitorConfig struct {

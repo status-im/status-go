@@ -72,6 +72,10 @@ func (n *testNode) RemovePeer(_ string) error {
 	panic("not implemented")
 }
 
+func (n *testNode) GetWaku(_ interface{}) (types.Waku, error) {
+	panic("not implemented")
+}
+
 func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return n.shh, nil
 }
@@ -1631,6 +1635,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	s.Require().True(ok)
 	client.messages = make(map[string]MockTransaction)
 	client.messages[transactionHash] = MockTransaction{
+		Status: coretypes.TransactionStatusSuccess,
 		Message: coretypes.NewMessage(
 			senderAddress,
 			&receiverAddress,
@@ -1731,6 +1736,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	s.Require().True(ok)
 	client.messages = make(map[string]MockTransaction)
 	client.messages[transactionHash] = MockTransaction{
+		Status: coretypes.TransactionStatusSuccess,
 		Message: coretypes.NewMessage(
 			senderAddress,
 			&contractAddress,
@@ -2064,6 +2070,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().True(ok)
 	client.messages = make(map[string]MockTransaction)
 	client.messages[transactionHash] = MockTransaction{
+		Status: coretypes.TransactionStatusSuccess,
 		Message: coretypes.NewMessage(
 			senderAddress,
 			&contractAddress,
@@ -2100,7 +2107,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 }
 
 type MockTransaction struct {
-	Pending bool
+	Status  coretypes.TransactionStatus
 	Message coretypes.Message
 }
 
@@ -2113,12 +2120,12 @@ type mockSendMessagesRequest struct {
 	req types.MessagesRequest
 }
 
-func (m MockEthClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, bool, error) {
+func (m MockEthClient) TransactionByHash(ctx context.Context, hash types.Hash) (coretypes.Message, coretypes.TransactionStatus, error) {
 	mockTransaction, ok := m.messages[hash.Hex()]
 	if !ok {
-		return coretypes.Message{}, false, nil
+		return coretypes.Message{}, coretypes.TransactionStatusFailed, nil
 	} else {
-		return mockTransaction.Message, mockTransaction.Pending, nil
+		return mockTransaction.Message, mockTransaction.Status, nil
 	}
 }
 

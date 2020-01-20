@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"time"
 
+	"math/big"
+	"strings"
+
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"go.uber.org/zap"
-	"math/big"
-	"strings"
 )
 
 const (
@@ -60,7 +62,7 @@ func NewTransactionValidator(addresses []types.Address, persistence *sqlitePersi
 }
 
 type EthClient interface {
-	TransactionByHash(context.Context, types.Hash) (coretypes.Message, bool, error)
+	TransactionByHash(context.Context, types.Hash) (coretypes.Message, coretypes.TransactionStatus, error)
 }
 
 func (t *TransactionValidator) verifyTransactionSignature(ctx context.Context, from *ecdsa.PublicKey, address types.Address, transactionHash string, signature []byte) error {
@@ -241,7 +243,8 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 		var validationResult *VerifyTransactionResponse
 		t.logger.Debug("Validating transaction", zap.Any("transaction", transaction))
 		if transaction.CommandID != "" {
-			message, err := t.persistence.MessageByCommandID(transaction.CommandID)
+			chatID := contactIDFromPublicKey(transaction.From)
+			message, err := t.persistence.MessageByCommandID(chatID, transaction.CommandID)
 			if err != nil {
 
 				t.logger.Error("error pulling message", zap.Error(err))
@@ -311,13 +314,17 @@ func (t *TransactionValidator) ValidateTransaction(ctx context.Context, paramete
 	c, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	message, pending, err := t.client.TransactionByHash(c, types.HexToHash(hash))
+	message, status, err := t.client.TransactionByHash(c, types.HexToHash(hash))
 	if err != nil {
 		return nil, err
 	}
-	if pending {
+	switch status {
+	case coretypes.TransactionStatusPending:
 		t.logger.Debug("Transaction pending")
 		return &VerifyTransactionResponse{Pending: true}, nil
+	case coretypes.TransactionStatusFailed:
+
+		return invalidResponse, nil
 	}
 
 	return t.validateTransaction(ctx, message, parameters, from)
