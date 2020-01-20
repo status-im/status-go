@@ -251,10 +251,8 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 	if len(coremessage.Data()) != 0 {
 		if wallet.IsTokenTransfer(receipt.Logs) {
 			return coremessage, coretypes.TransactionStatus(receipt.Status), nil
-		} else {
-			return coremessage, coretypes.TransactionStatusFailed, nil
 		}
-
+		return coremessage, coretypes.TransactionStatusFailed, nil
 	}
 
 	return coremessage, coretypes.TransactionStatus(receipt.Status), nil

@@ -1,3 +1,5 @@
+// +build !nimbus
+
 package api
 
 import (
@@ -82,10 +84,10 @@ type GethStatusBackend struct {
 
 // NewGethStatusBackend create a new GethStatusBackend instance
 func NewGethStatusBackend() *GethStatusBackend {
-	defer log.Info("Status backend initialized", "version", params.Version, "commit", params.GitCommit)
+	defer log.Info("Status backend initialized", "backend", "geth", "version", params.Version, "commit", params.GitCommit)
 
 	statusNode := node.New()
-	accountManager := account.NewManager()
+	accountManager := account.NewGethManager()
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	rpcFilters := rpcfilters.New(statusNode)
@@ -381,7 +383,7 @@ func (b *GethStatusBackend) rpcFiltersService() gethnode.ServiceConstructor {
 
 func (b *GethStatusBackend) subscriptionService() gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return subscriptions.New(b.statusNode), nil
+		return subscriptions.New(func() *rpc.Client { return b.statusNode.RPCPrivateClient() }), nil
 	}
 }
 

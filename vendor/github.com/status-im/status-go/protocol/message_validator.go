@@ -6,11 +6,39 @@ import (
 	"strings"
 
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/v1"
 )
 
-func ValidateReceivedPairInstallation(message *protobuf.PairInstallation) error {
-	if message.Clock == 0 {
+// maxWhisperDrift is how many milliseconds we allow the clock value to differ
+// from whisperTimestamp
+const maxWhisperFutureDriftMs uint64 = 120000
+
+func validateClockValue(clock uint64, whisperTimestamp uint64) error {
+	if clock == 0 {
 		return errors.New("clock can't be 0")
+	}
+
+	if clock > whisperTimestamp && clock-whisperTimestamp > maxWhisperFutureDriftMs {
+		return errors.New("clock value too high")
+	}
+
+	return nil
+}
+
+func ValidateMembershipUpdateMessage(message *protocol.MembershipUpdateMessage, timeNowMs uint64) error {
+
+	for _, e := range message.Events {
+		if err := validateClockValue(e.ClockValue, timeNowMs); err != nil {
+			return err
+		}
+
+	}
+	return nil
+}
+
+func ValidateReceivedPairInstallation(message *protobuf.PairInstallation, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(strings.TrimSpace(message.Name)) == 0 {
@@ -28,9 +56,9 @@ func ValidateReceivedPairInstallation(message *protobuf.PairInstallation) error 
 	return nil
 }
 
-func ValidateReceivedSendTransaction(message *protobuf.SendTransaction) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedSendTransaction(message *protobuf.SendTransaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(strings.TrimSpace(message.TransactionHash)) == 0 {
@@ -44,9 +72,9 @@ func ValidateReceivedSendTransaction(message *protobuf.SendTransaction) error {
 	return nil
 }
 
-func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddressForTransaction) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddressForTransaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(strings.TrimSpace(message.Value)) == 0 {
@@ -61,9 +89,9 @@ func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddre
 	return nil
 }
 
-func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(strings.TrimSpace(message.Value)) == 0 {
@@ -82,9 +110,9 @@ func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction) er
 	return nil
 }
 
-func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.AcceptRequestAddressForTransaction) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.AcceptRequestAddressForTransaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(message.Id) == 0 {
@@ -98,9 +126,9 @@ func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.Accept
 	return nil
 }
 
-func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.DeclineRequestAddressForTransaction) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.DeclineRequestAddressForTransaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(message.Id) == 0 {
@@ -110,9 +138,9 @@ func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.Decli
 	return nil
 }
 
-func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestTransaction) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestTransaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if len(message.Id) == 0 {
@@ -122,9 +150,9 @@ func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestT
 	return nil
 }
 
-func ValidateReceivedChatMessage(message *protobuf.ChatMessage) error {
-	if message.Clock == 0 {
-		return errors.New("clock can't be 0")
+func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp uint64) error {
+	if err := validateClockValue(message.Clock, whisperTimestamp); err != nil {
+		return err
 	}
 
 	if message.Timestamp == 0 {

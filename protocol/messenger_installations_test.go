@@ -143,7 +143,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().Equal(contact.ID, actualContact.ID)
 	s.Require().True(actualContact.IsAdded())
 
-	chat := CreatePublicChat("status")
+	chat := CreatePublicChat("status", s.m.transport)
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
@@ -176,7 +176,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// add chat
-	chat := CreatePublicChat("status")
+	chat := CreatePublicChat("status", s.m.transport)
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 

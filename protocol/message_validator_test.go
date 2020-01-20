@@ -18,13 +18,15 @@ func TestMessageValidatorSuite(t *testing.T) {
 
 func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 	testCases := []struct {
-		Name    string
-		Valid   bool
-		Message protobuf.RequestAddressForTransaction
+		Name             string
+		WhisperTimestamp uint64
+		Valid            bool
+		Message          protobuf.RequestAddressForTransaction
 	}{
 		{
-			Name:  "valid message",
-			Valid: true,
+			Name:             "valid message",
+			WhisperTimestamp: 30,
+			Valid:            true,
 			Message: protobuf.RequestAddressForTransaction{
 				Clock:    30,
 				Value:    "0.34",
@@ -32,34 +34,47 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 			},
 		},
 		{
-			Name:  "missing clock value",
-			Valid: false,
+			Name:             "missing clock value",
+			WhisperTimestamp: 30,
+			Valid:            false,
 			Message: protobuf.RequestAddressForTransaction{
 				Value:    "0.34",
 				Contract: "some contract",
 			},
 		},
 		{
-			Name:  "missing value",
-			Valid: false,
+			Name:             "missing value",
+			WhisperTimestamp: 30,
+			Valid:            false,
 			Message: protobuf.RequestAddressForTransaction{
 				Clock:    30,
 				Contract: "some contract",
 			},
 		},
 		{
-			Name:  "non number value",
-			Valid: false,
+			Name:             "non number value",
+			WhisperTimestamp: 30,
+			Valid:            false,
 			Message: protobuf.RequestAddressForTransaction{
 				Clock:    30,
 				Value:    "most definitely not a number",
 				Contract: "some contract",
 			},
 		},
+		{
+			Name:             "Clock value too high",
+			WhisperTimestamp: 30,
+			Valid:            false,
+			Message: protobuf.RequestAddressForTransaction{
+				Clock:    151000,
+				Value:    "0.34",
+				Contract: "some contract",
+			},
+		},
 	}
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			err := ValidateReceivedRequestAddressForTransaction(&tc.Message)
+			err := ValidateReceivedRequestAddressForTransaction(&tc.Message, tc.WhisperTimestamp)
 			if tc.Valid {
 				s.Nil(err)
 			} else {
@@ -72,13 +87,15 @@ func (s *MessageValidatorSuite) TestValidateRequestAddressForTransaction() {
 
 func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 	testCases := []struct {
-		Name    string
-		Valid   bool
-		Message protobuf.ChatMessage
+		Name             string
+		WhisperTimestamp uint64
+		Valid            bool
+		Message          protobuf.ChatMessage
 	}{
 		{
-			Name:  "A valid message",
-			Valid: true,
+			Name:             "A valid message",
+			WhisperTimestamp: 2,
+			Valid:            true,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       1,
@@ -91,8 +108,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Missing chatId",
-			Valid: false,
+			Name:             "Missing chatId",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				Clock:       1,
 				Timestamp:   2,
@@ -104,8 +122,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Missing clock",
-			Valid: false,
+			Name:             "Missing clock",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Timestamp:   2,
@@ -117,8 +136,24 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Missing timestamp",
-			Valid: false,
+			Name:             "Clock value too high",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: protobuf.ChatMessage{
+				ChatId:      "a",
+				Clock:       133000,
+				Timestamp:   1,
+				Text:        "some-text",
+				ResponseTo:  "",
+				EnsName:     "",
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+			},
+		},
+		{
+			Name:             "Missing timestamp",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       2,
@@ -130,8 +165,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Missing text",
-			Valid: false,
+			Name:             "Missing text",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Clock:       2,
@@ -143,8 +179,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Blank text",
-			Valid: false,
+			Name:             "Blank text",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "  \n \t \n  ",
@@ -157,8 +194,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Unknown MessageType",
-			Valid: false,
+			Name:             "Unknown MessageType",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
@@ -171,8 +209,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Unknown ContentType",
-			Valid: false,
+			Name:             "Unknown ContentType",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
@@ -185,8 +224,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "System message MessageType",
-			Valid: false,
+			Name:             "System message MessageType",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
@@ -199,8 +239,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Request address for transaction message type",
-			Valid: false,
+			Name:             "Request address for transaction message type",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
@@ -213,8 +254,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Valid  emoji only emssage",
-			Valid: true,
+			Name:             "Valid  emoji only emssage",
+			WhisperTimestamp: 2,
+			Valid:            true,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        ":+1:",
@@ -243,8 +285,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				}
 				,*/
 		{
-			Name:  "Valid sticker message",
-			Valid: true,
+			Name:             "Valid sticker message",
+			WhisperTimestamp: 2,
+			Valid:            true,
 			Message: protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
@@ -263,8 +306,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Invalid sticker message without Hash",
-			Valid: false,
+			Name:             "Invalid sticker message without Hash",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:     "a",
 				Text:       "valid",
@@ -282,8 +326,9 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 			},
 		},
 		{
-			Name:  "Invalid sticker message without any content",
-			Valid: false,
+			Name:             "Invalid sticker message without any content",
+			WhisperTimestamp: 2,
+			Valid:            false,
 			Message: protobuf.ChatMessage{
 				ChatId:      "a",
 				Text:        "valid",
@@ -299,7 +344,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 
 	for _, tc := range testCases {
 		s.Run(tc.Name, func() {
-			err := ValidateReceivedChatMessage(&tc.Message)
+			err := ValidateReceivedChatMessage(&tc.Message, tc.WhisperTimestamp)
 			if tc.Valid {
 				s.Nil(err)
 			} else {

@@ -12,7 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/waku"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/storage"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/node"
@@ -25,10 +28,7 @@ import (
 	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/storage"
+	"github.com/status-im/status-go/waku"
 )
 
 func TestRequestMessagesErrors(t *testing.T) {

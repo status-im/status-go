@@ -4,20 +4,17 @@ import (
 	"math"
 	"testing"
 
-	"github.com/status-im/status-go/services/wakuext"
-
-	"github.com/status-im/status-go/services/ext"
-
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/shhext"
-
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/ext"
+	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/waku"
-	"github.com/stretchr/testify/require"
+	"github.com/status-im/status-go/whisper/v6"
 )
 
 func TestShhextAndWakuextInSingleNode(t *testing.T) {

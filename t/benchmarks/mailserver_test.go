@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/services/shhext"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/node"
@@ -73,13 +75,13 @@ func testMailserverPeer(t *testing.T) {
 	require.NoError(t, err)
 	// register mail service as well
 	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		mailService := ext.New(gethbridge.NewNodeBridge(n), ctx, nil, nil, config)
+		mailService := shhext.New(config, gethbridge.NewNodeBridge(n), ctx, nil, nil)
 		return mailService, nil
 	})
 	require.NoError(t, err)
-	var mailService *ext.Service
+	var mailService *shhext.Service
 	require.NoError(t, n.Service(&mailService))
-	shhextAPI := ext.NewPublicAPI(mailService)
+	shhextAPI := shhext.NewPublicAPI(mailService)
 
 	// start node
 	require.NoError(t, n.Start())

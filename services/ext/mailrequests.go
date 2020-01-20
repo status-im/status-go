@@ -1,3 +1,5 @@
+// +build !nimbus
+
 package ext
 
 import (
@@ -15,10 +17,6 @@ type EnvelopeState int
 const (
 	// NotRegistered returned if asked hash wasn't registered in the tracker.
 	NotRegistered EnvelopeState = -1
-	// EnvelopePosted is set when envelope was added to a local whisper queue.
-	EnvelopePosted EnvelopeState = iota
-	// EnvelopeSent is set when envelope is sent to atleast one peer.
-	EnvelopeSent
 	// MailServerRequestSent is set when p2p request is sent to the mailserver
 	MailServerRequestSent
 )
