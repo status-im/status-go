@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -358,6 +359,11 @@ func (a *WakuServiceTransport) Track(identifiers [][]byte, hash []byte, newMessa
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Add(identifiers, types.BytesToHash(hash), *newMessage)
 	}
+}
+
+// GetCurrentTime returns the current unix timestamp in milliseconds
+func (a *WakuServiceTransport) GetCurrentTime() uint64 {
+	return uint64(a.waku.GetCurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
 func (a *WakuServiceTransport) Stop() error {

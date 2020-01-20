@@ -16,6 +16,7 @@ type Transport interface {
 	LeaveGroup(publicKeys []*ecdsa.PublicKey) error
 	JoinPublic(chatID string) error
 	LeavePublic(chatID string) error
+	GetCurrentTime() uint64
 
 	SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error)
 	SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error)

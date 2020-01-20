@@ -33,10 +33,17 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	var group *v1protocol.Group
 	var err error
 
+	logger := m.logger.With(zap.String("site", "HandleMembershipUpdate"))
+
 	message, err := v1protocol.MembershipUpdateMessageFromProtobuf(&rawMembershipUpdate)
 	if err != nil {
 		return err
 
+	}
+
+	if err := ValidateMembershipUpdateMessage(message, messageState.Timesource.GetCurrentTime()); err != nil {
+		logger.Warn("failed to validate message", zap.Error(err))
+		return err
 	}
 
 	if chat == nil {
@@ -52,7 +59,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		if !group.IsMember(contactIDFromPublicKey(&m.identity.PublicKey)) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
-		newChat := createGroupChat()
+		newChat := createGroupChat(messageState.Timesource)
 		chat = &newChat
 
 	} else {
@@ -108,7 +115,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	message.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
 	message.PrepareContent()
-	chat, err := m.matchMessage(message, state.AllChats)
+	chat, err := m.matchMessage(message, state.AllChats, state.Timesource)
 	if err != nil {
 		return err
 	}
@@ -137,7 +144,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 		message.OutgoingStatus = OutgoingStatusSent
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, state.Timesource)
 	if err != nil {
 		return err
 	}
@@ -158,7 +165,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContact) error {
 	chat, ok := state.AllChats[state.CurrentMessageState.Contact.ID]
 	if !ok {
-		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey)
+		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
@@ -205,7 +212,7 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 		return nil
 	}
 
-	chat := CreatePublicChat(chatID)
+	chat := CreatePublicChat(chatID, state.Timesource)
 
 	state.AllChats[chat.ID] = &chat
 	state.ModifiedChats[chat.ID] = true
@@ -218,7 +225,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 	contact := state.CurrentMessageState.Contact
 	chat, ok := state.AllChats[contact.ID]
 	if !ok {
-		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey)
+		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
@@ -252,7 +259,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 
 func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, message protobuf.PairInstallation) error {
 	logger := m.logger.With(zap.String("site", "HandlePairInstallation"))
-	if err := ValidateReceivedPairInstallation(&message); err != nil {
+	if err := ValidateReceivedPairInstallation(&message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
@@ -276,7 +283,7 @@ func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, mes
 
 func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
-	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message); err != nil {
+	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
@@ -291,7 +298,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	receivedMessage.PrepareContent()
-	chat, err := m.matchMessage(receivedMessage, state.AllChats)
+	chat, err := m.matchMessage(receivedMessage, state.AllChats, state.Timesource)
 	if err != nil {
 		return err
 	}
@@ -319,7 +326,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		receivedMessage.OutgoingStatus = OutgoingStatusSent
 	}
 
-	err = chat.UpdateFromMessage(receivedMessage)
+	err = chat.UpdateFromMessage(receivedMessage, state.Timesource)
 	if err != nil {
 		return err
 	}
@@ -339,7 +346,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 }
 
 func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.RequestAddressForTransaction) error {
-	err := ValidateReceivedRequestAddressForTransaction(&command)
+	err := ValidateReceivedRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -363,7 +370,7 @@ func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *Receiv
 }
 
 func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageState, command protobuf.RequestTransaction) error {
-	err := ValidateReceivedRequestTransaction(&command)
+	err := ValidateReceivedRequestTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -388,7 +395,7 @@ func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageS
 }
 
 func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.AcceptRequestAddressForTransaction) error {
-	err := ValidateReceivedAcceptRequestAddressForTransaction(&command)
+	err := ValidateReceivedAcceptRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -437,7 +444,7 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 }
 
 func (m *MessageHandler) HandleSendTransaction(messageState *ReceivedMessageState, command protobuf.SendTransaction) error {
-	err := ValidateReceivedSendTransaction(&command)
+	err := ValidateReceivedSendTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -457,7 +464,7 @@ func (m *MessageHandler) HandleSendTransaction(messageState *ReceivedMessageStat
 }
 
 func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState *ReceivedMessageState, command protobuf.DeclineRequestAddressForTransaction) error {
-	err := ValidateReceivedDeclineRequestAddressForTransaction(&command)
+	err := ValidateReceivedDeclineRequestAddressForTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -497,7 +504,7 @@ func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState 
 }
 
 func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedMessageState, command protobuf.DeclineRequestTransaction) error {
-	err := ValidateReceivedDeclineRequestTransaction(&command)
+	err := ValidateReceivedDeclineRequestTransaction(&command, messageState.CurrentMessageState.WhisperTimestamp)
 	if err != nil {
 		return err
 	}
@@ -536,7 +543,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat) (*Chat, error) {
+func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, timesource ClockValueTimesource) (*Chat, error) {
 	if message.SigPubKey == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a message with empty public key")
@@ -571,7 +578,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat) 
 				return nil, errors.Wrap(err, "failed to decode pubkey")
 			}
 
-			newChat := CreateOneToOneChat(chatID[:8], pubKey)
+			newChat := CreateOneToOneChat(chatID[:8], pubKey, timesource)
 			chat = &newChat
 		}
 		return chat, nil
@@ -582,7 +589,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat) 
 		chat := chats[chatID]
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
-			newChat := CreateOneToOneChat(chatID[:8], message.SigPubKey)
+			newChat := CreateOneToOneChat(chatID[:8], message.SigPubKey, timesource)
 			chat = &newChat
 		}
 		return chat, nil
