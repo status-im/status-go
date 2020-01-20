@@ -31,6 +31,8 @@ type Whisper interface {
 	AddKeyPair(key *ecdsa.PrivateKey) (string, error)
 	// DeleteKeyPair deletes the key with the specified ID if it exists.
 	DeleteKeyPair(keyID string) bool
+	// DeleteKeyPairs removes all cryptographic identities known to the node
+	DeleteKeyPairs() error
 	AddSymKeyDirect(key []byte) (string, error)
 	AddSymKeyFromPassword(password string) (string, error)
 	DeleteSymKey(id string) bool

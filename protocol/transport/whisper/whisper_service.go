@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -358,6 +359,11 @@ func (a *WhisperServiceTransport) Track(identifiers [][]byte, hash []byte, newMe
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Add(identifiers, types.BytesToHash(hash), *newMessage)
 	}
+}
+
+// GetCurrentTime returns the current unix timestamp in milliseconds
+func (a *WhisperServiceTransport) GetCurrentTime() uint64 {
+	return uint64(a.shh.GetCurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
 func (a *WhisperServiceTransport) Stop() error {

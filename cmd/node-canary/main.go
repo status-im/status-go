@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
+	"github.com/status-im/status-go/services/ext"
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
 )
@@ -170,7 +171,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	// request messages from mailbox
 	shhextAPI := shhext.NewPublicAPI(clientShhExtService)
 	requestIDBytes, err := shhextAPI.RequestMessages(context.TODO(),
-		shhext.MessagesRequest{
+		ext.MessagesRequest{
 			MailServerPeer: mailserverNode.String(),
 			From:           uint32(clientWhisperService.GetCurrentTime().Add(-time.Duration(*period) * time.Second).Unix()),
 			Limit:          1,

@@ -283,7 +283,7 @@ func NewMessenger(
 
 	// Initialize transport layer.
 	var transp transport.Transport
-	if shh, err := node.GetWhisper(nil); err == nil {
+	if shh, err := node.GetWhisper(nil); err == nil && shh != nil {
 		transp, err = shhtransp.NewWhisperServiceTransport(
 			shh,
 			identity,
@@ -295,10 +295,10 @@ func NewMessenger(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to create WhisperServiceTransport")
 		}
-	} else if err != nil {
+	} else {
 		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
 		waku, err := node.GetWaku(nil)
-		if err != nil {
+		if err != nil || waku == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
 		}
 		transp, err = wakutransp.NewWakuServiceTransport(
@@ -631,14 +631,14 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
 	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
-	chat := createGroupChat()
+	chat := createGroupChat(m.getTimesource())
 	group, err := v1protocol.NewGroupWithCreator(name, m.identity)
 	if err != nil {
 		return nil, err
 	}
 	chat.updateChatFromProtocolGroup(group)
 
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	// Add members
 	event := v1protocol.NewMembersAddedEvent(members, clock)
 	event.ChatID = chat.ID
@@ -678,6 +678,11 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 
 	response.Chats = []*Chat{&chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, m.saveChat(&chat)
 }
 
@@ -705,7 +710,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 		return nil, err
 	}
 
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	// Remove member
 	event := v1protocol.NewMemberRemovedEvent(member, clock)
 	event.ChatID = chat.ID
@@ -737,6 +742,11 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	chat.updateChatFromProtocolGroup(group)
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, m.saveChat(chat)
 }
 
@@ -757,7 +767,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		return nil, err
 	}
 
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	// Add members
 	event := v1protocol.NewMembersAddedEvent(members, clock)
 	event.ChatID = chat.ID
@@ -796,6 +806,10 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -818,7 +832,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 		return nil, err
 	}
 
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	// Add members
 	event := v1protocol.NewAdminsAddedEvent(members, clock)
 	event.ChatID = chat.ID
@@ -857,6 +871,10 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -881,7 +899,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	if err != nil {
 		return nil, err
 	}
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	event := v1protocol.NewMemberJoinedEvent(
 		clock,
 	)
@@ -920,6 +938,10 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, m.saveChat(chat)
 }
@@ -944,7 +966,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 	if err != nil {
 		return nil, err
 	}
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 	event := v1protocol.NewMemberRemovedEvent(
 		contactIDFromPublicKey(&m.identity.PublicKey),
 		clock,
@@ -985,6 +1007,11 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, m.saveChat(chat)
 }
 
@@ -1117,10 +1144,6 @@ func (m *Messenger) Contacts() []*Contact {
 	}
 
 	return contacts
-}
-
-func timestampInMs() uint64 {
-	return uint64(time.Now().UnixNano() / int64(time.Millisecond))
 }
 
 // ReSendChatMessage pulls a message from the database and sends it again
@@ -1280,7 +1303,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, errors.New("Chat not found")
 	}
 
-	err := extendMessageFromChat(message, chat, &m.identity.PublicKey)
+	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.getTimesource())
 	if err != nil {
 		return nil, err
 	}
@@ -1334,7 +1357,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.getTimesource())
 	if err != nil {
 		return nil, err
 	}
@@ -1405,13 +1428,13 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		if err != nil {
 			return nil, err
 		}
-		chat = OneToOneFromPublicKey(publicKey)
+		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
 	m.allChats[chat.ID] = chat
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	contactUpdate := &protobuf.ContactUpdate{
 		Clock:        clock,
@@ -1498,13 +1521,13 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey)
+		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
 	m.allChats[chat.ID] = chat
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	pairMessage := &protobuf.PairInstallation{
 		Clock:          clock,
@@ -1546,13 +1569,13 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey)
+		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
 	m.allChats[chat.ID] = chat
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationPublicChat{
 		Clock: clock,
@@ -1587,13 +1610,13 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		chat = OneToOneFromPublicKey(&m.identity.PublicKey)
+		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
 	m.allChats[chat.ID] = chat
-	clock, _ := chat.NextClockAndTimestamp()
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationContact{
 		Clock:        clock,
@@ -1678,6 +1701,8 @@ type ReceivedMessageState struct {
 	ExistingMessagesMap map[string]bool
 	// Response to the client
 	Response *MessengerResponse
+	// Timesource is a timesource for clock values/timestamps
+	Timesource ClockValueTimesource
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
@@ -1692,6 +1717,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
 		Response:              &MessengerResponse{},
+		Timesource:            m.getTimesource(),
 	}
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
@@ -2042,6 +2068,7 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 			contact.ENSVerifiedAt = details.VerifiedAt
 			contact.Name = details.Name
 
+			m.allContacts[contact.ID] = contact
 			contacts = append(contacts, contact)
 		} else {
 			m.logger.Warn("Failed to resolve ens name",
@@ -2083,7 +2110,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	}
 
 	message := &Message{}
-	err := extendMessageFromChat(message, chat, &m.identity.PublicKey)
+	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2129,7 +2156,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2160,7 +2187,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	}
 
 	message := &Message{}
-	err := extendMessageFromChat(message, chat, &m.identity.PublicKey)
+	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2205,7 +2232,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2246,7 +2273,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	clock, timestamp := chat.NextClockAndTimestamp()
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
@@ -2254,7 +2281,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	message.OutgoingStatus = OutgoingStatusSending
 
 	// Hide previous message
-	previousMessage, err := m.persistence.MessageByCommandID(messageID)
+	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
 	if err != nil {
 		return nil, err
 	}
@@ -2300,7 +2327,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2341,7 +2368,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	clock, timestamp := chat.NextClockAndTimestamp()
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
@@ -2382,7 +2409,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2423,7 +2450,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	clock, timestamp := chat.NextClockAndTimestamp()
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
@@ -2464,7 +2491,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2505,7 +2532,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	clock, timestamp := chat.NextClockAndTimestamp()
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
@@ -2513,7 +2540,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.OutgoingStatus = OutgoingStatusSending
 
 	// Hide previous message
-	previousMessage, err := m.persistence.MessageByCommandID(messageID)
+	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
 	if err != nil && err != errRecordNotFound {
 		return nil, err
 	}
@@ -2563,7 +2590,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2594,7 +2621,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	}
 
 	message := &Message{}
-	err := extendMessageFromChat(message, chat, &m.identity.PublicKey)
+	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2603,7 +2630,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.LocalChatID = chatID
 
-	clock, timestamp := chat.NextClockAndTimestamp()
+	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
@@ -2644,7 +2671,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	err = chat.UpdateFromMessage(message)
+	err = chat.UpdateFromMessage(message, m.transport)
 	if err != nil {
 		return nil, err
 	}
@@ -2688,13 +2715,13 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		chatID := contactIDFromPublicKey(validationResult.Transaction.From)
 		chat, ok := m.allChats[chatID]
 		if !ok {
-			chat = OneToOneFromPublicKey(validationResult.Transaction.From)
+			chat = OneToOneFromPublicKey(validationResult.Transaction.From, m.transport)
 		}
 		if validationResult.Message != nil {
 			message = validationResult.Message
 		} else {
 			message = &Message{}
-			err := extendMessageFromChat(message, chat, &m.identity.PublicKey)
+			err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 			if err != nil {
 				return nil, err
 			}
@@ -2705,7 +2732,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		message.LocalChatID = chatID
 		message.OutgoingStatus = ""
 
-		clock, timestamp := chat.NextClockAndTimestamp()
+		clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 		message.Clock = clock
 		message.Timestamp = timestamp
 		message.WhisperTimestamp = timestamp
@@ -2729,23 +2756,25 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			return nil, err
 		}
 
-		err = chat.UpdateFromMessage(message)
+		err = chat.UpdateFromMessage(message, m.transport)
 		if err != nil {
 			return nil, err
 		}
 
-		// Hide previous message
-		previousMessage, err := m.persistence.MessageByCommandID(message.CommandParameters.ID)
-		if err != nil && err != errRecordNotFound {
-			return nil, err
-		}
-
-		if previousMessage != nil {
-			err = m.persistence.HideMessage(previousMessage.ID)
-			if err != nil {
+		if len(message.CommandParameters.ID) != 0 {
+			// Hide previous message
+			previousMessage, err := m.persistence.MessageByCommandID(chatID, message.CommandParameters.ID)
+			if err != nil && err != errRecordNotFound {
 				return nil, err
 			}
-			message.Replace = previousMessage.ID
+
+			if previousMessage != nil {
+				err = m.persistence.HideMessage(previousMessage.ID)
+				if err != nil {
+					return nil, err
+				}
+				message.Replace = previousMessage.ID
+			}
 		}
 
 		response.Messages = append(response.Messages, message)
@@ -2764,4 +2793,8 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		}
 	}
 	return &response, nil
+}
+
+func (m *Messenger) getTimesource() ClockValueTimesource {
+	return m.transport
 }

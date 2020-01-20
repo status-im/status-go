@@ -9,8 +9,8 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
-func extendMessageFromChat(message *Message, chat *Chat, key *ecdsa.PublicKey) error {
-	clock, timestamp := chat.NextClockAndTimestamp()
+func extendMessageFromChat(message *Message, chat *Chat, key *ecdsa.PublicKey, timesource ClockValueTimesource) error {
+	clock, timestamp := chat.NextClockAndTimestamp(timesource)
 
 	message.LocalChatID = chat.ID
 	message.Clock = clock

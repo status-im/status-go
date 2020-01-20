@@ -3,7 +3,6 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
-	"strings"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -33,7 +32,7 @@ type Contact struct {
 	// ID of the contact. It's a hex-encoded public key (prefixed with 0x).
 	ID string `json:"id"`
 	// Ethereum address of the contact
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
 	// ENS name of contact
 	Name string `json:"name,omitempty"`
 	// EnsVerified whether we verified the name of the contact
@@ -54,7 +53,7 @@ type Contact struct {
 	SystemTags []string `json:"systemTags"`
 
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
-	TributeToTalk string              `json:"tributeToTalk"`
+	TributeToTalk string              `json:"tributeToTalk,omitEmpty"`
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
@@ -88,8 +87,6 @@ func existsInStringSlice(set []string, find string) bool {
 }
 
 func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
-	address := strings.ToLower(crypto.PubkeyToAddress(*publicKey).Hex())
-
 	id := "0x" + hex.EncodeToString(crypto.FromECDSAPub(publicKey))
 
 	identicon, err := identicon.GenerateBase64(id)
@@ -99,7 +96,6 @@ func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
 
 	contact := &Contact{
 		ID:        id,
-		Address:   address[2:],
 		Alias:     alias.GenerateFromPublicKey(publicKey),
 		Identicon: identicon,
 	}

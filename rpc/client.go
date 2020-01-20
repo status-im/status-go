@@ -155,6 +155,10 @@ func (c *Client) CallContextIgnoringLocalHandlers(ctx context.Context, result in
 		return client.CallContext(ctx, result, method, args...)
 	}
 
+	if c.local == nil {
+		c.log.Warn("Local JSON-RPC endpoint missing", "method", method)
+		return errors.New("missing local JSON-RPC endpoint")
+	}
 	return c.local.CallContext(ctx, result, method, args...)
 }
 

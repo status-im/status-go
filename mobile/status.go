@@ -27,8 +27,6 @@ import (
 	"github.com/status-im/status-go/transactions"
 )
 
-var statusBackend = api.NewGethStatusBackend()
-
 // OpenAccounts opens database and returns accounts list.
 func OpenAccounts(datadir string) string {
 	statusBackend.UpdateRootDataDir(datadir)
@@ -205,49 +203,51 @@ func CallPrivateRPC(inputJSON string) string {
 // CreateAccount is equivalent to creating an account from the command line,
 // just modified to handle the function arg passing.
 func CreateAccount(password string) string {
-	info, mnemonic, err := statusBackend.AccountManager().CreateAccount(password)
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
+	panic("CreateAccount")
+	// info, mnemonic, err := statusBackend.AccountManager().CreateAccount(password)
+	// errString := ""
+	// if err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// 	errString = err.Error()
+	// }
 
-	out := AccountInfo{
-		Address:       info.WalletAddress,
-		PubKey:        info.WalletPubKey,
-		WalletAddress: info.WalletAddress,
-		WalletPubKey:  info.WalletPubKey,
-		ChatAddress:   info.ChatAddress,
-		ChatPubKey:    info.ChatPubKey,
-		Mnemonic:      mnemonic,
-		Error:         errString,
-	}
-	outBytes, _ := json.Marshal(out)
-	return string(outBytes)
+	// out := AccountInfo{
+	// 	Address:       info.WalletAddress,
+	// 	PubKey:        info.WalletPubKey,
+	// 	WalletAddress: info.WalletAddress,
+	// 	WalletPubKey:  info.WalletPubKey,
+	// 	ChatAddress:   info.ChatAddress,
+	// 	ChatPubKey:    info.ChatPubKey,
+	// 	Mnemonic:      mnemonic,
+	// 	Error:         errString,
+	// }
+	// outBytes, _ := json.Marshal(out)
+	// return string(outBytes)
 }
 
 // RecoverAccount re-creates master key using given details.
 func RecoverAccount(password, mnemonic string) string {
-	info, err := statusBackend.AccountManager().RecoverAccount(password, mnemonic)
+	panic("RecoverAccount")
+	// info, err := statusBackend.AccountManager().RecoverAccount(password, mnemonic)
 
-	errString := ""
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		errString = err.Error()
-	}
+	// errString := ""
+	// if err != nil {
+	// 	fmt.Fprintln(os.Stderr, err)
+	// 	errString = err.Error()
+	// }
 
-	out := AccountInfo{
-		Address:       info.WalletAddress,
-		PubKey:        info.WalletPubKey,
-		WalletAddress: info.WalletAddress,
-		WalletPubKey:  info.WalletPubKey,
-		ChatAddress:   info.ChatAddress,
-		ChatPubKey:    info.ChatPubKey,
-		Mnemonic:      mnemonic,
-		Error:         errString,
-	}
-	outBytes, _ := json.Marshal(out)
-	return string(outBytes)
+	// out := AccountInfo{
+	// 	Address:       info.WalletAddress,
+	// 	PubKey:        info.WalletPubKey,
+	// 	WalletAddress: info.WalletAddress,
+	// 	WalletPubKey:  info.WalletPubKey,
+	// 	ChatAddress:   info.ChatAddress,
+	// 	ChatPubKey:    info.ChatPubKey,
+	// 	Mnemonic:      mnemonic,
+	// 	Error:         errString,
+	// }
+	// outBytes, _ := json.Marshal(out)
+	// return string(outBytes)
 }
 
 // StartOnboarding initialize the onboarding with n random accounts

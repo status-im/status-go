@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/status-im/status-go/node"
+	"github.com/status-im/status-go/rpc"
 )
 
 type API struct {
-	node                *node.StatusNode
-	activeSubscriptions *Subscriptions
+	rpcPrivateClientFunc func() *rpc.Client
+	activeSubscriptions  *Subscriptions
 }
 
-func NewPublicAPI(node *node.StatusNode) *API {
+func NewPublicAPI(rpcPrivateClientFunc func() *rpc.Client) *API {
 	return &API{
-		node:                node,
-		activeSubscriptions: NewSubscriptions(100 * time.Millisecond),
+		rpcPrivateClientFunc: rpcPrivateClientFunc,
+		activeSubscriptions:  NewSubscriptions(100 * time.Millisecond),
 	}
 }
 
@@ -26,13 +26,11 @@ func (api *API) SubscribeSignal(method string, args []interface{}) (Subscription
 		namespace = method[:3]
 	)
 
-	rpc := api.node.RPCPrivateClient()
-
 	switch namespace {
 	case "shh":
-		filter, err = installShhFilter(rpc, method, args)
+		filter, err = installShhFilter(api.rpcPrivateClientFunc(), method, args)
 	case "eth":
-		filter, err = installEthFilter(rpc, method, args)
+		filter, err = installEthFilter(api.rpcPrivateClientFunc(), method, args)
 	default:
 		err = fmt.Errorf("unexpected namespace: %s", namespace)
 	}

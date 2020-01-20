@@ -1,5 +1,3 @@
-// +build !nimbus
-
 package account
 
 import (
@@ -15,8 +13,8 @@ type GethManager struct {
 	gethAccManager *accounts.Manager
 }
 
-// NewManager returns new node account manager.
-func NewManager() *GethManager {
+// NewGethManager returns new node account manager.
+func NewGethManager() *GethManager {
 	m := &GethManager{}
 	m.Manager = &Manager{accountsGenerator: generator.New(m)}
 	return m

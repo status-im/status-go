@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/status-im/status-go/services/shhext"
+
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/crypto/sha3"
 
@@ -25,7 +27,6 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
-	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/whisper/v6"

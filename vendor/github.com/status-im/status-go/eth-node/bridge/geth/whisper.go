@@ -80,6 +80,11 @@ func (w *gethWhisperWrapper) DeleteKeyPair(keyID string) bool {
 	return w.whisper.DeleteKeyPair(keyID)
 }
 
+// DeleteKeyPairs removes all cryptographic identities known to the node
+func (w *gethWhisperWrapper) DeleteKeyPairs() error {
+	return w.whisper.DeleteKeyPairs()
+}
+
 func (w *gethWhisperWrapper) AddSymKeyDirect(key []byte) (string, error) {
 	return w.whisper.AddSymKeyDirect(key)
 }
