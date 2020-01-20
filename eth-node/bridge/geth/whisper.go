@@ -166,7 +166,7 @@ func (w *gethWhisperWrapper) SendMessagesRequest(peerID []byte, r types.Messages
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (w *gethWhisperWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
-	return w.whisper.RequestHistoricMessagesWithTimeout(peerID, MustUnwrapWhisperEnvelope(envelope), timeout)
+	return w.whisper.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*whisper.Envelope), timeout)
 }
 
 // SyncMessages can be sent between two Mail Servers and syncs envelopes between them.
