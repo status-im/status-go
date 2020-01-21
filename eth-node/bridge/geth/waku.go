@@ -166,7 +166,7 @@ func (w *gethWakuWrapper) SendMessagesRequest(peerID []byte, r types.MessagesReq
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (w *gethWakuWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
-	return w.waku.RequestHistoricMessagesWithTimeout(peerID, MustUnwrapWakuEnvelope(envelope), timeout)
+	return w.waku.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*waku.Envelope), timeout)
 }
 
 type wakuFilterWrapper struct {

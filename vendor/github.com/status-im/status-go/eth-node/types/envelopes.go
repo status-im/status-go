@@ -3,7 +3,9 @@ package types
 // Envelope represents a clear-text data packet to transmit through the Whisper
 // network. Its contents may or may not be encrypted and signed.
 type Envelope interface {
-	Hash() Hash // Cached hash of the envelope to avoid rehashing every time.
+	Wrapped
+
+	Hash() Hash // cached hash of the envelope to avoid rehashing every time
 	Bloom() []byte
 	PoW() float64
 	Expiry() uint32

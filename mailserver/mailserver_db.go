@@ -23,7 +23,7 @@ type DB interface {
 type Iterator interface {
 	Next() bool
 	DBKey() (*DBKey, error)
-	Release()
+	Release() error
 	Error() error
 	GetEnvelope(bloom []byte) ([]byte, error)
 }
@@ -34,4 +34,5 @@ type CursorQuery struct {
 	cursor []byte
 	limit  uint32
 	bloom  []byte
+	topics [][]byte
 }

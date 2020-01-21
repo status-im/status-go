@@ -75,8 +75,7 @@ func testMailserverPeer(t *testing.T) {
 	require.NoError(t, err)
 	// register mail service as well
 	err = n.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		mailService := shhext.New(config, gethbridge.NewNodeBridge(n), ctx, nil, nil)
-		return mailService, nil
+		return shhext.New(config, gethbridge.NewNodeBridge(n), ctx, nil, nil), nil
 	})
 	require.NoError(t, err)
 	var mailService *shhext.Service

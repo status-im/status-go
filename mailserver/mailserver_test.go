@@ -440,6 +440,7 @@ func (s *MailserverSuite) TestDecodeRequest() {
 		Lower:  50,
 		Upper:  100,
 		Bloom:  []byte{0x01},
+		Topics: [][]byte{},
 		Limit:  10,
 		Cursor: []byte{},
 		Batch:  true,
@@ -530,7 +531,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 				processFinished := make(chan struct{})
 
 				go func() {
-					s.server.ms.processRequestInBundles(iter, payload.Bloom, int(payload.Limit), timeout, "req-01", bundles, done)
+					s.server.ms.processRequestInBundles(iter, payload.Bloom, payload.Topics, int(payload.Limit), timeout, "req-01", bundles, done)
 					close(processFinished)
 				}()
 				go close(done)
@@ -554,7 +555,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 				processFinished := make(chan struct{})
 
 				go func() {
-					s.server.ms.processRequestInBundles(iter, payload.Bloom, int(payload.Limit), time.Second, "req-01", bundles, done)
+					s.server.ms.processRequestInBundles(iter, payload.Bloom, payload.Topics, int(payload.Limit), time.Second, "req-01", bundles, done)
 					close(processFinished)
 				}()
 
@@ -572,7 +573,7 @@ func (s *MailserverSuite) TestProcessRequestDeadlockHandling() {
 			iter, err := s.server.ms.createIterator(payload)
 			s.Require().NoError(err)
 
-			defer iter.Release()
+			defer func() { _ = iter.Release() }()
 
 			// Nothing reads from this unbuffered channel which simulates a situation
 			// when a connection between a peer and mail server was dropped.
@@ -772,7 +773,7 @@ func generateEnvelope(sentTime time.Time) (*whisper.Envelope, error) {
 
 func processRequestAndCollectHashes(server *WhisperMailServer, payload MessagesRequestPayload) ([]common.Hash, []byte, types.Hash) {
 	iter, _ := server.ms.createIterator(payload)
-	defer iter.Release()
+	defer func() { _ = iter.Release() }()
 	bundles := make(chan []rlp.RawValue, 10)
 	done := make(chan struct{})
 
@@ -790,7 +791,7 @@ func processRequestAndCollectHashes(server *WhisperMailServer, payload MessagesR
 		close(done)
 	}()
 
-	cursor, lastHash := server.ms.processRequestInBundles(iter, payload.Bloom, int(payload.Limit), time.Minute, "req-01", bundles, done)
+	cursor, lastHash := server.ms.processRequestInBundles(iter, payload.Bloom, payload.Topics, int(payload.Limit), time.Minute, "req-01", bundles, done)
 
 	<-done
 

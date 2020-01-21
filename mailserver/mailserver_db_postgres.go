@@ -2,8 +2,11 @@ package mailserver
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/lib/pq"
 
 	// Import postgres driver
 	_ "github.com/lib/pq"
@@ -20,6 +23,10 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
+type PostgresDB struct {
+	db *sql.DB
+}
+
 func NewPostgresDB(uri string) (*PostgresDB, error) {
 	db, err := sql.Open("postgres", uri)
 	if err != nil {
@@ -32,10 +39,6 @@ func NewPostgresDB(uri string) (*PostgresDB, error) {
 	}
 
 	return instance, nil
-}
-
-type PostgresDB struct {
-	db *sql.DB
 }
 
 type postgresIterator struct {
@@ -52,11 +55,11 @@ func (i *postgresIterator) DBKey() (*DBKey, error) {
 }
 
 func (i *postgresIterator) Error() error {
-	return nil
+	return i.Err()
 }
 
-func (i *postgresIterator) Release() {
-	i.Close()
+func (i *postgresIterator) Release() error {
+	return i.Close()
 }
 
 func (i *postgresIterator) GetEnvelope(bloom []byte) ([]byte, error) {
@@ -70,35 +73,40 @@ func (i *postgresIterator) GetEnvelope(bloom []byte) ([]byte, error) {
 }
 
 func (i *PostgresDB) BuildIterator(query CursorQuery) (Iterator, error) {
-	var upperLimit []byte
-	var stmtString string
-	if len(query.cursor) > 0 {
-		// If we have a cursor, we don't want to include that envelope in the result set
-		upperLimit = query.cursor
+	var args []interface{}
 
-		// We disable security checks as we need to use string interpolation
-		// for this, but it's converted to 0s and 1s so no injection should be possible
-		/* #nosec */
-		stmtString = fmt.Sprintf("SELECT id, data FROM envelopes where id >= $1 AND id < $2 AND bloom & b'%s'::bit(512) = bloom ORDER BY ID DESC LIMIT $3", toBitString(query.bloom))
+	stmtString := "SELECT id, data FROM envelopes"
+
+	if len(query.cursor) > 0 {
+		args = append(args, query.start, query.cursor)
+		// If we have a cursor, we don't want to include that envelope in the result set
+		stmtString += " " + "WHERE id >= $1 AND id < $2"
 	} else {
-		upperLimit = query.end
-		// We disable security checks as we need to use string interpolation
-		// for this, but it's converted to 0s and 1s so no injection should be possible
-		/* #nosec */
-		stmtString = fmt.Sprintf("SELECT id, data FROM envelopes where id >= $1 AND id <= $2 AND bloom & b'%s'::bit(512) = bloom ORDER BY ID DESC LIMIT $3", toBitString(query.bloom))
+		args = append(args, query.start, query.end)
+		stmtString += " " + "WHERE id >= $1 AND id <= $2"
 	}
+
+	if len(query.topics) > 0 {
+		args = append(args, pq.Array(query.topics))
+		stmtString += " " + "AND topic = any($3)"
+	} else {
+		stmtString += " " + fmt.Sprintf("AND bloom & b'%s'::bit(512) = bloom", toBitString(query.bloom))
+	}
+
+	// Positional argument depends on the fact whether the query uses topics or bloom filter.
+	// If topic is used, the list of topics is passed as an argument to the query.
+	// If bloom filter is used, it is included into the query statement.
+	args = append(args, query.limit)
+	stmtString += " " + fmt.Sprintf("ORDER BY ID DESC LIMIT $%d", len(args))
 
 	stmt, err := i.db.Prepare(stmtString)
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := stmt.Query(query.start, upperLimit, query.limit)
-
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
-
 	return &postgresIterator{rows}, nil
 }
 
@@ -185,11 +193,15 @@ func (i *PostgresDB) Prune(t time.Time, batch int) (int, error) {
 func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
 	topic := env.Topic()
 	key := NewDBKey(env.Expiry()-env.TTL(), topic, env.Hash())
-	rawEnvelope, err := rlp.EncodeToBytes(env)
+	rawEnvelope, err := rlp.EncodeToBytes(env.Unwrap())
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
 		archivedErrorsCounter.Inc()
 		return err
+	}
+	if rawEnvelope == nil {
+		archivedErrorsCounter.Inc()
+		return errors.New("failed to encode envelope to bytes")
 	}
 
 	statement := "INSERT INTO envelopes (id, data, topic, bloom) VALUES ($1, $2, $3, B'"
