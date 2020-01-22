@@ -2057,7 +2057,7 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 	var contacts []*Contact
 	for _, details := range ensResponse {
 		if details.Error == nil {
-			contact, ok := m.allContacts[details.PublicKeyString]
+			contact, ok := m.allContacts["0x"+details.PublicKeyString]
 			if !ok {
 				contact, err = buildContact(details.PublicKey)
 				if err != nil {
