@@ -100,6 +100,7 @@ func (db *Database) GetBrowsers() (rst []*Browser, err error) {
 		browsers[browser.ID] = &browser
 		rst = append(rst, &browser)
 	}
+	rows.Close()
 	rows, err = tx.Query("SELECT browser_id, history from browsers_history")
 	if err != nil {
 		return
@@ -115,6 +116,7 @@ func (db *Database) GetBrowsers() (rst []*Browser, err error) {
 		}
 		browsers[id].History = append(browsers[id].History, history)
 	}
+	rows.Close()
 	return rst, nil
 }
 

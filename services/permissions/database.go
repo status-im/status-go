@@ -95,6 +95,7 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 		}
 		dapps[perms.Name] = &perms
 	}
+	rows.Close()
 	rows, err = tx.Query("SELECT dapp_name, permission from permissions")
 	if err != nil {
 		return
@@ -110,6 +111,7 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 		}
 		dapps[name].Permissions = append(dapps[name].Permissions, permission)
 	}
+	rows.Close()
 	rst = make([]DappPermissions, 0, len(dapps))
 	for key := range dapps {
 		rst = append(rst, *dapps[key])

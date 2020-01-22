@@ -42,6 +42,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	rst := []Account{}
 	inthelper := sql.NullInt64{}
 	for rows.Next() {

@@ -26,6 +26,7 @@ func (s *sqlitePersistence) GetActiveInstallations(maxInstallations int, identit
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var (

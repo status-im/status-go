@@ -324,6 +324,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	accounts := []Account{}
 	pubkey := []byte{}
 	for rows.Next() {
@@ -410,6 +411,7 @@ func (db *Database) GetAddresses() (rst []types.Address, err error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		addr := types.Address{}
 		err = rows.Scan(&addr)
