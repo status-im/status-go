@@ -18,7 +18,7 @@ export MAIL_PASSWORD  ?= status-offline-inbox
 # Necessary to make mailserver available publicly
 export PUBLIC_IP      ?= $(shell curl -s https://ipecho.net/plain)
 
-all: checks start show info enode
+all: checks start show info enode enode-qr
 
 checks:
 ifeq (, $(shell which docker))
@@ -51,6 +51,9 @@ logs:
 
 enode:
 	@$(GIT_ROOT)/_assets/scripts/get_enode.sh
+
+enode-qr:
+	@$(GIT_ROOT)/_assets/scripts/get_enode.sh --qr
 
 config:
 	@$(GIT_ROOT)/_assets/scripts/gen_config.sh

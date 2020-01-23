@@ -26,6 +26,16 @@ ENODE_RAW=$(echo "${RESP_JSON}" | jq -r '.result.enode')
 ENODE_CLEAN=$(echo "${ENODE_RAW}" | grep -oP '\Kenode://[^?]+')
 
 # replace localhost with public IP and add mail password
-echo "${ENODE_CLEAN}" | sed \
+ENODE=$(echo "${ENODE_CLEAN}" | sed \
     -e "s/127.0.0.1/${PUBLIC_IP}/" \
-    -e "s/@/:${MAIL_PASSWORD}@/"
+    -e "s/@/:${MAIL_PASSWORD}@/")
+
+if [[ "$1" == "--qr" ]]; then
+    if ! [ -x "$(command -v qrencode)" ]; then
+      echo 'Install 'qrencode' for enode QR code.' >&2
+      exit 0
+    fi
+    qrencode -t UTF8 "${ENODE}"
+else
+    echo "${ENODE}"
+fi
