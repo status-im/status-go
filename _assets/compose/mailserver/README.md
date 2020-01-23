@@ -20,6 +20,7 @@ To simply start a container run `make`, other commands include:
 * `make logs` - Shows you logs of the container.
 * `make config` - Creates `${DATA_PATH}/config.json` with your Public IP.
 * `make enode` - Shows `enode://` address of the container.
+* `make enode-qr` - Shows `enode://` address using a QR code.
 
 # Settings
 

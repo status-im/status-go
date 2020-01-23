@@ -38,7 +38,7 @@ $(shell $(GIT_ROOT)/_assets/scripts/get_enode.sh 2>/dev/null)
 endef
 export INFO_MSG
 
-all: checks build config service enable restart info
+all: checks build config service enable restart info enode-qr
 
 clean: stop disable rm-service forget 
 
@@ -61,6 +61,9 @@ info:
 
 enode:
 	@$(GIT_ROOT)/_assets/scripts/get_enode.sh
+
+enode-qr:
+	@$(GIT_ROOT)/_assets/scripts/get_enode.sh --qr
 
 status:
 	systemctl $(SCTL_OPTS) status --no-pager $(SERVICE_NAME)

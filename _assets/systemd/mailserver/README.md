@@ -18,6 +18,7 @@ In order to manage the new `statusd` service you use other `Makefile` targets:
 
 * `make info` - Info about service
 * `make enode` - Get enode address
+* `make enode-qr` - Get enode address as QR code
 * `make start` - Start the service
 * `make stop` - Stop the service
 * `make status` - Check service status
