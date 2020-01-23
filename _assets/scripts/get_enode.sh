@@ -6,6 +6,8 @@ RPC_PORT="${RPC_PORT:-8545}"
 if [[ -z "${PUBLIC_IP}" ]]; then
     PUBLIC_IP=$(curl -s https://ipecho.net/plain)
 fi
+# Necessary for enode address for Status app
+MAIL_PASSWORD="${MAIL_PASSWORD:-status-offline-inbox}"
 
 # query local 
 RESP_JSON=$(
@@ -23,5 +25,7 @@ ENODE_RAW=$(echo "${RESP_JSON}" | jq -r '.result.enode')
 # drop arguments at the end of enode address
 ENODE_CLEAN=$(echo "${ENODE_RAW}" | grep -oP '\Kenode://[^?]+')
 
-# replace localhost with public IP
-echo "${ENODE_CLEAN}" | sed s/127.0.0.1/${PUBLIC_IP}/
+# replace localhost with public IP and add mail password
+echo "${ENODE_CLEAN}" | sed \
+    -e "s/127.0.0.1/${PUBLIC_IP}/" \
+    -e "s/@/:${MAIL_PASSWORD}@/"
