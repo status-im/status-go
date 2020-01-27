@@ -42,7 +42,7 @@ require (
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/eth-node v1.1.0
 	github.com/status-im/status-go/extkeys v1.1.0
-	github.com/status-im/status-go/protocol v1.1.0
+	github.com/status-im/status-go/protocol v1.1.1
 	github.com/status-im/status-go/waku v1.1.0
 	github.com/status-im/status-go/whisper/v6 v6.1.0
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
