@@ -2043,10 +2043,15 @@ func Identicon(id string) (string, error) {
 }
 
 // VerifyENSNames verifies that a registered ENS name matches the expected public key
-func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetails []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
+func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetails []enstypes.ENSDetails) (map[string]*enstypes.ENSResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	verifier := m.node.NewENSVerifier(m.logger)
+
+	clockValues := make(map[string]uint64)
+	for _, details := range ensDetails {
+		clockValues[details.PublicKeyString] = details.Clock
+	}
 
 	ensResponse, err := verifier.CheckBatch(ensDetails, rpcEndpoint, contractAddress)
 	if err != nil {
@@ -2065,7 +2070,9 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 				}
 			}
 			contact.ENSVerified = details.Verified
-			contact.ENSVerifiedAt = details.VerifiedAt
+			clock := clockValues[details.PublicKeyString]
+			contact.ENSVerifiedAt = clock
+			details.VerifiedAt = clock
 			contact.Name = details.Name
 
 			m.allContacts[contact.ID] = contact

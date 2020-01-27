@@ -309,7 +309,7 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 }
 
 // VerifyENSNames takes a list of ensdetails and returns whether they match the public key specified
-func (api *PublicAPI) VerifyENSNames(details []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
+func (api *PublicAPI) VerifyENSNames(details []enstypes.ENSDetails) (map[string]*enstypes.ENSResponse, error) {
 	return api.service.messenger.VerifyENSNames(params.MainnetEthereumNetworkURL, ensContractAddress, details)
 }
 

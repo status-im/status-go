@@ -30,14 +30,13 @@ func NewVerifier(logger *zap.Logger) *ENSVerifier {
 	return &ENSVerifier{logger: logger}
 }
 
-func (m *ENSVerifier) verifyENSName(ensInfo enstypes.ENSDetails, ethclient *ethclient.Client) enstypes.ENSResponse {
+func (m *ENSVerifier) verifyENSName(ensInfo enstypes.ENSDetails, ethclient *ethclient.Client) *enstypes.ENSResponse {
 	publicKeyStr := ensInfo.PublicKeyString
 	ensName := ensInfo.Name
 	m.logger.Info("Resolving ENS name", zap.String("name", ensName), zap.String("publicKey", publicKeyStr))
-	response := enstypes.ENSResponse{
+	response := &enstypes.ENSResponse{
 		Name:            ensName,
 		PublicKeyString: publicKeyStr,
-		VerifiedAt:      time.Now().Unix(),
 	}
 
 	expectedPubKeyBytes, err := hex.DecodeString(publicKeyStr)
@@ -75,12 +74,12 @@ func (m *ENSVerifier) verifyENSName(ensInfo enstypes.ENSDetails, ethclient *ethc
 }
 
 // CheckBatch verifies that a registered ENS name matches the expected public key
-func (m *ENSVerifier) CheckBatch(ensDetails []enstypes.ENSDetails, rpcEndpoint, contractAddress string) (map[string]enstypes.ENSResponse, error) {
+func (m *ENSVerifier) CheckBatch(ensDetails []enstypes.ENSDetails, rpcEndpoint, contractAddress string) (map[string]*enstypes.ENSResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), contractQueryTimeout)
 	defer cancel()
 
-	ch := make(chan enstypes.ENSResponse)
-	response := make(map[string]enstypes.ENSResponse)
+	ch := make(chan *enstypes.ENSResponse)
+	response := make(map[string]*enstypes.ENSResponse)
 
 	ethclient, err := ethclient.DialContext(ctx, rpcEndpoint)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 
 const (
 	// How often a ticker fires in seconds.
-	tickerInterval = 120
+	tickerInterval = 10
 	// How often we should publish a contact code in seconds.
 	publishInterval = 21600
 	// Cooldown period on acking messages when not targeting our device.

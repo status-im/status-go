@@ -38,7 +38,7 @@ type Contact struct {
 	// EnsVerified whether we verified the name of the contact
 	ENSVerified bool `json:"ensVerified"`
 	// EnsVerifiedAt the time we last verified the name
-	ENSVerifiedAt int64 `json:"ensVerifiedAt"`
+	ENSVerifiedAt uint64 `json:"ensVerifiedAt"`
 	// Generated username name of the contact
 	Alias string `json:"alias,omitempty"`
 	// Identicon generated from public key
