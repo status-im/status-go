@@ -78,12 +78,10 @@ type MessengerResponse struct {
 	Messages      []*Message                  `json:"messages,omitempty"`
 	Contacts      []*Contact                  `json:"contacts,omitempty"`
 	Installations []*multidevice.Installation `json:"installations,omitempty"`
-	// Raw unprocessed messages
-	RawMessages []*RawResponse `json:"rawMessages,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.RawMessages) == 0 && len(m.Installations) == 0
+	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0
 }
 
 type featureFlags struct {
@@ -1725,9 +1723,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
-	rawMessages := make(map[transport.Filter][]*v1protocol.StatusMessage)
-
-	for chat, messages := range chatWithMessages {
+	for _, messages := range chatWithMessages {
 		for _, shhMessage := range messages {
 			// TODO: fix this to use an exported method.
 			statusMessages, err := m.processor.handleMessages(shhMessage, true)
@@ -1899,12 +1895,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					default:
-						// RawMessage, not processed here, pass straight to the client
-						rawMessages[chat] = append(rawMessages[chat], msg)
+						logger.Debug("message not handled")
+
 					}
-				} else {
-					logger.Debug("Adding raw message", zap.Any("msg", msg))
-					rawMessages[chat] = append(rawMessages[chat], msg)
 				}
 			}
 		}
@@ -1948,10 +1941,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	for filter, messages := range rawMessages {
-		messageState.Response.RawMessages = append(messageState.Response.RawMessages, &RawResponse{Filter: &filter, Messages: messages})
 	}
 
 	// Reset installations

@@ -40,8 +40,7 @@ message ChatMessage {
     PUBLIC_GROUP = 2;
     PRIVATE_GROUP = 3;
     // Only local
-    SYSTEM_MESSAGE_PRIVATE_GROUP = 4;
-    }
+    SYSTEM_MESSAGE_PRIVATE_GROUP = 4;}
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;
@@ -49,5 +48,7 @@ message ChatMessage {
     STATUS = 3;
     EMOJI = 4;
     TRANSACTION_COMMAND = 5;
+    // Only local
+    SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP = 6;
   }
 }
