@@ -166,7 +166,7 @@ func checkRanges(parent context.Context, client reactorClient, cache BalanceCach
 	return c.GetRanges(), c.GetHeaders(), nil
 }
 
-func findBlocksWithEthTransfers(parent context.Context, client reactorClient, cache BalanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int) (from *big.Int, headers []*DBHeader, err error) {
+func findBlocksWithEthTransfers(parent context.Context, client reactorClient, cache BalanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int, noLimit bool) (from *big.Int, headers []*DBHeader, err error) {
 	ranges := [][]*big.Int{{low, high}}
 	minBlock := big.NewInt(low.Int64())
 	headers = []*DBHeader{}
@@ -184,7 +184,7 @@ func findBlocksWithEthTransfers(parent context.Context, client reactorClient, ca
 		if len(newRanges) > 0 {
 			log.Debug("found new ranges", "account", account, "lvl", lvl, "new ranges len", len(newRanges))
 		}
-		if len(newRanges) > 60 {
+		if len(newRanges) > 60 && !noLimit {
 			sort.SliceStable(newRanges, func(i, j int) bool {
 				return newRanges[i][0].Cmp(newRanges[j][0]) == 1
 			})

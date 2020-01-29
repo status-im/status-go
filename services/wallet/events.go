@@ -24,8 +24,9 @@ const (
 
 // Event is a type for wallet events.
 type Event struct {
-	Type        EventType        `json:"type"`
-	BlockNumber *big.Int         `json:"blockNumber"`
-	Accounts    []common.Address `json:"accounts"`
-	ERC20       bool             `json:"erc20"`
+	Type                      EventType              `json:"type"`
+	BlockNumber               *big.Int               `json:"blockNumber"`
+	Accounts                  []common.Address       `json:"accounts"`
+	NewTransactionsPerAccount map[common.Address]int `json:"newTransactions"`
+	ERC20                     bool                   `json:"erc20"`
 }

@@ -54,6 +54,7 @@ func (s *NewBlocksSuite) SetupTest() {
 		},
 		feed:   s.feed,
 		client: s.backend.Client,
+		chain:  big.NewInt(1777),
 	}
 }
 
@@ -153,7 +154,11 @@ func (s *NewBlocksSuite) TestReorg() {
 	s.Require().EqualError(s.runCmdUntilError(ctx), "not found")
 
 	close(events)
-	expected := []Event{{Type: EventReorg, BlockNumber: big.NewInt(21)}, {Type: EventNewBlock, BlockNumber: big.NewInt(25)}}
+	expected := []Event{
+		{Type: EventReorg, BlockNumber: big.NewInt(21)},
+		{Type: EventNewBlock, BlockNumber: big.NewInt(24)},
+		{Type: EventNewBlock, BlockNumber: big.NewInt(25)},
+	}
 	i := 0
 	for ev := range events {
 		s.Require().Equal(expected[i].Type, ev.Type)
@@ -161,7 +166,7 @@ func (s *NewBlocksSuite) TestReorg() {
 		i++
 	}
 
-	transfers, err = s.db.GetTransfers(big.NewInt(0), nil)
+	transfers, err = s.db.GetTransfers(nil, nil)
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 10)
 }

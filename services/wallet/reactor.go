@@ -23,14 +23,24 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 	case int64(params.MainNetworkID):
 		return 10 * time.Second
 	case int64(params.RopstenNetworkID):
-		return 2 * time.Second
+		return 4 * time.Second
 	default:
 		return 500 * time.Millisecond
 	}
 }
 
+func reorgSafetyDepth(chain *big.Int) *big.Int {
+	switch chain.Int64() {
+	case int64(params.MainNetworkID):
+		return big.NewInt(5)
+	case int64(params.RopstenNetworkID):
+		return big.NewInt(15)
+	default:
+		return big.NewInt(15)
+	}
+}
+
 var (
-	reorgSafetyDepth  = big.NewInt(15)
 	erc20BatchSize    = big.NewInt(100000)
 	errAlreadyRunning = errors.New("already running")
 )
@@ -88,7 +98,7 @@ func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 		},
 		erc20:       NewERC20TransfersDownloader(r.client, accounts, signer),
 		feed:        r.feed,
-		safetyDepth: reorgSafetyDepth,
+		safetyDepth: reorgSafetyDepth(r.chain),
 	}
 
 	return ctl
