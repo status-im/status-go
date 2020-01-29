@@ -367,15 +367,13 @@ func NewMessenger(
 		logger: logger,
 	}
 
-	// Start all services immediately.
-	// TODO: consider removing identity as an argument to Start().
-	if err := encryptionProtocol.Start(identity); err != nil {
-		return nil, err
-	}
-
 	logger.Debug("messages persistence", zap.Bool("enabled", c.messagesPersistenceEnabled))
 
 	return messenger, nil
+}
+
+func (m *Messenger) Start() error {
+	return m.encryptor.Start(m.identity)
 }
 
 // Init analyzes chats and contacts in order to setup filters

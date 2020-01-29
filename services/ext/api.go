@@ -330,6 +330,10 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
+func (api *PublicAPI) StartMessenger() error {
+	return api.service.StartMessenger()
+}
+
 func (api *PublicAPI) DeleteMessage(id string) error {
 	return api.service.messenger.DeleteMessage(id)
 }
