@@ -521,6 +521,10 @@ func (api *NimbusPublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus st
 	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }
 
+func (api *PublicAPI) StartMessenger() error {
+	return api.service.StartMessenger()
+}
+
 func (api *NimbusPublicAPI) SendChatMessage(ctx context.Context, message *protocol.Message) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendChatMessage(ctx, message)
 }
