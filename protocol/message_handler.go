@@ -337,6 +337,13 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	state.ModifiedChats[chat.ID] = true
 	state.AllChats[chat.ID] = chat
 
+	contact := state.CurrentMessageState.Contact
+	if hasENSNameChanged(contact, receivedMessage.EnsName, receivedMessage.Clock) {
+		contact.ResetENSVerification(receivedMessage.Clock, receivedMessage.EnsName)
+		state.ModifiedContacts[contact.ID] = true
+		state.AllContacts[contact.ID] = contact
+	}
+
 	// Add to response
 	if receivedMessage != nil {
 		state.Response.Messages = append(state.Response.Messages, receivedMessage)

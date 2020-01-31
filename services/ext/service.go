@@ -173,6 +173,7 @@ func (s *Service) StartMessenger() error {
 	s.cancelMessenger = make(chan struct{})
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
+	go s.verifyENSLoop(30*time.Second, s.cancelMessenger)
 	return s.messenger.Start()
 }
 
@@ -259,6 +260,35 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 	}
 
 	return coremessage, coretypes.TransactionStatus(receipt.Status), nil
+}
+
+func (s *Service) verifyENSLoop(tick time.Duration, cancel <-chan struct{}) {
+	if s.config.VerifyENSURL == "" || s.config.VerifyENSContractAddress == "" {
+		log.Warn("not starting ENS loop")
+		return
+	}
+
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	ctx, cancelVerifyENS := context.WithCancel(context.Background())
+
+	for {
+		select {
+		case <-ticker.C:
+			response, err := s.messenger.VerifyENSNames(ctx, s.config.VerifyENSURL, s.config.VerifyENSContractAddress)
+			if err != nil {
+				log.Error("failed to validate ens", "err", err)
+				continue
+			}
+			if !response.IsEmpty() {
+				PublisherSignalHandler{}.NewMessages(response)
+			}
+		case <-cancel:
+			cancelVerifyENS()
+			return
+		}
+	}
 }
 
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {

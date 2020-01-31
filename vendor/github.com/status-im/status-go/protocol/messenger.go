@@ -2041,33 +2041,45 @@ func Identicon(id string) (string, error) {
 }
 
 // VerifyENSNames verifies that a registered ENS name matches the expected public key
-func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetails []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
+func (m *Messenger) VerifyENSNames(ctx context.Context, rpcEndpoint, contractAddress string) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	m.logger.Debug("verifying ENS Names", zap.String("endpoint", rpcEndpoint))
 	verifier := m.node.NewENSVerifier(m.logger)
+
+	var response MessengerResponse
+
+	var ensDetails []enstypes.ENSDetails
+
+	now := m.getTimesource().GetCurrentTime()
+	for _, contact := range m.allContacts {
+		if shouldENSBeVerified(contact, now) {
+			ensDetails = append(ensDetails, enstypes.ENSDetails{
+				PublicKeyString: contact.ID[2:],
+				Name:            contact.Name,
+			})
+		}
+	}
 
 	ensResponse, err := verifier.CheckBatch(ensDetails, rpcEndpoint, contractAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update contacts
-	var contacts []*Contact
 	for _, details := range ensResponse {
-		if details.Error == nil {
-			contact, ok := m.allContacts["0x"+details.PublicKeyString]
-			if !ok {
-				contact, err = buildContact(details.PublicKey)
-				if err != nil {
-					return nil, err
-				}
-			}
-			contact.ENSVerified = details.Verified
-			contact.ENSVerifiedAt = details.VerifiedAt
-			contact.Name = details.Name
+		contact, ok := m.allContacts["0x"+details.PublicKeyString]
+		if !ok {
+			return nil, errors.New("contact must be existing")
+		}
 
+		m.logger.Debug("verifying ENS Name", zap.Any("details", details), zap.Any("contact", contact))
+
+		contact.ENSVerifiedAt = uint64(details.VerifiedAt)
+
+		if details.Error == nil {
+			contact.ENSVerified = details.Verified
 			m.allContacts[contact.ID] = contact
-			contacts = append(contacts, contact)
 		} else {
 			m.logger.Warn("Failed to resolve ens name",
 				zap.String("name", details.Name),
@@ -2075,16 +2087,17 @@ func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetai
 				zap.Error(details.Error),
 			)
 		}
+		response.Contacts = append(response.Contacts, contact)
 	}
 
-	if len(contacts) != 0 {
-		err = m.persistence.SaveContacts(contacts)
+	if len(response.Contacts) != 0 {
+		err = m.persistence.SaveContacts(response.Contacts)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return ensResponse, nil
+	return &response, nil
 }
 
 // GenerateAlias name returns the generated name given a public key hex encoded prefixed with 0x

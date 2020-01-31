@@ -12,9 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/transport"
@@ -24,9 +22,6 @@ import (
 const (
 	// defaultRequestTimeout is the default request timeout in seconds
 	defaultRequestTimeout = 10
-
-	// ensContractAddress is the address of the ENS resolver
-	ensContractAddress = "0x314159265dd8dbb310642f98f50c066173c1259b"
 )
 
 var (
@@ -306,11 +301,6 @@ func (api *PublicAPI) GetOurInstallations() []*multidevice.Installation {
 // SetInstallationMetadata sets the metadata for our own installation
 func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
-}
-
-// VerifyENSNames takes a list of ensdetails and returns whether they match the public key specified
-func (api *PublicAPI) VerifyENSNames(details []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
-	return api.service.messenger.VerifyENSNames(params.MainnetEthereumNetworkURL, ensContractAddress, details)
 }
 
 type ApplicationMessagesResponse struct {

@@ -527,6 +527,10 @@ type ShhextConfig struct {
 	// IMPORTANT: It should always be mainnet unless used for testing
 	VerifyENSURL string
 
+	// VerifyENSContractAddress is the address of the contract used to verify ENS
+	// No default is provided and if not set ENS resolution is disabled
+	VerifyENSContractAddress string
+
 	VerifyTransactionChainID int64
 }
 
