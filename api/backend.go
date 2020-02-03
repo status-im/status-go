@@ -21,7 +21,6 @@ type StatusBackend interface {
 	// RestartNode() error // NOTE: Only used in tests
 
 	UpdateRootDataDir(datadir string)
-	UpdateMailservers(enodes []string) error
 
 	// SelectAccount(loginParams account.LoginParams) error
 	OpenAccounts() error
@@ -49,7 +48,4 @@ type StatusBackend interface {
 	InjectChatAccount(chatKeyHex, encryptionKeyHex string) error // NOTE: Only used in lib and in tests
 	ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error)
 	SignGroupMembership(content string) (string, error)
-
-	EnableInstallation(installationID string) error
-	DisableInstallation(installationID string) error
 }

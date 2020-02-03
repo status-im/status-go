@@ -385,6 +385,22 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 		return
 	}
 
+	// Register Whisper eth-node bridge
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		w, err := ethnode.Node.GetWaku(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &nodebridge.WakuService{Waku: w}, nil
+	})
+	if err != nil {
+		return
+	}
+
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var ethnode *nodebridge.NodeService

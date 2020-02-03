@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -390,6 +391,18 @@ func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.Messe
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
 	return api.service.messenger.SyncDevices(ctx, name, picture)
+}
+
+func (api *PublicAPI) UpdateMailservers(enodes []string) error {
+	nodes := make([]*enode.Node, len(enodes))
+	for i, rawurl := range enodes {
+		node, err := enode.ParseV4(rawurl)
+		if err != nil {
+			return err
+		}
+		nodes[i] = node
+	}
+	return api.service.UpdateMailservers(nodes)
 }
 
 // Echo is a method for testing purposes.

@@ -69,11 +69,11 @@ type nimbusStatusBackend struct {
 	multiaccountsDB *multiaccounts.Database
 	accountManager  *account.GethManager
 	// transactor      *transactions.Transactor
-	connectionState         connectionState
-	appState                appState
-	selectedAccountShhKeyID string
-	log                     log.Logger
-	allowAllRPC             bool // used only for tests, disables api method restrictions
+	connectionState      connectionState
+	appState             appState
+	selectedAccountKeyID string
+	log                  log.Logger
+	allowAllRPC          bool // used only for tests, disables api method restrictions
 }
 
 // NewNimbusStatusBackend create a new nimbusStatusBackend instance
@@ -110,9 +110,9 @@ func (b *nimbusStatusBackend) AccountManager() *account.GethManager {
 // 	return b.transactor
 // }
 
-// SelectedAccountShhKeyID returns a Whisper key ID of the selected chat key pair.
-func (b *nimbusStatusBackend) SelectedAccountShhKeyID() string {
-	return b.selectedAccountShhKeyID
+// SelectedAccountKeyID returns a Whisper key ID of the selected chat key pair.
+func (b *nimbusStatusBackend) SelectedAccountKeyID() string {
+	return b.selectedAccountKeyID
 }
 
 // IsNodeRunning confirm that node is running
@@ -809,7 +809,7 @@ func (b *nimbusStatusBackend) cleanupServices() error {
 		if err := whisperService.Whisper.DeleteKeyPairs(); err != nil {
 			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 		}
-		b.selectedAccountShhKeyID = ""
+		b.selectedAccountKeyID = ""
 	default:
 		return err
 	}
@@ -881,7 +881,7 @@ func (b *nimbusStatusBackend) injectAccountIntoServices() error {
 		if err := whisperService.Whisper.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
 			return err
 		}
-		b.selectedAccountShhKeyID, err = whisperService.Whisper.AddKeyPair(identity)
+		b.selectedAccountKeyID, err = whisperService.Whisper.AddKeyPair(identity)
 		if err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
@@ -995,25 +995,6 @@ func (b *nimbusStatusBackend) DisableInstallation(installationID string) error {
 	}
 
 	return nil
-}
-
-// UpdateMailservers on ShhExtService.
-func (b *nimbusStatusBackend) UpdateMailservers(enodes []string) error {
-	// TODO
-	return nil
-	// st, err := b.statusNode.ShhExtService()
-	// if err != nil {
-	// 	return err
-	// }
-	// nodes := make([]*enode.Node, len(enodes))
-	// for i, rawurl := range enodes {
-	// 	node, err := enode.ParseV4(rawurl)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	nodes[i] = node
-	// }
-	// return st.UpdateMailservers(nodes)
 }
 
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm

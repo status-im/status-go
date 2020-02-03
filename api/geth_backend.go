@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
@@ -54,6 +53,10 @@ var (
 	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
 	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
+	// ErrWakuClearIdentitiesFailure clearing whisper identities has failed.
+	ErrWakuClearIdentitiesFailure = errors.New("failed to clear waku identities")
+	// ErrWakuIdentityInjectionFailure injecting whisper identities has failed.
+	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
 	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
 	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
@@ -67,19 +70,19 @@ var _ StatusBackend = (*GethStatusBackend)(nil)
 type GethStatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
-	rootDataDir             string
-	appDB                   *sql.DB
-	statusNode              *node.StatusNode
-	personalAPI             *personal.PublicAPI
-	rpcFilters              *rpcfilters.Service
-	multiaccountsDB         *multiaccounts.Database
-	accountManager          *account.GethManager
-	transactor              *transactions.Transactor
-	connectionState         connectionState
-	appState                appState
-	selectedAccountShhKeyID string
-	log                     log.Logger
-	allowAllRPC             bool // used only for tests, disables api method restrictions
+	rootDataDir          string
+	appDB                *sql.DB
+	statusNode           *node.StatusNode
+	personalAPI          *personal.PublicAPI
+	rpcFilters           *rpcfilters.Service
+	multiaccountsDB      *multiaccounts.Database
+	accountManager       *account.GethManager
+	transactor           *transactions.Transactor
+	connectionState      connectionState
+	appState             appState
+	selectedAccountKeyID string
+	log                  log.Logger
+	allowAllRPC          bool // used only for tests, disables api method restrictions
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -116,9 +119,9 @@ func (b *GethStatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
 }
 
-// SelectedAccountShhKeyID returns a Whisper key ID of the selected chat key pair.
-func (b *GethStatusBackend) SelectedAccountShhKeyID() string {
-	return b.selectedAccountShhKeyID
+// SelectedAccountKeyID returns a Whisper key ID of the selected chat key pair.
+func (b *GethStatusBackend) SelectedAccountKeyID() string {
+	return b.selectedAccountKeyID
 }
 
 // IsNodeRunning confirm that node is running
@@ -806,10 +809,22 @@ func (b *GethStatusBackend) cleanupServices() error {
 		if err := whisperService.DeleteKeyPairs(); err != nil {
 			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 		}
-		b.selectedAccountShhKeyID = ""
+		b.selectedAccountKeyID = ""
 	default:
 		return err
 	}
+	wakuService, err := b.statusNode.WakuService()
+	switch err {
+	case node.ErrServiceUnknown: // Waku was never registered
+	case nil:
+		if err := wakuService.DeleteKeyPairs(); err != nil {
+			return fmt.Errorf("%s: %v", ErrWakuClearIdentitiesFailure, err)
+		}
+		b.selectedAccountKeyID = ""
+	default:
+		return err
+	}
+
 	if b.statusNode.Config().WalletConfig.Enabled {
 		wallet, err := b.statusNode.WalletService()
 		switch err {
@@ -878,7 +893,7 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 		if err := whisperService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
 			return err
 		}
-		b.selectedAccountShhKeyID, err = whisperService.AddKeyPair(identity)
+		b.selectedAccountKeyID, err = whisperService.AddKeyPair(identity)
 		if err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
@@ -886,8 +901,24 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 		return err
 	}
 
-	if whisperService != nil {
-		st, err := b.statusNode.ShhExtService()
+	wakuService, err := b.statusNode.WakuService()
+
+	switch err {
+	case node.ErrServiceUnknown: // Waku was never registered
+	case nil:
+		if err := wakuService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
+			return err
+		}
+		b.selectedAccountKeyID, err = wakuService.AddKeyPair(identity)
+		if err != nil {
+			return ErrWakuIdentityInjectionFailure
+		}
+	default:
+		return err
+	}
+
+	if wakuService != nil {
+		st, err := b.statusNode.WakuExtService()
 		if err != nil {
 			return err
 		}
@@ -971,53 +1002,6 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 	}
 
 	return crypto.SignStringAsHex(content, selectedChatAccount.AccountKey.PrivateKey)
-}
-
-// EnableInstallation enables an installation for multi-device sync.
-func (b *GethStatusBackend) EnableInstallation(installationID string) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	if err := st.EnableInstallation(installationID); err != nil {
-		b.log.Error("error enabling installation", "err", err)
-		return err
-	}
-
-	return nil
-}
-
-// DisableInstallation disables an installation for multi-device sync.
-func (b *GethStatusBackend) DisableInstallation(installationID string) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	if err := st.DisableInstallation(installationID); err != nil {
-		b.log.Error("error disabling installation", "err", err)
-		return err
-	}
-
-	return nil
-}
-
-// UpdateMailservers on ShhExtService.
-func (b *GethStatusBackend) UpdateMailservers(enodes []string) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-	nodes := make([]*enode.Node, len(enodes))
-	for i, rawurl := range enodes {
-		node, err := enode.ParseV4(rawurl)
-		if err != nil {
-			return err
-		}
-		nodes[i] = node
-	}
-	return st.UpdateMailservers(nodes)
 }
 
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm

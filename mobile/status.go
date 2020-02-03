@@ -100,40 +100,6 @@ func SignGroupMembership(content string) string {
 	return string(data)
 }
 
-// EnableInstallation enables an installation for multi-device sync.
-func EnableInstallation(installationID string) string {
-	err := statusBackend.EnableInstallation(installationID)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Response string `json:"response"`
-	}{Response: "ok"})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
-}
-
-// DisableInstallation disables an installation for multi-device sync.
-func DisableInstallation(installationID string) string {
-	err := statusBackend.DisableInstallation(installationID)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	data, err := json.Marshal(struct {
-		Response string `json:"response"`
-	}{Response: "ok"})
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(data)
-}
-
 // ValidateNodeConfig validates config for the Status node.
 func ValidateNodeConfig(configJSON string) string {
 	var resp APIDetailedResponse
@@ -606,18 +572,6 @@ func makeJSONResponse(err error) string {
 	outBytes, _ := json.Marshal(out)
 
 	return string(outBytes)
-}
-
-// UpdateMailservers updates mail servers in status backend.
-//export UpdateMailservers
-func UpdateMailservers(data string) string {
-	var enodes []string
-	err := json.Unmarshal([]byte(data), &enodes)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-	err = statusBackend.UpdateMailservers(enodes)
-	return makeJSONResponse(err)
 }
 
 // GetNodesFromContract returns a list of nodes from a given contract
