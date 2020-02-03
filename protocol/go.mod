@@ -13,7 +13,7 @@ replace github.com/status-im/status-go/whisper/v6 => ../whisper
 require (
 	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/ethereum/go-ethereum v1.9.5
-	github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf v1.3.3
 	github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba
 	github.com/google/uuid v1.1.1
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
