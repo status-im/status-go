@@ -386,6 +386,9 @@ type NodeConfig struct {
 	// LogMobileSystem enables log redirection to android/ios system logger.
 	LogMobileSystem bool
 
+	// LogFile is a folder which contains LogFile
+	LogDir string
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 

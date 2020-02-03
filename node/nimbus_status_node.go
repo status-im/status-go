@@ -703,7 +703,7 @@ func (n *NimbusStatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
 
 	if on {
 		if strings.Contains(url, "infura.io") {
-			url = "https://httpstat.us/500"
+			url = "https://httpbin.org/status/500"
 		}
 	}
 

@@ -37,6 +37,7 @@ import (
 	. "github.com/status-im/status-go/t/utils" //nolint: golint
 	"github.com/status-im/status-go/transactions"
 )
+import "github.com/status-im/status-go/params"
 
 var (
 	testChainDir   string
@@ -109,13 +110,18 @@ func createAccountAndLogin(t *testing.T, feed *event.Feed) account.Info {
 		signalErrC <- waitSignal(feed, signal.EventLoggedIn, 5*time.Second)
 	}()
 
+	nodeConfig, _ := params.NewConfigFromJSON(nodeConfigJSON)
+	nodeConfig.KeyStoreDir = "keystore"
+	nodeConfig.DataDir = "/"
+	cnf, _ := json.Marshal(nodeConfig)
+
 	// SaveAccountAndLogin must be called only once when an account is created.
 	// If the account already exists, Login should be used.
 	rawResponse := SaveAccountAndLogin(
 		buildAccountData("test", account1.WalletAddress),
 		C.CString(TestConfig.Account1.Password),
 		buildAccountSettings("test"),
-		C.CString(nodeConfigJSON),
+		C.CString(string(cnf)),
 		buildSubAccountData(account1.WalletAddress),
 	)
 	var loginResponse APIResponse
@@ -131,13 +137,18 @@ func loginUsingAccount(t *testing.T, feed *event.Feed, addr string) {
 		signalErrC <- waitSignal(feed, signal.EventLoggedIn, 5*time.Second)
 	}()
 
+	nodeConfig, _ := params.NewConfigFromJSON(nodeConfigJSON)
+	nodeConfig.KeyStoreDir = "keystore"
+	nodeConfig.DataDir = "/"
+	cnf, _ := json.Marshal(nodeConfig)
+
 	// SaveAccountAndLogin must be called only once when an account is created.
 	// If the account already exists, Login should be used.
 	rawResponse := SaveAccountAndLogin(
 		buildAccountData("test", addr),
 		C.CString(TestConfig.Account1.Password),
 		buildAccountSettings("test"),
-		C.CString(nodeConfigJSON),
+		C.CString(string(cnf)),
 		buildSubAccountData(addr),
 	)
 	var loginResponse APIResponse

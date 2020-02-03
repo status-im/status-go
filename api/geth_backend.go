@@ -205,6 +205,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
+
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
@@ -372,6 +373,15 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version
+	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
+	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
+	if len(conf.LogDir) == 0 {
+		conf.LogFile = filepath.Join(b.rootDataDir, conf.LogFile)
+	} else {
+		conf.LogFile = filepath.Join(conf.LogDir, conf.LogFile)
+	}
+	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+
 	return &conf, nil
 }
 
