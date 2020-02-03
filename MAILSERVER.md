@@ -1,5 +1,16 @@
 # Description
 
+A poorly named "Mailserver" is essentially a Whisper node that stores message history in either a LevelDB or PostgreSQL database.
+
+A Status app user can run their own Mailserver for faster message retrieval or additional security.
+
+# Service Ports
+
+* `30303` TCP - [DevP2P](https://github.com/ethereum/devp2p) wire protocol port. Should __ALWAYS__ be public.
+* `8545` TCP - [JSON RPC](https://github.com/ethereum/wiki/wiki/json-rpc) management port. Should __NEVER__ be public.
+
+# Setup methods
+
 This document describes the two alternative ways to start a Status Mailserver:
 
 * [Docker Compose](https://docs.docker.com/compose/) - More self-contained and portable
