@@ -6,6 +6,8 @@
 // 0002_tokens.up.sql (248B)
 // 0003_settings.down.sql (118B)
 // 0003_settings.up.sql (1.311kB)
+// 0004_pending_stickers.down.sql (0)
+// 0004_pending_stickers.up.sql (61B)
 // doc.go (74B)
 
 package migrations
@@ -90,7 +92,7 @@ func _0001_appDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0001_app.down.sql", size: 356, mode: os.FileMode(0644), modTime: time.Unix(1579172955, 0)}
+	info := bindataFileInfo{name: "0001_app.down.sql", size: 356, mode: os.FileMode(0644), modTime: time.Unix(1580303056, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb5, 0x25, 0xa0, 0xf8, 0x7d, 0x2d, 0xd, 0xcf, 0x18, 0xe4, 0x73, 0xc3, 0x95, 0xf5, 0x24, 0x20, 0xa9, 0xe6, 0x9e, 0x1d, 0x93, 0xe5, 0xc5, 0xad, 0x93, 0x8f, 0x5e, 0x40, 0xb5, 0x30, 0xaa, 0x25}}
 	return a, nil
 }
@@ -110,7 +112,7 @@ func _0001_appUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0001_app.up.sql", size: 2967, mode: os.FileMode(0644), modTime: time.Unix(1579172940, 0)}
+	info := bindataFileInfo{name: "0001_app.up.sql", size: 2967, mode: os.FileMode(0644), modTime: time.Unix(1580303056, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf7, 0x3a, 0xa7, 0xf2, 0x8f, 0xfa, 0x82, 0x7c, 0xc5, 0x49, 0xac, 0xac, 0xf, 0xc, 0x77, 0xe2, 0xba, 0xe8, 0x4d, 0xe, 0x6f, 0x5d, 0x2c, 0x2c, 0x18, 0x80, 0xc2, 0x1d, 0xe, 0x25, 0xe, 0x18}}
 	return a, nil
 }
@@ -130,7 +132,7 @@ func _0002_tokensDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0002_tokens.down.sql", size: 19, mode: os.FileMode(0644), modTime: time.Unix(1576159007, 0)}
+	info := bindataFileInfo{name: "0002_tokens.down.sql", size: 19, mode: os.FileMode(0644), modTime: time.Unix(1580303056, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd1, 0x31, 0x2, 0xcc, 0x2f, 0x38, 0x90, 0xf7, 0x58, 0x37, 0x47, 0xf4, 0x18, 0xf7, 0x72, 0x74, 0x67, 0x14, 0x7e, 0xf3, 0xb1, 0xd6, 0x5f, 0xb0, 0xd5, 0xe7, 0x91, 0xf4, 0x26, 0x77, 0x8e, 0x68}}
 	return a, nil
 }
@@ -150,7 +152,7 @@ func _0002_tokensUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0002_tokens.up.sql", size: 248, mode: os.FileMode(0644), modTime: time.Unix(1576159007, 0)}
+	info := bindataFileInfo{name: "0002_tokens.up.sql", size: 248, mode: os.FileMode(0644), modTime: time.Unix(1580303056, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcc, 0xd6, 0xde, 0xd3, 0x7b, 0xee, 0x92, 0x11, 0x38, 0xa4, 0xeb, 0x84, 0xca, 0xcb, 0x37, 0x75, 0x5, 0x77, 0x7f, 0x14, 0x39, 0xee, 0xa1, 0x8b, 0xd4, 0x5c, 0x6e, 0x55, 0x6, 0x50, 0x16, 0xd4}}
 	return a, nil
 }
@@ -170,7 +172,7 @@ func _0003_settingsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0003_settings.down.sql", size: 118, mode: os.FileMode(0644), modTime: time.Unix(1578048597, 0)}
+	info := bindataFileInfo{name: "0003_settings.down.sql", size: 118, mode: os.FileMode(0644), modTime: time.Unix(1580303056, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe5, 0xa6, 0xf5, 0xc0, 0x60, 0x64, 0x77, 0xe2, 0xe7, 0x3c, 0x9b, 0xb1, 0x52, 0xa9, 0x95, 0x16, 0xf8, 0x60, 0x2f, 0xa5, 0xeb, 0x46, 0xb9, 0xb9, 0x8f, 0x4c, 0xf4, 0xfd, 0xbb, 0xe7, 0xe5, 0xe5}}
 	return a, nil
 }
@@ -190,8 +192,48 @@ func _0003_settingsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0003_settings.up.sql", size: 1311, mode: os.FileMode(0644), modTime: time.Unix(1578048597, 0)}
+	info := bindataFileInfo{name: "0003_settings.up.sql", size: 1311, mode: os.FileMode(0644), modTime: time.Unix(1580381202, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xea, 0x35, 0x0, 0xeb, 0xe2, 0x33, 0x68, 0xb9, 0xf4, 0xf6, 0x8e, 0x9e, 0x10, 0xe9, 0x58, 0x68, 0x28, 0xb, 0xcd, 0xec, 0x74, 0x71, 0xa7, 0x9a, 0x5a, 0x77, 0x59, 0xb1, 0x13, 0x1c, 0xa1, 0x5b}}
+	return a, nil
+}
+
+var __0004_pending_stickersDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+
+func _0004_pending_stickersDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0004_pending_stickersDownSql,
+		"0004_pending_stickers.down.sql",
+	)
+}
+
+func _0004_pending_stickersDownSql() (*asset, error) {
+	bytes, err := _0004_pending_stickersDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1580381133, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
+	return a, nil
+}
+
+var __0004_pending_stickersUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x2e\xc9\x4c\xce\x4e\x2d\x2a\x8e\x2f\x48\x4c\xce\x2e\x8e\x2f\x48\xcd\x4b\xc9\xcc\x4b\x57\x70\xf2\xf1\x77\xb2\xe6\x02\x04\x00\x00\xff\xff\xc9\xc1\xc2\xc6\x3d\x00\x00\x00")
+
+func _0004_pending_stickersUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0004_pending_stickersUpSql,
+		"0004_pending_stickers.up.sql",
+	)
+}
+
+func _0004_pending_stickersUpSql() (*asset, error) {
+	bytes, err := _0004_pending_stickersUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1580381236, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3c, 0xed, 0x25, 0xdf, 0x75, 0x2, 0x6c, 0xf0, 0xa2, 0xa8, 0x37, 0x62, 0x65, 0xad, 0xfd, 0x98, 0xa0, 0x9d, 0x63, 0x94, 0xdf, 0x6b, 0x46, 0xe0, 0x68, 0xec, 0x9c, 0x7f, 0x77, 0xdd, 0xb3, 0x6}}
 	return a, nil
 }
 
@@ -210,7 +252,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1573216280, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 74, mode: os.FileMode(0644), modTime: time.Unix(1574771268, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x7c, 0x28, 0xcd, 0x47, 0xf2, 0xfa, 0x7c, 0x51, 0x2d, 0xd8, 0x38, 0xb, 0xb0, 0x34, 0x9d, 0x4c, 0x62, 0xa, 0x9e, 0x28, 0xc3, 0x31, 0x23, 0xd9, 0xbb, 0x89, 0x9f, 0xa0, 0x89, 0x1f, 0xe8}}
 	return a, nil
 }
@@ -306,19 +348,15 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"0001_app.down.sql": _0001_appDownSql,
-
-	"0001_app.up.sql": _0001_appUpSql,
-
-	"0002_tokens.down.sql": _0002_tokensDownSql,
-
-	"0002_tokens.up.sql": _0002_tokensUpSql,
-
-	"0003_settings.down.sql": _0003_settingsDownSql,
-
-	"0003_settings.up.sql": _0003_settingsUpSql,
-
-	"doc.go": docGo,
+	"0001_app.down.sql":              _0001_appDownSql,
+	"0001_app.up.sql":                _0001_appUpSql,
+	"0002_tokens.down.sql":           _0002_tokensDownSql,
+	"0002_tokens.up.sql":             _0002_tokensUpSql,
+	"0003_settings.down.sql":         _0003_settingsDownSql,
+	"0003_settings.up.sql":           _0003_settingsUpSql,
+	"0004_pending_stickers.down.sql": _0004_pending_stickersDownSql,
+	"0004_pending_stickers.up.sql":   _0004_pending_stickersUpSql,
+	"doc.go":                         docGo,
 }
 
 // AssetDir returns the file names below a certain
@@ -362,13 +400,15 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_app.down.sql":      &bintree{_0001_appDownSql, map[string]*bintree{}},
-	"0001_app.up.sql":        &bintree{_0001_appUpSql, map[string]*bintree{}},
-	"0002_tokens.down.sql":   &bintree{_0002_tokensDownSql, map[string]*bintree{}},
-	"0002_tokens.up.sql":     &bintree{_0002_tokensUpSql, map[string]*bintree{}},
-	"0003_settings.down.sql": &bintree{_0003_settingsDownSql, map[string]*bintree{}},
-	"0003_settings.up.sql":   &bintree{_0003_settingsUpSql, map[string]*bintree{}},
-	"doc.go":                 &bintree{docGo, map[string]*bintree{}},
+	"0001_app.down.sql":              &bintree{_0001_appDownSql, map[string]*bintree{}},
+	"0001_app.up.sql":                &bintree{_0001_appUpSql, map[string]*bintree{}},
+	"0002_tokens.down.sql":           &bintree{_0002_tokensDownSql, map[string]*bintree{}},
+	"0002_tokens.up.sql":             &bintree{_0002_tokensUpSql, map[string]*bintree{}},
+	"0003_settings.down.sql":         &bintree{_0003_settingsDownSql, map[string]*bintree{}},
+	"0003_settings.up.sql":           &bintree{_0003_settingsUpSql, map[string]*bintree{}},
+	"0004_pending_stickers.down.sql": &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
+	"0004_pending_stickers.up.sql":   &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
+	"doc.go":                         &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

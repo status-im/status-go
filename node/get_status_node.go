@@ -687,7 +687,7 @@ func (n *StatusNode) RPCPrivateClient() *rpc.Client {
 
 // ChaosModeCheckRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
 // if defined, without restarting the node. This is required for the Chaos Unicorn Day.
-// Additionally, if the passed URL is Infura, it changes it to httpstat.us/500.
+// Additionally, if the passed URL is Infura, it changes it to httpbin.org/status/500.
 func (n *StatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
 	url := n.config.UpstreamConfig.URL
 
