@@ -132,7 +132,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ChatID            string                           `json:"chatId"`
 		LocalChatID       string                           `json:"localChatId"`
 		Clock             uint64                           `json:"clock"`
-		Replace           string                           `json:"replace,omitempty"`
+		Replace           string                           `json:"replace"`
 		ResponseTo        string                           `json:"responseTo"`
 		EnsName           string                           `json:"ensName"`
 		Sticker           *StickerAlias                    `json:"sticker"`
