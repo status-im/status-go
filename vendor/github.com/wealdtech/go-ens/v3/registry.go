@@ -135,7 +135,7 @@ func RegistryContractAddress(backend bind.ContractBackend) (common.Address, erro
 
 	// Instantiate the registry contract
 	if chainID.Cmp(params.MainnetChainConfig.ChainID) == 0 {
-		return common.HexToAddress("314159265dd8dbb310642f98f50c066173c1259b"), nil
+		return common.HexToAddress("00000000000C2E074eC69A0dFb2997BA6C7d2e1e"), nil
 	} else if chainID.Cmp(params.TestnetChainConfig.ChainID) == 0 {
 		return common.HexToAddress("112234455c3a32fd11230c42e7bccd4a84e02010"), nil
 	} else if chainID.Cmp(params.RinkebyChainConfig.ChainID) == 0 {

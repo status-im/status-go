@@ -62,7 +62,8 @@ A top-level name is one that sits directly underneath `.eth`, for example `mydom
 Starting out with names in `go-ens` is easy:
 
 ```go
-name, err := ens.Name("mydomain.eth")
+client, err := ethclient.Dial("https://infura.io/v3/SECRET")
+name, err := ens.NewName(client, "mydomain.eth")
 ```
 
 Addresses can be set and obtained using the address functions, for example to get an address:
