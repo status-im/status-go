@@ -3,6 +3,7 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -114,7 +115,9 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	message.Identicon = state.CurrentMessageState.Contact.Identicon
 	message.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
-	message.PrepareContent()
+	if err := message.PrepareContent(); err != nil {
+		return fmt.Errorf("failed to prepare content: %v", err)
+	}
 	chat, err := m.matchMessage(message, state.AllChats, state.Timesource)
 	if err != nil {
 		return err
@@ -297,10 +300,13 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
-	receivedMessage.PrepareContent()
+	err := receivedMessage.PrepareContent()
+	if err != nil {
+		return fmt.Errorf("failed to prepare message content: %v", err)
+	}
 	chat, err := m.matchMessage(receivedMessage, state.AllChats, state.Timesource)
 	if err != nil {
-		return err
+		return err // matchMessage returns a descriptive error message
 	}
 
 	// If deleted-at is greater, ignore message
@@ -567,7 +573,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 		}
 		return chat, nil
 	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && isPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
-		// It's a private message coming from us so we rely on Message.ChatId
+		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := message.ChatId
 		chat := chats[chatID]

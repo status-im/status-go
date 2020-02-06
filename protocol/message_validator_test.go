@@ -273,7 +273,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 					Name:  "Invalid  emoji only emssage",
 					Valid: false,
 					Message: protobuf.ChatMessage{
-						ChatId:      "a",
+						ChatID:      "a",
 						Text:        ":+1: not valid",
 						Clock:       2,
 						Timestamp:   3,

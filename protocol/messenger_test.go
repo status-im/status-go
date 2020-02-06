@@ -124,8 +124,7 @@ func (s *MessengerSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecds
 func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(s.shh, privateKey)
+	return s.newMessengerWithKey(shh, privateKey)
 }
 
 func (s *MessengerSuite) TearDownTest() {
@@ -1456,6 +1455,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 
 	// We decline the request
 	response, err = theirMessenger.DeclineRequestAddressForTransaction(context.Background(), receiverMessage.ID)
+	s.Require().NoError(err)
 	s.Require().Len(response.Chats, 1)
 	s.Require().Len(response.Messages, 1)
 
@@ -1751,6 +1751,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 
 	// We accept the request
 	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
+	s.Require().NoError(err)
 	s.Require().Len(response.Chats, 1)
 	s.Require().Len(response.Messages, 1)
 
@@ -2049,9 +2050,8 @@ func (m MockEthClient) TransactionByHash(ctx context.Context, hash types.Hash) (
 	mockTransaction, ok := m.messages[hash.Hex()]
 	if !ok {
 		return coretypes.Message{}, coretypes.TransactionStatusFailed, nil
-	} else {
-		return mockTransaction.Message, mockTransaction.Status, nil
 	}
+	return mockTransaction.Message, mockTransaction.Status, nil
 }
 
 func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request types.MessagesRequest) error {
@@ -2085,8 +2085,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 	s.Require().Equal(message, decodedMessage)
 }
 
-// TODO: For some reason is not mocking the method anymore, help?
-func (s *MessengerSuite) testRequestHistoricMessagesRequest() {
+func (s *MessengerSuite) TestRequestHistoricMessagesRequest() {
 	shh := &mockSendMessagesRequest{
 		Whisper: s.shh,
 	}

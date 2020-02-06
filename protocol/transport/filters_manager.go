@@ -45,11 +45,8 @@ type FiltersManager struct {
 	privateKey  *ecdsa.PrivateKey
 	keys        map[string][]byte // a cache of symmetric manager derived from passwords
 	logger      *zap.Logger
-
-	genericDiscoveryTopicEnabled bool
-
-	mutex   sync.Mutex
-	filters map[string]*Filter
+	mutex       sync.Mutex
+	filters     map[string]*Filter
 }
 
 // NewFiltersManager returns a new filtersManager.

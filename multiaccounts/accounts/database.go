@@ -142,7 +142,6 @@ INSERT INTO settings (
 	return err
 }
 
-// nolint: gocyclo
 func (db *Database) SaveSetting(setting string, value interface{}) error {
 	var (
 		update *sql.Stmt

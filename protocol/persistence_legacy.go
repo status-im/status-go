@@ -294,7 +294,7 @@ func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error)
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	query := fmt.Sprintf(`SELECT id FROM user_messages WHERE id IN (%s)`, inVector)
+	query := "SELECT id FROM user_messages WHERE id IN (" + inVector + ")" // nolint: gosec
 	rows, err := db.db.Query(query, idsArgs...)
 	if err != nil {
 		return nil, err
@@ -398,7 +398,7 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) 
 
 	allFields := db.tableUserMessagesLegacyAllFields()
 	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
-	query := fmt.Sprintf(`INSERT INTO user_messages(%s) VALUES (%s)`, allFields, valuesVector)
+	query := "INSERT INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -454,13 +454,8 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error 
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	_, err = tx.Exec(
-		fmt.Sprintf(`
-			UPDATE user_messages
-			SET seen = 1
-			WHERE id IN (%s)
-		`, inVector),
-		idsArgs...)
+	q := "UPDATE user_messages SET seen = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
+	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return err
 	}

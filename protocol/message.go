@@ -93,7 +93,7 @@ type Message struct {
 
 	// Replace indicates that this is a replacement of a message
 	// that has been updated
-	Replace   string           `json:"replace,omitEmpty"`
+	Replace   string           `json:"replace,omitempty"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
 }
 
@@ -112,7 +112,6 @@ type RawMessage struct {
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
-	type MessageAlias Message
 	type StickerAlias struct {
 		Hash string `json:"hash"`
 		Pack int32  `json:"pack"`
@@ -130,10 +129,10 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ParsedText        json.RawMessage                  `json:"parsedText"`
 		LineCount         int                              `json:"lineCount"`
 		Text              string                           `json:"text"`
-		ChatId            string                           `json:"chatId"`
+		ChatID            string                           `json:"chatId"`
 		LocalChatID       string                           `json:"localChatId"`
 		Clock             uint64                           `json:"clock"`
-		Replace           string                           `json:"replace,omitEmpty"`
+		Replace           string                           `json:"replace,omitempty"`
 		ResponseTo        string                           `json:"responseTo"`
 		EnsName           string                           `json:"ensName"`
 		Sticker           *StickerAlias                    `json:"sticker"`
@@ -155,7 +154,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		LineCount:         m.LineCount,
 		Text:              m.Text,
 		Replace:           m.Replace,
-		ChatId:            m.ChatId,
+		ChatID:            m.ChatId,
 		LocalChatID:       m.LocalChatID,
 		Clock:             m.Clock,
 		ResponseTo:        m.ResponseTo,

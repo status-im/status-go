@@ -205,7 +205,7 @@ func (m *Manager) SetChatAccount(privKey *ecdsa.PrivateKey) {
 	address := crypto.PubkeyToAddress(privKey.PublicKey)
 	id := uuid.NewRandom()
 	key := &types.Key{
-		Id:         id,
+		ID:         id,
 		Address:    address,
 		PrivateKey: privKey,
 	}

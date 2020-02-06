@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,9 +22,9 @@ var defaultSystemMessagesTranslations = map[protobuf.MembershipUpdateEvent_Event
 
 func tsprintf(format string, params map[string]string) string {
 	for key, val := range params {
-		format = strings.Replace(format, "{{"+key+"}}", fmt.Sprintf("%s", val), -1)
+		format = strings.Replace(format, "{{"+key+"}}", val, -1)
 	}
-	return fmt.Sprintf(format)
+	return format
 }
 
 func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) *Message {
@@ -72,7 +71,7 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[p
 		Seen:             true,
 		ID:               types.EncodeHex(crypto.Keccak256(e.Signature)),
 	}
-	message.PrepareContent()
+	_ = message.PrepareContent()
 	return message
 }
 

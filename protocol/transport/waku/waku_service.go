@@ -58,10 +58,10 @@ func (m *wakuServiceKeysManager) RawSymKey(id string) ([]byte, error) {
 	return m.waku.GetSymKey(id)
 }
 
-type Option func(*WakuServiceTransport) error
+type Option func(*Transport) error
 
-// WakuServiceTransport is a transport based on Whisper service.
-type WakuServiceTransport struct {
+// Transport is a transport based on Whisper service.
+type Transport struct {
 	waku        types.Waku
 	api         types.PublicWakuAPI // only PublicWakuAPI implements logic to send messages
 	keysManager *wakuServiceKeysManager
@@ -72,11 +72,11 @@ type WakuServiceTransport struct {
 	envelopesMonitor *EnvelopesMonitor
 }
 
-// NewWakuServiceTransport returns a new WakuServiceTransport.
+// NewTransport returns a new Transport.
 // TODO: leaving a chat should verify that for a given public key
 //       there are no other chats. It may happen that we leave a private chat
 //       but still have a public chat for a given public key.
-func NewWakuServiceTransport(
+func NewTransport(
 	waku types.Waku,
 	privateKey *ecdsa.PrivateKey,
 	db *sql.DB,
@@ -84,7 +84,7 @@ func NewWakuServiceTransport(
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	logger *zap.Logger,
 	opts ...Option,
-) (*WakuServiceTransport, error) {
+) (*Transport, error) {
 	filtersManager, err := transport.NewFiltersManager(newSQLitePersistence(db), waku, privateKey, logger)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func NewWakuServiceTransport(
 	if waku != nil {
 		api = waku.PublicWakuAPI()
 	}
-	t := &WakuServiceTransport{
+	t := &Transport{
 		waku:             waku,
 		api:              api,
 		envelopesMonitor: envelopesMonitor,
@@ -111,7 +111,7 @@ func NewWakuServiceTransport(
 		},
 		filters:     filtersManager,
 		mailservers: mailservers,
-		logger:      logger.With(zap.Namespace("WakuServiceTransport")),
+		logger:      logger.With(zap.Namespace("Transport")),
 	}
 
 	for _, opt := range opts {
@@ -123,29 +123,29 @@ func NewWakuServiceTransport(
 	return t, nil
 }
 
-func (a *WakuServiceTransport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*transport.Filter, error) {
+func (a *Transport) InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*transport.Filter, error) {
 	return a.filters.Init(chatIDs, publicKeys)
 }
 
-func (a *WakuServiceTransport) Filters() []*transport.Filter {
+func (a *Transport) Filters() []*transport.Filter {
 	return a.filters.Filters()
 }
 
 // DEPRECATED
-func (a *WakuServiceTransport) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
+func (a *Transport) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return a.filters.InitWithFilters(filters)
 }
 
 // DEPRECATED
-func (a *WakuServiceTransport) RemoveFilters(filters []*transport.Filter) error {
+func (a *Transport) RemoveFilters(filters []*transport.Filter) error {
 	return a.filters.Remove(filters...)
 }
 
-func (a *WakuServiceTransport) ResetFilters() error {
+func (a *Transport) ResetFilters() error {
 	return a.filters.Reset()
 }
 
-func (a *WakuServiceTransport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*transport.Filter, error) {
+func (a *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*transport.Filter, error) {
 	filter, err := a.filters.LoadNegotiated(secret)
 	if err != nil {
 		return nil, err
@@ -153,12 +153,12 @@ func (a *WakuServiceTransport) ProcessNegotiatedSecret(secret types.NegotiatedSe
 	return filter, nil
 }
 
-func (a *WakuServiceTransport) JoinPublic(chatID string) error {
+func (a *Transport) JoinPublic(chatID string) error {
 	_, err := a.filters.LoadPublic(chatID)
 	return err
 }
 
-func (a *WakuServiceTransport) LeavePublic(chatID string) error {
+func (a *Transport) LeavePublic(chatID string) error {
 	chat := a.filters.Filter(chatID)
 	if chat != nil {
 		return nil
@@ -166,7 +166,7 @@ func (a *WakuServiceTransport) LeavePublic(chatID string) error {
 	return a.filters.Remove(chat)
 }
 
-func (a *WakuServiceTransport) JoinPrivate(publicKey *ecdsa.PublicKey) error {
+func (a *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) error {
 	_, err := a.filters.LoadDiscovery()
 	if err != nil {
 		return err
@@ -175,12 +175,12 @@ func (a *WakuServiceTransport) JoinPrivate(publicKey *ecdsa.PublicKey) error {
 	return err
 }
 
-func (a *WakuServiceTransport) LeavePrivate(publicKey *ecdsa.PublicKey) error {
+func (a *Transport) LeavePrivate(publicKey *ecdsa.PublicKey) error {
 	filters := a.filters.FiltersByPublicKey(publicKey)
 	return a.filters.Remove(filters...)
 }
 
-func (a *WakuServiceTransport) JoinGroup(publicKeys []*ecdsa.PublicKey) error {
+func (a *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) error {
 	_, err := a.filters.LoadDiscovery()
 	if err != nil {
 		return err
@@ -194,7 +194,7 @@ func (a *WakuServiceTransport) JoinGroup(publicKeys []*ecdsa.PublicKey) error {
 	return nil
 }
 
-func (a *WakuServiceTransport) LeaveGroup(publicKeys []*ecdsa.PublicKey) error {
+func (a *Transport) LeaveGroup(publicKeys []*ecdsa.PublicKey) error {
 	for _, publicKey := range publicKeys {
 		filters := a.filters.FiltersByPublicKey(publicKey)
 		if err := a.filters.Remove(filters...); err != nil {
@@ -209,7 +209,7 @@ type Message struct {
 	Public  bool
 }
 
-func (a *WakuServiceTransport) RetrieveAllMessages() ([]Message, error) {
+func (a *Transport) RetrieveAllMessages() ([]Message, error) {
 	var messages []Message
 
 	for _, filter := range a.filters.Filters() {
@@ -229,7 +229,7 @@ func (a *WakuServiceTransport) RetrieveAllMessages() ([]Message, error) {
 	return messages, nil
 }
 
-func (a *WakuServiceTransport) RetrievePublicMessages(chatID string) ([]*types.Message, error) {
+func (a *Transport) RetrievePublicMessages(chatID string) ([]*types.Message, error) {
 	filter, err := a.filters.LoadPublic(chatID)
 	if err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ func (a *WakuServiceTransport) RetrievePublicMessages(chatID string) ([]*types.M
 	return a.api.GetFilterMessages(filter.FilterID)
 }
 
-func (a *WakuServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]*types.Message, error) {
+func (a *Transport) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]*types.Message, error) {
 	chats := a.filters.FiltersByPublicKey(publicKey)
 	discoveryChats, err := a.filters.Init(nil, nil)
 	if err != nil {
@@ -259,7 +259,7 @@ func (a *WakuServiceTransport) RetrievePrivateMessages(publicKey *ecdsa.PublicKe
 	return result, nil
 }
 
-func (a *WakuServiceTransport) RetrieveRawAll() (map[transport.Filter][]*types.Message, error) {
+func (a *Transport) RetrieveRawAll() (map[transport.Filter][]*types.Message, error) {
 	result := make(map[transport.Filter][]*types.Message)
 
 	allFilters := a.filters.Filters()
@@ -277,7 +277,7 @@ func (a *WakuServiceTransport) RetrieveRawAll() (map[transport.Filter][]*types.M
 // SendPublic sends a new message using the Whisper service.
 // For public filters, chat name is used as an ID as well as
 // a topic.
-func (a *WakuServiceTransport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
+func (a *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (a *WakuServiceTransport) SendPublic(ctx context.Context, newMessage *types
 	return a.api.Post(ctx, *newMessage)
 }
 
-func (a *WakuServiceTransport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
+func (a *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -313,7 +313,7 @@ func (a *WakuServiceTransport) SendPrivateWithSharedSecret(ctx context.Context, 
 	return a.api.Post(ctx, *newMessage)
 }
 
-func (a *WakuServiceTransport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -329,7 +329,7 @@ func (a *WakuServiceTransport) SendPrivateWithPartitioned(ctx context.Context, n
 	return a.api.Post(ctx, *newMessage)
 }
 
-func (a *WakuServiceTransport) SendPrivateOnDiscovery(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (a *Transport) SendPrivateOnDiscovery(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func (a *WakuServiceTransport) SendPrivateOnDiscovery(ctx context.Context, newMe
 	return a.api.Post(ctx, *newMessage)
 }
 
-func (a *WakuServiceTransport) addSig(newMessage *types.NewMessage) error {
+func (a *Transport) addSig(newMessage *types.NewMessage) error {
 	sigID, err := a.keysManager.AddOrGetKeyPair(a.keysManager.privateKey)
 	if err != nil {
 		return err
@@ -355,18 +355,18 @@ func (a *WakuServiceTransport) addSig(newMessage *types.NewMessage) error {
 	return nil
 }
 
-func (a *WakuServiceTransport) Track(identifiers [][]byte, hash []byte, newMessage *types.NewMessage) {
+func (a *Transport) Track(identifiers [][]byte, hash []byte, newMessage *types.NewMessage) {
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Add(identifiers, types.BytesToHash(hash), *newMessage)
 	}
 }
 
 // GetCurrentTime returns the current unix timestamp in milliseconds
-func (a *WakuServiceTransport) GetCurrentTime() uint64 {
+func (a *Transport) GetCurrentTime() uint64 {
 	return uint64(a.waku.GetCurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
-func (a *WakuServiceTransport) Stop() error {
+func (a *Transport) Stop() error {
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Stop()
 	}
@@ -374,7 +374,7 @@ func (a *WakuServiceTransport) Stop() error {
 }
 
 // RequestHistoricMessages requests historic messages for all registered filters.
-func (a *WakuServiceTransport) SendMessagesRequest(
+func (a *Transport) SendMessagesRequest(
 	ctx context.Context,
 	peerID []byte,
 	from, to uint32,
@@ -406,7 +406,7 @@ func (a *WakuServiceTransport) SendMessagesRequest(
 	return
 }
 
-func (a *WakuServiceTransport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan types.EnvelopeEvent) (*types.MailServerResponse, error) {
+func (a *Transport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan types.EnvelopeEvent) (*types.MailServerResponse, error) {
 	for {
 		select {
 		case ev := <-events:

@@ -58,7 +58,7 @@ type Contact struct {
 	SystemTags []string `json:"systemTags"`
 
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
-	TributeToTalk string              `json:"tributeToTalk,omitEmpty"`
+	TributeToTalk string              `json:"tributeToTalk,omitempty"`
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {

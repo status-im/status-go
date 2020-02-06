@@ -192,7 +192,7 @@ func keyFrom(k *C.key) (*types.Key, error) {
 
 	var err error
 	key := types.Key{
-		Id: uuid.Parse(C.GoString(&k.id[0])),
+		ID: uuid.Parse(C.GoString(&k.id[0])),
 	}
 	key.Address = types.BytesToAddress(C.GoBytes(unsafe.Pointer(&k.address[0]), C.ADDRESS_LEN))
 	key.PrivateKey, err = crypto.ToECDSA(C.GoBytes(unsafe.Pointer(&k.privateKeyID[0]), C.PRIVKEY_LEN))

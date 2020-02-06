@@ -69,7 +69,7 @@ func (t *TransactionValidator) verifyTransactionSignature(ctx context.Context, f
 	publicKeyBytes := crypto.FromECDSAPub(from)
 
 	if len(transactionHash) != transactionHashLength {
-		return errors.New("wrong transaction hash lenght")
+		return errors.New("wrong transaction hash length")
 	}
 
 	hashBytes, err := hex.DecodeString(transactionHash[2:])
@@ -146,7 +146,7 @@ func (t *TransactionValidator) validateTokenTransfer(parameters *CommandParamete
 }
 
 func (t *TransactionValidator) validateToAddress(specifiedTo, actualTo string) bool {
-	if len(specifiedTo) != 0 && (strings.ToLower(specifiedTo) != strings.ToLower(actualTo) || !t.addresses[strings.ToLower(actualTo)]) {
+	if len(specifiedTo) != 0 && (!strings.EqualFold(specifiedTo, actualTo) || !t.addresses[strings.ToLower(actualTo)]) {
 		return false
 	}
 
@@ -159,6 +159,7 @@ func (t *TransactionValidator) validateEthereumTransfer(parameters *CommandParam
 	if !t.validateToAddress(parameters.Address, toAddress) {
 		return invalidResponse, nil
 	}
+
 	amount := transaction.Value()
 	if parameters.Value != "" {
 		advertisedAmount, ok := new(big.Int).SetString(parameters.Value, 10)
@@ -171,17 +172,14 @@ func (t *TransactionValidator) validateEthereumTransfer(parameters *CommandParam
 			Value:           amount.String(),
 			Address:         toAddress,
 		}, nil
-
-	} else {
-		return &VerifyTransactionResponse{
-			AccordingToSpec: false,
-			Valid:           true,
-			Value:           amount.String(),
-			Address:         toAddress,
-		}, nil
-
 	}
 
+	return &VerifyTransactionResponse{
+		AccordingToSpec: false,
+		Valid:           true,
+		Value:           amount.String(),
+		Address:         toAddress,
+	}, nil
 }
 
 type VerifyTransactionResponse struct {
@@ -208,7 +206,6 @@ type VerifyTransactionResponse struct {
 // not be retried.
 // If an error is returned, validation can be retried.
 func (t *TransactionValidator) validateTransaction(ctx context.Context, message coretypes.Message, parameters *CommandParameters, from *ecdsa.PublicKey) (*VerifyTransactionResponse, error) {
-
 	fromAddress := types.BytesToAddress(message.From().Bytes())
 
 	err := t.verifyTransactionSignature(ctx, from, fromAddress, parameters.TransactionHash, parameters.Signature)
@@ -220,10 +217,10 @@ func (t *TransactionValidator) validateTransaction(ctx context.Context, message 
 	if len(message.Data()) != 0 {
 		t.logger.Debug("Validating token")
 		return t.validateTokenTransfer(parameters, message)
-	} else {
-		t.logger.Debug("Validating eth")
-		return t.validateEthereumTransfer(parameters, message)
 	}
+
+	t.logger.Debug("Validating eth")
+	return t.validateEthereumTransfer(parameters, message)
 }
 
 func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*VerifyTransactionResponse, error) {
@@ -246,7 +243,6 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 			chatID := contactIDFromPublicKey(transaction.From)
 			message, err := t.persistence.MessageByCommandID(chatID, transaction.CommandID)
 			if err != nil {
-
 				t.logger.Error("error pulling message", zap.Error(err))
 				return nil, err
 			}
@@ -254,7 +250,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 				t.logger.Info("No message found, ignoring transaction")
 				// This is not a valid case, ignore transaction
 				transaction.Validate = false
-				transaction.RetryCount += 1
+				transaction.RetryCount++
 				err = t.persistence.UpdateTransactionToValidate(transaction)
 				if err != nil {
 					return nil, err
@@ -291,7 +287,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 
 		// Mark transaction as valid
 		transaction.Validate = false
-		transaction.RetryCount += 1
+		transaction.RetryCount++
 		err = t.persistence.UpdateTransactionToValidate(transaction)
 		if err != nil {
 			return nil, err

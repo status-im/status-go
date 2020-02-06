@@ -23,6 +23,6 @@ func TestNewWhisperServiceTransport(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = logger.Sync() }()
 
-	_, err = NewWhisperServiceTransport(nil, nil, db, nil, nil, logger)
+	_, err = NewTransport(nil, nil, db, nil, nil, logger)
 	require.NoError(t, err)
 }

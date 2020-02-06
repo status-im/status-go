@@ -47,8 +47,7 @@ const RecoveryIDOffset = 64
 const DigestLength = 32
 
 var (
-	secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
-	secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
+	secp256k1N, _ = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
 )
 
 var errInvalidPubkey = errors.New("invalid secp256k1 public key")
@@ -57,7 +56,7 @@ var errInvalidPubkey = errors.New("invalid secp256k1 public key")
 func Keccak256(data ...[]byte) []byte {
 	d := sha3.NewLegacyKeccak256()
 	for _, b := range data {
-		d.Write(b)
+		_, _ = d.Write(b)
 	}
 	return d.Sum(nil)
 }
@@ -67,7 +66,7 @@ func Keccak256(data ...[]byte) []byte {
 func Keccak256Hash(data ...[]byte) (h types.Hash) {
 	d := sha3.NewLegacyKeccak256()
 	for _, b := range data {
-		d.Write(b)
+		_, _ = d.Write(b)
 	}
 	d.Sum(h[:0])
 	return h
@@ -77,7 +76,7 @@ func Keccak256Hash(data ...[]byte) (h types.Hash) {
 func Keccak512(data ...[]byte) []byte {
 	d := sha3.NewLegacyKeccak512()
 	for _, b := range data {
-		d.Write(b)
+		_, _ = d.Write(b)
 	}
 	return d.Sum(nil)
 }
@@ -200,12 +199,6 @@ func GenerateKey() (*ecdsa.PrivateKey, error) {
 func PubkeyToAddress(p ecdsa.PublicKey) types.Address {
 	pubBytes := FromECDSAPub(&p)
 	return types.BytesToAddress(Keccak256(pubBytes[1:])[12:])
-}
-
-func zeroBytes(bytes []byte) {
-	for i := range bytes {
-		bytes[i] = 0
-	}
 }
 
 // Ecrecover returns the uncompressed public key that created the given signature.
