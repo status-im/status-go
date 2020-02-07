@@ -234,11 +234,11 @@ func (db *Database) GetTransfersInRange(address common.Address, start, end *big.
 }
 
 // GetTransfersByAddress loads transfers for a given address between two blocks.
-func (db *Database) GetTransfersByAddress(address common.Address, fromBlock *big.Int, limit int64) (rst []Transfer, err error) {
+func (db *Database) GetTransfersByAddress(address common.Address, toBlock *big.Int, limit int64) (rst []Transfer, err error) {
 	query := newTransfersQuery().
 		FilterNetwork(db.network).
 		FilterAddress(address).
-		FilterEnd(fromBlock).
+		FilterEnd(toBlock).
 		FilterLoaded(1).
 		Limit(limit)
 
@@ -250,7 +250,7 @@ func (db *Database) GetTransfersByAddress(address common.Address, fromBlock *big
 	return query.Scan(rows)
 }
 
-// GetTransfersByAddress loads transfers for a given address between two blocks.
+// GetBlocksByAddress loads blocks for a given address.
 func (db *Database) GetBlocksByAddress(address common.Address, limit int) (rst []*big.Int, err error) {
 	query := `SELECT blk_number FROM blocks
 	WHERE address = ? AND network_id = ? AND loaded = 0

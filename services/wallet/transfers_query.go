@@ -85,7 +85,7 @@ func (q *transfersQuery) FilterBlockHash(blockHash common.Hash) *transfersQuery 
 }
 
 func (q *transfersQuery) Limit(pageSize int64) *transfersQuery {
-	q.buf.WriteString(" ORDER BY blk_number DESC ")
+	q.buf.WriteString(" ORDER BY blk_number DESC, hash ASC ")
 	q.buf.WriteString(" LIMIT ?")
 	q.args = append(q.args, pageSize)
 	return q

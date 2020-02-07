@@ -24,69 +24,22 @@ type API struct {
 	s *Service
 }
 
-// GetTransfers returns transfers in range of blocks. If `end` is nil all transfers from `start` will be returned.
-// TODO(dshulyak) benchmark loading many transfers from database. We can avoid json unmarshal/marshal if we will
-// read header, tx and receipt as a raw json.
-func (api *API) GetTransfers(ctx context.Context, start, end *hexutil.Big) ([]TransferView, error) {
-	log.Debug("call to get transfers", "start", start, "end", end)
-	if start == nil {
-		return nil, errors.New("start of the query must be provided. use 0 if you want to load all transfers")
-	}
-	if api.s.db == nil {
-		return nil, ErrServiceNotInitialized
-	}
-	rst, err := api.s.db.GetTransfers((*big.Int)(start), (*big.Int)(end))
-	if err != nil {
-		return nil, err
-	}
-	log.Debug("result from database for transfers", "start", start, "end", end, "len", len(rst))
-	return castToTransferViews(rst), nil
-}
-
-type StatsView struct {
-	BlocksStats    map[int64]int64 `json:"blocksStats"`
-	TransfersCount int64           `json:"transfersCount"`
-}
-
-// GetTransfersFromBlock
-func (api *API) GetTransfersFromBlock(ctx context.Context, address common.Address, block *hexutil.Big) ([]TransferView, error) {
-	log.Debug("[WalletAPI:: GetTransfersFromBlock] get transfers from block", "address", address, "block", block)
-	if api.s.db == nil {
-		return nil, ErrServiceNotInitialized
-	}
-
-	blocksByAddress := make(map[common.Address][]*big.Int)
-	blocksByAddress[address] = []*big.Int{block.ToInt()}
-
-	txCommand := &loadTransfersCommand{
-		accounts:        []common.Address{address},
-		db:              api.s.db,
-		chain:           api.s.reactor.chain,
-		client:          api.s.client,
-		blocksByAddress: blocksByAddress,
-	}
-
-	err := txCommand.Command()(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	rst, err := api.s.db.GetTransfersInRange(address, block.ToInt(), block.ToInt())
-	if err != nil {
-		return nil, err
-	}
-
-	return castToTransferViews(rst), nil
-}
-
 // GetTransfersByAddress returns transfers for a single address
-func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, beforeBlock, limit *hexutil.Big) ([]TransferView, error) {
-	log.Info("call to get transfers for an address", "address", address, "block", beforeBlock, "limit", limit)
+func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big) ([]TransferView, error) {
+	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
 	if api.s.db == nil {
+		log.Error("[WalletAPI:: GetTransfersByAddress] db is not initialized")
 		return nil, ErrServiceNotInitialized
 	}
-	rst, err := api.s.db.GetTransfersByAddress(address, beforeBlock.ToInt(), limit.ToInt().Int64())
+
+	var toBlockBN *big.Int
+	if toBlock != nil {
+		toBlockBN = toBlock.ToInt()
+	}
+
+	rst, err := api.s.db.GetTransfersByAddress(address, toBlockBN, limit.ToInt().Int64())
 	if err != nil {
+		log.Error("[WalletAPI:: GetTransfersByAddress] can't fetch transfers", "err", err)
 		return nil, err
 	}
 
@@ -142,7 +95,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 			if err != nil {
 				return nil, err
 			}
-			rst, err = api.s.db.GetTransfersByAddress(address, beforeBlock.ToInt(), limit.ToInt().Int64())
+			rst, err = api.s.db.GetTransfersByAddress(address, toBlockBN, limit.ToInt().Int64())
 			if err != nil {
 				return nil, err
 			}
