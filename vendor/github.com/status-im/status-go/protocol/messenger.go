@@ -126,6 +126,8 @@ type config struct {
 
 type Option func(*config) error
 
+// WithSystemMessagesTranslations is required for Group Chats which are currently disabled.
+// nolint: unused
 func WithSystemMessagesTranslations(t map[protobuf.MembershipUpdateEvent_EventType]string) Option {
 	return func(c *config) error {
 		c.systemMessagesTranslations = t
@@ -629,7 +631,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
 	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
-	chat := createGroupChat(m.getTimesource())
+	chat := CreateGroupChat(m.getTimesource())
 	group, err := v1protocol.NewGroupWithCreator(name, m.identity)
 	if err != nil {
 		return nil, err
@@ -1699,8 +1701,8 @@ type ReceivedMessageState struct {
 	ExistingMessagesMap map[string]bool
 	// Response to the client
 	Response *MessengerResponse
-	// Timesource is a timesource for clock values/timestamps
-	Timesource ClockValueTimesource
+	// Timesource is a time source for clock values/timestamps.
+	Timesource TimeSource
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
@@ -2806,6 +2808,10 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	return &response, nil
 }
 
-func (m *Messenger) getTimesource() ClockValueTimesource {
+func (m *Messenger) getTimesource() TimeSource {
 	return m.transport
+}
+
+func (m *Messenger) Timesource() TimeSource {
+	return m.getTimesource()
 }
