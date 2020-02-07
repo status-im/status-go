@@ -1202,14 +1202,18 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid request response message")
 				}
+
 				event, err := CreateMailServerEvent(p.peer.ID(), payload)
+
 				if err != nil {
 					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return err
 				}
+
 				if event != nil {
 					whisper.postP2P(*event)
 				}
+
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.

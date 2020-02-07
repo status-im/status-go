@@ -10,12 +10,6 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
 
-replace github.com/status-im/status-go/extkeys => ./extkeys
-
-replace github.com/status-im/status-go/whisper/v6 => ./whisper
-
-replace github.com/status-im/status-go/waku => ./waku
-
 require (
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.20.1-beta
