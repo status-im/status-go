@@ -11,7 +11,7 @@ GID = $(shell id -g)
 
 # Settings
 export LOG_LEVEL       ?= 3
-export LISTEN_PORT     ?= 30303
+export LISTEN_PORT     ?= 30301
 export API_MODULES     ?= eth,net,web3,admin
 export CONTAINER_NAME  ?= status-go-bootnode
 export CONTAINER_IMAGE ?= statusteam/bootnode:latest

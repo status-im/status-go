@@ -1,5 +1,14 @@
 # Description
 
+A "Bootnode" is a match-maker for all kinds of nodes. For example our [Mailserver](/MAILSERVER.md). It helps a new node find other nodes it can communicate with. It bootstraps connections between them.
+
+A Bootstrap node is a very static thing and should not change its IP. Their addresses are either hardcoded into the node binary or provided via flags or config files on process start.
+
+# Service Ports
+
+* `30301` UDP - Ethereum [Discovery port](https://github.com/ethereum/devp2p/wiki/Discovery-Overview), should __ALWAYS__ be public.
+# Setup methods
+
 This document describes the two alternative ways to start a Status Bootnode:
 
 * [Docker Compose](https://docs.docker.com/compose/) - More self-contained and portable
