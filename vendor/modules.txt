@@ -374,7 +374,7 @@ github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
 # github.com/status-im/status-go/extkeys v1.1.0 => ./extkeys
 github.com/status-im/status-go/extkeys
-# github.com/status-im/status-go/waku v1.1.0 => ./waku
+# github.com/status-im/status-go/waku v1.2.0 => ./waku
 github.com/status-im/status-go/waku
 # github.com/status-im/status-go/whisper/v6 v6.1.0 => ./whisper
 github.com/status-im/status-go/whisper/v6
