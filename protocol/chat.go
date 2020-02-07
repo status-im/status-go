@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math/rand"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -76,6 +77,22 @@ func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
 
 func (c *Chat) Public() bool {
 	return c.ChatType == ChatTypePublic
+}
+
+func (c *Chat) OneToOne() bool {
+	return c.ChatType == ChatTypeOneToOne
+}
+
+func (c *Chat) Validate() error {
+	if c.ID == "" {
+		return errors.New("chatID can't be blank")
+	}
+
+	if c.OneToOne() {
+		_, err := c.PublicKey()
+		return err
+	}
+	return nil
 }
 
 func (c *Chat) MarshalJSON() ([]byte, error) {

@@ -182,6 +182,7 @@ func (s *MessengerSuite) TestInit() {
 				key2, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				groupChat := Chat{
+					ID:       "some-id",
 					ChatType: ChatTypePrivateGroupChat,
 					Active:   true,
 					Members: []ChatMember{
