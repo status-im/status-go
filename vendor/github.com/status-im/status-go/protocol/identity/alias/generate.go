@@ -24,6 +24,7 @@ func generate(seed uint64) string {
 
 // GenerateFromPublicKey returns the 3 words name given an *ecdsa.PublicKey
 func GenerateFromPublicKey(publicKey *ecdsa.PublicKey) string {
+	// Here we truncate the public key to the least significant 64 bits
 	return generate(uint64(publicKey.X.Int64()))
 }
 
