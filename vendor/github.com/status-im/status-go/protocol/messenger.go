@@ -401,6 +401,11 @@ func (m *Messenger) Init() error {
 		return err
 	}
 	for _, chat := range chats {
+		if err := chat.Validate(); err != nil {
+			logger.Warn("failed to validate chat", zap.Error(err))
+			continue
+		}
+
 		m.allChats[chat.ID] = chat
 		if !chat.Active {
 			continue
