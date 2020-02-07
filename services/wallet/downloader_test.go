@@ -190,7 +190,17 @@ func (s *ERC20TransferSuite) SetupTest() {
 	s.ethclient = ethclient.NewClient(client)
 	s.downloader = NewERC20TransfersDownloader(s.ethclient, []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)}, s.signer)
 
-	_, tx, contract, err := erc20.DeployERC20Transfer(bind.NewKeyedTransactor(s.faucet), s.ethclient)
+	var (
+		tx       *types.Transaction
+		contract *erc20.ERC20Transfer
+	)
+	for i := 0; i <= 3; i++ {
+		opts := bind.NewKeyedTransactor(s.faucet)
+		_, tx, contract, err = erc20.DeployERC20Transfer(opts, s.ethclient)
+		if err != nil {
+			continue
+		}
+	}
 	s.Require().NoError(err)
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -209,8 +219,8 @@ func (s *ERC20TransferSuite) TestNoEvents() {
 }
 
 func (s *ERC20TransferSuite) TestInboundEvent() {
-	tx, err := s.contract.Transfer(bind.NewKeyedTransactor(s.faucet), crypto.PubkeyToAddress(s.identity.PublicKey),
-		big.NewInt(100))
+	opts := bind.NewKeyedTransactor(s.faucet)
+	tx, err := s.contract.Transfer(opts, crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(100))
 	s.Require().NoError(err)
 	timeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -228,9 +238,7 @@ func (s *ERC20TransferSuite) TestInboundEvent() {
 func (s *ERC20TransferSuite) TestOutboundEvent() {
 	// give some eth to pay for gas
 	ctx := context.TODO()
-	// nonce is 1 - contact with nonce 0 was deployed in setup
-	// FIXME request nonce
-	tx := types.NewTransaction(1, crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
+	tx := types.NewTransaction(4, crypto.PubkeyToAddress(s.identity.PublicKey), big.NewInt(1e18), 1e6, big.NewInt(10), nil)
 	tx, err := types.SignTx(tx, s.signer, s.faucet)
 	s.Require().NoError(err)
 	s.Require().NoError(s.ethclient.SendTransaction(ctx, tx))
@@ -239,7 +247,8 @@ func (s *ERC20TransferSuite) TestOutboundEvent() {
 	cancel()
 	s.Require().NoError(err)
 
-	tx, err = s.contract.Transfer(bind.NewKeyedTransactor(s.identity), common.Address{1}, big.NewInt(100))
+	opts := bind.NewKeyedTransactor(s.identity)
+	tx, err = s.contract.Transfer(opts, common.Address{1}, big.NewInt(100))
 	s.Require().NoError(err)
 	timeout, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	_, err = bind.WaitMined(timeout, s.ethclient, tx)

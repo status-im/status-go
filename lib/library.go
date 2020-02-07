@@ -379,9 +379,7 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	if err != nil {
 		return makeJSONResponse(err)
 	}
-	err = <-api.RunAsync(func() error {
-		return statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), settings, &conf, subaccs)
-	})
+	err = statusBackend.StartNodeWithAccountAndConfig(account, C.GoString(password), settings, &conf, subaccs)
 	return makeJSONResponse(err)
 }
 

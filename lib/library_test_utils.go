@@ -105,15 +105,16 @@ func createAccountAndLogin(t *testing.T, feed *event.Feed) account.Info {
 	require.NoError(t, err)
 	t.Logf("account created: {address: %s, key: %s}", account1.WalletAddress, account1.WalletPubKey)
 
-	signalErrC := make(chan error, 1)
-	go func() {
-		signalErrC <- waitSignal(feed, signal.EventLoggedIn, 5*time.Second)
-	}()
-
 	nodeConfig, _ := params.NewConfigFromJSON(nodeConfigJSON)
 	nodeConfig.KeyStoreDir = "keystore"
 	nodeConfig.DataDir = "/"
-	cnf, _ := json.Marshal(nodeConfig)
+	cnf, err := json.Marshal(nodeConfig)
+	require.NoError(t, err)
+
+	signalErrC := make(chan error, 1)
+	go func() {
+		signalErrC <- waitSignal(feed, signal.EventLoggedIn, 10*time.Second)
+	}()
 
 	// SaveAccountAndLogin must be called only once when an account is created.
 	// If the account already exists, Login should be used.

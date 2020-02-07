@@ -359,10 +359,11 @@ func (s *RequestMessagesSyncSuite) TestExpired() {
 	}()
 	_, err := s.localAPI.RequestMessagesSync(
 		ext.RetryConfig{
-			BaseTimeout: time.Second,
+			BaseTimeout: time.Millisecond * 100,
 		},
 		ext.MessagesRequest{
 			MailServerPeer: s.localNode.String(),
+			Topics:         []types.TopicType{{0x01, 0x02, 0x03, 0x04}},
 		},
 	)
 	s.Require().EqualError(err, "failed to request messages after 1 retries")

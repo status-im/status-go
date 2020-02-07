@@ -883,13 +883,12 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupWrappedMessageChat() {
 	err = tt.RetryWithBackOff(func() error {
 		var err error
 		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
+		if err == nil && len(response.Chats) == 0 {
+			err = errors.New("no chats")
 		}
 		return err
 	})
 	s.Require().NoError(err)
-
 	s.Require().Len(response.Chats, 1)
 	actualChat := response.Chats[0]
 	// It updates the unviewed messages count
