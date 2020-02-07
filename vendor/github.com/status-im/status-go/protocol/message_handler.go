@@ -59,7 +59,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		if !group.IsMember(contactIDFromPublicKey(&m.identity.PublicKey)) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
-		newChat := createGroupChat(messageState.Timesource)
+		newChat := CreateGroupChat(messageState.Timesource)
 		chat = &newChat
 
 	} else {
@@ -550,7 +550,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, timesource ClockValueTimesource) (*Chat, error) {
+func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
 	if message.SigPubKey == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a message with empty public key")
