@@ -22,6 +22,10 @@ type sqlitePersistence struct {
 }
 
 func (db sqlitePersistence) SaveChat(chat Chat) error {
+	err := chat.Validate()
+	if err != nil {
+		return err
+	}
 	return db.saveChat(nil, chat)
 }
 
