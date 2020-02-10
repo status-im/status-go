@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/gomarkdown/markdown"
+	"github.com/status-im/markdown"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )

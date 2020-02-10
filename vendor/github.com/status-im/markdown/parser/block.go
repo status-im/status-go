@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"unicode"
 
-	"github.com/gomarkdown/markdown/ast"
+	"github.com/status-im/markdown/ast"
 )
 
 // Parsing block-level elements.

@@ -1,4 +1,4 @@
-module github.com/gomarkdown/markdown
+module github.com/status-im/markdown
 
 go 1.12
 

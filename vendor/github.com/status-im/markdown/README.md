@@ -1,21 +1,21 @@
 # Markdown Parser and HTML Renderer for Go
 
-[![GoDoc](https://godoc.org/github.com/gomarkdown/markdown?status.svg)](https://godoc.org/github.com/gomarkdown/markdown) [![codecov](https://codecov.io/gh/gomarkdown/markdown/branch/master/graph/badge.svg)](https://codecov.io/gh/gomarkdown/markdown)
+[![GoDoc](https://godoc.org/github.com/status-im/markdown?status.svg)](https://godoc.org/github.com/gomarkdown/markdown) [![codecov](https://codecov.io/gh/gomarkdown/markdown/branch/master/graph/badge.svg)](https://codecov.io/gh/gomarkdown/markdown)
 
-Package `github.com/gomarkdown/markdown` is a very fast Go library for parsing [Markdown](https://daringfireball.net/projects/markdown/) documents and rendering them to HTML.
+Package `github.com/status-im/markdown` is a very fast Go library for parsing [Markdown](https://daringfireball.net/projects/markdown/) documents and rendering them to HTML.
 
 It's fast and supports common extensions.
 
 ## Installation
 
-    go get -u github.com/gomarkdown/markdown
+    go get -u github.com/status-im/markdown
 
 API Docs:
 
-- https://godoc.org/github.com/gomarkdown/markdown : top level package
-- https://godoc.org/github.com/gomarkdown/markdown/ast : defines abstract syntax tree of parsed markdown document
-- https://godoc.org/github.com/gomarkdown/markdown/parser : parser
-- https://godoc.org/github.com/gomarkdown/markdown/html : html renderer
+- https://godoc.org/github.com/status-im/markdown : top level package
+- https://godoc.org/github.com/status-im/markdown/ast : defines abstract syntax tree of parsed markdown document
+- https://godoc.org/github.com/status-im/markdown/parser : parser
+- https://godoc.org/github.com/status-im/markdown/html : html renderer
 
 ## Usage
 
@@ -30,14 +30,14 @@ output := markdown.ToHTML(md, nil, nil)
 
 Markdown format is loosely specified and there are multiple extensions invented after original specification was created.
 
-The parser supports several [extensions](https://godoc.org/github.com/gomarkdown/markdown/parser#Extensions).
+The parser supports several [extensions](https://godoc.org/github.com/status-im/markdown/parser#Extensions).
 
 Default parser uses most common `parser.CommonExtensions` but you can easily use parser with custom extension:
 
 ```go
 import (
-    "github.com/gomarkdown/markdown"
-    "github.com/gomarkdown/markdown/parser"
+    "github.com/status-im/markdown"
+    "github.com/status-im/markdown/parser"
 )
 
 extensions := parser.CommonExtensions | parser.AutoHeadingIDs
@@ -49,14 +49,14 @@ html := markdown.ToHTML(md, parser, nil)
 
 ## Customizing HTML renderer
 
-Similarly, HTML renderer can be configured with different [options](https://godoc.org/github.com/gomarkdown/markdown/html#RendererOptions)
+Similarly, HTML renderer can be configured with different [options](https://godoc.org/github.com/status-im/markdown/html#RendererOptions)
 
 Here's how to use a custom renderer:
 
 ```go
 import (
-    "github.com/gomarkdown/markdown"
-    "github.com/gomarkdown/markdown/html"
+    "github.com/status-im/markdown"
+    "github.com/status-im/markdown/html"
 )
 
 htmlFlags := html.CommonFlags | html.HrefTargetBlank
@@ -69,7 +69,7 @@ html := markdown.ToHTML(md, nil, renderer)
 
 HTML renderer also supports reusing most of the logic and overriding rendering of only specifc nodes.
 
-You can provide [RenderNodeFunc](https://godoc.org/github.com/gomarkdown/markdown/html#RenderNodeFunc) in [RendererOptions](https://godoc.org/github.com/gomarkdown/markdown/html#RendererOptions).
+You can provide [RenderNodeFunc](https://godoc.org/github.com/status-im/markdown/html#RenderNodeFunc) in [RendererOptions](https://godoc.org/github.com/gomarkdown/markdown/html#RendererOptions).
 
 The function is called for each node in AST, you can implement custom rendering logic and tell HTML renderer to skip rendering this node.
 
@@ -77,9 +77,9 @@ Here's the simplest example that drops all code blocks from the output:
 
 ````go
 import (
-    "github.com/gomarkdown/markdown"
-    "github.com/gomarkdown/markdown/ast"
-    "github.com/gomarkdown/markdown/html"
+    "github.com/status-im/markdown"
+    "github.com/status-im/markdown/ast"
+    "github.com/status-im/markdown/html"
 )
 
 // return (ast.GoToNext, true) to tell html renderer to skip rendering this node
@@ -113,7 +113,7 @@ Here's an example of simple usage with Bluemonday:
 ```go
 import (
     "github.com/microcosm-cc/bluemonday"
-    "github.com/gomarkdown/markdown"
+    "github.com/status-im/markdown"
 )
 
 // ...
@@ -152,7 +152,7 @@ To run: `mdtohtml input-file [output-file]`
 
   NOTE: "safety" in this context means _runtime safety only_. In order to
   protect yourself against JavaScript injection in untrusted content, see
-  [this example](https://github.com/gomarkdown/markdown#sanitize-untrusted-content).
+  [this example](https://github.com/status-im/markdown#sanitize-untrusted-content).
 
 - **Fast**. It is fast enough to render on-demand in
   most web applications without having to cache the output.

@@ -366,8 +366,8 @@ func (b *nimbusStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version
-	
-	// Replace all relative paths with absolute	
+
+	// Replace all relative paths with absolute
 	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
 	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
 	if len(conf.LogDir) == 0 {
