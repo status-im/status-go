@@ -31,11 +31,11 @@ import (
 
 const PubKeyStringLength = 132
 
+const transactionSentTxt = "Transaction sent"
+
 var (
 	ErrChatIDEmpty    = errors.New("chat ID is empty")
 	ErrNotImplemented = errors.New("not implemented")
-
-	errChatNotFound = errors.New("chat not found")
 )
 
 // Messenger is a entity managing chats and messages.
@@ -74,12 +74,12 @@ type RawResponse struct {
 }
 
 type MessengerResponse struct {
-	Chats         []*Chat                     `json:"chats,omitEmpty"`
-	Messages      []*Message                  `json:"messages,omitEmpty"`
-	Contacts      []*Contact                  `json:"contacts,omitEmpty"`
-	Installations []*multidevice.Installation `json:"installations,omitEmpty"`
+	Chats         []*Chat                     `json:"chats,omitempty"`
+	Messages      []*Message                  `json:"messages,omitempty"`
+	Contacts      []*Contact                  `json:"contacts,omitempty"`
+	Installations []*multidevice.Installation `json:"installations,omitempty"`
 	// Raw unprocessed messages
-	RawMessages []*RawResponse `json:"rawMessages,omitEmpty"`
+	RawMessages []*RawResponse `json:"rawMessages,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
@@ -286,7 +286,7 @@ func NewMessenger(
 	// Initialize transport layer.
 	var transp transport.Transport
 	if shh, err := node.GetWhisper(nil); err == nil && shh != nil {
-		transp, err = shhtransp.NewWhisperServiceTransport(
+		transp, err = shhtransp.NewTransport(
 			shh,
 			identity,
 			database,
@@ -295,7 +295,7 @@ func NewMessenger(
 			logger,
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create WhisperServiceTransport")
+			return nil, errors.Wrap(err, "failed to create Transport")
 		}
 	} else {
 		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
@@ -303,7 +303,7 @@ func NewMessenger(
 		if err != nil || waku == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
 		}
-		transp, err = wakutransp.NewWakuServiceTransport(
+		transp, err = wakutransp.NewTransport(
 			waku,
 			identity,
 			database,
@@ -312,7 +312,7 @@ func NewMessenger(
 			logger,
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create  WakuServiceTransport")
+			return nil, errors.Wrap(err, "failed to create  Transport")
 		}
 	}
 
@@ -1179,7 +1179,7 @@ func (m *Messenger) hasPairedDevices() bool {
 	var count int
 	for _, i := range m.allInstallations {
 		if i.Enabled {
-			count += 1
+			count++
 		}
 	}
 	return count > 1
@@ -1208,7 +1208,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec *R
 		return nil, err
 	}
 	spec.ID = types.EncodeHex(id)
-	spec.SendCount += 1
+	spec.SendCount++
 	err = m.persistence.SaveRawMessage(spec)
 	if err != nil {
 		return nil, err
@@ -1285,7 +1285,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 		return nil, errors.New("chat type not supported")
 	}
 	spec.ID = types.EncodeHex(id)
-	spec.SendCount += 1
+	spec.SendCount++
 	err = m.persistence.SaveRawMessage(spec)
 	if err != nil {
 		return nil, err
@@ -1696,7 +1696,7 @@ type ReceivedMessageState struct {
 	ModifiedChats map[string]bool
 	// All contacts in memory
 	AllContacts map[string]*Contact
-	// List of contacs modified
+	// List of contacts modified
 	ModifiedContacts map[string]bool
 	// All installations in memory
 	AllInstallations map[string]*multidevice.Installation
@@ -1919,7 +1919,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.Contacts = append(messageState.Response.Contacts, messageState.AllContacts[id])
 	}
 
-	for id, _ := range messageState.ModifiedInstallations {
+	for id := range messageState.ModifiedInstallations {
 		installation := messageState.AllInstallations[id]
 		messageState.Response.Installations = append(messageState.Response.Installations, installation)
 		if installation.InstallationMetadata != nil {
@@ -2554,7 +2554,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
-	message.Text = "Transaction sent"
+	message.Text = transactionSentTxt
 	message.OutgoingStatus = OutgoingStatusSending
 
 	// Hide previous message
@@ -2652,7 +2652,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
-	message.Text = "Transaction sent"
+	message.Text = transactionSentTxt
 
 	request := &protobuf.SendTransaction{
 		Clock:           message.Clock,
@@ -2800,7 +2800,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		modifiedChats[chat.ID] = true
 
 	}
-	for id, _ := range modifiedChats {
+	for id := range modifiedChats {
 		response.Chats = append(response.Chats, m.allChats[id])
 	}
 

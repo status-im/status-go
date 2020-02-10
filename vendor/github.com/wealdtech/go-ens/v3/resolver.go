@@ -53,7 +53,7 @@ func NewResolver(backend bind.ContractBackend, domain string) (*Resolver, error)
 	if err != nil {
 		return nil, err
 	}
-	if bytes.Compare(ownerAddress.Bytes(), UnknownAddress.Bytes()) == 0 {
+	if bytes.Equal(ownerAddress.Bytes(), UnknownAddress.Bytes()) {
 		return nil, errors.New("unregistered name")
 	}
 
@@ -204,7 +204,7 @@ func resolveName(backend bind.ContractBackend, input string) (address common.Add
 	if err != nil {
 		return UnknownAddress, err
 	}
-	if bytes.Compare(nameHash[:], zeroHash) == 0 {
+	if bytes.Equal(nameHash[:], zeroHash) {
 		err = errors.New("Bad name")
 	} else {
 		address, err = resolveHash(backend, input)
@@ -223,7 +223,7 @@ func resolveHash(backend bind.ContractBackend, domain string) (address common.Ad
 	if err != nil {
 		return UnknownAddress, err
 	}
-	if bytes.Compare(address.Bytes(), UnknownAddress.Bytes()) == 0 {
+	if bytes.Equal(address.Bytes(), UnknownAddress.Bytes()) {
 		return UnknownAddress, errors.New("no address")
 	}
 
@@ -258,7 +258,9 @@ func (r *Resolver) SetABI(opts *bind.TransactOpts, name string, abi string, cont
 		// Zlib-compressed JSON
 		var b bytes.Buffer
 		w := zlib.NewWriter(&b)
-		w.Write([]byte(abi))
+		if _, err := w.Write([]byte(abi)); err != nil {
+			return nil, err
+		}
 		w.Close()
 		data = b.Bytes()
 	} else {

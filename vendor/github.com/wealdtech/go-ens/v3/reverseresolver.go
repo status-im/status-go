@@ -82,7 +82,7 @@ func (r *ReverseResolver) Name(address common.Address) (string, error) {
 func Format(backend bind.ContractBackend, address common.Address) string {
 	result, err := ReverseResolve(backend, address)
 	if err != nil {
-		result = fmt.Sprintf("%s", address.Hex())
+		result = address.Hex()
 	}
 	return result
 }

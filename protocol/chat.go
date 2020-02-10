@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -224,11 +223,6 @@ type ChatMembershipUpdate struct {
 	Members []string `json:"members,omitempty"`
 }
 
-func (u *ChatMembershipUpdate) setID() {
-	sum := sha1.Sum([]byte(u.Signature))
-	u.ID = hex.EncodeToString(sum[:])
-}
-
 // ChatMember represents a member who participates in a group chat
 type ChatMember struct {
 	// ID is the hex encoded public key of the member
@@ -286,15 +280,6 @@ func CreateGroupChat(timesource TimeSource) Chat {
 		Timestamp: int64(timesource.GetCurrentTime()),
 		ChatType:  ChatTypePrivateGroupChat,
 	}
-}
-
-func findChatByID(chatID string, chats []*Chat) *Chat {
-	for _, c := range chats {
-		if c.ID == chatID {
-			return c
-		}
-	}
-	return nil
 }
 
 func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey, error) {

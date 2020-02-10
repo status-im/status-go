@@ -115,7 +115,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { // nolint: gocyclo
+func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error {
 	if !s.config.PFSEnabled {
 		return nil
 	}

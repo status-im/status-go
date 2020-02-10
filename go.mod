@@ -10,25 +10,26 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
 
-replace github.com/status-im/status-go/protocol => ./protocol
-
-replace github.com/status-im/status-go/extkeys => ./extkeys
-
-replace github.com/status-im/status-go/eth-node => ./eth-node
-
-replace github.com/status-im/status-go/whisper/v6 => ./whisper
-
-replace github.com/status-im/status-go/waku => ./waku
-
 require (
 	github.com/beevik/ntp v0.2.0
+	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/ethereum/go-ethereum v1.9.5
+	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
+	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
 	github.com/golang/mock v1.3.1
+	github.com/golang/protobuf v1.3.2
+	github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba
+	github.com/google/uuid v1.1.1
+	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
+	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p v0.4.2 // indirect
 	github.com/libp2p/go-libp2p-core v0.2.4
+	github.com/lucasb-eyer/go-colorful v1.0.3
+	github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
 	github.com/multiformats/go-multiaddr v0.1.1
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
@@ -38,16 +39,18 @@ require (
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
+	github.com/status-im/doubleratchet v3.0.0+incompatible
+	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
-	github.com/status-im/status-go/eth-node v1.1.0
 	github.com/status-im/status-go/extkeys v1.1.0
-	github.com/status-im/status-go/protocol v1.1.0
-	github.com/status-im/status-go/waku v1.1.0
+	github.com/status-im/status-go/waku v1.2.0
 	github.com/status-im/status-go/whisper/v6 v6.1.0
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
+	github.com/vacp2p/mvds v0.0.23
+	github.com/wealdtech/go-ens/v3 v3.3.0
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/tools v0.0.0-20200116062425-473961ec044c // indirect

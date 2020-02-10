@@ -14,14 +14,14 @@ import (
 
 type DataSync struct {
 	*datasyncnode.Node
-	// DataSyncNodeTransport is the implementation of the datasync transport interface.
-	*DataSyncNodeTransport
+	// NodeTransport is the implementation of the datasync transport interface.
+	*NodeTransport
 	logger         *zap.Logger
 	sendingEnabled bool
 }
 
-func New(node *datasyncnode.Node, transport *DataSyncNodeTransport, sendingEnabled bool, logger *zap.Logger) *DataSync {
-	return &DataSync{Node: node, DataSyncNodeTransport: transport, sendingEnabled: sendingEnabled, logger: logger}
+func New(node *datasyncnode.Node, transport *NodeTransport, sendingEnabled bool, logger *zap.Logger) *DataSync {
+	return &DataSync{Node: node, NodeTransport: transport, sendingEnabled: sendingEnabled, logger: logger}
 }
 
 func (d *DataSync) Handle(sender *ecdsa.PublicKey, payload []byte) [][]byte {
@@ -57,7 +57,7 @@ func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto
 		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
 		Payload: datasyncMessage,
 	}
-	d.DataSyncNodeTransport.AddPacket(packet)
+	d.NodeTransport.AddPacket(packet)
 }
 
 func unwrap(payload []byte) (datasyncPayload datasyncproto.Payload, err error) {

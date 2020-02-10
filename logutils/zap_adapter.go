@@ -32,7 +32,7 @@ func (c gethLoggerCore) Check(ent zapcore.Entry, ce *zapcore.CheckedEntry) *zapc
 	}
 	return ce
 }
-func (c gethLoggerCore) Write(ent zapcore.Entry, fields []zapcore.Field) error { // nolint: gocyclo
+func (c gethLoggerCore) Write(ent zapcore.Entry, fields []zapcore.Field) error {
 	fields = append(c.fields[:], fields...)
 
 	var args []interface{}

@@ -5,11 +5,11 @@ import (
 	"strings"
 )
 
-// maxRetries is the maximum number of attemps we do before giving up
+// maxRetries is the maximum number of attempts we do before giving up
 const maxRetries uint64 = 11
 
 // ENSBackoffTimeMs is the step of the exponential backoff
-// we retry roughtly for 17 hours after receiving the message 2^11 * 30000
+// we retry roughly for 17 hours after receiving the message 2^11 * 30000
 const ENSBackoffTimeMs uint64 = 30000
 
 // We calculate if it's too early to retry, by exponentially backing off

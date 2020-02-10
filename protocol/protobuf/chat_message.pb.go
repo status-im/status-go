@@ -5,8 +5,9 @@ package protobuf
 
 import (
 	fmt "fmt"
-	proto "github.com/golang/protobuf/proto"
 	math "math"
+
+	proto "github.com/golang/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -147,7 +148,7 @@ type ChatMessage struct {
 	Timestamp uint64 `protobuf:"varint,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// Text of the message
 	Text string `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
-	// Id of the message that we are replying to
+	// ID of the message that we are replying to
 	ResponseTo string `protobuf:"bytes,4,opt,name=response_to,json=responseTo,proto3" json:"response_to,omitempty"`
 	// Ens name of the sender
 	EnsName string `protobuf:"bytes,5,opt,name=ens_name,json=ensName,proto3" json:"ens_name,omitempty"`

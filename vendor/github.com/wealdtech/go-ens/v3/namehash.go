@@ -46,7 +46,9 @@ func LabelHash(label string) (hash [32]byte, err error) {
 	}
 
 	sha := sha3.NewLegacyKeccak256()
-	sha.Write([]byte(normalizedLabel))
+	if _, err = sha.Write([]byte(normalizedLabel)); err != nil {
+		return
+	}
 	sha.Sum(hash[:0])
 	return
 }
@@ -63,18 +65,26 @@ func NameHash(name string) (hash [32]byte, err error) {
 	}
 	parts := strings.Split(normalizedName, ".")
 	for i := len(parts) - 1; i >= 0; i-- {
-		hash = nameHashPart(hash, parts[i])
+		if hash, err = nameHashPart(hash, parts[i]); err != nil {
+			return
+		}
 	}
 	return
 }
 
-func nameHashPart(currentHash [32]byte, name string) (hash [32]byte) {
+func nameHashPart(currentHash [32]byte, name string) (hash [32]byte, err error) {
 	sha := sha3.NewLegacyKeccak256()
-	sha.Write(currentHash[:])
+	if _, err = sha.Write(currentHash[:]); err != nil {
+		return
+	}
 	nameSha := sha3.NewLegacyKeccak256()
-	nameSha.Write([]byte(name))
+	if _, err = nameSha.Write([]byte(name)); err != nil {
+		return
+	}
 	nameHash := nameSha.Sum(nil)
-	sha.Write(nameHash)
+	if _, err = sha.Write(nameHash); err != nil {
+		return
+	}
 	sha.Sum(hash[:0])
 	return
 }

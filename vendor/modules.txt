@@ -18,6 +18,8 @@ github.com/btcsuite/btcd/wire
 github.com/btcsuite/btcutil
 github.com/btcsuite/btcutil/base58
 github.com/btcsuite/btcutil/bech32
+# github.com/cenkalti/backoff/v3 v3.2.2
+github.com/cenkalti/backoff/v3
 # github.com/cespare/xxhash/v2 v2.1.0
 github.com/cespare/xxhash/v2
 # github.com/coreos/go-semver v0.3.0
@@ -109,7 +111,7 @@ github.com/ethereum/go-ethereum/trie
 # github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 github.com/fjl/memsize
 github.com/fjl/memsize/memsizeui
-# github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff
+# github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 github.com/gballet/go-libpcsclite
 # github.com/go-playground/locales v0.13.0
 github.com/go-playground/locales
@@ -121,7 +123,7 @@ github.com/go-stack/stack
 # github.com/gogo/protobuf v1.3.1
 github.com/gogo/protobuf/io
 github.com/gogo/protobuf/proto
-# github.com/golang-migrate/migrate/v4 v4.6.2
+# github.com/golang-migrate/migrate/v4 v4.8.0
 github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4/internal/url
@@ -175,9 +177,9 @@ github.com/jbenet/go-temp-err-catcher
 github.com/jbenet/goprocess
 github.com/jbenet/goprocess/context
 github.com/jbenet/goprocess/periodic
-# github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
+# github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 github.com/jinzhu/copier
-# github.com/karalabe/usb v0.0.0-20190819132248-550797b1cad8
+# github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9
 github.com/karalabe/usb
 # github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d
 github.com/koron/go-ssdp
@@ -276,7 +278,7 @@ github.com/libp2p/go-tcp-transport
 github.com/libp2p/go-ws-transport
 # github.com/libp2p/go-yamux v1.2.3
 github.com/libp2p/go-yamux
-# github.com/lucasb-eyer/go-colorful v1.0.2
+# github.com/lucasb-eyer/go-colorful v1.0.3
 github.com/lucasb-eyer/go-colorful
 # github.com/mattn/go-colorable v0.1.1
 github.com/mattn/go-colorable
@@ -358,7 +360,7 @@ github.com/spaolacci/murmur3
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48
+# github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e
 github.com/status-im/keycard-go/derivationpath
 # github.com/status-im/migrate/v4 v4.6.2-status.2
 github.com/status-im/migrate/v4
@@ -370,42 +372,11 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-go/eth-node v1.1.0 => ./eth-node
-github.com/status-im/status-go/eth-node/bridge/geth
-github.com/status-im/status-go/eth-node/bridge/geth/ens
-github.com/status-im/status-go/eth-node/bridge/nimbus
-github.com/status-im/status-go/eth-node/core/types
-github.com/status-im/status-go/eth-node/crypto
-github.com/status-im/status-go/eth-node/crypto/ecies
-github.com/status-im/status-go/eth-node/keystore
-github.com/status-im/status-go/eth-node/types
-github.com/status-im/status-go/eth-node/types/ens
-# github.com/status-im/status-go/extkeys v1.1.0 => ./extkeys
+# github.com/status-im/status-go/extkeys v1.1.0
 github.com/status-im/status-go/extkeys
-# github.com/status-im/status-go/protocol v1.1.0 => ./protocol
-github.com/status-im/status-go/protocol
-github.com/status-im/status-go/protocol/datasync
-github.com/status-im/status-go/protocol/datasync/peer
-github.com/status-im/status-go/protocol/encryption
-github.com/status-im/status-go/protocol/encryption/migrations
-github.com/status-im/status-go/protocol/encryption/multidevice
-github.com/status-im/status-go/protocol/encryption/publisher
-github.com/status-im/status-go/protocol/encryption/sharedsecret
-github.com/status-im/status-go/protocol/identity/alias
-github.com/status-im/status-go/protocol/identity/identicon
-github.com/status-im/status-go/protocol/migrations
-github.com/status-im/status-go/protocol/protobuf
-github.com/status-im/status-go/protocol/sqlite
-github.com/status-im/status-go/protocol/transport
-github.com/status-im/status-go/protocol/transport/waku
-github.com/status-im/status-go/protocol/transport/waku/migrations
-github.com/status-im/status-go/protocol/transport/whisper
-github.com/status-im/status-go/protocol/transport/whisper/migrations
-github.com/status-im/status-go/protocol/v1
-github.com/status-im/status-go/protocol/zaputil
-# github.com/status-im/status-go/waku v1.1.0 => ./waku
+# github.com/status-im/status-go/waku v1.2.0
 github.com/status-im/status-go/waku
-# github.com/status-im/status-go/whisper/v6 v6.1.0 => ./whisper
+# github.com/status-im/status-go/whisper/v6 v6.1.0
 github.com/status-im/status-go/whisper/v6
 # github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 github.com/status-im/tcp-shaker
@@ -447,7 +418,7 @@ github.com/vacp2p/mvds/state/migrations
 github.com/vacp2p/mvds/store
 github.com/vacp2p/mvds/store/migrations
 github.com/vacp2p/mvds/transport
-# github.com/wealdtech/go-ens/v3 v3.0.9
+# github.com/wealdtech/go-ens/v3 v3.3.0
 github.com/wealdtech/go-ens/v3
 github.com/wealdtech/go-ens/v3/contracts/auctionregistrar
 github.com/wealdtech/go-ens/v3/contracts/baseregistrar

@@ -94,7 +94,7 @@ func keyFrom(k *keystore.Key) *types.Key {
 	}
 
 	return &types.Key{
-		Id:              k.Id,
+		ID:              k.Id,
 		Address:         types.Address(k.Address),
 		PrivateKey:      k.PrivateKey,
 		ExtendedKey:     k.ExtendedKey,

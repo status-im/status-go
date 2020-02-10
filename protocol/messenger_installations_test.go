@@ -28,12 +28,13 @@ type MessengerInstallationSuite struct {
 	suite.Suite
 	m          *Messenger        // main instance of Messenger
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
+
 	// If one wants to send messages between different instances of Messenger,
 	// a single Whisper service should be shared.
-	shh            types.Whisper
-	tmpFiles       []*os.File // files to clean up
-	logger         *zap.Logger
-	installationID string
+	shh types.Whisper
+
+	tmpFiles []*os.File // files to clean up
+	logger   *zap.Logger
 }
 
 func (s *MessengerInstallationSuite) SetupTest() {

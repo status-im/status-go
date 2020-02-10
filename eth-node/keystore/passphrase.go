@@ -108,7 +108,7 @@ func DecryptKey(keyjson []byte, auth string) (*types.Key, error) {
 	key := crypto.ToECDSAUnsafe(keyBytes)
 
 	return &types.Key{
-		Id:              uuid.UUID(keyId),
+		ID:              uuid.UUID(keyId),
 		Address:         crypto.PubkeyToAddress(key.PublicKey),
 		PrivateKey:      key,
 		ExtendedKey:     extKey,

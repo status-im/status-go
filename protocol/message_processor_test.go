@@ -84,7 +84,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 	config := &config{}
 	s.Require().NoError(WithDatasync()(config))
 
-	whisperTransport, err := transport.NewWhisperServiceTransport(
+	whisperTransport, err := transport.NewTransport(
 		gethbridge.NewGethWhisperWrapper(shh),
 		identity,
 		database,

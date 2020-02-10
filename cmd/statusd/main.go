@@ -283,7 +283,7 @@ func printVersion(config *params.NodeConfig, buildStamp string) {
 		fmt.Println("Build Stamp:", buildStamp)
 	}
 
-	fmt.Println("Network Id:", config.NetworkID)
+	fmt.Println("Network ID:", config.NetworkID)
 	fmt.Println("Go Version:", runtime.Version())
 	fmt.Println("OS:", runtime.GOOS)
 	fmt.Printf("GOPATH=%s\n", os.Getenv("GOPATH"))
