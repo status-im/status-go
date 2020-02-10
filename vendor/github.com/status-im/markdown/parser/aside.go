@@ -3,7 +3,7 @@ package parser
 import (
 	"bytes"
 
-	"github.com/gomarkdown/markdown/ast"
+	"github.com/status-im/markdown/ast"
 )
 
 // returns aisde prefix length

@@ -8,8 +8,6 @@ replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
-replace github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba => github.com/status-im/markdown v0.0.0-20191209105822-e3ba6c6109ba
-
 require (
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.20.1-beta
@@ -20,7 +18,6 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
-	github.com/gomarkdown/markdown v0.0.0-20191209105822-e3ba6c6109ba
 	github.com/google/uuid v1.1.1
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
@@ -41,6 +38,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
+	github.com/status-im/markdown v0.0.0-20200210164614-b9fe92168122
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/extkeys v1.1.0
@@ -53,7 +51,7 @@ require (
 	github.com/wealdtech/go-ens/v3 v3.3.0
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
-	golang.org/x/tools v0.0.0-20200116062425-473961ec044c // indirect
+	golang.org/x/tools v0.0.0-20200211045251-2de505fc5306 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
