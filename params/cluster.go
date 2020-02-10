@@ -4,6 +4,7 @@ package params
 const (
 	FleetUndefined = ""
 	FleetBeta      = "eth.beta"
+	FleetProd      = "eth.prod"
 	FleetStaging   = "eth.staging"
 )
 

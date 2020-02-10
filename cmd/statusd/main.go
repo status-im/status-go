@@ -87,7 +87,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	opts := []params.Option{params.WithFleet(params.FleetBeta)}
+	opts := []params.Option{params.WithFleet(params.FleetProd)}
 	if *mailserver {
 		opts = append(opts, params.WithMailserver())
 	}
