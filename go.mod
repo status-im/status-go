@@ -27,7 +27,7 @@ require (
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/lib/pq v1.2.0
 	github.com/libp2p/go-libp2p v0.4.2 // indirect
-	github.com/libp2p/go-libp2p-core v0.2.4
+	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
 	github.com/multiformats/go-multiaddr v0.1.1
