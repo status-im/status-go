@@ -1184,10 +1184,12 @@ func TestMessagesResponseWithError(t *testing.T) {
 			rw1,
 			statusCode,
 			ProtocolVersion,
-			math.Float64bits(w.MinPow()), w.BloomFilter(),
-			true,
-			true,
-			RateLimits{},
+			statusOptions{
+				PoWRequirement:       math.Float64bits(w.MinPow()),
+				BloomFilter:          w.BloomFilter(),
+				ConfirmationsEnabled: true,
+				LightNodeEnabled:     true,
+			},
 		),
 	)
 
@@ -1354,13 +1356,10 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 			rw1,
 			statusCode,
 			ProtocolVersion,
-			[]interface{}{
-				ProtocolVersion,
-				statusOptions{
-					PoWRequirement:   math.Float64bits(w.MinPow()),
-					BloomFilter:      w.BloomFilter(),
-					LightNodeEnabled: true,
-				},
+			statusOptions{
+				PoWRequirement:   math.Float64bits(w.MinPow()),
+				BloomFilter:      w.BloomFilter(),
+				LightNodeEnabled: true,
 			},
 		),
 	)
@@ -1526,10 +1525,17 @@ func TestRateLimiterIntegration(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, false, RateLimits{
-				IPLimits:     10,
-				PeerIDLimits: 5,
-			}},
+			[]interface{}{
+				ProtocolVersion,
+				statusOptions{
+					PoWRequirement: math.Float64bits(w.MinPow()),
+					BloomFilter:    w.BloomFilter(),
+					RateLimits: RateLimits{
+						IPLimits:     10,
+						PeerIDLimits: 5,
+					},
+				},
+			},
 		),
 	)
 	select {
