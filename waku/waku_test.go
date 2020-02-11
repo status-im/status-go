@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/pbkdf2"
@@ -913,6 +915,7 @@ func TestSendP2PDirect(t *testing.T) {
 
 	rwStub := &rwP2PMessagesStub{}
 	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub, nil)
+	w.peers[peerW] = struct{}{}
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -929,7 +932,7 @@ func TestSendP2PDirect(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	err = w.SendP2PDirect(peerW, env, env, env)
+	err = w.SendP2PDirect(peerW.ID(), env, env, env)
 	if err != nil {
 		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
 	}
@@ -1053,7 +1056,14 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations, RateLimits{}},
+			[]interface{}{
+				ProtocolVersion,
+				statusOptions{
+					PoWRequirement:       math.Float64bits(w.MinPow()),
+					LightNodeEnabled:     false,
+					ConfirmationsEnabled: expectConfirmations,
+				},
+			},
 		),
 	)
 }
@@ -1067,12 +1077,14 @@ func TestHandshakeWithConfirmationsDisabled(t *testing.T) {
 }
 
 func TestConfirmationReceived(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
 	conf := &Config{
 		MinimumAcceptedPoW:  0,
 		MaxMessageSize:      10 << 20,
 		EnableConfirmations: true,
 	}
-	w := New(conf, nil)
+	w := New(conf, logger)
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
@@ -1080,15 +1092,27 @@ func TestConfirmationReceived(t *testing.T) {
 		err := w.HandlePeer(p, rw2)
 		errorc <- err
 	}()
-	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
-	})
+	go func() {
+		select {
+		case err := <-errorc:
+			t.Log(err)
+		case <-time.After(time.Second * 5):
+			rw1.Close()
+		}
+	}()
 	require.NoError(
 		t,
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+			[]interface{}{
+				ProtocolVersion,
+				statusOptions{
+					PoWRequirement:       math.Float64bits(w.MinPow()),
+					BloomFilter:          w.BloomFilter(),
+					ConfirmationsEnabled: true,
+				},
+			},
 		),
 	)
 	require.NoError(
@@ -1097,10 +1121,12 @@ func TestConfirmationReceived(t *testing.T) {
 			rw1,
 			statusCode,
 			ProtocolVersion,
-			math.Float64bits(w.MinPow()),
-			w.BloomFilter(),
-			true,
-			true,
+			statusOptions{
+				PoWRequirement:       math.Float64bits(w.MinPow()),
+				BloomFilter:          w.BloomFilter(),
+				ConfirmationsEnabled: true,
+				LightNodeEnabled:     true,
+			},
 		),
 	)
 
@@ -1142,7 +1168,14 @@ func TestMessagesResponseWithError(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+			[]interface{}{
+				ProtocolVersion,
+				statusOptions{
+					PoWRequirement:       math.Float64bits(w.MinPow()),
+					BloomFilter:          w.BloomFilter(),
+					ConfirmationsEnabled: true,
+				},
+			},
 		),
 	)
 	require.NoError(
@@ -1204,9 +1237,29 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}}))
-	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
-
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{
+			ProtocolVersion,
+			statusOptions{
+				PoWRequirement:       math.Float64bits(w.MinPow()),
+				BloomFilter:          w.BloomFilter(),
+				ConfirmationsEnabled: true,
+			},
+		},
+	))
+	require.NoError(t, p2p.SendItems(
+		rw1,
+		statusCode,
+		ProtocolVersion,
+		statusOptions{
+			PoWRequirement:       math.Float64bits(w.MinPow()),
+			BloomFilter:          w.BloomFilter(),
+			ConfirmationsEnabled: true,
+			LightNodeEnabled:     true,
+		},
+	))
 	require.NoError(t, w.Send(&envelope))
 	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&envelope}))
 
@@ -1286,7 +1339,13 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, false, RateLimits{}},
+			[]interface{}{
+				ProtocolVersion,
+				statusOptions{
+					PoWRequirement: math.Float64bits(w.MinPow()),
+					BloomFilter:    w.BloomFilter(),
+				},
+			},
 		),
 	)
 	require.NoError(
@@ -1295,11 +1354,14 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 			rw1,
 			statusCode,
 			ProtocolVersion,
-			math.Float64bits(w.MinPow()),
-			w.BloomFilter(),
-			true,
-			false,
-			RateLimits{},
+			[]interface{}{
+				ProtocolVersion,
+				statusOptions{
+					PoWRequirement:   math.Float64bits(w.MinPow()),
+					BloomFilter:      w.BloomFilter(),
+					LightNodeEnabled: true,
+				},
+			},
 		),
 	)
 

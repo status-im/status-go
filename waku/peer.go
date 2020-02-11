@@ -96,13 +96,15 @@ func (p *Peer) handshake() error {
 	isLightNode := p.host.LightClientMode()
 	isRestrictedLightNodeConnection := p.host.LightClientModeConnectionRestricted()
 	go func() {
-		pow := p.host.MinPow()
-		powConverted := math.Float64bits(pow)
-		bloom := p.host.BloomFilter()
-		confirmationsEnabled := p.host.ConfirmationsEnabled()
-		rateLimits := p.host.RateLimits()
-
-		errc <- p2p.SendItems(p.ws, statusCode, ProtocolVersion, powConverted, bloom, isLightNode, confirmationsEnabled, rateLimits)
+		opts := statusOptions{
+			BloomFilter:          p.host.BloomFilter(),
+			LightNodeEnabled:     isLightNode,
+			ConfirmationsEnabled: p.host.ConfirmationsEnabled(),
+			RateLimits:           p.host.RateLimits(),
+			TopicInterest:        nil,
+		}
+		opts.SetPoWRequirementFromF(p.host.MinPow())
+		errc <- p2p.SendItems(p.ws, statusCode, ProtocolVersion, opts)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -113,56 +115,51 @@ func (p *Peer) handshake() error {
 	if packet.Code != statusCode {
 		return fmt.Errorf("p [%x] sent packet %x before status packet", p.ID(), packet.Code)
 	}
+
+	var (
+		peerProtocolVersion uint64
+		peerOptions         statusOptions
+	)
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-	_, err = s.List()
-	if err != nil {
-		return fmt.Errorf("p [%x] sent bad status message: %v", p.ID(), err)
+	if _, err := s.List(); err != nil {
+		return fmt.Errorf("p [%x]: failed to decode status packet: %w", p.ID(), err)
 	}
-	peerVersion, err := s.Uint()
-	if err != nil {
-		return fmt.Errorf("p [%x] sent bad status message (unable to decode version): %v", p.ID(), err)
+	// Validate protocol version.
+	if err := s.Decode(&peerProtocolVersion); err != nil {
+		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %w", p.ID(), err)
 	}
-	if peerVersion != ProtocolVersion {
-		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerVersion, ProtocolVersion)
+	if peerProtocolVersion != ProtocolVersion {
+		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerProtocolVersion, ProtocolVersion)
 	}
-
-	// only version is mandatory, subsequent parameters are optional
-	powRaw, err := s.Uint()
-	if err == nil {
-		pow := math.Float64frombits(powRaw)
-		if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
-			return fmt.Errorf("p [%x] sent bad status message: invalid pow", p.ID())
-		}
-		p.powRequirement = pow
-
-		var bloom []byte
-		err = s.Decode(&bloom)
-		if err == nil {
-			sz := len(bloom)
-			if sz != BloomFilterSize && sz != 0 {
-				return fmt.Errorf("p [%x] sent bad status message: wrong bloom filter size %d", p.ID(), sz)
-			}
-			p.setBloomFilter(bloom)
-		}
+	// Decode and validate other status packet options.
+	if err := s.Decode(&peerOptions); err != nil {
+		return fmt.Errorf("p [%x]: failed to decode status options: %w", p.ID(), err)
 	}
-
-	isRemotePeerLightNode, _ := s.Bool()
-	if isRemotePeerLightNode && isLightNode && isRestrictedLightNodeConnection {
+	if err := s.ListEnd(); err != nil {
+		return fmt.Errorf("p [%x]: failed to decode status packet: %w", p.ID(), err)
+	}
+	if err := peerOptions.Validate(); err != nil {
+		return fmt.Errorf("p [%x]: sent invalid options: %w", p.ID(), err)
+	}
+	// Validate and save peer's PoW.
+	pow := peerOptions.PoWRequirementF()
+	if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
+		return fmt.Errorf("p [%x]: sent bad status message: invalid pow", p.ID())
+	}
+	p.powRequirement = pow
+	// Validate and save peer's bloom filters.
+	bloom := peerOptions.BloomFilter
+	bloomSize := len(bloom)
+	if bloomSize != 0 && bloomSize != BloomFilterSize {
+		return fmt.Errorf("p [%x] sent bad status message: wrong bloom filter size %d", p.ID(), bloomSize)
+	}
+	p.setBloomFilter(bloom)
+	// Validate and save other peer's options.
+	if peerOptions.LightNodeEnabled && isLightNode && isRestrictedLightNodeConnection {
 		return fmt.Errorf("p [%x] is useless: two light client communication restricted", p.ID())
 	}
-	confirmationsEnabled, err := s.Bool()
-	if err != nil || !confirmationsEnabled {
-		p.logger.Info("confirmations are disabled for peer", zap.Binary("peer", p.ID()))
-	} else {
-		p.confirmationsEnabled = confirmationsEnabled
-	}
-
-	var rateLimits RateLimits
-	if err := s.Decode(&rateLimits); err != nil {
-		p.logger.Info("rate limiting is disabled for peer", zap.Binary("peer", p.ID()))
-	} else {
-		p.setRateLimits(rateLimits)
-	}
+	p.confirmationsEnabled = peerOptions.ConfirmationsEnabled
+	p.setRateLimits(peerOptions.RateLimits)
 
 	if err := <-errc; err != nil {
 		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
