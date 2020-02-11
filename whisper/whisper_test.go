@@ -911,6 +911,7 @@ func TestSendP2PDirect(t *testing.T) {
 
 	rwStub := &rwP2PMessagesStub{}
 	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub)
+	w.peers[peerW] = struct{}{}
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -928,7 +929,7 @@ func TestSendP2PDirect(t *testing.T) {
 	}
 
 	// verify sending a single envelope
-	err = w.SendP2PDirect(peerW, env)
+	err = w.SendP2PDirect(peerW.ID(), env)
 	if err != nil {
 		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
 	}
