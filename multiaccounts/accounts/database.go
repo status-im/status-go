@@ -68,6 +68,7 @@ type Settings struct {
 	RememberSyncingChoice  bool             `json:"remember-syncing-choice?,omitempty"`
 	SigningPhrase          string           `json:"signing-phrase"`
 	StickerPacksInstalled  *json.RawMessage `json:"stickers/packs-installed,omitempty"`
+	StickerPacksPending    *json.RawMessage `json:"stickers/packs-pending,omitempty"`
 	StickersRecentStickers *json.RawMessage `json:"stickers/recent-stickers,omitempty"`
 	SyncingOnMobileNetwork bool             `json:"syncing-on-mobile-network?,omitempty"`
 	Usernames              *json.RawMessage `json:"usernames,omitempty"`
@@ -241,6 +242,9 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "stickers/packs-installed":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_installed = ? WHERE synthetic_id = 'id'")
+	case "stickers/packs-pending":
+		value = &sqlite.JSONBlob{value}
+		update, err = db.db.Prepare("UPDATE settings SET stickers_packs_pending = ? WHERE synthetic_id = 'id'")
 	case "stickers/recent-stickers":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET stickers_recent_stickers = ? WHERE synthetic_id = 'id'")
@@ -278,7 +282,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_recent_stickers, syncing_on_mobile_network, usernames, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -309,6 +313,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.RememberSyncingChoice,
 		&s.SigningPhrase,
 		&s.StickerPacksInstalled,
+		&s.StickerPacksPending,
 		&s.StickersRecentStickers,
 		&s.SyncingOnMobileNetwork,
 		&s.Usernames,
