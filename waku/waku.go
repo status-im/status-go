@@ -901,7 +901,8 @@ func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			}
 		case batchAcknowledgedCode:
 			if err := w.handleBatchAcknowledgeCode(p, packet, logger); err != nil {
-
+				logger.Warn("failed to handle batchAcknowledgedCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
+				return err
 			}
 		case powRequirementCode:
 			if err := w.handlePowRequirementCode(p, packet, logger); err != nil {
@@ -912,6 +913,10 @@ func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			if err := w.handleBloomFilterExCode(p, packet, logger); err != nil {
 				logger.Warn("failed to decode bloom filter exchange message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
 				return err
+			}
+		case rateLimitingCode:
+			if err := w.handleRateLimitingCode(p, packet, logger); err != nil {
+				logger.Warn("failed to decode rate limits, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
 			}
 		case p2pMessageCode:
 			if err := w.handleP2PMessageCode(p, packet, logger); err != nil {
@@ -1016,6 +1021,16 @@ func (w *Waku) handleBloomFilterExCode(p *Peer, packet p2p.Msg, logger *zap.Logg
 	}
 
 	p.setBloomFilter(bloom)
+	return nil
+}
+
+func (w *Waku) handleRateLimitingCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
+	var rateLimits RateLimits
+	if err := packet.Decode(&rateLimits); err != nil {
+		logger.Warn("invalid rate limits information", zap.Binary("peerID", p.peer.ID().Bytes()), zap.Error(err))
+		return errors.New("invalid rate limits exchange message")
+	}
+	p.setRateLimits(rateLimits)
 	return nil
 }
 
