@@ -15,9 +15,8 @@ type Bridge struct {
 	waku    *waku.Waku
 	logger  *zap.Logger
 
-	mu     sync.Mutex
 	cancel chan struct{}
-	done   chan struct{}
+	wg     sync.WaitGroup
 
 	whisperIn  chan *whisper.Envelope
 	whisperOut chan *whisper.Envelope
@@ -54,25 +53,17 @@ func (b *bridgeWaku) Pipe() (<-chan *waku.Envelope, chan<- *waku.Envelope) {
 }
 
 func (b *Bridge) Start() {
-	cancel := make(chan struct{})
-	done := make(chan struct{})
-
-	b.mu.Lock()
-	b.cancel = cancel
-	b.done = done
-	b.mu.Unlock()
+	b.cancel = make(chan struct{})
 
 	b.waku.RegisterBridge(&bridgeWaku{Bridge: b})
 	b.whisper.RegisterBridge(&bridgeWhisper{Bridge: b})
 
-	var wg sync.WaitGroup
-
-	wg.Add(1)
+	b.wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer b.wg.Done()
 		for {
 			select {
-			case <-cancel:
+			case <-b.cancel:
 				return
 			case env := <-b.wakuIn:
 				shhEnvelope := (*whisper.Envelope)(unsafe.Pointer(env))
@@ -82,12 +73,12 @@ func (b *Bridge) Start() {
 		}
 	}()
 
-	wg.Add(1)
+	b.wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer b.wg.Done()
 		for {
 			select {
-			case <-cancel:
+			case <-b.cancel:
 				return
 			case env := <-b.whisperIn:
 				wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(env))
@@ -96,14 +87,9 @@ func (b *Bridge) Start() {
 			}
 		}
 	}()
-
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
 }
 
 func (b *Bridge) Cancel() {
 	close(b.cancel)
-	<-b.done
+	b.wg.Wait()
 }
