@@ -51,6 +51,10 @@ import (
 // TimeSyncError error for clock skew errors.
 type TimeSyncError error
 
+type Bridge interface {
+	Pipe() (<-chan *Envelope, chan<- *Envelope)
+}
+
 type settings struct {
 	MaxMsgSize               uint32  // Maximal message length allowed by the waku node
 	EnableConfirmations      bool    // Enable sending message confirmations
@@ -94,6 +98,10 @@ type Waku struct {
 	envelopeFeed event.Feed
 
 	timeSource func() time.Time // source of time for waku
+
+	bridge       Bridge
+	bridgeWg     sync.WaitGroup
+	cancelBridge chan struct{}
 
 	logger *zap.Logger
 }
@@ -341,6 +349,47 @@ func (w *Waku) RegisterMailServer(server MailServer) {
 // SetRateLimiter registers a rate limiter.
 func (w *Waku) RegisterRateLimiter(r *PeerRateLimiter) {
 	w.rateLimiter = r
+}
+
+// RegisterBridge registers a new Bridge that moves envelopes
+// between different subprotocols.
+// It's important that a bridge is registered before the service
+// is started, otherwise, it won't read and propagate envelopes.
+func (w *Waku) RegisterBridge(b Bridge) {
+	if w.cancelBridge != nil {
+		close(w.cancelBridge)
+	}
+	w.bridge = b
+	w.cancelBridge = make(chan struct{})
+	w.bridgeWg.Add(1)
+	go w.readBridgeLoop()
+}
+
+func (w *Waku) readBridgeLoop() {
+	defer w.bridgeWg.Done()
+	out, _ := w.bridge.Pipe()
+	for {
+		select {
+		case <-w.cancelBridge:
+			return
+		case env := <-out:
+			_, err := w.addAndBridge(env, false, true)
+			if err != nil {
+				w.logger.Warn(
+					"failed to add a bridged envelope",
+					zap.Binary("ID", env.Hash().Bytes()),
+					zap.Error(err),
+				)
+			} else {
+				w.logger.Debug("bridged envelope successfully", zap.Binary("ID", env.Hash().Bytes()))
+				w.envelopeFeed.Send(EnvelopeEvent{
+					Event: EventEnvelopeReceived,
+					Topic: env.Topic,
+					Hash:  env.Hash(),
+				})
+			}
+		}
+	}
 }
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
@@ -829,6 +878,11 @@ func (w *Waku) Start(*p2p.Server) error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
+	if w.cancelBridge != nil {
+		close(w.cancelBridge)
+		w.cancelBridge = nil
+		w.bridgeWg.Wait()
+	}
 	close(w.quit)
 	return nil
 }
@@ -1145,11 +1199,15 @@ func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.L
 	return nil
 }
 
-// add inserts a new envelope into the message pool to be distributed within the
+func (w *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
+	return w.addAndBridge(envelope, isP2P, false)
+}
+
+// addAndBridge inserts a new envelope into the message pool to be distributed within the
 // waku network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
-func (w *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
+func (w *Waku) addAndBridge(envelope *Envelope, isP2P bool, bridged bool) (bool, error) {
 	now := uint32(w.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
@@ -1231,6 +1289,13 @@ func (w *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
 				Hash:  envelope.Hash(),
 				Event: EventMailServerEnvelopeArchived,
 			})
+		}
+		// Bridge only envelopes that are not p2p messages.
+		// In particular, if a node is a lightweight node,
+		// it should not bridge any envelopes.
+		if !isP2P && !bridged && w.bridge != nil {
+			_, in := w.bridge.Pipe()
+			in <- envelope
 		}
 	}
 	return true, nil
