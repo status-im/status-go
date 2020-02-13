@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -125,7 +127,7 @@ func TestInitProtocol(t *testing.T) {
 	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	require.NoError(t, err)
 
-	err = service.InitProtocol(privateKey, sqlDB)
+	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
 	require.NoError(t, err)
 }
 
@@ -179,7 +181,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	s.Require().NoError(err)
 	privateKey, err := crypto.GenerateKey()
 	s.NoError(err)
-	err = service.InitProtocol(privateKey, sqlDB)
+	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
 	s.NoError(err)
 	err = stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 		return service, nil

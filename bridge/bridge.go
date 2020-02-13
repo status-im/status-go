@@ -1,0 +1,109 @@
+package bridge
+
+import (
+	"sync"
+	"unsafe"
+
+	"go.uber.org/zap"
+
+	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/whisper/v6"
+)
+
+type Bridge struct {
+	whisper *whisper.Whisper
+	waku    *waku.Waku
+	logger  *zap.Logger
+
+	mu     sync.Mutex
+	cancel chan struct{}
+	done   chan struct{}
+
+	whisperIn  chan *whisper.Envelope
+	whisperOut chan *whisper.Envelope
+	wakuIn     chan *waku.Envelope
+	wakuOut    chan *waku.Envelope
+}
+
+func New(shh *whisper.Whisper, w *waku.Waku, logger *zap.Logger) *Bridge {
+	return &Bridge{
+		whisper:    shh,
+		waku:       w,
+		logger:     logger,
+		whisperOut: make(chan *whisper.Envelope),
+		whisperIn:  make(chan *whisper.Envelope),
+		wakuIn:     make(chan *waku.Envelope),
+		wakuOut:    make(chan *waku.Envelope),
+	}
+}
+
+type bridgeWhisper struct {
+	*Bridge
+}
+
+func (b *bridgeWhisper) Pipe() (<-chan *whisper.Envelope, chan<- *whisper.Envelope) {
+	return b.whisperOut, b.whisperIn
+}
+
+type bridgeWaku struct {
+	*Bridge
+}
+
+func (b *bridgeWaku) Pipe() (<-chan *waku.Envelope, chan<- *waku.Envelope) {
+	return b.wakuOut, b.wakuIn
+}
+
+func (b *Bridge) Start() {
+	cancel := make(chan struct{})
+	done := make(chan struct{})
+
+	b.mu.Lock()
+	b.cancel = cancel
+	b.done = done
+	b.mu.Unlock()
+
+	b.waku.RegisterBridge(&bridgeWaku{Bridge: b})
+	b.whisper.RegisterBridge(&bridgeWhisper{Bridge: b})
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-cancel:
+				return
+			case env := <-b.wakuIn:
+				shhEnvelope := (*whisper.Envelope)(unsafe.Pointer(env))
+				b.logger.Info("received whisper envelope from waku", zap.Any("envelope", shhEnvelope))
+				b.whisperOut <- shhEnvelope
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-cancel:
+				return
+			case env := <-b.whisperIn:
+				wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(env))
+				b.logger.Info("received whisper envelope from waku", zap.Any("envelope", wakuEnvelope))
+				b.wakuOut <- wakuEnvelope
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+}
+
+func (b *Bridge) Cancel() {
+	close(b.cancel)
+	<-b.done
+}

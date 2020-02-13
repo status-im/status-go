@@ -43,6 +43,10 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+type Bridge interface {
+	Pipe() (<-chan *Envelope, chan<- *Envelope)
+}
+
 // TimeSyncError error for clock skew errors.
 type TimeSyncError error
 
@@ -113,6 +117,10 @@ type Whisper struct {
 	envelopeFeed event.Feed
 
 	timeSource func() time.Time // source of time for whisper
+
+	bridge       Bridge
+	bridgeWg     sync.WaitGroup
+	cancelBridge chan struct{}
 }
 
 // New creates a Whisper client ready to communicate through the Ethereum P2P network.
@@ -266,6 +274,51 @@ func (whisper *Whisper) GetCurrentTime() time.Time {
 // MailServer will process all the incoming messages with p2pRequestCode.
 func (whisper *Whisper) RegisterMailServer(server MailServer) {
 	whisper.mailServer = server
+}
+
+// RegisterBridge registers a new Bridge that moves envelopes
+// between different subprotocols.
+// It's important that a bridge is registered before the service
+// is started, otherwise, it won't read and propagate envelopes.
+func (whisper *Whisper) RegisterBridge(b Bridge) {
+	if whisper.cancelBridge != nil {
+		close(whisper.cancelBridge)
+		whisper.bridgeWg.Wait()
+	}
+	whisper.bridge = b
+	whisper.cancelBridge = make(chan struct{})
+	whisper.bridgeWg.Add(1)
+	go whisper.readBridgeLoop()
+}
+
+func (whisper *Whisper) readBridgeLoop() {
+	defer whisper.bridgeWg.Done()
+	out, _ := whisper.bridge.Pipe()
+	for {
+		select {
+		case <-whisper.cancelBridge:
+			return
+		case env := <-out:
+			_, err := whisper.addAndBridge(env, false, true)
+			if err != nil {
+				log.Warn(
+					"failed to add a bridged envelope",
+					"ID", env.Hash().Bytes(),
+					"err", err,
+				)
+			} else {
+				log.Debug(
+					"bridged envelope successfully",
+					"ID", env.Hash().Bytes(),
+				)
+				whisper.envelopeFeed.Send(EnvelopeEvent{
+					Event: EventEnvelopeReceived,
+					Topic: env.Topic,
+					Hash:  env.Hash(),
+				})
+			}
+		}
+	}
 }
 
 // Protocols returns the whisper sub-protocols ran by this particular client.
@@ -877,6 +930,11 @@ func (whisper *Whisper) Start(*p2p.Server) error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Whisper protocol.
 func (whisper *Whisper) Stop() error {
+	if whisper.cancelBridge != nil {
+		close(whisper.cancelBridge)
+		whisper.cancelBridge = nil
+		whisper.bridgeWg.Wait()
+	}
 	close(whisper.quit)
 	log.Info("whisper stopped")
 	return nil
@@ -1202,18 +1260,14 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					log.Warn("failed to decode response message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return errors.New("invalid request response message")
 				}
-
 				event, err := CreateMailServerEvent(p.peer.ID(), payload)
-
 				if err != nil {
 					log.Warn("error while parsing request complete code, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 					return err
 				}
-
 				if event != nil {
 					whisper.postP2P(*event)
 				}
-
 			}
 		default:
 			// New message types might be implemented in the future versions of Whisper.
@@ -1224,11 +1278,15 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 	}
 }
 
+func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
+	return whisper.addAndBridge(envelope, isP2P, false)
+}
+
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
-func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
+func (whisper *Whisper) addAndBridge(envelope *Envelope, isP2P bool, bridged bool) (bool, error) {
 	now := uint32(whisper.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
@@ -1312,6 +1370,13 @@ func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 				Hash:  envelope.Hash(),
 				Event: EventMailServerEnvelopeArchived,
 			})
+		}
+		// Bridge only envelopes that are not p2p messages.
+		// In particular, if a node is a lightweight node,
+		// it should not bridge any envelopes.
+		if !isP2P && !bridged && whisper.bridge != nil {
+			_, in := whisper.bridge.Pipe()
+			in <- envelope
 		}
 	}
 	return true, nil

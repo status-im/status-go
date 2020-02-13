@@ -428,6 +428,9 @@ type NodeConfig struct {
 	// WakuConfig provides a configuration for Waku subprotocol.
 	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
 
+	// BridgeConfig provides a configuration for Whisper-Waku bridge.
+	BridgeConfig BridgeConfig `json:"BridgeConfig" validate:"structonly"`
+
 	// IncentivisationConfig extra configuration for incentivisation service
 	IncentivisationConfig IncentivisationConfig `json:"IncentivisationConfig," validate:"structonly"`
 
@@ -479,6 +482,11 @@ type PermissionsConfig struct {
 
 // MailserversConfig extra configuration for mailservers.Service.
 type MailserversConfig struct {
+	Enabled bool
+}
+
+// BridgeConfig provides configuration for Whisper-Waku bridge.
+type BridgeConfig struct {
 	Enabled bool
 }
 

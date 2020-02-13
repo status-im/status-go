@@ -13,8 +13,6 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 
-	"github.com/status-im/status-go/logutils"
-
 	commongethtypes "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -115,7 +113,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error {
+func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *zap.Logger) error {
 	if !s.config.PFSEnabled {
 		return nil
 	}
@@ -137,12 +135,6 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error {
 		return err
 	}
 
-	// Create a custom zap.Logger which will forward logs from status-go/protocol to status-go logger.
-	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
-	if err != nil {
-		return err
-	}
-
 	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
 		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
 		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
@@ -150,9 +142,9 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error {
 			return s.peerStore.Exist(peer)
 		},
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
-		Logger:                zapLogger,
+		Logger:                logger,
 	}
-	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, zapLogger)
+	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, logger)
 
 	messenger, err := protocol.NewMessenger(
 		identity,

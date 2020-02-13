@@ -25,8 +25,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 
+	"github.com/status-im/status-go/bridge"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
@@ -68,6 +70,8 @@ type StatusNode struct {
 	register  *peers.Register
 	peerPool  *peers.PeerPool
 	db        *leveldb.DB // used as a cache for PeerPool
+
+	bridge *bridge.Bridge // Whisper-Waku bridge
 
 	log log.Logger
 }
@@ -176,6 +180,10 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		return err
 	}
 
+	if err := n.setupBridge(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -214,6 +222,25 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	n.rpcPrivateClient, err = rpc.NewClient(gethNodePrivateClient, n.config.UpstreamConfig)
 
 	return
+}
+
+func (n *StatusNode) setupBridge() error {
+	if !n.config.BridgeConfig.Enabled {
+		return nil
+	}
+	var shh *whisper.Whisper
+	if err := n.gethService(&shh); err != nil {
+		return fmt.Errorf("setup bridge: failed to get Whisper: %v", err)
+	}
+	var wak *waku.Waku
+	if err := n.gethService(&wak); err != nil {
+		return fmt.Errorf("setup bridge: failed to get Waku: %v", err)
+	}
+
+	n.bridge = bridge.New(shh, wak, logutils.ZapLogger())
+	n.bridge.Start()
+
+	return nil
 }
 
 func (n *StatusNode) discoveryEnabled() bool {
@@ -353,6 +380,11 @@ func (n *StatusNode) stop() error {
 		n.register = nil
 		n.peerPool = nil
 		n.discovery = nil
+	}
+
+	if n.bridge != nil {
+		n.bridge.Cancel()
+		n.bridge = nil
 	}
 
 	if err := n.gethNode.Stop(); err != nil {
@@ -687,7 +719,7 @@ func (n *StatusNode) RPCPrivateClient() *rpc.Client {
 
 // ChaosModeCheckRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
 // if defined, without restarting the node. This is required for the Chaos Unicorn Day.
-// Additionally, if the passed URL is Infura, it changes it to httpbin.org/status/500.
+// Additionally, if the passed URL is Infura, it changes it to httpstat.us/500.
 func (n *StatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
 	url := n.config.UpstreamConfig.URL
 
