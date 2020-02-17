@@ -644,6 +644,8 @@ github.com/status-im/status-go/extkeys v1.1.0 h1:QgnXlMvhlFyRu+GdpPn1Ve22IidnDds
 github.com/status-im/status-go/extkeys v1.1.0/go.mod h1:nT/T2+G4L/6qPVIIfI3oT8dQSVyn7fQYY8G3yL3PIGY=
 github.com/status-im/status-go/waku v1.2.0 h1:bhAm5XpvIT+oPHE8Yq6OWoAprTiERfGu1WrO/OR9crk=
 github.com/status-im/status-go/waku v1.2.0/go.mod h1:1bjvQAL4cJYtxCsm6DnKdJbxcZwnvvZmxb6pmoUDtuY=
+github.com/status-im/status-go/waku v1.3.0 h1:sULZzzz8fV3Ufn8HI5BmQaqWxyJiH8P/8Z9I920sGPk=
+github.com/status-im/status-go/waku v1.3.0/go.mod h1:hmq99wlA8qKyYEYalqMz1FieIWhq7pl9zDlkw/jsd4M=
 github.com/status-im/status-go/whisper/v6 v6.1.0 h1:jFGK8zr5bXaFTcyS/xIKh/5TlyqUks+5kyivDUii/1c=
 github.com/status-im/status-go/whisper/v6 v6.1.0/go.mod h1:csqMoPMkCPW1NJO56HJzNTWAl9UMdetnQzkPbPjsAC4=
 github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501 h1:oa0KU5jJRNtXaM/P465MhvSFo/HM2O8qi2DDuPcd7ro=
