@@ -7,7 +7,7 @@ status-go client of Waku is spec compliant with [Waku spec v0.3](https://specs.v
 - Currently nodes with higher version don't automatically disconnect if versions are different
 
 It doesn't yet implement the following recommended features:
-- It doesn't disconnect a peer if it receives a message before a Status message
+- It doesn't apply a timeout to receive Status message
 - Partial support for rate limiting
 - No support for DNS discovery to find Waku nodes
 - No support for negotiation with peer supporting multiple version
