@@ -2,7 +2,7 @@
 
 *Last updated February 14, 2020*
 
-status-nim client of Waku is spec compliant with [Waku spec v0.3](https://specs.vac.dev/waku.html) with the exception of:
+status-go client of Waku is spec compliant with [Waku spec v0.3](https://specs.vac.dev/waku.html) with the exception of:
 - It doesn't support all the MUST packet codes (!)
 - Currently nodes with higher version don't automatically disconnect if versions are different
 
