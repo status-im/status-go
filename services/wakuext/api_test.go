@@ -303,30 +303,13 @@ func (s *WakuNodeMockSuite) SetupTest() {
 	node := enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
 	peer := p2p.NewPeer(node.ID(), "1", []p2p.Cap{{"shh", 6}})
 	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
 	go func() {
 		err := w.HandlePeer(peer, rw2)
-		errorc <- err
+		panic(err)
 	}()
 	wakuWrapper := gethbridge.NewGethWakuWrapper(w)
-	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{
-		waku.ProtocolVersion,
-		math.Float64bits(wakuWrapper.MinPow()),
-		wakuWrapper.BloomFilter(),
-		false,
-		true,
-		waku.RateLimits{},
-	}))
-	s.Require().NoError(p2p.SendItems(
-		rw1,
-		statusCode,
-		waku.ProtocolVersion,
-		math.Float64bits(wakuWrapper.MinPow()),
-		wakuWrapper.BloomFilter(),
-		true,
-		true,
-		waku.RateLimits{},
-	))
+	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, nil))
+	s.Require().NoError(p2p.SendItems(rw1, statusCode, waku.ProtocolVersion, []interface{}{}))
 
 	nodeWrapper := ext.NewTestNodeWrapper(nil, wakuWrapper)
 	s.localService = New(
