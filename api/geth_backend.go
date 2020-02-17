@@ -901,6 +901,18 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 		return err
 	}
 
+	if whisperService != nil {
+		st, err := b.statusNode.ShhExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.InitProtocol(identity, b.appDB); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	wakuService, err := b.statusNode.WakuService()
 
 	switch err {
