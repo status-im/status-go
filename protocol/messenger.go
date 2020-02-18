@@ -1658,21 +1658,6 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	return m.saveChat(chat)
 }
 
-// SendRaw takes encoded data, encrypts it and sends through the wire.
-// DEPRECATED
-func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte, error) {
-	publicKey, err := chat.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	if publicKey != nil {
-		return m.processor.SendPrivateRaw(ctx, publicKey, data, protobuf.ApplicationMetadataMessage_UNKNOWN)
-	} else if chat.Name != "" {
-		return m.processor.SendPublicRaw(ctx, chat.Name, data, protobuf.ApplicationMetadataMessage_UNKNOWN)
-	}
-	return nil, errors.New("chat is neither public nor private")
-}
-
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
@@ -1980,17 +1965,14 @@ func (m *Messenger) RequestHistoricMessages(
 	return m.transport.SendMessagesRequest(ctx, peer, from, to, cursor)
 }
 
-// DEPRECATED
 func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return m.transport.LoadFilters(filters)
 }
 
-// DEPRECATED
 func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
 	return m.transport.RemoveFilters(filters)
 }
 
-// DEPRECATED
 func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 	for _, id := range messageIDs {
 		if err := m.encryptor.ConfirmMessageProcessed(id); err != nil {
@@ -2000,37 +1982,30 @@ func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 	return nil
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MessageByID(id string) (*Message, error) {
 	return m.persistence.MessageByID(id)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 	return m.persistence.MessagesExist(ids)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*Message, string, error) {
 	return m.persistence.MessageByChatID(chatID, cursor, limit)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) SaveMessages(messages []*Message) error {
 	return m.persistence.SaveMessagesLegacy(messages)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) DeleteMessage(id string) error {
 	return m.persistence.DeleteMessage(id)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -2047,7 +2022,24 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) error {
 	return nil
 }
 
-// DEPRECATED: required by status-react.
+func (m *Messenger) MarkAllRead(chatID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	err := m.persistence.MarkAllRead(chatID)
+	if err != nil {
+		return err
+	}
+
+	chat.UnviewedMessagesCount = 0
+	m.allChats[chat.ID] = chat
+	return nil
+}
+
 func (m *Messenger) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
 	return m.persistence.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }

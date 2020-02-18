@@ -327,6 +327,29 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	s.Require().Equal(uint(1), chats[0].UnviewedMessagesCount)
 }
 
+func (s *MessengerSuite) TestMarkAllRead() {
+	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat.UnviewedMessagesCount = 2
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+	inputMessage1 := buildTestMessage(chat)
+	inputMessage1.ID = "1"
+	inputMessage1.Seen = false
+	inputMessage2 := buildTestMessage(chat)
+	inputMessage2.ID = "2"
+	inputMessage2.Seen = false
+
+	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
+	s.Require().NoError(err)
+
+	err = s.m.MarkAllRead(chat.ID)
+	s.Require().NoError(err)
+
+	chats := s.m.Chats()
+	s.Require().Len(chats, 1)
+	s.Require().Equal(uint(0), chats[0].UnviewedMessagesCount)
+}
+
 func (s *MessengerSuite) TestSendPublic() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.LastClockValue = uint64(100000000000000)

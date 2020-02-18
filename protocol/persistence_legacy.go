@@ -434,6 +434,28 @@ func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
 	return err
 }
 
+func (db sqlitePersistence) MarkAllRead(chatID string) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ?`, chatID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE chats SET unviewed_message_count = 0 WHERE id = ?`, chatID)
+	return err
+}
+
 func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
