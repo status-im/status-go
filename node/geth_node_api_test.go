@@ -52,3 +52,68 @@ func TestWhisperLightModeEnabledSetsNilBloomFilter(t *testing.T) {
 	require.NoError(t, node.gethService(&whisper))
 	require.Nil(t, whisper.BloomFilter())
 }
+
+func TestBridgeSetup(t *testing.T) {
+	testCases := []struct {
+		Name         string
+		Cfg          params.NodeConfig
+		ErrorMessage string
+	}{
+		{
+			Name: "no whisper and waku",
+			Cfg: params.NodeConfig{
+				BridgeConfig: params.BridgeConfig{Enabled: true},
+			},
+			ErrorMessage: "setup bridge: failed to get Whisper: unknown service",
+		},
+		{
+			Name: "only whisper",
+			Cfg: params.NodeConfig{
+				WhisperConfig: params.WhisperConfig{
+					Enabled:     true,
+					LightClient: false,
+				},
+				BridgeConfig: params.BridgeConfig{Enabled: true},
+			},
+			ErrorMessage: "setup bridge: failed to get Waku: unknown service",
+		},
+		{
+			Name: "only waku",
+			Cfg: params.NodeConfig{
+				WakuConfig: params.WakuConfig{
+					Enabled:     true,
+					LightClient: false,
+				},
+				BridgeConfig: params.BridgeConfig{Enabled: true},
+			},
+			ErrorMessage: "setup bridge: failed to get Whisper: unknown service",
+		},
+		{
+			Name: "both",
+			Cfg: params.NodeConfig{
+				WhisperConfig: params.WhisperConfig{
+					Enabled:     true,
+					LightClient: false,
+				},
+				WakuConfig: params.WakuConfig{
+					Enabled:     true,
+					LightClient: false,
+				},
+				BridgeConfig: params.BridgeConfig{Enabled: true},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			node := New()
+			err := node.Start(&tc.Cfg, &accounts.Manager{})
+			if err != nil {
+				require.EqualError(t, err, tc.ErrorMessage)
+			} else if tc.ErrorMessage != "" {
+				t.Fatalf("expected an error: %s", tc.ErrorMessage)
+			}
+			require.NoError(t, node.Stop())
+		})
+	}
+}

@@ -907,7 +907,7 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 			return err
 		}
 
-		if err := st.InitProtocol(identity, b.appDB); err != nil {
+		if err := st.InitProtocol(identity, b.appDB, logutils.ZapLogger()); err != nil {
 			return err
 		}
 		return nil

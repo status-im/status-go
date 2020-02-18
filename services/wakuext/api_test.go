@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -125,7 +127,7 @@ func TestInitProtocol(t *testing.T) {
 	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	require.NoError(t, err)
 
-	err = service.InitProtocol(privateKey, sqlDB)
+	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
 	require.NoError(t, err)
 }
 
@@ -179,7 +181,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	s.Require().NoError(err)
 	privateKey, err := crypto.GenerateKey()
 	s.NoError(err)
-	err = service.InitProtocol(privateKey, sqlDB)
+	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
 	s.NoError(err)
 	err = stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 		return service, nil
@@ -301,30 +303,13 @@ func (s *WakuNodeMockSuite) SetupTest() {
 	node := enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
 	peer := p2p.NewPeer(node.ID(), "1", []p2p.Cap{{"shh", 6}})
 	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
 	go func() {
 		err := w.HandlePeer(peer, rw2)
-		errorc <- err
+		panic(err)
 	}()
 	wakuWrapper := gethbridge.NewGethWakuWrapper(w)
-	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, []interface{}{
-		waku.ProtocolVersion,
-		math.Float64bits(wakuWrapper.MinPow()),
-		wakuWrapper.BloomFilter(),
-		false,
-		true,
-		waku.RateLimits{},
-	}))
-	s.Require().NoError(p2p.SendItems(
-		rw1,
-		statusCode,
-		waku.ProtocolVersion,
-		math.Float64bits(wakuWrapper.MinPow()),
-		wakuWrapper.BloomFilter(),
-		true,
-		true,
-		waku.RateLimits{},
-	))
+	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, nil))
+	s.Require().NoError(p2p.SendItems(rw1, statusCode, waku.ProtocolVersion, []interface{}{}))
 
 	nodeWrapper := ext.NewTestNodeWrapper(nil, wakuWrapper)
 	s.localService = New(

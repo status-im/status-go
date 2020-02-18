@@ -29,6 +29,7 @@ import (
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
@@ -87,14 +88,6 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 		return nil, fmt.Errorf(ErrNodeMakeFailureFormat, err.Error())
 	}
 
-	if config.EnableNTPSync {
-		if err = stack.Register(func(*node.ServiceContext) (node.Service, error) {
-			return timesource.Default(), nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to register NTP time source: %v", err)
-		}
-	}
-
 	err = activateServices(stack, config, accs, db)
 	if err != nil {
 		return nil, err
@@ -103,6 +96,15 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 }
 
 func activateServices(stack *node.Node, config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) error {
+	if config.EnableNTPSync {
+		err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
+			return timesource.Default(), nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to register NTP time source: %v", err)
+		}
+	}
+
 	// start Ethereum service if we are not expected to use an upstream server
 	if !config.UpstreamConfig.Enabled {
 		if err := activateLightEthService(stack, accs, config); err != nil {
@@ -465,8 +467,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 		cfg.MinimumAcceptedPoW = wakuCfg.MinimumPoW
 	}
 
-	// TODO: provide a logger
-	w := waku.New(cfg, nil)
+	w := waku.New(cfg, logutils.ZapLogger())
 
 	if wakuCfg.EnableRateLimiter {
 		r := wakuRateLimiter(wakuCfg, clusterCfg)
