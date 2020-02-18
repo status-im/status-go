@@ -353,9 +353,11 @@ type RequestMessagesSyncSuite struct {
 func (s *RequestMessagesSyncSuite) TestExpired() {
 	// intentionally discarding all requests, so that request will timeout
 	go func() {
-		msg, err := s.remoteRW.ReadMsg()
-		s.Require().NoError(err)
-		s.Require().NoError(msg.Discard())
+		for {
+			msg, err := s.remoteRW.ReadMsg()
+			s.Require().NoError(err)
+			s.Require().NoError(msg.Discard())
+		}
 	}()
 	_, err := s.localAPI.RequestMessagesSync(
 		ext.RetryConfig{
