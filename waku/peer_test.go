@@ -104,10 +104,10 @@ var debugMode = false
 var prevTime time.Time
 var cntPrev int
 
-func TestSimulation(t *testing.T) {
+func TestSimulationBloomFilter(t *testing.T) {
 	// create a chain of waku nodes,
 	// installs the filters with shared (predefined) parameters
-	initialize(t)
+	initializeBloomFilterMode(t)
 
 	// each node sends one random (not decryptable) message
 	for i := 0; i < NumNodes; i++ {
@@ -172,7 +172,7 @@ func initBloom(t *testing.T) {
 	}
 }
 
-func initialize(t *testing.T) {
+func initializeBloomFilterMode(t *testing.T) {
 	initBloom(t)
 
 	var err error
@@ -181,7 +181,9 @@ func initialize(t *testing.T) {
 		var node TestNode
 		b := make([]byte, BloomFilterSize)
 		copy(b, masterBloomFilter)
-		node.shh = New(nil, nil)
+		config := DefaultConfig
+		config.BloomFilterMode = true
+		node.shh = New(&config, nil)
 		_ = node.shh.SetMinimumPoW(masterPow, false)
 		_ = node.shh.SetBloomFilter(b)
 		if !bytes.Equal(node.shh.BloomFilter(), masterBloomFilter) {
@@ -511,12 +513,32 @@ func waitForServersToStart(t *testing.T) {
 //two generic waku node handshake
 func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
 	w1 := Waku{}
+	var pow uint64 = 123
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
 		&rwStub{[]interface{}{
 			ProtocolVersion,
-			statusOptions{PoWRequirement: 123},
+			statusOptions{PoWRequirement: &pow},
+		}},
+		nil,
+	)
+	err := p1.handshake()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+//two generic waku node handshake. one don't send light flag
+func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
+	w1 := Waku{}
+	var pow uint64 = 123
+	p1 := newPeer(
+		&w1,
+		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		&rwStub{[]interface{}{
+			ProtocolVersion,
+			statusOptions{PoWRequirement: &pow},
 		}},
 		nil,
 	)
@@ -527,21 +549,19 @@ func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
 }
 
 //two generic waku node handshake. one don't send light flag
-func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
-	w1 := Waku{}
-	p1 := newPeer(
-		&w1,
-		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
-		&rwStub{[]interface{}{
-			ProtocolVersion,
-			statusOptions{PoWRequirement: 123},
-		}},
-		nil,
-	)
-	err := p1.handshake()
-	if err != nil {
-		t.Fatal()
+func TestTopicOrBloomMatch(t *testing.T) {
+	p := Peer{}
+	p.setTopicInterest([]TopicType{sharedTopic})
+	envelope := &Envelope{Topic: sharedTopic}
+	if !p.topicOrBloomMatch(envelope) {
+		t.Fatal("envelope should match")
 	}
+
+	badEnvelope := &Envelope{Topic: wrongTopic}
+	if p.topicOrBloomMatch(badEnvelope) {
+		t.Fatal("envelope should not match")
+	}
+
 }
 
 //two light nodes handshake. restriction disabled
@@ -549,12 +569,14 @@ func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 	w1 := Waku{}
 	w1.settings.RestrictLightClientsConn = false
 	w1.SetLightClientMode(true)
+	var pow uint64 = 123
+	var lightNodeEnabled bool = true
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
 		&rwStub{[]interface{}{
 			ProtocolVersion,
-			statusOptions{PoWRequirement: 123, LightNodeEnabled: true},
+			statusOptions{PoWRequirement: &pow, LightNodeEnabled: &lightNodeEnabled},
 		}},
 		nil,
 	)

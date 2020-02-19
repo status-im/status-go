@@ -37,11 +37,9 @@ const (
 	// Waku protocol message codes, according to https://github.com/vacp2p/specs/blob/master/waku.md
 	statusCode             = 0   // used in the handshake
 	messagesCode           = 1   // regular message
-	powRequirementCode     = 2   // node's PoW requirement
-	bloomFilterExCode      = 3   // bloom filter exchange
+	statusUpdateCode       = 2   // update of settings
 	batchAcknowledgedCode  = 11  // confirmation that batch of envelopes was received
 	messageResponseCode    = 12  // includes confirmation for delivery and information about errors
-	rateLimitingCode       = 20  // includes peer's rate limiting settings
 	p2pRequestCompleteCode = 125 // peer-to-peer message, used by Dapp protocol
 	p2pRequestCode         = 126 // peer-to-peer message, used by Dapp protocol
 	p2pMessageCode         = 127 // peer-to-peer message (to be consumed by the peer, but not forwarded any further)
@@ -50,13 +48,14 @@ const (
 	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
 	signatureFlag = byte(4)
 
-	TopicLength     = 4                      // in bytes
-	signatureLength = crypto.SignatureLength // in bytes
-	aesKeyLength    = 32                     // in bytes
-	aesNonceLength  = 12                     // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
-	keyIDSize       = 32                     // in bytes
-	BloomFilterSize = 64                     // in bytes
-	flagsLength     = 1
+	TopicLength      = 4                      // in bytes
+	signatureLength  = crypto.SignatureLength // in bytes
+	aesKeyLength     = 32                     // in bytes
+	aesNonceLength   = 12                     // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
+	keyIDSize        = 32                     // in bytes
+	BloomFilterSize  = 64                     // in bytes
+	MaxTopicInterest = 10000
+	flagsLength      = 1
 
 	EnvelopeHeaderLength = 20
 

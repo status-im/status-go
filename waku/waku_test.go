@@ -709,6 +709,95 @@ func TestSymmetricSendCycle(t *testing.T) {
 
 }
 
+func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
+	InitSingleTest()
+
+	w := New(nil, nil)
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
+	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
+	_ = w.Start(nil)
+	defer w.Stop()
+
+	filter1, err := generateFilter(t, true)
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+	filter1.PoW = DefaultMinimumPoW
+
+	// Copy the first filter since some of its fields
+	// are randomly generated.
+	filter2 := &Filter{
+		KeySym:   filter1.KeySym,
+		Topics:   filter1.Topics,
+		PoW:      filter1.PoW,
+		AllowP2P: filter1.AllowP2P,
+		Messages: NewMemoryMessageStore(),
+	}
+
+	params, err := generateMessageParams()
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+
+	filter1.Src = &params.Src.PublicKey
+	filter2.Src = &params.Src.PublicKey
+
+	params.KeySym = filter1.KeySym
+	params.Topic = BytesToTopic(filter1.Topics[2])
+	params.PoW = filter1.PoW
+	params.WorkTime = 10
+	params.TTL = 50
+	msg, err := NewSentMessage(params)
+	if err != nil {
+		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
+	}
+	env, err := msg.Wrap(params, time.Now())
+	if err != nil {
+		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
+	}
+
+	_, err = w.Subscribe(filter1)
+	if err != nil {
+		t.Fatalf("failed subscribe 1 with seed %d: %s.", seed, err)
+	}
+
+	_, err = w.Subscribe(filter2)
+	if err != nil {
+		t.Fatalf("failed subscribe 2 with seed %d: %s.", seed, err)
+	}
+
+	err = w.Send(env)
+	if err != nil {
+		t.Fatalf("Failed sending envelope with PoW %.06f (seed %d): %s", env.PoW(), seed, err)
+	}
+
+	// wait till received or timeout
+	var received bool
+	for j := 0; j < 200; j++ {
+		time.Sleep(10 * time.Millisecond)
+		if len(w.Envelopes()) > 0 {
+			received = true
+			break
+		}
+	}
+
+	if !received {
+		t.Fatalf("did not receive the sent envelope, seed: %d.", seed)
+	}
+
+	// check w.messages()
+	time.Sleep(5 * time.Millisecond)
+	mail1 := filter1.Retrieve()
+	mail2 := filter2.Retrieve()
+	if len(mail2) == 0 {
+		t.Fatalf("did not receive any email for filter 2")
+	}
+	if len(mail1) == 0 {
+		t.Fatalf("did not receive any email for filter 1")
+	}
+
+}
+
 func TestSymmetricSendWithoutAKey(t *testing.T) {
 	InitSingleTest()
 
@@ -904,6 +993,45 @@ func TestBloom(t *testing.T) {
 	}
 }
 
+func TestTopicInterest(t *testing.T) {
+	w := New(nil, nil)
+	topicInterest := w.TopicInterest()
+	if topicInterest != nil {
+		t.Fatalf("wrong topic on creation")
+	}
+
+	filter1, err := generateFilter(t, true)
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+
+	_, err = w.Subscribe(filter1)
+	if err != nil {
+		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
+	}
+
+	topicInterest = w.TopicInterest()
+	if len(topicInterest) != len(filter1.Topics) {
+		t.Fatalf("wrong number of topics created")
+	}
+
+	filter2, err := generateFilter(t, true)
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+
+	_, err = w.Subscribe(filter2)
+	if err != nil {
+		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
+	}
+
+	topicInterest = w.TopicInterest()
+	if len(topicInterest) != len(filter1.Topics)+len(filter2.Topics) {
+		t.Fatalf("wrong number of topics created")
+	}
+
+}
+
 func TestSendP2PDirect(t *testing.T) {
 	InitSingleTest()
 
@@ -1058,11 +1186,7 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 			statusCode,
 			[]interface{}{
 				ProtocolVersion,
-				statusOptions{
-					PoWRequirement:       math.Float64bits(w.MinPow()),
-					LightNodeEnabled:     false,
-					ConfirmationsEnabled: expectConfirmations,
-				},
+				w.toStatusOptions(),
 			},
 		),
 	)
@@ -1100,6 +1224,9 @@ func TestConfirmationReceived(t *testing.T) {
 			rw1.Close()
 		}
 	}()
+	pow := math.Float64bits(w.MinPow())
+	confirmationsEnabled := true
+	lightNodeEnabled := true
 	require.NoError(
 		t,
 		p2p.ExpectMsg(
@@ -1107,11 +1234,7 @@ func TestConfirmationReceived(t *testing.T) {
 			statusCode,
 			[]interface{}{
 				ProtocolVersion,
-				statusOptions{
-					PoWRequirement:       math.Float64bits(w.MinPow()),
-					BloomFilter:          w.BloomFilter(),
-					ConfirmationsEnabled: true,
-				},
+				w.toStatusOptions(),
 			},
 		),
 	)
@@ -1122,10 +1245,10 @@ func TestConfirmationReceived(t *testing.T) {
 			statusCode,
 			ProtocolVersion,
 			statusOptions{
-				PoWRequirement:       math.Float64bits(w.MinPow()),
+				PoWRequirement:       &pow,
 				BloomFilter:          w.BloomFilter(),
-				ConfirmationsEnabled: true,
-				LightNodeEnabled:     true,
+				ConfirmationsEnabled: &confirmationsEnabled,
+				LightNodeEnabled:     &lightNodeEnabled,
 			},
 		),
 	)
@@ -1163,6 +1286,10 @@ func TestMessagesResponseWithError(t *testing.T) {
 		err := w.HandlePeer(p, rw2)
 		errorc <- err
 	}()
+
+	pow := math.Float64bits(w.MinPow())
+	confirmationsEnabled := true
+	lightNodeEnabled := true
 	require.NoError(
 		t,
 		p2p.ExpectMsg(
@@ -1170,11 +1297,7 @@ func TestMessagesResponseWithError(t *testing.T) {
 			statusCode,
 			[]interface{}{
 				ProtocolVersion,
-				statusOptions{
-					PoWRequirement:       math.Float64bits(w.MinPow()),
-					BloomFilter:          w.BloomFilter(),
-					ConfirmationsEnabled: true,
-				},
+				w.toStatusOptions(),
 			},
 		),
 	)
@@ -1185,10 +1308,10 @@ func TestMessagesResponseWithError(t *testing.T) {
 			statusCode,
 			ProtocolVersion,
 			statusOptions{
-				PoWRequirement:       math.Float64bits(w.MinPow()),
+				PoWRequirement:       &pow,
 				BloomFilter:          w.BloomFilter(),
-				ConfirmationsEnabled: true,
-				LightNodeEnabled:     true,
+				ConfirmationsEnabled: &confirmationsEnabled,
+				LightNodeEnabled:     &lightNodeEnabled,
 			},
 		),
 	)
@@ -1239,16 +1362,17 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
+
+	pow := math.Float64bits(w.MinPow())
+	confirmationsEnabled := true
+	lightNodeEnabled := true
+
 	require.NoError(t, p2p.ExpectMsg(
 		rw1,
 		statusCode,
 		[]interface{}{
 			ProtocolVersion,
-			statusOptions{
-				PoWRequirement:       math.Float64bits(w.MinPow()),
-				BloomFilter:          w.BloomFilter(),
-				ConfirmationsEnabled: true,
-			},
+			w.toStatusOptions(),
 		},
 	))
 	require.NoError(t, p2p.SendItems(
@@ -1256,10 +1380,10 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 		statusCode,
 		ProtocolVersion,
 		statusOptions{
-			PoWRequirement:       math.Float64bits(w.MinPow()),
+			PoWRequirement:       &pow,
 			BloomFilter:          w.BloomFilter(),
-			ConfirmationsEnabled: true,
-			LightNodeEnabled:     true,
+			ConfirmationsEnabled: &confirmationsEnabled,
+			LightNodeEnabled:     &lightNodeEnabled,
 		},
 	))
 	require.NoError(t, w.Send(&envelope))
@@ -1336,6 +1460,10 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
+
+	pow := math.Float64bits(w.MinPow())
+	lightNodeEnabled := true
+
 	require.NoError(
 		t,
 		p2p.ExpectMsg(
@@ -1343,10 +1471,7 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 			statusCode,
 			[]interface{}{
 				ProtocolVersion,
-				statusOptions{
-					PoWRequirement: math.Float64bits(w.MinPow()),
-					BloomFilter:    w.BloomFilter(),
-				},
+				w.toStatusOptions(),
 			},
 		),
 	)
@@ -1357,9 +1482,9 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 			statusCode,
 			ProtocolVersion,
 			statusOptions{
-				PoWRequirement:   math.Float64bits(w.MinPow()),
+				PoWRequirement:   &pow,
 				BloomFilter:      w.BloomFilter(),
-				LightNodeEnabled: true,
+				LightNodeEnabled: &lightNodeEnabled,
 			},
 		),
 	)
@@ -1519,7 +1644,9 @@ func TestRateLimiterIntegration(t *testing.T) {
 	go func() {
 		err := w.HandlePeer(p, rw2)
 		errorc <- err
+
 	}()
+
 	require.NoError(
 		t,
 		p2p.ExpectMsg(
@@ -1527,14 +1654,7 @@ func TestRateLimiterIntegration(t *testing.T) {
 			statusCode,
 			[]interface{}{
 				ProtocolVersion,
-				statusOptions{
-					PoWRequirement: math.Float64bits(w.MinPow()),
-					BloomFilter:    w.BloomFilter(),
-					RateLimits: RateLimits{
-						IPLimits:     10,
-						PeerIDLimits: 5,
-					},
-				},
+				w.toStatusOptions(),
 			},
 		),
 	)

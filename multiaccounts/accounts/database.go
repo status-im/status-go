@@ -75,6 +75,8 @@ type Settings struct {
 	WalletRootAddress      types.Address    `json:"wallet-root-address,omitempty"`
 	WalletSetUpPassed      bool             `json:"wallet-set-up-passed?,omitempty"`
 	WalletVisibleTokens    *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
+	WakuEnabled            bool             `json:"waku-enabled,omitempty"`
+	WakuBloomFilterMode    bool             `json:"waku-bloom-filter-mode,omitempty"`
 }
 
 func NewDB(db *sql.DB) *Database {
@@ -266,6 +268,19 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "wallet/visible-tokens":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET wallet_visible_tokens = ? WHERE synthetic_id = 'id'")
+	case "waku-enabled":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET waku_enabled = ? WHERE synthetic_id = 'id'")
+	case "waku-bloom-filter-mode":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET waku_bloom_filter_mode = ? WHERE synthetic_id = 'id'")
+
 	default:
 		return ErrInvalidConfig
 	}
