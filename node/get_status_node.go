@@ -226,6 +226,7 @@ func (n *StatusNode) setupRPCClient() (err error) {
 
 func (n *StatusNode) setupBridge() error {
 	if !n.config.BridgeConfig.Enabled {
+		log.Info("a Whisper-Waku bridge is disabled")
 		return nil
 	}
 	var shh *whisper.Whisper
@@ -239,6 +240,8 @@ func (n *StatusNode) setupBridge() error {
 
 	n.bridge = bridge.New(shh, wak, logutils.ZapLogger())
 	n.bridge.Start()
+
+	log.Info("setup a Whisper-Waku bridge successfully")
 
 	return nil
 }

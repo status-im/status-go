@@ -375,12 +375,14 @@ func (w *Waku) readBridgeLoop() {
 		case env := <-out:
 			_, err := w.addAndBridge(env, false, true)
 			if err != nil {
+				bridgeReceivedFailed.Inc()
 				w.logger.Warn(
 					"failed to add a bridged envelope",
 					zap.Binary("ID", env.Hash().Bytes()),
 					zap.Error(err),
 				)
 			} else {
+				bridgeReceivedSucceed.Inc()
 				w.logger.Debug("bridged envelope successfully", zap.Binary("ID", env.Hash().Bytes()))
 				w.envelopeFeed.Send(EnvelopeEvent{
 					Event: EventEnvelopeReceived,
@@ -1309,8 +1311,10 @@ func (w *Waku) addAndBridge(envelope *Envelope, isP2P bool, bridged bool) (bool,
 		// In particular, if a node is a lightweight node,
 		// it should not bridge any envelopes.
 		if !isP2P && !bridged && w.bridge != nil {
+			log.Debug("bridging envelope from Waku", "hash", envelope.Hash().Hex())
 			_, in := w.bridge.Pipe()
 			in <- envelope
+			bridgeSent.Inc()
 		}
 	}
 	return true, nil

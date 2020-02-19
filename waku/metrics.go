@@ -57,6 +57,19 @@ var (
 		Name: "waku_rate_limits_exceeded_total",
 		Help: "Number of times the Waku rate limits were exceeded",
 	}, []string{"type"})
+	// bridging
+	bridgeSent = prom.NewCounter(prom.CounterOpts{
+		Name: "waku_bridge_sent_total",
+		Help: "Number of envelopes bridged from Waku",
+	})
+	bridgeReceivedSucceed = prom.NewCounter(prom.CounterOpts{
+		Name: "waku_bridge_received_success_total",
+		Help: "Number of envelopes bridged to Waku and successfully added",
+	})
+	bridgeReceivedFailed = prom.NewCounter(prom.CounterOpts{
+		Name: "waku_bridge_received_failure_total",
+		Help: "Number of envelopes bridged to Waku and failed to be added",
+	})
 )
 
 func init() {
@@ -67,4 +80,7 @@ func init() {
 	prom.MustRegister(envelopesSizeMeter)
 	prom.MustRegister(rateLimitsProcessed)
 	prom.MustRegister(rateLimitsExceeded)
+	prom.MustRegister(bridgeSent)
+	prom.MustRegister(bridgeReceivedSucceed)
+	prom.MustRegister(bridgeReceivedFailed)
 }
