@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"math"
 	mrand "math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -946,7 +947,7 @@ func TestSendP2PDirect(t *testing.T) {
 	rwStub.messages = nil
 
 	// send a batch of envelopes
-	err = w.SendP2PDirect(peerW, env, env, env)
+	err = w.SendP2PDirect(peerW.ID(), env, env, env)
 	if err != nil {
 		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
 	}
@@ -1065,7 +1066,11 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations}))
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations, RateLimits{}},
+	))
 }
 
 func TestConfirmationHadnshakeExtension(t *testing.T) {
@@ -1092,7 +1097,11 @@ func TestConfirmationReceived(t *testing.T) {
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+	))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
 	e := Envelope{
@@ -1127,8 +1136,15 @@ func TestMessagesResponseWithError(t *testing.T) {
 		err := w.HandlePeer(p, rw2)
 		errorc <- err
 	}()
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
-	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+	))
+	require.NoError(
+		t,
+		p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true),
+	)
 
 	failed := Envelope{
 		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
@@ -1175,7 +1191,11 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+	))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
 	require.NoError(t, w.Send(&envelope))
@@ -1228,7 +1248,8 @@ func TestConfirmationEventsExtendedWithErrors(t *testing.T) {
 			Hash:        e.Hash(),
 			Code:        EnvelopeTimeNotSynced,
 			Description: "test error",
-		}})
+		}},
+	)
 }
 
 func TestEventsWithoutConfirmation(t *testing.T) {
@@ -1251,7 +1272,11 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 	time.AfterFunc(5*time.Second, func() {
 		rw1.Close()
 	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
+	))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, false))
 
 	e := Envelope{
@@ -1401,14 +1426,14 @@ func TestSyncMessages(t *testing.T) {
 
 	t.Run("WithoutPeer", func(t *testing.T) {
 		w := New(nil)
-		w.RegisterServer(&stubMailServer{})
+		w.RegisterMailServer(&stubMailServer{})
 		err := w.SyncMessages([]byte{0x01, 0x02}, SyncMailRequest{})
 		require.EqualError(t, err, "Could not find peer with ID: 0102")
 	})
 
 	t.Run("WithInvalidRequest", func(t *testing.T) {
 		w := New(nil)
-		w.RegisterServer(&stubMailServer{})
+		w.RegisterMailServer(&stubMailServer{})
 
 		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 		rw1, _ := p2p.MsgPipe()
@@ -1421,7 +1446,7 @@ func TestSyncMessages(t *testing.T) {
 
 	t.Run("AllGood", func(t *testing.T) {
 		w := New(nil)
-		w.RegisterServer(&stubMailServer{})
+		w.RegisterMailServer(&stubMailServer{})
 
 		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 		rw1, rw2 := p2p.MsgPipe()
@@ -1442,13 +1467,23 @@ func TestSendSyncResponse(t *testing.T) {
 	p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 	rw1, rw2 := p2p.MsgPipe()
 	whisperPeer := newPeer(w, p, rw1)
+	w.peers[whisperPeer] = struct{}{}
+	errC := make(chan error, 2)
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		err := w.SendSyncResponse(whisperPeer, SyncResponse{})
-		require.NoError(t, err)
+		errC <- w.SendSyncResponse(whisperPeer.ID(), SyncResponse{})
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		errC <- p2p.ExpectMsg(rw2, p2pSyncResponseCode, nil)
+		wg.Done()
 	}()
 
-	require.NoError(t, p2p.ExpectMsg(rw2, p2pSyncResponseCode, nil))
+	require.NoError(t, <-errC)
+	require.NoError(t, <-errC)
 }
 
 func TestHandleP2PSyncRequestCode(t *testing.T) {
@@ -1456,10 +1491,10 @@ func TestHandleP2PSyncRequestCode(t *testing.T) {
 	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", nil), nil)
 
 	mailMock := &mockMailServer{}
-	mailMock.On("SyncMail", peer, mock.Anything).Return(nil)
+	mailMock.On("SyncMail", peer.ID(), mock.Anything).Return(nil)
 
 	w := New(nil)
-	w.RegisterServer(mailMock)
+	w.RegisterMailServer(mailMock)
 
 	go func() {
 		err := p2p.Send(rw1, p2pSyncRequestCode, SyncMailRequest{Limit: 10})
@@ -1483,7 +1518,7 @@ func TestHandleP2PSyncRequestCodeWithInvalidRequest(t *testing.T) {
 	mailMock.On("SyncMail", peer, mock.Anything).Return(nil)
 
 	w := New(nil)
-	w.RegisterServer(mailMock)
+	w.RegisterMailServer(mailMock)
 
 	// create an invalid request
 	req := SyncMailRequest{Limit: 10, Lower: 10, Upper: 5}
@@ -1510,7 +1545,7 @@ func TestHandleP2PSyncResponseCode(t *testing.T) {
 	mailMock.On("Archive", mock.Anything)
 
 	w := New(nil)
-	w.RegisterServer(mailMock)
+	w.RegisterMailServer(mailMock)
 
 	envelopesCount := 3
 
@@ -1560,7 +1595,11 @@ func TestRateLimiterIntegration(t *testing.T) {
 		err := w.HandlePeer(p, rw2)
 		errorc <- err
 	}()
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true}))
+	require.NoError(t, p2p.ExpectMsg(
+		rw1,
+		statusCode,
+		[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, w.RateLimits()},
+	))
 	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
 
 	envelope := Envelope{
@@ -1580,10 +1619,10 @@ func TestRateLimiterIntegration(t *testing.T) {
 
 type stubMailServer struct{}
 
-func (stubMailServer) Archive(*Envelope)                     {}
-func (stubMailServer) DeliverMail(*Peer, *Envelope)          {}
-func (stubMailServer) Deliver(*Peer, MessagesRequest)        {}
-func (stubMailServer) SyncMail(*Peer, SyncMailRequest) error { return nil }
+func (stubMailServer) Archive(*Envelope)                      {}
+func (stubMailServer) DeliverMail([]byte, *Envelope)          {}
+func (stubMailServer) Deliver([]byte, MessagesRequest)        {}
+func (stubMailServer) SyncMail([]byte, SyncMailRequest) error { return nil }
 
 type mockMailServer struct {
 	mock.Mock
@@ -1593,15 +1632,15 @@ func (m *mockMailServer) Archive(env *Envelope) {
 	m.Called(env)
 }
 
-func (m *mockMailServer) DeliverMail(p *Peer, env *Envelope) {
+func (m *mockMailServer) DeliverMail(p []byte, env *Envelope) {
 	m.Called(p, env)
 }
 
-func (m *mockMailServer) Deliver(p *Peer, r MessagesRequest) {
+func (m *mockMailServer) Deliver(p []byte, r MessagesRequest) {
 	m.Called(p, r)
 }
 
-func (m *mockMailServer) SyncMail(p *Peer, r SyncMailRequest) error {
+func (m *mockMailServer) SyncMail(p []byte, r SyncMailRequest) error {
 	args := m.Called(p, r)
 	return args.Error(0)
 }
