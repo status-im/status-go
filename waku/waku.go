@@ -419,7 +419,7 @@ func (w *Waku) APIs() []rpc.API {
 			Namespace: ProtocolName,
 			Version:   ProtocolVersionStr,
 			Service:   NewPublicWakuAPI(w),
-			Public:    true,
+			Public:    false,
 		},
 	}
 }
