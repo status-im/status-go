@@ -123,24 +123,24 @@ func (p *Peer) handshake() error {
 	)
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 	if _, err := s.List(); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status packet: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
 	}
 	// Validate protocol version.
 	if err := s.Decode(&peerProtocolVersion); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %v", p.ID(), err)
 	}
 	if peerProtocolVersion != ProtocolVersion {
 		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerProtocolVersion, ProtocolVersion)
 	}
 	// Decode and validate other status packet options.
 	if err := s.Decode(&peerOptions); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status options: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode status options: %v", p.ID(), err)
 	}
 	if err := s.ListEnd(); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status packet: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
 	}
 	if err := p.setOptions(peerOptions.WithDefaults()); err != nil {
-		return fmt.Errorf("p [%x]: failed to set options: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to set options: %v", p.ID(), err)
 	}
 	if err := <-errc; err != nil {
 		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
@@ -153,7 +153,7 @@ func (p *Peer) setOptions(peerOptions statusOptions) error {
 	p.logger.Debug("settings options", zap.Binary("peerID", p.ID()), zap.Any("Options", peerOptions))
 
 	if err := peerOptions.Validate(); err != nil {
-		return fmt.Errorf("p [%x]: sent invalid options: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: sent invalid options: %v", p.ID(), err)
 	}
 	// Validate and save peer's PoW.
 	pow := peerOptions.PoWRequirementF()

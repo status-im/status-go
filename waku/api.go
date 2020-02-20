@@ -219,7 +219,7 @@ type NewMessage struct {
 	TargetPeer string    `json:"targetPeer"`
 }
 
-type newMessageOverride struct {
+type newMessageOverride struct { // nolint: deadcode,unused
 	PublicKey hexutil.Bytes
 	Payload   hexutil.Bytes
 	Padding   hexutil.Bytes
@@ -316,15 +316,13 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 // UninstallFilter is alias for Unsubscribe
 func (api *PublicWakuAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id)
+	api.w.Unsubscribe(id) // nolint: errcheck
 }
 
 // Unsubscribe disables and removes an existing filter.
 func (api *PublicWakuAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id)
+	api.w.Unsubscribe(id) // nolint: errcheck
 }
-
-//go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
 
 // Criteria holds various filter options for inbound messages.
 type Criteria struct {
@@ -334,10 +332,6 @@ type Criteria struct {
 	MinPow       float64     `json:"minPow"`
 	Topics       []TopicType `json:"topics"`
 	AllowP2P     bool        `json:"allowP2P"`
-}
-
-type criteriaOverride struct {
-	Sig hexutil.Bytes
 }
 
 // Messages set up a subscription that fires events when messages arrive that match
@@ -451,7 +445,7 @@ type Message struct {
 	P2P       bool      `json:"bool,omitempty"`
 }
 
-type messageOverride struct {
+type messageOverride struct { // nolint: deadcode,unused
 	Sig     hexutil.Bytes
 	Payload hexutil.Bytes
 	Padding hexutil.Bytes

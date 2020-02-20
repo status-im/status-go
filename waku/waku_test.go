@@ -30,7 +30,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/pbkdf2"
 
@@ -65,7 +64,7 @@ func TestBasic(t *testing.T) {
 	}
 
 	peerID := make([]byte, 64)
-	mrand.Read(peerID)
+	mrand.Read(peerID) // nolint: gosec
 	peer, _ := w.getPeer(peerID)
 	if peer != nil {
 		t.Fatal("found peer for random key.")
@@ -278,10 +277,9 @@ func TestSymKeyManagement(t *testing.T) {
 	var err error
 	var k1, k2 []byte
 	w := New(nil, nil)
-	id1 := string("arbitrary-string-1")
 	id2 := string("arbitrary-string-2")
 
-	id1, err = w.GenerateSymKey()
+	id1, err := w.GenerateSymKey()
 	if err != nil {
 		t.Fatalf("failed GenerateSymKey with seed %d: %s.", seed, err)
 	}
@@ -309,7 +307,7 @@ func TestSymKeyManagement(t *testing.T) {
 
 	// add existing id, nothing should change
 	randomKey := make([]byte, aesKeyLength)
-	mrand.Read(randomKey)
+	mrand.Read(randomKey) // nolint: gosec
 	id1, err = w.AddSymKeyDirect(randomKey)
 	if err != nil {
 		t.Fatalf("failed AddSymKey with seed %d: %s.", seed, err)
@@ -428,7 +426,7 @@ func TestSymKeyManagement(t *testing.T) {
 	}
 
 	randomKey = make([]byte, aesKeyLength+1)
-	mrand.Read(randomKey)
+	mrand.Read(randomKey) // nolint: gosec
 	_, err = w.AddSymKeyDirect(randomKey)
 	if err == nil {
 		t.Fatalf("added the key with wrong size, seed %d.", seed)
@@ -469,10 +467,17 @@ func TestExpiry(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	_ = w.SetMinimumPoW(0.0000001, false)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	_ = w.Start(nil)
-	defer w.Stop()
+	err := w.SetMinimumPoW(0.0000001, false)
+	if err != nil {
+		t.Fatal("failed to set min pow")
+	}
+
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false) // nolint: errcheck
+	err = w.Start(nil)
+	if err != nil {
+		t.Fatal("failed to start waku")
+	}
+	defer w.Stop() // nolint: errcheck
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -533,10 +538,12 @@ func TestCustomization(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
-	defer w.Stop()
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
+	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	if err := w.Start(nil); err != nil {
+		t.Fatal("failed to start node")
+	}
+	defer w.Stop() // nolint: errcheck
 
 	const smallPoW = 0.00001
 
@@ -624,10 +631,13 @@ func TestSymmetricSendCycle(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	_ = w.Start(nil)
-	defer w.Stop()
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
+	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	err := w.Start(nil)
+	if err != nil {
+		t.Fatal("failed to start node")
+	}
+	defer w.Stop() // nolint: errcheck
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
@@ -713,10 +723,12 @@ func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	_ = w.Start(nil)
-	defer w.Stop()
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
+	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	if err := w.Start(nil); err != nil {
+		t.Fatal("could not start node")
+	}
+	defer w.Stop() // nolint: errcheck
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
@@ -802,10 +814,10 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
-	defer w.Stop()
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
+	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	w.Start(nil)                                     // nolint: errcheck
+	defer w.Stop()                                   // nolint: errcheck
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
@@ -870,10 +882,10 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
-	defer w.Stop()
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
+	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	w.Start(nil)                                     // nolint: errcheck
+	defer w.Stop()                                   // nolint: errcheck
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
@@ -943,11 +955,11 @@ func TestBloom(t *testing.T) {
 		t.Fatalf("bloom filter does not match the mask")
 	}
 
-	_, err := mrand.Read(b)
+	_, err := mrand.Read(b) // nolint: gosec
 	if err != nil {
 		t.Fatalf("math rand error")
 	}
-	_, err = mrand.Read(x)
+	_, err = mrand.Read(x) // nolint: gosec
 	if err != nil {
 		t.Fatalf("math rand error")
 	}
@@ -1036,10 +1048,10 @@ func TestSendP2PDirect(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	_ = w.SetMinimumPoW(0.0000001, false)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	_ = w.Start(nil)
-	defer w.Stop()
+	_ = w.SetMinimumPoW(0.0000001, false)           // nolint: errcheck
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false) // nolint: errcheck
+	_ = w.Start(nil)                                // nolint: errcheck
+	defer w.Stop()                                  // nolint: errcheck
 
 	rwStub := &rwP2PMessagesStub{}
 	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub, nil)
@@ -1082,10 +1094,10 @@ func TestHandleP2PMessageCode(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	w.SetMinimumPoW(0.0000001, false)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	w.Start(nil)
-	defer w.Stop()
+	w.SetMinimumPoW(0.0000001, false)               // nolint: errcheck
+	defer w.SetMinimumPoW(DefaultMinimumPoW, false) // nolint: errcheck
+	w.Start(nil)                                    // nolint: errcheck
+	defer w.Stop()                                  // nolint: errcheck
 
 	envelopeEvents := make(chan EnvelopeEvent, 10)
 	sub := w.SubscribeEnvelopeEvents(envelopeEvents)
@@ -1517,7 +1529,7 @@ func discardPipe() *p2p.MsgPipeRW {
 			if err != nil {
 				return
 			}
-			msg.Discard()
+			msg.Discard() // nolint: errcheck
 		}
 	}()
 	return rw2
@@ -1538,7 +1550,7 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	w1, w2 := New(c, nil), New(c, nil)
 	errc := make(chan error)
 	go func() {
-		w1.HandlePeer(p2, rw2)
+		w1.HandlePeer(p2, rw2) // nolint: errcheck
 	}()
 	go func() {
 		errc <- w2.HandlePeer(p1, rw1)
@@ -1665,32 +1677,10 @@ func TestRateLimiterIntegration(t *testing.T) {
 	}
 }
 
-type stubMailServer struct{}
-
-func (stubMailServer) Archive(*Envelope)              {}
-func (stubMailServer) DeliverMail(*Peer, *Envelope)   {}
-func (stubMailServer) Deliver(*Peer, MessagesRequest) {}
-
-type mockMailServer struct {
-	mock.Mock
-}
-
-func (m *mockMailServer) Archive(env *Envelope) {
-	m.Called(env)
-}
-
-func (m *mockMailServer) DeliverMail(p *Peer, env *Envelope) {
-	m.Called(p, env)
-}
-
-func (m *mockMailServer) Deliver(p *Peer, r MessagesRequest) {
-	m.Called(p, r)
-}
-
 func TestMailserverCompletionEvent(t *testing.T) {
 	w := New(nil, nil)
 	require.NoError(t, w.Start(nil))
-	defer w.Stop()
+	defer w.Stop() // nolint: errcheck
 
 	rw1, rw2 := p2p.MsgPipe()
 	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)

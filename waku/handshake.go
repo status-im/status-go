@@ -31,30 +31,30 @@ type statusOptions struct {
 // WithDefaults adds the default values for a given peer.
 // This are not the host default values, but the default values that ought to
 // be used when receiving from an update from a peer.
-func (s statusOptions) WithDefaults() statusOptions {
-	if s.PoWRequirement == nil {
-		s.PoWRequirement = &defaultMinPoW
+func (o statusOptions) WithDefaults() statusOptions {
+	if o.PoWRequirement == nil {
+		o.PoWRequirement = &defaultMinPoW
 	}
 
-	if s.LightNodeEnabled == nil {
+	if o.LightNodeEnabled == nil {
 		lightNodeEnabled := false
-		s.LightNodeEnabled = &lightNodeEnabled
+		o.LightNodeEnabled = &lightNodeEnabled
 	}
 
-	if s.ConfirmationsEnabled == nil {
+	if o.ConfirmationsEnabled == nil {
 		confirmationsEnabled := false
-		s.ConfirmationsEnabled = &confirmationsEnabled
+		o.ConfirmationsEnabled = &confirmationsEnabled
 	}
 
-	if s.RateLimits == nil {
-		s.RateLimits = &RateLimits{}
+	if o.RateLimits == nil {
+		o.RateLimits = &RateLimits{}
 	}
 
-	if s.BloomFilter == nil {
-		s.BloomFilter = MakeFullNodeBloom()
+	if o.BloomFilter == nil {
+		o.BloomFilter = MakeFullNodeBloom()
 	}
 
-	return s
+	return o
 }
 
 var idxFieldKey = make(map[int]string)
@@ -114,7 +114,7 @@ func (o statusOptions) EncodeRLP(w io.Writer) error {
 func (o *statusOptions) DecodeRLP(s *rlp.Stream) error {
 	_, err := s.List()
 	if err != nil {
-		return fmt.Errorf("expected an outer list: %w", err)
+		return fmt.Errorf("expected an outer list: %v", err)
 	}
 
 	v := reflect.ValueOf(o)
@@ -128,11 +128,11 @@ loop:
 		case rlp.EOL:
 			break loop
 		default:
-			return fmt.Errorf("expected an inner list: %w", err)
+			return fmt.Errorf("expected an inner list: %v", err)
 		}
 		var key string
 		if err := s.Decode(&key); err != nil {
-			return fmt.Errorf("invalid key: %w", err)
+			return fmt.Errorf("invalid key: %v", err)
 		}
 		// Skip processing if a key does not exist.
 		// It might happen when there is a new peer
@@ -143,12 +143,12 @@ loop:
 			// Read the rest of the list items and dump them.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %s: %w", key, err)
+				return fmt.Errorf("failed to read the value of key %s: %v", key, err)
 			}
 			continue
 		}
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %s: %w", key, err)
+			return fmt.Errorf("failed to decode an option %s: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err

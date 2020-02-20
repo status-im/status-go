@@ -156,7 +156,7 @@ func resetParams(t *testing.T) {
 
 func initBloom(t *testing.T) {
 	masterBloomFilter = make([]byte, BloomFilterSize)
-	_, err := mrand.Read(masterBloomFilter)
+	_, err := mrand.Read(masterBloomFilter) // nolint: gosec
 	if err != nil {
 		t.Fatalf("rand failed: %s.", err)
 	}
@@ -215,7 +215,7 @@ func initializeBloomFilterMode(t *testing.T) {
 			},
 		}
 
-		go startServer(t, node.server)
+		go startServer(t, node.server) // nolint: staticcheck
 
 		nodes[i] = &node
 	}
@@ -224,9 +224,9 @@ func initializeBloomFilterMode(t *testing.T) {
 
 	for i := 0; i < NumNodes; i++ {
 		for j := 0; j < i; j++ {
-			peerNodeId := nodes[j].id
+			peerNodeID := nodes[j].id
 			address, _ := net.ResolveTCPAddr("tcp", nodes[j].server.ListenAddr)
-			peer := enode.NewV4(&peerNodeId.PublicKey, address.IP, address.Port, address.Port)
+			peer := enode.NewV4(&peerNodeID.PublicKey, address.IP, address.Port, address.Port)
 			nodes[i].server.AddPeer(peer)
 		}
 	}
@@ -570,7 +570,7 @@ func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 	w1.settings.RestrictLightClientsConn = false
 	w1.SetLightClientMode(true)
 	var pow uint64 = 123
-	var lightNodeEnabled bool = true
+	var lightNodeEnabled = true
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),

@@ -20,13 +20,13 @@ func TestEnvelopesBeingIdentical(t *testing.T) {
 	// whisper.Envelope --> waku.Envelope
 	whisperEnvelope, err := createWhisperEnvelope()
 	require.NoError(t, err)
-	wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(whisperEnvelope))
+	wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(whisperEnvelope)) // nolint: gosec
 	require.Equal(t, whisperEnvelope.Hash(), wakuEnvelope.Hash())
 
 	// waku.Envelope --> whisper.Envelope
 	wakuEnvelope, err = createWakuEnvelope()
 	require.NoError(t, err)
-	whisperEnvelope = (*whisper.Envelope)(unsafe.Pointer(wakuEnvelope))
+	whisperEnvelope = (*whisper.Envelope)(unsafe.Pointer(wakuEnvelope)) // nolint: gosec
 	require.Equal(t, wakuEnvelope.Hash(), whisperEnvelope.Hash())
 }
 

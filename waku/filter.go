@@ -57,7 +57,7 @@ func (store *MemoryMessageStore) Add(msg *ReceivedMessage) error {
 	return nil
 }
 
-// Pop returns all avaiable messages and cleans the store.
+// Pop returns all available messages and cleans the store.
 func (store *MemoryMessageStore) Pop() ([]*ReceivedMessage, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -81,7 +81,6 @@ type Filter struct {
 	id         string            // unique identifier
 
 	Messages MessageStore
-	mutex    sync.RWMutex
 }
 
 // Filters represents a collection of filters

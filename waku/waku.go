@@ -290,7 +290,7 @@ func (w *Waku) TopicInterest() []TopicType {
 	topicInterest := make([]TopicType, len(w.settings.TopicInterest))
 
 	i := 0
-	for topic, _ := range w.settings.TopicInterest {
+	for topic := range w.settings.TopicInterest {
 		topicInterest[i] = topic
 		i++
 	}
@@ -742,7 +742,7 @@ func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 // SelectKeyPair adds cryptographic identity, and makes sure
 // that it is the only private key known to the node.
 func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
 	if err != nil {
 		return err
 	}
@@ -942,14 +942,17 @@ func (w *Waku) updateSettingsForFilter(f *Filter) error {
 			return err
 		}
 	} else {
-		w.updateBloomFilter(f)
+		err := w.updateBloomFilter(f)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // updateBloomFilter recalculates the new value of bloom filter,
 // and informs the peers if necessary.
-func (w *Waku) updateBloomFilter(f *Filter) {
+func (w *Waku) updateBloomFilter(f *Filter) error {
 	aggregate := make([]byte, BloomFilterSize)
 	for _, t := range f.Topics {
 		top := BytesToTopic(t)
@@ -960,8 +963,9 @@ func (w *Waku) updateBloomFilter(f *Filter) {
 	if !BloomFilterMatch(w.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(w.BloomFilter(), aggregate)
-		w.SetBloomFilter(aggregate)
+		return w.SetBloomFilter(aggregate)
 	}
+	return nil
 }
 
 // GetFilter returns the filter by id.
@@ -1052,6 +1056,9 @@ func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 func (w *Waku) sendConfirmation(rw p2p.MsgReadWriter, data []byte, envelopeErrors []EnvelopeError) (err error) {
 	batchHash := crypto.Keccak256Hash(data)
 	err = p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
+	if err != nil {
+		return
+	}
 	err = p2p.Send(rw, batchAcknowledgedCode, batchHash) // DEPRECATED
 	return
 }
@@ -1127,13 +1134,13 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 	data, err := ioutil.ReadAll(packet.Payload)
 	if err != nil {
 		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		return fmt.Errorf("failed to read packet payload: %w", err)
+		return fmt.Errorf("failed to read packet payload: %v", err)
 	}
 
 	var envelopes []*Envelope
 	if err := rlp.DecodeBytes(data, &envelopes); err != nil {
 		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		return fmt.Errorf("invalid payload: %w", err)
+		return fmt.Errorf("invalid payload: %v", err)
 	}
 
 	envelopeErrors := make([]EnvelopeError, 0)
@@ -1161,7 +1168,7 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 	}
 
 	if w.ConfirmationsEnabled() {
-		go w.sendConfirmation(rw, data, envelopeErrors)
+		go w.sendConfirmation(rw, data, envelopeErrors) // nolint: errcheck
 	}
 
 	if trouble {
@@ -1197,7 +1204,7 @@ func (w *Waku) handleP2PMessageCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	)
 
 	if err = packet.Decode(&envelopes); err != nil {
-		return fmt.Errorf("invalid direct message payload: %w", err)
+		return fmt.Errorf("invalid direct message payload: %v", err)
 	}
 
 	for _, envelope := range envelopes {
@@ -1217,7 +1224,7 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	// Read all data as we will try to decode it possibly twice.
 	data, err := ioutil.ReadAll(packet.Payload)
 	if err != nil {
-		return fmt.Errorf("invalid p2p request messages: %w", err)
+		return fmt.Errorf("invalid p2p request messages: %v", err)
 	}
 	r := bytes.NewReader(data)
 	packet.Payload = r
@@ -1227,14 +1234,13 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	if errDepReq == nil {
 		w.mailServer.DeliverMail(p.ID(), &requestDeprecated)
 		return nil
-	} else {
-		logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 	}
+	logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 
 	// As we failed to decode the request, let's set the offset
 	// to the beginning and try decode it again.
 	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("invalid p2p request message: %w", err)
+		return fmt.Errorf("invalid p2p request message: %v", err)
 	}
 
 	var request MessagesRequest
@@ -1242,9 +1248,8 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	if errReq == nil {
 		w.mailServer.Deliver(p.ID(), request)
 		return nil
-	} else {
-		logger.Info("failed to decode p2p request message", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 	}
+	logger.Info("failed to decode p2p request message", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 
 	return errors.New("invalid p2p request message")
 }
@@ -1256,12 +1261,12 @@ func (w *Waku) handleP2PRequestCompleteCode(p *Peer, packet p2p.Msg, logger *zap
 
 	var payload []byte
 	if err := packet.Decode(&payload); err != nil {
-		return fmt.Errorf("invalid p2p request complete message: %w", err)
+		return fmt.Errorf("invalid p2p request complete message: %v", err)
 	}
 
 	event, err := CreateMailServerEvent(p.peer.ID(), payload)
 	if err != nil {
-		return fmt.Errorf("invalid p2p request complete payload: %w", err)
+		return fmt.Errorf("invalid p2p request complete payload: %v", err)
 	}
 
 	w.postP2P(*event)
@@ -1272,7 +1277,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 	var resp MultiVersionResponse
 	if err := packet.Decode(&resp); err != nil {
 		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		return fmt.Errorf("invalid response message: %w", err)
+		return fmt.Errorf("invalid response message: %v", err)
 	}
 	if resp.Version != 1 {
 		logger.Info("received unsupported version of MultiVersionResponse for messageResponseCode packet", zap.Uint("version", resp.Version))
@@ -1282,7 +1287,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 	response, err := resp.DecodeResponse1()
 	if err != nil {
 		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		return fmt.Errorf("failed to decode response message: %w", err)
+		return fmt.Errorf("failed to decode response message: %v", err)
 	}
 
 	w.envelopeFeed.Send(EnvelopeEvent{
@@ -1298,7 +1303,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
 	var batchHash common.Hash
 	if err := packet.Decode(&batchHash); err != nil {
-		return fmt.Errorf("invalid batch ack message: %w", err)
+		return fmt.Errorf("invalid batch ack message: %v", err)
 	}
 	w.envelopeFeed.Send(EnvelopeEvent{
 		Batch: batchHash,
