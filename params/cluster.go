@@ -3,7 +3,6 @@ package params
 // Define available fleets.
 const (
 	FleetUndefined = ""
-	FleetBeta      = "eth.beta"
 	FleetProd      = "eth.prod"
 	FleetStaging   = "eth.staging"
 )
