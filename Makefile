@@ -285,7 +285,7 @@ test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 canary-test: node-canary
 	# TODO: uncomment that!
-	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.beta.json
+	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
@@ -316,7 +316,7 @@ vendor:
 .PHONY: vendor
 
 update-fleet-config: ##@other Update fleets configuration from fleets.status.im
-	./_assets/ci/update-fleet-config.sh
+	./_assets/scripts/update-fleet-config.sh
 	@echo "Updating static assets..."
 	@go generate ./static
 	@echo "Done"

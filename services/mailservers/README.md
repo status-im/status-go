@@ -31,7 +31,7 @@ Stores `Mailserver` in the database.
     "name": "my mailserver",
     "address": "enode://...",
     "password": "some-pass",
-    "fleet": "beta"
+    "fleet": "prod"
 }
 ```
 

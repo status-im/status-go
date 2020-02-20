@@ -22,7 +22,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	c, err := params.NewNodeConfigWithDefaults(
 		"/some/data/path",
 		params.RopstenNetworkID,
-		params.WithFleet(params.FleetBeta),
+		params.WithFleet(params.FleetProd),
 		params.WithLES(),
 		params.WithMailserver(),
 	)
@@ -38,7 +38,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.NotEmpty(t, c.WhisperConfig.MailServerPassword)
 	// assert cluster
 	assert.Equal(t, false, c.NoDiscovery)
-	assert.Equal(t, params.FleetBeta, c.ClusterConfig.Fleet)
+	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
 	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
 	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
 	assert.NotEmpty(t, c.ClusterConfig.RendezvousNodes)

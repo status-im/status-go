@@ -30,7 +30,7 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 		ID:      "mailserver001",
 		Name:    "My Mailserver",
 		Address: "enode://...",
-		Fleet:   "beta",
+		Fleet:   "prod",
 	}
 	testMailserverWithPassword := testMailserver
 	testMailserverWithPassword.ID = "mailserver002"
