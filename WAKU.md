@@ -10,7 +10,6 @@ It doesn't yet implement the following recommended features:
 - Partial support for rate limiting
 - No support for DNS discovery to find Waku nodes
 - No support for negotiation with peer supporting multiple version
-- Exchange topic-interest packet code isn't implemented yet (WIP status-im/status-go#1853)
 
 Additionally it makes the following choices:
 - It doesn't enforce rate limit policy
