@@ -2,7 +2,7 @@
 
 *Last updated February 21, 2020*
 
-status-go client of Waku is spec compliant with [Waku spec v0.3](https://specs.vac.dev/waku.html) with the exception of:
+status-go client of Waku is spec compliant with [Waku spec v0.4](https://specs.vac.dev/waku.html) with the exception of:
 - Currently nodes with higher version don't automatically disconnect if versions are different
 
 It doesn't yet implement the following recommended features:
