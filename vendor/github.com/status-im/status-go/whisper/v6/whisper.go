@@ -301,12 +301,14 @@ func (whisper *Whisper) readBridgeLoop() {
 		case env := <-out:
 			_, err := whisper.addAndBridge(env, false, true)
 			if err != nil {
+				bridgeReceivedFailed.Inc()
 				log.Warn(
 					"failed to add a bridged envelope",
 					"ID", env.Hash().Bytes(),
 					"err", err,
 				)
 			} else {
+				bridgeReceivedSucceed.Inc()
 				log.Debug(
 					"bridged envelope successfully",
 					"ID", env.Hash().Bytes(),
@@ -1375,8 +1377,10 @@ func (whisper *Whisper) addAndBridge(envelope *Envelope, isP2P bool, bridged boo
 		// In particular, if a node is a lightweight node,
 		// it should not bridge any envelopes.
 		if !isP2P && !bridged && whisper.bridge != nil {
+			log.Debug("bridging envelope from Whisper", "hash", envelope.Hash().Hex())
 			_, in := whisper.bridge.Pipe()
 			in <- envelope
+			bridgeSent.Inc()
 		}
 	}
 	return true, nil
