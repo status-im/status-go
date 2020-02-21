@@ -187,6 +187,10 @@ type WakuConfig struct {
 	// in order to drop a peer.
 	// If equal to 0, the peers are never dropped.
 	RateLimitTolerance int64
+
+	// BloomFilterMode tells us whether we should be sending a bloom
+	// filter rather than TopicInterest
+	BloomFilterMode bool
 }
 
 // IncentivisationConfig holds incentivisation-related configuration

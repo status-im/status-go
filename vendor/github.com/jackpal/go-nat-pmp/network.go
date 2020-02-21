@@ -2,6 +2,7 @@ package natpmp
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"time"
 )
@@ -15,7 +16,7 @@ type network struct {
 	gateway net.IP
 }
 
-func (n *network) call(msg []byte, timeout time.Duration) (result []byte, err error) {
+func (n *network) call(msg []byte) (result []byte, err error) {
 	var server net.UDPAddr
 	server.IP = n.gateway
 	server.Port = nAT_PMP_PORT
@@ -28,18 +29,12 @@ func (n *network) call(msg []byte, timeout time.Duration) (result []byte, err er
 	// 16 bytes is the maximum result size.
 	result = make([]byte, 16)
 
-	var finalTimeout time.Time
-	if timeout != 0 {
-		finalTimeout = time.Now().Add(timeout)
-	}
-
 	needNewDeadline := true
 
 	var tries uint
-	for tries = 0; (tries < nAT_TRIES && finalTimeout.IsZero()) || time.Now().Before(finalTimeout); {
+	for tries = 0; tries < nAT_TRIES; {
 		if needNewDeadline {
-			nextDeadline := time.Now().Add((nAT_INITIAL_MS << tries) * time.Millisecond)
-			err = conn.SetDeadline(minTime(nextDeadline, finalTimeout))
+			err = conn.SetDeadline(time.Now().Add((nAT_INITIAL_MS << tries) * time.Millisecond))
 			if err != nil {
 				return
 			}
@@ -61,6 +56,7 @@ func (n *network) call(msg []byte, timeout time.Duration) (result []byte, err er
 			return
 		}
 		if !remoteAddr.IP.Equal(n.gateway) {
+			log.Printf("Ignoring packet because IPs differ:", remoteAddr, n.gateway)
 			// Ignore this packet.
 			// Continue without increasing retransmission timeout or deadline.
 			continue
@@ -73,17 +69,4 @@ func (n *network) call(msg []byte, timeout time.Duration) (result []byte, err er
 	}
 	err = fmt.Errorf("Timed out trying to contact gateway")
 	return
-}
-
-func minTime(a, b time.Time) time.Time {
-	if a.IsZero() {
-		return b
-	}
-	if b.IsZero() {
-		return a
-	}
-	if a.Before(b) {
-		return a
-	}
-	return b
 }

@@ -100,7 +100,7 @@ func TestPeerLimiterHandler(t *testing.T) {
 		close(done)
 	}()
 
-	for i := 0; i < count; i += 1 {
+	for i := 0; i < count; i++ {
 		err := rw1.WriteMsg(p2p.Msg{Code: 101})
 		require.NoError(t, err)
 	}
@@ -140,7 +140,7 @@ func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
 		close(done)
 	}()
 
-	for i := 0; i < count; i += 1 {
+	for i := 0; i < count; i++ {
 		err := rw1.WriteMsg(p2p.Msg{Code: 101})
 		require.NoError(t, err)
 	}
@@ -171,5 +171,5 @@ type mockRateLimiterHandler struct {
 	exceedIPLimit   int
 }
 
-func (m *mockRateLimiterHandler) ExceedPeerLimit() error { m.exceedPeerLimit += 1; return nil }
-func (m *mockRateLimiterHandler) ExceedIPLimit() error   { m.exceedIPLimit += 1; return nil }
+func (m *mockRateLimiterHandler) ExceedPeerLimit() error { m.exceedPeerLimit++; return nil }
+func (m *mockRateLimiterHandler) ExceedIPLimit() error   { m.exceedIPLimit++; return nil }

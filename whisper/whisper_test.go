@@ -274,7 +274,6 @@ func TestWhisperSymKeyManagement(t *testing.T) {
 	var err error
 	var k1, k2 []byte
 	w := New(&DefaultConfig)
-	id1 := string("arbitrary-string-1")
 	id2 := string("arbitrary-string-2")
 
 	id1, err = w.GenerateSymKey()

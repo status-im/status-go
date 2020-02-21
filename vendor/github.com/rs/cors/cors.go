@@ -5,8 +5,8 @@ as defined by http://www.w3.org/TR/cors/
 You can configure it by passing an option struct to cors.New:
 
     c := cors.New(cors.Options{
-        AllowedOrigins:   []string{"foo.com"},
-        AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodDelete},
+        AllowedOrigins: []string{"foo.com"},
+        AllowedMethods: []string{"GET", "POST", "DELETE"},
         AllowCredentials: true,
     })
 
@@ -69,15 +69,10 @@ type Options struct {
 	Debug bool
 }
 
-// Logger generic interface for logger
-type Logger interface {
-	Printf(string, ...interface{})
-}
-
 // Cors http handler
 type Cors struct {
 	// Debug logger
-	Log Logger
+	Log *log.Logger
 	// Normalized list of plain allowed origins
 	allowedOrigins []string
 	// List of allowed origins containing wildcards
@@ -111,7 +106,7 @@ func New(options Options) *Cors {
 		maxAge:                 options.MaxAge,
 		optionPassthrough:      options.OptionsPassthrough,
 	}
-	if options.Debug && c.Log == nil {
+	if options.Debug {
 		c.Log = log.New(os.Stdout, "[cors] ", log.LstdFlags)
 	}
 
@@ -166,7 +161,7 @@ func New(options Options) *Cors {
 	// Allowed Methods
 	if len(options.AllowedMethods) == 0 {
 		// Default is spec's "simple" methods
-		c.allowedMethods = []string{http.MethodGet, http.MethodPost, http.MethodHead}
+		c.allowedMethods = []string{"GET", "POST", "HEAD"}
 	} else {
 		c.allowedMethods = convert(options.AllowedMethods, strings.ToUpper)
 	}
@@ -183,15 +178,8 @@ func Default() *Cors {
 // origins with all standard methods with any header and credentials.
 func AllowAll() *Cors {
 	return New(Options{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{
-			http.MethodHead,
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodPatch,
-			http.MethodDelete,
-		},
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"HEAD", "GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: false,
 	})
@@ -316,6 +304,10 @@ func (c *Cors) handleActualRequest(w http.ResponseWriter, r *http.Request) {
 	headers := w.Header()
 	origin := r.Header.Get("Origin")
 
+	if r.Method == http.MethodOptions {
+		c.logf("  Actual request no headers added: method == %s", r.Method)
+		return
+	}
 	// Always set Vary, see https://github.com/rs/cors/issues/10
 	headers.Add("Vary", "Origin")
 	if origin == "" {
@@ -350,7 +342,7 @@ func (c *Cors) handleActualRequest(w http.ResponseWriter, r *http.Request) {
 	c.logf("  Actual response added headers: %v", headers)
 }
 
-// convenience method. checks if a logger is set.
+// convenience method. checks if debugging is turned on before printing
 func (c *Cors) logf(format string, a ...interface{}) {
 	if c.Log != nil {
 		c.Log.Printf(format, a...)

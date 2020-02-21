@@ -79,7 +79,7 @@ func TestMessageByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
-	chatID := "super-chat"
+	chatID := testPublicChatID
 	count := 1000
 	pageSize := 50
 
@@ -162,7 +162,7 @@ func TestMessageReplies(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
-	chatID := "super-chat"
+	chatID := testPublicChatID
 	message1 := &Message{
 		ID:          "id-1",
 		LocalChatID: chatID,
@@ -217,7 +217,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
-	chatID := "super-chat"
+	chatID := testPublicChatID
 	clockValues := []uint64{10, 10, 9, 9, 9, 11, 12, 11, 100000, 6, 4, 5, 5, 5, 5}
 	count := len(clockValues)
 	pageSize := 2

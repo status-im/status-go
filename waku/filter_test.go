@@ -38,11 +38,6 @@ func InitSingleTest() {
 	mrand.Seed(seed)
 }
 
-func InitDebugTest(i int64) {
-	seed = i
-	mrand.Seed(seed)
-}
-
 type FilterTestCase struct {
 	f      *Filter
 	id     string
@@ -58,7 +53,7 @@ func generateFilter(t *testing.T, symmetric bool) (*Filter, error) {
 	f.Topics = make([][]byte, topicNum)
 	for i := 0; i < topicNum; i++ {
 		f.Topics[i] = make([]byte, 4)
-		mrand.Read(f.Topics[i])
+		mrand.Read(f.Topics[i]) // nolint: gosec
 		f.Topics[i][0] = 0x01
 	}
 
@@ -71,7 +66,7 @@ func generateFilter(t *testing.T, symmetric bool) (*Filter, error) {
 
 	if symmetric {
 		f.KeySym = make([]byte, aesKeyLength)
-		mrand.Read(f.KeySym)
+		mrand.Read(f.KeySym) // nolint: gosec
 		f.SymKeyHash = crypto.Keccak256Hash(f.KeySym)
 	} else {
 		f.KeyAsym, err = crypto.GenerateKey()
@@ -90,7 +85,7 @@ func generateTestCases(t *testing.T, SizeTestFilters int) []FilterTestCase {
 	for i := 0; i < SizeTestFilters; i++ {
 		f, _ := generateFilter(t, true)
 		cases[i].f = f
-		cases[i].alive = mrand.Int()&int(1) == 0
+		cases[i].alive = mrand.Int()&int(1) == 0 // nolint: gosec
 	}
 	return cases
 }
@@ -311,20 +306,20 @@ func TestMatchEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err := msg.Wrap(params, time.Now())
+	_, err = msg.Wrap(params, time.Now())
 	if err != nil {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
 	// encrypt symmetrically
-	i := mrand.Int() % 4
+	i := mrand.Int() % 4 // nolint: gosec
 	fsym.Topics[i] = params.Topic[:]
 	fasym.Topics[i] = params.Topic[:]
 	msg, err = NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err = msg.Wrap(params, time.Now())
+	env, err := msg.Wrap(params, time.Now())
 	if err != nil {
 		t.Fatalf("failed Wrap() with seed %d: %s.", seed, err)
 	}
@@ -710,7 +705,10 @@ func TestWatchers(t *testing.T) {
 	total = 0
 	last := NumFilters - 1
 	tst[last].f = clone
-	filters.Install(clone)
+	if _, err := filters.Install(clone); err != nil {
+		t.Fatal("failed to install filter")
+	}
+
 	for i = 0; i < NumFilters; i++ {
 		tst[i].msgCnt = 0
 		count[i] = 0

@@ -11,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+var defaultMinPoW = math.Float64bits(0.001)
+
 // statusOptions defines additional information shared between peers
 // during the handshake.
 // There might be more options provided then fields in statusOptions
@@ -18,12 +20,41 @@ import (
 // In the case of RLP, options should be serialized to an array of tuples
 // where the first item is a field name and the second is a RLP-serialized value.
 type statusOptions struct {
-	PoWRequirement       uint64      `rlp:"key=0"` // RLP does not support float64 natively
+	PoWRequirement       *uint64     `rlp:"key=0"` // RLP does not support float64 natively
 	BloomFilter          []byte      `rlp:"key=1"`
-	LightNodeEnabled     bool        `rlp:"key=2"`
-	ConfirmationsEnabled bool        `rlp:"key=3"`
-	RateLimits           RateLimits  `rlp:"key=4"`
+	LightNodeEnabled     *bool       `rlp:"key=2"`
+	ConfirmationsEnabled *bool       `rlp:"key=3"`
+	RateLimits           *RateLimits `rlp:"key=4"`
 	TopicInterest        []TopicType `rlp:"key=5"`
+}
+
+// WithDefaults adds the default values for a given peer.
+// This are not the host default values, but the default values that ought to
+// be used when receiving from an update from a peer.
+func (o statusOptions) WithDefaults() statusOptions {
+	if o.PoWRequirement == nil {
+		o.PoWRequirement = &defaultMinPoW
+	}
+
+	if o.LightNodeEnabled == nil {
+		lightNodeEnabled := false
+		o.LightNodeEnabled = &lightNodeEnabled
+	}
+
+	if o.ConfirmationsEnabled == nil {
+		confirmationsEnabled := false
+		o.ConfirmationsEnabled = &confirmationsEnabled
+	}
+
+	if o.RateLimits == nil {
+		o.RateLimits = &RateLimits{}
+	}
+
+	if o.BloomFilter == nil {
+		o.BloomFilter = MakeFullNodeBloom()
+	}
+
+	return o
 }
 
 var idxFieldKey = make(map[int]string)
@@ -48,24 +79,34 @@ var keyFieldIdx = func() map[string]int {
 	return result
 }()
 
-func (o statusOptions) PoWRequirementF() float64 {
-	return math.Float64frombits(o.PoWRequirement)
+func (o statusOptions) PoWRequirementF() *float64 {
+	if o.PoWRequirement == nil {
+		return nil
+	}
+	result := math.Float64frombits(*o.PoWRequirement)
+	return &result
 }
 
 func (o *statusOptions) SetPoWRequirementFromF(val float64) {
-	o.PoWRequirement = math.Float64bits(val)
+	requirement := math.Float64bits(val)
+	o.PoWRequirement = &requirement
 }
 
 func (o statusOptions) EncodeRLP(w io.Writer) error {
 	v := reflect.ValueOf(o)
-	optionsList := make([]interface{}, 0, v.NumField())
+	var optionsList []interface{}
 	for i := 0; i < v.NumField(); i++ {
-		value := v.Field(i).Interface()
-		key, ok := idxFieldKey[i]
-		if !ok {
-			continue
+		field := v.Field(i)
+		if !field.IsNil() {
+			value := field.Interface()
+			key, ok := idxFieldKey[i]
+			if !ok {
+				continue
+			}
+			if value != nil {
+				optionsList = append(optionsList, []interface{}{key, value})
+			}
 		}
-		optionsList = append(optionsList, []interface{}{key, value})
 	}
 	return rlp.Encode(w, optionsList)
 }
@@ -73,7 +114,7 @@ func (o statusOptions) EncodeRLP(w io.Writer) error {
 func (o *statusOptions) DecodeRLP(s *rlp.Stream) error {
 	_, err := s.List()
 	if err != nil {
-		return fmt.Errorf("expected an outer list: %w", err)
+		return fmt.Errorf("expected an outer list: %v", err)
 	}
 
 	v := reflect.ValueOf(o)
@@ -87,11 +128,11 @@ loop:
 		case rlp.EOL:
 			break loop
 		default:
-			return fmt.Errorf("expected an inner list: %w", err)
+			return fmt.Errorf("expected an inner list: %v", err)
 		}
 		var key string
 		if err := s.Decode(&key); err != nil {
-			return fmt.Errorf("invalid key: %w", err)
+			return fmt.Errorf("invalid key: %v", err)
 		}
 		// Skip processing if a key does not exist.
 		// It might happen when there is a new peer
@@ -102,12 +143,12 @@ loop:
 			// Read the rest of the list items and dump them.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %s: %w", key, err)
+				return fmt.Errorf("failed to read the value of key %s: %v", key, err)
 			}
 			continue
 		}
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %s: %w", key, err)
+			return fmt.Errorf("failed to decode an option %s: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err

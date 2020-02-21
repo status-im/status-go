@@ -53,7 +53,7 @@ func OpenWithIter(path, key string, kdfIter int) (*sql.DB, error) {
 
 func open(path string, key string, kdfIter int) (*sql.DB, error) {
 	if path != inMemoryPath {
-		_, err := os.OpenFile(path, os.O_CREATE, 0644)
+		_, err := os.OpenFile(path, os.O_CREATE, 0600)
 		if err != nil {
 			return nil, err
 		}

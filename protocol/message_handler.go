@@ -14,6 +14,12 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
+const (
+	transactionRequestDeclinedMessage           = "Transaction request declined"
+	requestAddressForTransactionAcceptedMessage = "Request address for transaction accepted"
+	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
+)
+
 type MessageHandler struct {
 	identity    *ecdsa.PrivateKey
 	persistence *sqlitePersistence
@@ -434,7 +440,7 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 
 	initialMessage.Clock = command.Clock
 	initialMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
-	initialMessage.Text = "Request address for transaction accepted"
+	initialMessage.Text = requestAddressForTransactionAcceptedMessage
 	initialMessage.CommandParameters.Address = command.Address
 	initialMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionAccepted
 
@@ -503,7 +509,7 @@ func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState 
 
 	oldMessage.Clock = command.Clock
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
-	oldMessage.Text = "Request address for transaction declined"
+	oldMessage.Text = requestAddressForTransactionDeclinedMessage
 	oldMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionDeclined
 
 	// Hide previous message
@@ -543,7 +549,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 
 	oldMessage.Clock = command.Clock
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
-	oldMessage.Text = "Transaction request declined"
+	oldMessage.Text = transactionRequestDeclinedMessage
 	oldMessage.CommandParameters.CommandState = CommandStateRequestTransactionDeclined
 
 	// Hide previous message

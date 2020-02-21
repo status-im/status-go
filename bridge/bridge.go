@@ -66,7 +66,7 @@ func (b *Bridge) Start() {
 			case <-b.cancel:
 				return
 			case env := <-b.wakuIn:
-				shhEnvelope := (*whisper.Envelope)(unsafe.Pointer(env))
+				shhEnvelope := (*whisper.Envelope)(unsafe.Pointer(env)) // nolint: gosec
 				b.logger.Info("received whisper envelope from waku", zap.Any("envelope", shhEnvelope))
 				b.whisperOut <- shhEnvelope
 			}
@@ -81,7 +81,7 @@ func (b *Bridge) Start() {
 			case <-b.cancel:
 				return
 			case env := <-b.whisperIn:
-				wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(env))
+				wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(env)) // nolint: gosec
 				b.logger.Info("received whisper envelope from waku", zap.Any("envelope", wakuEnvelope))
 				b.wakuOut <- wakuEnvelope
 			}

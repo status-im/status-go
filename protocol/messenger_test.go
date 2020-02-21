@@ -30,6 +30,16 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
+const (
+	testPK              = "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
+	testPublicChatID    = "super-chat"
+	testContract        = "0x314159265dd8dbb310642f98f50c066173c1259b"
+	testValue           = "2000"
+	testTransactionHash = "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	testIdenticon       = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
+	testAlias           = "Concrete Lavender Xiphias"
+)
+
 func TestMessengerSuite(t *testing.T) {
 	suite.Run(t, new(MessengerSuite))
 }
@@ -970,7 +980,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 
 	s.Require().Equal(expectedChat, actualChat)
 
-	chat.Name = "updated-name"
+	chat.Name = "updated-name-1"
 	s.Require().NoError(s.m.SaveChat(&chat))
 	updatedChats := s.m.Chats()
 	s.Require().Equal(1, len(updatedChats))
@@ -982,10 +992,9 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 }
 
 func (s *MessengerSuite) TestChatPersistenceOneToOne() {
-	pkStr := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
 	chat := Chat{
-		ID:                    pkStr,
-		Name:                  pkStr,
+		ID:                    testPK,
+		Name:                  testPK,
 		Color:                 "#fffff",
 		Active:                true,
 		ChatType:              ChatTypeOneToOne,
@@ -995,7 +1004,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		UnviewedMessagesCount: 40,
 		LastMessage:           []byte("test"),
 	}
-	publicKeyBytes, err := hex.DecodeString(pkStr[2:])
+	publicKeyBytes, err := hex.DecodeString(testPK[2:])
 	s.Require().NoError(err)
 
 	pk, err := crypto.UnmarshalPubkey(publicKeyBytes)
@@ -1088,10 +1097,8 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 }
 
 func (s *MessengerSuite) TestBlockContact() {
-	pk := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
-
 	contact := Contact{
-		ID:          pk,
+		ID:          testPK,
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
@@ -1278,7 +1285,7 @@ func (s *MessengerSuite) TestBlockContact() {
 
 func (s *MessengerSuite) TestContactPersistence() {
 	contact := Contact{
-		ID: "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1",
+		ID: testPK,
 
 		Name:        "contact-name",
 		Photo:       "contact-photo",
@@ -1305,13 +1312,13 @@ func (s *MessengerSuite) TestContactPersistence() {
 
 	actualContact := savedContacts[0]
 	expectedContact := &contact
-	expectedContact.Alias = "Concrete Lavender Xiphias"
-	expectedContact.Identicon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
+	expectedContact.Alias = testAlias
+	expectedContact.Identicon = testIdenticon
 	s.Require().Equal(expectedContact, actualContact)
 }
 
 func (s *MessengerSuite) TestContactPersistenceUpdate() {
-	contactID := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
+	contactID := testPK
 
 	contact := Contact{
 		ID:          contactID,
@@ -1341,12 +1348,12 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 	actualContact := savedContacts[0]
 	expectedContact := &contact
 
-	expectedContact.Alias = "Concrete Lavender Xiphias"
-	expectedContact.Identicon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
+	expectedContact.Alias = testAlias
+	expectedContact.Identicon = testIdenticon
 
 	s.Require().Equal(expectedContact, actualContact)
 
-	contact.Name = "updated-name"
+	contact.Name = "updated-name-2"
 	s.Require().NoError(s.m.SaveContact(&contact))
 	updatedContact := s.m.Contacts()
 	s.Require().Equal(1, len(updatedContact))
@@ -1363,7 +1370,7 @@ func (s *MessengerSuite) TestSharedSecretHandler() {
 }
 
 func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
-	members := []string{"0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"}
+	members := []string{testPK}
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", members)
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
@@ -1401,8 +1408,8 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 }
 
 func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
-	value := "0.01"
-	contract := "some-contract"
+	value := testValue
+	contract := testContract
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
@@ -1495,8 +1502,8 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 }
 
 func (s *MessengerSuite) TestSendEthTransaction() {
-	value := "2000"
-	contract := "some-contract"
+	value := testValue
+	contract := testContract
 
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1508,7 +1515,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	err := s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
-	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	transactionHash := testTransactionHash
 	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
 	s.Require().NoError(err)
 
@@ -1596,8 +1603,8 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 }
 
 func (s *MessengerSuite) TestSendTokenTransaction() {
-	value := "2000"
-	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	value := testValue
+	contract := testContract
 
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1609,7 +1616,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	err := s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
-	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	transactionHash := testTransactionHash
 	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
 	s.Require().NoError(err)
 
@@ -1697,8 +1704,8 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 }
 
 func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
-	value := "0.01"
-	contract := "some-contract"
+	value := testValue
+	contract := testContract
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
@@ -1793,8 +1800,8 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 }
 
 func (s *MessengerSuite) TestDeclineRequestTransaction() {
-	value := "2000"
-	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	value := testValue
+	contract := testContract
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 	theirMessenger := s.newMessenger(s.shh)
@@ -1886,8 +1893,8 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 }
 
 func (s *MessengerSuite) TestRequestTransaction() {
-	value := "2000"
-	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	value := testValue
+	contract := testContract
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 	theirMessenger := s.newMessenger(s.shh)

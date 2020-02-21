@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"runtime"
 	"sync"
 	"time"
@@ -56,15 +55,18 @@ type Bridge interface {
 }
 
 type settings struct {
-	MaxMsgSize               uint32  // Maximal message length allowed by the waku node
-	EnableConfirmations      bool    // Enable sending message confirmations
-	MinPow                   float64 // Minimal PoW required by the waku node
-	MinPowTolerance          float64 // Minimal PoW tolerated by the waku node for a limited time
-	BloomFilter              []byte  // Bloom filter for topics of interest for this node
-	BloomFilterTolerance     []byte  // Bloom filter tolerated by the waku node for a limited time
-	LightClient              bool    // Light client mode enabled does not forward messages
-	RestrictLightClientsConn bool    // Restrict connection between two light clients
-	SyncAllowance            int     // Maximum time in seconds allowed to process the waku-related messages
+	MaxMsgSize               uint32             // Maximal message length allowed by the waku node
+	EnableConfirmations      bool               // Enable sending message confirmations
+	MinPow                   float64            // Minimal PoW required by the waku node
+	MinPowTolerance          float64            // Minimal PoW tolerated by the waku node for a limited time
+	BloomFilter              []byte             // Bloom filter for topics of interest for this node
+	BloomFilterTolerance     []byte             // Bloom filter tolerated by the waku node for a limited time
+	TopicInterest            map[TopicType]bool // Topic interest for this node
+	TopicInterestTolerance   map[TopicType]bool // Topic interest tolerated by the waku node for a limited time
+	BloomFilterMode          bool               // Whether we should match against bloom-filter only
+	LightClient              bool               // Light client mode enabled does not forward messages
+	RestrictLightClientsConn bool               // Restrict connection between two light clients
+	SyncAllowance            int                // Maximum time in seconds allowed to process the waku-related messages
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -136,6 +138,7 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 		MinPowTolerance:          cfg.MinimumAcceptedPoW,
 		EnableConfirmations:      cfg.EnableConfirmations,
 		LightClient:              cfg.LightClient,
+		BloomFilterMode:          cfg.BloomFilterMode,
 		RestrictLightClientsConn: cfg.RestrictLightClientsConn,
 		SyncAllowance:            DefaultSyncAllowance,
 	}
@@ -192,10 +195,14 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 	if tolerate {
 		go func() {
 			// allow some time before all the peers have processed the notification
-			time.Sleep(time.Duration(w.settings.SyncAllowance) * time.Second)
-			w.settingsMu.Lock()
-			w.settings.MinPowTolerance = val
-			w.settingsMu.Unlock()
+			select {
+			case <-w.quit:
+				return
+			case <-time.After(time.Duration(w.settings.SyncAllowance) * time.Second):
+				w.settingsMu.Lock()
+				w.settings.MinPowTolerance = val
+				w.settingsMu.Unlock()
+			}
 		}()
 	}
 
@@ -231,6 +238,13 @@ func (w *Waku) BloomFilterTolerance() []byte {
 	return w.settings.BloomFilterTolerance
 }
 
+// BloomFilterMode returns whether the node is running in bloom filter mode
+func (w *Waku) BloomFilterMode() bool {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	return w.settings.BloomFilterMode
+}
+
 // SetBloomFilter sets the new bloom filter
 func (w *Waku) SetBloomFilter(bloom []byte) error {
 	if len(bloom) != BloomFilterSize {
@@ -242,15 +256,90 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 
 	w.settingsMu.Lock()
 	w.settings.BloomFilter = b
+	// Setting bloom filter reset topic interest
+	w.settings.TopicInterest = nil
 	w.settingsMu.Unlock()
 	w.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
-		time.Sleep(time.Duration(w.settings.SyncAllowance) * time.Second)
-		w.settingsMu.Lock()
-		w.settings.BloomFilterTolerance = b
-		w.settingsMu.Unlock()
+		select {
+		case <-w.quit:
+			return
+		case <-time.After(time.Duration(w.settings.SyncAllowance) * time.Second):
+			w.settingsMu.Lock()
+			w.settings.BloomFilterTolerance = b
+			w.settingsMu.Unlock()
+		}
+
+	}()
+
+	return nil
+}
+
+// TopicInterest returns the all the topics of interest.
+// The nodes are required to send only messages that match the advertised topics.
+// If a message does not match the topic-interest, it will tantamount to spam, and the peer will
+// be disconnected.
+func (w *Waku) TopicInterest() []TopicType {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	if w.settings.TopicInterest == nil {
+		return nil
+	}
+	topicInterest := make([]TopicType, len(w.settings.TopicInterest))
+
+	i := 0
+	for topic := range w.settings.TopicInterest {
+		topicInterest[i] = topic
+		i++
+	}
+	return topicInterest
+}
+
+// updateTopicInterest adds a new topic interest
+// and informs the peers
+func (w *Waku) updateTopicInterest(f *Filter) error {
+	newTopicInterest := w.TopicInterest()
+	for _, t := range f.Topics {
+		top := BytesToTopic(t)
+		newTopicInterest = append(newTopicInterest, top)
+	}
+
+	return w.SetTopicInterest(newTopicInterest)
+}
+
+// SetTopicInterest sets the new topicInterest
+func (w *Waku) SetTopicInterest(topicInterest []TopicType) error {
+	var topicInterestMap map[TopicType]bool
+	if len(topicInterest) > MaxTopicInterest {
+		return fmt.Errorf("invalid topic interest: %d", len(topicInterest))
+	}
+
+	if topicInterest != nil {
+		topicInterestMap = make(map[TopicType]bool, len(topicInterest))
+		for _, topic := range topicInterest {
+			topicInterestMap[topic] = true
+		}
+	}
+
+	w.settingsMu.Lock()
+	w.settings.TopicInterest = topicInterestMap
+	// Setting topic interest resets bloom filter
+	w.settings.BloomFilter = nil
+	w.settingsMu.Unlock()
+	w.notifyPeersAboutTopicInterestChange(topicInterest)
+
+	go func() {
+		// allow some time before all the peers have processed the notification
+		select {
+		case <-w.quit:
+			return
+		case <-time.After(time.Duration(w.settings.SyncAllowance) * time.Second):
+			w.settingsMu.Lock()
+			w.settings.TopicInterestTolerance = topicInterestMap
+			w.settingsMu.Unlock()
+		}
 	}()
 
 	return nil
@@ -423,7 +512,21 @@ func (w *Waku) notifyPeersAboutBloomFilterChange(bloom []byte) {
 			err = p.notifyAboutBloomFilterChange(bloom)
 		}
 		if err != nil {
-			w.logger.Warn("failed to notify peer about new pow requirement", zap.Binary("peer", p.ID()), zap.Error(err))
+			w.logger.Warn("failed to notify peer about new bloom filter change", zap.Binary("peer", p.ID()), zap.Error(err))
+		}
+	}
+}
+
+func (w *Waku) notifyPeersAboutTopicInterestChange(topicInterest []TopicType) {
+	arr := w.getPeers()
+	for _, p := range arr {
+		err := p.notifyAboutTopicInterestChange(topicInterest)
+		if err != nil {
+			// allow one retry
+			err = p.notifyAboutTopicInterestChange(topicInterest)
+		}
+		if err != nil {
+			w.logger.Warn("failed to notify peer about new topic interest", zap.Binary("peer", p.ID()), zap.Error(err))
 		}
 	}
 }
@@ -639,7 +742,7 @@ func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 // SelectKeyPair adds cryptographic identity, and makes sure
 // that it is the only private key known to the node.
 func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
 	if err != nil {
 		return err
 	}
@@ -816,15 +919,40 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 // and subsequent storing of incoming messages.
 func (w *Waku) Subscribe(f *Filter) (string, error) {
 	s, err := w.filters.Install(f)
-	if err == nil {
-		w.updateBloomFilter(f)
+	if err != nil {
+		return s, err
 	}
-	return s, err
+
+	err = w.updateSettingsForFilter(f)
+	if err != nil {
+		w.filters.Uninstall(s)
+		return s, err
+	}
+	return s, nil
+}
+
+func (w *Waku) updateSettingsForFilter(f *Filter) error {
+	w.settingsMu.RLock()
+	topicInterestMode := !w.settings.BloomFilterMode
+	w.settingsMu.RUnlock()
+
+	if topicInterestMode {
+		err := w.updateTopicInterest(f)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := w.updateBloomFilter(f)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // updateBloomFilter recalculates the new value of bloom filter,
 // and informs the peers if necessary.
-func (w *Waku) updateBloomFilter(f *Filter) {
+func (w *Waku) updateBloomFilter(f *Filter) error {
 	aggregate := make([]byte, BloomFilterSize)
 	for _, t := range f.Topics {
 		top := BytesToTopic(t)
@@ -835,8 +963,9 @@ func (w *Waku) updateBloomFilter(f *Filter) {
 	if !BloomFilterMatch(w.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(w.BloomFilter(), aggregate)
-		w.SetBloomFilter(aggregate)
+		return w.SetBloomFilter(aggregate)
 	}
+	return nil
 }
 
 // GetFilter returns the filter by id.
@@ -845,6 +974,11 @@ func (w *Waku) GetFilter(id string) *Filter {
 }
 
 // Unsubscribe removes an installed message handler.
+// TODO: This does not seem to update the bloom filter, nor topic-interest
+// Note that the filter/topic-interest needs to take into account that there
+// might be filters with duplicated topics, so it's not just a matter of removing
+// from the map, in the topic-interest case, while the bloom filter might need to
+// be rebuilt from scratch
 func (w *Waku) Unsubscribe(id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
@@ -922,6 +1056,9 @@ func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 func (w *Waku) sendConfirmation(rw p2p.MsgReadWriter, data []byte, envelopeErrors []EnvelopeError) (err error) {
 	batchHash := crypto.Keccak256Hash(data)
 	err = p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
+	if err != nil {
+		return
+	}
 	err = p2p.Send(rw, batchAcknowledgedCode, batchHash) // DEPRECATED
 	return
 }
@@ -960,19 +1097,10 @@ func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				logger.Warn("failed to handle batchAcknowledgedCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
 				return err
 			}
-		case powRequirementCode:
-			if err := w.handlePowRequirementCode(p, packet, logger); err != nil {
-				logger.Warn("failed to handle powRequirementCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
+		case statusUpdateCode:
+			if err := w.handleStatusUpdateCode(p, packet, logger); err != nil {
+				logger.Warn("failed to decode status update message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
 				return err
-			}
-		case bloomFilterExCode:
-			if err := w.handleBloomFilterExCode(p, packet, logger); err != nil {
-				logger.Warn("failed to decode bloom filter exchange message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case rateLimitingCode:
-			if err := w.handleRateLimitingCode(p, packet, logger); err != nil {
-				logger.Warn("failed to decode rate limits, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
 			}
 		case p2pMessageCode:
 			if err := w.handleP2PMessageCode(p, packet, logger); err != nil {
@@ -1006,13 +1134,13 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 	data, err := ioutil.ReadAll(packet.Payload)
 	if err != nil {
 		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		return fmt.Errorf("failed to read packet payload: %w", err)
+		return fmt.Errorf("failed to read packet payload: %v", err)
 	}
 
 	var envelopes []*Envelope
 	if err := rlp.DecodeBytes(data, &envelopes); err != nil {
 		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		return fmt.Errorf("invalid payload: %w", err)
+		return fmt.Errorf("invalid payload: %v", err)
 	}
 
 	envelopeErrors := make([]EnvelopeError, 0)
@@ -1040,7 +1168,7 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 	}
 
 	if w.ConfirmationsEnabled() {
-		go w.sendConfirmation(rw, data, envelopeErrors)
+		go w.sendConfirmation(rw, data, envelopeErrors) // nolint: errcheck
 	}
 
 	if trouble {
@@ -1049,45 +1177,16 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 	return nil
 }
 
-func (w *Waku) handlePowRequirementCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-	i, err := s.Uint()
+func (w *Waku) handleStatusUpdateCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
+	var statusOptions statusOptions
+	err := packet.Decode(&statusOptions)
 	if err != nil {
-		envelopesRejectedCounter.WithLabelValues("invalid_pow_req").Inc()
-		return fmt.Errorf("invalid powRequirementCode message: %w", err)
-	}
-	f := math.Float64frombits(i)
-	if math.IsInf(f, 0) || math.IsNaN(f) || f < 0.0 {
-		envelopesRejectedCounter.WithLabelValues("invalid_pow_req").Inc()
-		return errors.New("invalid value in powRequirementCode message")
-	}
-	p.powRequirement = f
-	return nil
-}
-
-func (w *Waku) handleBloomFilterExCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	var bloom []byte
-	err := packet.Decode(&bloom)
-	if err == nil && len(bloom) != BloomFilterSize {
-		err = fmt.Errorf("wrong bloom filter size %d", len(bloom))
-	}
-	if err != nil {
-		envelopesRejectedCounter.WithLabelValues("invalid_bloom").Inc()
-		return errors.New("invalid bloom filter exchange message")
+		logger.Error("failed to decode status-options", zap.Error(err))
+		envelopesRejectedCounter.WithLabelValues("invalid_settings_changed").Inc()
+		return err
 	}
 
-	p.setBloomFilter(bloom)
-	return nil
-}
-
-func (w *Waku) handleRateLimitingCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	var rateLimits RateLimits
-	if err := packet.Decode(&rateLimits); err != nil {
-		logger.Warn("invalid rate limits information", zap.Binary("peerID", p.peer.ID().Bytes()), zap.Error(err))
-		return errors.New("invalid rate limits exchange message")
-	}
-	p.setRateLimits(rateLimits)
-	return nil
+	return p.setOptions(statusOptions)
 }
 
 func (w *Waku) handleP2PMessageCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
@@ -1105,7 +1204,7 @@ func (w *Waku) handleP2PMessageCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	)
 
 	if err = packet.Decode(&envelopes); err != nil {
-		return fmt.Errorf("invalid direct message payload: %w", err)
+		return fmt.Errorf("invalid direct message payload: %v", err)
 	}
 
 	for _, envelope := range envelopes {
@@ -1125,7 +1224,7 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	// Read all data as we will try to decode it possibly twice.
 	data, err := ioutil.ReadAll(packet.Payload)
 	if err != nil {
-		return fmt.Errorf("invalid p2p request messages: %w", err)
+		return fmt.Errorf("invalid p2p request messages: %v", err)
 	}
 	r := bytes.NewReader(data)
 	packet.Payload = r
@@ -1135,14 +1234,13 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	if errDepReq == nil {
 		w.mailServer.DeliverMail(p.ID(), &requestDeprecated)
 		return nil
-	} else {
-		logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 	}
+	logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 
 	// As we failed to decode the request, let's set the offset
 	// to the beginning and try decode it again.
 	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("invalid p2p request message: %w", err)
+		return fmt.Errorf("invalid p2p request message: %v", err)
 	}
 
 	var request MessagesRequest
@@ -1150,9 +1248,8 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	if errReq == nil {
 		w.mailServer.Deliver(p.ID(), request)
 		return nil
-	} else {
-		logger.Info("failed to decode p2p request message", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 	}
+	logger.Info("failed to decode p2p request message", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
 
 	return errors.New("invalid p2p request message")
 }
@@ -1164,12 +1261,12 @@ func (w *Waku) handleP2PRequestCompleteCode(p *Peer, packet p2p.Msg, logger *zap
 
 	var payload []byte
 	if err := packet.Decode(&payload); err != nil {
-		return fmt.Errorf("invalid p2p request complete message: %w", err)
+		return fmt.Errorf("invalid p2p request complete message: %v", err)
 	}
 
 	event, err := CreateMailServerEvent(p.peer.ID(), payload)
 	if err != nil {
-		return fmt.Errorf("invalid p2p request complete payload: %w", err)
+		return fmt.Errorf("invalid p2p request complete payload: %v", err)
 	}
 
 	w.postP2P(*event)
@@ -1180,7 +1277,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 	var resp MultiVersionResponse
 	if err := packet.Decode(&resp); err != nil {
 		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		return fmt.Errorf("invalid response message: %w", err)
+		return fmt.Errorf("invalid response message: %v", err)
 	}
 	if resp.Version != 1 {
 		logger.Info("received unsupported version of MultiVersionResponse for messageResponseCode packet", zap.Uint("version", resp.Version))
@@ -1190,7 +1287,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 	response, err := resp.DecodeResponse1()
 	if err != nil {
 		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		return fmt.Errorf("failed to decode response message: %w", err)
+		return fmt.Errorf("failed to decode response message: %v", err)
 	}
 
 	w.envelopeFeed.Send(EnvelopeEvent{
@@ -1206,7 +1303,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
 	var batchHash common.Hash
 	if err := packet.Decode(&batchHash); err != nil {
-		return fmt.Errorf("invalid batch ack message: %w", err)
+		return fmt.Errorf("invalid batch ack message: %v", err)
 	}
 	w.envelopeFeed.Send(EnvelopeEvent{
 		Batch: batchHash,
@@ -1218,6 +1315,62 @@ func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.L
 
 func (w *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
 	return w.addAndBridge(envelope, isP2P, false)
+}
+
+func (w *Waku) bloomMatch(envelope *Envelope) (bool, error) {
+	if !BloomFilterMatch(w.BloomFilter(), envelope.Bloom()) {
+		// maybe the value was recently changed, and the peers did not adjust yet.
+		// in this case the previous value is retrieved by BloomFilterTolerance()
+		// for a short period of peer synchronization.
+		if !BloomFilterMatch(w.BloomFilterTolerance(), envelope.Bloom()) {
+			envelopesCacheFailedCounter.WithLabelValues("no_bloom_match").Inc()
+			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
+				envelope.Hash().Hex(), w.BloomFilter(), envelope.Bloom(), envelope.Topic)
+		}
+	}
+	return true, nil
+}
+
+func (w *Waku) topicInterestMatch(envelope *Envelope) (bool, error) {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	if w.settings.TopicInterest == nil {
+		return false, nil
+	}
+	if !w.settings.TopicInterest[envelope.Topic] {
+		if !w.settings.TopicInterestTolerance[envelope.Topic] {
+			envelopesCacheFailedCounter.WithLabelValues("no_topic_interest_match").Inc()
+			return false, fmt.Errorf("envelope does not match topic interest, hash=[%v], bloom: \n%x \n%x",
+				envelope.Hash().Hex(), envelope.Bloom(), envelope.Topic)
+
+		}
+	}
+
+	return true, nil
+}
+
+func (w *Waku) topicInterestOrBloomMatch(envelope *Envelope) (bool, error) {
+	w.settingsMu.RLock()
+	topicInterestMode := !w.settings.BloomFilterMode
+	w.settingsMu.RUnlock()
+
+	if topicInterestMode {
+		match, err := w.topicInterestMatch(envelope)
+		if err != nil {
+			return false, err
+		}
+		if match {
+			return true, nil
+		}
+	}
+	return w.bloomMatch(envelope)
+}
+
+func (w *Waku) SetBloomFilterMode(mode bool) {
+	w.settingsMu.Lock()
+	w.settings.BloomFilterMode = mode
+	w.settingsMu.Unlock()
+	// Recalculate and notify topic interest or bloom, currently not implemented
 }
 
 // addAndBridge inserts a new envelope into the message pool to be distributed within the
@@ -1252,7 +1405,7 @@ func (w *Waku) addAndBridge(envelope *Envelope, isP2P bool, bridged bool) (bool,
 
 	if uint32(envelope.size()) > w.MaxMessageSize() {
 		envelopesCacheFailedCounter.WithLabelValues("oversized").Inc()
-		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
+		return false, fmt.Errorf("huge messages are not allowed [%x][%d][%d]", envelope.Hash(), envelope.size(), w.MaxMessageSize())
 	}
 
 	if envelope.PoW() < w.MinPow() {
@@ -1265,15 +1418,13 @@ func (w *Waku) addAndBridge(envelope *Envelope, isP2P bool, bridged bool) (bool,
 		}
 	}
 
-	if !BloomFilterMatch(w.BloomFilter(), envelope.Bloom()) {
-		// maybe the value was recently changed, and the peers did not adjust yet.
-		// in this case the previous value is retrieved by BloomFilterTolerance()
-		// for a short period of peer synchronization.
-		if !BloomFilterMatch(w.BloomFilterTolerance(), envelope.Bloom()) {
-			envelopesCacheFailedCounter.WithLabelValues("no_bloom_match").Inc()
-			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
-				envelope.Hash().Hex(), w.BloomFilter(), envelope.Bloom(), envelope.Topic)
-		}
+	match, err := w.topicInterestOrBloomMatch(envelope)
+	if err != nil {
+		return false, err
+	}
+
+	if !match {
+		return false, nil
 	}
 
 	hash := envelope.Hash()
@@ -1412,6 +1563,31 @@ func (w *Waku) expire() {
 			delete(w.expirations, expiry)
 		}
 	}
+}
+
+func (w *Waku) toStatusOptions() statusOptions {
+	opts := statusOptions{}
+
+	rateLimits := w.RateLimits()
+	opts.RateLimits = &rateLimits
+
+	lightNode := w.LightClientMode()
+	opts.LightNodeEnabled = &lightNode
+
+	minPoW := w.MinPow()
+	opts.SetPoWRequirementFromF(minPoW)
+
+	confirmationsEnabled := w.ConfirmationsEnabled()
+	opts.ConfirmationsEnabled = &confirmationsEnabled
+
+	bloomFilterMode := w.BloomFilterMode()
+	if bloomFilterMode {
+		opts.BloomFilter = w.BloomFilter()
+	} else {
+		opts.TopicInterest = w.TopicInterest()
+	}
+
+	return opts
 }
 
 // Envelopes retrieves all the messages currently pooled by the node.

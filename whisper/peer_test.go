@@ -221,9 +221,9 @@ func initialize(t *testing.T) {
 
 	for i := 0; i < NumNodes; i++ {
 		for j := 0; j < i; j++ {
-			peerNodeId := nodes[j].id
+			peerNodeID := nodes[j].id
 			address, _ := net.ResolveTCPAddr("tcp", nodes[j].server.ListenAddr)
-			peer := enode.NewV4(&peerNodeId.PublicKey, address.IP, address.Port, address.Port)
+			peer := enode.NewV4(&peerNodeID.PublicKey, address.IP, address.Port, address.Port)
 			nodes[i].server.AddPeer(peer)
 		}
 	}

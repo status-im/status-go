@@ -41,10 +41,20 @@ type Peer struct {
 	ws     p2p.MsgReadWriter
 	logger *zap.Logger
 
-	trusted              bool
-	powRequirement       float64
-	bloomMu              sync.Mutex
-	bloomFilter          []byte
+	trusted        bool
+	powRequirement float64
+	// bloomMu is to allow thread safe access to
+	// the bloom filter
+	bloomMu     sync.Mutex
+	bloomFilter []byte
+	// topicInterestMu is to allow thread safe access to
+	// the map of topic interests
+	topicInterestMu sync.Mutex
+	topicInterest   map[TopicType]bool
+	// fullNode is used to indicate that the node will be accepting any
+	// envelope. The opposite is an "empty node" , which is when
+	// a bloom filter is all 0s or topic interest is an empty map (not nil).
+	// In that case no envelope is accepted.
 	fullNode             bool
 	confirmationsEnabled bool
 	rateLimitsMu         sync.Mutex
@@ -93,17 +103,8 @@ func (p *Peer) stop() {
 func (p *Peer) handshake() error {
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
-	isLightNode := p.host.LightClientMode()
-	isRestrictedLightNodeConnection := p.host.LightClientModeConnectionRestricted()
+	opts := p.host.toStatusOptions()
 	go func() {
-		opts := statusOptions{
-			BloomFilter:          p.host.BloomFilter(),
-			LightNodeEnabled:     isLightNode,
-			ConfirmationsEnabled: p.host.ConfirmationsEnabled(),
-			RateLimits:           p.host.RateLimits(),
-			TopicInterest:        nil,
-		}
-		opts.SetPoWRequirementFromF(p.host.MinPow())
 		errc <- p2p.SendItems(p.ws, statusCode, ProtocolVersion, opts)
 	}()
 
@@ -122,48 +123,72 @@ func (p *Peer) handshake() error {
 	)
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 	if _, err := s.List(); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status packet: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
 	}
 	// Validate protocol version.
 	if err := s.Decode(&peerProtocolVersion); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %v", p.ID(), err)
 	}
 	if peerProtocolVersion != ProtocolVersion {
 		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerProtocolVersion, ProtocolVersion)
 	}
 	// Decode and validate other status packet options.
 	if err := s.Decode(&peerOptions); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status options: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode status options: %v", p.ID(), err)
 	}
 	if err := s.ListEnd(); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status packet: %w", p.ID(), err)
+		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
 	}
-	if err := peerOptions.Validate(); err != nil {
-		return fmt.Errorf("p [%x]: sent invalid options: %w", p.ID(), err)
+	if err := p.setOptions(peerOptions.WithDefaults()); err != nil {
+		return fmt.Errorf("p [%x]: failed to set options: %v", p.ID(), err)
 	}
-	// Validate and save peer's PoW.
-	pow := peerOptions.PoWRequirementF()
-	if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
-		return fmt.Errorf("p [%x]: sent bad status message: invalid pow", p.ID())
-	}
-	p.powRequirement = pow
-	// Validate and save peer's bloom filters.
-	bloom := peerOptions.BloomFilter
-	bloomSize := len(bloom)
-	if bloomSize != 0 && bloomSize != BloomFilterSize {
-		return fmt.Errorf("p [%x] sent bad status message: wrong bloom filter size %d", p.ID(), bloomSize)
-	}
-	p.setBloomFilter(bloom)
-	// Validate and save other peer's options.
-	if peerOptions.LightNodeEnabled && isLightNode && isRestrictedLightNodeConnection {
-		return fmt.Errorf("p [%x] is useless: two light client communication restricted", p.ID())
-	}
-	p.confirmationsEnabled = peerOptions.ConfirmationsEnabled
-	p.setRateLimits(peerOptions.RateLimits)
-
 	if err := <-errc; err != nil {
 		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
 	}
+	return nil
+}
+
+func (p *Peer) setOptions(peerOptions statusOptions) error {
+
+	p.logger.Debug("settings options", zap.Binary("peerID", p.ID()), zap.Any("Options", peerOptions))
+
+	if err := peerOptions.Validate(); err != nil {
+		return fmt.Errorf("p [%x]: sent invalid options: %v", p.ID(), err)
+	}
+	// Validate and save peer's PoW.
+	pow := peerOptions.PoWRequirementF()
+	if pow != nil {
+		if math.IsInf(*pow, 0) || math.IsNaN(*pow) || *pow < 0.0 {
+			return fmt.Errorf("p [%x]: sent bad status message: invalid pow", p.ID())
+		}
+		p.powRequirement = *pow
+	}
+
+	if peerOptions.TopicInterest != nil {
+		p.setTopicInterest(peerOptions.TopicInterest)
+	} else if peerOptions.BloomFilter != nil {
+		// Validate and save peer's bloom filters.
+		bloom := peerOptions.BloomFilter
+		bloomSize := len(bloom)
+		if bloomSize != 0 && bloomSize != BloomFilterSize {
+			return fmt.Errorf("p [%x] sent bad status message: wrong bloom filter size %d", p.ID(), bloomSize)
+		}
+		p.setBloomFilter(bloom)
+	}
+
+	if peerOptions.LightNodeEnabled != nil {
+		// Validate and save other peer's options.
+		if *peerOptions.LightNodeEnabled && p.host.LightClientMode() && p.host.LightClientModeConnectionRestricted() {
+			return fmt.Errorf("p [%x] is useless: two light client communication restricted", p.ID())
+		}
+	}
+	if peerOptions.ConfirmationsEnabled != nil {
+		p.confirmationsEnabled = *peerOptions.ConfirmationsEnabled
+	}
+	if peerOptions.RateLimits != nil {
+		p.setRateLimits(*peerOptions.RateLimits)
+	}
+
 	return nil
 }
 
@@ -224,7 +249,7 @@ func (p *Peer) broadcast() error {
 	envelopes := p.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
-		if !p.marked(envelope) && envelope.PoW() >= p.powRequirement && p.bloomMatch(envelope) {
+		if !p.marked(envelope) && envelope.PoW() >= p.powRequirement && p.topicOrBloomMatch(envelope) {
 			bundle = append(bundle, envelope)
 		}
 	}
@@ -264,17 +289,48 @@ func (p *Peer) ID() []byte {
 
 func (p *Peer) notifyAboutPowRequirementChange(pow float64) error {
 	i := math.Float64bits(pow)
-	return p2p.Send(p.ws, powRequirementCode, i)
+	return p2p.Send(p.ws, statusUpdateCode, statusOptions{PoWRequirement: &i})
 }
 
 func (p *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
-	return p2p.Send(p.ws, bloomFilterExCode, bloom)
+	return p2p.Send(p.ws, statusUpdateCode, statusOptions{BloomFilter: bloom})
+}
+
+func (p *Peer) notifyAboutTopicInterestChange(topics []TopicType) error {
+	return p2p.Send(p.ws, statusUpdateCode, statusOptions{TopicInterest: topics})
 }
 
 func (p *Peer) bloomMatch(env *Envelope) bool {
 	p.bloomMu.Lock()
 	defer p.bloomMu.Unlock()
 	return p.fullNode || BloomFilterMatch(p.bloomFilter, env.Bloom())
+}
+
+func (p *Peer) topicInterestMatch(env *Envelope) bool {
+	p.topicInterestMu.Lock()
+	defer p.topicInterestMu.Unlock()
+
+	if p.topicInterest == nil {
+		return false
+	}
+
+	return p.fullNode || p.topicInterest[env.Topic]
+}
+
+// topicOrBloomMatch matches against topic-interest if topic interest
+// is not nil. Otherwise it will match against the bloom-filter.
+// If the bloom-filter is nil, or full, the node is considered a full-node
+// and any envelope will be accepted. An empty topic-interest (but not nil)
+// signals that we are not interested in any envelope.
+func (p *Peer) topicOrBloomMatch(env *Envelope) bool {
+	p.topicInterestMu.Lock()
+	topicInterestMode := p.topicInterest != nil
+	p.topicInterestMu.Unlock()
+
+	if topicInterestMode {
+		return p.topicInterestMatch(env)
+	}
+	return p.bloomMatch(env)
 }
 
 func (p *Peer) setBloomFilter(bloom []byte) {
@@ -285,6 +341,21 @@ func (p *Peer) setBloomFilter(bloom []byte) {
 	if p.fullNode && p.bloomFilter == nil {
 		p.bloomFilter = MakeFullNodeBloom()
 	}
+	p.topicInterest = nil
+}
+
+func (p *Peer) setTopicInterest(topicInterest []TopicType) {
+	p.topicInterestMu.Lock()
+	defer p.topicInterestMu.Unlock()
+	if topicInterest == nil {
+		p.topicInterest = nil
+		return
+	}
+	p.topicInterest = make(map[TopicType]bool)
+	for _, topic := range topicInterest {
+		p.topicInterest[topic] = true
+	}
+	p.bloomFilter = nil
 }
 
 func (p *Peer) setRateLimits(r RateLimits) {

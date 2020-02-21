@@ -35,7 +35,7 @@ func generateMessageParams() (*MessageParams, error) {
 	// set all the parameters except p.Dst and p.Padding
 
 	buf := make([]byte, 4)
-	mrand.Read(buf)
+	mrand.Read(buf) // nolint: gosec
 	sz := mrand.Intn(400)
 
 	var p MessageParams
@@ -44,8 +44,8 @@ func generateMessageParams() (*MessageParams, error) {
 	p.TTL = uint32(mrand.Intn(1024))
 	p.Payload = make([]byte, sz)
 	p.KeySym = make([]byte, aesKeyLength)
-	mrand.Read(p.Payload)
-	mrand.Read(p.KeySym)
+	mrand.Read(p.Payload) // nolint: gosec
+	mrand.Read(p.KeySym)  // nolint: gosec
 	p.Topic = BytesToTopic(buf)
 
 	var err error
@@ -190,7 +190,7 @@ func TestMessageSeal(t *testing.T) {
 	target := 32.0
 	params.WorkTime = 4
 	params.PoW = target
-	env.Seal(params)
+	env.Seal(params) // nolint: errcheck
 
 	env.calculatePoW(0)
 	pow := env.PoW()
@@ -200,7 +200,7 @@ func TestMessageSeal(t *testing.T) {
 
 	params.WorkTime = 1
 	params.PoW = 1000000000.0
-	env.Seal(params)
+	env.Seal(params) // nolint: errcheck
 	env.calculatePoW(0)
 	pow = env.PoW()
 	if pow < 2*target {
@@ -353,7 +353,7 @@ func TestRlpEncode(t *testing.T) {
 	}
 
 	var decoded Envelope
-	rlp.DecodeBytes(raw, &decoded)
+	err = rlp.DecodeBytes(raw, &decoded)
 	if err != nil {
 		t.Fatalf("RLP decode failed: %s.", err)
 	}
@@ -374,7 +374,7 @@ func singlePaddingTest(t *testing.T, padSize int) {
 	params.Padding = make([]byte, padSize)
 	params.PoW = 0.0000000001
 	pad := make([]byte, padSize)
-	_, err = mrand.Read(pad)
+	_, err = mrand.Read(pad) // nolint: gosec
 	if err != nil {
 		t.Fatalf("padding is not generated (seed %d): %s", seed, err)
 	}
