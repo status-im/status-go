@@ -260,7 +260,7 @@ func (whisper *Whisper) APIs() []rpc.API {
 			Namespace: ProtocolName,
 			Version:   ProtocolVersionStr,
 			Service:   NewPublicWhisperAPI(whisper),
-			Public:    true,
+			Public:    false,
 		},
 	}
 }
