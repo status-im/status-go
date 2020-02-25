@@ -44,7 +44,7 @@ require (
 	github.com/status-im/status-go/extkeys v1.1.0
 	github.com/status-im/status-go/protocol v1.1.0
 	github.com/status-im/status-go/waku v1.1.0
-	github.com/status-im/status-go/whisper/v6 v6.1.0
+	github.com/status-im/status-go/whisper/v6 v6.2.4
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
