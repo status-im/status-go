@@ -135,7 +135,7 @@ func (n *NimbusStatusNode) StartWithOptions(config *params.NodeConfig, options N
 	defer n.mu.Unlock()
 
 	if n.isRunning() {
-		n.log.Debug("cannot start, node already running")
+		n.log.Debug("node is already running")
 		return ErrNodeRunning
 	}
 
