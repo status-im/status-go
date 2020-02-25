@@ -57,6 +57,15 @@ var (
 			params.MainNetworkID, params.RopstenNetworkID, params.RinkebyNetworkID, params.GoerliNetworkID,
 		),
 	)
+	fleet = flag.String(
+		"fleet",
+		params.FleetProd,
+		fmt.Sprintf(
+			"Select fleet: %s (default %s)",
+			[]string{params.FleetProd, params.FleetStaging, params.FleetTest}, params.FleetProd,
+		),
+	)
+	listenAddr = flag.String("addr", ":30303", "address to bind listener to")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -87,7 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	opts := []params.Option{params.WithFleet(params.FleetProd)}
+	opts := []params.Option{params.WithFleet(*fleet)}
 	if *mailserver {
 		opts = append(opts, params.WithMailserver())
 	}
@@ -103,6 +112,8 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
+
+	config.ListenAddr = *listenAddr
 
 	if *register && *mailserver {
 		config.RegisterTopics = append(config.RegisterTopics, params.MailServerDiscv5Topic)
