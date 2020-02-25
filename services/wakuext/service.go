@@ -43,7 +43,7 @@ func (s *Service) APIs() []rpc.API {
 			Namespace: "wakuext",
 			Version:   "1.0",
 			Service:   NewPublicAPI(s),
-			Public:    true,
+			Public:    false,
 		},
 	}
 	return apis

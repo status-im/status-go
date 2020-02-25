@@ -125,7 +125,7 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttleIP(ip); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedIPLimit(); err != nil {
-						errC <- fmt.Errorf("exceed rate limit by IP: %w", err)
+						errC <- fmt.Errorf("exceed rate limit by IP: %v", err)
 						return
 					}
 				}
@@ -138,7 +138,7 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttlePeer(peerID); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedPeerLimit(); err != nil {
-						errC <- fmt.Errorf("exceeded rate limit by peer: %w", err)
+						errC <- fmt.Errorf("exceeded rate limit by peer: %v", err)
 						return
 					}
 				}
