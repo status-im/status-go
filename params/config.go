@@ -338,7 +338,7 @@ type NodeConfig struct {
 	Version string
 
 	// APIModules is a comma-separated list of API modules exposed via *any* (HTTP/WS/IPC) RPC interface.
-	APIModules string
+	APIModules string `validate:"required"`
 
 	// HTTPEnabled specifies whether the http RPC server is to be enabled by default.
 	HTTPEnabled bool
@@ -620,6 +620,19 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	}
 
 	return c, nil
+}
+
+// UpdateWithMobileDefaults updates config with missing default values
+// tailored for the mobile nodes.
+func (c *NodeConfig) UpdateWithMobileDefaults() {
+	// Empty APIModules will fallback to services' APIs definition.
+	// If any API is defined as public, it will be exposed.
+	// We disallow empty APIModules to avoid confusion
+	// when some APIs suddenly become available for Dapps.
+	// More: https://github.com/status-im/status-go/issues/1870.
+	if c.APIModules == "" {
+		c.APIModules = "net,web3"
+	}
 }
 
 // NewNodeConfigWithDefaultsAndFiles creates new node configuration object

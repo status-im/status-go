@@ -487,6 +487,13 @@ func TestNodeConfigValidate(t *testing.T) {
 			},
 			Error: "field Port is required if incentivisation is enabled",
 		},
+		{
+			Name:   "Missing APIModules",
+			Config: `{"NetworkId": 1, "DataDir": "/tmp/data", "KeyStoreDir": "/tmp/data", "APIModules" :""}`,
+			FieldErrors: map[string]string{
+				"APIModules": "required",
+			},
+		},
 	}
 
 	for _, tc := range testCases {

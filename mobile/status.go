@@ -45,21 +45,6 @@ func OpenAccounts(datadir string) string {
 	return string(data)
 }
 
-// GenerateConfig for status node.
-func GenerateConfig(datadir string, networkID int) string {
-	config, err := params.NewNodeConfig(datadir, uint64(networkID))
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	outBytes, err := json.Marshal(config)
-	if err != nil {
-		return makeJSONResponse(err)
-	}
-
-	return string(outBytes)
-}
-
 // ExtractGroupMembershipSignatures extract public keys from tuples of content/signature.
 func ExtractGroupMembershipSignatures(signaturePairsStr string) string {
 	var signaturePairs [][2]string

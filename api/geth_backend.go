@@ -440,6 +440,9 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
+	// Update config with some defaults.
+	config.UpdateWithMobileDefaults()
+
 	// Start by validating configuration
 	if err := config.Validate(); err != nil {
 		return err

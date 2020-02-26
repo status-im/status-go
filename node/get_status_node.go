@@ -135,11 +135,11 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	defer n.mu.Unlock()
 
 	if n.isRunning() {
-		n.log.Debug("cannot start, node already running")
+		n.log.Debug("node is already running")
 		return ErrNodeRunning
 	}
 
-	n.log.Debug("starting with NodeConfig", "ClusterConfig", config.ClusterConfig)
+	n.log.Debug("starting with options", "ClusterConfig", config.ClusterConfig)
 
 	db, err := db.Create(config.DataDir, params.StatusDatabase)
 	if err != nil {
@@ -172,7 +172,7 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	}
 	n.config = config
 
-	if err := n.start(services); err != nil {
+	if err := n.startGethNode(services); err != nil {
 		return err
 	}
 
@@ -192,8 +192,8 @@ func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manage
 	return err
 }
 
-// start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) start(services []node.ServiceConstructor) error {
+// startGethNode starts current StatusNode, will fail if it's already started.
+func (n *StatusNode) startGethNode(services []node.ServiceConstructor) error {
 	for _, service := range services {
 		if err := n.gethNode.Register(service); err != nil {
 			return err
