@@ -1,0 +1,8 @@
+{
+	"APIModules": "waku,shh",
+	"HTTPEnabled": true,
+	"WhisperConfig": {
+		"Enabled": true
+	},
+	"IPCEnabled": true
+}
