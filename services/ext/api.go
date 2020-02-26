@@ -194,30 +194,6 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*Metad
 	return api.service.ConfirmMessagesProcessed(encryptionIDs)
 }
 
-// SendPublicMessage sends a public chat message to the underlying transport.
-// Message's payload is a transit encoded message.
-// It's important to call PublicAPI.afterSend() so that the client receives a signal
-// with confirmation that the message left the device.
-func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (types.HexBytes, error) {
-	chat := protocol.Chat{
-		Name: msg.Chat,
-	}
-	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
-}
-
-// SendDirectMessage sends a 1:1 chat message to the underlying transport
-// Message's payload is a transit encoded message.
-// It's important to call PublicAPI.afterSend() so that the client receives a signal
-// with confirmation that the message left the device.
-func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (types.HexBytes, error) {
-	chat := protocol.Chat{
-		ChatType: protocol.ChatTypeOneToOne,
-		ID:       types.EncodeHex(msg.PubKey),
-	}
-
-	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
-}
-
 func (api *PublicAPI) Join(chat protocol.Chat) error {
 	return api.service.messenger.Join(chat)
 }
@@ -335,6 +311,10 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 
 func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) error {
 	return api.service.messenger.MarkMessagesSeen(chatID, ids)
+}
+
+func (api *PublicAPI) MarkAllRead(chatID string) error {
+	return api.service.messenger.MarkAllRead(chatID)
 }
 
 func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
