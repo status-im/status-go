@@ -239,6 +239,9 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
+	if err := b.startWallet(); err != nil {
+		return err
+	}
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
 	if err != nil {
 		return err
