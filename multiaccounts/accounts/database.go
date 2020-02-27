@@ -297,7 +297,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_enabled, waku_bloom_filter_mode FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -334,7 +334,9 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.Usernames,
 		&s.WalletRootAddress,
 		&s.WalletSetUpPassed,
-		&s.WalletVisibleTokens)
+		&s.WalletVisibleTokens,
+		&s.WakuEnabled,
+		&s.WakuBloomFilterMode)
 	return s, err
 }
 
