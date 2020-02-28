@@ -372,7 +372,7 @@ github.com/status-im/migrate/v4/source/go_bindata
 github.com/status-im/rendezvous
 github.com/status-im/rendezvous/protocol
 github.com/status-im/rendezvous/server
-# github.com/status-im/status-go/extkeys v1.1.0
+# github.com/status-im/status-go/extkeys v1.1.2
 github.com/status-im/status-go/extkeys
 # github.com/status-im/status-go/whisper/v6 v6.2.4
 github.com/status-im/status-go/whisper/v6
@@ -486,7 +486,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
-# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
+# golang.org/x/sync v0.0.0-20190423024810-112230192c58
 golang.org/x/sync/syncmap
 # golang.org/x/sys v0.0.0-20191113165036-4c7a9d0fe056
 golang.org/x/sys/cpu
