@@ -631,7 +631,7 @@ func (c *NodeConfig) UpdateWithMobileDefaults() {
 	// when some APIs suddenly become available for Dapps.
 	// More: https://github.com/status-im/status-go/issues/1870.
 	if c.APIModules == "" {
-		c.APIModules = "net,web3"
+		c.APIModules = "net,web3,eth"
 	}
 }
 
