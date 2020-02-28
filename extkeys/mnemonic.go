@@ -268,7 +268,7 @@ func (m *Mnemonic) ValidateMnemonic(mnemonic string, language Language) error {
 
 	// Calculate checksum from entropy derived above
 	hasher := sha256.New()
-	if err := hasher.Write(entropy); err != nil {
+	if _, err := hasher.Write(entropy); err != nil {
 		return err
 	}
 
