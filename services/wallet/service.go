@@ -149,3 +149,7 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 	}
 	return rst
 }
+
+func (s *Service) IsStarted() bool {
+	return s.group != nil
+}

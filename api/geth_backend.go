@@ -783,6 +783,37 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
+	if s == appStateForeground {
+		wallet, err := b.statusNode.WalletService()
+		if err != nil {
+			b.log.Error("Retrieving of wallet service failed on app state change to active", "error", err)
+			return
+		}
+		if !wallet.IsStarted() {
+			err = wallet.Start(b.statusNode.Server())
+			if err != nil {
+				b.log.Error("Wallet service start failed on app state change to active", "error", err)
+				return
+			}
+
+			err = b.startWallet()
+			if err != nil {
+				b.log.Error("Wallet reactor start failed on app state change to active", "error", err)
+				return
+			}
+		}
+	} else if s == appStateBackground {
+		wallet, err := b.statusNode.WalletService()
+		if err != nil {
+			b.log.Error("Retrieving of wallet service failed on app state change to background", "error", err)
+			return
+		}
+		err = wallet.Stop()
+		if err != nil {
+			b.log.Error("Wallet service stop failed on app state change to background", "error", err)
+			return
+		}
+	}
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }

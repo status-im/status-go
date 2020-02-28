@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -107,4 +108,28 @@ func (s *ReactorChangesSuite) TestWatchNewAccounts() {
 		}
 		return nil
 	}, 5*time.Second, 500*time.Millisecond))
+}
+
+func TestServiceStartStop(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	backend, err := testchain.NewBackend()
+	require.NoError(t, err)
+
+	s := NewService(db, &event.Feed{})
+	require.NoError(t, s.Start(nil))
+
+	account, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	err = s.StartReactor(backend.Client, []common.Address{crypto.PubkeyToAddress(account.PublicKey)}, big.NewInt(1337))
+	require.NoError(t, err)
+
+	require.NoError(t, s.Stop())
+	require.NoError(t, s.Start(nil))
+
+	err = s.StartReactor(backend.Client, []common.Address{crypto.PubkeyToAddress(account.PublicKey)}, big.NewInt(1337))
+	require.NoError(t, err)
+	require.NoError(t, s.Stop())
 }
