@@ -1,8 +1,0 @@
-{
-	"APIModules": "waku,shh",
-	"HTTPEnabled": true,
-	"WakuConfig": {
-		"Enabled": true
-	},
-	"IPCEnabled": true
-}

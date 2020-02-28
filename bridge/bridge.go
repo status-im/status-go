@@ -82,7 +82,7 @@ func (b *Bridge) Start() {
 				return
 			case env := <-b.whisperIn:
 				wakuEnvelope := (*waku.Envelope)(unsafe.Pointer(env)) // nolint: gosec
-				b.logger.Info("received waku envelope from whisper", zap.Any("envelope", wakuEnvelope))
+				b.logger.Info("received whisper envelope from waku", zap.Any("envelope", wakuEnvelope))
 				b.wakuOut <- wakuEnvelope
 			}
 		}

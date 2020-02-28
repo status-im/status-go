@@ -5,7 +5,6 @@ const (
 	FleetUndefined = ""
 	FleetProd      = "eth.prod"
 	FleetStaging   = "eth.staging"
-	FleetTest      = "eth.test"
 )
 
 // Cluster defines a list of Ethereum nodes.
