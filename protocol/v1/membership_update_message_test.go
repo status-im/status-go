@@ -64,7 +64,7 @@ func TestSignMembershipUpdate(t *testing.T) {
 func TestGroupCreator(t *testing.T) {
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
-	g, err := NewGroupWithCreator("abc", key)
+	g, err := NewGroupWithCreator("abc", 20, key)
 	require.NoError(t, err)
 	creator, err := g.creator()
 	require.NoError(t, err)

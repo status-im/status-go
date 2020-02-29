@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
@@ -232,9 +231,8 @@ func NewGroupWithEvents(chatID string, events []MembershipUpdateEvent) (*Group, 
 	return newGroup(chatID, events)
 }
 
-func NewGroupWithCreator(name string, creator *ecdsa.PrivateKey) (*Group, error) {
+func NewGroupWithCreator(name string, clock uint64, creator *ecdsa.PrivateKey) (*Group, error) {
 	chatID := groupChatID(&creator.PublicKey)
-	clock := TimestampInMsFromTime(time.Now())
 	chatCreated := NewChatCreatedEvent(name, clock)
 	chatCreated.ChatID = chatID
 	err := chatCreated.Sign(creator)
