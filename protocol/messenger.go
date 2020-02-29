@@ -637,13 +637,17 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
 	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
 	chat := CreateGroupChat(m.getTimesource())
-	group, err := v1protocol.NewGroupWithCreator(name, m.identity)
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	group, err := v1protocol.NewGroupWithCreator(name, clock, m.identity)
 	if err != nil {
 		return nil, err
 	}
+	chat.LastClockValue = clock
 	chat.updateChatFromProtocolGroup(group)
 
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	// Add members
 	event := v1protocol.NewMembersAddedEvent(members, clock)
 	event.ChatID = chat.ID
