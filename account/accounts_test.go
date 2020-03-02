@@ -78,6 +78,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
+		accManager.ReadKey = true
 		accountKey, err := accManager.VerifyAccountPassword(testCase.keyPath, testCase.address, testCase.password)
 		if !reflect.DeepEqual(err, testCase.expectedError) {
 			require.FailNow(t, fmt.Sprintf("unexpected error: expected \n'%v', got \n'%v'", testCase.expectedError, err))

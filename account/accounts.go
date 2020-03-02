@@ -43,6 +43,7 @@ type Manager struct {
 	selectedChatAccount *SelectedExtKey // account that was processed during the last call to SelectAccount()
 	mainAccountAddress  types.Address
 	watchAddresses      []types.Address
+	ReadKey             bool // parameter to determine if private key should be returned
 }
 
 // GetKeystore is only used in tests
@@ -117,6 +118,9 @@ func (m *Manager) RecoverAccount(password, mnemonic string) (Info, error) {
 
 // VerifyAccountPassword tries to decrypt a given account key file, with a provided password.
 // If no error is returned, then account is considered verified.
+// read_priv_key is a boolean which should be set iff the function is used to verify the passphrase **and** to read
+// the private key. The dual return pattern is used instead of splitting the function to minimise code exposure
+// for private key handling.
 func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (*types.Key, error) {
 	var err error
 	var foundKeyFile []byte
@@ -169,8 +173,12 @@ func (m *Manager) VerifyAccountPassword(keyStoreDir, address, password string) (
 	if key.Address != addressObj {
 		return nil, fmt.Errorf("account mismatch: have %s, want %s", key.Address.Hex(), addressObj.Hex())
 	}
+	if m.ReadKey {
+		m.ReadKey = false // reset readKey parameter to avoid key leakage due to shared mgr
+		return key, nil
+	}
 
-	return key, nil
+	return nil, nil
 }
 
 // SelectAccount selects current account, by verifying that address has corresponding account which can be decrypted

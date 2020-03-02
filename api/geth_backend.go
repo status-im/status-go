@@ -683,6 +683,29 @@ func (b *GethStatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash
 	return types.Hash(hash), err
 }
 
+func (b *GethStatusBackend) VerifyWalletAccount(address, password string) error {
+	config := b.StatusNode().Config()
+
+	db := accounts.NewDB(b.appDB)
+	exists, err := db.AddressExists(types.HexToAddress(address))
+	if err != nil {
+		b.log.Error("failed to query db for a given address", "address", address, "error", err)
+		return err
+	}
+
+	if !exists {
+		b.log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
+		return transactions.ErrAccountDoesntExist
+	}
+
+	_, err = b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)
+	if err != nil {
+		b.log.Error("failed to verify account", "account", address, "error", err)
+		return err
+	}
+	return nil
+}
+
 func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (*account.SelectedExtKey, error) {
 	config := b.StatusNode().Config()
 
@@ -697,7 +720,7 @@ func (b *GethStatusBackend) getVerifiedWalletAccount(address, password string) (
 		b.log.Error("failed to get a selected account", "err", transactions.ErrInvalidTxSender)
 		return nil, transactions.ErrAccountDoesntExist
 	}
-
+	b.accountManager.ReadKey = true
 	key, err := b.accountManager.VerifyAccountPassword(config.KeyStoreDir, address, password)
 	if err != nil {
 		b.log.Error("failed to verify account", "account", address, "error", err)
