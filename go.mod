@@ -45,7 +45,7 @@ require (
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/status-go/whisper/v6 v6.2.6
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.23
