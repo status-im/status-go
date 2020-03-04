@@ -242,10 +242,6 @@ func NewGroupWithCreator(name string, clock uint64, creator *ecdsa.PrivateKey) (
 	return newGroup(chatID, []MembershipUpdateEvent{chatCreated})
 }
 
-func NewGroup(chatID string, events []MembershipUpdateEvent) (*Group, error) {
-	return newGroup(chatID, events)
-}
-
 func newGroup(chatID string, events []MembershipUpdateEvent) (*Group, error) {
 	g := Group{
 		chatID:  chatID,
@@ -293,12 +289,12 @@ func (g Group) ChatID() string {
 	return g.chatID
 }
 
-func (g Group) Events() []MembershipUpdateEvent {
-	return g.events
-}
-
 func (g Group) Name() string {
 	return g.name
+}
+
+func (g Group) Events() []MembershipUpdateEvent {
+	return g.events
 }
 
 func (g Group) Members() []string {

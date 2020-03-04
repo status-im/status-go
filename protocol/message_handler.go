@@ -79,7 +79,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 			return errors.Wrap(err, "invalid membership update")
 		}
 		merged := v1protocol.MergeMembershipUpdateEvents(existingGroup.Events(), updateGroup.Events())
-		group, err = v1protocol.NewGroup(chat.ID, merged)
+		group, err = v1protocol.NewGroupWithEvents(chat.ID, merged)
 		if err != nil {
 			return errors.Wrap(err, "failed to create a group with new membership updates")
 		}
