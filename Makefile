@@ -228,8 +228,8 @@ release-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
-	go get -u github.com/kevinburke/go-bindata/go-bindata@v3.13.0
-	go get -u github.com/golang/protobuf/protoc-gen-go@v1.3.1
+	go get github.com/kevinburke/go-bindata/go-bindata@v3.13.0
+	go get github.com/golang/protobuf/protoc-gen-go@v1.3.4
 
 xtools-install:
 	# special fix for gomobile issues
