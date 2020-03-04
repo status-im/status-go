@@ -32,7 +32,7 @@ require (
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pborman/uuid v1.2.0
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.2.1
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
