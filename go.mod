@@ -17,7 +17,7 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
-	github.com/golang/mock v1.3.1
+	github.com/golang/mock v1.4.1
 	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.1.1
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
@@ -33,7 +33,7 @@ require (
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/client_golang v1.2.1
+	github.com/prometheus/client_golang v1.5.0
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a

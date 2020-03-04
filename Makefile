@@ -241,8 +241,7 @@ modvendor-install:
 	GO111MODULE=off go get -u github.com/adambabik/modvendor
 
 mock-install: ##@other Install mocking tools
-	go get -u github.com/golang/mock/mockgen
-	go get -u github.com/golang/mock
+	go get github.com/golang/mock/mockgen@latest
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
