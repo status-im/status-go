@@ -1736,6 +1736,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				continue
 			}
 
+			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
+
 			for _, msg := range statusMessages {
 				publicKey := msg.SigPubKey()
 
@@ -1896,11 +1898,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
 							continue
 						}
-
 					default:
 						// RawMessage, not processed here, pass straight to the client
 						rawMessages[chat] = append(rawMessages[chat], msg)
-
 					}
 				} else {
 					logger.Debug("Adding raw message", zap.Any("msg", msg))

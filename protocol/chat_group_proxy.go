@@ -5,5 +5,5 @@ import (
 )
 
 func newProtocolGroupFromChat(chat *Chat) (*v1protocol.Group, error) {
-	return v1protocol.NewGroup(chat.ID, chat.MembershipUpdates)
+	return v1protocol.NewGroupWithEvents(chat.ID, chat.MembershipUpdates)
 }
