@@ -33,10 +33,6 @@ const (
 )
 
 var (
-	buildStamp = "N/A" // rely on linker: -ldflags -X main.buildStamp"
-)
-
-var (
 	configFiles      configFlags
 	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
@@ -138,7 +134,7 @@ func main() {
 	config.Name = serverClientName
 
 	if *version {
-		printVersion(config, buildStamp)
+		printVersion(config)
 		return
 	}
 
@@ -290,14 +286,9 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 }
 
 // printVersion prints verbose output about version and config.
-func printVersion(config *params.NodeConfig, buildStamp string) {
+func printVersion(config *params.NodeConfig) {
 	fmt.Println(strings.Title(config.Name))
 	fmt.Println("Version:", config.Version)
-
-	if buildStamp != "" {
-		fmt.Println("Build Stamp:", buildStamp)
-	}
-
 	fmt.Println("Network ID:", config.NetworkID)
 	fmt.Println("Go Version:", runtime.Version())
 	fmt.Println("OS:", runtime.GOOS)

@@ -17,8 +17,7 @@ GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
 ENABLE_METRICS ?= true
-BUILD_FLAGS ?= $(shell echo "-ldflags '\
-	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
