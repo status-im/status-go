@@ -22,8 +22,7 @@ BUILD_FLAGS ?= $(shell echo "-ldflags '\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
-BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags '\
-	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT)'")
 
@@ -70,7 +69,7 @@ nimbus-statusgo: nimbus ##@build Build status-go (based on Nimbus node) as statu
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	go build -mod=vendor -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 

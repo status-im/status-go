@@ -825,12 +825,8 @@ func (c *NodeConfig) Validate() error {
 		return fmt.Errorf("PFSEnabled is true, but InstallationID is empty")
 	}
 
-	if len(c.ClusterConfig.RendezvousNodes) == 0 {
-		if c.Rendezvous {
-			return fmt.Errorf("Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty")
-		}
-	} else if !c.Rendezvous {
-		return fmt.Errorf("Rendezvous is disabled, but ClusterConfig.RendezvousNodes is not empty")
+	if len(c.ClusterConfig.RendezvousNodes) == 0 && c.Rendezvous {
+		return fmt.Errorf("Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty")
 	}
 
 	return nil
