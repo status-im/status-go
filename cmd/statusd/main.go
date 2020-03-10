@@ -33,10 +33,6 @@ const (
 )
 
 var (
-	buildStamp = "N/A" // rely on linker: -ldflags -X main.buildStamp"
-)
-
-var (
 	configFiles      configFlags
 	logLevel         = flag.String("log", "", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logWithoutColors = flag.Bool("log-without-color", false, "Disables log colors")
@@ -65,7 +61,7 @@ var (
 			[]string{params.FleetProd, params.FleetStaging, params.FleetTest}, params.FleetProd,
 		),
 	)
-	listenAddr = flag.String("addr", ":30303", "address to bind listener to")
+	listenAddr = flag.String("addr", "", "address to bind listener to")
 
 	// don't change the name of this flag, https://github.com/ethereum/go-ethereum/blob/master/metrics/metrics.go#L41
 	metricsEnabled = flag.Bool("metrics", false, "Expose ethereum metrics with debug_metrics jsonrpc call")
@@ -113,7 +109,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	config.ListenAddr = *listenAddr
+	// Use listenAddr if and only if explicitly provided in the arguments.
+	// The default value is set in params.NewNodeConfigWithDefaultsAndFiles().
+	if *listenAddr != "" {
+		config.ListenAddr = *listenAddr
+	}
 
 	if *register && *mailserver {
 		config.RegisterTopics = append(config.RegisterTopics, params.MailServerDiscv5Topic)
@@ -134,7 +134,7 @@ func main() {
 	config.Name = serverClientName
 
 	if *version {
-		printVersion(config, buildStamp)
+		printVersion(config)
 		return
 	}
 
@@ -286,14 +286,9 @@ func configureStatusService(flagValue string, nodeConfig *params.NodeConfig) (*p
 }
 
 // printVersion prints verbose output about version and config.
-func printVersion(config *params.NodeConfig, buildStamp string) {
+func printVersion(config *params.NodeConfig) {
 	fmt.Println(strings.Title(config.Name))
 	fmt.Println("Version:", config.Version)
-
-	if buildStamp != "" {
-		fmt.Println("Build Stamp:", buildStamp)
-	}
-
 	fmt.Println("Network ID:", config.NetworkID)
 	fmt.Println("Go Version:", runtime.Version())
 	fmt.Println("OS:", runtime.GOOS)
