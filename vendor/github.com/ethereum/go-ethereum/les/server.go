@@ -24,12 +24,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth"
+	"github.com/ethereum/go-ethereum/les/checkpointoracle"
 	"github.com/ethereum/go-ethereum/les/flowcontrol"
 	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -49,9 +51,9 @@ type LesServer struct {
 	servingQueue *servingQueue
 	clientPool   *clientPool
 
-	freeCapacity uint64 // The minimal client capacity used for free client.
-	threadsIdle  int    // Request serving threads count when system is idle.
-	threadsBusy  int    // Request serving threads count when system is busy(block insertion).
+	minCapacity, maxCapacity, freeCapacity uint64
+	threadsIdle                            int // Request serving threads count when system is idle.
+	threadsBusy                            int // Request serving threads count when system is busy(block insertion).
 }
 
 func NewLesServer(e *eth.Ethereum, config *eth.Config) (*LesServer, error) {
@@ -87,14 +89,15 @@ func NewLesServer(e *eth.Ethereum, config *eth.Config) (*LesServer, error) {
 		threadsIdle:  threads,
 	}
 	srv.handler = newServerHandler(srv, e.BlockChain(), e.ChainDb(), e.TxPool(), e.Synced)
-	srv.costTracker, srv.freeCapacity = newCostTracker(e.ChainDb(), config)
+	srv.costTracker, srv.minCapacity = newCostTracker(e.ChainDb(), config)
+	srv.freeCapacity = srv.minCapacity
 
 	// Set up checkpoint oracle.
 	oracle := config.CheckpointOracle
 	if oracle == nil {
 		oracle = params.CheckpointOracles[e.BlockChain().Genesis().Hash()]
 	}
-	srv.oracle = newCheckpointOracle(oracle, srv.localCheckpoint)
+	srv.oracle = checkpointoracle.New(oracle, srv.localCheckpoint)
 
 	// Initialize server capacity management fields.
 	srv.defParams = flowcontrol.ServerParams{
@@ -107,13 +110,13 @@ func NewLesServer(e *eth.Ethereum, config *eth.Config) (*LesServer, error) {
 	// to send requests most of the time. Our goal is to serve as many clients as
 	// possible while the actually used server capacity does not exceed the limits
 	totalRecharge := srv.costTracker.totalRecharge()
-	maxCapacity := srv.freeCapacity * uint64(srv.config.LightPeers)
-	if totalRecharge > maxCapacity {
-		maxCapacity = totalRecharge
+	srv.maxCapacity = srv.freeCapacity * uint64(srv.config.LightPeers)
+	if totalRecharge > srv.maxCapacity {
+		srv.maxCapacity = totalRecharge
 	}
-	srv.fcManager.SetCapacityLimits(srv.freeCapacity, maxCapacity, srv.freeCapacity*2)
-	srv.clientPool = newClientPool(srv.chainDb, srv.freeCapacity, 10000, mclock.System{}, func(id enode.ID) { go srv.peers.Unregister(peerIdToString(id)) })
-	srv.clientPool.setPriceFactors(priceFactors{0, 1, 1}, priceFactors{0, 1, 1})
+	srv.fcManager.SetCapacityLimits(srv.freeCapacity, srv.maxCapacity, srv.freeCapacity*2)
+	srv.clientPool = newClientPool(srv.chainDb, srv.freeCapacity, mclock.System{}, func(id enode.ID) { go srv.peers.Unregister(peerIdToString(id)) })
+	srv.clientPool.setDefaultFactors(priceFactors{0, 1, 1}, priceFactors{0, 1, 1})
 
 	checkpoint := srv.latestLocalCheckpoint()
 	if !checkpoint.Empty() {
@@ -132,16 +135,33 @@ func (s *LesServer) APIs() []rpc.API {
 			Service:   NewPrivateLightAPI(&s.lesCommons),
 			Public:    false,
 		},
+		{
+			Namespace: "les",
+			Version:   "1.0",
+			Service:   NewPrivateLightServerAPI(s),
+			Public:    false,
+		},
+		{
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   NewPrivateDebugAPI(s),
+			Public:    false,
+		},
 	}
 }
 
 func (s *LesServer) Protocols() []p2p.Protocol {
-	return s.makeProtocols(ServerProtocolVersions, s.handler.runPeer, func(id enode.ID) interface{} {
+	ps := s.makeProtocols(ServerProtocolVersions, s.handler.runPeer, func(id enode.ID) interface{} {
 		if p := s.peers.Peer(peerIdToString(id)); p != nil {
 			return p.Info()
 		}
 		return nil
 	})
+	// Add "les" ENR entries.
+	for i := range ps {
+		ps[i].Attributes = []enr.Entry{&lesEntry{}}
+	}
+	return ps
 }
 
 // Start starts the LES server
@@ -177,9 +197,9 @@ func (s *LesServer) Stop() {
 	s.peers.Close()
 
 	s.fcManager.Stop()
-	s.clientPool.stop()
 	s.costTracker.stop()
 	s.handler.stop()
+	s.clientPool.stop() // client pool should be closed after handler.
 	s.servingQueue.stop()
 
 	// Note, bloom trie indexer is closed by parent bloombits indexer.
@@ -197,7 +217,7 @@ func (s *LesServer) SetContractBackend(backend bind.ContractBackend) {
 	if s.oracle == nil {
 		return
 	}
-	s.oracle.start(backend)
+	s.oracle.Start(backend)
 }
 
 // capacityManagement starts an event handler loop that updates the recharge curve of

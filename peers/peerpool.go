@@ -280,20 +280,23 @@ func (p *PeerPool) handleServerPeers(server *p2p.Server, events <-chan *p2p.Peer
 				}
 			}
 		case event := <-events:
+			var info []*p2p.PeerInfo
 			switch event.Type {
 			case p2p.PeerEventTypeDrop:
 				log.Debug("confirm peer dropped", "ID", event.Peer)
+				info = server.PeersInfo()
 				if p.handleDroppedPeer(server, event.Peer) {
 					retryDiscv5 = time.After(0)
 				}
 			case p2p.PeerEventTypeAdd: // skip other events
 				log.Debug("confirm peer added", "ID", event.Peer)
+				info = server.PeersInfo()
 				p.handleAddedPeer(server, event.Peer)
 				stopDiscv5 = time.After(p.opts.TopicStopSearchDelay)
 			default:
 				continue
 			}
-			SendDiscoverySummary(server.PeersInfo())
+			SendDiscoverySummary(info)
 		}
 	}
 }

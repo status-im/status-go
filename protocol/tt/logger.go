@@ -1,6 +1,7 @@
 package tt
 
 import (
+	"os"
 	"sync"
 
 	"github.com/status-im/status-go/protocol/zaputil"
@@ -17,12 +18,17 @@ func MustCreateTestLogger() *zap.Logger {
 			panic(err)
 		}
 	})
-
-	cfg := zap.NewDevelopmentConfig()
-	cfg.Encoding = "console-hex"
-	l, err := cfg.Build()
-	if err != nil {
-		panic(err)
+	l := zap.NewNop()
+	for _, arg := range os.Args {
+		if arg == "-v" || arg == "-test.v" {
+			cfg := zap.NewDevelopmentConfig()
+			cfg.Encoding = "console-hex"
+			var err error
+			l, err = cfg.Build()
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
 	return l
 }

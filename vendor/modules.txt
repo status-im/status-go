@@ -1,8 +1,7 @@
 # github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
-# github.com/allegro/bigcache v1.2.0
-github.com/allegro/bigcache
-github.com/allegro/bigcache/queue
+# github.com/VictoriaMetrics/fastcache v1.5.3
+github.com/VictoriaMetrics/fastcache
 # github.com/aristanetworks/goarista v0.0.0-20190502180301-283422fc1708
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
@@ -33,7 +32,6 @@ github.com/edsrzf/mmap-go
 # github.com/elastic/gosigar v0.10.4
 github.com/elastic/gosigar
 github.com/elastic/gosigar/sys/windows
-# github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.9
 github.com/ethereum/go-ethereum
 github.com/ethereum/go-ethereum/accounts
 github.com/ethereum/go-ethereum/accounts/abi
@@ -87,6 +85,7 @@ github.com/ethereum/go-ethereum/event
 github.com/ethereum/go-ethereum/internal/debug
 github.com/ethereum/go-ethereum/internal/ethapi
 github.com/ethereum/go-ethereum/les
+github.com/ethereum/go-ethereum/les/checkpointoracle
 github.com/ethereum/go-ethereum/les/flowcontrol
 github.com/ethereum/go-ethereum/light
 github.com/ethereum/go-ethereum/log
@@ -98,6 +97,7 @@ github.com/ethereum/go-ethereum/node
 github.com/ethereum/go-ethereum/p2p
 github.com/ethereum/go-ethereum/p2p/discover
 github.com/ethereum/go-ethereum/p2p/discv5
+github.com/ethereum/go-ethereum/p2p/dnsdisc
 github.com/ethereum/go-ethereum/p2p/enode
 github.com/ethereum/go-ethereum/p2p/enr
 github.com/ethereum/go-ethereum/p2p/nat
@@ -169,7 +169,7 @@ github.com/ipfs/go-log/tracer/wire
 github.com/ipfs/go-log/writer
 # github.com/jackpal/gateway v1.0.5
 github.com/jackpal/gateway
-# github.com/jackpal/go-nat-pmp v1.0.1
+# github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458
 github.com/jackpal/go-nat-pmp
 # github.com/jbenet/go-temp-err-catcher v0.0.0-20150120210811-aac704a3f4f2
 github.com/jbenet/go-temp-err-catcher
@@ -316,7 +316,7 @@ github.com/multiformats/go-multistream
 github.com/mutecomm/go-sqlcipher
 # github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 github.com/okzk/sdnotify
-# github.com/olekukonko/tablewriter v0.0.1
+# github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c
 github.com/olekukonko/tablewriter
 # github.com/opentracing/opentracing-go v1.1.0
 github.com/opentracing/opentracing-go
@@ -390,7 +390,7 @@ github.com/steakknife/hamming
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 github.com/stretchr/testify/suite
-# github.com/syndtr/goleveldb v1.0.0
+# github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 github.com/syndtr/goleveldb/leveldb
 github.com/syndtr/goleveldb/leveldb/cache
 github.com/syndtr/goleveldb/leveldb/comparer
@@ -480,7 +480,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+# golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
@@ -517,6 +517,8 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
+# golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
+golang.org/x/time/rate
 # golang.org/x/tools v0.0.0-20200211045251-2de505fc5306
 golang.org/x/tools/go/analysis
 golang.org/x/tools/go/analysis/passes/inspect
