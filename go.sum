@@ -637,6 +637,8 @@ github.com/status-im/status-go/extkeys v1.1.2 h1:FSjARgDathJ3rIapJt851LsIXP9Oyuu
 github.com/status-im/status-go/extkeys v1.1.2/go.mod h1:hCmFzb2jiiVF2voZKYbzuhOQiHHCmyLJsZJXrFFg7BY=
 github.com/status-im/status-go/whisper/v6 v6.2.6 h1:xELIv/8QB9CQlJjChnCPt4COWOFmgsc2kl03Y3Dspmo=
 github.com/status-im/status-go/whisper/v6 v6.2.6/go.mod h1:csqMoPMkCPW1NJO56HJzNTWAl9UMdetnQzkPbPjsAC4=
+github.com/status-im/status-go/whisper/v6 v6.2.1001 h1:DHdIPywN+uJFZ51xlbI9zvfltoWEwh/IQ4dP1djl5KY=
+github.com/status-im/status-go/whisper/v6 v6.2.1001/go.mod h1:csqMoPMkCPW1NJO56HJzNTWAl9UMdetnQzkPbPjsAC4=
 github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501 h1:oa0KU5jJRNtXaM/P465MhvSFo/HM2O8qi2DDuPcd7ro=
 github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501/go.mod h1:RYo/itke1oU5k/6sj9DNM3QAwtE5rZSgg5JnkOv83hk=
 github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570 h1:gIlAHnH1vJb5vwEjIp5kBj/eu99p/bl0Ay2goiPe5xE=

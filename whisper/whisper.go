@@ -1038,7 +1038,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					Peer:  p.peer.ID(),
 				})
 				envelopeCount += 1
-				logger.Info("Envelope count whisper", "count", envelopeCount)
+				log.Info("Envelope count whisper", "count", envelopeCount)
 				envelopesValidatedCounter.Inc()
 				if cached {
 					p.mark(env)
