@@ -47,6 +47,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
+var envelopeCount int
+
 // TimeSyncError error for clock skew errors.
 type TimeSyncError error
 
@@ -1164,6 +1166,8 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 			Hash:  env.Hash(),
 			Peer:  p.peer.ID(),
 		})
+		envelopeCount += 1
+		logger.Info("Envelope count waku", zap.Int("count", envelopeCount))
 		envelopesValidatedCounter.Inc()
 	}
 

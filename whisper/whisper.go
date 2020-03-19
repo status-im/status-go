@@ -47,6 +47,8 @@ type Bridge interface {
 	Pipe() (<-chan *Envelope, chan<- *Envelope)
 }
 
+var envelopeCount int
+
 // TimeSyncError error for clock skew errors.
 type TimeSyncError error
 
@@ -1035,6 +1037,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 					Hash:  env.Hash(),
 					Peer:  p.peer.ID(),
 				})
+				envelopeCount += 1
+				logger.Info("Envelope count whisper", "count", envelopeCount)
 				envelopesValidatedCounter.Inc()
 				if cached {
 					p.mark(env)
