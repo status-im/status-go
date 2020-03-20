@@ -314,7 +314,7 @@ func (p *Peer) topicInterestMatch(env *Envelope) bool {
 		return false
 	}
 
-	return p.fullNode || p.topicInterest[env.Topic]
+	return p.topicInterest[env.Topic]
 }
 
 // topicOrBloomMatch matches against topic-interest if topic interest
@@ -355,6 +355,7 @@ func (p *Peer) setTopicInterest(topicInterest []TopicType) {
 	for _, topic := range topicInterest {
 		p.topicInterest[topic] = true
 	}
+	p.fullNode = false
 	p.bloomFilter = nil
 }
 
