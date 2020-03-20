@@ -336,7 +336,8 @@ type RequestMessagesSyncSuite struct {
 }
 
 // NOTE: Disabling this for now as too flaky
-func (s *RequestMessagesSyncSuite) testExpired() {
+/*
+func (s *RequestMessagesSyncSuite) TestExpired() {
 	// intentionally discarding all requests, so that request will timeout
 	go func() {
 		for {
@@ -356,6 +357,7 @@ func (s *RequestMessagesSyncSuite) testExpired() {
 	)
 	s.Require().EqualError(err, "failed to request messages after 1 retries")
 }
+*/
 
 func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
 	const cursorSize = 36 // taken from mailserver_response.go from waku package
