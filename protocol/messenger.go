@@ -3068,6 +3068,11 @@ func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*Message) ([]*Mess
 	return m.persistence.MessagesByIDs(messageIDs)
 }
 
+func (m *Messenger) SignMessage(message string) ([]byte, error) {
+	hash := crypto.TextHash([]byte(message))
+	return crypto.Sign(hash, m.identity)
+}
+
 func (m *Messenger) getTimesource() TimeSource {
 	return m.transport
 }

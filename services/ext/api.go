@@ -392,6 +392,10 @@ func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) err
 	return api.service.messenger.SyncDevices(ctx, name, picture)
 }
 
+func (api *PublicAPI) SignMessageWithChatKey(ctx context.Context, message string) (types.HexBytes, error) {
+	return api.service.messenger.SignMessage(message)
+}
+
 func (api *PublicAPI) UpdateMailservers(enodes []string) error {
 	nodes := make([]*enode.Node, len(enodes))
 	for i, rawurl := range enodes {
