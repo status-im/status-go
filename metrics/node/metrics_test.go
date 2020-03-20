@@ -5,9 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p"
-
 	prom "github.com/prometheus/client_golang/prometheus"
 )
 
