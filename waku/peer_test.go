@@ -564,6 +564,22 @@ func TestTopicOrBloomMatch(t *testing.T) {
 
 }
 
+func TestTopicOrBloomMatchFullNode(t *testing.T) {
+	p := Peer{}
+	// Set as full node
+	p.fullNode = true
+	p.setTopicInterest([]TopicType{sharedTopic})
+	envelope := &Envelope{Topic: sharedTopic}
+	if !p.topicOrBloomMatch(envelope) {
+		t.Fatal("envelope should match")
+	}
+
+	badEnvelope := &Envelope{Topic: wrongTopic}
+	if p.topicOrBloomMatch(badEnvelope) {
+		t.Fatal("envelope should not match")
+	}
+}
+
 //two light nodes handshake. restriction disabled
 func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 	w1 := Waku{}
