@@ -9,7 +9,7 @@ replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
 require (
-	github.com/beevik/ntp v0.2.0
+	github.com/beevik/ntp v0.3.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/deckarep/golang-set v1.7.1
