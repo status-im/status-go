@@ -10,6 +10,7 @@
 // 0004_pending_stickers.up.sql (61B)
 // 0005_waku_mode.down.sql (0)
 // 0005_waku_mode.up.sql (146B)
+// 0006_appearance.up.sql (67B)
 // doc.go (74B)
 
 package migrations
@@ -214,7 +215,7 @@ func _0004_pending_stickersDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1581952751, 0)}
+	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -234,7 +235,7 @@ func _0004_pending_stickersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1581952751, 0)}
+	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3c, 0xed, 0x25, 0xdf, 0x75, 0x2, 0x6c, 0xf0, 0xa2, 0xa8, 0x37, 0x62, 0x65, 0xad, 0xfd, 0x98, 0xa0, 0x9d, 0x63, 0x94, 0xdf, 0x6b, 0x46, 0xe0, 0x68, 0xec, 0x9c, 0x7f, 0x77, 0xdd, 0xb3, 0x6}}
 	return a, nil
 }
@@ -254,7 +255,7 @@ func _0005_waku_modeDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0005_waku_mode.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1582295057, 0)}
+	info := bindataFileInfo{name: "0005_waku_mode.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -274,8 +275,28 @@ func _0005_waku_modeUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0005_waku_mode.up.sql", size: 146, mode: os.FileMode(0644), modTime: time.Unix(1582295057, 0)}
+	info := bindataFileInfo{name: "0005_waku_mode.up.sql", size: 146, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa6, 0x91, 0xc, 0xd7, 0x89, 0x61, 0x2e, 0x4c, 0x5a, 0xb6, 0x67, 0xd1, 0xc1, 0x42, 0x24, 0x38, 0xd6, 0x1b, 0x75, 0x41, 0x9c, 0x23, 0xb0, 0xca, 0x5c, 0xf1, 0x5c, 0xd0, 0x13, 0x92, 0x3e, 0xe1}}
+	return a, nil
+}
+
+var __0006_appearanceUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x2c\x28\x48\x4d\x2c\x4a\xcc\x4b\x4e\x55\xf0\xf4\x0b\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xb0\xe6\x02\x04\x00\x00\xff\xff\x0b\x18\x43\x21\x43\x00\x00\x00")
+
+func _0006_appearanceUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0006_appearanceUpSql,
+		"0006_appearance.up.sql",
+	)
+}
+
+func _0006_appearanceUpSql() (*asset, error) {
+	bytes, err := _0006_appearanceUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1584955991, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xae, 0x6, 0x25, 0x6c, 0xe4, 0x9d, 0xa7, 0x72, 0xe8, 0xbc, 0xe4, 0x1f, 0x1e, 0x2d, 0x7c, 0xb7, 0xf6, 0xa3, 0xec, 0x3b, 0x4e, 0x93, 0x2e, 0xa4, 0xec, 0x6f, 0xe5, 0x95, 0x94, 0xe8, 0x4, 0xfb}}
 	return a, nil
 }
 
@@ -410,6 +431,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0005_waku_mode.up.sql": _0005_waku_modeUpSql,
 
+	"0006_appearance.up.sql": _0006_appearanceUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -464,6 +487,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0004_pending_stickers.up.sql":   &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
 	"0005_waku_mode.down.sql":        &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
 	"0005_waku_mode.up.sql":          &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
+	"0006_appearance.up.sql":         &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
 	"doc.go":                         &bintree{docGo, map[string]*bintree{}},
 }}
 
