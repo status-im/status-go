@@ -71,7 +71,7 @@ type Settings struct {
 	StickerPacksPending    *json.RawMessage `json:"stickers/packs-pending,omitempty"`
 	StickersRecentStickers *json.RawMessage `json:"stickers/recent-stickers,omitempty"`
 	SyncingOnMobileNetwork bool             `json:"syncing-on-mobile-network?,omitempty"`
-	Appearance             int64            `json:"appearance"`
+	Appearance             uint             `json:"appearance"`
 	Usernames              *json.RawMessage `json:"usernames,omitempty"`
 	WalletRootAddress      types.Address    `json:"wallet-root-address,omitempty"`
 	WalletSetUpPassed      bool             `json:"wallet-set-up-passed?,omitempty"`
@@ -276,10 +276,6 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		}
 		update, err = db.db.Prepare("UPDATE settings SET waku_enabled = ? WHERE synthetic_id = 'id'")
 	case "appearance":
-		_, ok := value.(uint)
-		if !ok {
-			return ErrInvalidConfig
-		}
 		update, err = db.db.Prepare("UPDATE settings SET appearance = ? WHERE synthetic_id = 'id'")
 	case "waku-bloom-filter-mode":
 		_, ok := value.(bool)
