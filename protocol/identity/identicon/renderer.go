@@ -13,7 +13,7 @@ func renderBase64(id Identicon) (string, error) {
 	img := image.NewRGBA(image.Rect(0, 0, 50, 50))
 	var buff bytes.Buffer
 
-	setBackgroundWhite(img)
+	setBackgroundTransparent(img)
 
 	for i, v := range id.bitmap {
 		if v == 1 {
@@ -30,8 +30,8 @@ func renderBase64(id Identicon) (string, error) {
 	return image, nil
 }
 
-func setBackgroundWhite(img *image.RGBA) {
-	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.White}, image.Point{}, draw.Src)
+func setBackgroundTransparent(img *image.RGBA) {
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.Transparent}, image.Point{}, draw.Src)
 }
 
 func drawRect(rgba *image.RGBA, i int, c color.Color) {
