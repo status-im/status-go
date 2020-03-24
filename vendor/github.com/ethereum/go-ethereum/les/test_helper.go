@@ -39,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/les/checkpointoracle"
 	"github.com/ethereum/go-ethereum/les/flowcontrol"
 	"github.com/ethereum/go-ethereum/light"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -71,10 +72,10 @@ var (
 
 var (
 	// The block frequency for creating checkpoint(only used in test)
-	sectionSize = big.NewInt(512)
+	sectionSize = big.NewInt(128)
 
 	// The number of confirmations needed to generate a checkpoint(only used in test).
-	processConfirms = big.NewInt(4)
+	processConfirms = big.NewInt(1)
 
 	// The token bucket buffer limit for testing purpose.
 	testBufLimit = uint64(1000000)
@@ -174,7 +175,7 @@ func newTestClientHandler(backend *backends.SimulatedBackend, odr *LesOdr, index
 			Alloc:    core.GenesisAlloc{bankAddr: {Balance: bankFunds}},
 			GasLimit: 100000000,
 		}
-		oracle *checkpointOracle
+		oracle *checkpointoracle.CheckpointOracle
 	)
 	genesis := gspec.MustCommit(db)
 	chain, _ := light.NewLightChain(odr, gspec.Config, engine, nil)
@@ -194,7 +195,7 @@ func newTestClientHandler(backend *backends.SimulatedBackend, odr *LesOdr, index
 				BloomRoot:    light.GetBloomTrieRoot(db, index, sectionHead),
 			}
 		}
-		oracle = newCheckpointOracle(checkpointConfig, getLocal)
+		oracle = checkpointoracle.New(checkpointConfig, getLocal)
 	}
 	client := &LightEthereum{
 		lesCommons: lesCommons{
@@ -218,7 +219,7 @@ func newTestClientHandler(backend *backends.SimulatedBackend, odr *LesOdr, index
 	client.handler = newClientHandler(ulcServers, ulcFraction, nil, client)
 
 	if client.oracle != nil {
-		client.oracle.start(backend)
+		client.oracle.Start(backend)
 	}
 	return client.handler
 }
@@ -230,7 +231,7 @@ func newTestServerHandler(blocks int, indexers []*core.ChainIndexer, db ethdb.Da
 			Alloc:    core.GenesisAlloc{bankAddr: {Balance: bankFunds}},
 			GasLimit: 100000000,
 		}
-		oracle *checkpointOracle
+		oracle *checkpointoracle.CheckpointOracle
 	)
 	genesis := gspec.MustCommit(db)
 
@@ -257,7 +258,7 @@ func newTestServerHandler(blocks int, indexers []*core.ChainIndexer, db ethdb.Da
 				BloomRoot:    light.GetBloomTrieRoot(db, index, sectionHead),
 			}
 		}
-		oracle = newCheckpointOracle(checkpointConfig, getLocal)
+		oracle = checkpointoracle.New(checkpointConfig, getLocal)
 	}
 	server := &LesServer{
 		lesCommons: lesCommons{
@@ -280,11 +281,11 @@ func newTestServerHandler(blocks int, indexers []*core.ChainIndexer, db ethdb.Da
 	}
 	server.costTracker, server.freeCapacity = newCostTracker(db, server.config)
 	server.costTracker.testCostList = testCostList(0) // Disable flow control mechanism.
-	server.clientPool = newClientPool(db, 1, 10000, clock, nil)
+	server.clientPool = newClientPool(db, 1, clock, nil)
 	server.clientPool.setLimits(10000, 10000) // Assign enough capacity for clientpool
 	server.handler = newServerHandler(server, simulation.Blockchain(), db, txpool, func() bool { return true })
 	if server.oracle != nil {
-		server.oracle.start(simulation)
+		server.oracle.Start(simulation)
 	}
 	server.servingQueue.setThreads(4)
 	server.handler.start()
@@ -517,7 +518,7 @@ func newClientServerEnv(t *testing.T, blocks int, protocol int, callback indexer
 	if connect {
 		cpeer, err1, speer, err2 = newTestPeerPair("peer", protocol, server, client)
 		select {
-		case <-time.After(time.Millisecond * 100):
+		case <-time.After(time.Millisecond * 300):
 		case err := <-err1:
 			t.Fatalf("peer 1 handshake error: %v", err)
 		case err := <-err2:

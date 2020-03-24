@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	bytes32Type, _ = abi.NewType("bytes32", nil)
-	int256Type, _  = abi.NewType("int256", nil)
+	bytes32Type, _ = abi.NewType("bytes32", "", nil)
+	int256Type, _  = abi.NewType("int256", "", nil)
 
 	errNotInteger = errors.New("not an integer")
 )
@@ -137,7 +137,7 @@ func toABITypeAndValue(f Field, data map[string]json.RawMessage, types Types) (v
 }
 
 func atomicType(f Field, data map[string]json.RawMessage) (val interface{}, typ abi.Type, err error) {
-	typ, err = abi.NewType(f.Type, nil)
+	typ, err = abi.NewType(f.Type, "", nil)
 	if err != nil {
 		return
 	}

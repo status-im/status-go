@@ -80,15 +80,19 @@ func makeTopics(query ...[]interface{}) ([][]common.Hash, error) {
 				copy(topic[:], hash[:])
 
 			default:
+				// todo(rjl493456442) according solidity documentation, indexed event
+				// parameters that are not value types i.e. arrays and structs are not
+				// stored directly but instead a keccak256-hash of an encoding is stored.
+				//
+				// We only convert stringS and bytes to hash, still need to deal with
+				// array(both fixed-size and dynamic-size) and struct.
+
 				// Attempt to generate the topic from funky types
 				val := reflect.ValueOf(rule)
-
 				switch {
-
 				// static byte array
 				case val.Kind() == reflect.Array && reflect.TypeOf(rule).Elem().Kind() == reflect.Uint8:
 					reflect.Copy(reflect.ValueOf(topic[:val.Len()]), val)
-
 				default:
 					return nil, fmt.Errorf("unsupported indexed type: %T", rule)
 				}
@@ -162,6 +166,7 @@ func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) er
 
 		default:
 			// Ran out of plain primitive types, try custom types
+
 			switch field.Type() {
 			case reflectHash: // Also covers all dynamic types
 				field.Set(reflect.ValueOf(topics[0]))
@@ -173,16 +178,21 @@ func parseTopics(out interface{}, fields abi.Arguments, topics []common.Hash) er
 
 			case reflectBigInt:
 				num := new(big.Int).SetBytes(topics[0][:])
+				if arg.Type.T == abi.IntTy {
+					if num.Cmp(abi.MaxInt256) > 0 {
+						num.Add(abi.MaxUint256, big.NewInt(0).Neg(num))
+						num.Add(num, big.NewInt(1))
+						num.Neg(num)
+					}
+				}
 				field.Set(reflect.ValueOf(num))
 
 			default:
 				// Ran out of custom types, try the crazies
 				switch {
-
 				// static byte array
 				case arg.Type.T == abi.FixedBytesTy:
 					reflect.Copy(field, reflect.ValueOf(topics[0][:arg.Type.Size]))
-
 				default:
 					return fmt.Errorf("unsupported indexed type: %v", arg.Type)
 				}
@@ -209,8 +219,7 @@ func parseTopicsIntoMap(out map[string]interface{}, fields abi.Arguments, topics
 		case abi.BoolTy:
 			out[arg.Name] = topics[0][common.HashLength-1] == 1
 		case abi.IntTy, abi.UintTy:
-			num := new(big.Int).SetBytes(topics[0][:])
-			out[arg.Name] = num
+			out[arg.Name] = abi.ReadInteger(arg.Type.T, arg.Type.Kind, topics[0].Bytes())
 		case abi.AddressTy:
 			var addr common.Address
 			copy(addr[:], topics[0][common.HashLength-common.AddressLength:])
@@ -218,7 +227,11 @@ func parseTopicsIntoMap(out map[string]interface{}, fields abi.Arguments, topics
 		case abi.HashTy:
 			out[arg.Name] = topics[0]
 		case abi.FixedBytesTy:
-			out[arg.Name] = topics[0][:]
+			array, err := abi.ReadFixedBytes(arg.Type, topics[0].Bytes())
+			if err != nil {
+				return err
+			}
+			out[arg.Name] = array
 		case abi.StringTy, abi.BytesTy, abi.SliceTy, abi.ArrayTy:
 			// Array types (including strings and bytes) have their keccak256 hashes stored in the topic- not a hash
 			// whose bytes can be decoded to the actual value- so the best we can do is retrieve that hash

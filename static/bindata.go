@@ -6,7 +6,7 @@
 // ../config/cli/fleet-eth.test.json (1.855kB)
 // ../config/cli/les-enabled.json (58B)
 // ../config/cli/mailserver-enabled.json (176B)
-// ../config/status-chain-genesis.json (612B)
+// ../config/status-chain-genesis.json (634B)
 // keys/bootnode.key (65B)
 // keys/firebaseauthkey (153B)
 // keys/test-account1-status-chain.pk (489B)
@@ -97,7 +97,7 @@ func ConfigReadmeMd() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/README.md", size: 3132, mode: os.FileMode(0644), modTime: time.Unix(1584010418, 0)}
+	info := bindataFileInfo{name: "../config/README.md", size: 3132, mode: os.FileMode(0644), modTime: time.Unix(1582296905, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd0, 0x71, 0x14, 0x3e, 0x9d, 0x9c, 0x11, 0x40, 0xe1, 0xe9, 0x8b, 0xcc, 0x38, 0x17, 0x69, 0xb, 0xa7, 0xf2, 0x91, 0xa6, 0x4a, 0x9f, 0xd2, 0xc6, 0xf4, 0xff, 0x37, 0x5d, 0xd3, 0xed, 0x7c, 0xbd}}
 	return a, nil
 }
@@ -117,7 +117,7 @@ func ConfigCliFleetEthProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 3625, mode: os.FileMode(0644), modTime: time.Unix(1584394651, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 3625, mode: os.FileMode(0644), modTime: time.Unix(1584568685, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1c, 0x86, 0x93, 0x3b, 0x8c, 0xb4, 0x1b, 0x8b, 0x70, 0xe6, 0x90, 0x3, 0xc9, 0x93, 0x99, 0x97, 0x18, 0xb7, 0x49, 0xbf, 0x2d, 0x35, 0x98, 0xb8, 0x49, 0xa8, 0x73, 0x30, 0xf5, 0x2d, 0x7f, 0x5c}}
 	return a, nil
 }
@@ -137,7 +137,7 @@ func ConfigCliFleetEthStagingJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1846, mode: os.FileMode(0644), modTime: time.Unix(1584394651, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1846, mode: os.FileMode(0644), modTime: time.Unix(1584568685, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd1, 0xef, 0x3d, 0x5c, 0x41, 0xb1, 0xc8, 0x54, 0xd3, 0x82, 0x60, 0xcf, 0x5f, 0x8b, 0x92, 0xd0, 0x41, 0xa7, 0xff, 0xfd, 0x2c, 0x95, 0x44, 0x68, 0xd3, 0xad, 0x16, 0x8c, 0x49, 0x10, 0x4e, 0xb7}}
 	return a, nil
 }
@@ -157,7 +157,7 @@ func ConfigCliFleetEthTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 1855, mode: os.FileMode(0644), modTime: time.Unix(1584394651, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 1855, mode: os.FileMode(0644), modTime: time.Unix(1584568685, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe4, 0x90, 0x4, 0x6, 0x2b, 0xe4, 0x67, 0x7a, 0xfc, 0x70, 0xa9, 0xb, 0x85, 0x8c, 0xb3, 0x8, 0x8e, 0xee, 0xec, 0x64, 0xb7, 0xac, 0x4c, 0x6, 0x4d, 0xcc, 0x4f, 0xda, 0xbd, 0xed, 0x17, 0x53}}
 	return a, nil
 }
@@ -177,7 +177,7 @@ func ConfigCliLesEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "../config/cli/les-enabled.json", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x7e, 0xee, 0x27, 0xa7, 0x74, 0xa0, 0x46, 0xa1, 0x41, 0xed, 0x4d, 0x16, 0x5b, 0xf3, 0xf0, 0x7c, 0xc8, 0x2f, 0x6f, 0x47, 0xa4, 0xbb, 0x5f, 0x43, 0x33, 0xd, 0x9, 0x9d, 0xea, 0x9e, 0x15, 0xee}}
 	return a, nil
 }
@@ -197,12 +197,12 @@ func ConfigCliMailserverEnabledJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "../config/cli/mailserver-enabled.json", size: 176, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0xec, 0x81, 0x8b, 0x99, 0xb6, 0xdb, 0xc0, 0x8b, 0x46, 0x97, 0x96, 0xc7, 0x58, 0x30, 0x33, 0xef, 0x54, 0x25, 0x87, 0x7b, 0xb9, 0x94, 0x6b, 0x18, 0xa4, 0x5b, 0x58, 0x67, 0x7c, 0x44, 0xa6}}
 	return a, nil
 }
 
-var _ConfigStatusChainGenesisJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\x90\x41\x6f\x13\x31\x10\x85\xef\xf9\x15\x96\xcf\x1c\xc6\xf6\x78\x66\xbd\x37\x4a\x59\x81\xc4\x8d\x5f\x30\xb6\xc7\xcd\xaa\x9b\x6c\x94\x6c\xa4\x16\xd4\xff\x8e\x92\x2c\xa1\x42\x9c\xf0\xcd\x7e\x33\xef\x7b\x7e\x3f\x37\xc6\x58\x99\xa6\xb9\xd8\xde\x5c\x2e\xc6\x18\x9b\x07\x47\x58\x24\xa0\x0b\x9e\x04\x42\x8e\xc8\x05\xe2\x43\xc0\x90\xfd\x67\xef\x74\xf8\xa8\x1e\x73\xfa\xb3\x62\x6c\x96\x49\xf6\x45\x6d\x6f\x2c\xbc\x38\x18\xe0\xd3\x00\x84\x8f\x8f\x31\x79\xb8\x1c\x7b\x1d\x7c\xfb\xb0\x22\x3c\x44\x89\x15\x94\x7d\x6b\x14\x81\x53\x2b\x92\x33\x0a\x05\x0d\xa1\xfa\x4e\x84\xaa\x36\x5f\xfe\x03\xb1\x59\x31\xb6\xcc\xfb\x36\x3e\xdd\x1d\x6c\xd9\xca\xb8\xff\x5a\x6d\x6f\x98\xf9\x16\xc4\x6e\xe7\x9d\x9e\x16\x95\xfa\x30\xcd\xe5\xd9\xf6\x06\x56\xa1\xca\x3c\xcc\xc7\xe7\xef\xe7\xc3\x61\x3e\x2e\xb6\x37\xcb\xf1\xac\xab\x96\x5f\x7f\xc8\x7e\x19\xcf\xbb\xbf\x97\x74\x3c\xb8\x08\x5f\xe4\xb4\xbd\x85\x8c\xa0\xa4\x35\xa3\x26\xa8\x89\x1c\x49\xe9\x72\x63\xe7\x92\x6a\xe0\x82\x80\x5d\x41\x27\x15\x52\xf0\x1d\x31\xa9\xcb\x21\xd5\x42\x9d\x80\x96\x96\x43\xb5\xef\x7d\xe3\x3f\x69\xdd\xfd\xf5\xfe\xef\x3a\xb6\x36\x96\xf3\xb4\xbc\xfe\xae\xea\xda\xce\x55\xd3\x97\xe5\x28\x8f\xb2\xc8\x1a\x30\x30\x92\x63\xe4\xc8\x01\x03\x75\xe4\x28\x91\x7a\x88\xc0\x9e\x12\xd3\x45\xa3\xe8\x21\x22\x45\xbe\xcc\x26\x52\x62\x0f\xa8\x14\x19\x99\xa9\xb1\xa7\x7c\xb3\x7e\x92\xd3\xb7\x71\x37\x2e\xef\xa1\x60\x37\x6f\x9b\x5f\x01\x00\x00\xff\xff\x91\xc6\xb3\x58\x64\x02\x00\x00")
+var _ConfigStatusChainGenesisJson = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x9c\x90\xcd\x6e\x1b\x31\x0c\x84\xef\x7e\x0a\x41\xe7\x1e\x28\x89\x22\x57\xbe\x35\x75\x17\x2d\xd0\x5b\x9f\x80\x92\xa8\x78\x91\xb5\xd7\xb0\xd7\x40\xd2\x22\xef\x5e\xd8\xde\xba\x3f\xc8\x29\xba\x89\x43\xce\x37\x98\x9f\x2b\x63\xac\x8c\xe3\x54\xec\xda\x5c\x3e\xc6\x18\x9b\x7b\x47\x58\x24\xa0\x0b\x9e\x04\x42\x8e\xc8\x05\xe2\x43\xc0\x90\xfd\x67\xef\xb4\xff\xa8\x1e\x73\xfa\x73\x62\x6c\x96\x51\xf6\x45\xed\xda\x58\x78\x76\xd0\xc3\xa7\x1e\x08\x37\x9b\x98\x3c\x5c\x9e\xbd\x2e\xbe\x7e\x58\x10\x1e\xa2\xc4\x0a\xca\xbe\x35\x8a\xc0\xa9\x15\xc9\x19\x85\x82\x86\x50\x7d\x27\x42\x55\x9b\x2f\xef\x40\xac\x16\x8c\x2d\xd3\xbe\x0d\x8f\x77\x07\x5b\xb6\x32\xec\xbf\x56\xbb\x36\xcc\x7c\x0b\x62\xb7\xd3\x4e\x4f\xb3\x4a\x7d\x18\xa7\xf2\x64\xd7\x06\x16\xa1\xca\xd4\x4f\xc7\xa7\xef\xe7\xc3\x61\x3a\xce\x76\x6d\xe6\xe3\x59\x17\x2d\xbf\xfc\x90\xfd\x3c\x9c\x77\xff\x1f\xe9\x70\x70\x11\xbe\xc8\x69\x7b\x0b\x19\x41\x49\x6b\x46\x4d\x50\x13\x39\x92\xd2\xe5\xc6\xce\x25\xd5\xc0\x05\x01\xbb\x82\x4e\x2a\xa4\xe0\x3b\x62\x52\x97\x43\xaa\x85\x3a\x01\x2d\x2d\x87\x6a\xff\xf1\x7d\x93\x16\xdf\x9c\x76\xf7\xe9\xbd\x8d\x3a\xb4\x36\x94\xf3\x38\xbf\xfc\x2e\xf0\xda\xd9\x55\xd3\xe7\xf9\x28\x1b\x99\x65\x89\x1d\x18\xc9\x31\x72\xe4\x80\x81\x3a\x72\x94\x48\x3d\x44\x60\x4f\x89\xe9\xa2\x51\xf4\x10\x91\x22\x5f\x76\x13\x29\xb1\x07\x54\x8a\x8c\xcc\xd4\xd8\x53\xbe\x59\x3f\xca\xe9\xdb\xb0\x1b\xe6\xbf\xa1\x60\x57\xaf\xab\x5f\x01\x00\x00\xff\xff\x6d\xb8\x55\x51\x7a\x02\x00\x00")
 
 func ConfigStatusChainGenesisJsonBytes() ([]byte, error) {
 	return bindataRead(
@@ -217,8 +217,8 @@ func ConfigStatusChainGenesisJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 612, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb, 0xf0, 0xc, 0x1, 0x95, 0x65, 0x6, 0x55, 0x48, 0x8f, 0x83, 0xa0, 0xb4, 0x81, 0xda, 0xad, 0x30, 0x6d, 0xb2, 0x78, 0x1b, 0x26, 0x4, 0x13, 0x12, 0x9, 0x6, 0xae, 0x3a, 0x2c, 0x1, 0x71}}
+	info := bindataFileInfo{name: "../config/status-chain-genesis.json", size: 634, mode: os.FileMode(0644), modTime: time.Unix(1584994798, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4d, 0xca, 0xd3, 0xf8, 0x4e, 0x41, 0x5c, 0x57, 0x7c, 0x4f, 0xda, 0x51, 0x43, 0xb6, 0xb1, 0x5c, 0x87, 0x99, 0xa6, 0x4a, 0xad, 0xbb, 0x80, 0x2c, 0x77, 0x8, 0xfc, 0x12, 0x99, 0x53, 0x88, 0x7a}}
 	return a, nil
 }
 
@@ -237,7 +237,7 @@ func keysBootnodeKey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "keys/bootnode.key", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x31, 0xcf, 0x27, 0xd4, 0x96, 0x2e, 0x32, 0xcd, 0x58, 0x96, 0x2a, 0xe5, 0x8c, 0xa0, 0xf1, 0x73, 0x1f, 0xd6, 0xd6, 0x8b, 0xb, 0x73, 0xd3, 0x2c, 0x84, 0x1a, 0x56, 0xa4, 0x74, 0xb6, 0x95, 0x20}}
 	return a, nil
 }
@@ -257,7 +257,7 @@ func keysFirebaseauthkey() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(0644), modTime: time.Unix(1574347314, 0)}
+	info := bindataFileInfo{name: "keys/firebaseauthkey", size: 153, mode: os.FileMode(0644), modTime: time.Unix(1560062905, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe, 0x69, 0x23, 0x64, 0x7d, 0xf9, 0x14, 0x37, 0x6f, 0x2b, 0x1, 0xf0, 0xb0, 0xa4, 0xb2, 0xd0, 0x18, 0xcd, 0xf9, 0xeb, 0x57, 0xa3, 0xfd, 0x79, 0x25, 0xa7, 0x9c, 0x3, 0xce, 0x26, 0xec, 0xe1}}
 	return a, nil
 }
@@ -277,7 +277,7 @@ func keysTestAccount1StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "keys/test-account1-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x8f, 0xba, 0x35, 0x1, 0x2b, 0x9d, 0xad, 0xf0, 0x2d, 0x3c, 0x4d, 0x6, 0xb5, 0x22, 0x2, 0x47, 0xd4, 0x1c, 0xf4, 0x31, 0x2f, 0xb, 0x5b, 0x27, 0x5d, 0x43, 0x97, 0x58, 0x2d, 0xf0, 0xe1, 0xbe}}
 	return a, nil
 }
@@ -297,7 +297,7 @@ func keysTestAccount1Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "keys/test-account1.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9, 0x43, 0xc2, 0xf4, 0x8c, 0xc6, 0x64, 0x25, 0x8c, 0x7, 0x8c, 0xa8, 0x89, 0x2b, 0x7b, 0x9b, 0x4f, 0x81, 0xcb, 0xce, 0x3d, 0xef, 0x82, 0x9c, 0x27, 0x27, 0xa9, 0xc5, 0x46, 0x70, 0x30, 0x38}}
 	return a, nil
 }
@@ -317,7 +317,7 @@ func keysTestAccount2StatusChainPk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "keys/test-account2-status-chain.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9, 0xf8, 0x5c, 0xe9, 0x92, 0x96, 0x2d, 0x88, 0x2b, 0x8e, 0x42, 0x3f, 0xa4, 0x93, 0x6c, 0xad, 0xe9, 0xc0, 0x1b, 0x8a, 0x8, 0x8c, 0x5e, 0x7a, 0x84, 0xa2, 0xf, 0x9f, 0x77, 0x58, 0x2c, 0x2c}}
 	return a, nil
 }
@@ -337,7 +337,7 @@ func keysTestAccount2Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "keys/test-account2.pk", size: 491, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9f, 0x72, 0xd5, 0x95, 0x5c, 0x5a, 0x99, 0x9d, 0x2f, 0x21, 0x83, 0xd7, 0x10, 0x17, 0x4a, 0x3d, 0x65, 0xc9, 0x26, 0x1a, 0x2c, 0x9d, 0x65, 0x63, 0xd2, 0xa0, 0xfc, 0x7c, 0x0, 0x87, 0x38, 0x9f}}
 	return a, nil
 }
@@ -357,7 +357,7 @@ func keysTestAccount3BeforeEip55Pk() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1576772083, 0)}
+	info := bindataFileInfo{name: "keys/test-account3-before-eip55.pk", size: 489, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x81, 0x40, 0x56, 0xc1, 0x5e, 0x10, 0x6e, 0x28, 0x15, 0x3, 0x4e, 0xc4, 0xc4, 0x71, 0x4d, 0x16, 0x99, 0xcc, 0x1b, 0x63, 0xee, 0x10, 0x20, 0xe4, 0x59, 0x52, 0x3f, 0xc0, 0xad, 0x15, 0x13, 0x72}}
 	return a, nil
 }

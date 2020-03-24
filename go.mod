@@ -2,7 +2,7 @@ module github.com/status-im/status-go
 
 go 1.13
 
-replace github.com/ethereum/go-ethereum v1.9.5 => github.com/status-im/go-ethereum v1.9.5-status.9
+replace github.com/ethereum/go-ethereum => github.com/status-im/go-ethereum v1.9.11-status.0
 
 replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
@@ -13,7 +13,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/deckarep/golang-set v1.7.1
-	github.com/ethereum/go-ethereum v1.9.5
+	github.com/ethereum/go-ethereum v1.9.11
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
@@ -46,7 +46,7 @@ require (
 	github.com/status-im/status-go/whisper/v6 v6.2.6
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.5.1
-	github.com/syndtr/goleveldb v1.0.0
+	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.23
 	github.com/wealdtech/go-ens/v3 v3.3.0

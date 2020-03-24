@@ -920,6 +920,8 @@ func (s *MessengerSuite) testRetrieveTheirPrivateGroupWrappedMessageChat() {
 		response, err = s.m.RetrieveAll()
 		if err == nil && len(response.Chats) == 0 {
 			err = errors.New("no chats")
+		} else if err == nil && response.Chats[0].UnviewedMessagesCount == 0 {
+			err = errors.New("no unviewed messages")
 		}
 		return err
 	})

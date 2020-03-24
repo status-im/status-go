@@ -651,8 +651,6 @@ func NewNodeConfigWithDefaultsAndFiles(
 		}
 	}
 
-	c.updatePeerLimits()
-
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
