@@ -11,6 +11,7 @@
 // 0005_waku_mode.down.sql (0)
 // 0005_waku_mode.up.sql (146B)
 // 0006_appearance.up.sql (67B)
+// 0007_enable_waku_default.up.sql (38B)
 // doc.go (74B)
 
 package migrations
@@ -295,8 +296,28 @@ func _0006_appearanceUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1585119952, 0)}
+	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1585125858, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xae, 0x6, 0x25, 0x6c, 0xe4, 0x9d, 0xa7, 0x72, 0xe8, 0xbc, 0xe4, 0x1f, 0x1e, 0x2d, 0x7c, 0xb7, 0xf6, 0xa3, 0xec, 0x3b, 0x4e, 0x93, 0x2e, 0xa4, 0xec, 0x6f, 0xe5, 0x95, 0x94, 0xe8, 0x4, 0xfb}}
+	return a, nil
+}
+
+var __0007_enable_waku_defaultUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x0a\x0d\x70\x71\x0c\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x08\x76\x0d\x51\x28\x4f\xcc\x2e\x8d\x4f\xcd\x4b\x4c\xca\x49\x4d\x51\xb0\x55\x30\xb4\xe6\x02\x04\x00\x00\xff\xff\xa7\x77\xcb\x82\x26\x00\x00\x00")
+
+func _0007_enable_waku_defaultUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0007_enable_waku_defaultUpSql,
+		"0007_enable_waku_default.up.sql",
+	)
+}
+
+func _0007_enable_waku_defaultUpSql() (*asset, error) {
+	bytes, err := _0007_enable_waku_defaultUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0007_enable_waku_default.up.sql", size: 38, mode: os.FileMode(0644), modTime: time.Unix(1585302708, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd4, 0x42, 0xb6, 0xe5, 0x48, 0x41, 0xeb, 0xc0, 0x7e, 0x3b, 0xe6, 0x8e, 0x96, 0x33, 0x20, 0x92, 0x24, 0x5a, 0x60, 0xfa, 0xa0, 0x3, 0x5e, 0x76, 0x4b, 0x89, 0xaa, 0x37, 0x66, 0xbc, 0x26, 0x11}}
 	return a, nil
 }
 
@@ -433,6 +454,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0006_appearance.up.sql": _0006_appearanceUpSql,
 
+	"0007_enable_waku_default.up.sql": _0007_enable_waku_defaultUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -477,18 +500,19 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_app.down.sql":              &bintree{_0001_appDownSql, map[string]*bintree{}},
-	"0001_app.up.sql":                &bintree{_0001_appUpSql, map[string]*bintree{}},
-	"0002_tokens.down.sql":           &bintree{_0002_tokensDownSql, map[string]*bintree{}},
-	"0002_tokens.up.sql":             &bintree{_0002_tokensUpSql, map[string]*bintree{}},
-	"0003_settings.down.sql":         &bintree{_0003_settingsDownSql, map[string]*bintree{}},
-	"0003_settings.up.sql":           &bintree{_0003_settingsUpSql, map[string]*bintree{}},
-	"0004_pending_stickers.down.sql": &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
-	"0004_pending_stickers.up.sql":   &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
-	"0005_waku_mode.down.sql":        &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
-	"0005_waku_mode.up.sql":          &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
-	"0006_appearance.up.sql":         &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
-	"doc.go":                         &bintree{docGo, map[string]*bintree{}},
+	"0001_app.down.sql":               &bintree{_0001_appDownSql, map[string]*bintree{}},
+	"0001_app.up.sql":                 &bintree{_0001_appUpSql, map[string]*bintree{}},
+	"0002_tokens.down.sql":            &bintree{_0002_tokensDownSql, map[string]*bintree{}},
+	"0002_tokens.up.sql":              &bintree{_0002_tokensUpSql, map[string]*bintree{}},
+	"0003_settings.down.sql":          &bintree{_0003_settingsDownSql, map[string]*bintree{}},
+	"0003_settings.up.sql":            &bintree{_0003_settingsUpSql, map[string]*bintree{}},
+	"0004_pending_stickers.down.sql":  &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
+	"0004_pending_stickers.up.sql":    &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
+	"0005_waku_mode.down.sql":         &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
+	"0005_waku_mode.up.sql":           &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
+	"0006_appearance.up.sql":          &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
+	"0007_enable_waku_default.up.sql": &bintree{_0007_enable_waku_defaultUpSql, map[string]*bintree{}},
+	"doc.go":                          &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

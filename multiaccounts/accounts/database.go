@@ -117,10 +117,12 @@ INSERT INTO settings (
   public_key,
   signing_phrase,
   wallet_root_address,
+  waku_enabled,
   synthetic_id
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,
 ?,?,?,?,?,?,?,?,?,?,
+?,
 'id')`,
 		s.Address,
 		s.Currency,
@@ -141,7 +143,9 @@ INSERT INTO settings (
 		s.PreviewPrivacy,
 		s.PublicKey,
 		s.SigningPhrase,
-		s.WalletRootAddress)
+		s.WalletRootAddress,
+		s.WakuEnabled,
+	)
 
 	return err
 }
