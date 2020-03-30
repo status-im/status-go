@@ -1,5 +1,5 @@
 {
-	"APIModules": "waku,shh",
+	"APIModules": "waku",
 	"HTTPEnabled": true,
 	"WakuConfig": {
 		"Enabled": true

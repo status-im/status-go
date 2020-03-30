@@ -2,6 +2,31 @@
 
 > All code snippets are run from the root project directory.
 
+## Run Waku node
+
+Running Waku node is a matter of a correct configuration. To enable Waku and JSON-RPC HTTP interface use:
+```shell script
+{
+  "APIModules": "waku",
+  "HTTPEnabled": true,
+  "HTTPHost": "localhost",
+  "HTTPPort": "8545",
+  "WakuConfig": {
+    "Enabled": true
+  }
+}
+```
+
+This command will start a Waku node using the `eth.prod` fleet:
+```shell script
+$ ./build/bin/statusd -c ./_examples/waku.json
+```
+
+From now on, you can interact with Waku using HTTP interface:
+```shell script
+$ curl -XPOST http://localhost:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"waku_info","params":[],"id":1}'
+```
+
 ## Whisper-Waku bridge
 
 This example demonstrates how bridging between Whisper and Waku works.
@@ -12,7 +37,7 @@ First, start a Whisper node and listen to messages:
 $ ./build/bin/statusd -c ./_examples/whisper.json -fleet eth.test -dir ./test-bridge-whisper -addr=:30313
 
 # create a symmetric key
-$ echo '{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test-channel"],"id":1}' | \ 
+$ echo '{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test-channel"],"id":1}' | \
     nc -U ./test-bridge-whisper/geth.ipc
 {
   "jsonrpc": "2.0",
