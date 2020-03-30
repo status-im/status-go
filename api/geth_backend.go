@@ -371,9 +371,25 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var conf params.NodeConfig
-	err := accounts.NewDB(b.appDB).GetNodeConfig(&conf)
+	accountDB := accounts.NewDB(b.appDB)
+	err := accountDB.GetNodeConfig(&conf)
 	if err != nil {
 		return nil, err
+	}
+	settings, err := accountDB.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	// NodeConfig is denormalized and we can't migrate it easily
+	// WakuEnabled is pulled from settings and it's the source
+	// of truth on whether `WakuConfig` or `WhisperConfig` should be enabled
+	if settings.WakuEnabled {
+		conf.WakuConfig.Enabled = true
+		conf.WhisperConfig.Enabled = false
+	} else {
+		conf.WakuConfig.Enabled = false
+		conf.WhisperConfig.Enabled = true
 	}
 	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
