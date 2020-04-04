@@ -10,7 +10,7 @@ Running Waku node is a matter of a correct configuration. To enable Waku and JSO
   "APIModules": "waku",
   "HTTPEnabled": true,
   "HTTPHost": "localhost",
-  "HTTPPort": "8545",
+  "HTTPPort": 8545,
   "WakuConfig": {
     "Enabled": true
   }
@@ -98,5 +98,4 @@ $ echo '{"jsonrpc":"2.0","method":"shh_getFilterMessages","params":["8fd6c01721a
   ]
 }
 ```
-
 
