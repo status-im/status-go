@@ -309,7 +309,7 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 	return api.service.messenger.DeleteMessagesByChatID(id)
 }
 
-func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) error {
+func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
 	return api.service.messenger.MarkMessagesSeen(chatID, ids)
 }
 

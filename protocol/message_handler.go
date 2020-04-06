@@ -442,6 +442,7 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 	initialMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
 	initialMessage.Text = requestAddressForTransactionAcceptedMessage
 	initialMessage.CommandParameters.Address = command.Address
+	initialMessage.Seen = false
 	initialMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionAccepted
 
 	// Hide previous message
@@ -510,6 +511,7 @@ func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState 
 	oldMessage.Clock = command.Clock
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
 	oldMessage.Text = requestAddressForTransactionDeclinedMessage
+	oldMessage.Seen = false
 	oldMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionDeclined
 
 	// Hide previous message
@@ -550,6 +552,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	oldMessage.Clock = command.Clock
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
 	oldMessage.Text = transactionRequestDeclinedMessage
+	oldMessage.Seen = false
 	oldMessage.CommandParameters.CommandState = CommandStateRequestTransactionDeclined
 
 	// Hide previous message

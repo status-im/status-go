@@ -102,10 +102,10 @@ type MembershipUpdateEvent struct {
 	ClockValue uint64                                   `json:"clockValue"`
 	Members    []string                                 `json:"members,omitempty"` // in "members-added" and "admins-added" events
 	Name       string                                   `json:"name,omitempty"`    // name of the group chat
-	From       string
-	Signature  []byte
-	ChatID     string
-	RawPayload []byte
+	From       string                                   `json:"from,omitempty"`
+	Signature  []byte                                   `json:"signature,omitempty"`
+	ChatID     string                                   `json:"chatId"`
+	RawPayload []byte                                   `json:"rawPayload"`
 }
 
 func (u *MembershipUpdateEvent) Equal(update MembershipUpdateEvent) bool {

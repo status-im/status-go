@@ -456,10 +456,10 @@ func (db sqlitePersistence) MarkAllRead(chatID string) error {
 	return err
 }
 
-func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error {
+func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer func() {
 		if err == nil {
@@ -479,7 +479,13 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error 
 	q := "UPDATE user_messages SET seen = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
-		return err
+		return 0, err
+	}
+
+	var count uint64
+	row := tx.QueryRow("SELECT changes();")
+	if err := row.Scan(&count); err != nil {
+		return 0, err
 	}
 
 	// Update denormalized count
@@ -490,7 +496,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) error 
 		   FROM user_messages
 		   WHERE local_chat_id = ? AND seen = 0)
 		WHERE id = ?`, chatID, chatID)
-	return err
+	return count, err
 }
 
 func (db sqlitePersistence) UpdateMessageOutgoingStatus(id string, newOutgoingStatus string) error {

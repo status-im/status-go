@@ -331,8 +331,9 @@ func TestMarkMessageSeen(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, m.Seen)
 
-	err = p.MarkMessagesSeen(chatID, []string{m.ID})
+	count, err := p.MarkMessagesSeen(chatID, []string{m.ID})
 	require.NoError(t, err)
+	require.Equal(t, uint64(1), count)
 
 	m, err = p.MessageByID(id)
 	require.NoError(t, err)

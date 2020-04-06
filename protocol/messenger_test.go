@@ -319,8 +319,9 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
-	err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	count, err := s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
 	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), count)
 
 	chats := s.m.Chats()
 	s.Require().Len(chats, 1)
