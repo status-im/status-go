@@ -1999,20 +1999,23 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
-func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) error {
+// MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
+// It returns the number of affected messages or error. If there is an error,
+// the number of affected messages is always zero.
+func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	err := m.persistence.MarkMessagesSeen(chatID, ids)
+	count, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	m.allChats[chatID] = chat
-	return nil
+	return count, nil
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
@@ -2750,6 +2753,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		message.Timestamp = timestamp
 		message.WhisperTimestamp = timestamp
 		message.Text = "Transaction received"
+		message.Seen = false
 
 		message.ID = validationResult.Transaction.MessageID
 		if message.CommandParameters == nil {
