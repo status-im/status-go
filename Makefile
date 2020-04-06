@@ -13,6 +13,7 @@ help: ##@other Show this help
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+GOPATH ?= $(HOME)/go
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
@@ -163,7 +164,7 @@ endif
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup-dev: setup-build mock-install install-os-dependencies gen-install ##@other Prepare project for development
+setup-dev: lint-install mock-install modvendor-install gen-install tidy install-os-dependencies ##@other Prepare project for development
 
 setup-build: lint-install release-install gomobile-install ##@other Prepare project for build
 
@@ -239,7 +240,8 @@ modvendor-install:
 	GO111MODULE=off go get -u github.com/adambabik/modvendor
 
 mock-install: ##@other Install mocking tools
-	go get github.com/golang/mock/mockgen@latest
+	# keep in sync with go.mod and github.com/golang/mock
+	go get github.com/golang/mock/mockgen@v1.4.1
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
