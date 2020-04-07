@@ -93,7 +93,10 @@ func setupTestServer(t *testing.T) *WhisperMailServer {
 	db, _ := leveldb.Open(storage.NewMemStorage(), nil)
 
 	s.ms = &mailServer{
-		db:      &LevelDB{ldb: db},
+		db: &LevelDB{
+			ldb:  db,
+			done: make(chan struct{}),
+		},
 		adapter: &whisperAdapter{},
 	}
 	s.minRequestPoW = powRequirement

@@ -18,7 +18,9 @@ import (
 
 type LevelDB struct {
 	// We can't embed as there are some state problems with go-routines
-	ldb *leveldb.DB
+	ldb  *leveldb.DB
+	name string
+	done chan struct{}
 }
 
 type LevelDBIterator struct {
@@ -68,7 +70,41 @@ func NewLevelDB(dataDir string) (*LevelDB, error) {
 		log.Info("database is corrupted trying to recover", "path", dataDir)
 		db, err = leveldb.RecoverFile(dataDir, nil)
 	}
-	return &LevelDB{ldb: db}, err
+
+	instance := LevelDB{
+		ldb:  db,
+		name: dataDir, // name is used for metrics labels
+		done: make(chan struct{}),
+	}
+
+	// initialize the metric value
+	instance.updateArchivedEnvelopesCount()
+	// checking count on every insert is inefficient
+	go func() {
+		for {
+			select {
+			case <-instance.done:
+				return
+			case <-time.After(time.Second * envelopeCountCheckInterval):
+				instance.updateArchivedEnvelopesCount()
+			}
+		}
+	}()
+	return &instance, err
+}
+
+// GetEnvelope get an envelope by its key
+func (db *LevelDB) GetEnvelope(key *DBKey) ([]byte, error) {
+	defer recoverLevelDBPanics("GetEnvelope")
+	return db.ldb.Get(key.Bytes(), nil)
+}
+
+func (db *LevelDB) updateArchivedEnvelopesCount() {
+	if count, err := db.envelopesCount(); err != nil {
+		log.Warn("db query for envelopes count failed", "err", err)
+	} else {
+		archivedEnvelopesGauge.WithLabelValues(db.name).Set(float64(count))
+	}
 }
 
 // Build iterator returns an iterator given a start/end and a cursor
@@ -81,13 +117,6 @@ func (db *LevelDB) BuildIterator(query CursorQuery) (Iterator, error) {
 		i.Seek(query.cursor)
 	}
 	return &LevelDBIterator{i}, nil
-}
-
-// GetEnvelope get an envelope by its key
-func (db *LevelDB) GetEnvelope(key *DBKey) ([]byte, error) {
-	defer recoverLevelDBPanics("GetEnvelope")
-
-	return db.ldb.Get(key.Bytes(), nil)
 }
 
 // Prune removes envelopes older than time
@@ -140,6 +169,20 @@ func (db *LevelDB) Prune(t time.Time, batchSize int) (int, error) {
 	return removed, nil
 }
 
+func (db *LevelDB) envelopesCount() (int, error) {
+	defer recoverLevelDBPanics("envelopesCount")
+	iterator, err := db.BuildIterator(CursorQuery{})
+	if err != nil {
+		return 0, err
+	}
+	// LevelDB does not have API for getting a count
+	var count int
+	for iterator.Next() {
+		count++
+	}
+	return count, nil
+}
+
 // SaveEnvelope stores an envelope in leveldb and increments the metrics
 func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	defer recoverLevelDBPanics("SaveEnvelope")
@@ -148,20 +191,26 @@ func (db *LevelDB) SaveEnvelope(env types.Envelope) error {
 	rawEnvelope, err := rlp.EncodeToBytes(env.Unwrap())
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
-		archivedErrorsCounter.Inc()
+		archivedErrorsCounter.WithLabelValues(db.name).Inc()
 		return err
 	}
 
 	if err = db.ldb.Put(key.Bytes(), rawEnvelope, nil); err != nil {
 		log.Error(fmt.Sprintf("Writing to DB failed: %s", err))
-		archivedErrorsCounter.Inc()
+		archivedErrorsCounter.WithLabelValues(db.name).Inc()
 	}
-	archivedEnvelopesCounter.Inc()
-	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + env.Size()))
+	archivedEnvelopesGauge.WithLabelValues(db.name).Inc()
+	archivedEnvelopeSizeMeter.WithLabelValues(db.name).Observe(
+		float64(whisper.EnvelopeHeaderLength + env.Size()))
 	return err
 }
 
 func (db *LevelDB) Close() error {
+	select {
+	case <-db.done:
+	default:
+		close(db.done)
+	}
 	return db.ldb.Close()
 }
 
