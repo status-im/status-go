@@ -146,7 +146,10 @@ func (o *statusOptions) DecodeRLP(s *rlp.Stream) error {
 		return fmt.Errorf("expected an outer list: %v", err)
 	}
 
-	o.parseStatusOptionKeys()
+	err = o.parseStatusOptionKeys()
+	if err != nil {
+		return err
+	}
 
 	v := reflect.ValueOf(o)
 
