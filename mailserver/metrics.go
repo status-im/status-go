@@ -43,23 +43,23 @@ var (
 		Help:    "Size of processed Whisper envelopes in bytes.",
 		Buckets: prom.ExponentialBuckets(1024, 4, 10),
 	})
-	archivedErrorsCounter = prom.NewCounter(prom.CounterOpts{
-		Name: "mailserver_archived_envelopes_falures_total",
-		Help: "Number of failures storing a Whisper envelope.",
-	})
-	archivedEnvelopesCounter = prom.NewCounter(prom.CounterOpts{
-		Name: "mailserver_archived_envelopes_total",
-		Help: "Number of envelopes saved.",
-	})
-	archivedEnvelopeSizeMeter = prom.NewHistogram(prom.HistogramOpts{
-		Name:    "mailserver_archived_envelope_size_bytes",
-		Help:    "Size of envelopes saved.",
-		Buckets: prom.ExponentialBuckets(1024, 2, 11),
-	})
 	mailDeliveryDuration = prom.NewHistogram(prom.HistogramOpts{
 		Name: "mailserver_delivery_duration_seconds",
 		Help: "Time it takes to deliver messages to a Whisper peer.",
 	})
+	archivedErrorsCounter = prom.NewCounterVec(prom.CounterOpts{
+		Name: "mailserver_archived_envelopes_falures_total",
+		Help: "Number of failures storing a Whisper envelope.",
+	}, []string{"db"})
+	archivedEnvelopesGauge = prom.NewGaugeVec(prom.GaugeOpts{
+		Name: "mailserver_archived_envelopes_total",
+		Help: "Number of envelopes saved in the DB.",
+	}, []string{"db"})
+	archivedEnvelopeSizeMeter = prom.NewHistogramVec(prom.HistogramOpts{
+		Name:    "mailserver_archived_envelope_size_bytes",
+		Help:    "Size of envelopes saved.",
+		Buckets: prom.ExponentialBuckets(1024, 2, 11),
+	}, []string{"db"})
 )
 
 func init() {
@@ -72,8 +72,8 @@ func init() {
 	prom.MustRegister(syncAttemptsCounter)
 	prom.MustRegister(sendRawEnvelopeDuration)
 	prom.MustRegister(sentEnvelopeBatchSizeMeter)
-	prom.MustRegister(archivedErrorsCounter)
-	prom.MustRegister(archivedEnvelopesCounter)
-	prom.MustRegister(archivedEnvelopeSizeMeter)
 	prom.MustRegister(mailDeliveryDuration)
+	prom.MustRegister(archivedErrorsCounter)
+	prom.MustRegister(archivedEnvelopesGauge)
+	prom.MustRegister(archivedEnvelopeSizeMeter)
 }

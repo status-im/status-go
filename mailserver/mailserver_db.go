@@ -6,6 +6,9 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
+// every this many seconds check real envelopes count
+const envelopeCountCheckInterval = 60
+
 // DB is an interface to abstract interactions with the db so that the mailserver
 // is agnostic to the underlying technology used
 type DB interface {
