@@ -66,6 +66,7 @@ Session.vim
 /.idea/
 /.vscode/
 /cmd/*/.ethereum/
+*.iml
 
 # created for running container
 _assets/compose/bootnode/keys
