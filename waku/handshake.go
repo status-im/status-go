@@ -6,12 +6,15 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var defaultMinPoW = math.Float64bits(0.001)
+
+type statusOptionKey int64
 
 // statusOptions defines additional information shared between peers
 // during the handshake.
@@ -26,6 +29,9 @@ type statusOptions struct {
 	ConfirmationsEnabled *bool       `rlp:"key=3"`
 	RateLimits           *RateLimits `rlp:"key=4"`
 	TopicInterest        []TopicType `rlp:"key=5"`
+
+	idxFieldKey map[int]statusOptionKey
+	keyFieldIdx map[statusOptionKey]int
 }
 
 // WithDefaults adds the default values for a given peer.
@@ -57,11 +63,15 @@ func (o statusOptions) WithDefaults() statusOptions {
 	return o
 }
 
-var idxFieldKey = make(map[int]string)
-var keyFieldIdx = func() map[string]int {
-	result := make(map[string]int)
-	opts := statusOptions{}
-	v := reflect.ValueOf(opts)
+//var idxFieldKey = make(map[int]statusOptionKey)
+//var keyFieldIdx = map[statusOptionKey]int{}
+
+func (o *statusOptions) parseStatusOptionKeys() error {
+	kfi := make(map[statusOptionKey]int)
+	ifk := make(map[int]statusOptionKey)
+
+	v := reflect.ValueOf(o)
+
 	for i := 0; i < v.NumField(); i++ {
 		// skip unexported fields
 		if !v.Field(i).CanInterface() {
@@ -72,12 +82,31 @@ var keyFieldIdx = func() map[string]int {
 		if rlpTag == "" {
 			continue
 		}
-		key := strings.Split(rlpTag, "=")[1]
-		result[key] = i
-		idxFieldKey[i] = key
+
+		keys := strings.Split(rlpTag, "=")
+		// skip rlp tags that cannot be split by "="
+		// TODO Do we want to throw an error here if the length is not exactly 2?
+		if len(keys) < 2 {
+			continue
+		}
+
+		// parse keys[1] as an int
+		rkey, err := strconv.ParseInt(keys[1], 10, 64)
+		if err != nil {
+			return err
+		}
+
+		// typecast rkey to be of statusOptionKey type
+		key := statusOptionKey(rkey)
+		kfi[key] = i
+		ifk[i] = key
 	}
-	return result
-}()
+
+	o.keyFieldIdx = kfi
+	o.idxFieldKey = ifk
+
+	return nil
+}
 
 func (o statusOptions) PoWRequirementF() *float64 {
 	if o.PoWRequirement == nil {
@@ -99,7 +128,7 @@ func (o statusOptions) EncodeRLP(w io.Writer) error {
 		field := v.Field(i)
 		if !field.IsNil() {
 			value := field.Interface()
-			key, ok := idxFieldKey[i]
+			key, ok := o.idxFieldKey[i]
 			if !ok {
 				continue
 			}
@@ -117,6 +146,8 @@ func (o *statusOptions) DecodeRLP(s *rlp.Stream) error {
 		return fmt.Errorf("expected an outer list: %v", err)
 	}
 
+	o.parseStatusOptionKeys()
+
 	v := reflect.ValueOf(o)
 
 loop:
@@ -130,7 +161,7 @@ loop:
 		default:
 			return fmt.Errorf("expected an inner list: %v", err)
 		}
-		var key string
+		var key statusOptionKey
 		if err := s.Decode(&key); err != nil {
 			return fmt.Errorf("invalid key: %v", err)
 		}
@@ -138,17 +169,17 @@ loop:
 		// It might happen when there is a new peer
 		// which supports a new option with
 		// a higher index.
-		idx, ok := keyFieldIdx[key]
+		idx, ok := o.keyFieldIdx[key]
 		if !ok {
 			// Read the rest of the list items and dump them.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %s: %v", key, err)
+				return fmt.Errorf("failed to read the value of key %d: %v", key, err)
 			}
 			continue
 		}
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %s: %v", key, err)
+			return fmt.Errorf("failed to decode an option %d: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err
