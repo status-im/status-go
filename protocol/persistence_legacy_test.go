@@ -37,6 +37,24 @@ func TestSaveMessages(t *testing.T) {
 	}
 }
 
+func TestMessagesByIDs(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	var ids []string
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalMessage(p, id)
+		require.NoError(t, err)
+		ids = append(ids, id)
+
+	}
+	m, err := p.MessagesByIDs(ids)
+	require.NoError(t, err)
+	require.Len(t, m, 10)
+}
+
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)

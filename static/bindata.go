@@ -117,7 +117,7 @@ func ConfigCliFleetEthProdJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 3625, mode: os.FileMode(0644), modTime: time.Unix(1585119952, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.prod.json", size: 3625, mode: os.FileMode(0644), modTime: time.Unix(1585559578, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1c, 0x86, 0x93, 0x3b, 0x8c, 0xb4, 0x1b, 0x8b, 0x70, 0xe6, 0x90, 0x3, 0xc9, 0x93, 0x99, 0x97, 0x18, 0xb7, 0x49, 0xbf, 0x2d, 0x35, 0x98, 0xb8, 0x49, 0xa8, 0x73, 0x30, 0xf5, 0x2d, 0x7f, 0x5c}}
 	return a, nil
 }
@@ -137,7 +137,7 @@ func ConfigCliFleetEthStagingJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1846, mode: os.FileMode(0644), modTime: time.Unix(1585119952, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.staging.json", size: 1846, mode: os.FileMode(0644), modTime: time.Unix(1585559578, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd1, 0xef, 0x3d, 0x5c, 0x41, 0xb1, 0xc8, 0x54, 0xd3, 0x82, 0x60, 0xcf, 0x5f, 0x8b, 0x92, 0xd0, 0x41, 0xa7, 0xff, 0xfd, 0x2c, 0x95, 0x44, 0x68, 0xd3, 0xad, 0x16, 0x8c, 0x49, 0x10, 0x4e, 0xb7}}
 	return a, nil
 }
@@ -157,7 +157,7 @@ func ConfigCliFleetEthTestJson() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 1855, mode: os.FileMode(0644), modTime: time.Unix(1585119952, 0)}
+	info := bindataFileInfo{name: "../config/cli/fleet-eth.test.json", size: 1855, mode: os.FileMode(0644), modTime: time.Unix(1585559578, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe4, 0x90, 0x4, 0x6, 0x2b, 0xe4, 0x67, 0x7a, 0xfc, 0x70, 0xa9, 0xb, 0x85, 0x8c, 0xb3, 0x8, 0x8e, 0xee, 0xec, 0x64, 0xb7, 0xac, 0x4c, 0x6, 0x4d, 0xcc, 0x4f, 0xda, 0xbd, 0xed, 0x17, 0x53}}
 	return a, nil
 }

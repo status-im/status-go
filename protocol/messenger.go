@@ -1453,8 +1453,12 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
+	response.Messages, err = m.pullMessagesAndResponsesFromDB([]*Message{message})
+	if err != nil {
+		return nil, err
+	}
+
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -2011,6 +2015,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			return nil, err
 		}
 	}
+
+	messagesWithResponses, err := m.pullMessagesAndResponsesFromDB(messageState.Response.Messages)
+	if err != nil {
+		return nil, err
+	}
+	messageState.Response.Messages = messagesWithResponses
 
 	// Reset installations
 	m.modifiedInstallations = make(map[string]bool)
@@ -2881,6 +2891,22 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		}
 	}
 	return &response, nil
+}
+
+// pullMessagesAndResponsesFromDB pulls all the messages and the one that have
+// been replied to from the database
+func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*Message) ([]*Message, error) {
+	var messageIDs []string
+	for _, message := range messages {
+		messageIDs = append(messageIDs, message.ID)
+		if len(message.ResponseTo) != 0 {
+			messageIDs = append(messageIDs, message.ResponseTo)
+		}
+
+	}
+	// We pull from the database all the messages & replies involved,
+	// so we let the db build the correct messages
+	return m.persistence.MessagesByIDs(messageIDs)
 }
 
 func (m *Messenger) getTimesource() TimeSource {
