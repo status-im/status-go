@@ -4,6 +4,7 @@ GIT_ROOT=$(cd "${BASH_SOURCE%/*}" && git rev-parse --show-toplevel)
 
 # Settings & defaults
 RPC_PORT="${RPC_PORT:-8545}"
+LISTEN_PORT="${LSTEN_PORT:-30303}"
 API_MODULES="${API_MODULES:-eth,net,web3,admin,mailserver}"
 FLEET_NAME="${FLEET_NAME:-eth.prod}"
 REGISTER_TOPIC="${REGISTER_TOPIC:-whispermail}"
@@ -27,6 +28,7 @@ export PUBLIC_IP=$(curl -s https://ipecho.net/plain)
 # Assemble the filter for changing the config JSON
 JQ_FILTER_ARRAY=(
   ".AdvertiseAddr = \"${PUBLIC_IP}\""
+  ".ListenAddr = \"0.0.0.0:${LISTEN_PORT}\""
   ".HTTPEnabled = true"
   ".HTTPHost = \"0.0.0.0\""
   ".HTTPPort= ${RPC_PORT}"

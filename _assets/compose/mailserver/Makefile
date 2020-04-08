@@ -9,6 +9,7 @@ BLD := $(shell tput bold)
 # Settings
 export LOG_LEVEL      ?= INFO
 export LISTEN_PORT    ?= 30303
+export METRICS_PORT   ?= 9090
 export RPC_PORT       ?= 8545
 export API_MODULES    ?= eth,net,web3,admin,mailserver
 export CONTAINER_NAME ?= status-go-mailserver
