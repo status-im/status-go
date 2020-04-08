@@ -4,6 +4,8 @@
 // 000001_init.up.db.sql (2.719kB)
 // 000002_add_last_ens_clock_value.down.sql (0)
 // 000002_add_last_ens_clock_value.up.sql (77B)
+// 1586358095_add_replace.down.sql (0)
+// 1586358095_add_replace.up.sql (224B)
 // doc.go (377B)
 
 package migrations
@@ -88,7 +90,7 @@ func _000001_initDownDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.down.db.sql", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "000001_init.down.db.sql", size: 65, mode: os.FileMode(0644), modTime: time.Unix(1578682784, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5e, 0xbb, 0x3f, 0x1, 0x75, 0x19, 0x70, 0x86, 0xa7, 0x34, 0x40, 0x17, 0x34, 0x3e, 0x18, 0x51, 0x79, 0xd4, 0x22, 0xad, 0x8f, 0x80, 0xcc, 0xa6, 0xcc, 0x6, 0x2b, 0x62, 0x2, 0x47, 0xba, 0xf9}}
 	return a, nil
 }
@@ -108,7 +110,7 @@ func _000001_initUpDbSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 2719, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "000001_init.up.db.sql", size: 2719, mode: os.FileMode(0644), modTime: time.Unix(1578682784, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x60, 0xdc, 0xeb, 0xe, 0xc2, 0x4f, 0x75, 0xa, 0xf6, 0x3e, 0xc7, 0xc4, 0x4, 0xe2, 0xe1, 0xa4, 0x73, 0x2f, 0x4a, 0xad, 0x1a, 0x0, 0xc3, 0x93, 0x9d, 0x77, 0x3e, 0x31, 0x91, 0x77, 0x2e, 0xc8}}
 	return a, nil
 }
@@ -128,7 +130,7 @@ func _000002_add_last_ens_clock_valueDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -148,8 +150,48 @@ func _000002_add_last_ens_clock_valueUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4d, 0x3, 0x8f, 0xd5, 0x85, 0x83, 0x47, 0xbe, 0xf9, 0x82, 0x7e, 0x81, 0xa4, 0xbd, 0xaa, 0xd5, 0x98, 0x18, 0x5, 0x2d, 0x82, 0x42, 0x3b, 0x3, 0x50, 0xc3, 0x1e, 0x84, 0x35, 0xf, 0xb6, 0x2b}}
+	return a, nil
+}
+
+var __1586358095_add_replaceDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+
+func _1586358095_add_replaceDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1586358095_add_replaceDownSql,
+		"1586358095_add_replace.down.sql",
+	)
+}
+
+func _1586358095_add_replaceDownSql() (*asset, error) {
+	bytes, err := _1586358095_add_replaceDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1586358095_add_replace.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1586355165, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
+	return a, nil
+}
+
+var __1586358095_add_replaceUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\xce\x31\x0a\xc2\x40\x10\x46\xe1\x3e\xa7\xf8\xc9\x09\xec\x53\x4d\xdc\x09\x08\xe3\x2c\xe8\x2c\xd8\x85\x10\x06\x11\xd6\x28\xd9\xe4\xfe\x56\x56\x5a\x6c\xfd\xe0\xe3\x91\x18\x5f\x60\xd4\x0b\x63\x2f\xbe\x8e\x4f\x2f\x65\xba\x7b\x01\x85\x80\x63\x94\x74\x56\xac\xfe\xce\xd3\xec\xdf\x06\xe3\x9b\x41\xa3\x41\x93\x08\x02\x0f\x94\xc4\xd0\xb6\x5d\x53\xc7\x6d\x19\x7d\x8c\xc2\xa4\xbf\xca\x40\x72\xe5\x4a\x28\x3f\x16\x1f\xe7\xd7\xbe\x6c\x38\xe9\x9f\xa3\x43\xd7\x7c\x02\x00\x00\xff\xff\xca\x94\x3f\xe0\xe0\x00\x00\x00")
+
+func _1586358095_add_replaceUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1586358095_add_replaceUpSql,
+		"1586358095_add_replace.up.sql",
+	)
+}
+
+func _1586358095_add_replaceUpSql() (*asset, error) {
+	bytes, err := _1586358095_add_replaceUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1586358095_add_replace.up.sql", size: 224, mode: os.FileMode(0644), modTime: time.Unix(1586352560, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd2, 0xb3, 0xa9, 0xc7, 0x7f, 0x9d, 0x8f, 0x43, 0x8c, 0x9e, 0x58, 0x8d, 0x44, 0xbc, 0xfa, 0x6b, 0x5f, 0x3f, 0x5a, 0xbe, 0xe8, 0xb1, 0x16, 0xf, 0x91, 0x2a, 0xa0, 0x71, 0xbb, 0x8d, 0x6b, 0xcb}}
 	return a, nil
 }
 
@@ -168,7 +210,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 377, mode: os.FileMode(0644), modTime: time.Unix(1574354941, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xef, 0xaf, 0xdf, 0xcf, 0x65, 0xae, 0x19, 0xfc, 0x9d, 0x29, 0xc1, 0x91, 0xaf, 0xb5, 0xd5, 0xb1, 0x56, 0xf3, 0xee, 0xa8, 0xba, 0x13, 0x65, 0xdb, 0xab, 0xcf, 0x4e, 0xac, 0x92, 0xe9, 0x60, 0xf1}}
 	return a, nil
 }
@@ -272,6 +314,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"000002_add_last_ens_clock_value.up.sql": _000002_add_last_ens_clock_valueUpSql,
 
+	"1586358095_add_replace.down.sql": _1586358095_add_replaceDownSql,
+
+	"1586358095_add_replace.up.sql": _1586358095_add_replaceUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -320,6 +366,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"000001_init.up.db.sql":                    &bintree{_000001_initUpDbSql, map[string]*bintree{}},
 	"000002_add_last_ens_clock_value.down.sql": &bintree{_000002_add_last_ens_clock_valueDownSql, map[string]*bintree{}},
 	"000002_add_last_ens_clock_value.up.sql":   &bintree{_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
+	"1586358095_add_replace.down.sql":          &bintree{_1586358095_add_replaceDownSql, map[string]*bintree{}},
+	"1586358095_add_replace.up.sql":            &bintree{_1586358095_add_replaceUpSql, map[string]*bintree{}},
 	"doc.go":                                   &bintree{docGo, map[string]*bintree{}},
 }}
 

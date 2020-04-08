@@ -87,9 +87,12 @@ type Message struct {
 	CommandParameters *CommandParameters `json:"commandParameters"`
 
 	// Computed fields
-	RTL        bool   `json:"rtl"`
+	// RTL is whether this is a right-to-left message (arabic/hebrew script etc)
+	RTL bool `json:"rtl"`
+	// ParsedText is the parsed markdown for displaying
 	ParsedText []byte `json:"parsedText"`
-	LineCount  int    `json:"lineCount"`
+	// LineCount is the count of newlines in the message
+	LineCount int `json:"lineCount"`
 
 	// Replace indicates that this is a replacement of a message
 	// that has been updated
