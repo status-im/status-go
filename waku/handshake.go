@@ -6,15 +6,29 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type statusOptionKey uint
 
+type statusOptionKeyType uint
+
+type statusOptionKeyToType struct {
+	Idx  int
+	Key  statusOptionKey
+	Type statusOptionKeyType
+}
+
+const (
+	sOKTS statusOptionKeyType = iota // Status Option Key Type String
+	sOKTU                            // Status Option Key Type Uint
+)
+
 var (
 	defaultMinPoW = math.Float64bits(0.001)
-	idxFieldKey = map[int]statusOptionKey{
+	idxFieldKey   = map[int]statusOptionKey{
 		0: 0,
 		1: 1,
 		2: 2,
@@ -32,6 +46,11 @@ var (
 	}
 )
 
+type keyTypeMapping struct {
+	idxFieldKey map[int]*statusOptionKeyToType
+	keyFieldIdx map[statusOptionKey]*statusOptionKeyToType
+}
+
 // statusOptions defines additional information shared between peers
 // during the handshake.
 // There might be more options provided then fields in statusOptions
@@ -45,6 +64,7 @@ type statusOptions struct {
 	ConfirmationsEnabled *bool       `rlp:"key=3"`
 	RateLimits           *RateLimits `rlp:"key=4"`
 	TopicInterest        []TopicType `rlp:"key=5"`
+	keyTypeMapping       keyTypeMapping
 }
 
 // WithDefaults adds the default values for a given peer.
@@ -94,15 +114,41 @@ func (o statusOptions) EncodeRLP(w io.Writer) error {
 	var optionsList []interface{}
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
-		if !field.IsNil() {
-			value := field.Interface()
-			key, ok := idxFieldKey[i]
-			if !ok {
-				continue
+
+		// skip unexported fields
+		if !field.CanInterface() {
+			continue
+		}
+
+		if field.IsNil() {
+			continue
+		}
+
+		value := field.Interface()
+		key, ok := idxFieldKey[i]
+		if !ok {
+			continue
+		}
+
+		var val []interface{}
+
+		if o.keyTypeMapping.idxFieldKey == nil {
+			val = append(val, key, value)
+		}
+
+		k, ok := o.keyTypeMapping.idxFieldKey[i]
+		if !ok {
+			val = append(val, key, value)
+		} else {
+			ke, err := k.encode()
+			if err != nil {
+				return fmt.Errorf("key encoding fail: %v", err)
 			}
-			if value != nil {
-				optionsList = append(optionsList, []interface{}{key, value})
-			}
+			val = append(val, ke, value)
+		}
+
+		if value != nil {
+			optionsList = append(optionsList, val)
 		}
 	}
 	return rlp.Encode(w, optionsList)
@@ -127,34 +173,30 @@ loop:
 			return fmt.Errorf("expected an inner list: %v", err)
 		}
 
-		var key statusOptionKey
-		if err := s.Decode(&key); err != nil {
+		ktt := statusOptionKeyToType{}
+		if err = ktt.decodeStream(s); err != nil {
 			return fmt.Errorf("invalid key: %v", err)
 		}
-
-		// TODO encode as a string and parse in case incoming is encoded as string
-
-		// TODO once key data type is determined record the data type against the key value
-
-		// TODO this will mean that using a static keyFieldIdx mapping won't work as there is no way to know for any
-		//  incoming stream what data types the field keys will be defined as. Therefore the keyFieldIdx would need to
-		//  be associated with the instantiated struct.
 
 		// Skip processing if a key does not exist.
 		// It might happen when there is a new peer
 		// which supports a new option with
 		// a higher index.
-		idx, ok := keyFieldIdx[key]
+		idx, ok := keyFieldIdx[ktt.Key]
 		if !ok {
 			// Read the rest of the list items and dump them.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %d: %v", key, err)
+				return fmt.Errorf("failed to read the value of key %d: %v", ktt.Key, err)
 			}
 			continue
 		}
+
+		ktt.Idx = idx
+		o.addKeyToType(&ktt)
+
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %d: %v", key, err)
+			return fmt.Errorf("failed to decode an option %d: %v", ktt.Key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err
@@ -162,6 +204,58 @@ loop:
 	}
 
 	return s.ListEnd()
+}
+
+func (o *statusOptions) addKeyToType(ktt *statusOptionKeyToType) {
+
+	if o.keyTypeMapping.idxFieldKey == nil {
+		o.keyTypeMapping.idxFieldKey = make(map[int]*statusOptionKeyToType)
+	}
+
+	if o.keyTypeMapping.keyFieldIdx == nil {
+		o.keyTypeMapping.keyFieldIdx = make(map[statusOptionKey]*statusOptionKeyToType)
+	}
+
+	o.keyTypeMapping.idxFieldKey[ktt.Idx] = ktt
+	o.keyTypeMapping.keyFieldIdx[ktt.Key] = ktt
+}
+
+func (k statusOptionKeyToType) decodeStream(s *rlp.Stream) error {
+	var key statusOptionKey
+
+	// If uint can be decoded return it
+	if err := s.Decode(&key); err == nil {
+		k.Key = key
+		k.Type = sOKTU
+		return nil
+	}
+
+	// Attempt decoding into a string
+	var sKey string
+	if err := s.Decode(&sKey); err != nil {
+		return err
+	}
+
+	// Parse string into uint
+	uKey, err := strconv.ParseUint(sKey, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	k.Key = statusOptionKey(uKey)
+	k.Type = sOKTS
+	return nil
+}
+
+func (k statusOptionKeyToType) encode() (interface{}, error) {
+	switch k.Type {
+	case sOKTU:
+		return k.Key, nil
+	case sOKTS:
+		return fmt.Sprint(k.Key), nil
+	default:
+		return nil, fmt.Errorf("failed to encode key '%d', unknown key type '%d'", k.Key, k.Type)
+	}
 }
 
 func (o statusOptions) Validate() error {

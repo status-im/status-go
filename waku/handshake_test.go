@@ -2,10 +2,10 @@ package waku
 
 import (
 	"math"
-	"testing"
 	"reflect"
 	"strconv"
 	"strings"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 
@@ -103,12 +103,12 @@ func TestStatusOptionKeys(t *testing.T) {
 
 	// Test that each index of the statusOptions' derived kfi values matches the global keyFieldIdx of the same index
 	for k, v := range kfi {
-		require.Equal(t, keyFieldIdx[k], v)
+		require.Exactly(t, keyFieldIdx[k], v)
 	}
 
 	// Test that each index of the global keyFieldIdx values matches statusOptions' derived kfi values of the same index
 	for k, v := range keyFieldIdx {
-		require.Equal(t, kfi[k], v)
+		require.Exactly(t, kfi[k], v)
 	}
 
 	// Test that the statusOptions' derived ifk length matches the global idxFieldKey length
@@ -116,11 +116,11 @@ func TestStatusOptionKeys(t *testing.T) {
 
 	// Test that each index of the statusOptions' derived ifk values matches the global idxFieldKey of the same index
 	for k, v := range ifk {
-		require.Equal(t, idxFieldKey[k], v)
+		require.Exactly(t, idxFieldKey[k], v)
 	}
 
 	// Test that each index of the global idxFieldKey values matches statusOptions' derived ifk values of the same index
 	for k, v := range idxFieldKey {
-		require.Equal(t, ifk[k], v)
+		require.Exactly(t, ifk[k], v)
 	}
 }
