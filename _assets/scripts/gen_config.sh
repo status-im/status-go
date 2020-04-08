@@ -36,6 +36,11 @@ JQ_FILTER_ARRAY=(
   ".WhisperConfig.EnableMailServer = true"
   ".WhisperConfig.LightClient = false"
   ".WhisperConfig.MailServerPassword = \"${MAIL_PASSWORD}\""
+  ".WakuConfig.Enabled = true"
+  ".WakuConfig.EnableMailServer = true"
+  ".WakuConfig.DataDir = \"${DATA_PATH}/waku\""
+  ".WakuConfig.MailServerPassword = \"${MAIL_PASSWORD}\""
+
 )
 
 JQ_FILTER=$(printf " | %s" "${JQ_FILTER_ARRAY[@]}")
