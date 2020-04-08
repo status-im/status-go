@@ -8,10 +8,11 @@ WatchdogSec=60s
 WorkingDirectory=${DATA_PATH}
 ExecStart=${GIT_ROOT}/build/bin/statusd \
     -log-without-color \
-    -log "${LOG_LEVEL}" \
-    -dir "${DATA_PATH}" \
-    -c "${DATA_PATH}/config.json" \
-    -metrics
+    -log="${LOG_LEVEL}" \
+    -metrics \
+    -metrics-port=${METRICS_PORT} \
+    -c="${DATA_PATH}/config.json" \
+    -dir="${DATA_PATH}"
 
 [Install]
 WantedBy=default.target

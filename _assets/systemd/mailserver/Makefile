@@ -24,6 +24,8 @@ export SERVICE_PATH ?= $(SERVICE_DIR)/$(SERVICE_NAME).service
 export DATA_PATH    ?= /var/tmp/$(SERVICE_NAME)
 export LOG_LEVEL    ?= INFO
 export LISTEN_PORT  ?= 30303
+export METRICS_PORT ?= 9090
+export RPC_PORT     ?= 8545
 # Necessary to make mailserver available publicly
 export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 
