@@ -34,7 +34,7 @@ func (s *ENSSuite) TestShouldBeVerified() {
 				ENSVerificationRetries: 4,
 			},
 			Expected: true,
-			TimeNow:  10 + ENSBackoffTimeMs*4*16 + 1,
+			TimeNow:  10 + ENSBackoffTimeSec*4*16 + 1,
 		},
 		{
 			Name:     "Empty name",
@@ -63,7 +63,7 @@ func (s *ENSSuite) TestShouldBeVerified() {
 				ENSVerificationRetries: 4,
 			},
 			Expected: false,
-			TimeNow:  10 + ENSBackoffTimeMs*4*16 - 1,
+			TimeNow:  10 + ENSBackoffTimeSec*4*16 - 1,
 		},
 		{
 			Name: "max retries reached",
@@ -73,7 +73,7 @@ func (s *ENSSuite) TestShouldBeVerified() {
 				ENSVerificationRetries: 11,
 			},
 			Expected: false,
-			TimeNow:  10 + ENSBackoffTimeMs*5*2048 + 1,
+			TimeNow:  10 + ENSBackoffTimeSec*5*2048 + 1,
 		},
 	}
 	for _, tc := range testCases {
