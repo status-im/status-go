@@ -69,7 +69,7 @@ $ echo '{"jsonrpc":"2.0","method":"waku_generateSymKeyFromPassword","params":["t
 }
 
 # send a message
-$ echo '{"jsonrpc":"2.0","method":"waku_post","params":[{"symKeyID":"98999c238e3747b7562674a86d450d531eca616d288a500268878e90848bfe4e", "ttl":100, "topic": "0xaabbccdd", "payload":"0x010203", "powTarget": 5.0, "powTime": 3}],"id":1}' | \
+$ echo '{"jsonrpc":"2.0","method":"waku_post","params":[{"symKeyID":"1e07adfcb80c9e9853fb2c4cce3d91c17edd17ab6e950387833d64878fe91624", "ttl":100, "topic": "0xaabbccdd", "payload":"0x010203", "powTarget": 5.0, "powTime": 3}],"id":1}' | \
     nc -U ./test-waku-bridge/geth.ipc
 {
   "jsonrpc": "2.0",
