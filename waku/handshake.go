@@ -171,6 +171,9 @@ loop:
 		}
 
 		key, keyType, err := o.decodeKey(s)
+		if err != nil {
+			return fmt.Errorf("key decode failure: %v", err)
+		}
 		o.setKeyType(keyType)
 
 		// Skip processing if a key does not exist.
