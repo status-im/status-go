@@ -11,8 +11,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// statusOptionKey is a current type used in statusOptions as a key.
 type statusOptionKey uint
 
+// statusOptionKeyType is a type of a statusOptions key used for a particular instance of statusOptions struct.
 type statusOptionKeyType uint
 
 type statusOptionKeyToType struct {
@@ -22,7 +24,7 @@ type statusOptionKeyToType struct {
 }
 
 const (
-	sOKTS statusOptionKeyType = iota // Status Option Key Type String
+	sOKTS statusOptionKeyType = iota + 1 // Status Option Key Type String
 	sOKTU                            // Status Option Key Type Uint
 )
 
@@ -220,7 +222,7 @@ func (o *statusOptions) addKeyToType(ktt *statusOptionKeyToType) {
 	o.keyTypeMapping.keyFieldIdx[ktt.Key] = ktt
 }
 
-func (k statusOptionKeyToType) decodeStream(s *rlp.Stream) error {
+func (k *statusOptionKeyToType) decodeStream(s *rlp.Stream) error {
 	var key statusOptionKey
 
 	// If uint can be decoded return it
