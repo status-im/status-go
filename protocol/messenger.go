@@ -2057,7 +2057,8 @@ func (m *Messenger) VerifyENSNames(ctx context.Context, rpcEndpoint, contractAdd
 
 	var ensDetails []enstypes.ENSDetails
 
-	now := m.getTimesource().GetCurrentTime()
+	// Now in seconds
+	now := m.getTimesource().GetCurrentTime() / 1000
 	for _, contact := range m.allContacts {
 		if shouldENSBeVerified(contact, now) {
 			ensDetails = append(ensDetails, enstypes.ENSDetails{
@@ -2091,6 +2092,7 @@ func (m *Messenger) VerifyENSNames(ctx context.Context, rpcEndpoint, contractAdd
 				zap.String("publicKey", details.PublicKeyString),
 				zap.Error(details.Error),
 			)
+			contact.ENSVerificationRetries++
 		}
 		response.Contacts = append(response.Contacts, contact)
 	}

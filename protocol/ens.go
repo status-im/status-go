@@ -8,13 +8,13 @@ import (
 // maxRetries is the maximum number of attempts we do before giving up
 const maxRetries uint64 = 11
 
-// ENSBackoffTimeMs is the step of the exponential backoff
-// we retry roughly for 17 hours after receiving the message 2^11 * 30000
-const ENSBackoffTimeMs uint64 = 30000
+// ENSBackoffTimeSec is the step of the exponential backoff
+// we retry roughly for 17 hours after receiving the message 2^11 * 30
+const ENSBackoffTimeSec uint64 = 30
 
 // We calculate if it's too early to retry, by exponentially backing off
 func verifiedENSRecentlyEnough(now, verifiedAt, retries uint64) bool {
-	return now < verifiedAt+ENSBackoffTimeMs*retries*uint64(math.Exp2(float64(retries)))
+	return now < verifiedAt+ENSBackoffTimeSec*retries*uint64(math.Exp2(float64(retries)))
 }
 
 func shouldENSBeVerified(c *Contact, now uint64) bool {
