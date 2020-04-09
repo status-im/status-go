@@ -2,9 +2,6 @@ package waku
 
 import (
 	"math"
-	"reflect"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,60 +64,47 @@ func TestForwardCompatibility(t *testing.T) {
 	require.EqualValues(t, statusOptions{PoWRequirement: &pow}, optsDecoded)
 }
 
-func TestStatusOptionKeys(t *testing.T) {
-	o := statusOptions{}
-
-	kfi := make(map[statusOptionKey]int)
-	ifk := make(map[int]statusOptionKey)
-
-	v := reflect.ValueOf(o)
-
-	for i := 0; i < v.NumField(); i++ {
-		// skip unexported fields
-		if !v.Field(i).CanInterface() {
-			continue
-		}
-		rlpTag := v.Type().Field(i).Tag.Get("rlp")
-		// skip fields without rlp field tag
-		if rlpTag == "" {
-			continue
-		}
-
-		keys := strings.Split(rlpTag, "=")
-		require.Equal(t, 2, len(keys))
-
-		// parse keys[1] as an int
-		key, err := strconv.ParseUint(keys[1], 10, 64)
-		require.NoError(t, err)
-
-		// typecast key to be of statusOptionKey type
-		kfi[statusOptionKey(key)] = i
-		ifk[i] = statusOptionKey(key)
+func TestInitRLPKeyFields(t *testing.T) {
+	ifk := map[int]statusOptionKey{
+		0: 0,
+		1: 1,
+		2: 2,
+		3: 3,
+		4: 4,
+		5: 5,
+	}
+	kfi := map[statusOptionKey]int{
+		0: 0,
+		1: 1,
+		2: 2,
+		3: 3,
+		4: 4,
+		5: 5,
 	}
 
-	// Test that the statusOptions' derived kfi length matches the global keyFieldIdx length
-	require.Equal(t, len(keyFieldIdx), len(kfi))
+	// Test that the kfi length matches the inited global keyFieldIdx length
+	require.Equal(t, len(kfi), len(keyFieldIdx))
 
-	// Test that each index of the statusOptions' derived kfi values matches the global keyFieldIdx of the same index
+	// Test that each index of the kfi values matches the inited global keyFieldIdx of the same index
 	for k, v := range kfi {
-		require.Exactly(t, keyFieldIdx[k], v)
+		require.Exactly(t, v, keyFieldIdx[k])
 	}
 
-	// Test that each index of the global keyFieldIdx values matches statusOptions' derived kfi values of the same index
+	// Test that each index of the inited global keyFieldIdx values matches kfi values of the same index
 	for k, v := range keyFieldIdx {
-		require.Exactly(t, kfi[k], v)
+		require.Exactly(t, v, kfi[k])
 	}
 
-	// Test that the statusOptions' derived ifk length matches the global idxFieldKey length
-	require.Equal(t, len(idxFieldKey), len(ifk))
+	// Test that the ifk length matches the inited global idxFieldKey length
+	require.Equal(t, len(ifk), len(idxFieldKey))
 
-	// Test that each index of the statusOptions' derived ifk values matches the global idxFieldKey of the same index
+	// Test that each index of the ifk values matches the inited global idxFieldKey of the same index
 	for k, v := range ifk {
-		require.Exactly(t, idxFieldKey[k], v)
+		require.Exactly(t, v, idxFieldKey[k])
 	}
 
-	// Test that each index of the global idxFieldKey values matches statusOptions' derived ifk values of the same index
+	// Test that each index of the inited global idxFieldKey values matches ifk values of the same index
 	for k, v := range idxFieldKey {
-		require.Exactly(t, ifk[k], v)
+		require.Exactly(t, v, ifk[k])
 	}
 }
