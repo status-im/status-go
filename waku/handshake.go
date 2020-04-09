@@ -18,12 +18,6 @@ type statusOptionKey uint
 // statusOptionKeyType is a type of a statusOptions key used for a particular instance of statusOptions struct.
 type statusOptionKeyType uint
 
-type statusOptionKeyToType struct {
-	Idx  int
-	Key  statusOptionKey
-	Type statusOptionKeyType
-}
-
 const (
 	sOKTS statusOptionKeyType = iota + 1 // Status Option Key Type String
 	sOKTU                                // Status Option Key Type Uint
@@ -34,11 +28,6 @@ var (
 	idxFieldKey   = make(map[int]statusOptionKey)
 	keyFieldIdx   = make(map[statusOptionKey]int)
 )
-
-type keyTypeMapping struct {
-	idxFieldKey map[int]*statusOptionKeyToType
-	keyFieldIdx map[statusOptionKey]*statusOptionKeyToType
-}
 
 // statusOptions defines additional information shared between peers
 // during the handshake.
@@ -53,7 +42,7 @@ type statusOptions struct {
 	ConfirmationsEnabled *bool       `rlp:"key=3"`
 	RateLimits           *RateLimits `rlp:"key=4"`
 	TopicInterest        []TopicType `rlp:"key=5"`
-	keyTypeMapping       keyTypeMapping
+	keyType              statusOptionKeyType
 }
 
 // initFLPKeyFields initialises the values of `idxFieldKey` and `keyFieldIdx`
@@ -74,10 +63,14 @@ func initRLPKeyFields() error {
 
 		keys := strings.Split(rlpTag, "=")
 
-		// parse keys[1] as an int
+		if len(keys) != 2 || keys[0] != "key" {
+			panic("invalid value of \"rlp\" tag, expected \"key=N\" where N is uint")
+		}
+
+		// parse keys[1] as an uint
 		key, err := strconv.ParseUint(keys[1], 10, 64)
 		if err != nil {
-			return fmt.Errorf("malformed rlp tag '%s', tag should be formatted 'rlp:\"key=0\"': %v", rlpTag, err)
+			return fmt.Errorf("malformed rlp tag '%s', expected \"key=N\" where N is uint: %v", rlpTag, err)
 		}
 
 		// typecast key to be of statusOptionKey type
@@ -151,25 +144,8 @@ func (o statusOptions) EncodeRLP(w io.Writer) error {
 			continue
 		}
 
-		var val []interface{}
-
-		if o.keyTypeMapping.idxFieldKey == nil {
-			val = append(val, key, value)
-		}
-
-		k, ok := o.keyTypeMapping.idxFieldKey[i]
-		if !ok {
-			val = append(val, key, value)
-		} else {
-			ke, err := k.encode()
-			if err != nil {
-				return fmt.Errorf("key encoding fail: %v", err)
-			}
-			val = append(val, ke, value)
-		}
-
 		if value != nil {
-			optionsList = append(optionsList, val)
+			optionsList = append(optionsList, []interface{}{o.encodeKey(key), value})
 		}
 	}
 	return rlp.Encode(w, optionsList)
@@ -194,30 +170,25 @@ loop:
 			return fmt.Errorf("expected an inner list: %v", err)
 		}
 
-		ktt := statusOptionKeyToType{}
-		if err = ktt.decodeStream(s); err != nil {
-			return fmt.Errorf("invalid key: %v", err)
-		}
+		key, keyType, err := o.decodeKey(s)
+		o.setKeyType(keyType)
 
 		// Skip processing if a key does not exist.
 		// It might happen when there is a new peer
 		// which supports a new option with
 		// a higher index.
-		idx, ok := keyFieldIdx[ktt.Key]
+		idx, ok := keyFieldIdx[key]
 		if !ok {
 			// Read the rest of the list items and dump them.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %d: %v", ktt.Key, err)
+				return fmt.Errorf("failed to read the value of key %d: %v", key, err)
 			}
 			continue
 		}
 
-		ktt.Idx = idx
-		o.addKeyToType(&ktt)
-
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %d: %v", ktt.Key, err)
+			return fmt.Errorf("failed to decode an option %d: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err
@@ -227,56 +198,44 @@ loop:
 	return s.ListEnd()
 }
 
-func (o *statusOptions) addKeyToType(ktt *statusOptionKeyToType) {
-
-	if o.keyTypeMapping.idxFieldKey == nil {
-		o.keyTypeMapping.idxFieldKey = make(map[int]*statusOptionKeyToType)
-	}
-
-	if o.keyTypeMapping.keyFieldIdx == nil {
-		o.keyTypeMapping.keyFieldIdx = make(map[statusOptionKey]*statusOptionKeyToType)
-	}
-
-	o.keyTypeMapping.idxFieldKey[ktt.Idx] = ktt
-	o.keyTypeMapping.keyFieldIdx[ktt.Key] = ktt
-}
-
-func (k *statusOptionKeyToType) decodeStream(s *rlp.Stream) error {
+func (o statusOptions) decodeKey(s *rlp.Stream) (statusOptionKey, statusOptionKeyType, error) {
 	var key statusOptionKey
 
-	// If uint can be decoded return it
+	// If statusOptionKey (uint) can be decoded return it
+	// Ignore the first error and attempt string decoding
 	if err := s.Decode(&key); err == nil {
-		k.Key = key
-		k.Type = sOKTU
-		return nil
+		return key, sOKTU, nil
 	}
 
 	// Attempt decoding into a string
 	var sKey string
 	if err := s.Decode(&sKey); err != nil {
-		return err
+		return key, 0, err
 	}
 
 	// Parse string into uint
 	uKey, err := strconv.ParseUint(sKey, 10, 64)
 	if err != nil {
-		return err
+		return key, 0, err
 	}
 
-	k.Key = statusOptionKey(uKey)
-	k.Type = sOKTS
-	return nil
+	key = statusOptionKey(uKey)
+	return key, sOKTS, nil
 }
 
-func (k statusOptionKeyToType) encode() (interface{}, error) {
-	switch k.Type {
-	case sOKTU:
-		return k.Key, nil
-	case sOKTS:
-		return fmt.Sprint(k.Key), nil
-	default:
-		return nil, fmt.Errorf("failed to encode key '%d', unknown key type '%d'", k.Key, k.Type)
+// setKeyType sets a statusOptions' keyType if it hasn't previously been set
+func (o *statusOptions) setKeyType(t statusOptionKeyType) {
+	if o.keyType == 0 {
+		o.keyType = t
 	}
+}
+
+func (o statusOptions) encodeKey(key statusOptionKey) interface{} {
+	if o.keyType == sOKTS {
+		return fmt.Sprint(key)
+	}
+
+	return key
 }
 
 func (o statusOptions) Validate() error {

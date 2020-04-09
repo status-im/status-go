@@ -25,6 +25,7 @@ func TestEncodeDecodeRLP(t *testing.T) {
 			TopicLimits:  1,
 		},
 		TopicInterest: []TopicType{{0x01}, {0x02}, {0x03}, {0x04}},
+		keyType:       sOKTU,
 	}
 	data, err := rlp.EncodeToBytes(opts)
 	require.NoError(t, err)
