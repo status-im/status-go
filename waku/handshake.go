@@ -7,6 +7,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -25,27 +26,13 @@ type statusOptionKeyToType struct {
 
 const (
 	sOKTS statusOptionKeyType = iota + 1 // Status Option Key Type String
-	sOKTU                            // Status Option Key Type Uint
+	sOKTU                                // Status Option Key Type Uint
 )
 
 var (
 	defaultMinPoW = math.Float64bits(0.001)
-	idxFieldKey   = map[int]statusOptionKey{
-		0: 0,
-		1: 1,
-		2: 2,
-		3: 3,
-		4: 4,
-		5: 5,
-	}
-	keyFieldIdx = map[statusOptionKey]int{
-		0: 0,
-		1: 1,
-		2: 2,
-		3: 3,
-		4: 4,
-		5: 5,
-	}
+	idxFieldKey   = make(map[int]statusOptionKey)
+	keyFieldIdx   = make(map[statusOptionKey]int)
 )
 
 type keyTypeMapping struct {
@@ -67,6 +54,38 @@ type statusOptions struct {
 	RateLimits           *RateLimits `rlp:"key=4"`
 	TopicInterest        []TopicType `rlp:"key=5"`
 	keyTypeMapping       keyTypeMapping
+}
+
+// initFLPKeyFields initialises the values of `idxFieldKey` and `keyFieldIdx`
+func initRLPKeyFields() error {
+	o := statusOptions{}
+	v := reflect.ValueOf(o)
+
+	for i := 0; i < v.NumField(); i++ {
+		// skip unexported fields
+		if !v.Field(i).CanInterface() {
+			continue
+		}
+		rlpTag := v.Type().Field(i).Tag.Get("rlp")
+		// skip fields without rlp field tag
+		if rlpTag == "" {
+			continue
+		}
+
+		keys := strings.Split(rlpTag, "=")
+
+		// parse keys[1] as an int
+		key, err := strconv.ParseUint(keys[1], 10, 64)
+		if err != nil {
+			return fmt.Errorf("malformed rlp tag '%s', tag should be formatted 'rlp:\"key=0\"': %v", rlpTag, err)
+		}
+
+		// typecast key to be of statusOptionKey type
+		keyFieldIdx[statusOptionKey(key)] = i
+		idxFieldKey[i] = statusOptionKey(key)
+	}
+
+	return nil
 }
 
 // WithDefaults adds the default values for a given peer.

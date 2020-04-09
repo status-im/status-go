@@ -108,6 +108,14 @@ type Waku struct {
 	logger *zap.Logger
 }
 
+// init initialises the waku package
+func init() {
+	err := initRLPKeyFields()
+	if err != nil {
+		panic(err)
+	}
+}
+
 // New creates a Waku client ready to communicate through the Ethereum P2P network.
 func New(cfg *Config, logger *zap.Logger) *Waku {
 	if cfg == nil {
