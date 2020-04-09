@@ -2,6 +2,31 @@
 
 > All code snippets are run from the root project directory.
 
+## Run Waku node
+
+Running Waku node is a matter of a correct configuration. To enable Waku and JSON-RPC HTTP interface use:
+```shell script
+{
+  "APIModules": "waku",
+  "HTTPEnabled": true,
+  "HTTPHost": "localhost",
+  "HTTPPort": 8545,
+  "WakuConfig": {
+    "Enabled": true
+  }
+}
+```
+
+This command will start a Waku node using the `eth.prod` fleet:
+```shell script
+$ ./build/bin/statusd -c ./_examples/waku.json
+```
+
+From now on, you can interact with Waku using HTTP interface:
+```shell script
+$ curl -XPOST http://localhost:8545 -H 'Content-type: application/json' -d '{"jsonrpc":"2.0","method":"waku_info","params":[],"id":1}'
+```
+
 ## Whisper-Waku bridge
 
 This example demonstrates how bridging between Whisper and Waku works.
@@ -12,7 +37,7 @@ First, start a Whisper node and listen to messages:
 $ ./build/bin/statusd -c ./_examples/whisper.json -fleet eth.test -dir ./test-bridge-whisper -addr=:30313
 
 # create a symmetric key
-$ echo '{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test-channel"],"id":1}' | \ 
+$ echo '{"jsonrpc":"2.0","method":"shh_generateSymKeyFromPassword","params":["test-channel"],"id":1}' | \
     nc -U ./test-bridge-whisper/geth.ipc
 {
   "jsonrpc": "2.0",
@@ -44,7 +69,7 @@ $ echo '{"jsonrpc":"2.0","method":"waku_generateSymKeyFromPassword","params":["t
 }
 
 # send a message
-$ echo '{"jsonrpc":"2.0","method":"waku_post","params":[{"symKeyID":"98999c238e3747b7562674a86d450d531eca616d288a500268878e90848bfe4e", "ttl":100, "topic": "0xaabbccdd", "payload":"0x010203", "powTarget": 5.0, "powTime": 3}],"id":1}' | \
+$ echo '{"jsonrpc":"2.0","method":"waku_post","params":[{"symKeyID":"1e07adfcb80c9e9853fb2c4cce3d91c17edd17ab6e950387833d64878fe91624", "ttl":100, "topic": "0xaabbccdd", "payload":"0x010203", "powTarget": 5.0, "powTime": 3}],"id":1}' | \
     nc -U ./test-waku-bridge/geth.ipc
 {
   "jsonrpc": "2.0",
@@ -73,5 +98,4 @@ $ echo '{"jsonrpc":"2.0","method":"shh_getFilterMessages","params":["8fd6c01721a
   ]
 }
 ```
-
 
