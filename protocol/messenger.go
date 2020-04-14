@@ -1020,7 +1020,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	return &response, m.saveChat(chat)
 }
 
-func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*MessengerResponse, error) {
+func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -1077,7 +1077,9 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 	}
 
 	chat.updateChatFromProtocolGroup(group)
-	chat.Active = false
+	if remove {
+		chat.Active = false
+	}
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
