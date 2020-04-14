@@ -1,8 +1,11 @@
 package waku
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"math"
 	"reflect"
@@ -202,28 +205,36 @@ loop:
 }
 
 func (o statusOptions) decodeKey(s *rlp.Stream) (statusOptionKey, statusOptionKeyType, error) {
-	var key statusOptionKey
+	// Problem: A string will be encoded to bytes, and bytes can be decoded into a uint.
+	// This means that an encoded string that is attempted to be decoded into a uint will succeed and return a valid uint.
+	// This is bad because wildly inaccurate keys can be returned. See below examples:
+	// - string("0"); encodes to byte(48); decodes to uint(48).
+	// - string("111"); encodes to []byte(131, 49, 49, 49); decode to uint(3223857).
+	// This means an expected index of 0 will be returned as 48. An expected index of 111 will be returned as 3223857
 
-	// If statusOptionKey (uint) can be decoded return it
-	// Ignore the first error and attempt string decoding
-	if err := s.Decode(&key); err == nil {
-		return key, sOKTU, nil
-	}
+	// Solution: We need to first test if the RLP stream can be decoded into a string.
+	// If a stream can be decoded into a string, attempt to decode the string into a uint.
+	// If decoding the string into a uint is successful return the value.
+	// If decoding the string failed, attempt to decode as a uint. Return the result or error from this final step.
 
-	// Attempt decoding into a string
-	var sKey string
-	if err := s.Decode(&sKey); err != nil {
-		return key, 0, err
+	// decode into bytes, detect if bytes can be parsed as a string and from a string to a uint
+	var bKey []byte
+	if err := s.Decode(&bKey); err != nil {
+		return 0, 0, err
 	}
 
 	// Parse string into uint
-	uKey, err := strconv.ParseUint(sKey, 10, 64)
-	if err != nil {
-		return key, 0, err
+	uKey, err := strconv.ParseUint(string(bKey), 10, 64)
+	if err == nil {
+		return statusOptionKey(uKey), sOKTS, err
 	}
 
-	key = statusOptionKey(uKey)
-	return key, sOKTS, nil
+	// If statusOptionKey (uint) can be decoded return it
+	buf := bytes.NewBuffer(bKey)
+	uintKey, c := binary.ReadUvarint(buf)
+	spew.Dump(uintKey, c)
+
+	return statusOptionKey(uintKey), sOKTU, nil
 }
 
 // setKeyType sets a statusOptions' keyType if it hasn't previously been set
