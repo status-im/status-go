@@ -874,6 +874,68 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.Require().NotNil(actualChat.LastMessage)
 }
 
+// Test receiving a message on an existing private group chat
+func (s *MessengerSuite) TestChangeNameGroupChat() {
+	var response *MessengerResponse
+	theirMessenger := s.newMessenger(s.shh)
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
+	s.NoError(err)
+	s.Require().Len(response.Chats, 1)
+
+	ourChat := response.Chats[0]
+
+	err = s.m.SaveChat(ourChat)
+	s.NoError(err)
+
+	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))}
+	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = theirMessenger.RetrieveAll()
+		if err == nil && len(response.Chats) == 0 {
+			err = errors.New("chat invitation not received")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
+	s.NoError(err)
+
+	// Wait for join group event
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = s.m.RetrieveAll()
+		if err == nil && len(response.Chats) == 0 {
+			err = errors.New("no joining group event received")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	newName := "new-name"
+	_, err = s.m.ChangeGroupChatName(context.Background(), ourChat.ID, newName)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	err = tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = theirMessenger.RetrieveAll()
+		if err == nil && len(response.Chats) == 0 {
+			err = errors.New("chat invitation not received")
+		}
+		return err
+	})
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	actualChat := response.Chats[0]
+	s.Require().Equal(newName, actualChat.Name)
+}
+
 // Test receiving a message on an existing private group chat, if messages
 // are not wrapped this will fail as they'll likely come out of order
 // NOTE: Disabling this as too flaky

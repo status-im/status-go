@@ -200,6 +200,8 @@ func (p *messageProcessor) SendPairInstallation(
 	return messageID, nil
 }
 
+// EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
+// All the events in a group are encoded and added to the payload
 func (p *messageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatMessage *protobuf.ChatMessage,

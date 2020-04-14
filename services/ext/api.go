@@ -226,6 +226,10 @@ func (api *PublicAPI) ConfirmJoiningGroup(ctx context.Context, chatID string) (*
 	return api.service.messenger.ConfirmJoiningGroup(ctx, chatID)
 }
 
+func (api *PublicAPI) ChangeGroupChatName(ctx Context, chatID string, name string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ChangeGroupChatName(ctx, chatID, name)
+}
+
 func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {
 	return api.service.messenger.LoadFilters(chats)
 }
