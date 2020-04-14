@@ -35,6 +35,7 @@ const transactionSentTxt = "Transaction sent"
 
 var (
 	ErrChatIDEmpty    = errors.New("chat ID is empty")
+	ErrChatNotFound   = errors.New("can't find chat")
 	ErrNotImplemented = errors.New("not implemented")
 )
 
@@ -702,7 +703,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	group, err := newProtocolGroupFromChat(chat)
@@ -766,7 +767,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	group, err := newProtocolGroupFromChat(chat)
@@ -821,6 +822,72 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	return &response, m.saveChat(chat)
 }
 
+func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "ChangeGroupChatName"))
+	logger.Info("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	// Add members
+	event := v1protocol.NewNameChangedEvent(name, clock)
+	event.ChatID = chat.ID
+	err = event.Sign(m.identity)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update in-memory group
+	err = group.ProcessEvent(event)
+	if err != nil {
+		return nil, err
+	}
+
+	recipients, err := stringSliceToPublicKeys(group.Members(), true)
+	if err != nil {
+		return nil, err
+	}
+
+	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.dispatchMessage(ctx, &RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
+		Recipients:          recipients,
+		ResendAutomatically: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	chat.updateChatFromProtocolGroup(group)
+
+	var response MessengerResponse
+	response.Chats = []*Chat{chat}
+	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, m.saveChat(chat)
+}
+
 func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -831,7 +898,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	group, err := newProtocolGroupFromChat(chat)
@@ -894,7 +961,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	err := m.Join(*chat)
@@ -961,7 +1028,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	err := m.Leave(*chat)
