@@ -411,7 +411,7 @@ func TestPeerBasic(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d.", seed)
 	}
 
-	p := newPeer(nil, nil, nil, nil)
+	p := newPeer(nil, nil, ProtocolVersion1, nil, nil)
 	p.mark(env)
 	if !p.marked(env) {
 		t.Fatalf("failed mark with seed %d.", seed)
@@ -511,19 +511,37 @@ func waitForServersToStart(t *testing.T) {
 }
 
 //two generic waku node handshake
-func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
+func TestPeerHandshakeWithTwoFullNodeV0(t *testing.T) {
 	w1 := Waku{}
 	var pow uint64 = 123
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		ProtocolVersion0,
 		&rwStub{[]interface{}{
-			ProtocolVersion,
-			statusOptions{PoWRequirement: &pow},
+			ProtocolVersion0,
+			statusOptionsV0{PoWRequirement: &pow},
 		}},
 		nil,
 	)
-	err := p1.handshake()
+	err := p1.handshakeV0()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+//two generic waku node handshake V1
+func TestPeerHandshakeWithTwoFullNodeV1(t *testing.T) {
+	w1 := Waku{}
+	var pow uint64 = 123
+	p1 := newPeer(
+		&w1,
+		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		ProtocolVersion1,
+		&rwStub{[]interface{}{statusOptionsV1{PoWRequirement: &pow}}},
+		nil,
+	)
+	err := p1.handshakeV1()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -536,13 +554,14 @@ func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		ProtocolVersion0,
 		&rwStub{[]interface{}{
-			ProtocolVersion,
+			ProtocolVersion0,
 			statusOptions{PoWRequirement: &pow},
 		}},
 		nil,
 	)
-	err := p1.handshake()
+	err := p1.handshakeV0()
 	if err != nil {
 		t.Fatal()
 	}
@@ -590,13 +609,14 @@ func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
+		ProtocolVersion0,
 		&rwStub{[]interface{}{
-			ProtocolVersion,
+			ProtocolVersion0,
 			statusOptions{PoWRequirement: &pow, LightNodeEnabled: &lightNodeEnabled},
 		}},
 		nil,
 	)
-	err := p1.handshake()
+	err := p1.handshakeV0()
 	if err != nil {
 		t.FailNow()
 	}
@@ -610,10 +630,11 @@ func TestTwoLightPeerHandshakeError(t *testing.T) {
 	p1 := newPeer(
 		&w1,
 		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
-		&rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}},
+		ProtocolVersion0,
+		&rwStub{[]interface{}{ProtocolVersion0, uint64(123), make([]byte, BloomFilterSize), true}},
 		nil,
 	)
-	err := p1.handshake()
+	err := p1.handshakeV0()
 	if err == nil {
 		t.FailNow()
 	}

@@ -41,8 +41,9 @@ type Peer struct {
 	ws     p2p.MsgReadWriter
 	logger *zap.Logger
 
-	trusted        bool
-	powRequirement float64
+	trusted         bool
+	protocolVersion uint64
+	powRequirement  float64
 	// bloomMu is to allow thread safe access to
 	// the bloom filter
 	bloomMu     sync.Mutex
@@ -66,22 +67,23 @@ type Peer struct {
 }
 
 // newPeer creates a new waku peer object, but does not run the handshake itself.
-func newPeer(host *Waku, remote *p2p.Peer, rw p2p.MsgReadWriter, logger *zap.Logger) *Peer {
+func newPeer(host *Waku, remote *p2p.Peer, protocolVersion uint64, rw p2p.MsgReadWriter, logger *zap.Logger) *Peer {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
 	return &Peer{
-		host:           host,
-		peer:           remote,
-		ws:             rw,
-		logger:         logger,
-		trusted:        false,
-		powRequirement: 0.0,
-		known:          mapset.NewSet(),
-		quit:           make(chan struct{}),
-		bloomFilter:    MakeFullNodeBloom(),
-		fullNode:       true,
+		host:            host,
+		peer:            remote,
+		protocolVersion: protocolVersion,
+		ws:              rw,
+		logger:          logger,
+		trusted:         false,
+		powRequirement:  0.0,
+		known:           mapset.NewSet(),
+		quit:            make(chan struct{}),
+		bloomFilter:     MakeFullNodeBloom(),
+		fullNode:        true,
 	}
 }
 
@@ -100,12 +102,13 @@ func (p *Peer) stop() {
 
 // handshake sends the protocol initiation status message to the remote peer and
 // verifies the remote status too.
-func (p *Peer) handshake() error {
+func (p *Peer) handshakeV0() error {
+	p.logger.Info("V0 Handshake", zap.Binary("peerID", p.ID()))
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
-	opts := p.host.toStatusOptions()
+	opts := p.host.toStatusOptionsV0()
 	go func() {
-		errc <- p2p.SendItems(p.ws, statusCode, ProtocolVersion, opts)
+		errc <- p2p.SendItems(p.ws, statusCode, ProtocolVersion0, opts)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -119,7 +122,7 @@ func (p *Peer) handshake() error {
 
 	var (
 		peerProtocolVersion uint64
-		peerOptions         statusOptions
+		peerOptions         statusOptionsV0
 	)
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 	if _, err := s.List(); err != nil {
@@ -129,9 +132,6 @@ func (p *Peer) handshake() error {
 	if err := s.Decode(&peerProtocolVersion); err != nil {
 		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %v", p.ID(), err)
 	}
-	if peerProtocolVersion != ProtocolVersion {
-		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerProtocolVersion, ProtocolVersion)
-	}
 	// Decode and validate other status packet options.
 	if err := s.Decode(&peerOptions); err != nil {
 		return fmt.Errorf("p [%x]: failed to decode status options: %v", p.ID(), err)
@@ -139,12 +139,51 @@ func (p *Peer) handshake() error {
 	if err := s.ListEnd(); err != nil {
 		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
 	}
-	if err := p.setOptions(peerOptions.WithDefaults()); err != nil {
+	if err := p.setOptions(peerOptions.ToStatusOptions().WithDefaults()); err != nil {
 		return fmt.Errorf("p [%x]: failed to set options: %v", p.ID(), err)
 	}
 	if err := <-errc; err != nil {
 		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
 	}
+	_ = packet.Discard()
+	return nil
+}
+
+// handshake sends the protocol initiation status message to the remote peer and
+// verifies the remote status too.
+func (p *Peer) handshakeV1() error {
+	p.logger.Info("V1 Handshake", zap.Binary("peerID", p.ID()))
+	// Send the handshake status message asynchronously
+	errc := make(chan error, 1)
+	opts := p.host.toStatusOptionsV1()
+	go func() {
+		errc <- p2p.Send(p.ws, statusCode, opts)
+	}()
+
+	// Fetch the remote status packet and verify protocol match
+	packet, err := p.ws.ReadMsg()
+	if err != nil {
+		return err
+	}
+	if packet.Code != statusCode {
+		return fmt.Errorf("p [%x] sent packet %x before status packet", p.ID(), packet.Code)
+	}
+
+	var peerOptions statusOptionsV1
+	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
+
+	// Decode and validate other status packet options.
+	if err := s.Decode(&peerOptions); err != nil {
+		return fmt.Errorf("p [%x]: failed to decode status options: %v", p.ID(), err)
+	}
+
+	if err := p.setOptions(peerOptions.ToStatusOptions().WithDefaults()); err != nil {
+		return fmt.Errorf("p [%x]: failed to set options: %v", p.ID(), err)
+	}
+	if err := <-errc; err != nil {
+		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
+	}
+	_ = packet.Discard()
 	return nil
 }
 
@@ -287,17 +326,31 @@ func (p *Peer) ID() []byte {
 	return id[:]
 }
 
+func (p *Peer) V0() bool {
+	return p.protocolVersion == ProtocolVersion0
+}
+
 func (p *Peer) notifyAboutPowRequirementChange(pow float64) error {
 	i := math.Float64bits(pow)
-	return p2p.Send(p.ws, statusUpdateCode, statusOptions{PoWRequirement: &i})
+	if p.V0() {
+		return p2p.Send(p.ws, statusUpdateCode, statusOptionsV0{PoWRequirement: &i})
+	}
+	return p2p.Send(p.ws, statusUpdateCode, statusOptionsV1{PoWRequirement: &i})
 }
 
 func (p *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
-	return p2p.Send(p.ws, statusUpdateCode, statusOptions{BloomFilter: bloom})
+	if p.V0() {
+		return p2p.Send(p.ws, statusUpdateCode, statusOptionsV0{BloomFilter: bloom})
+	}
+
+	return p2p.Send(p.ws, statusUpdateCode, statusOptionsV1{BloomFilter: bloom})
 }
 
 func (p *Peer) notifyAboutTopicInterestChange(topics []TopicType) error {
-	return p2p.Send(p.ws, statusUpdateCode, statusOptions{TopicInterest: topics})
+	if p.V0() {
+		return p2p.Send(p.ws, statusUpdateCode, statusOptionsV0{TopicInterest: topics})
+	}
+	return p2p.Send(p.ws, statusUpdateCode, statusOptionsV1{TopicInterest: topics})
 }
 
 func (p *Peer) bloomMatch(env *Envelope) bool {

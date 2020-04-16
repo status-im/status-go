@@ -47,7 +47,7 @@ func TestBasic(t *testing.T) {
 	if shh.Name != ProtocolName {
 		t.Fatalf("failed Protocol Name: %v.", shh.Name)
 	}
-	if uint64(shh.Version) != ProtocolVersion {
+	if uint64(shh.Version) != ProtocolVersion1 {
 		t.Fatalf("failed Protocol Version: %v.", shh.Version)
 	}
 	if shh.Length != NumberOfMessageCodes {
@@ -55,9 +55,6 @@ func TestBasic(t *testing.T) {
 	}
 	if shh.Run == nil {
 		t.Fatalf("failed shh.Run.")
-	}
-	if uint64(w.Version()) != ProtocolVersion {
-		t.Fatalf("failed waku Version: %v.", shh.Version)
 	}
 	if w.GetFilter("non-existent") != nil {
 		t.Fatalf("failed GetFilter.")
@@ -1054,7 +1051,7 @@ func TestSendP2PDirect(t *testing.T) {
 	defer w.Stop()                                  // nolint: errcheck
 
 	rwStub := &rwP2PMessagesStub{}
-	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub, nil)
+	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), ProtocolVersion1, rwStub, nil)
 	w.peers[peerW] = struct{}{}
 
 	params, err := generateMessageParams()
@@ -1122,7 +1119,7 @@ func TestHandleP2PMessageCode(t *testing.T) {
 	rwStub := &rwP2PMessagesStub{}
 	rwStub.payload = []interface{}{[]*Envelope{env}}
 
-	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), nil, nil)
+	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), ProtocolVersion1, nil, nil)
 	peer.trusted = true
 
 	err = w.runMessageLoop(peer, rwStub)
@@ -1184,7 +1181,7 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w.HandlePeer(p, rw2)
+		err := w.HandlePeerV1(p, rw2)
 		errorc <- err
 	}()
 	// so that actual read won't hang forever
@@ -1196,10 +1193,7 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{
-				ProtocolVersion,
-				w.toStatusOptions(),
-			},
+			w.toStatusOptionsV1(),
 		),
 	)
 }
@@ -1225,7 +1219,7 @@ func TestConfirmationReceived(t *testing.T) {
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w.HandlePeer(p, rw2)
+		err := w.HandlePeerV1(p, rw2)
 		errorc <- err
 	}()
 	go func() {
@@ -1244,18 +1238,14 @@ func TestConfirmationReceived(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{
-				ProtocolVersion,
-				w.toStatusOptions(),
-			},
+			w.toStatusOptionsV1(),
 		),
 	)
 	require.NoError(
 		t,
-		p2p.SendItems(
+		p2p.Send(
 			rw1,
 			statusCode,
-			ProtocolVersion,
 			statusOptions{
 				PoWRequirement:       &pow,
 				BloomFilter:          w.BloomFilter(),
@@ -1295,7 +1285,7 @@ func TestMessagesResponseWithError(t *testing.T) {
 	}()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w.HandlePeer(p, rw2)
+		err := w.HandlePeerV1(p, rw2)
 		errorc <- err
 	}()
 
@@ -1307,19 +1297,15 @@ func TestMessagesResponseWithError(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{
-				ProtocolVersion,
-				w.toStatusOptions(),
-			},
+			w.toStatusOptionsV1(),
 		),
 	)
 	require.NoError(
 		t,
-		p2p.SendItems(
+		p2p.Send(
 			rw1,
 			statusCode,
-			ProtocolVersion,
-			statusOptions{
+			statusOptionsV1{
 				PoWRequirement:       &pow,
 				BloomFilter:          w.BloomFilter(),
 				ConfirmationsEnabled: &confirmationsEnabled,
@@ -1368,7 +1354,7 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w.HandlePeer(p, rw2)
+		err := w.HandlePeerV1(p, rw2)
 		errorc <- err
 	}()
 	time.AfterFunc(5*time.Second, func() {
@@ -1382,16 +1368,12 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 	require.NoError(t, p2p.ExpectMsg(
 		rw1,
 		statusCode,
-		[]interface{}{
-			ProtocolVersion,
-			w.toStatusOptions(),
-		},
+		w.toStatusOptionsV1(),
 	))
-	require.NoError(t, p2p.SendItems(
+	require.NoError(t, p2p.Send(
 		rw1,
 		statusCode,
-		ProtocolVersion,
-		statusOptions{
+		statusOptionsV1{
 			PoWRequirement:       &pow,
 			BloomFilter:          w.BloomFilter(),
 			ConfirmationsEnabled: &confirmationsEnabled,
@@ -1466,7 +1448,7 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w.HandlePeer(p, rw2)
+		err := w.HandlePeerV1(p, rw2)
 		errorc <- err
 	}()
 	time.AfterFunc(5*time.Second, func() {
@@ -1481,19 +1463,15 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{
-				ProtocolVersion,
-				w.toStatusOptions(),
-			},
+			w.toStatusOptionsV1(),
 		),
 	)
 	require.NoError(
 		t,
-		p2p.SendItems(
+		p2p.Send(
 			rw1,
 			statusCode,
-			ProtocolVersion,
-			statusOptions{
+			statusOptionsV1{
 				PoWRequirement:   &pow,
 				BloomFilter:      w.BloomFilter(),
 				LightNodeEnabled: &lightNodeEnabled,
@@ -1550,10 +1528,10 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	w1, w2 := New(c, nil), New(c, nil)
 	errc := make(chan error)
 	go func() {
-		w1.HandlePeer(p2, rw2) // nolint: errcheck
+		w1.HandlePeerV1(p2, rw2) // nolint: errcheck
 	}()
 	go func() {
-		errc <- w2.HandlePeer(p1, rw1)
+		errc <- w2.HandlePeerV1(p1, rw1)
 	}()
 	w1.SetTimeSource(func() time.Time {
 		return time.Now().Add(time.Hour)
@@ -1584,7 +1562,7 @@ func TestRequestSentEventWithExpiry(t *testing.T) {
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	rw := discardPipe()
 	defer rw.Close()
-	w.peers[newPeer(w, p, rw, nil)] = struct{}{}
+	w.peers[newPeer(w, p, ProtocolVersion1, rw, nil)] = struct{}{}
 	events := make(chan EnvelopeEvent, 1)
 	sub := w.SubscribeEnvelopeEvents(events)
 	defer sub.Unsubscribe()
@@ -1628,7 +1606,7 @@ func TestSendMessagesRequest(t *testing.T) {
 		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
 		rw1, rw2 := p2p.MsgPipe()
 		w := New(nil, nil)
-		w.peers[newPeer(w, p, rw1, nil)] = struct{}{}
+		w.peers[newPeer(w, p, ProtocolVersion1, rw1, nil)] = struct{}{}
 
 		go func() {
 			err := w.SendMessagesRequest(p.ID().Bytes(), validMessagesRequest)
@@ -1654,7 +1632,7 @@ func TestRateLimiterIntegration(t *testing.T) {
 	}()
 	errorc := make(chan error, 1)
 	go func() {
-		err := w.HandlePeer(p, rw2)
+		err := w.HandlePeerV1(p, rw2)
 		errorc <- err
 
 	}()
@@ -1664,10 +1642,7 @@ func TestRateLimiterIntegration(t *testing.T) {
 		p2p.ExpectMsg(
 			rw1,
 			statusCode,
-			[]interface{}{
-				ProtocolVersion,
-				w.toStatusOptions(),
-			},
+			w.toStatusOptionsV1(),
 		),
 	)
 	select {
@@ -1683,7 +1658,7 @@ func TestMailserverCompletionEvent(t *testing.T) {
 	defer w.Stop() // nolint: errcheck
 
 	rw1, rw2 := p2p.MsgPipe()
-	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
+	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), ProtocolVersion1, rw1, nil)
 	peer.trusted = true
 	w.peers[peer] = struct{}{}
 

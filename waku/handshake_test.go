@@ -14,7 +14,7 @@ func TestEncodeDecodeRLP(t *testing.T) {
 	lightNodeEnabled := true
 	confirmationsEnabled := true
 
-	opts := statusOptions{
+	opts := statusOptionsV1{
 		PoWRequirement:       &pow,
 		BloomFilter:          TopicToBloom(TopicType{0xaa, 0xbb, 0xcc, 0xdd}),
 		LightNodeEnabled:     &lightNodeEnabled,
@@ -29,7 +29,7 @@ func TestEncodeDecodeRLP(t *testing.T) {
 	data, err := rlp.EncodeToBytes(opts)
 	require.NoError(t, err)
 
-	var optsDecoded statusOptions
+	var optsDecoded statusOptionsV1
 	err = rlp.DecodeBytes(data, &optsDecoded)
 	require.NoError(t, err)
 	require.EqualValues(t, opts, optsDecoded)
@@ -42,11 +42,11 @@ func TestBackwardCompatibility(t *testing.T) {
 	data, err := rlp.EncodeToBytes(alist)
 	require.NoError(t, err)
 
-	var optsDecoded statusOptions
+	var optsDecoded statusOptionsV1
 	err = rlp.DecodeBytes(data, &optsDecoded)
 	require.NoError(t, err)
 	pow := math.Float64bits(2.05)
-	require.EqualValues(t, statusOptions{PoWRequirement: &pow}, optsDecoded)
+	require.EqualValues(t, statusOptionsV1{PoWRequirement: &pow}, optsDecoded)
 }
 
 func TestForwardCompatibility(t *testing.T) {
@@ -58,8 +58,8 @@ func TestForwardCompatibility(t *testing.T) {
 	data, err := rlp.EncodeToBytes(alist)
 	require.NoError(t, err)
 
-	var optsDecoded statusOptions
+	var optsDecoded statusOptionsV1
 	err = rlp.DecodeBytes(data, &optsDecoded)
 	require.NoError(t, err)
-	require.EqualValues(t, statusOptions{PoWRequirement: &pow}, optsDecoded)
+	require.EqualValues(t, statusOptionsV1{PoWRequirement: &pow}, optsDecoded)
 }

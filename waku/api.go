@@ -63,7 +63,7 @@ func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
 
 // Version returns the Waku sub-protocol version.
 func (api *PublicWakuAPI) Version(ctx context.Context) string {
-	return ProtocolVersionStr
+	return ProtocolVersion1Str
 }
 
 // Info contains diagnostic information.

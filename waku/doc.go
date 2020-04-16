@@ -30,9 +30,11 @@ import (
 
 // Waku protocol parameters
 const (
-	ProtocolVersion    = uint64(0) // Protocol version number
-	ProtocolVersionStr = "0"       // The same, as a string
-	ProtocolName       = "waku"    // Nickname of the protocol
+	ProtocolVersion1    = uint64(1) // Protocol version number
+	ProtocolVersion1Str = "1"       // The same, as a string
+	ProtocolVersion0    = uint64(0) // Protocol version number for legacy version
+	ProtocolVersion0Str = "0"       // The same, as a string
+	ProtocolName        = "waku"    // Nickname of the protocol
 
 	// Waku protocol message codes, according to https://github.com/vacp2p/specs/blob/master/waku.md
 	statusCode             = 0   // used in the handshake
@@ -74,10 +76,11 @@ const (
 
 	MaxLimitInSyncMailRequest = 1000
 
+	MaxLimitInMessagesRequest = 1000
+)
+const (
 	EnvelopeTimeNotSynced uint = iota + 1
 	EnvelopeOtherError
-
-	MaxLimitInMessagesRequest = 1000
 )
 
 // MailServer represents a mail server, capable of

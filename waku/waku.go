@@ -72,8 +72,8 @@ type settings struct {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	protocol p2p.Protocol // Protocol description and parameters
-	filters  *Filters     // Message filters installed with Subscribe function
+	protocols []p2p.Protocol // Protocols description and parameters
+	filters   *Filters       // Message filters installed with Subscribe function
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -151,26 +151,36 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	waku.filters = NewFilters(waku)
 
 	// p2p waku sub-protocol handler
-	waku.protocol = p2p.Protocol{
-		Name:    ProtocolName,
-		Version: uint(ProtocolVersion),
-		Length:  NumberOfMessageCodes,
-		Run:     waku.HandlePeer,
-		NodeInfo: func() interface{} {
-			return map[string]interface{}{
-				"version":        ProtocolVersionStr,
-				"maxMessageSize": waku.MaxMessageSize(),
-				"minimumPoW":     waku.MinPow(),
-			}
+	waku.protocols = []p2p.Protocol{
+		{
+			Name:    ProtocolName,
+			Version: uint(ProtocolVersion0),
+			Length:  NumberOfMessageCodes,
+			Run:     waku.HandlePeerV0,
+			NodeInfo: func() interface{} {
+				return map[string]interface{}{
+					"version":        ProtocolVersion0Str,
+					"maxMessageSize": waku.MaxMessageSize(),
+					"minimumPoW":     waku.MinPow(),
+				}
+			},
+		},
+		{
+			Name:    ProtocolName,
+			Version: uint(ProtocolVersion1),
+			Length:  NumberOfMessageCodes,
+			Run:     waku.HandlePeerV1,
+			NodeInfo: func() interface{} {
+				return map[string]interface{}{
+					"version":        ProtocolVersion1Str,
+					"maxMessageSize": waku.MaxMessageSize(),
+					"minimumPoW":     waku.MinPow(),
+				}
+			},
 		},
 	}
 
 	return waku
-}
-
-// Version returns the waku sub-protocol version number.
-func (w *Waku) Version() uint {
-	return w.protocol.Version
 }
 
 // MinPow returns the PoW value required by this node.
@@ -417,7 +427,7 @@ func (w *Waku) APIs() []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: ProtocolName,
-			Version:   ProtocolVersionStr,
+			Version:   ProtocolVersion1Str,
 			Service:   NewPublicWakuAPI(w),
 			Public:    false,
 		},
@@ -426,7 +436,7 @@ func (w *Waku) APIs() []rpc.API {
 
 // Protocols returns the waku sub-protocols ran by this particular client.
 func (w *Waku) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{w.protocol}
+	return w.protocols
 }
 
 // RegisterMailServer registers MailServer interface.
@@ -1025,9 +1035,9 @@ func (w *Waku) Stop() error {
 
 // HandlePeer is called by the underlying P2P layer when the waku sub-protocol
 // connection is negotiated.
-func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+func (w *Waku) HandlePeerV0(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	// Create the new peer and start tracking it
-	wakuPeer := newPeer(w, peer, rw, w.logger.Named("waku/peer"))
+	wakuPeer := newPeer(w, peer, ProtocolVersion0, rw, w.logger.Named("waku/peer"))
 
 	w.peerMu.Lock()
 	w.peers[wakuPeer] = struct{}{}
@@ -1040,7 +1050,36 @@ func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 	}()
 
 	// Run the peer handshake and state updates
-	if err := wakuPeer.handshake(); err != nil {
+	if err := wakuPeer.handshakeV0(); err != nil {
+		return err
+	}
+	wakuPeer.start()
+	defer wakuPeer.stop()
+
+	if w.rateLimiter != nil {
+		return w.rateLimiter.decorate(wakuPeer, rw, w.runMessageLoop)
+	}
+	return w.runMessageLoop(wakuPeer, rw)
+}
+
+// HandlePeer is called by the underlying P2P layer when the waku sub-protocol
+// connection is negotiated.
+func (w *Waku) HandlePeerV1(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	// Create the new peer and start tracking it
+	wakuPeer := newPeer(w, peer, ProtocolVersion1, rw, w.logger.Named("waku/peer"))
+
+	w.peerMu.Lock()
+	w.peers[wakuPeer] = struct{}{}
+	w.peerMu.Unlock()
+
+	defer func() {
+		w.peerMu.Lock()
+		delete(w.peers, wakuPeer)
+		w.peerMu.Unlock()
+	}()
+
+	// Run the peer handshake and state updates
+	if err := wakuPeer.handshakeV1(); err != nil {
 		return err
 	}
 	wakuPeer.start()
@@ -1178,15 +1217,26 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 }
 
 func (w *Waku) handleStatusUpdateCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	var statusOptions statusOptions
+	if p.protocolVersion == ProtocolVersion0 {
+		var statusOptions statusOptionsV0
+		err := packet.Decode(&statusOptions)
+		if err != nil {
+			logger.Error("failed to decode status-options", zap.Error(err))
+			envelopesRejectedCounter.WithLabelValues("invalid_settings_changed").Inc()
+			return err
+		}
+		return p.setOptions(statusOptions.ToStatusOptions())
+	}
+
+	var statusOptions statusOptionsV1
 	err := packet.Decode(&statusOptions)
 	if err != nil {
 		logger.Error("failed to decode status-options", zap.Error(err))
 		envelopesRejectedCounter.WithLabelValues("invalid_settings_changed").Inc()
 		return err
 	}
+	return p.setOptions(statusOptions.ToStatusOptions())
 
-	return p.setOptions(statusOptions)
 }
 
 func (w *Waku) handleP2PMessageCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
@@ -1565,8 +1615,33 @@ func (w *Waku) expire() {
 	}
 }
 
-func (w *Waku) toStatusOptions() statusOptions {
-	opts := statusOptions{}
+func (w *Waku) toStatusOptionsV0() statusOptionsV0 {
+	opts := statusOptionsV0{}
+
+	rateLimits := w.RateLimits()
+	opts.RateLimits = &rateLimits
+
+	lightNode := w.LightClientMode()
+	opts.LightNodeEnabled = &lightNode
+
+	minPoW := w.MinPow()
+	opts.SetPoWRequirementFromF(minPoW)
+
+	confirmationsEnabled := w.ConfirmationsEnabled()
+	opts.ConfirmationsEnabled = &confirmationsEnabled
+
+	bloomFilterMode := w.BloomFilterMode()
+	if bloomFilterMode {
+		opts.BloomFilter = w.BloomFilter()
+	} else {
+		opts.TopicInterest = w.TopicInterest()
+	}
+
+	return opts
+}
+
+func (w *Waku) toStatusOptionsV1() statusOptionsV1 {
+	opts := statusOptionsV1{}
 
 	rateLimits := w.RateLimits()
 	opts.RateLimits = &rateLimits
