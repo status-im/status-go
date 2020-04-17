@@ -116,6 +116,12 @@ func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
 	return contact, nil
 }
 
+// HasCustomFields returns whether the the contact has any field that is valuable
+// to the client other than the computed name/image
+func (c Contact) HasCustomFields() bool {
+	return c.IsAdded() || c.HasBeenAdded() || c.IsBlocked() || c.ENSVerified
+}
+
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 

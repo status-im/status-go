@@ -1191,7 +1191,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
+		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
 			{
 				InstallationID: "1",
@@ -1379,7 +1379,7 @@ func (s *MessengerSuite) TestContactPersistence() {
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
+		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
 			{
 				InstallationID: "1",
@@ -1414,7 +1414,7 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
+		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
 			{
 				InstallationID: "1",
