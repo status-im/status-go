@@ -1,8 +1,6 @@
 package waku
 
 import (
-	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"math"
 	"testing"
 
@@ -27,7 +25,6 @@ func TestEncodeDecodeRLP(t *testing.T) {
 			TopicLimits:  1,
 		},
 		TopicInterest: []TopicType{{0x01}, {0x02}, {0x03}, {0x04}},
-		keyType:       sOKTU,
 	}
 	data, err := rlp.EncodeToBytes(opts)
 	require.NoError(t, err)
@@ -38,87 +35,18 @@ func TestEncodeDecodeRLP(t *testing.T) {
 	require.EqualValues(t, opts, optsDecoded)
 }
 
-// TODO remove once key type issue is resolved.
-func TestKeyTypes(t *testing.T) {
-	uKeys := []uint{
-		0, 1, 2, 49, 50, 256, 257, 1000, 6000,
-	}
-
-	for i, uKey := range uKeys {
-		fmt.Printf("test %d, for key '%d'", i+1, uKey)
-
-		encodeable := []interface{}{
-			[]interface{}{uKey, true},
-		}
-		data, err := rlp.EncodeToBytes(encodeable)
-		spew.Dump(data, err)
-
-		var optsDecoded statusOptions
-		err = rlp.DecodeBytes(data, &optsDecoded)
-		spew.Dump(optsDecoded, err)
-
-		println("\n----------------\n")
-	}
-}
-
 func TestBackwardCompatibility(t *testing.T) {
+	alist := []interface{}{
+		[]interface{}{"0", math.Float64bits(2.05)},
+	}
+	data, err := rlp.EncodeToBytes(alist)
+	require.NoError(t, err)
+
+	var optsDecoded statusOptions
+	err = rlp.DecodeBytes(data, &optsDecoded)
+	require.NoError(t, err)
 	pow := math.Float64bits(2.05)
-	lne := true
-
-	cs := []struct {
-		Input []interface{}
-		Expected statusOptions
-	}{
-		{
-			[]interface{}{
-				[]interface{}{"0", pow},
-			},
-			statusOptions{PoWRequirement: &pow, keyType: sOKTS},
-		},
-		{
-			[]interface{}{
-				[]interface{}{"2", true},
-			},
-			statusOptions{LightNodeEnabled: &lne, keyType: sOKTS},
-		},
-		{
-			[]interface{}{
-				[]interface{}{uint(2), true},
-			},
-			statusOptions{LightNodeEnabled: &lne, keyType: sOKTU},
-		},
-		{
-			[]interface{}{
-				[]interface{}{uint(0), pow},
-			},
-			statusOptions{PoWRequirement: &pow, keyType: sOKTU},
-		},
-		{
-			[]interface{}{
-				[]interface{}{"1000", true},
-			},
-			statusOptions{keyType: sOKTS},
-		},
-		{
-			[]interface{}{
-				[]interface{}{uint(1000), true},
-			},
-			statusOptions{keyType: sOKTU},
-		},
-	}
-
-	for i, c := range cs {
-		failMsg := fmt.Sprintf("test '%d'", i+1)
-
-		data, err := rlp.EncodeToBytes(c.Input)
-		require.NoError(t, err, failMsg)
-
-		var optsDecoded statusOptions
-		err = rlp.DecodeBytes(data, &optsDecoded)
-		require.NoError(t, err, failMsg)
-
-		require.EqualValues(t, c.Expected, optsDecoded, failMsg)
-	}
+	require.EqualValues(t, statusOptions{PoWRequirement: &pow}, optsDecoded)
 }
 
 func TestForwardCompatibility(t *testing.T) {
@@ -138,20 +66,20 @@ func TestForwardCompatibility(t *testing.T) {
 
 func TestInitRLPKeyFields(t *testing.T) {
 	ifk := map[int]statusOptionKey{
-		0: 0,
-		1: 1,
-		2: 2,
-		3: 3,
-		4: 4,
-		5: 5,
+		0: "0",
+		1: "1",
+		2: "2",
+		3: "3",
+		4: "4",
+		5: "5",
 	}
 	kfi := map[statusOptionKey]int{
-		0: 0,
-		1: 1,
-		2: 2,
-		3: 3,
-		4: 4,
-		5: 5,
+		"0": 0,
+		"1": 1,
+		"2": 2,
+		"3": 3,
+		"4": 4,
+		"5": 5,
 	}
 
 	// Test that the kfi length matches the inited global keyFieldIdx length
