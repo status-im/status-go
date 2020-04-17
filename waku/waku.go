@@ -110,10 +110,7 @@ type Waku struct {
 
 // init initialises the waku package
 func init() {
-	err := initRLPKeyFields()
-	if err != nil {
-		panic(err)
-	}
+	initRLPKeyFields()
 }
 
 // New creates a Waku client ready to communicate through the Ethereum P2P network.
