@@ -1216,7 +1216,9 @@ func (m *Messenger) Contacts() []*Contact {
 	defer m.mutex.Unlock()
 	var contacts []*Contact
 	for _, contact := range m.allContacts {
-		contacts = append(contacts, contact)
+		if contact.HasCustomFields() {
+			contacts = append(contacts, contact)
+		}
 	}
 	return contacts
 }
@@ -1980,8 +1982,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.Chats = append(messageState.Response.Chats, messageState.AllChats[id])
 	}
 
+	var contactsToSave []*Contact
 	for id := range messageState.ModifiedContacts {
-		messageState.Response.Contacts = append(messageState.Response.Contacts, messageState.AllContacts[id])
+		contact := messageState.AllContacts[id]
+		if contact != nil {
+			// We save all contacts so we can pull back name/image,
+			// but we only send to client those
+			// that have some custom fields
+			contactsToSave = append(contactsToSave, contact)
+			if contact.HasCustomFields() {
+				messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
+			}
+		}
 	}
 
 	for id := range messageState.ModifiedInstallations {
@@ -2009,8 +2021,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
-	if len(messageState.Response.Contacts) > 0 {
-		err = m.persistence.SaveContacts(messageState.Response.Contacts)
+	if len(contactsToSave) > 0 {
+		err = m.persistence.SaveContacts(contactsToSave)
 		if err != nil {
 			return nil, err
 		}

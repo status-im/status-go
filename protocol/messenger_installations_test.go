@@ -219,7 +219,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	var allChats []*Chat
-	var allContacts []*Contact
+	var actualContact *Contact
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
 		var err error
@@ -229,9 +229,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		}
 
 		allChats = append(allChats, response.Chats...)
-		allContacts = append(allContacts, response.Contacts...)
 
-		if len(allChats) >= 2 && len(allContacts) >= 3 {
+		if len(allChats) >= 2 && len(response.Contacts) == 1 {
+			actualContact = response.Contacts[0]
 			return nil
 		}
 
@@ -250,28 +250,5 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().NotNil(statusChat)
 
-	var actualContact *Contact
-	for _, c := range allContacts {
-		if c.ID == contact.ID {
-			actualContact = c
-		}
-	}
-
 	s.Require().True(actualContact.IsAdded())
-
-	var ourContact *Contact
-
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	for _, c := range allContacts {
-		if c.ID == myID {
-			if ourContact == nil || ourContact.LastUpdated < c.LastUpdated {
-				ourContact = c
-			}
-		}
-	}
-
-	s.Require().NotNil(ourContact)
-	s.Require().Equal("ens-name", ourContact.Name)
-	s.Require().Equal("profile-image", ourContact.Photo)
-
 }
