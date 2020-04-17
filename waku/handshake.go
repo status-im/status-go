@@ -1,30 +1,18 @@
 package waku
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"math"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // statusOptionKey is a current type used in statusOptions as a key.
-type statusOptionKey uint
-
-// statusOptionKeyType is a type of a statusOptions key used for a particular instance of statusOptions struct.
-type statusOptionKeyType uint
-
-const (
-	sOKTS statusOptionKeyType = iota + 1 // Status Option Key Type String
-	sOKTU                                // Status Option Key Type Uint
-)
+type statusOptionKey string
 
 var (
 	defaultMinPoW = math.Float64bits(0.001)
@@ -45,11 +33,10 @@ type statusOptions struct {
 	ConfirmationsEnabled *bool       `rlp:"key=3"`
 	RateLimits           *RateLimits `rlp:"key=4"`
 	TopicInterest        []TopicType `rlp:"key=5"`
-	keyType              statusOptionKeyType
 }
 
 // initFLPKeyFields initialises the values of `idxFieldKey` and `keyFieldIdx`
-func initRLPKeyFields() error {
+func initRLPKeyFields() {
 	o := statusOptions{}
 	v := reflect.ValueOf(o)
 
@@ -59,6 +46,7 @@ func initRLPKeyFields() error {
 			continue
 		}
 		rlpTag := v.Type().Field(i).Tag.Get("rlp")
+
 		// skip fields without rlp field tag
 		if rlpTag == "" {
 			continue
@@ -70,18 +58,10 @@ func initRLPKeyFields() error {
 			panic("invalid value of \"rlp\" tag, expected \"key=N\" where N is uint")
 		}
 
-		// parse keys[1] as an uint
-		key, err := strconv.ParseUint(keys[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("malformed rlp tag '%s', expected \"key=N\" where N is uint: %v", rlpTag, err)
-		}
-
 		// typecast key to be of statusOptionKey type
-		keyFieldIdx[statusOptionKey(key)] = i
-		idxFieldKey[i] = statusOptionKey(key)
+		keyFieldIdx[statusOptionKey(keys[1])] = i
+		idxFieldKey[i] = statusOptionKey(keys[1])
 	}
-
-	return nil
 }
 
 // WithDefaults adds the default values for a given peer.
@@ -131,24 +111,15 @@ func (o statusOptions) EncodeRLP(w io.Writer) error {
 	var optionsList []interface{}
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
-
-		// skip unexported fields
-		if !field.CanInterface() {
-			continue
-		}
-
-		if field.IsNil() {
-			continue
-		}
-
-		value := field.Interface()
-		key, ok := idxFieldKey[i]
-		if !ok {
-			continue
-		}
-
-		if value != nil {
-			optionsList = append(optionsList, []interface{}{o.encodeKey(key), value})
+		if !field.IsNil() {
+			value := field.Interface()
+			key, ok := idxFieldKey[i]
+			if !ok {
+				continue
+			}
+			if value != nil {
+				optionsList = append(optionsList, []interface{}{key, value})
+			}
 		}
 	}
 	return rlp.Encode(w, optionsList)
@@ -159,6 +130,7 @@ func (o *statusOptions) DecodeRLP(s *rlp.Stream) error {
 	if err != nil {
 		return fmt.Errorf("expected an outer list: %v", err)
 	}
+
 	v := reflect.ValueOf(o)
 
 loop:
@@ -172,13 +144,10 @@ loop:
 		default:
 			return fmt.Errorf("expected an inner list: %v", err)
 		}
-
-		key, keyType, err := o.decodeKey(s)
-		if err != nil {
-			return fmt.Errorf("key decode failure: %v", err)
+		var key statusOptionKey
+		if err := s.Decode(&key); err != nil {
+			return fmt.Errorf("invalid key: %v", err)
 		}
-		o.setKeyType(keyType)
-
 		// Skip processing if a key does not exist.
 		// It might happen when there is a new peer
 		// which supports a new option with
@@ -188,13 +157,12 @@ loop:
 			// Read the rest of the list items and dump them.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %d: %v", key, err)
+				return fmt.Errorf("failed to read the value of key %s: %v", key, err)
 			}
 			continue
 		}
-
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %d: %v", key, err)
+			return fmt.Errorf("failed to decode an option %s: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err
@@ -202,54 +170,6 @@ loop:
 	}
 
 	return s.ListEnd()
-}
-
-func (o statusOptions) decodeKey(s *rlp.Stream) (statusOptionKey, statusOptionKeyType, error) {
-	// Problem: A string will be encoded to bytes, and bytes can be decoded into a uint.
-	// This means that an encoded string that is attempted to be decoded into a uint will succeed and return a valid uint.
-	// This is bad because wildly inaccurate keys can be returned. See below examples:
-	// - string("0"); encodes to byte(48); decodes to uint(48).
-	// - string("111"); encodes to []byte(131, 49, 49, 49); decode to uint(3223857).
-	// This means an expected index of 0 will be returned as 48. An expected index of 111 will be returned as 3223857
-
-	// Solution: We need to first test if the RLP stream can be decoded into a string.
-	// If a stream can be decoded into a string, attempt to decode the string into a uint.
-	// If decoding the string into a uint is successful return the value.
-	// If decoding the string failed, attempt to decode as a uint. Return the result or error from this final step.
-
-	// decode into bytes, detect if bytes can be parsed as a string and from a string to a uint
-	var bKey []byte
-	if err := s.Decode(&bKey); err != nil {
-		return 0, 0, err
-	}
-
-	// Parse string into uint
-	uKey, err := strconv.ParseUint(string(bKey), 10, 64)
-	if err == nil {
-		return statusOptionKey(uKey), sOKTS, err
-	}
-
-	// If statusOptionKey (uint) can be decoded return it
-	buf := bytes.NewBuffer(bKey)
-	uintKey, c := binary.ReadUvarint(buf)
-	spew.Dump(uintKey, c)
-
-	return statusOptionKey(uintKey), sOKTU, nil
-}
-
-// setKeyType sets a statusOptions' keyType if it hasn't previously been set
-func (o *statusOptions) setKeyType(t statusOptionKeyType) {
-	if o.keyType == 0 {
-		o.keyType = t
-	}
-}
-
-func (o statusOptions) encodeKey(key statusOptionKey) interface{} {
-	if o.keyType == sOKTS {
-		return fmt.Sprint(key)
-	}
-
-	return key
 }
 
 func (o statusOptions) Validate() error {
