@@ -2,8 +2,7 @@
 
 First of all, thank you for taking time to add more value to Status, we really appreciate it!
 
-If you just have a question, don't open an issue but rather ask us on our Slack channel: https://slack.status.im/
-
+If you just have a question, don't open an issue but rather ask us on our [Discord server](https://discord.gg/3Exux7Y)
 ## Starter Links
 
 You just want to contribute something without reading tons of documentation, right? There're only a few useful links to start with.
