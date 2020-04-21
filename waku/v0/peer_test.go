@@ -16,52 +16,45 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package v0
 
 import (
-	"bytes"
 	"testing"
-	"time"
 
 	"github.com/status-im/status-go/waku/common"
 )
 
-func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
-	w := New(nil, nil)
+var sharedTopic = common.TopicType{0xF, 0x1, 0x2, 0}
+var wrongTopic = common.TopicType{0, 0, 0, 0}
 
-	keyID, err := w.GenerateSymKey()
-	if err != nil {
-		t.Fatalf("Error generating symmetric key: %v", err)
-	}
-	api := PublicWakuAPI{
-		w:        w,
-		lastUsed: make(map[string]time.Time),
-	}
-
-	t1 := [4]byte{0xde, 0xea, 0xbe, 0xef}
-	t2 := [4]byte{0xca, 0xfe, 0xde, 0xca}
-
-	crit := Criteria{
-		SymKeyID: keyID,
-		Topics:   []common.TopicType{common.TopicType(t1), common.TopicType(t2)},
+//two generic waku node handshake. one don't send light flag
+func TestTopicOrBloomMatch(t *testing.T) {
+	p := Peer{}
+	p.setTopicInterest([]common.TopicType{sharedTopic})
+	envelope := &common.Envelope{Topic: sharedTopic}
+	if !p.topicOrBloomMatch(envelope) {
+		t.Fatal("envelope should match")
 	}
 
-	_, err = api.NewMessageFilter(crit)
-	if err != nil {
-		t.Fatalf("Error creating the filter: %v", err)
+	badEnvelope := &common.Envelope{Topic: wrongTopic}
+	if p.topicOrBloomMatch(badEnvelope) {
+		t.Fatal("envelope should not match")
 	}
 
-	found := false
-	candidates := w.filters.GetWatchersByTopic(common.TopicType(t1))
-	for _, f := range candidates {
-		if len(f.Topics) == 2 {
-			if bytes.Equal(f.Topics[0], t1[:]) && bytes.Equal(f.Topics[1], t2[:]) {
-				found = true
-			}
-		}
+}
+
+func TestTopicOrBloomMatchFullNode(t *testing.T) {
+	p := Peer{}
+	// Set as full node
+	p.fullNode = true
+	p.setTopicInterest([]common.TopicType{sharedTopic})
+	envelope := &common.Envelope{Topic: sharedTopic}
+	if !p.topicOrBloomMatch(envelope) {
+		t.Fatal("envelope should match")
 	}
 
-	if !found {
-		t.Fatalf("Could not find filter with both topics")
+	badEnvelope := &common.Envelope{Topic: wrongTopic}
+	if p.topicOrBloomMatch(badEnvelope) {
+		t.Fatal("envelope should not match")
 	}
 }

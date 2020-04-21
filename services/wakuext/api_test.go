@@ -31,6 +31,8 @@ import (
 	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
+	wakucommon "github.com/status-im/status-go/waku/common"
+	v0 "github.com/status-im/status-go/waku/v0"
 )
 
 func TestRequestMessagesErrors(t *testing.T) {
@@ -273,7 +275,6 @@ func (s *ShhExtSuite) TestFailedRequestWithUnknownMailServerPeer() {
 
 const (
 	// internal waku protocol codes
-	statusCode             = 0
 	p2pRequestCompleteCode = 125
 )
 
@@ -297,6 +298,7 @@ func (s *WakuNodeMockSuite) SetupTest() {
 		EnableConfirmations: true,
 	}
 	w := waku.New(conf, nil)
+	w2 := waku.New(nil, nil)
 	s.Require().NoError(w.Start(nil))
 	pkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -308,8 +310,10 @@ func (s *WakuNodeMockSuite) SetupTest() {
 		panic(err)
 	}()
 	wakuWrapper := gethbridge.NewGethWakuWrapper(w)
-	s.Require().NoError(p2p.ExpectMsg(rw1, statusCode, nil))
-	s.Require().NoError(p2p.SendItems(rw1, statusCode, waku.ProtocolVersion, []interface{}{}))
+
+	peer1 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rw1, nil)
+	err = peer1.Start()
+	s.Require().NoError(err, "failed run message loop")
 
 	nodeWrapper := ext.NewTestNodeWrapper(nil, wakuWrapper)
 	s.localService = New(
@@ -352,7 +356,7 @@ func (s *RequestMessagesSyncSuite) TestExpired() {
 		},
 		ext.MessagesRequest{
 			MailServerPeer: s.localNode.String(),
-			Topics:         []types.TopicType{{0x01, 0x02, 0x03, 0x04}},
+			Topics:         []common.TopicType{{0x01, 0x02, 0x03, 0x04}},
 		},
 	)
 	s.Require().EqualError(err, "failed to request messages after 1 retries")
@@ -374,7 +378,7 @@ func (s *RequestMessagesSyncSuite) testCompletedFromAttempt(target int) {
 				s.Require().NoError(msg.Discard())
 				continue
 			}
-			var e waku.Envelope
+			var e wakucommon.Envelope
 			s.Require().NoError(msg.Decode(&e))
 			s.Require().NoError(p2p.Send(s.remoteRW, p2pRequestCompleteCode, waku.CreateMailServerRequestCompletedPayload(e.Hash(), common.Hash{}, cursor[:])))
 		}

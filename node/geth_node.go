@@ -43,6 +43,7 @@ import (
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
+	wakucommon "github.com/status-im/status-go/waku/common"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -456,7 +457,7 @@ func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperCon
 
 func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*waku.Waku, error) {
 	cfg := &waku.Config{
-		MaxMessageSize:     waku.DefaultMaxMessageSize,
+		MaxMessageSize:     wakucommon.DefaultMaxMessageSize,
 		BloomFilterMode:    wakuCfg.BloomFilterMode,
 		MinimumAcceptedPoW: params.WakuMinimumPoW,
 	}
@@ -613,7 +614,7 @@ func whisperRateLimiter(whisperConfig *params.WhisperConfig, clusterConfig *para
 	)
 }
 
-func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *waku.PeerRateLimiter {
+func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakucommon.PeerRateLimiter {
 	enodes := append(
 		parseNodes(clusterCfg.StaticNodes),
 		parseNodes(clusterCfg.TrustedMailServers)...,
@@ -626,8 +627,8 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 		ips = append(ips, item.IP().String())
 		peerIDs = append(peerIDs, item.ID())
 	}
-	return waku.NewPeerRateLimiter(
-		&waku.PeerRateLimiterConfig{
+	return wakucommon.NewPeerRateLimiter(
+		&wakucommon.PeerRateLimiterConfig{
 			LimitPerSecIP:      wakuCfg.RateLimitIP,
 			LimitPerSecPeerID:  wakuCfg.RateLimitPeerID,
 			WhitelistedIPs:     ips,

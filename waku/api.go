@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/status-go/waku/common"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -59,11 +61,6 @@ func NewPublicWakuAPI(w *Waku) *PublicWakuAPI {
 		lastUsed: make(map[string]time.Time),
 	}
 	return api
-}
-
-// Version returns the Waku sub-protocol version.
-func (api *PublicWakuAPI) Version(ctx context.Context) string {
-	return ProtocolVersionStr
 }
 
 // Info contains diagnostic information.
@@ -207,16 +204,16 @@ func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
 
 // NewMessage represents a new waku message that is posted through the RPC.
 type NewMessage struct {
-	SymKeyID   string    `json:"symKeyID"`
-	PublicKey  []byte    `json:"pubKey"`
-	Sig        string    `json:"sig"`
-	TTL        uint32    `json:"ttl"`
-	Topic      TopicType `json:"topic"`
-	Payload    []byte    `json:"payload"`
-	Padding    []byte    `json:"padding"`
-	PowTime    uint32    `json:"powTime"`
-	PowTarget  float64   `json:"powTarget"`
-	TargetPeer string    `json:"targetPeer"`
+	SymKeyID   string           `json:"symKeyID"`
+	PublicKey  []byte           `json:"pubKey"`
+	Sig        string           `json:"sig"`
+	TTL        uint32           `json:"ttl"`
+	Topic      common.TopicType `json:"topic"`
+	Payload    []byte           `json:"payload"`
+	Padding    []byte           `json:"padding"`
+	PowTime    uint32           `json:"powTime"`
+	PowTarget  float64          `json:"powTarget"`
+	TargetPeer string           `json:"targetPeer"`
 }
 
 type newMessageOverride struct { // nolint: deadcode,unused
@@ -239,7 +236,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		return nil, ErrSymAsym
 	}
 
-	params := &MessageParams{
+	params := &common.MessageParams{
 		TTL:      req.TTL,
 		Payload:  req.Payload,
 		Padding:  req.Padding,
@@ -257,13 +254,13 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
-		if params.Topic == (TopicType{}) { // topics are mandatory with symmetric encryption
+		if params.Topic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
 		if params.KeySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return nil, err
 		}
-		if !validateDataIntegrity(params.KeySym, aesKeyLength) {
+		if !common.ValidateDataIntegrity(params.KeySym, common.AESKeyLength) {
 			return nil, ErrInvalidSymmetricKey
 		}
 	}
@@ -276,7 +273,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	}
 
 	// encrypt and sent message
-	msg, err := NewSentMessage(params)
+	msg, err := common.NewSentMessage(params)
 	if err != nil {
 		return nil, err
 	}
@@ -326,12 +323,12 @@ func (api *PublicWakuAPI) Unsubscribe(id string) {
 
 // Criteria holds various filter options for inbound messages.
 type Criteria struct {
-	SymKeyID     string      `json:"symKeyID"`
-	PrivateKeyID string      `json:"privateKeyID"`
-	Sig          []byte      `json:"sig"`
-	MinPow       float64     `json:"minPow"`
-	Topics       []TopicType `json:"topics"`
-	AllowP2P     bool        `json:"allowP2P"`
+	SymKeyID     string             `json:"symKeyID"`
+	PrivateKeyID string             `json:"privateKeyID"`
+	Sig          []byte             `json:"sig"`
+	MinPow       float64            `json:"minPow"`
+	Topics       []common.TopicType `json:"topics"`
+	AllowP2P     bool               `json:"allowP2P"`
 }
 
 // Messages set up a subscription that fires events when messages arrive that match
@@ -354,9 +351,9 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 		return nil, ErrSymAsym
 	}
 
-	filter := Filter{
+	filter := common.Filter{
 		PoW:      crit.MinPow,
-		Messages: NewMemoryMessageStore(),
+		Messages: common.NewMemoryMessageStore(),
 		AllowP2P: crit.AllowP2P,
 	}
 
@@ -382,7 +379,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 		if err != nil {
 			return nil, err
 		}
-		if !validateDataIntegrity(key, aesKeyLength) {
+		if !common.ValidateDataIntegrity(key, common.AESKeyLength) {
 			return nil, ErrInvalidSymmetricKey
 		}
 		filter.KeySym = key
@@ -433,16 +430,16 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 
 // Message is the RPC representation of a waku message.
 type Message struct {
-	Sig       []byte    `json:"sig,omitempty"`
-	TTL       uint32    `json:"ttl"`
-	Timestamp uint32    `json:"timestamp"`
-	Topic     TopicType `json:"topic"`
-	Payload   []byte    `json:"payload"`
-	Padding   []byte    `json:"padding"`
-	PoW       float64   `json:"pow"`
-	Hash      []byte    `json:"hash"`
-	Dst       []byte    `json:"recipientPublicKey,omitempty"`
-	P2P       bool      `json:"bool,omitempty"`
+	Sig       []byte           `json:"sig,omitempty"`
+	TTL       uint32           `json:"ttl"`
+	Timestamp uint32           `json:"timestamp"`
+	Topic     common.TopicType `json:"topic"`
+	Payload   []byte           `json:"payload"`
+	Padding   []byte           `json:"padding"`
+	PoW       float64          `json:"pow"`
+	Hash      []byte           `json:"hash"`
+	Dst       []byte           `json:"recipientPublicKey,omitempty"`
+	P2P       bool             `json:"bool,omitempty"`
 }
 
 type messageOverride struct { // nolint: deadcode,unused
@@ -454,7 +451,7 @@ type messageOverride struct { // nolint: deadcode,unused
 }
 
 // ToWakuMessage converts an internal message into an API version.
-func ToWakuMessage(message *ReceivedMessage) *Message {
+func ToWakuMessage(message *common.ReceivedMessage) *Message {
 	msg := Message{
 		Payload:   message.Payload,
 		Padding:   message.Padding,
@@ -473,7 +470,7 @@ func ToWakuMessage(message *ReceivedMessage) *Message {
 		}
 	}
 
-	if isMessageSigned(message.Raw[0]) {
+	if common.IsMessageSigned(message.Raw[0]) {
 		b := crypto.FromECDSAPub(message.SigToPubKey())
 		if b != nil {
 			msg.Sig = b
@@ -484,7 +481,7 @@ func ToWakuMessage(message *ReceivedMessage) *Message {
 }
 
 // toMessage converts a set of messages to its RPC representation.
-func toMessage(messages []*ReceivedMessage) []*Message {
+func toMessage(messages []*common.ReceivedMessage) []*Message {
 	msgs := make([]*Message, len(messages))
 	for i, msg := range messages {
 		msgs[i] = ToWakuMessage(msg)
@@ -552,7 +549,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		if keySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return "", err
 		}
-		if !validateDataIntegrity(keySym, aesKeyLength) {
+		if !common.ValidateDataIntegrity(keySym, common.AESKeyLength) {
 			return "", ErrInvalidSymmetricKey
 		}
 	}
@@ -566,19 +563,19 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	if len(req.Topics) > 0 {
 		topics = make([][]byte, len(req.Topics))
 		for i, topic := range req.Topics {
-			topics[i] = make([]byte, TopicLength)
+			topics[i] = make([]byte, common.TopicLength)
 			copy(topics[i], topic[:])
 		}
 	}
 
-	f := &Filter{
+	f := &common.Filter{
 		Src:      src,
 		KeySym:   keySym,
 		KeyAsym:  keyAsym,
 		PoW:      req.MinPow,
 		AllowP2P: req.AllowP2P,
 		Topics:   topics,
-		Messages: NewMemoryMessageStore(),
+		Messages: common.NewMemoryMessageStore(),
 	}
 
 	id, err := api.w.Subscribe(f)

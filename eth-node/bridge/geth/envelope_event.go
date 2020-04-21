@@ -3,6 +3,7 @@ package gethbridge
 import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
+	wakucommon "github.com/status-im/status-go/waku/common"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -34,14 +35,14 @@ func NewWhisperEnvelopeEventWrapper(envelopeEvent *whisper.EnvelopeEvent) *types
 }
 
 // NewWakuEnvelopeEventWrapper returns a types.EnvelopeEvent object that mimics Geth's EnvelopeEvent
-func NewWakuEnvelopeEventWrapper(envelopeEvent *waku.EnvelopeEvent) *types.EnvelopeEvent {
+func NewWakuEnvelopeEventWrapper(envelopeEvent *wakucommon.EnvelopeEvent) *types.EnvelopeEvent {
 	if envelopeEvent == nil {
 		panic("envelopeEvent should not be nil")
 	}
 
 	wrappedData := envelopeEvent.Data
 	switch data := envelopeEvent.Data.(type) {
-	case []waku.EnvelopeError:
+	case []wakucommon.EnvelopeError:
 		wrappedData := make([]types.EnvelopeError, len(data))
 		for index, envError := range data {
 			wrappedData[index] = *NewWakuEnvelopeErrorWrapper(&envError)
