@@ -16,25 +16,27 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package v0
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
+
 	"github.com/status-im/status-go/waku/common"
 )
 
-// Config represents the configuration state of a waku node.
-type Config struct {
-	MaxMessageSize           uint32  `toml:",omitempty"`
-	MinimumAcceptedPoW       float64 `toml:",omitempty"`
-	BloomFilterMode          bool    `toml:",omitempty"` // when true, we only match against bloom filter
-	LightClient              bool    `toml:",omitempty"` // when true, it does not forward messages
-	FullNode                 bool    `toml:",omitempty"` // when true, it forwards all messages
-	RestrictLightClientsConn bool    `toml:",omitempty"` // when true, do not accept light client as peers if it is a light client itself
-	EnableConfirmations      bool    `toml:",omitempty"` // when true, sends message confirmations
-}
+func TestEncodeDecodeVersionedResponse(t *testing.T) {
+	response := NewMessagesResponse(gethcommon.Hash{1}, []common.EnvelopeError{{Code: 1}})
+	bytes, err := rlp.EncodeToBytes(response)
+	require.NoError(t, err)
 
-var DefaultConfig = Config{
-	MaxMessageSize:           common.DefaultMaxMessageSize,
-	MinimumAcceptedPoW:       common.DefaultMinimumPoW,
-	RestrictLightClientsConn: true,
+	var mresponse MultiVersionResponse
+	require.NoError(t, rlp.DecodeBytes(bytes, &mresponse))
+	v1resp, err := mresponse.DecodeResponse1()
+	require.NoError(t, err)
+	require.Equal(t, response.Response.Hash, v1resp.Hash)
 }

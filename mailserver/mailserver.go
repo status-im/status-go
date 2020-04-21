@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/waku"
+	wakucommon "github.com/status-im/status-go/waku/common"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -332,8 +333,8 @@ type WakuMailServer struct {
 	shh           *waku.Waku
 	minRequestPoW float64
 
-	symFilter  *waku.Filter
-	asymFilter *waku.Filter
+	symFilter  *wakucommon.Filter
+	asymFilter *wakucommon.Filter
 }
 
 func (s *WakuMailServer) Init(waku *waku.Waku, cfg *params.WakuConfig) error {
@@ -370,11 +371,11 @@ func (s *WakuMailServer) Close() {
 	s.ms.Close()
 }
 
-func (s *WakuMailServer) Archive(env *waku.Envelope) {
+func (s *WakuMailServer) Archive(env *wakucommon.Envelope) {
 	s.ms.Archive(gethbridge.NewWakuEnvelope(env))
 }
 
-func (s *WakuMailServer) Deliver(peerID []byte, req waku.MessagesRequest) {
+func (s *WakuMailServer) Deliver(peerID []byte, req wakucommon.MessagesRequest) {
 	s.ms.DeliverMail(types.BytesToHash(peerID), types.BytesToHash(req.ID), MessagesRequestPayload{
 		Lower:  req.From,
 		Upper:  req.To,
@@ -387,7 +388,7 @@ func (s *WakuMailServer) Deliver(peerID []byte, req waku.MessagesRequest) {
 }
 
 // DEPRECATED; user Deliver instead
-func (s *WakuMailServer) DeliverMail(peerID []byte, req *waku.Envelope) {
+func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakucommon.Envelope) {
 	payload, err := s.decodeRequest(peerID, req)
 	if err != nil {
 		deliveryFailuresCounter.WithLabelValues("validation").Inc()
@@ -419,7 +420,7 @@ func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
 			return fmt.Errorf("save symmetric key: %v", err)
 		}
 
-		s.symFilter = &waku.Filter{KeySym: symKey}
+		s.symFilter = &wakucommon.Filter{KeySym: symKey}
 	}
 
 	if asymKey != "" {
@@ -427,7 +428,7 @@ func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
 		if err != nil {
 			return err
 		}
-		s.asymFilter = &waku.Filter{KeyAsym: keyAsym}
+		s.asymFilter = &wakucommon.Filter{KeyAsym: keyAsym}
 	}
 
 	return nil
@@ -435,7 +436,7 @@ func (s *WakuMailServer) setupDecryptor(password, asymKey string) error {
 
 // openEnvelope tries to decrypt an envelope, first based on asymetric key (if
 // provided) and second on the symetric key (if provided)
-func (s *WakuMailServer) openEnvelope(request *waku.Envelope) *waku.ReceivedMessage {
+func (s *WakuMailServer) openEnvelope(request *wakucommon.Envelope) *wakucommon.ReceivedMessage {
 	if s.asymFilter != nil {
 		if d := request.Open(s.asymFilter); d != nil {
 			return d
@@ -449,7 +450,7 @@ func (s *WakuMailServer) openEnvelope(request *waku.Envelope) *waku.ReceivedMess
 	return nil
 }
 
-func (s *WakuMailServer) decodeRequest(peerID []byte, request *waku.Envelope) (MessagesRequestPayload, error) {
+func (s *WakuMailServer) decodeRequest(peerID []byte, request *wakucommon.Envelope) (MessagesRequestPayload, error) {
 	var payload MessagesRequestPayload
 
 	if s.minRequestPoW > 0.0 && request.PoW() < s.minRequestPoW {
