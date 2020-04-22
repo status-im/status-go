@@ -38,6 +38,7 @@ const (
 	testTransactionHash = "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
 	testIdenticon       = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
 	testAlias           = "Concrete Lavender Xiphias"
+	newName             = "new-name"
 )
 
 func TestMessengerSuite(t *testing.T) {
@@ -521,15 +522,12 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	sentMessage := sendResponse.Messages[0]
 
 	// Wait for the message to reach its destination
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
+
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Messages, 1)
@@ -634,15 +632,11 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Messages, 1)
@@ -688,15 +682,11 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 
 	sentMessage := sendResponse.Messages[0]
 
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Equal(len(response.Chats), 1)
@@ -726,15 +716,12 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	sentMessage := sendResponse.Messages[0]
 
 	// Wait for the message to reach its destination
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
+
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -771,40 +758,6 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	s.Require().Equal(len(response.Chats), 0)
 }
 
-// Test receiving a message on an non-existing private public chat
-func (s *MessengerSuite) TestRetrieveTheirGroupChatNonExisting() {
-	theirMessenger := s.newMessenger(s.shh)
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", []string{})
-	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
-
-	chat := response.Chats[0]
-
-	err = theirMessenger.SaveChat(chat)
-	s.NoError(err)
-
-	inputMessage := buildTestMessage(*chat)
-
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
-
-	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Chats) == 1 {
-			err = errors.New("chat membership update not received")
-		}
-		return err
-	})
-	s.Require().NoError(err)
-
-	// The message is discarded
-	s.Require().Equal(0, len(response.Messages))
-	s.Require().Equal(0, len(response.Chats))
-}
-
 // Test receiving a message on an existing private group chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	var response *MessengerResponse
@@ -823,27 +776,22 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("chat invitation not received")
-		}
-		return err
-	})
+	_, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("no joining group event received")
-		}
-		return err
-	})
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
 	s.Require().NoError(err)
 
 	inputMessage := buildTestMessage(*ourChat)
@@ -854,14 +802,11 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 
 	sentMessage := sendResponse.Messages[0]
 
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -892,43 +837,33 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("chat invitation not received")
-		}
-		return err
-	})
+	_, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
 
 	// Wait for join group event
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("no joining group event received")
-		}
-		return err
-	})
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
 	s.Require().NoError(err)
 
-	newName := "new-name"
 	_, err = s.m.ChangeGroupChatName(context.Background(), ourChat.ID, newName)
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("chat invitation not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -936,14 +871,11 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	s.Require().Equal(newName, actualChat.Name)
 }
 
-// Test receiving a message on an existing private group chat, if messages
-// are not wrapped this will fail as they'll likely come out of order
-// NOTE: Disabling this as too flaky
-/*
-func (s *MessengerSuite) testRetrieveTheirPrivateGroupWrappedMessageChat() {
+// Test being re-invited to a group chat
+func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger(s.shh)
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
 
@@ -957,46 +889,46 @@ func (s *MessengerSuite) testRetrieveTheirPrivateGroupWrappedMessageChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("chat invitation not received")
-		}
-		return err
-	})
+	_, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
 
-	inputMessage := buildTestMessage(*ourChat)
-
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
-
-	sentMessage := sendResponse.Messages[0]
-
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("no chats")
-		}
-		return err
-	})
+	// Wait for join group event
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
 	s.Require().NoError(err)
+
+	response, err = theirMessenger.LeaveGroupChat(context.Background(), ourChat.ID, true)
+	s.NoError(err)
+
 	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
-	// It updates the unviewed messages count
-	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
-	// It updates the last message clock value
-	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
-	// It sets the last message
-	s.Require().NotNil(actualChat.LastMessage)
+	s.Require().False(response.Chats[0].Active)
+
+	// And we get re-invited
+	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
+
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	s.Require().True(response.Chats[0].Active)
 }
-*/
 
 func (s *MessengerSuite) TestChatPersistencePublic() {
 	chat := Chat{
@@ -1526,14 +1458,11 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1566,14 +1495,11 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -1822,14 +1748,11 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1863,14 +1786,11 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -1919,14 +1839,11 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1958,14 +1875,11 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal(CommandStateRequestTransactionDeclined, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -2012,14 +1926,11 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -2348,4 +2259,16 @@ func (s *MessageHandlerSuite) TestRun() {
 			}
 		})
 	}
+}
+
+func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
+	var response *MessengerResponse
+	return response, tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = m.RetrieveAll()
+		if err == nil && !condition(response) {
+			err = errors.New(errorMessage)
+		}
+		return err
+	})
 }
