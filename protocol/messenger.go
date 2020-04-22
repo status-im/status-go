@@ -644,7 +644,8 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 	chat.LastClockValue = clock
-	chat.updateChatFromProtocolGroup(group)
+
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	// Add members
@@ -682,7 +683,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{&chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
@@ -747,7 +748,8 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
 	err = m.persistence.SaveMessagesLegacy(response.Messages)
@@ -810,7 +812,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -875,7 +877,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	var response MessengerResponse
 	response.Chats = []*Chat{chat}
@@ -941,7 +943,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -1008,7 +1010,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -1076,7 +1078,8 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
 	if remove {
 		chat.Active = false
 	}
