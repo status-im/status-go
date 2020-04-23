@@ -25,6 +25,7 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	mrand "math/rand"
 	"strconv"
 	"time"
@@ -33,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // MessageParams specifies the exact way a message should be wrapped
@@ -77,6 +79,85 @@ type ReceivedMessage struct {
 	EnvelopeHash common.Hash // Message envelope hash to act as a unique id
 
 	P2P bool // is set to true if this message was received from mail server.
+}
+
+// MessagesRequest contains details of a request of historic messages.
+type MessagesRequest struct {
+	// ID of the request. The current implementation requires ID to be 32-byte array,
+	// however, it's not enforced for future implementation.
+	ID []byte `json:"id"`
+
+	// From is a lower bound of time range.
+	From uint32 `json:"from"`
+
+	// To is a upper bound of time range.
+	To uint32 `json:"to"`
+
+	// Limit determines the number of messages sent by the mail server
+	// for the current paginated request.
+	Limit uint32 `json:"limit"`
+
+	// Cursor is used as starting point for paginated requests.
+	Cursor []byte `json:"cursor"`
+
+	// Bloom is a filter to match requested messages.
+	Bloom []byte `json:"bloom"`
+}
+
+func (r MessagesRequest) Validate() error {
+	if len(r.ID) != common.HashLength {
+		return errors.New("invalid 'ID', expected a 32-byte slice")
+	}
+
+	if r.From > r.To {
+		return errors.New("invalid 'From' value which is greater than To")
+	}
+
+	if r.Limit > MaxLimitInMessagesRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInMessagesRequest)
+	}
+
+	if len(r.Bloom) == 0 {
+		return errors.New("invalid 'Bloom' provided")
+	}
+
+	return nil
+}
+
+// MessagesResponse sent as a response after processing batch of envelopes.
+type MessagesResponse struct {
+	// Hash is a hash of all envelopes sent in the single batch.
+	Hash common.Hash
+	// Per envelope error.
+	Errors []EnvelopeError
+}
+
+// MultiVersionResponse allows to decode response into chosen version.
+type MultiVersionResponse struct {
+	Version  uint
+	Response rlp.RawValue
+}
+
+// DecodeResponse1 decodes response into first version of the messages response.
+func (m MultiVersionResponse) DecodeResponse1() (resp MessagesResponse, err error) {
+	return resp, rlp.DecodeBytes(m.Response, &resp)
+}
+
+// Version1MessageResponse first version of the message response.
+type Version1MessageResponse struct {
+	Version  uint
+	Response MessagesResponse
+}
+
+// NewMessagesResponse returns instane of the version messages response.
+func NewMessagesResponse(batch common.Hash, errors []EnvelopeError) Version1MessageResponse {
+	return Version1MessageResponse{
+		Version: 1,
+		Response: MessagesResponse{
+			Hash:   batch,
+			Errors: errors,
+		},
+	}
 }
 
 func isMessageSigned(flags byte) bool {

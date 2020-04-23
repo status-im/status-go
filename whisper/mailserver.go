@@ -7,12 +7,76 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
 	mailServerFailedPayloadPrefix = "ERROR="
 	cursorSize                    = 36
 )
+
+// MailServer represents a mail server, capable of
+// archiving the old messages for subsequent delivery
+// to the peers. Any implementation must ensure that both
+// functions are thread-safe. Also, they must return ASAP.
+// DeliverMail should use directMessagesCode for delivery,
+// in order to bypass the expiry checks.
+type MailServer interface {
+	Archive(env *Envelope)
+	DeliverMail(peerID []byte, req *Envelope) // DEPRECATED; user Deliver instead
+	Deliver(peerID []byte, req MessagesRequest)
+	SyncMail(peerID []byte, req SyncMailRequest) error
+}
+
+// SyncMailRequest contains details which envelopes should be synced
+// between Mail Servers.
+type SyncMailRequest struct {
+	// Lower is a lower bound of time range for which messages are requested.
+	Lower uint32
+	// Upper is a lower bound of time range for which messages are requested.
+	Upper uint32
+	// Bloom is a bloom filter to filter envelopes.
+	Bloom []byte
+	// Limit is the max number of envelopes to return.
+	Limit uint32
+	// Cursor is used for pagination of the results.
+	Cursor []byte
+}
+
+// Validate checks request's fields if they are valid.
+func (r SyncMailRequest) Validate() error {
+	if r.Limit == 0 {
+		return errors.New("invalid 'Limit' value, expected value greater than 0")
+	}
+
+	if r.Limit > MaxLimitInSyncMailRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInSyncMailRequest)
+	}
+
+	if r.Lower > r.Upper {
+		return errors.New("invalid 'Lower' value, can't be greater than 'Upper'")
+	}
+
+	return nil
+}
+
+// SyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type SyncResponse struct {
+	Envelopes []*Envelope
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
+}
+
+// RawSyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type RawSyncResponse struct {
+	Envelopes []rlp.RawValue
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
+}
 
 func invalidResponseSizeError(size int) error {
 	return fmt.Errorf("unexpected payload size: %d", size)
