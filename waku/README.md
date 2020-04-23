@@ -36,21 +36,41 @@ Waku was [created to solve scaling issues with Whisper](https://discuss.status.i
 
 The basic function of this package is to implement the [waku specifications](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md), and provide the `status-go` binary with the ability to send and receive messages via Waku.
 
+---
+
 ### `waku.go`
 
 [`waku.go`](./waku.go) serves as the main entry point for the package and where the main `Waku{}` struct lives. Additionally the package's `init()` can be found in this file.
 
+---
+
 ### `api.go`
 
-[`api.go`](./api.go) //TODO
+[`api.go`](./api.go) is home to the `PublicWakuAPI{}` struct which provides the waku RPC service that can be used publicly without security implications.
+
+`PublicWakuAPI{}` wraps the main `Waku{}`, making the `Waku{}` functionality suitable for external consumption.
+
+#### Consumption
+
+`PublicWakuAPI{}` is wrapped by `eth-node\bridge\geth.gethPublicWakuAPIWrapper{}`, which is initialised via `eth-node\bridge\geth.NewGethPublicWakuAPIWrapper()` and exposed via `gethWakuWrapper.PublicWakuAPI()` and is finally consumed by wider parts of the application.
+
+---
 
 ### `config.go`
 
-[`config.go`](./config.go) //TODO
+[`config.go`](./config.go) is home to the `Config{}` struct and the declaration of `DefaultConfig`.
+
+`Config{}` is used to initialise the settings of an instantiated `Waku{}`. `waku.New()` creates a new instance of a `Waku{}` and takes a `Config{}` as a parameter, if nil is passed instead of an instance of `Config{}`, `DefaultConfig` is used. 
+
+---
 
 ### `doc.go`
 
-[`doc.go`](./doc.go) //TODO
+[`doc.go`](./doc.go) originally a hangover from the [`go-ethereum` `whisperv6` package](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go)  is home to the package's constants, and other misc `struct`s and `func`s.
+
+This file needs to be refactored to adhere with the [golang convention on docs](https://blog.golang.org/godoc).
+
+---
 
 ### `envelope.go`
 
