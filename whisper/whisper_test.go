@@ -275,9 +275,9 @@ func TestWhisperSymKeyManagement(t *testing.T) {
 	var err error
 	var k1, k2 []byte
 	w := New(&DefaultConfig)
-	id2 := string("arbitrary-string-2")
+	id2 := "arbitrary-string-2"
 
-	id1, err = w.GenerateSymKey()
+	id1, err := w.GenerateSymKey()
 	if err != nil {
 		t.Fatalf("failed GenerateSymKey with seed %d: %s.", seed, err)
 	}
