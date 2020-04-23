@@ -32,6 +32,25 @@ const (
 	cursorSize                    = 36
 )
 
+// MailServer represents a mail server, capable of
+// archiving the old messages for subsequent delivery
+// to the peers. Any implementation must ensure that both
+// functions are thread-safe. Also, they must return ASAP.
+// DeliverMail should use p2pMessageCode for delivery,
+// in order to bypass the expiry checks.
+type MailServer interface {
+	Archive(env *Envelope)
+	DeliverMail(peerID []byte, request *Envelope) // DEPRECATED; use Deliver()
+	Deliver(peerID []byte, request MessagesRequest)
+}
+
+// MailServerResponse is the response payload sent by the mailserver.
+type MailServerResponse struct {
+	LastEnvelopeHash common.Hash
+	Cursor           []byte
+	Error            error
+}
+
 func invalidResponseSizeError(size int) error {
 	return fmt.Errorf("unexpected payload size: %d", size)
 }

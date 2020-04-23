@@ -48,6 +48,18 @@ func (MetricsRateLimiterHandler) ExceedIPLimit() error {
 	return nil
 }
 
+// RateLimits contains information about rate limit settings.
+// It is exchanged using rateLimitingCode packet or in the handshake.
+type RateLimits struct {
+	IPLimits     uint64 // messages per second from a single IP (default 0, no limits)
+	PeerIDLimits uint64 // messages per second from a single peer ID (default 0, no limits)
+	TopicLimits  uint64 // messages per second from a single topic (default 0, no limits)
+}
+
+func (r RateLimits) IsZero() bool {
+	return r == (RateLimits{})
+}
+
 var ErrRateLimitExceeded = errors.New("rate limit has been exceeded")
 
 type DropPeerRateLimiterHandler struct {

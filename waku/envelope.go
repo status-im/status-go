@@ -270,3 +270,24 @@ func TopicToBloom(topic TopicType) []byte {
 	}
 	return b
 }
+
+// EnvelopeError code and optional description of the error.
+type EnvelopeError struct {
+	Hash        common.Hash
+	Code        uint
+	Description string
+}
+
+// ErrorToEnvelopeError converts common golang error into EnvelopeError with a code.
+func ErrorToEnvelopeError(hash common.Hash, err error) EnvelopeError {
+	code := EnvelopeOtherError
+	switch err.(type) {
+	case TimeSyncError:
+		code = EnvelopeTimeNotSynced
+	}
+	return EnvelopeError{
+		Hash:        hash,
+		Code:        code,
+		Description: err.Error(),
+	}
+}
