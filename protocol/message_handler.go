@@ -85,7 +85,8 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		}
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
 	systemMessages := buildSystemMessages(message.Events, translations)
 
 	for _, message := range systemMessages {

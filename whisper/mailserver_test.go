@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 
@@ -77,4 +78,39 @@ func TestCreateMailServerEvent(t *testing.T) {
 	payloadTooBig := make([]byte, common.HashLength*2+cursorSize+100)
 	_, err = CreateMailServerEvent(enode.ID{}, payloadTooBig)
 	require.Error(t, err)
+}
+
+func TestSyncMailRequestValidate(t *testing.T) {
+	testCases := []struct {
+		Name  string
+		Req   SyncMailRequest
+		Error string
+	}{
+		{
+			Name:  "invalid zero Limit",
+			Req:   SyncMailRequest{},
+			Error: "invalid 'Limit' value, expected value greater than 0",
+		},
+		{
+			Name:  "invalid large Limit",
+			Req:   SyncMailRequest{Limit: 1e6},
+			Error: "invalid 'Limit' value, expected value lower than 1000",
+		},
+		{
+			Name:  "invalid Lower",
+			Req:   SyncMailRequest{Limit: 10, Lower: 10, Upper: 5},
+			Error: "invalid 'Lower' value, can't be greater than 'Upper'",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			err := tc.Req.Validate()
+			if tc.Error != "" {
+				assert.EqualError(t, err, tc.Error)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

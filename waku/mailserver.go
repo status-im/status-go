@@ -1,4 +1,22 @@
-package whisper
+// Copyright 2019 The Waku Library Authors.
+//
+// The Waku library is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// The Waku library is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty off
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with the Waku library. If not, see <http://www.gnu.org/licenses/>.
+//
+// This software uses the go-ethereum library, which is licensed
+// under the GNU Lesser General Public Library, version 3 or any later.
+
+package waku
 
 import (
 	"bytes"
@@ -13,6 +31,25 @@ const (
 	mailServerFailedPayloadPrefix = "ERROR="
 	cursorSize                    = 36
 )
+
+// MailServer represents a mail server, capable of
+// archiving the old messages for subsequent delivery
+// to the peers. Any implementation must ensure that both
+// functions are thread-safe. Also, they must return ASAP.
+// DeliverMail should use p2pMessageCode for delivery,
+// in order to bypass the expiry checks.
+type MailServer interface {
+	Archive(env *Envelope)
+	DeliverMail(peerID []byte, request *Envelope) // DEPRECATED; use Deliver()
+	Deliver(peerID []byte, request MessagesRequest)
+}
+
+// MailServerResponse is the response payload sent by the mailserver.
+type MailServerResponse struct {
+	LastEnvelopeHash common.Hash
+	Cursor           []byte
+	Error            error
+}
 
 func invalidResponseSizeError(size int) error {
 	return fmt.Errorf("unexpected payload size: %d", size)
@@ -43,15 +80,15 @@ func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []by
 // * request failed
 // If the payload is unknown/unparseable, it returns `nil`
 func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
-
 	if len(payload) < common.HashLength {
 		return nil, invalidResponseSizeError(len(payload))
 	}
 
 	event, err := tryCreateMailServerRequestFailedEvent(nodeID, payload)
-
-	if err != nil || event != nil {
-		return event, err
+	if err != nil {
+		return nil, err
+	} else if event != nil {
+		return event, nil
 	}
 
 	return tryCreateMailServerRequestCompletedEvent(nodeID, payload)

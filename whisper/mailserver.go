@@ -1,22 +1,4 @@
-// Copyright 2019 The Waku Library Authors.
-//
-// The Waku library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The Waku library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty off
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the Waku library. If not, see <http://www.gnu.org/licenses/>.
-//
-// This software uses the go-ethereum library, which is licensed
-// under the GNU Lesser General Public Library, version 3 or any later.
-
-package waku
+package whisper
 
 import (
 	"bytes"
@@ -25,12 +7,76 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
 	mailServerFailedPayloadPrefix = "ERROR="
 	cursorSize                    = 36
 )
+
+// MailServer represents a mail server, capable of
+// archiving the old messages for subsequent delivery
+// to the peers. Any implementation must ensure that both
+// functions are thread-safe. Also, they must return ASAP.
+// DeliverMail should use directMessagesCode for delivery,
+// in order to bypass the expiry checks.
+type MailServer interface {
+	Archive(env *Envelope)
+	DeliverMail(peerID []byte, req *Envelope) // DEPRECATED; user Deliver instead
+	Deliver(peerID []byte, req MessagesRequest)
+	SyncMail(peerID []byte, req SyncMailRequest) error
+}
+
+// SyncMailRequest contains details which envelopes should be synced
+// between Mail Servers.
+type SyncMailRequest struct {
+	// Lower is a lower bound of time range for which messages are requested.
+	Lower uint32
+	// Upper is a lower bound of time range for which messages are requested.
+	Upper uint32
+	// Bloom is a bloom filter to filter envelopes.
+	Bloom []byte
+	// Limit is the max number of envelopes to return.
+	Limit uint32
+	// Cursor is used for pagination of the results.
+	Cursor []byte
+}
+
+// Validate checks request's fields if they are valid.
+func (r SyncMailRequest) Validate() error {
+	if r.Limit == 0 {
+		return errors.New("invalid 'Limit' value, expected value greater than 0")
+	}
+
+	if r.Limit > MaxLimitInSyncMailRequest {
+		return fmt.Errorf("invalid 'Limit' value, expected value lower than %d", MaxLimitInSyncMailRequest)
+	}
+
+	if r.Lower > r.Upper {
+		return errors.New("invalid 'Lower' value, can't be greater than 'Upper'")
+	}
+
+	return nil
+}
+
+// SyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type SyncResponse struct {
+	Envelopes []*Envelope
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
+}
+
+// RawSyncResponse is a struct representing a response sent to the peer
+// asking for syncing archived envelopes.
+type RawSyncResponse struct {
+	Envelopes []rlp.RawValue
+	Cursor    []byte
+	Final     bool // if true it means all envelopes were processed
+	Error     string
+}
 
 func invalidResponseSizeError(size int) error {
 	return fmt.Errorf("unexpected payload size: %d", size)
@@ -61,15 +107,15 @@ func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []by
 // * request failed
 // If the payload is unknown/unparseable, it returns `nil`
 func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
+
 	if len(payload) < common.HashLength {
 		return nil, invalidResponseSizeError(len(payload))
 	}
 
 	event, err := tryCreateMailServerRequestFailedEvent(nodeID, payload)
-	if err != nil {
-		return nil, err
-	} else if event != nil {
-		return event, nil
+
+	if err != nil || event != nil {
+		return event, err
 	}
 
 	return tryCreateMailServerRequestCompletedEvent(nodeID, payload)

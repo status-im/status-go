@@ -26,6 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -182,9 +185,6 @@ func TestMessageSeal(t *testing.T) {
 	params.TTL = 1
 
 	env := NewEnvelope(params.TTL, params.Topic, msg, time.Now())
-	if err != nil {
-		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
-	}
 
 	env.Expiry = uint32(seed) // make it deterministic
 	target := 32.0
@@ -494,4 +494,16 @@ func TestValidateAndParseSizeOfPayloadSize(t *testing.T) {
 			msg.ValidateAndParse()
 		})
 	}
+}
+
+func TestEncodeDecodeVersionedResponse(t *testing.T) {
+	response := NewMessagesResponse(common.Hash{1}, []EnvelopeError{{Code: 1}})
+	b, err := rlp.EncodeToBytes(response)
+	require.NoError(t, err)
+
+	var mresponse MultiVersionResponse
+	require.NoError(t, rlp.DecodeBytes(b, &mresponse))
+	v1resp, err := mresponse.DecodeResponse1()
+	require.NoError(t, err)
+	require.Equal(t, response.Response.Hash, v1resp.Hash)
 }

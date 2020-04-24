@@ -277,7 +277,7 @@ func TestSymKeyManagement(t *testing.T) {
 	var err error
 	var k1, k2 []byte
 	w := New(nil, nil)
-	id2 := string("arbitrary-string-2")
+	id2 := "arbitrary-string-2"
 
 	id1, err := w.GenerateSymKey()
 	if err != nil {

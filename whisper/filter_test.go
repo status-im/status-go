@@ -30,7 +30,7 @@ var seed int64
 
 // InitSingleTest should be called in the beginning of every
 // test, which uses RNG, in order to make the tests
-// reproduciblity independent of their sequence.
+// reproducibility independent of their sequence.
 func InitSingleTest() {
 	seed = time.Now().Unix()
 	mrand.Seed(seed)
@@ -88,7 +88,7 @@ func generateTestCases(t *testing.T, SizeTestFilters int) []FilterTestCase {
 	for i := 0; i < SizeTestFilters; i++ {
 		f, _ := generateFilter(t, true)
 		cases[i].f = f
-		cases[i].alive = mrand.Int()&int(1) == 0
+		cases[i].alive = mrand.Int()&1 == 0
 	}
 	return cases
 }
