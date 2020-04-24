@@ -7,12 +7,12 @@
   - [waku.go](#wakugo)
   - [api.go](#apigo)
   - [config.go](#configgo)
-  - [doc.go](#docgo)
+  - [const.go](#constgo)
   - [envelope.go](#envelopego)
   - [events.go](#eventsgo)
   - [filter.go](#filtergo)
   - [handshake.go](#handshakego)
-  - [mailserver_response.go](#mailserver_responsego)
+  - [mailserver.go](#mailservergo)
   - [message.go](#messagego)
   - [metrics.go](#metricsgo)
   - [peer.go](#peergo)
@@ -64,33 +64,41 @@ The basic function of this package is to implement the [waku specifications](htt
 
 ---
 
-### `doc.go`
+### `const.go`
 
-[`doc.go`](./doc.go) originally a hangover from the [`go-ethereum` `whisperv6` package](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go)  is home to the package's constants, and other misc `struct`s and `func`s.
-
-This file needs to be refactored to adhere with the [golang convention on docs](https://blog.golang.org/godoc).
+[`const.go`](./const.go), originally a hangover from the [`go-ethereum` `whisperv6/doc.go` package file](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go) later [refactored](https://github.com/status-im/status-go/pull/1950), is home to the package's constants.
 
 ---
 
 ### `envelope.go`
 
-[`envelope.go`](./envelope.go) //TODO
+[`envelope.go`](./envelope.go) is home to the `Evelope{}` and `EnvelopeError{}` structs. `Envelope{}` is used as the data packet in which message data is sent through the Waku network.
+
+`Envelope{}` is accessed via the initialisation function `NewEnvelope()`, which is exclusively consumed by `Message.Wrap()` that prepares a message to be sent via Waku. 
+
+---
 
 ### `events.go`
 
-[`events.go`](./events.go) //TODO
+[`events.go`](./events.go) handles data related to Waku events. This file contains string type `const`s that identify known Waku events.
+
+Additionally, the file contains `EnvelopeEvent{}`, which serves as a representation of events created by envelopes. `EnvelopeEvent{}`s are initialised exclusively within the `waku` package.  
+
+--- 
 
 ### `filter.go`
 
 [`filter.go`](./filter.go) //TODO
 
+---
+
 ### `handshake.go`
 
 [`handshake.go`](./handshake.go) //TODO
 
-### `mailserver_response.go`
+### `mailserver.go`
 
-[`mailserver_response.go`](./mailserver_response.go) //TODO
+[`mailserver.go`](./mailserver.go) //TODO
 
 ### `message.go`
 
