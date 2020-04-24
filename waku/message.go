@@ -28,6 +28,7 @@ import (
 	"fmt"
 	mrand "math/rand"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -444,4 +445,45 @@ func (msg *ReceivedMessage) hash() []byte {
 		return crypto.Keccak256(msg.Raw[:sz])
 	}
 	return crypto.Keccak256(msg.Raw)
+}
+
+// MessageStore defines interface for temporary message store.
+type MessageStore interface {
+	Add(*ReceivedMessage) error
+	Pop() ([]*ReceivedMessage, error)
+}
+
+// NewMemoryMessageStore returns pointer to an instance of the MemoryMessageStore.
+func NewMemoryMessageStore() *MemoryMessageStore {
+	return &MemoryMessageStore{
+		messages: map[common.Hash]*ReceivedMessage{},
+	}
+}
+
+// MemoryMessageStore stores massages in memory hash table.
+type MemoryMessageStore struct {
+	mu       sync.Mutex
+	messages map[common.Hash]*ReceivedMessage
+}
+
+// Add adds message to store.
+func (store *MemoryMessageStore) Add(msg *ReceivedMessage) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, exist := store.messages[msg.EnvelopeHash]; !exist {
+		store.messages[msg.EnvelopeHash] = msg
+	}
+	return nil
+}
+
+// Pop returns all available messages and cleans the store.
+func (store *MemoryMessageStore) Pop() ([]*ReceivedMessage, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	all := make([]*ReceivedMessage, 0, len(store.messages))
+	for hash, msg := range store.messages {
+		delete(store.messages, hash)
+		all = append(all, msg)
+	}
+	return all, nil
 }
