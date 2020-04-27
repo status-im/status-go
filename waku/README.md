@@ -88,7 +88,32 @@ Additionally, the file contains `EnvelopeEvent{}`, which serves as a representat
 
 ### `filter.go`
 
-[`filter.go`](./filter.go) //TODO
+[`filter.go`](./filter.go) is home to `Filter{}` which represents a waku filter.
+
+basically Filters are more of an internal implementation
+essentially what happens is
+(This is both in waku/whisper, no difference)
+A node will "install" filters through RPC calls (i.e status-react)
+when status-react installs a filter, it will specify 1) An encryption key,  we'll keep it simple by saying it's symmetric, say "hello"
+2) a topic, which is 4 bytes 0x1234 say
+so the node will install then the filter ["hello", 0x1234]
+that's the same for both waku and whisper
+once this filter is installed, the node will notify the other peers of this event
+and here is where things are different from waku/whisper
+whisper, will take all the filters that the node has, and build a BloomFilter (an array of bits basically), build from all the topics of the filters installed
+func ToBloomFilter(topics []TopicType) []byte { ... }
+something like that, the construction of the filter is a bit fiddly but not really important
+waku passes this around
+once a peer receives this bloom filter, it will match the topic on each envelope that they receive against the BloomFilter, if it matches, it will forward this to the peer
+waku is different because by default it does not send a bloom filter, it actually sends the topic in clear
+so an array of []TopicType
+a bloom filter will include false positives (which increase bandwidth usage), while clear topics the matches are exact
+when a node receives an envelope
+it will matches is against the topics (in both cases), and then try to decrypt it if the topic matches
+on the example above
+say that we received an envelope with topic 0x1234, it will try to use key hello to decrypt it
+if that works is passed to the client (status-react)
+(i am also oversimplifying a bit, there's a bit more parameters like PoW , whether is a P2P peer etc, but mostly we use encyrption key/topic)
 
 ---
 
