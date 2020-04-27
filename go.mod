@@ -49,7 +49,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.23
-	github.com/wealdtech/go-ens/v3 v3.3.0
+	github.com/wealdtech/go-ens/v3 v3.4.2
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/tools v0.0.0-20200211045251-2de505fc5306 // indirect
