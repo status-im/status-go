@@ -1,4 +1,4 @@
-package v0
+package v1
 
 // Waku protocol parameters
 const (
