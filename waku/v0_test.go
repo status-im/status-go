@@ -21,7 +21,6 @@ package waku
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"fmt"
 	mrand "math/rand"
 	"net"
 	"sync"
@@ -336,16 +335,6 @@ func checkTestStatus() {
 		envelopes := nodes[i].waku.Envelopes()
 		if len(envelopes) >= NumNodes {
 			cnt++
-		}
-	}
-
-	// TODO Should this be removed? debug is always false and has no method of updating, this code will never be reached
-	if debugMode {
-		if cntPrev != cnt {
-			fmt.Printf(" %v \t number of nodes that have received all msgs: %d, number of peers per node: %v \n",
-				time.Since(prevTime), cnt, arr)
-			prevTime = time.Now()
-			cntPrev = cnt
 		}
 	}
 }

@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"github.com/stretchr/testify/require"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -198,13 +199,11 @@ func TestMessageSeal(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
 	}
 
-	// TODO is this meant to fail? The WorkTime is set to 1 but the PoW is 1000000000.0
+	// Seal should fail as WorkTime is significantly lower than PoW would require
 	params.WorkTime = 1
 	params.PoW = 1000000000.0
 	err = env.Seal(params)
-	if err != nil {
-		t.Logf("failed to seal envelope: %s", err)
-	}
+	require.EqualError(t, err, "failed to reach the PoW target, specified pow time (1 seconds) was insufficient")
 	env.CalculatePoW(0)
 	pow = env.PoW()
 	if pow < 2*target {

@@ -218,13 +218,6 @@ type NewMessage struct {
 	TargetPeer string           `json:"targetPeer"`
 }
 
-// TODO if this is dead code why not remove it? I've checked and there are no usages of this
-type newMessageOverride struct { // nolint: deadcode,unused
-	PublicKey hexutil.Bytes
-	Payload   hexutil.Bytes
-	Padding   hexutil.Bytes
-}
-
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
@@ -366,12 +359,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 		}
 	}
 
-	for i, bt := range crit.Topics {
-		// TODO these checks will always be false, common.TopicType has a predefined length and so any other length
-		//  would cause a compile error.
-		if len(bt) == 0 || len(bt) > 4 {
-			return nil, fmt.Errorf("subscribe: topic %d has wrong size: %d", i, len(bt))
-		}
+	for _, bt := range crit.Topics {
 		filter.Topics = append(filter.Topics, bt[:])
 	}
 
@@ -445,15 +433,6 @@ type Message struct {
 	Hash      []byte           `json:"hash"`
 	Dst       []byte           `json:"recipientPublicKey,omitempty"`
 	P2P       bool             `json:"bool,omitempty"`
-}
-
-// TODO why not remove? This has no usage.
-type messageOverride struct { // nolint: deadcode,unused
-	Sig     hexutil.Bytes
-	Payload hexutil.Bytes
-	Padding hexutil.Bytes
-	Hash    hexutil.Bytes
-	Dst     hexutil.Bytes
 }
 
 // ToWakuMessage converts an internal message into an API version.
