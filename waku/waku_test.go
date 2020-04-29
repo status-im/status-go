@@ -46,7 +46,7 @@ var seed int64
 
 // InitSingleTest should be called in the beginning of every
 // test, which uses RNG, in order to make the tests
-// reproduciblity independent of their sequence.
+// reproducibility independent of their sequence.
 func InitSingleTest() {
 	seed = time.Now().Unix()
 	mrand.Seed(seed)
@@ -1091,15 +1091,27 @@ func TestHandleP2PMessageCode(t *testing.T) {
 	InitSingleTest()
 
 	w1 := New(nil, nil)
-	w1.SetMinimumPoW(0.0000001, false) // nolint: errcheck
-	w1.Start(nil)
+	if err := w1.SetMinimumPoW(0.0000001, false); err != nil {
+		t.Error(err)
+	}
+	if err := w1.Start(nil); err != nil {
+		t.Error(err)
+	}
 
-	defer w1.Stop() // nolint: errcheck
+	defer func() {
+		handleError(t, w1.Stop())
+	}()
 
 	w2 := New(nil, nil)
-	w2.SetMinimumPoW(0.0000001, false) // nolint: errcheck
-	w2.Start(nil)                      // nolint: errcheck
-	defer w2.Stop()                    // nolint: errcheck
+	if err := w2.SetMinimumPoW(0.0000001, false); err != nil {
+		t.Error(err)
+	}
+	if err := w2.Start(nil); err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		handleError(t, w2.Stop())
+	}()
 
 	envelopeEvents := make(chan common.EnvelopeEvent, 10)
 	sub := w1.SubscribeEnvelopeEvents(envelopeEvents)
@@ -1132,8 +1144,12 @@ func TestHandleP2PMessageCode(t *testing.T) {
 		case err := <-errorc:
 			t.Log(err)
 		case <-time.After(time.Second * 5):
-			rw1.Close()
-			rw2.Close()
+			if err := rw1.Close(); err != nil {
+				t.Error(err)
+			}
+			if err := rw2.Close(); err != nil {
+				t.Error(err)
+			}
 		}
 	}()
 
