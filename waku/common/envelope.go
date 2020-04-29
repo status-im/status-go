@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package common
 
 import (
 	"crypto/ecdsa"
@@ -48,8 +48,8 @@ type Envelope struct {
 	bloom []byte
 }
 
-// size returns the size of envelope as it is sent (i.e. public fields only)
-func (e *Envelope) size() int {
+// Size returns the size of envelope as it is sent (i.e. public fields only)
+func (e *Envelope) Size() int {
 	return EnvelopeHeaderLength + len(e.Data)
 }
 
@@ -124,12 +124,12 @@ func (e *Envelope) Seal(options *MessageParams) error {
 // of the envelope.
 func (e *Envelope) PoW() float64 {
 	if e.pow == 0 {
-		e.calculatePoW(0)
+		e.CalculatePoW(0)
 	}
 	return e.pow
 }
 
-func (e *Envelope) calculatePoW(diff uint32) {
+func (e *Envelope) CalculatePoW(diff uint32) {
 	rwn := e.rlpWithoutNonce()
 	buf := make([]byte, len(rwn)+8)
 	copy(buf, rwn)
@@ -144,7 +144,7 @@ func (e *Envelope) calculatePoW(diff uint32) {
 
 func (e *Envelope) powToFirstBit(pow float64) int {
 	x := pow
-	x *= float64(e.size())
+	x *= float64(e.Size())
 	x *= float64(e.TTL)
 	bits := math.Log2(x)
 	bits = math.Ceil(bits)

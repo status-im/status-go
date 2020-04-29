@@ -29,13 +29,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
-	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/status-im/status-go/waku/common"
+	v0 "github.com/status-im/status-go/waku/v0"
+
+	"github.com/stretchr/testify/require"
 )
 
 var keys = []string{
@@ -81,7 +85,7 @@ type TestData struct {
 }
 
 type TestNode struct {
-	shh     *Waku
+	waku    *Waku
 	id      *ecdsa.PrivateKey
 	server  *p2p.Server
 	filerID string
@@ -93,8 +97,8 @@ var result TestData
 var nodes [NumNodes]*TestNode
 var sharedKey = hexutil.MustDecode("0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd31")
 var wrongKey = hexutil.MustDecode("0xf91156714d7ec88d3edc1c652c2181dbb3044e8771c683f3b30d33c12b986b11")
-var sharedTopic = TopicType{0xF, 0x1, 0x2, 0}
-var wrongTopic = TopicType{0, 0, 0, 0}
+var sharedTopic = common.TopicType{0xF, 0x1, 0x2, 0}
+var wrongTopic = common.TopicType{0, 0, 0, 0}
 var expectedMessage = []byte("per aspera ad astra")
 var unexpectedMessage = []byte("per rectum ad astra")
 var masterBloomFilter []byte
@@ -143,31 +147,31 @@ func TestSimulationBloomFilter(t *testing.T) {
 func resetParams() {
 	// change pow only for node zero
 	masterPow = 7777777.0
-	_ = nodes[0].shh.SetMinimumPoW(masterPow, true)
+	_ = nodes[0].waku.SetMinimumPoW(masterPow, true)
 
 	// change bloom for all nodes
-	masterBloomFilter = TopicToBloom(sharedTopic)
+	masterBloomFilter = common.TopicToBloom(sharedTopic)
 	for i := 0; i < NumNodes; i++ {
-		_ = nodes[i].shh.SetBloomFilter(masterBloomFilter)
+		_ = nodes[i].waku.SetBloomFilter(masterBloomFilter)
 	}
 
 	round++
 }
 
 func initBloom(t *testing.T) {
-	masterBloomFilter = make([]byte, BloomFilterSize)
+	masterBloomFilter = make([]byte, common.BloomFilterSize)
 	_, err := mrand.Read(masterBloomFilter) // nolint: gosec
 	if err != nil {
 		t.Fatalf("rand failed: %s.", err)
 	}
 
-	msgBloom := TopicToBloom(sharedTopic)
+	msgBloom := common.TopicToBloom(sharedTopic)
 	masterBloomFilter = addBloom(masterBloomFilter, msgBloom)
 	for i := 0; i < 32; i++ {
 		masterBloomFilter[i] = 0xFF
 	}
 
-	if !BloomFilterMatch(masterBloomFilter, msgBloom) {
+	if !common.BloomFilterMatch(masterBloomFilter, msgBloom) {
 		t.Fatalf("bloom mismatch on initBloom.")
 	}
 }
@@ -179,22 +183,22 @@ func initializeBloomFilterMode(t *testing.T) {
 
 	for i := 0; i < NumNodes; i++ {
 		var node TestNode
-		b := make([]byte, BloomFilterSize)
+		b := make([]byte, common.BloomFilterSize)
 		copy(b, masterBloomFilter)
 		config := DefaultConfig
 		config.BloomFilterMode = true
-		node.shh = New(&config, nil)
-		_ = node.shh.SetMinimumPoW(masterPow, false)
-		_ = node.shh.SetBloomFilter(b)
-		if !bytes.Equal(node.shh.BloomFilter(), masterBloomFilter) {
+		node.waku = New(&config, nil)
+		_ = node.waku.SetMinimumPoW(masterPow, false)
+		_ = node.waku.SetBloomFilter(b)
+		if !bytes.Equal(node.waku.BloomFilter(), masterBloomFilter) {
 			t.Fatalf("bloom mismatch on init.")
 		}
-		_ = node.shh.Start(nil)
-		topics := make([]TopicType, 0)
+		_ = node.waku.Start(nil)
+		topics := make([]common.TopicType, 0)
 		topics = append(topics, sharedTopic)
-		f := Filter{KeySym: sharedKey, Messages: NewMemoryMessageStore()}
+		f := common.Filter{KeySym: sharedKey, Messages: common.NewMemoryMessageStore()}
 		f.Topics = [][]byte{topics[0][:]}
-		node.filerID, err = node.shh.Subscribe(&f)
+		node.filerID, err = node.waku.Subscribe(&f)
 		if err != nil {
 			t.Fatalf("failed to install the filter: %s.", err)
 		}
@@ -202,14 +206,14 @@ func initializeBloomFilterMode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed convert the key: %s.", keys[i])
 		}
-		name := common.MakeName("waku-go", "2.0")
+		name := gethcommon.MakeName("waku-go", "2.0")
 
 		node.server = &p2p.Server{
 			Config: p2p.Config{
 				PrivateKey: node.id,
 				MaxPeers:   NumNodes/2 + 1,
 				Name:       name,
-				Protocols:  node.shh.Protocols(),
+				Protocols:  node.waku.Protocols(),
 				ListenAddr: "127.0.0.1:0",
 				NAT:        nat.Any(),
 			},
@@ -245,8 +249,8 @@ func stopServers() {
 	for i := 0; i < NumNodes; i++ {
 		n := nodes[i]
 		if n != nil {
-			_ = n.shh.Unsubscribe(n.filerID)
-			_ = n.shh.Stop()
+			_ = n.waku.Unsubscribe(n.filerID)
+			_ = n.waku.Stop()
 			n.server.Stop()
 		}
 	}
@@ -269,7 +273,7 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 
 	for j := 0; j < iterations; j++ {
 		for i := first; i < NumNodes; i++ {
-			f := nodes[i].shh.GetFilter(nodes[i].filerID)
+			f := nodes[i].waku.GetFilter(nodes[i].filerID)
 			if f == nil {
 				t.Fatalf("failed to get filterId %s from node %d, round %d.", nodes[i].filerID, i, round)
 			}
@@ -288,7 +292,7 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 	}
 
 	if !includingNodeZero {
-		f := nodes[0].shh.GetFilter(nodes[0].filerID)
+		f := nodes[0].waku.GetFilter(nodes[0].filerID)
 		if f != nil {
 			t.Fatalf("node zero received a message with low PoW.")
 		}
@@ -297,7 +301,7 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 	t.Fatalf("Test was not complete (%d round): timeout %d seconds. nodes=%v", round, iterations*cycle/1000, nodes)
 }
 
-func validateMail(t *testing.T, index int, mail []*ReceivedMessage) {
+func validateMail(t *testing.T, index int, mail []*common.ReceivedMessage) {
 	var cnt int
 	for _, m := range mail {
 		if bytes.Equal(m.Payload, expectedMessage) {
@@ -329,7 +333,7 @@ func checkTestStatus() {
 
 	for i := 0; i < NumNodes; i++ {
 		arr[i] = nodes[i].server.PeerCount()
-		envelopes := nodes[i].shh.Envelopes()
+		envelopes := nodes[i].waku.Envelopes()
 		if len(envelopes) >= NumNodes {
 			cnt++
 		}
@@ -357,7 +361,7 @@ func isTestComplete() bool {
 	}
 
 	for i := 0; i < NumNodes; i++ {
-		envelopes := nodes[i].shh.Envelopes()
+		envelopes := nodes[i].waku.Envelopes()
 		if len(envelopes) < NumNodes+1 {
 			return false
 		}
@@ -371,7 +375,7 @@ func sendMsg(t *testing.T, expected bool, id int) {
 		return
 	}
 
-	opt := MessageParams{KeySym: sharedKey, Topic: sharedTopic, Payload: expectedMessage, PoW: 0.00000001, WorkTime: 1}
+	opt := common.MessageParams{KeySym: sharedKey, Topic: sharedTopic, Payload: expectedMessage, PoW: 0.00000001, WorkTime: 1}
 	if !expected {
 		opt.KeySym = wrongKey
 		opt.Topic = wrongTopic
@@ -379,7 +383,7 @@ func sendMsg(t *testing.T, expected bool, id int) {
 		opt.Payload[0] = byte(id)
 	}
 
-	msg, err := NewSentMessage(&opt)
+	msg, err := common.NewSentMessage(&opt)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -388,7 +392,7 @@ func sendMsg(t *testing.T, expected bool, id int) {
 		t.Fatalf("failed to seal message: %s", err)
 	}
 
-	err = nodes[id].shh.Send(envelope)
+	err = nodes[id].waku.Send(envelope)
 	if err != nil {
 		t.Fatalf("failed to send message: %s", err)
 	}
@@ -403,7 +407,7 @@ func TestPeerBasic(t *testing.T) {
 	}
 
 	params.PoW = 0.001
-	msg, err := NewSentMessage(params)
+	msg, err := common.NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -412,9 +416,9 @@ func TestPeerBasic(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d.", seed)
 	}
 
-	p := newPeer(nil, nil, nil, nil)
-	p.mark(env)
-	if !p.marked(env) {
+	p := v0.NewPeer(nil, nil, nil, nil)
+	p.Mark(env)
+	if !p.Marked(env) {
 		t.Fatalf("failed mark with seed %d.", seed)
 	}
 }
@@ -434,10 +438,10 @@ func checkPowExchangeForNodeZero(t *testing.T) {
 func checkPowExchangeForNodeZeroOnce(t *testing.T, mustPass bool) bool {
 	cnt := 0
 	for i, node := range nodes {
-		for peer := range node.shh.peers {
-			if peer.peer.ID() == nodes[0].server.Self().ID() {
+		for protocol := range node.waku.peers {
+			if protocol.EnodeID() == nodes[0].server.Self().ID() {
 				cnt++
-				if peer.powRequirement != masterPow {
+				if protocol.PoWRequirement() != masterPow {
 					if mustPass {
 						t.Fatalf("node %d: failed to set the new pow requirement for node zero.", i)
 					} else {
@@ -455,11 +459,11 @@ func checkPowExchangeForNodeZeroOnce(t *testing.T, mustPass bool) bool {
 
 func checkPowExchange(t *testing.T) {
 	for i, node := range nodes {
-		for peer := range node.shh.peers {
-			if peer.peer.ID() != nodes[0].server.Self().ID() {
-				if peer.powRequirement != masterPow {
+		for protocol := range node.waku.peers {
+			if protocol.EnodeID() != nodes[0].server.Self().ID() {
+				if protocol.PoWRequirement() != masterPow {
 					t.Fatalf("node %d: failed to exchange pow requirement in round %d; expected %f, got %f",
-						i, round, masterPow, peer.powRequirement)
+						i, round, masterPow, protocol.PoWRequirement())
 				}
 			}
 		}
@@ -468,14 +472,12 @@ func checkPowExchange(t *testing.T) {
 
 func checkBloomFilterExchangeOnce(t *testing.T, mustPass bool) bool {
 	for i, node := range nodes {
-		for peer := range node.shh.peers {
-			peer.bloomMu.Lock()
-			equals := bytes.Equal(peer.bloomFilter, masterBloomFilter)
-			peer.bloomMu.Unlock()
+		for protocol := range node.waku.peers {
+			equals := bytes.Equal(protocol.BloomFilter(), masterBloomFilter)
 			if !equals {
 				if mustPass {
 					t.Fatalf("node %d: failed to exchange bloom filter requirement in round %d. \n%x expected \n%x got",
-						i, round, masterBloomFilter, peer.bloomFilter)
+						i, round, masterBloomFilter, protocol.BloomFilter())
 				} else {
 					return false
 				}
@@ -513,125 +515,82 @@ func waitForServersToStart(t *testing.T) {
 
 //two generic waku node handshake
 func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
-	w1 := Waku{}
-	var pow uint64 = 123
-	p1 := newPeer(
-		&w1,
-		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
-		&rwStub{[]interface{}{
-			ProtocolVersion,
-			statusOptions{PoWRequirement: &pow},
-		}},
-		nil,
-	)
-	err := p1.handshake()
+	rw1, rw2 := p2p.MsgPipe()
+	defer rw1.Close()
+	defer rw2.Close()
+
+	w1 := New(nil, nil)
+	var pow float64 = 0.1
+	err := w1.SetMinimumPoW(pow, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w2 := New(nil, nil)
+
+	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
+
+	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	err = p2.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, pow, p2.PoWRequirement())
+}
+
+//two generic waku node handshake. one don't send light flag
+func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
+	rw1, rw2 := p2p.MsgPipe()
+	defer rw1.Close()
+	defer rw2.Close()
+
+	w1 := New(nil, nil)
+	w1.SetLightClientMode(true)
+
+	w2 := New(nil, nil)
+
+	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
+
+	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	err := p2.Start()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-//two generic waku node handshake. one don't send light flag
-func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
-	w1 := Waku{}
-	var pow uint64 = 123
-	p1 := newPeer(
-		&w1,
-		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
-		&rwStub{[]interface{}{
-			ProtocolVersion,
-			statusOptions{PoWRequirement: &pow},
-		}},
-		nil,
-	)
-	err := p1.handshake()
-	if err != nil {
-		t.Fatal()
-	}
-}
-
-//two generic waku node handshake. one don't send light flag
-func TestTopicOrBloomMatch(t *testing.T) {
-	p := Peer{}
-	p.setTopicInterest([]TopicType{sharedTopic})
-	envelope := &Envelope{Topic: sharedTopic}
-	if !p.topicOrBloomMatch(envelope) {
-		t.Fatal("envelope should match")
-	}
-
-	badEnvelope := &Envelope{Topic: wrongTopic}
-	if p.topicOrBloomMatch(badEnvelope) {
-		t.Fatal("envelope should not match")
-	}
-
-}
-
-func TestTopicOrBloomMatchFullNode(t *testing.T) {
-	p := Peer{}
-	// Set as full node
-	p.fullNode = true
-	p.setTopicInterest([]TopicType{sharedTopic})
-	envelope := &Envelope{Topic: sharedTopic}
-	if !p.topicOrBloomMatch(envelope) {
-		t.Fatal("envelope should match")
-	}
-
-	badEnvelope := &Envelope{Topic: wrongTopic}
-	if p.topicOrBloomMatch(badEnvelope) {
-		t.Fatal("envelope should not match")
-	}
-}
-
-//two light nodes handshake. restriction disabled
+//two light nodes handshake. restriction enable
 func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
-	w1 := Waku{}
-	w1.settings.RestrictLightClientsConn = false
+	rw1, rw2 := p2p.MsgPipe()
+	defer rw1.Close()
+	defer rw2.Close()
+
+	w1 := New(nil, nil)
 	w1.SetLightClientMode(true)
-	var pow uint64 = 123
-	var lightNodeEnabled = true
-	p1 := newPeer(
-		&w1,
-		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
-		&rwStub{[]interface{}{
-			ProtocolVersion,
-			statusOptions{PoWRequirement: &pow, LightNodeEnabled: &lightNodeEnabled},
-		}},
-		nil,
-	)
-	err := p1.handshake()
-	if err != nil {
-		t.FailNow()
-	}
+	w1.settings.RestrictLightClientsConn = false
+
+	w2 := New(nil, nil)
+	w2.SetLightClientMode(true)
+	w2.settings.RestrictLightClientsConn = false
+
+	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
+
+	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	require.NoError(t, p2.Start())
 }
 
 //two light nodes handshake. restriction enabled
 func TestTwoLightPeerHandshakeError(t *testing.T) {
-	w1 := Waku{}
-	w1.settings.RestrictLightClientsConn = true
+	rw1, rw2 := p2p.MsgPipe()
+	w1 := New(nil, nil)
 	w1.SetLightClientMode(true)
-	p1 := newPeer(
-		&w1,
-		p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}),
-		&rwStub{[]interface{}{ProtocolVersion, uint64(123), make([]byte, BloomFilterSize), true}},
-		nil,
-	)
-	err := p1.handshake()
-	if err == nil {
-		t.FailNow()
-	}
-}
+	w1.settings.RestrictLightClientsConn = true
 
-type rwStub struct {
-	payload []interface{}
-}
+	w2 := New(nil, nil)
+	w2.SetLightClientMode(true)
+	w2.settings.RestrictLightClientsConn = true
 
-func (stub *rwStub) ReadMsg() (p2p.Msg, error) {
-	size, r, err := rlp.EncodeToReader(stub.payload)
-	if err != nil {
-		return p2p.Msg{}, err
-	}
-	return p2p.Msg{Code: statusCode, Size: uint32(size), Payload: r}, nil
-}
+	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
 
-func (stub *rwStub) WriteMsg(m p2p.Msg) error {
-	return nil
+	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
+	require.Error(t, p2.Start())
 }
