@@ -876,9 +876,6 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 	// kdf should run no less than 0.1 seconds on an average computer,
 	// because it's an once in a session experience
 	derived := pbkdf2.Key([]byte(password), nil, 65356, aesKeyLength, sha256.New)
-	if err != nil {
-		return "", err
-	}
 
 	w.keyMu.Lock()
 	defer w.keyMu.Unlock()
@@ -987,7 +984,7 @@ func (w *Waku) GetFilter(id string) *Filter {
 func (w *Waku) Unsubscribe(id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
-		return fmt.Errorf("Unsubscribe: Invalid ID")
+		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
 	return nil
 }
@@ -1058,6 +1055,8 @@ func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
 }
 
 // sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.
+// TODO this function returns an error, but it is only ever called as a go routine.
+//  Should we log the error?
 func (w *Waku) sendConfirmation(rw p2p.MsgReadWriter, data []byte, envelopeErrors []EnvelopeError) (err error) {
 	batchHash := crypto.Keccak256Hash(data)
 	err = p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
@@ -1173,6 +1172,7 @@ func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg,
 	}
 
 	if w.ConfirmationsEnabled() {
+		// TODO see L-1058
 		go w.sendConfirmation(rw, data, envelopeErrors) // nolint: errcheck
 	}
 
@@ -1194,6 +1194,8 @@ func (w *Waku) handleStatusUpdateCode(p *Peer, packet p2p.Msg, logger *zap.Logge
 	return p.setOptions(statusOptions)
 }
 
+// TODO logger is passed into this function but isn't used and isn't an interface implementation.
+//  Should this be removed or implement a new interface?
 func (w *Waku) handleP2PMessageCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
 	// peer-to-peer message, sent directly to peer bypassing PoW checks, etc.
 	// this message is not supposed to be forwarded to other peers, and
@@ -1259,6 +1261,7 @@ func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger)
 	return errors.New("invalid p2p request message")
 }
 
+// TODO logger is passed into this function but isn't used. See L-1197
 func (w *Waku) handleP2PRequestCompleteCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
 	if !p.trusted {
 		return nil
@@ -1269,12 +1272,12 @@ func (w *Waku) handleP2PRequestCompleteCode(p *Peer, packet p2p.Msg, logger *zap
 		return fmt.Errorf("invalid p2p request complete message: %v", err)
 	}
 
-	event, err := CreateMailServerEvent(p.peer.ID(), payload)
+	msEvent, err := CreateMailServerEvent(p.peer.ID(), payload)
 	if err != nil {
 		return fmt.Errorf("invalid p2p request complete payload: %v", err)
 	}
 
-	w.postP2P(*event)
+	w.postP2P(*msEvent)
 	return nil
 }
 
@@ -1305,6 +1308,7 @@ func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Lo
 	return nil
 }
 
+// TODO logger is passed into this function but isn't used. See L-1197
 func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
 	var batchHash common.Hash
 	if err := packet.Decode(&batchHash); err != nil {
@@ -1512,16 +1516,16 @@ func (w *Waku) processP2P() {
 		case <-w.quit:
 			return
 		case e := <-w.p2pMsgQueue:
-			switch event := e.(type) {
+			switch evn := e.(type) {
 			case *Envelope:
-				w.filters.NotifyWatchers(event, true)
+				w.filters.NotifyWatchers(evn, true)
 				w.envelopeFeed.Send(EnvelopeEvent{
-					Topic: event.Topic,
-					Hash:  event.Hash(),
+					Topic: evn.Topic,
+					Hash:  evn.Hash(),
 					Event: EventEnvelopeAvailable,
 				})
 			case EnvelopeEvent:
-				w.envelopeFeed.Send(event)
+				w.envelopeFeed.Send(evn)
 			}
 		}
 	}

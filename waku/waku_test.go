@@ -392,9 +392,6 @@ func TestSymKeyManagement(t *testing.T) {
 	if !w.HasSymKey(id2) {
 		t.Fatalf("failed to delete first key: second key does not exist.")
 	}
-	if k1 != nil {
-		t.Fatalf("failed to delete first key.")
-	}
 	if k2 == nil {
 		t.Fatalf("failed to delete first key: second key is nil.")
 	}
@@ -417,12 +414,6 @@ func TestSymKeyManagement(t *testing.T) {
 	}
 	if w.HasSymKey(id2) {
 		t.Fatalf("failed to delete second key: still exist.")
-	}
-	if k1 != nil {
-		t.Fatalf("failed to delete second key: first key is not nil.")
-	}
-	if k2 != nil {
-		t.Fatalf("failed to delete second key: second key is not nil.")
 	}
 
 	randomKey = make([]byte, aesKeyLength+1)
@@ -472,12 +463,16 @@ func TestExpiry(t *testing.T) {
 		t.Fatal("failed to set min pow")
 	}
 
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false) // nolint: errcheck
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
 	err = w.Start(nil)
 	if err != nil {
 		t.Fatal("failed to start waku")
 	}
-	defer w.Stop() // nolint: errcheck
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -538,12 +533,18 @@ func TestCustomization(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.SetMaxMessageSize(DefaultMaxMessageSize))
+	}()
 	if err := w.Start(nil); err != nil {
 		t.Fatal("failed to start node")
 	}
-	defer w.Stop() // nolint: errcheck
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	const smallPoW = 0.00001
 
@@ -631,13 +632,19 @@ func TestSymmetricSendCycle(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.SetMaxMessageSize(DefaultMaxMessageSize))
+	}()
 	err := w.Start(nil)
 	if err != nil {
 		t.Fatal("failed to start node")
 	}
-	defer w.Stop() // nolint: errcheck
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
@@ -723,12 +730,18 @@ func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.SetMaxMessageSize(DefaultMaxMessageSize))
+	}()
 	if err := w.Start(nil); err != nil {
 		t.Fatal("could not start node")
 	}
-	defer w.Stop() // nolint: errcheck
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
@@ -814,10 +827,19 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
-	w.Start(nil)                                     // nolint: errcheck
-	defer w.Stop()                                   // nolint: errcheck
+	if err := w.Start(nil); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.SetMaxMessageSize(DefaultMaxMessageSize))
+	}()
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
@@ -882,10 +904,18 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)  // nolint: errcheck
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize) // nolint: errcheck
-	w.Start(nil)                                     // nolint: errcheck
-	defer w.Stop()                                   // nolint: errcheck
+	if err := w.Start(nil); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.SetMaxMessageSize(DefaultMaxMessageSize))
+	}()
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
@@ -1048,10 +1078,18 @@ func TestSendP2PDirect(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	_ = w.SetMinimumPoW(0.0000001, false)           // nolint: errcheck
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false) // nolint: errcheck
-	_ = w.Start(nil)                                // nolint: errcheck
-	defer w.Stop()                                  // nolint: errcheck
+	if err := w.SetMinimumPoW(0.0000001, false); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+	if err := w.Start(nil); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	rwStub := &rwP2PMessagesStub{}
 	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub, nil)
@@ -1094,10 +1132,18 @@ func TestHandleP2PMessageCode(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	w.SetMinimumPoW(0.0000001, false)               // nolint: errcheck
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false) // nolint: errcheck
-	w.Start(nil)                                    // nolint: errcheck
-	defer w.Stop()                                  // nolint: errcheck
+	if err := w.SetMinimumPoW(0.0000001, false); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+	if err := w.Start(nil); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+	defer func() {
+		handleError(t, w.SetMinimumPoW(DefaultMinimumPoW, false))
+	}()
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	envelopeEvents := make(chan EnvelopeEvent, 10)
 	sub := w.SubscribeEnvelopeEvents(envelopeEvents)
@@ -1189,7 +1235,9 @@ func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
 	}()
 	// so that actual read won't hang forever
 	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
+		if err := rw1.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
 	})
 	require.NoError(
 		t,
@@ -1233,7 +1281,9 @@ func TestConfirmationReceived(t *testing.T) {
 		case err := <-errorc:
 			t.Log(err)
 		case <-time.After(time.Second * 5):
-			rw1.Close()
+			if err := rw1.Close(); err != nil {
+				t.Errorf("error closing MsgPipe, '%s'", err)
+			}
 		}
 	}()
 	pow := math.Float64bits(w.MinPow())
@@ -1290,8 +1340,12 @@ func TestMessagesResponseWithError(t *testing.T) {
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() {
-		rw1.Close()
-		rw2.Close()
+		if err := rw1.Close(); err != nil {
+			t.Errorf("error closing MsgPipe 1, '%s'", err)
+		}
+		if err := rw2.Close(); err != nil {
+			t.Errorf("error closing MsgPipe 2, '%s'", err)
+		}
 	}()
 	errorc := make(chan error, 1)
 	go func() {
@@ -1372,7 +1426,9 @@ func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []En
 		errorc <- err
 	}()
 	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
+		if err := rw1.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
 	})
 
 	pow := math.Float64bits(w.MinPow())
@@ -1470,7 +1526,9 @@ func TestEventsWithoutConfirmation(t *testing.T) {
 		errorc <- err
 	}()
 	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
+		if err := rw1.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
 	})
 
 	pow := math.Float64bits(w.MinPow())
@@ -1542,15 +1600,21 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	}
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() {
-		rw1.Close()
-		rw2.Close()
+		if err := rw1.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
+		if err := rw2.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
 	}()
 	p1 := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	p2 := p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"shh", 6}})
 	w1, w2 := New(c, nil), New(c, nil)
 	errc := make(chan error)
 	go func() {
-		w1.HandlePeer(p2, rw2) // nolint: errcheck
+		if err := w1.HandlePeer(p2, rw2); err != nil {
+			t.Errorf("error handling peer, '%s'", err)
+		}
 	}()
 	go func() {
 		errc <- w2.HandlePeer(p1, rw1)
@@ -1570,7 +1634,9 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 	}
-	rw2.Close()
+	if err := rw2.Close(); err != nil {
+		t.Errorf("error closing MsgPipe, '%s'", err)
+	}
 	select {
 	case err := <-errc:
 		require.Error(t, err, "p2p: read or write on closed message pipe")
@@ -1583,7 +1649,9 @@ func TestRequestSentEventWithExpiry(t *testing.T) {
 	w := New(nil, nil)
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
 	rw := discardPipe()
-	defer rw.Close()
+	defer func() {
+		handleError(t, rw.Close())
+	}()
 	w.peers[newPeer(w, p, rw, nil)] = struct{}{}
 	events := make(chan EnvelopeEvent, 1)
 	sub := w.SubscribeEnvelopeEvents(events)
@@ -1649,8 +1717,12 @@ func TestRateLimiterIntegration(t *testing.T) {
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
 	rw1, rw2 := p2p.MsgPipe()
 	defer func() {
-		rw1.Close()
-		rw2.Close()
+		if err := rw1.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
+		if err := rw2.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
 	}()
 	errorc := make(chan error, 1)
 	go func() {
@@ -1680,7 +1752,9 @@ func TestRateLimiterIntegration(t *testing.T) {
 func TestMailserverCompletionEvent(t *testing.T) {
 	w := New(nil, nil)
 	require.NoError(t, w.Start(nil))
-	defer w.Stop() // nolint: errcheck
+	defer func() {
+		handleError(t, w.Stop())
+	}()
 
 	rw1, rw2 := p2p.MsgPipe()
 	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
@@ -1695,7 +1769,9 @@ func TestMailserverCompletionEvent(t *testing.T) {
 	go func() {
 		require.NoError(t, p2p.Send(rw2, p2pMessageCode, envelopes))
 		require.NoError(t, p2p.Send(rw2, p2pRequestCompleteCode, [100]byte{})) // 2 hashes + cursor size
-		rw2.Close()
+		if err := rw2.Close(); err != nil {
+			t.Errorf("error closing MsgPipe, '%s'", err)
+		}
 	}()
 	require.EqualError(t, w.runMessageLoop(peer, rw1), "p2p: read or write on closed message pipe")
 
@@ -1711,9 +1787,15 @@ func TestMailserverCompletionEvent(t *testing.T) {
 				count++
 			case EventMailServerRequestCompleted:
 				require.Equal(t, count, len(envelopes),
-					"all envelope.avaiable events mut be recevied before request is compelted")
+					"all envelope.available events mut be received before request is completed")
 				return
 			}
 		}
+	}
+}
+
+func handleError(t *testing.T, err error) {
+	if err != nil {
+		t.Logf("deferred function error: '%s'", err)
 	}
 }

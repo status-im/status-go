@@ -125,7 +125,7 @@ func TestSimulationBloomFilter(t *testing.T) {
 	checkPowExchange(t)
 
 	// send new pow and bloom exchange messages
-	resetParams(t)
+	resetParams()
 
 	// node #1 sends one expected (decryptable) message
 	sendMsg(t, true, 1)
@@ -140,7 +140,7 @@ func TestSimulationBloomFilter(t *testing.T) {
 	stopServers()
 }
 
-func resetParams(t *testing.T) {
+func resetParams() {
 	// change pow only for node zero
 	masterPow = 7777777.0
 	_ = nodes[0].shh.SetMinimumPoW(masterPow, true)
@@ -335,6 +335,7 @@ func checkTestStatus() {
 		}
 	}
 
+	// TODO Should this be removed? debug is always false and has no method of updating, this code will never be reached
 	if debugMode {
 		if cntPrev != cnt {
 			fmt.Printf(" %v \t number of nodes that have received all msgs: %d, number of peers per node: %v \n",
@@ -421,7 +422,7 @@ func TestPeerBasic(t *testing.T) {
 func checkPowExchangeForNodeZero(t *testing.T) {
 	const iterations = 200
 	for j := 0; j < iterations; j++ {
-		lastCycle := (j == iterations-1)
+		lastCycle := j == iterations-1
 		ok := checkPowExchangeForNodeZeroOnce(t, lastCycle)
 		if ok {
 			break
@@ -488,7 +489,7 @@ func checkBloomFilterExchangeOnce(t *testing.T, mustPass bool) bool {
 func checkBloomFilterExchange(t *testing.T) {
 	const iterations = 200
 	for j := 0; j < iterations; j++ {
-		lastCycle := (j == iterations-1)
+		lastCycle := j == iterations-1
 		ok := checkBloomFilterExchangeOnce(t, lastCycle)
 		if ok {
 			break

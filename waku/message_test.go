@@ -190,7 +190,10 @@ func TestMessageSeal(t *testing.T) {
 	target := 32.0
 	params.WorkTime = 4
 	params.PoW = target
-	env.Seal(params) // nolint: errcheck
+	err = env.Seal(params)
+	if err != nil {
+		t.Logf("failed to seal envelope: %s", err)
+	}
 
 	env.calculatePoW(0)
 	pow := env.PoW()
@@ -198,9 +201,13 @@ func TestMessageSeal(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
 	}
 
+	// TODO is this meant to fail? The WorkTime is set to 1 but the PoW is 1000000000.0
 	params.WorkTime = 1
 	params.PoW = 1000000000.0
-	env.Seal(params) // nolint: errcheck
+	err = env.Seal(params)
+	if err != nil {
+		t.Logf("failed to seal envelope: %s", err)
+	}
 	env.calculatePoW(0)
 	pow = env.PoW()
 	if pow < 2*target {
