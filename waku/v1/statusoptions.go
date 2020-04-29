@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -14,7 +15,7 @@ import (
 )
 
 // statusOptionKey is a current type used in StatusOptions as a key.
-type statusOptionKey string
+type statusOptionKey uint64
 
 var (
 	defaultMinPoW = math.Float64bits(0.001)
@@ -84,10 +85,14 @@ func initRLPKeyFields() {
 		if len(keys) != 2 || keys[0] != "key" {
 			panic("invalid value of \"rlp\" tag, expected \"key=N\" where N is uint")
 		}
+		key, err := strconv.ParseUint(keys[1], 10, 64)
+		if err != nil {
+			panic("could not parse \"rlp\" key")
+		}
 
 		// typecast key to be of statusOptionKey type
-		keyFieldIdx[statusOptionKey(keys[1])] = i
-		idxFieldKey[i] = statusOptionKey(keys[1])
+		keyFieldIdx[statusOptionKey(key)] = i
+		idxFieldKey[i] = statusOptionKey(key)
 	}
 }
 
@@ -184,12 +189,12 @@ loop:
 			// Read the rest of the list items and dump peer.
 			_, err := s.Raw()
 			if err != nil {
-				return fmt.Errorf("failed to read the value of key %s: %v", key, err)
+				return fmt.Errorf("failed to read the value of key %d: %v", key, err)
 			}
 			continue
 		}
 		if err := s.Decode(v.Elem().Field(idx).Addr().Interface()); err != nil {
-			return fmt.Errorf("failed to decode an option %s: %v", key, err)
+			return fmt.Errorf("failed to decode an option %d: %v", key, err)
 		}
 		if err := s.ListEnd(); err != nil {
 			return err
