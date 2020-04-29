@@ -2,8 +2,8 @@ package v1
 
 // Waku protocol parameters
 const (
-	Version    = uint64(0) // Peer version number
-	VersionStr = "0"       // The same, as a string
+	Version    = uint64(1) // Peer version number
+	VersionStr = "1"       // The same, as a string
 	Name       = "waku"    // Nickname of the protocol
 
 	// Waku protocol message codes, according to https://github.com/vacp2p/specs/blob/master/specs/waku/waku-0.md

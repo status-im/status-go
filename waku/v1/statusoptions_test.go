@@ -38,7 +38,7 @@ func TestEncodeDecodeRLP(t *testing.T) {
 
 func TestBackwardCompatibility(t *testing.T) {
 	alist := []interface{}{
-		[]interface{}{"0", math.Float64bits(2.05)},
+		[]interface{}{uint64(0), math.Float64bits(2.05)},
 	}
 	data, err := rlp.EncodeToBytes(alist)
 	require.NoError(t, err)
@@ -53,8 +53,8 @@ func TestBackwardCompatibility(t *testing.T) {
 func TestForwardCompatibility(t *testing.T) {
 	pow := math.Float64bits(2.05)
 	alist := []interface{}{
-		[]interface{}{"0", pow},
-		[]interface{}{"99", uint(10)}, // some future option
+		[]interface{}{uint64(0), pow},
+		[]interface{}{uint64(99), uint(10)}, // some future option
 	}
 	data, err := rlp.EncodeToBytes(alist)
 	require.NoError(t, err)
@@ -67,20 +67,20 @@ func TestForwardCompatibility(t *testing.T) {
 
 func TestInitRLPKeyFields(t *testing.T) {
 	ifk := map[int]statusOptionKey{
-		0: "0",
-		1: "1",
-		2: "2",
-		3: "3",
-		4: "4",
-		5: "5",
+		0: 0,
+		1: 1,
+		2: 2,
+		3: 3,
+		4: 4,
+		5: 5,
 	}
 	kfi := map[statusOptionKey]int{
-		"0": 0,
-		"1": 1,
-		"2": 2,
-		"3": 3,
-		"4": 4,
-		"5": 5,
+		0: 0,
+		1: 1,
+		2: 2,
+		3: 3,
+		4: 4,
+		5: 5,
 	}
 
 	// Test that the kfi length matches the inited global keyFieldIdx length
