@@ -1,6 +1,7 @@
 package waku
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -258,7 +259,7 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types.Hash, err error) {
 		}
 		if attempt < m.maxAttempts {
 			m.logger.Debug("retrying to send a message", zap.String("hash", hash.String()), zap.Int("attempt", attempt+1))
-			hex, err := m.api.Post(*message)
+			hex, err := m.api.Post(context.TODO(), *message)
 			if err != nil {
 				m.logger.Error("failed to retry sending message", zap.String("hash", hash.String()), zap.Int("attempt", attempt+1), zap.Error(err))
 				if m.handler != nil {

@@ -70,8 +70,10 @@ type Info struct {
 	MaxMessageSize uint32  `json:"maxMessageSize"` // Maximum accepted message size
 }
 
+// TODO does anyone know why all the PublicWakuAPI methods have an unused context.Context?
+//  Doesn't seem to be an interface implementation hangover.
 // Info returns diagnostic information about the waku node.
-func (api *PublicWakuAPI) Info() Info {
+func (api *PublicWakuAPI) Info(ctx context.Context) Info {
 	return Info{
 		Messages:       len(api.w.msgQueue) + len(api.w.p2pMsgQueue),
 		MinPow:         api.w.MinPow(),
@@ -81,23 +83,23 @@ func (api *PublicWakuAPI) Info() Info {
 
 // SetMaxMessageSize sets the maximum message size that is accepted.
 // Upper limit is defined by MaxMessageSize.
-func (api *PublicWakuAPI) SetMaxMessageSize(size uint32) (bool, error) {
+func (api *PublicWakuAPI) SetMaxMessageSize(ctx context.Context, size uint32) (bool, error) {
 	return true, api.w.SetMaxMessageSize(size)
 }
 
 // SetMinPoW sets the minimum PoW, and notifies the peers.
-func (api *PublicWakuAPI) SetMinPoW(pow float64) (bool, error) {
+func (api *PublicWakuAPI) SetMinPoW(ctx context.Context, pow float64) (bool, error) {
 	return true, api.w.SetMinimumPoW(pow, true)
 }
 
 // SetBloomFilter sets the new value of bloom filter, and notifies the peers.
-func (api *PublicWakuAPI) SetBloomFilter(bloom hexutil.Bytes) (bool, error) {
+func (api *PublicWakuAPI) SetBloomFilter(ctx context.Context, bloom hexutil.Bytes) (bool, error) {
 	return true, api.w.SetBloomFilter(bloom)
 }
 
 // MarkTrustedPeer marks a peer trusted, which will allow it to send historic (expired) messages.
 // Note: This function is not adding new nodes, the node needs to exists as a peer.
-func (api *PublicWakuAPI) MarkTrustedPeer(url string) (bool, error) {
+func (api *PublicWakuAPI) MarkTrustedPeer(ctx context.Context, url string) (bool, error) {
 	n, err := enode.Parse(enode.ValidSchemes, url)
 	if err != nil {
 		return false, err
@@ -107,12 +109,12 @@ func (api *PublicWakuAPI) MarkTrustedPeer(url string) (bool, error) {
 
 // NewKeyPair generates a new public and private key pair for message decryption and encryption.
 // It returns an ID that can be used to refer to the keypair.
-func (api *PublicWakuAPI) NewKeyPair() (string, error) {
+func (api *PublicWakuAPI) NewKeyPair(ctx context.Context) (string, error) {
 	return api.w.NewKeyPair()
 }
 
 // AddPrivateKey imports the given private key.
-func (api *PublicWakuAPI) AddPrivateKey(privateKey hexutil.Bytes) (string, error) {
+func (api *PublicWakuAPI) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
 	key, err := crypto.ToECDSA(privateKey)
 	if err != nil {
 		return "", err
@@ -121,7 +123,7 @@ func (api *PublicWakuAPI) AddPrivateKey(privateKey hexutil.Bytes) (string, error
 }
 
 // DeleteKeyPair removes the key with the given key if it exists.
-func (api *PublicWakuAPI) DeleteKeyPair(key string) (bool, error) {
+func (api *PublicWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
 	if ok := api.w.DeleteKeyPair(key); ok {
 		return true, nil
 	}
@@ -129,13 +131,13 @@ func (api *PublicWakuAPI) DeleteKeyPair(key string) (bool, error) {
 }
 
 // HasKeyPair returns an indication if the node has a key pair that is associated with the given id.
-func (api *PublicWakuAPI) HasKeyPair(id string) bool {
+func (api *PublicWakuAPI) HasKeyPair(ctx context.Context, id string) bool {
 	return api.w.HasKeyPair(id)
 }
 
 // GetPublicKey returns the public key associated with the given key. The key is the hex
 // encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWakuAPI) GetPublicKey(id string) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	key, err := api.w.GetPrivateKey(id)
 	if err != nil {
 		return hexutil.Bytes{}, err
@@ -145,7 +147,7 @@ func (api *PublicWakuAPI) GetPublicKey(id string) (hexutil.Bytes, error) {
 
 // GetPrivateKey returns the private key associated with the given key. The key is the hex
 // encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWakuAPI) GetPrivateKey(id string) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	key, err := api.w.GetPrivateKey(id)
 	if err != nil {
 		return hexutil.Bytes{}, err
@@ -156,46 +158,46 @@ func (api *PublicWakuAPI) GetPrivateKey(id string) (hexutil.Bytes, error) {
 // NewSymKey generate a random symmetric key.
 // It returns an ID that can be used to refer to the key.
 // Can be used encrypting and decrypting messages where the key is known to both parties.
-func (api *PublicWakuAPI) NewSymKey() (string, error) {
+func (api *PublicWakuAPI) NewSymKey(ctx context.Context) (string, error) {
 	return api.w.GenerateSymKey()
 }
 
 // AddSymKey import a symmetric key.
 // It returns an ID that can be used to refer to the key.
 // Can be used encrypting and decrypting messages where the key is known to both parties.
-func (api *PublicWakuAPI) AddSymKey(key hexutil.Bytes) (string, error) {
-	return api.w.AddSymKeyDirect(key)
+func (api *PublicWakuAPI) AddSymKey(ctx context.Context, key hexutil.Bytes) (string, error) {
+	return api.w.AddSymKeyDirect([]byte(key))
 }
 
 // GenerateSymKeyFromPassword derive a key from the given password, stores it, and returns its ID.
-func (api *PublicWakuAPI) GenerateSymKeyFromPassword(passwd string) (string, error) {
+func (api *PublicWakuAPI) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
 	return api.w.AddSymKeyFromPassword(passwd)
 }
 
 // HasSymKey returns an indication if the node has a symmetric key associated with the given key.
-func (api *PublicWakuAPI) HasSymKey(id string) bool {
+func (api *PublicWakuAPI) HasSymKey(ctx context.Context, id string) bool {
 	return api.w.HasSymKey(id)
 }
 
 // GetSymKey returns the symmetric key associated with the given id.
-func (api *PublicWakuAPI) GetSymKey(id string) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) GetSymKey(ctx context.Context, id string) (hexutil.Bytes, error) {
 	return api.w.GetSymKey(id)
 }
 
 // DeleteSymKey deletes the symmetric key that is associated with the given id.
-func (api *PublicWakuAPI) DeleteSymKey(id string) bool {
+func (api *PublicWakuAPI) DeleteSymKey(ctx context.Context, id string) bool {
 	return api.w.DeleteSymKey(id)
 }
 
 // MakeLightClient turns the node into light client, which does not forward
 // any incoming messages, and sends only messages originated in this node.
-func (api *PublicWakuAPI) MakeLightClient() bool {
+func (api *PublicWakuAPI) MakeLightClient(ctx context.Context) bool {
 	api.w.SetLightClientMode(true)
 	return api.w.LightClientMode()
 }
 
 // CancelLightClient cancels light client mode.
-func (api *PublicWakuAPI) CancelLightClient() bool {
+func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
 	api.w.SetLightClientMode(false)
 	return !api.w.LightClientMode()
 }
@@ -218,7 +220,7 @@ type NewMessage struct {
 
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
-func (api *PublicWakuAPI) Post(req NewMessage) (hexutil.Bytes, error) {
+func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
