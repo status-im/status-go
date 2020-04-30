@@ -8,17 +8,26 @@
   - [waku.go](#wakugo)
   - [api.go](#apigo)
   - [config.go](#configgo)
-  - [const.go](#constgo)
-  - [envelope.go](#envelopego)
-  - [events.go](#eventsgo)
-  - [filter.go](#filtergo)
-  - [handshake.go](#handshakego)
   - [mailserver.go](#mailservergo)
-  - [message.go](#messagego)
-  - [metrics.go](#metricsgo)
-  - [peer.go](#peergo)
-  - [rate_limiter.go](#rate_limitergo)
-  - [topic.go](#topicgo)
+  - [common](#common)
+    - [bloomfilter.go](#bloomfiltergo)
+    - [const.go](#constgo)
+    - [envelope.go](#envelopego)
+    - [errors.go](#errorsgo)
+    - [events.go](#eventsgo)
+    - [filter.go](#filtergo)
+    - [helpers.go](#helpersgo)
+    - [message.go](#messagego)
+    - [metrics.go](#metricsgo)
+    - [protocol.go](#protocolgo)
+    - [rate_limiter.go](#rate_limitergo)
+    - [topic.go](#topicgo)
+  - Versioned
+     - [const.go](#version-constgo)
+     - [init.go](#version-initgo)
+     - [message.go](#version-messagego)
+     - [peer.go](#version-peergo)
+     - [status_options.go](#version-status_optionsgo)
 
 ## What is Waku?
 
@@ -42,6 +51,8 @@ Waku was [created to solve scaling issues with Whisper](https://discuss.status.i
 The basic function of this package is to implement the [waku specifications](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md), and provide the `status-go` binary with the ability to send and receive messages via Waku.
 
 ---
+
+## Root
 
 ### `waku.go`
 
@@ -69,23 +80,43 @@ The basic function of this package is to implement the [waku specifications](htt
 
 ---
 
+### `mailserver.go`
+
+[`mailserver.go`](./mailserver.go) //TODO
+
+---
+
+## Common
+
+### `bloomfilter.go`
+
+[`bloomfilter.go`](./common/bloomfilter.go) //TODO
+
+---
+
 ### `const.go`
 
-[`const.go`](./const.go), originally a hangover from the [`go-ethereum` `whisperv6/doc.go` package file](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go) later [refactored](https://github.com/status-im/status-go/pull/1950), is home to the package's constants.
+[`const.go`](./common/const.go), originally a hangover from the [`go-ethereum` `whisperv6/doc.go` package file](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go) later [refactored](https://github.com/status-im/status-go/pull/1950), is home to the package's constants.
 
 ---
 
 ### `envelope.go`
 
-[`envelope.go`](./envelope.go) is home to the `Evelope{}` and `EnvelopeError{}` structs. `Envelope{}` is used as the data packet in which message data is sent through the Waku network.
+[`envelope.go`](./common/envelope.go) is home to the `Evelope{}` and `EnvelopeError{}` structs. `Envelope{}` is used as the data packet in which message data is sent through the Waku network.
 
 `Envelope{}` is accessed via the initialisation function `NewEnvelope()`, which is exclusively consumed by `Message.Wrap()` that prepares a message to be sent via Waku. 
 
 ---
 
+### `errors.go`
+
+[`errors.go`](./common/errors.go) //TODO
+
+---
+
 ### `events.go`
 
-[`events.go`](./events.go) handles data related to Waku events. This file contains string type `const`s that identify known Waku events.
+[`events.go`](./common/events.go) handles data related to Waku events. This file contains string type `const`s that identify known Waku events.
 
 Additionally, the file contains `EnvelopeEvent{}`, which serves as a representation of events created by envelopes. `EnvelopeEvent{}`s are initialised exclusively within the `waku` package.  
 
@@ -93,7 +124,7 @@ Additionally, the file contains `EnvelopeEvent{}`, which serves as a representat
 
 ### `filter.go`
 
-[`filter.go`](./filter.go) is home to `Filter{}` which represents a waku filter.
+[`filter.go`](./common/filter.go) is home to `Filter{}` which represents a waku filter.
 
 #### Usage
 
@@ -117,30 +148,73 @@ Waku, by default, does not send a BloomFilter, instead sends the topic in a clea
 
 ---
 
-### `handshake.go`
+### `helpers.go`
 
-[`handshake.go`](./handshake.go) //TODO
+[`helpers.go`](./common/helpers.go) //TODO
 
-### `mailserver.go`
-
-[`mailserver.go`](./mailserver.go) //TODO
+---
 
 ### `message.go`
 
-[`message.go`](./message.go) //TODO
+[`message.go`](./common/message.go) //TODO
+
+---
 
 ### `metrics.go`
 
-[`metrics.go`](./metrics.go) //TODO
+[`metrics.go`](./common/metrics.go) //TODO
 
-### `peer.go`
+---
 
-[`peer.go`](./peer.go) //TODO
+### `protocol.go`
+
+[`protocol.go`](./common/protocol.go) //TODO
+
+---
 
 ### `rate_limiter.go`
 
-[`rate_limiter.go`](./rate_limiter.go) //TODO
+[`rate_limiter.go`](./common/rate_limiter.go) //TODO
+
+---
 
 ### `topic.go`
 
-[`topic.go`](./topic.go) //TODO
+[`topic.go`](./common/topic.go) //TODO
+
+---
+
+## Versioned
+
+For details about the divergence between versions please consult the `README`s of each version package.
+
+- [version 0](./v0)
+- [version 1](./v1)
+
+### Version `const.go`
+
+`const.go` // TODO
+
+---
+
+### Version `init.go`
+
+`init.go` // TODO
+
+---
+
+### Version `message.go`
+
+`message.go` // TODO
+
+---
+
+### Version `peer.go`
+
+`peer.go` // TODO
+
+---
+
+### Version `status_options.go`
+
+`status_options.go` // TODO
