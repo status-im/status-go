@@ -1561,9 +1561,7 @@ func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
 	w1, w2 := New(c, nil), New(c, nil)
 	errc := make(chan error)
 	go func() {
-		if err := w1.HandlePeer(p2, rw2); err != nil {
-			t.Errorf("error handling peer, '%s'", err)
-		}
+		errc <- w1.HandlePeer(p2, rw2)
 	}()
 	go func() {
 		errc <- w2.HandlePeer(p1, rw1)
