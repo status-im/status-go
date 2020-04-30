@@ -1,8 +1,6 @@
 package gethbridge
 
 import (
-	"context"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/eth-node/types"
@@ -26,18 +24,18 @@ func NewGethPublicWakuAPIWrapper(api *waku.PublicWakuAPI) types.PublicWakuAPI {
 }
 
 // AddPrivateKey imports the given private key.
-func (w *gethPublicWakuAPIWrapper) AddPrivateKey(ctx context.Context, privateKey types.HexBytes) (string, error) {
-	return w.api.AddPrivateKey(ctx, hexutil.Bytes(privateKey))
+func (w *gethPublicWakuAPIWrapper) AddPrivateKey(privateKey types.HexBytes) (string, error) {
+	return w.api.AddPrivateKey(hexutil.Bytes(privateKey))
 }
 
 // GenerateSymKeyFromPassword derives a key from the given password, stores it, and returns its ID.
-func (w *gethPublicWakuAPIWrapper) GenerateSymKeyFromPassword(ctx context.Context, passwd string) (string, error) {
-	return w.api.GenerateSymKeyFromPassword(ctx, passwd)
+func (w *gethPublicWakuAPIWrapper) GenerateSymKeyFromPassword(passwd string) (string, error) {
+	return w.api.GenerateSymKeyFromPassword(passwd)
 }
 
 // DeleteKeyPair removes the key with the given key if it exists.
-func (w *gethPublicWakuAPIWrapper) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
-	return w.api.DeleteKeyPair(ctx, key)
+func (w *gethPublicWakuAPIWrapper) DeleteKeyPair(key string) (bool, error) {
+	return w.api.DeleteKeyPair(key)
 }
 
 // NewMessageFilter creates a new filter that can be used to poll for
@@ -87,7 +85,7 @@ func (w *gethPublicWakuAPIWrapper) GetFilterMessages(id string) ([]*types.Messag
 
 // Post posts a message on the network.
 // returns the hash of the message in case of success.
-func (w *gethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessage) ([]byte, error) {
+func (w *gethPublicWakuAPIWrapper) Post(req types.NewMessage) ([]byte, error) {
 	msg := waku.NewMessage{
 		SymKeyID:   req.SymKeyID,
 		PublicKey:  req.PublicKey,
@@ -100,5 +98,5 @@ func (w *gethPublicWakuAPIWrapper) Post(ctx context.Context, req types.NewMessag
 		PowTarget:  req.PowTarget,
 		TargetPeer: req.TargetPeer,
 	}
-	return w.api.Post(ctx, msg)
+	return w.api.Post(msg)
 }

@@ -96,7 +96,7 @@ func NewTransport(
 		envelopesMonitor.Start()
 	}
 
-	var api types.PublicWhisperAPI
+	var api types.PublicWakuAPI
 	if waku != nil {
 		api = waku.PublicWakuAPI()
 	}
@@ -277,7 +277,7 @@ func (a *Transport) RetrieveRawAll() (map[transport.Filter][]*types.Message, err
 // SendPublic sends a new message using the Whisper service.
 // For public filters, chat name is used as an ID as well as
 // a topic.
-func (a *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage, chatName string) ([]byte, error) {
+func (a *Transport) SendPublic(newMessage *types.NewMessage, chatName string) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -290,10 +290,10 @@ func (a *Transport) SendPublic(ctx context.Context, newMessage *types.NewMessage
 	newMessage.SymKeyID = filter.SymKeyID
 	newMessage.Topic = filter.Topic
 
-	return a.api.Post(ctx, *newMessage)
+	return a.api.Post(*newMessage)
 }
 
-func (a *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
+func (a *Transport) SendPrivateWithSharedSecret(newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -310,10 +310,10 @@ func (a *Transport) SendPrivateWithSharedSecret(ctx context.Context, newMessage 
 	newMessage.Topic = filter.Topic
 	newMessage.PublicKey = nil
 
-	return a.api.Post(ctx, *newMessage)
+	return a.api.Post(*newMessage)
 }
 
-func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (a *Transport) SendPrivateWithPartitioned(newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -326,10 +326,10 @@ func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 	newMessage.Topic = filter.Topic
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	return a.api.Post(ctx, *newMessage)
+	return a.api.Post(*newMessage)
 }
 
-func (a *Transport) SendPrivateOnDiscovery(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+func (a *Transport) SendPrivateOnDiscovery(newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if err := a.addSig(newMessage); err != nil {
 		return nil, err
 	}
@@ -343,7 +343,7 @@ func (a *Transport) SendPrivateOnDiscovery(ctx context.Context, newMessage *type
 	newMessage.Topic = types.BytesToTopic(transport.ToTopic(transport.DiscoveryTopic()))
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
-	return a.api.Post(ctx, *newMessage)
+	return a.api.Post(*newMessage)
 }
 
 func (a *Transport) addSig(newMessage *types.NewMessage) error {
