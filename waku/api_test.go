@@ -52,7 +52,7 @@ func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
 	}
 
 	found := false
-	candidates := w.filters.GetWatchersByTopic(common.TopicType(t1))
+	candidates := w.filters.GetWatchersByTopic(t1)
 	for _, f := range candidates {
 		if len(f.Topics) == 2 {
 			if bytes.Equal(f.Topics[0], t1[:]) && bytes.Equal(f.Topics[1], t2[:]) {

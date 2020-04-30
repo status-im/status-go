@@ -11,7 +11,6 @@ import (
 )
 
 func TestEncodeDecodeRLP(t *testing.T) {
-	initRLPKeyFields()
 	pow := math.Float64bits(6.02)
 	lightNodeEnabled := true
 	confirmationsEnabled := true

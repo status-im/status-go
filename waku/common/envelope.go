@@ -91,15 +91,15 @@ func (e *Envelope) Seal(options *MessageParams) error {
 		target = e.powToFirstBit(options.PoW)
 	}
 
-	rlp := e.rlpWithoutNonce()
-	buf := make([]byte, len(rlp)+8)
-	copy(buf, rlp)
+	rwn := e.rlpWithoutNonce()
+	buf := make([]byte, len(rwn)+8)
+	copy(buf, rwn)
 	asAnInt := new(big.Int)
 
 	finish := time.Now().Add(time.Duration(options.WorkTime) * time.Second).UnixNano()
 	for nonce := uint64(0); time.Now().UnixNano() < finish; {
 		for i := 0; i < 1024; i++ {
-			binary.BigEndian.PutUint64(buf[len(rlp):], nonce)
+			binary.BigEndian.PutUint64(buf[len(rwn):], nonce)
 			h := crypto.Keccak256(buf)
 			asAnInt.SetBytes(h)
 			leadingZeros := 256 - asAnInt.BitLen()
@@ -130,14 +130,14 @@ func (e *Envelope) PoW() float64 {
 }
 
 func (e *Envelope) CalculatePoW(diff uint32) {
-	rlp := e.rlpWithoutNonce()
-	buf := make([]byte, len(rlp)+8)
-	copy(buf, rlp)
-	binary.BigEndian.PutUint64(buf[len(rlp):], e.Nonce)
+	rwn := e.rlpWithoutNonce()
+	buf := make([]byte, len(rwn)+8)
+	copy(buf, rwn)
+	binary.BigEndian.PutUint64(buf[len(rwn):], e.Nonce)
 	powHash := new(big.Int).SetBytes(crypto.Keccak256(buf))
 	leadingZeroes := 256 - powHash.BitLen()
 	x := math.Pow(2, float64(leadingZeroes))
-	x /= float64(len(rlp))
+	x /= float64(len(rwn))
 	x /= float64(e.TTL + diff)
 	e.pow = x
 }
@@ -266,7 +266,7 @@ func TopicToBloom(topic TopicType) []byte {
 	for j := 0; j < 3; j++ {
 		byteIndex := index[j] / 8
 		bitIndex := index[j] % 8
-		b[byteIndex] = (1 << uint(bitIndex))
+		b[byteIndex] = 1 << uint(bitIndex)
 	}
 	return b
 }

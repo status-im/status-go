@@ -860,9 +860,6 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 	// kdf should run no less than 0.1 seconds on an average computer,
 	// because it's an once in a session experience
 	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
-	if err != nil {
-		return "", err
-	}
 
 	w.keyMu.Lock()
 	defer w.keyMu.Unlock()
@@ -971,7 +968,7 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 func (w *Waku) Unsubscribe(id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
-		return fmt.Errorf("Unsubscribe: Invalid ID")
+		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
 	return nil
 }
@@ -1091,12 +1088,12 @@ func (w *Waku) OnMessagesRequest(request common.MessagesRequest, p common.Peer) 
 }
 
 func (w *Waku) OnP2PRequestCompleted(payload []byte, p common.Peer) error {
-	event, err := CreateMailServerEvent(p.EnodeID(), payload)
+	msEvent, err := CreateMailServerEvent(p.EnodeID(), payload)
 	if err != nil {
 		return fmt.Errorf("invalid p2p request complete payload: %v", err)
 	}
 
-	w.postP2P(*event)
+	w.postP2P(*msEvent)
 	return nil
 }
 
@@ -1314,16 +1311,16 @@ func (w *Waku) processP2P() {
 		case <-w.quit:
 			return
 		case e := <-w.p2pMsgQueue:
-			switch event := e.(type) {
+			switch evn := e.(type) {
 			case *common.Envelope:
-				w.filters.NotifyWatchers(event, true)
+				w.filters.NotifyWatchers(evn, true)
 				w.envelopeFeed.Send(common.EnvelopeEvent{
-					Topic: event.Topic,
-					Hash:  event.Hash(),
+					Topic: evn.Topic,
+					Hash:  evn.Hash(),
 					Event: common.EventEnvelopeAvailable,
 				})
 			case common.EnvelopeEvent:
-				w.envelopeFeed.Send(event)
+				w.envelopeFeed.Send(evn)
 			}
 		}
 	}

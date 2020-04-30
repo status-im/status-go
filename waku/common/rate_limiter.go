@@ -122,8 +122,8 @@ type PeerRateLimiter struct {
 
 func NewPeerRateLimiter(cfg *PeerRateLimiterConfig, handlers ...RateLimiterHandler) *PeerRateLimiter {
 	if cfg == nil {
-		copy := defaultPeerRateLimiterConfig
-		cfg = &copy
+		cfgCopy := defaultPeerRateLimiterConfig
+		cfg = &cfgCopy
 	}
 
 	return &PeerRateLimiter{
@@ -138,10 +138,19 @@ func NewPeerRateLimiter(cfg *PeerRateLimiterConfig, handlers ...RateLimiterHandl
 }
 
 func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runLoop runLoop) error {
-	in, out := p2p.MsgPipe()
-	defer in.Close()
-	defer out.Close()
 	errC := make(chan error, 1)
+
+	in, out := p2p.MsgPipe()
+	defer func() {
+		if err := in.Close(); err != nil {
+			errC <- err
+		}
+	}()
+	defer func() {
+		if err := out.Close(); err != nil {
+			errC <- err
+		}
+	}()
 
 	// Read from the original reader and write to the message pipe.
 	go func() {

@@ -85,7 +85,7 @@ func generateTestCases(t *testing.T, SizeTestFilters int) []FilterTestCase {
 	for i := 0; i < SizeTestFilters; i++ {
 		f, _ := generateFilter(t, true)
 		cases[i].f = f
-		cases[i].alive = mrand.Int()&int(1) == 0 // nolint: gosec
+		cases[i].alive = mrand.Int()&1 == 0 // nolint: gosec
 	}
 	return cases
 }

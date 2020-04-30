@@ -21,7 +21,6 @@ package waku
 import (
 	"bytes"
 	"crypto/ecdsa"
-	"fmt"
 	mrand "math/rand"
 	"net"
 	"sync"
@@ -104,9 +103,7 @@ var unexpectedMessage = []byte("per rectum ad astra")
 var masterBloomFilter []byte
 var masterPow = 0.00000001
 var round = 1
-var debugMode = false
 var prevTime time.Time
-var cntPrev int
 
 func TestSimulationBloomFilter(t *testing.T) {
 	// create a chain of waku nodes,
@@ -129,7 +126,7 @@ func TestSimulationBloomFilter(t *testing.T) {
 	checkPowExchange(t)
 
 	// send new pow and bloom exchange messages
-	resetParams(t)
+	resetParams()
 
 	// node #1 sends one expected (decryptable) message
 	sendMsg(t, true, 1)
@@ -144,7 +141,7 @@ func TestSimulationBloomFilter(t *testing.T) {
 	stopServers()
 }
 
-func resetParams(t *testing.T) {
+func resetParams() {
 	// change pow only for node zero
 	masterPow = 7777777.0
 	_ = nodes[0].waku.SetMinimumPoW(masterPow, true)
@@ -338,15 +335,6 @@ func checkTestStatus() {
 			cnt++
 		}
 	}
-
-	if debugMode {
-		if cntPrev != cnt {
-			fmt.Printf(" %v \t number of nodes that have received all msgs: %d, number of peers per node: %v \n",
-				time.Since(prevTime), cnt, arr)
-			prevTime = time.Now()
-			cntPrev = cnt
-		}
-	}
 }
 
 func isTestComplete() bool {
@@ -425,7 +413,7 @@ func TestPeerBasic(t *testing.T) {
 func checkPowExchangeForNodeZero(t *testing.T) {
 	const iterations = 200
 	for j := 0; j < iterations; j++ {
-		lastCycle := (j == iterations-1)
+		lastCycle := j == iterations-1
 		ok := checkPowExchangeForNodeZeroOnce(t, lastCycle)
 		if ok {
 			break
@@ -490,7 +478,7 @@ func checkBloomFilterExchangeOnce(t *testing.T, mustPass bool) bool {
 func checkBloomFilterExchange(t *testing.T) {
 	const iterations = 200
 	for j := 0; j < iterations; j++ {
-		lastCycle := (j == iterations-1)
+		lastCycle := j == iterations-1
 		ok := checkBloomFilterExchangeOnce(t, lastCycle)
 		if ok {
 			break

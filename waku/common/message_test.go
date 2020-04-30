@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -187,7 +189,10 @@ func TestMessageSeal(t *testing.T) {
 	target := 32.0
 	params.WorkTime = 4
 	params.PoW = target
-	env.Seal(params) // nolint: errcheck
+	err = env.Seal(params)
+	if err != nil {
+		t.Logf("failed to seal envelope: %s", err)
+	}
 
 	env.CalculatePoW(0)
 	pow := env.PoW()
@@ -195,9 +200,11 @@ func TestMessageSeal(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
 	}
 
+	// Seal should fail as WorkTime is significantly lower than PoW would require
 	params.WorkTime = 1
 	params.PoW = 1000000000.0
-	env.Seal(params) // nolint: errcheck
+	err = env.Seal(params)
+	require.EqualError(t, err, "failed to reach the PoW target, specified pow time (1 seconds) was insufficient")
 	env.CalculatePoW(0)
 	pow = env.PoW()
 	if pow < 2*target {
