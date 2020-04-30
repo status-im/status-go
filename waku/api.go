@@ -70,8 +70,8 @@ type Info struct {
 	MaxMessageSize uint32  `json:"maxMessageSize"` // Maximum accepted message size
 }
 
-// TODO does anyone know why all the PublicWakuAPI methods have an unused context.Context?
-//  Doesn't seem to be an interface implementation hangover.
+// Context is used higher up the food-chain and without significant refactoring is not a simple thing to remove / change
+
 // Info returns diagnostic information about the waku node.
 func (api *PublicWakuAPI) Info(ctx context.Context) Info {
 	return Info{
