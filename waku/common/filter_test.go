@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package common
 
 import (
 	"math/big"
@@ -65,7 +65,7 @@ func generateFilter(t *testing.T, symmetric bool) (*Filter, error) {
 	f.Src = &key.PublicKey
 
 	if symmetric {
-		f.KeySym = make([]byte, aesKeyLength)
+		f.KeySym = make([]byte, AESKeyLength)
 		mrand.Read(f.KeySym) // nolint: gosec
 		f.SymKeyHash = crypto.Keccak256Hash(f.KeySym)
 	} else {
@@ -85,7 +85,7 @@ func generateTestCases(t *testing.T, SizeTestFilters int) []FilterTestCase {
 	for i := 0; i < SizeTestFilters; i++ {
 		f, _ := generateFilter(t, true)
 		cases[i].f = f
-		cases[i].alive = mrand.Int()&int(1) == 0 // nolint: gosec
+		cases[i].alive = mrand.Int()&1 == 0 // nolint: gosec
 	}
 	return cases
 }
@@ -94,8 +94,7 @@ func TestInstallFilters(t *testing.T) {
 	InitSingleTest()
 
 	const SizeTestFilters = 256
-	w := New(&Config{}, nil)
-	filters := NewFilters(w)
+	filters := NewFilters()
 	tst := generateTestCases(t, SizeTestFilters)
 
 	var err error
@@ -106,7 +105,7 @@ func TestInstallFilters(t *testing.T) {
 			t.Fatalf("seed %d: failed to install filter: %s", seed, err)
 		}
 		tst[i].id = j
-		if len(j) != keyIDSize*2 {
+		if len(j) != KeyIDSize*2 {
 			t.Fatalf("seed %d: wrong filter id size [%d]", seed, len(j))
 		}
 	}
@@ -132,8 +131,7 @@ func TestInstallFilters(t *testing.T) {
 func TestInstallSymKeyGeneratesHash(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&Config{}, nil)
-	filters := NewFilters(w)
+	filters := NewFilters()
 	filter, _ := generateFilter(t, true)
 
 	// save the current SymKeyHash for comparison
@@ -159,8 +157,7 @@ func TestInstallSymKeyGeneratesHash(t *testing.T) {
 func TestInstallIdenticalFilters(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&Config{}, nil)
-	filters := NewFilters(w)
+	filters := NewFilters()
 	filter1, _ := generateFilter(t, true)
 
 	// Copy the first filter since some of its fields
@@ -185,7 +182,7 @@ func TestInstallIdenticalFilters(t *testing.T) {
 		t.Fatalf("Error installing the second filter with seed %d: %s", seed, err)
 	}
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
 		t.Fatalf("Error generating message parameters with seed %d: %s", seed, err)
 	}
@@ -229,8 +226,7 @@ func TestInstallIdenticalFilters(t *testing.T) {
 func TestInstallFilterWithSymAndAsymKeys(t *testing.T) {
 	InitSingleTest()
 
-	w := New(&Config{}, nil)
-	filters := NewFilters(w)
+	filters := NewFilters()
 	filter1, _ := generateFilter(t, true)
 
 	asymKey, err := crypto.GenerateKey()
@@ -295,9 +291,9 @@ func TestMatchEnvelope(t *testing.T) {
 		t.Fatalf("failed generateFilter() with seed %d: %s.", seed, err)
 	}
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	params.Topic[0] = 0xFF // topic mismatch
@@ -428,9 +424,9 @@ func TestMatchEnvelope(t *testing.T) {
 func TestMatchMessageSym(t *testing.T) {
 	InitSingleTest()
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	f, err := generateFilter(t, true)
@@ -525,9 +521,9 @@ func TestMatchMessageAsym(t *testing.T) {
 		t.Fatalf("failed generateFilter with seed %d: %s.", seed, err)
 	}
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	const index = 1
@@ -613,9 +609,9 @@ func cloneFilter(orig *Filter) *Filter {
 }
 
 func generateCompatibeEnvelope(t *testing.T, f *Filter) *Envelope {
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 		return nil
 	}
 
@@ -644,8 +640,7 @@ func TestWatchers(t *testing.T) {
 	var x, firstID string
 	var err error
 
-	w := New(&Config{}, nil)
-	filters := NewFilters(w)
+	filters := NewFilters()
 	tst := generateTestCases(t, NumFilters)
 	for i = 0; i < NumFilters; i++ {
 		tst[i].f.Src = nil
@@ -796,9 +791,9 @@ func TestVariableTopics(t *testing.T) {
 
 	const lastTopicByte = 3
 	var match bool
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 	msg, err := NewSentMessage(params)
 	if err != nil {

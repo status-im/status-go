@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package common
 
 import (
 	mrand "math/rand"
@@ -33,7 +33,7 @@ func TestPoWCalculationsWithNoLeadingZeros(t *testing.T) {
 		Nonce: 100000,
 	}
 
-	e.calculatePoW(0)
+	e.CalculatePoW(0)
 
 	if e.pow != 0.07692307692307693 {
 		t.Fatalf("invalid PoW calculation. Expected 0.07692307692307693, got %v", e.pow)
@@ -46,7 +46,7 @@ func TestPoWCalculationsWith8LeadingZeros(t *testing.T) {
 		Data:  []byte{0xde, 0xad, 0xbe, 0xef},
 		Nonce: 276,
 	}
-	e.calculatePoW(0)
+	e.CalculatePoW(0)
 
 	if e.pow != 19.692307692307693 {
 		t.Fatalf("invalid PoW calculation. Expected 19.692307692307693, got %v", e.pow)
@@ -54,7 +54,7 @@ func TestPoWCalculationsWith8LeadingZeros(t *testing.T) {
 }
 
 func TestEnvelopeOpenAcceptsOnlyOneKeyTypeInFilter(t *testing.T) {
-	symKey := make([]byte, aesKeyLength)
+	symKey := make([]byte, AESKeyLength)
 	mrand.Read(symKey) //nolint: gosec
 
 	asymKey, err := crypto.GenerateKey()

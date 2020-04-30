@@ -16,10 +16,11 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package common
 
 import (
 	"bytes"
+	"net"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 	}()
 
 	messages := make(chan p2p.Msg, 1)
-	runLoop := func(p *Peer, rw p2p.MsgReadWriter) error {
+	runLoop := func(rw p2p.MsgReadWriter) error {
 		msg, err := rw.ReadMsg()
 		if err != nil {
 			return err
@@ -55,7 +56,7 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 	}
 
 	r := NewPeerRateLimiter(nil, &mockRateLimiterHandler{})
-	err := r.decorate(nil, out, runLoop)
+	err := r.Decorate(nil, out, runLoop)
 	require.NoError(t, err)
 
 	receivedMsg := <-messages
@@ -79,7 +80,7 @@ func TestPeerLimiterThrottlingWithZeroLimit(t *testing.T) {
 func TestPeerLimiterHandler(t *testing.T) {
 	h := &mockRateLimiterHandler{}
 	r := NewPeerRateLimiter(nil, h)
-	p := &Peer{
+	p := &TestWakuPeer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
 	}
 	rw1, rw2 := p2p.MsgPipe()
@@ -119,7 +120,7 @@ func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
 		WhitelistedIPs:     []string{"<nil>"}, // no IP is represented as <nil> string
 		WhitelistedPeerIDs: []enode.ID{{0xaa, 0xbb, 0xcc}},
 	}, h)
-	p := &Peer{
+	p := &TestWakuPeer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
 	}
 	rw1, rw2 := p2p.MsgPipe()
@@ -151,8 +152,8 @@ func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
 	require.Equal(t, 0, h.exceedPeerLimit)
 }
 
-func echoMessages(r *PeerRateLimiter, p *Peer, rw p2p.MsgReadWriter) error {
-	return r.decorate(p, rw, func(p *Peer, rw p2p.MsgReadWriter) error {
+func echoMessages(r *PeerRateLimiter, p RateLimiterPeer, rw p2p.MsgReadWriter) error {
+	return r.Decorate(p, rw, func(rw p2p.MsgReadWriter) error {
 		for {
 			msg, err := rw.ReadMsg()
 			if err != nil {
@@ -173,3 +174,16 @@ type mockRateLimiterHandler struct {
 
 func (m *mockRateLimiterHandler) ExceedPeerLimit() error { m.exceedPeerLimit++; return nil }
 func (m *mockRateLimiterHandler) ExceedIPLimit() error   { m.exceedIPLimit++; return nil }
+
+type TestWakuPeer struct {
+	peer *p2p.Peer
+}
+
+func (p *TestWakuPeer) IP() net.IP {
+	return p.peer.Node().IP()
+}
+
+func (p *TestWakuPeer) ID() []byte {
+	id := p.peer.ID()
+	return id[:]
+}

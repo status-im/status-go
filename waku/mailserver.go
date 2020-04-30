@@ -23,7 +23,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/waku/common"
+
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
@@ -39,14 +41,14 @@ const (
 // DeliverMail should use p2pMessageCode for delivery,
 // in order to bypass the expiry checks.
 type MailServer interface {
-	Archive(env *Envelope)
-	DeliverMail(peerID []byte, request *Envelope) // DEPRECATED; use Deliver()
-	Deliver(peerID []byte, request MessagesRequest)
+	Archive(env *common.Envelope)
+	DeliverMail(peerID []byte, request *common.Envelope) // DEPRECATED; use Deliver()
+	Deliver(peerID []byte, request common.MessagesRequest)
 }
 
 // MailServerResponse is the response payload sent by the mailserver.
 type MailServerResponse struct {
-	LastEnvelopeHash common.Hash
+	LastEnvelopeHash gethcommon.Hash
 	Cursor           []byte
 	Error            error
 }
@@ -57,7 +59,7 @@ func invalidResponseSizeError(size int) error {
 
 // CreateMailServerRequestCompletedPayload creates a payload representing
 // a successful request to mailserver
-func CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash common.Hash, cursor []byte) []byte {
+func CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash gethcommon.Hash, cursor []byte) []byte {
 	payload := make([]byte, len(requestID))
 	copy(payload, requestID[:])
 	payload = append(payload, lastEnvelopeHash[:]...)
@@ -67,7 +69,7 @@ func CreateMailServerRequestCompletedPayload(requestID, lastEnvelopeHash common.
 
 // CreateMailServerRequestFailedPayload creates a payload representing
 // a failed request to a mailserver
-func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []byte {
+func CreateMailServerRequestFailedPayload(requestID gethcommon.Hash, err error) []byte {
 	payload := []byte(mailServerFailedPayloadPrefix)
 	payload = append(payload, requestID[:]...)
 	payload = append(payload, []byte(err.Error())...)
@@ -79,8 +81,8 @@ func CreateMailServerRequestFailedPayload(requestID common.Hash, err error) []by
 // * request completed successfully
 // * request failed
 // If the payload is unknown/unparseable, it returns `nil`
-func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
-	if len(payload) < common.HashLength {
+func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*common.EnvelopeEvent, error) {
+	if len(payload) < gethcommon.HashLength {
 		return nil, invalidResponseSizeError(len(payload))
 	}
 
@@ -94,8 +96,8 @@ func CreateMailServerEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, err
 	return tryCreateMailServerRequestCompletedEvent(nodeID, payload)
 }
 
-func tryCreateMailServerRequestFailedEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
-	if len(payload) < common.HashLength+len(mailServerFailedPayloadPrefix) {
+func tryCreateMailServerRequestFailedEvent(nodeID enode.ID, payload []byte) (*common.EnvelopeEvent, error) {
+	if len(payload) < gethcommon.HashLength+len(mailServerFailedPayloadPrefix) {
 		return nil, nil
 	}
 
@@ -106,17 +108,17 @@ func tryCreateMailServerRequestFailedEvent(nodeID enode.ID, payload []byte) (*En
 	}
 
 	var (
-		requestID common.Hash
+		requestID gethcommon.Hash
 		errorMsg  string
 	)
 
 	requestID, remainder = extractHash(remainder)
 	errorMsg = string(remainder)
 
-	event := EnvelopeEvent{
+	event := common.EnvelopeEvent{
 		Peer:  nodeID,
 		Hash:  requestID,
-		Event: EventMailServerRequestCompleted,
+		Event: common.EventMailServerRequestCompleted,
 		Data: &MailServerResponse{
 			Error: errors.New(errorMsg),
 		},
@@ -126,7 +128,7 @@ func tryCreateMailServerRequestFailedEvent(nodeID enode.ID, payload []byte) (*En
 
 }
 
-func tryCreateMailServerRequestCompletedEvent(nodeID enode.ID, payload []byte) (*EnvelopeEvent, error) {
+func tryCreateMailServerRequestCompletedEvent(nodeID enode.ID, payload []byte) (*common.EnvelopeEvent, error) {
 	// check if payload is
 	// - requestID or
 	// - requestID + lastEnvelopeHash or
@@ -134,19 +136,19 @@ func tryCreateMailServerRequestCompletedEvent(nodeID enode.ID, payload []byte) (
 	// requestID is the hash of the request envelope.
 	// lastEnvelopeHash is the last envelope sent by the mail server
 	// cursor is the db key, 36 bytes: 4 for the timestamp + 32 for the envelope hash.
-	if len(payload) > common.HashLength*2+cursorSize {
+	if len(payload) > gethcommon.HashLength*2+cursorSize {
 		return nil, invalidResponseSizeError(len(payload))
 	}
 
 	var (
-		requestID        common.Hash
-		lastEnvelopeHash common.Hash
+		requestID        gethcommon.Hash
+		lastEnvelopeHash gethcommon.Hash
 		cursor           []byte
 	)
 
 	requestID, remainder := extractHash(payload)
 
-	if len(remainder) >= common.HashLength {
+	if len(remainder) >= gethcommon.HashLength {
 		lastEnvelopeHash, remainder = extractHash(remainder)
 	}
 
@@ -154,10 +156,10 @@ func tryCreateMailServerRequestCompletedEvent(nodeID enode.ID, payload []byte) (
 		cursor = remainder
 	}
 
-	event := EnvelopeEvent{
+	event := common.EnvelopeEvent{
 		Peer:  nodeID,
 		Hash:  requestID,
-		Event: EventMailServerRequestCompleted,
+		Event: common.EventMailServerRequestCompleted,
 		Data: &MailServerResponse{
 			LastEnvelopeHash: lastEnvelopeHash,
 			Cursor:           cursor,
@@ -167,9 +169,9 @@ func tryCreateMailServerRequestCompletedEvent(nodeID enode.ID, payload []byte) (
 	return &event, nil
 }
 
-func extractHash(payload []byte) (common.Hash, []byte) {
-	prefix, remainder := extractPrefix(payload, common.HashLength)
-	return common.BytesToHash(prefix), remainder
+func extractHash(payload []byte) (gethcommon.Hash, []byte) {
+	prefix, remainder := extractPrefix(payload, gethcommon.HashLength)
+	return gethcommon.BytesToHash(prefix), remainder
 }
 
 func extractPrefix(payload []byte, size int) ([]byte, []byte) {

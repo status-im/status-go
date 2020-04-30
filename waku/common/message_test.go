@@ -16,7 +16,7 @@
 // This software uses the go-ethereum library, which is licensed
 // under the GNU Lesser General Public Library, version 3 or any later.
 
-package waku
+package common
 
 import (
 	"bytes"
@@ -28,13 +28,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func generateMessageParams() (*MessageParams, error) {
+func GenerateMessageParams() (*MessageParams, error) {
 	// set all the parameters except p.Dst and p.Padding
 
 	buf := make([]byte, 4)
@@ -46,7 +45,7 @@ func generateMessageParams() (*MessageParams, error) {
 	p.WorkTime = 1
 	p.TTL = uint32(mrand.Intn(1024))
 	p.Payload = make([]byte, sz)
-	p.KeySym = make([]byte, aesKeyLength)
+	p.KeySym = make([]byte, AESKeyLength)
 	mrand.Read(p.Payload) // nolint: gosec
 	mrand.Read(p.KeySym)  // nolint: gosec
 	p.Topic = BytesToTopic(buf)
@@ -61,9 +60,9 @@ func generateMessageParams() (*MessageParams, error) {
 }
 
 func singleMessageTest(t *testing.T, symmetric bool) {
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	key, err := crypto.GenerateKey()
@@ -106,7 +105,7 @@ func singleMessageTest(t *testing.T, symmetric bool) {
 	if !bytes.Equal(text, decrypted.Payload) {
 		t.Fatalf("failed with seed %d: compare payload.", seed)
 	}
-	if !isMessageSigned(decrypted.Raw[0]) {
+	if !IsMessageSigned(decrypted.Raw[0]) {
 		t.Fatalf("failed with seed %d: unsigned.", seed)
 	}
 	if len(decrypted.Signature) != signatureLength {
@@ -132,9 +131,9 @@ func TestMessageWrap(t *testing.T) {
 	mrand.Seed(seed)
 	target := 128.0
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	msg, err := NewSentMessage(params)
@@ -173,9 +172,9 @@ func TestMessageSeal(t *testing.T) {
 	seed = int64(1976726903)
 	mrand.Seed(seed)
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	msg, err := NewSentMessage(params)
@@ -190,18 +189,23 @@ func TestMessageSeal(t *testing.T) {
 	target := 32.0
 	params.WorkTime = 4
 	params.PoW = target
-	env.Seal(params) // nolint: errcheck
+	err = env.Seal(params)
+	if err != nil {
+		t.Logf("failed to seal envelope: %s", err)
+	}
 
-	env.calculatePoW(0)
+	env.CalculatePoW(0)
 	pow := env.PoW()
 	if pow < target {
 		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
 	}
 
+	// Seal should fail as WorkTime is significantly lower than PoW would require
 	params.WorkTime = 1
 	params.PoW = 1000000000.0
-	env.Seal(params) // nolint: errcheck
-	env.calculatePoW(0)
+	err = env.Seal(params)
+	require.EqualError(t, err, "failed to reach the PoW target, specified pow time (1 seconds) was insufficient")
+	env.CalculatePoW(0)
 	pow = env.PoW()
 	if pow < 2*target {
 		t.Fatalf("failed Wrap with seed %d: pow too small %f.", seed, pow)
@@ -219,9 +223,9 @@ func TestEnvelopeOpen(t *testing.T) {
 }
 
 func singleEnvelopeOpenTest(t *testing.T, symmetric bool) {
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 
 	key, err := crypto.GenerateKey()
@@ -260,7 +264,7 @@ func singleEnvelopeOpenTest(t *testing.T, symmetric bool) {
 	if !bytes.Equal(text, decrypted.Payload) {
 		t.Fatalf("failed with seed %d: compare payload.", seed)
 	}
-	if !isMessageSigned(decrypted.Raw[0]) {
+	if !IsMessageSigned(decrypted.Raw[0]) {
 		t.Fatalf("failed with seed %d: unsigned.", seed)
 	}
 	if len(decrypted.Signature) != signatureLength {
@@ -288,23 +292,23 @@ func singleEnvelopeOpenTest(t *testing.T, symmetric bool) {
 func TestEncryptWithZeroKey(t *testing.T) {
 	InitSingleTest()
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 	msg, err := NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	params.KeySym = make([]byte, aesKeyLength)
+	params.KeySym = make([]byte, AESKeyLength)
 	_, err = msg.Wrap(params, time.Now())
 	if err == nil {
 		t.Fatalf("wrapped with zero key, seed: %d.", seed)
 	}
 
-	params, err = generateMessageParams()
+	params, err = GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 	msg, err = NewSentMessage(params)
 	if err != nil {
@@ -316,9 +320,9 @@ func TestEncryptWithZeroKey(t *testing.T) {
 		t.Fatalf("wrapped with empty key, seed: %d.", seed)
 	}
 
-	params, err = generateMessageParams()
+	params, err = GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 	msg, err = NewSentMessage(params)
 	if err != nil {
@@ -334,9 +338,9 @@ func TestEncryptWithZeroKey(t *testing.T) {
 func TestRlpEncode(t *testing.T) {
 	InitSingleTest()
 
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
 	}
 	msg, err := NewSentMessage(params)
 	if err != nil {
@@ -367,9 +371,9 @@ func TestRlpEncode(t *testing.T) {
 }
 
 func singlePaddingTest(t *testing.T, padSize int) {
-	params, err := generateMessageParams()
+	params, err := GenerateMessageParams()
 	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d and sz=%d: %s.", seed, padSize, err)
+		t.Fatalf("failed GenerateMessageParams with seed %d and sz=%d: %s.", seed, padSize, err)
 	}
 	params.Padding = make([]byte, padSize)
 	params.PoW = 0.0000000001
@@ -426,7 +430,7 @@ func TestPadding(t *testing.T) {
 func TestPaddingAppendedToSymMessagesWithSignature(t *testing.T) {
 	params := &MessageParams{
 		Payload: make([]byte, 246),
-		KeySym:  make([]byte, aesKeyLength),
+		KeySym:  make([]byte, AESKeyLength),
 	}
 
 	pSrc, err := crypto.GenerateKey()
@@ -494,16 +498,4 @@ func TestValidateAndParseSizeOfPayloadSize(t *testing.T) {
 			msg.ValidateAndParse()
 		})
 	}
-}
-
-func TestEncodeDecodeVersionedResponse(t *testing.T) {
-	response := NewMessagesResponse(common.Hash{1}, []EnvelopeError{{Code: 1}})
-	b, err := rlp.EncodeToBytes(response)
-	require.NoError(t, err)
-
-	var mresponse MultiVersionResponse
-	require.NoError(t, rlp.DecodeBytes(b, &mresponse))
-	v1resp, err := mresponse.DecodeResponse1()
-	require.NoError(t, err)
-	require.Equal(t, response.Response.Hash, v1resp.Hash)
 }
