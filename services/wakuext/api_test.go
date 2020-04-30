@@ -303,8 +303,8 @@ func (s *WakuNodeMockSuite) SetupTest() {
 	pkey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	node := enode.NewV4(&pkey.PublicKey, net.ParseIP("127.0.0.1"), 1, 1)
-	peer := p2p.NewPeer(node.ID(), "1", []p2p.Cap{{"shh", 6}})
 	rw1, rw2 := p2p.MsgPipe()
+	peer := v0.NewPeer(w, p2p.NewPeer(node.ID(), "1", []p2p.Cap{{"shh", 6}}), rw2, nil)
 	go func() {
 		err := w.HandlePeer(peer, rw2)
 		panic(err)
