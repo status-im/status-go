@@ -103,9 +103,7 @@ var unexpectedMessage = []byte("per rectum ad astra")
 var masterBloomFilter []byte
 var masterPow = 0.00000001
 var round = 1
-var debugMode = false
 var prevTime time.Time
-var cntPrev int
 
 func TestSimulationBloomFilter(t *testing.T) {
 	// create a chain of waku nodes,
