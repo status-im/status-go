@@ -58,7 +58,7 @@ The basic function of this package is to implement the [waku specifications](htt
 
 ### `waku.go`
 
-[`waku.go`](./waku.go) serves as the main entry point for the package and where the main `Waku{}` struct lives. Additionally the package's `init()` can be found in this file.
+[`waku.go`](./waku.go) serves as the main entry point for the package and where the main `Waku{}` struct lives.
 
 ---
 
@@ -68,11 +68,13 @@ The basic function of this package is to implement the [waku specifications](htt
 
 `PublicWakuAPI{}` wraps the main `Waku{}`, making the `Waku{}` functionality suitable for external consumption.
 
----
-
 #### Consumption
 
 `PublicWakuAPI{}` is wrapped by `eth-node\bridge\geth.gethPublicWakuAPIWrapper{}`, which is initialised via `eth-node\bridge\geth.NewGethPublicWakuAPIWrapper()` and exposed via `gethWakuWrapper.PublicWakuAPI()` and is finally consumed by wider parts of the application.
+
+#### Notes
+
+It is worth noting that each function of `PublicWakuAPI{}` received an unused `context.Context` parameter. This is originally passed in way higher up the food-chain and without significant refactoring is not a simple thing to remove / change. Mobile bindings depend on the ability to pass in a context.
 
 ---
 
@@ -86,7 +88,9 @@ The basic function of this package is to implement the [waku specifications](htt
 
 ### `mailserver.go`
 
-[`mailserver.go`](./mailserver.go) //TODO
+[`mailserver.go`](./mailserver.go) is home to `MailServer` interface, which is implemented by `mailserver.WakuMailServer{}` found in the package file [`mailserver/mailserver.go`](../mailserver/mailserver.go). `MailServer` represents a mail server, capable of receiving and archiving messages for subsequent delivery to the peers.
+
+Additionally this package is home to `MailServerResponse{}` which represents the response payload sent by the mail-server. `MailServerResponse{}` is ultimately initialised by `CreateMailServerEvent()`, which is tied to the main `Waku{}` via the `Waku.OnP2PRequestCompleted()` function. This is ultimately accessed via the `Peer.Run()` function and is made available outside of the package with the `waku.HandlePeer()` function via `Waku.protocol.Run := waku.HandlePeer`. 
 
 ---
 
