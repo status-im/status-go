@@ -5,29 +5,7 @@
 - [What is Waku?](#what-is-waku)
 - [Waku versioning](#waku-versioning)
 - [What does this package do?](#what-does-this-package-do)
-  - [waku.go](#wakugo)
-  - [api.go](#apigo)
-  - [config.go](#configgo)
-  - [mailserver.go](#mailservergo)
-  - [common](#common)
-    - [bloomfilter.go](#bloomfiltergo)
-    - [const.go](#constgo)
-    - [envelope.go](#envelopego)
-    - [errors.go](#errorsgo)
-    - [events.go](#eventsgo)
-    - [filter.go](#filtergo)
-    - [helpers.go](#helpersgo)
-    - [message.go](#messagego)
-    - [metrics.go](#metricsgo)
-    - [protocol.go](#protocolgo)
-    - [rate_limiter.go](#rate_limitergo)
-    - [topic.go](#topicgo)
-  - Versioned
-     - [const.go](#version-constgo)
-     - [init.go](#version-initgo)
-     - [message.go](#version-messagego)
-     - [peer.go](#version-peergo)
-     - [status_options.go](#version-status_optionsgo)
+- [Waku package files](#waku-package-files)
 
 ## What is Waku?
 
@@ -50,7 +28,31 @@ Waku was [created to solve scaling issues with Whisper](https://discuss.status.i
 
 The basic function of this package is to implement the [waku specifications](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md), and provide the `status-go` binary with the ability to send and receive messages via Waku.
 
----
+## Waku package files
+
+  - [waku.go](#wakugo)
+  - [api.go](#apigo)
+  - [config.go](#configgo)
+  - [mailserver.go](#mailservergo)
+  - [common](#common)
+    - [bloomfilter.go](#bloomfiltergo)
+    - [const.go](#constgo)
+    - [envelope.go](#envelopego)
+    - [errors.go](#errorsgo)
+    - [events.go](#eventsgo)
+    - [filter.go](#filtergo)
+    - [helpers.go](#helpersgo)
+    - [message.go](#messagego)
+    - [metrics.go](#metricsgo)
+    - [protocol.go](#protocolgo)
+    - [rate_limiter.go](#rate_limitergo)
+    - [topic.go](#topicgo)
+  - [Versioned](#versioned)
+     - [const.go](#version-constgo)
+     - [init.go](#version-initgo)
+     - [message.go](#version-messagego)
+     - [peer.go](#version-peergo)
+     - [status_options.go](#version-status_optionsgo)
 
 ## Root
 
@@ -65,6 +67,8 @@ The basic function of this package is to implement the [waku specifications](htt
 [`api.go`](./api.go) is home to the `PublicWakuAPI{}` struct which provides the waku RPC service that can be used publicly without security implications.
 
 `PublicWakuAPI{}` wraps the main `Waku{}`, making the `Waku{}` functionality suitable for external consumption.
+
+---
 
 #### Consumption
 
@@ -144,7 +148,6 @@ For example, if a node receives an envelope with topic `0x1234`, the node will t
 Whisper, will process all the installed filters that the node has, and build a `BloomFilter` from all the topics of each installed filter (i.e. `func ToBloomFilter(topics []TopicType) []byte { ... }`). When a peer receives this BloomFilter, it will match the topic on each envelope that they receive against the BloomFilter, if it matches, it will forward this to the peer.
 
 Waku, by default, does not send a BloomFilter, instead sends the topic in a clear array of `[]TopicType`. This is an improvement on Whisper's usage as a BloomFilter may include false positives, which increase bandwidth usage. In contrast, clear topics are matched exactly and therefore don't create redundant bandwidth usage.
-
 
 ---
 
