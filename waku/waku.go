@@ -46,6 +46,7 @@ import (
 
 	"github.com/status-im/status-go/waku/common"
 	v0 "github.com/status-im/status-go/waku/v0"
+	v1 "github.com/status-im/status-go/waku/v1"
 )
 
 const messageQueueLimit = 1024
@@ -72,8 +73,8 @@ type settings struct {
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	protocol p2p.Protocol    // Peer description and parameters
-	filters  *common.Filters // Message filters installed with Subscribe function
+	protocols []p2p.Protocol  // Peer description and parameters
+	filters   *common.Filters // Message filters installed with Subscribe function
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
@@ -151,11 +152,11 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	waku.filters = common.NewFilters()
 
 	// p2p waku sub-protocol handler
-	waku.protocol = p2p.Protocol{
+	waku.protocols = []p2p.Protocol{{
 		Name:    v0.Name,
 		Version: uint(v0.Version),
 		Length:  v0.NumberOfMessageCodes,
-		Run:     waku.HandlePeer,
+		Run:     waku.handlePeerV0,
 		NodeInfo: func() interface{} {
 			return map[string]interface{}{
 				"version":        v0.VersionStr,
@@ -163,14 +164,23 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 				"minimumPoW":     waku.MinPow(),
 			}
 		},
+	},
+		{
+			Name:    v1.Name,
+			Version: uint(v1.Version),
+			Length:  v1.NumberOfMessageCodes,
+			Run:     waku.handlePeerV1,
+			NodeInfo: func() interface{} {
+				return map[string]interface{}{
+					"version":        v1.VersionStr,
+					"maxMessageSize": waku.MaxMessageSize(),
+					"minimumPoW":     waku.MinPow(),
+				}
+			},
+		},
 	}
 
 	return waku
-}
-
-// Version returns the waku sub-protocol version number.
-func (w *Waku) Version() uint {
-	return w.protocol.Version
 }
 
 // MinPow returns the PoW value required by this node.
@@ -426,7 +436,7 @@ func (w *Waku) APIs() []rpc.API {
 
 // Protocols returns the waku sub-protocols ran by this particular client.
 func (w *Waku) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{w.protocol}
+	return w.protocols
 }
 
 // RegisterMailServer registers MailServer interface.
@@ -1009,12 +1019,17 @@ func (w *Waku) Stop() error {
 	return nil
 }
 
+func (w *Waku) handlePeerV0(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	return w.HandlePeer(v0.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv0")), rw)
+}
+
+func (w *Waku) handlePeerV1(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	return w.HandlePeer(v1.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv1")), rw)
+}
+
 // HandlePeer is called by the underlying P2P layer when the waku sub-protocol
 // connection is negotiated.
-func (w *Waku) HandlePeer(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
-	// Create the new peer and start tracking it
-	var peer common.Peer = v0.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peer"))
-
+func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	w.peerMu.Lock()
 	w.peers[peer] = struct{}{}
 	w.peerMu.Unlock()
@@ -1177,6 +1192,22 @@ func (w *Waku) SetBloomFilterMode(mode bool) {
 	// Recalculate and notify topic interest or bloom, currently not implemented
 }
 
+// addEnvelope adds an envelope to the envelope map, used for sending
+func (w *Waku) addEnvelope(envelope *common.Envelope) {
+
+	hash := envelope.Hash()
+
+	w.poolMu.Lock()
+	w.envelopes[hash] = envelope
+	if w.expirations[envelope.Expiry] == nil {
+		w.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
+	}
+	if !w.expirations[envelope.Expiry].Contains(hash) {
+		w.expirations[envelope.Expiry].Add(hash)
+	}
+	w.poolMu.Unlock()
+}
+
 // addAndBridge inserts a new envelope into the message pool to be distributed within the
 // waku network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
@@ -1235,16 +1266,10 @@ func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool)
 
 	w.poolMu.Lock()
 	_, alreadyCached := w.envelopes[hash]
-	if !alreadyCached {
-		w.envelopes[hash] = envelope
-		if w.expirations[envelope.Expiry] == nil {
-			w.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
-		}
-		if !w.expirations[envelope.Expiry].Contains(hash) {
-			w.expirations[envelope.Expiry].Add(hash)
-		}
-	}
 	w.poolMu.Unlock()
+	if !alreadyCached {
+		w.addEnvelope(envelope)
+	}
 
 	if alreadyCached {
 		log.Trace("w envelope already cached", "hash", envelope.Hash().Hex())
