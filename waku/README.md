@@ -28,6 +28,8 @@ This package follows a versioning pattern that makes clean separation between br
 >
 >This has the drawback of some code duplication, but the advantage is that is more explicit what each version requires, and changes in one version will not impact the other, so we won't pile up backward compatible code. This is the same strategy used by whisper in go ethereum and is influenced by https://www.youtube.com/watch?v=oyLBGkS5ICk.
 
+Familiarise yourself with the [Spec-ulation Keynote by Rich Hickey](https://www.youtube.com/watch?v=oyLBGkS5ICk), if you wish to more deeply understand the rationale for this versioning implementation. 
+
 This means that breaking changes will necessitate a new protocol version and a new version sub-package. The packages follow the naming convention of `v*` where `*` represents the major / breaking version number of the protocol.
 
 Currently the package has the following version sub-packages:
@@ -252,28 +254,34 @@ For details about the divergence between versions please consult the `README`s o
 
 ### Version `const.go`
 
-`const.go` // TODO
+`const.go` is home to the version sub-package's `const`s. These constants are version dependant and, as expected, may change from version to version.
 
 ---
 
 ### Version `init.go`
 
-`init.go` // TODO
+`init.go` is home to the version sub-package's initialisation, and is used to initialise struct based variables at runtime. 
 
 ---
 
 ### Version `message.go`
 
-`message.go` // TODO
+`message.go` // TODO - I don't really understand what this does.
 
 ---
 
 ### Version `peer.go`
 
-`peer.go` // TODO
+`peer.go` holds the version's sub-package `Peer{}` implementation of the `common.Peer` interface. 
 
 ---
 
 ### Version `status_options.go`
 
-`status_options.go` // TODO
+`status_options.go` holds the version's sub-package `StatusOptions{}` which implements the `ethereum/go-ethereum/rlp` `Decoder` and `Encoder` interfaces.
+
+`StatusOptions` defines additional information shared between peers during the handshake. There might be more options provided than fields in `StatusOptions`, and as per the specs, should be ignored during deserialisation to stay forward compatible. In the case of RLP, options should be serialised to an array of tuples where the first item is a field name and the second is a RLP-serialised value.
+
+For further details on RLP see:
+- https://github.com/ethereum/wiki/wiki/RLP
+- https://specs.vac.dev/specs/waku/waku.html#use-of-rlpx-transport-protocol
