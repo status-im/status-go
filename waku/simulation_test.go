@@ -100,7 +100,6 @@ var unexpectedMessage = []byte("per rectum ad astra")
 var masterBloomFilter []byte
 var masterPow = 0.00000001
 var round = 1
-var prevTime time.Time
 
 func TestSimulationBloomFilter(t *testing.T) {
 	// create a chain of waku nodes,
@@ -144,7 +143,7 @@ func resetParams() {
 	_ = nodes[0].waku.SetMinimumPoW(masterPow, true)
 
 	// change bloom for all nodes
-	masterBloomFilter = common.TopicToBloom(sharedTopic)
+	masterBloomFilter = sharedTopic.ToBloom()
 	for i := 0; i < NumNodes; i++ {
 		_ = nodes[i].waku.SetBloomFilter(masterBloomFilter)
 	}
@@ -159,7 +158,7 @@ func initBloom(t *testing.T) {
 		t.Fatalf("rand failed: %s.", err)
 	}
 
-	msgBloom := common.TopicToBloom(sharedTopic)
+	msgBloom := sharedTopic.ToBloom()
 	masterBloomFilter = addBloom(masterBloomFilter, msgBloom)
 	for i := 0; i < 32; i++ {
 		masterBloomFilter[i] = 0xFF
@@ -255,7 +254,6 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 		return
 	}
 
-	prevTime = time.Now()
 	// (cycle * iterations) should not exceed 50 seconds, since TTL=50
 	const cycle = 200 // time in milliseconds
 	const iterations = 250

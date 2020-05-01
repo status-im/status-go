@@ -2,7 +2,10 @@ package common
 
 import (
 	"crypto/ecdsa"
+	crand "crypto/rand"
+	"errors"
 	"fmt"
+	mrand "math/rand"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -50,6 +53,37 @@ func ContainsOnlyZeros(data []byte) bool {
 		}
 	}
 	return true
+}
+
+// GenerateSecureRandomData generates random data where extra security is required.
+// The purpose of this function is to prevent some bugs in software or in hardware
+// from delivering not-very-random data. This is especially useful for AES nonce,
+// where true randomness does not really matter, but it is very important to have
+// a unique nonce for every message.
+func GenerateSecureRandomData(length int) ([]byte, error) {
+	x := make([]byte, length)
+	y := make([]byte, length)
+	res := make([]byte, length)
+
+	_, err := crand.Read(x)
+	if err != nil {
+		return nil, err
+	} else if !ValidateDataIntegrity(x, length) {
+		return nil, errors.New("crypto/rand failed to generate secure random data")
+	}
+	_, err = mrand.Read(y) // nolint: gosec
+	if err != nil {
+		return nil, err
+	} else if !ValidateDataIntegrity(y, length) {
+		return nil, errors.New("math/rand failed to generate secure random data")
+	}
+	for i := 0; i < length; i++ {
+		res[i] = x[i] ^ y[i]
+	}
+	if !ValidateDataIntegrity(res, length) {
+		return nil, errors.New("failed to generate secure random data")
+	}
+	return res, nil
 }
 
 // GenerateRandomID generates a random string, which is then returned to be used as a key id

@@ -459,21 +459,15 @@ func TestExpiry(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	err := w.SetMinimumPoW(0.0000001, false)
-	if err != nil {
+	if err := w.SetMinimumPoW(0.0000001, false); err != nil {
 		t.Fatal("failed to set min pow")
 	}
 
-	defer func() {
-		handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false))
-	}()
-	err = w.Start(nil)
-	if err != nil {
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	if err := w.Start(nil); err != nil {
 		t.Fatal("failed to start waku")
 	}
-	defer func() {
-		handleError(t, w.Stop())
-	}()
+	defer func() { handleError(t, w.Stop()) }()
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -534,18 +528,12 @@ func TestCustomization(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer func() {
-		handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false))
-	}()
-	defer func() {
-		handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize))
-	}()
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
 	if err := w.Start(nil); err != nil {
 		t.Fatal("failed to start node")
 	}
-	defer func() {
-		handleError(t, w.Stop())
-	}()
+	defer func() { handleError(t, w.Stop()) }()
 
 	const smallPoW = 0.00001
 
@@ -633,19 +621,12 @@ func TestSymmetricSendCycle(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer func() {
-		handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false))
-	}()
-	defer func() {
-		handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize))
-	}()
-	err := w.Start(nil)
-	if err != nil {
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	if err := w.Start(nil); err != nil {
 		t.Fatal("failed to start node")
 	}
-	defer func() {
-		handleError(t, w.Stop())
-	}()
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
@@ -731,18 +712,12 @@ func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer func() {
-		handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false))
-	}()
-	defer func() {
-		handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize))
-	}()
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
 	if err := w.Start(nil); err != nil {
 		t.Fatal("could not start node")
 	}
-	defer func() {
-		handleError(t, w.Stop())
-	}()
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
@@ -832,15 +807,9 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 		t.Errorf("failed to start waku: '%s'", err)
 	}
 
-	defer func() {
-		handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false))
-	}()
-	defer func() {
-		handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize))
-	}()
-	defer func() {
-		handleError(t, w.Stop())
-	}()
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
@@ -908,15 +877,9 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	if err := w.Start(nil); err != nil {
 		t.Errorf("failed to start waku: '%s'", err)
 	}
-	defer func() {
-		handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false))
-	}()
-	defer func() {
-		handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize))
-	}()
-	defer func() {
-		handleError(t, w.Stop())
-	}()
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
@@ -977,7 +940,7 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 
 func TestBloom(t *testing.T) {
 	topic := common.TopicType{0, 0, 255, 6}
-	b := common.TopicToBloom(topic)
+	b := topic.ToBloom()
 	x := make([]byte, common.BloomFilterSize)
 	x[0] = byte(1)
 	x[32] = byte(1)

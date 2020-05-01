@@ -356,7 +356,7 @@ func (p *Peer) handleP2PMessageCode(packet p2p.Msg) error {
 		return fmt.Errorf("invalid direct message payload: %v", err)
 	}
 
-	return p.host.OnNewP2PEnvelopes(envelopes, p)
+	return p.host.OnNewP2PEnvelopes(envelopes)
 }
 
 func (p *Peer) handleP2PRequestCompleteCode(packet p2p.Msg) error {

@@ -69,16 +69,12 @@ func (s *WakuTestSuite) TestHandleP2PMessageCode() {
 	s.Require().NoError(w1.SetMinimumPoW(0.0000001, false))
 	s.Require().NoError(w1.Start(nil))
 
-	go func() {
-		handleError(s.T(), w1.Stop())
-	}()
+	go func() { handleError(s.T(), w1.Stop()) }()
 
 	w2 := New(nil, nil)
 	s.Require().NoError(w2.SetMinimumPoW(0.0000001, false))
 	s.Require().NoError(w2.Start(nil))
-	go func() {
-		handleError(s.T(), w2.Stop())
-	}()
+	go func() { handleError(s.T(), w2.Stop()) }()
 
 	envelopeEvents := make(chan common.EnvelopeEvent, 10)
 	sub := w1.SubscribeEnvelopeEvents(envelopeEvents)
@@ -187,10 +183,7 @@ func (s *WakuTestSuite) TestMessagesResponseWithError() {
 	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 0}}), rw1, nil)
 
 	errorc := make(chan error, 1)
-	go func() {
-		err := w1.HandlePeer(p1, rw2)
-		errorc <- err
-	}()
+	go func() { errorc <- w1.HandlePeer(p1, rw2) }()
 	s.Require().NoError(p2.Start())
 
 	failed := common.Envelope{
@@ -253,10 +246,7 @@ func (s *WakuTestSuite) testConfirmationEvents(envelope common.Envelope, envelop
 	p2 := s.newPeer(w2, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 0}}), rw1, nil)
 
 	errorc := make(chan error, 1)
-	go func() {
-		err := w1.HandlePeer(p1, rw2)
-		errorc <- err
-	}()
+	go func() { errorc <- w1.HandlePeer(p1, rw2) }()
 
 	timer := time.AfterFunc(5*time.Second, func() {
 		if err := rw1.Close(); err != nil {
@@ -273,10 +263,7 @@ func (s *WakuTestSuite) testConfirmationEvents(envelope common.Envelope, envelop
 	s.Require().NoError(err)
 
 	// And run mainloop
-	go func() {
-		err := p2.Run()
-		errorc <- err
-	}()
+	go func() { errorc <- p2.Run() }()
 
 	w1.addEnvelope(&envelope)
 
@@ -355,9 +342,7 @@ func (s *WakuTestSuite) TestEventsWithoutConfirmation() {
 	rw1, rw2 := p2p.MsgPipe()
 	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
 
-	go func() {
-		handleError(s.T(), w1.HandlePeer(p1, rw2))
-	}()
+	go func() { handleError(s.T(), w1.HandlePeer(p1, rw2)) }()
 
 	timer := time.AfterFunc(5*time.Second, func() {
 		handleError(s.T(), rw1.Close())
@@ -365,9 +350,7 @@ func (s *WakuTestSuite) TestEventsWithoutConfirmation() {
 	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
 	s.Require().NoError(peer2.Start())
 
-	go func() {
-		handleError(s.T(), peer2.Run())
-	}()
+	go func() { handleError(s.T(), peer2.Run()) }()
 
 	e := common.Envelope{
 		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
@@ -423,12 +406,8 @@ func (s *WakuTestSuite) TestWakuTimeDesyncEnvelopeIgnored() {
 	p2 := s.newPeer(w1, p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"waku", 1}}), rw2, nil)
 
 	errc := make(chan error)
-	go func() {
-		errc <- w1.HandlePeer(p2, rw2)
-	}()
-	go func() {
-		errc <- w2.HandlePeer(p1, rw1)
-	}()
+	go func() { errc <- w1.HandlePeer(p2, rw2) }()
+	go func() { errc <- w2.HandlePeer(p1, rw1) }()
 	w1.SetTimeSource(func() time.Time {
 		return time.Now().Add(time.Hour)
 	})
@@ -457,9 +436,7 @@ func (s *WakuTestSuite) TestRequestSentEventWithExpiry() {
 	w := New(nil, nil)
 	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 1}})
 	rw := discardPipe()
-	defer func() {
-		handleError(s.T(), rw.Close())
-	}()
+	defer func() { handleError(s.T(), rw.Close()) }()
 	w.peers[s.newPeer(w, p, rw, nil)] = struct{}{}
 	events := make(chan common.EnvelopeEvent, 1)
 	sub := w.SubscribeEnvelopeEvents(events)
@@ -510,8 +487,8 @@ func (s *WakuTestSuite) TestSendMessagesRequest() {
 			// Read out so that it's consumed
 			_, err := rw2.ReadMsg()
 			s.Require().NoError(err)
-			rw2.Close()
-			rw1.Close()
+			s.Require().NoError(rw1.Close())
+			s.Require().NoError(rw2.Close())
 
 		}()
 		err := w.SendMessagesRequest(p.ID().Bytes(), validMessagesRequest)
@@ -537,10 +514,7 @@ func (s *WakuTestSuite) TestRateLimiterIntegration() {
 	}()
 	p := s.newPeer(w, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
 	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
+	go func() { errorc <- w.HandlePeer(p, rw2) }()
 
 	_, err := rw1.ReadMsg()
 	s.Require().NoError(err)
@@ -555,9 +529,7 @@ func (s *WakuTestSuite) TestRateLimiterIntegration() {
 func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 	w1 := New(nil, nil)
 	s.Require().NoError(w1.Start(nil))
-	defer func() {
-		handleError(s.T(), w1.Stop())
-	}()
+	defer func() { handleError(s.T(), w1.Stop()) }()
 
 	rw1, rw2 := p2p.MsgPipe()
 	errorc := make(chan error, 1)
@@ -568,9 +540,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 
 	w2 := New(nil, nil)
 	s.Require().NoError(w2.Start(nil))
-	defer func() {
-		handleError(s.T(), w2.Stop())
-	}()
+	defer func() { handleError(s.T(), w2.Stop()) }()
 
 	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw2, nil)
 	peer2.SetPeerTrusted(true)
@@ -586,7 +556,7 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 
 	s.Require().NoError(peer2.SendP2PMessages(envelopes))
 	s.Require().NoError(peer2.SendHistoricMessageResponse(make([]byte, 100)))
-	rw2.Close()
+	s.Require().NoError(rw2.Close())
 
 	// Wait for all messages to be read
 	err := <-errorc
@@ -614,15 +584,11 @@ func (s *WakuTestSuite) TestMailserverCompletionEvent() {
 //two generic waku node handshake
 func (s *WakuTestSuite) TestPeerHandshakeWithTwoFullNode() {
 	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		handleError(s.T(), rw1.Close())
-	}()
-	defer func() {
-		handleError(s.T(), rw2.Close())
-	}()
+	defer func() { handleError(s.T(), rw1.Close()) }()
+	defer func() { handleError(s.T(), rw2.Close()) }()
 
 	w1 := New(nil, nil)
-	var pow float64 = 0.1
+	var pow = 0.1
 	err := w1.SetMinimumPoW(pow, true)
 	s.Require().NoError(err)
 
@@ -642,12 +608,8 @@ func (s *WakuTestSuite) TestPeerHandshakeWithTwoFullNode() {
 //two generic waku node handshake. one don't send light flag
 func (s *WakuTestSuite) TestHandshakeWithOldVersionWithoutLightModeFlag() {
 	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		handleError(s.T(), rw1.Close())
-	}()
-	defer func() {
-		handleError(s.T(), rw2.Close())
-	}()
+	defer func() { handleError(s.T(), rw1.Close()) }()
+	defer func() { handleError(s.T(), rw2.Close()) }()
 
 	w1 := New(nil, nil)
 	w1.SetLightClientMode(true)
@@ -666,12 +628,8 @@ func (s *WakuTestSuite) TestHandshakeWithOldVersionWithoutLightModeFlag() {
 //two light nodes handshake. restriction enable
 func (s *WakuTestSuite) TestTwoLightPeerHandshakeRestrictionOff() {
 	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		handleError(s.T(), rw1.Close())
-	}()
-	defer func() {
-		handleError(s.T(), rw2.Close())
-	}()
+	defer func() { handleError(s.T(), rw1.Close()) }()
+	defer func() { handleError(s.T(), rw2.Close()) }()
 
 	w1 := New(nil, nil)
 	w1.SetLightClientMode(true)
@@ -692,12 +650,8 @@ func (s *WakuTestSuite) TestTwoLightPeerHandshakeRestrictionOff() {
 //two light nodes handshake. restriction enabled
 func (s *WakuTestSuite) TestTwoLightPeerHandshakeError() {
 	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		handleError(s.T(), rw1.Close())
-	}()
-	defer func() {
-		handleError(s.T(), rw2.Close())
-	}()
+	defer func() { handleError(s.T(), rw1.Close()) }()
+	defer func() { handleError(s.T(), rw2.Close()) }()
 
 	w1 := New(nil, nil)
 	w1.SetLightClientMode(true)

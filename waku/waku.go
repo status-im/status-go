@@ -952,7 +952,7 @@ func (w *Waku) updateBloomFilter(f *common.Filter) error {
 	aggregate := make([]byte, common.BloomFilterSize)
 	for _, t := range f.Topics {
 		top := common.BytesToTopic(t)
-		b := common.TopicToBloom(top)
+		b := top.ToBloom()
 		aggregate = addBloom(aggregate, b)
 	}
 
@@ -1087,12 +1087,13 @@ func (w *Waku) OnNewEnvelopes(envelopes []*common.Envelope, peer common.Peer) ([
 	return envelopeErrors, nil
 }
 
-func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope, p common.Peer) error {
+func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope) error {
 	for _, envelope := range envelopes {
 		w.postP2P(envelope)
 	}
 	return nil
 }
+
 func (w *Waku) Mailserver() bool {
 	return w.mailServer != nil
 }

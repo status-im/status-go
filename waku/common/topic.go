@@ -54,3 +54,22 @@ func (t TopicType) MarshalText() ([]byte, error) {
 func (t *TopicType) UnmarshalText(input []byte) error {
 	return hexutil.UnmarshalFixedText("Topic", input, t[:])
 }
+
+// ToBloom converts the topic (4 bytes) to the bloom filter (64 bytes)
+func (t TopicType) ToBloom() []byte {
+	b := make([]byte, BloomFilterSize)
+	var index [3]int
+	for j := 0; j < 3; j++ {
+		index[j] = int(t[j])
+		if (t[3] & (1 << uint(j))) != 0 {
+			index[j] += 256
+		}
+	}
+
+	for j := 0; j < 3; j++ {
+		byteIndex := index[j] / 8
+		bitIndex := index[j] % 8
+		b[byteIndex] = 1 << uint(bitIndex)
+	}
+	return b
+}
