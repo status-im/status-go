@@ -24,6 +24,8 @@ import (
 	"github.com/status-im/status-go/waku/common"
 )
 
+// Peer is the implementation of the Peer interface and represents a remote Waku client with which the local host Waku
+// instance exchanges data / messages.
 type Peer struct {
 	host    common.WakuHost
 	rw      p2p.MsgReadWriter

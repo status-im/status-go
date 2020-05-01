@@ -183,13 +183,17 @@ Waku, by default, does not send a BloomFilter, instead sends the topic in a clea
 
 ### `metrics.go`
 
-[`metrics.go`](./common/metrics.go) //TODO
+[`metrics.go`](./common/metrics.go) is home to [Prometheus](https://prometheus.io/) metric hooks, for counting a range of Waku related metrics.
 
 ---
 
 ### `protocol.go`
 
-[`protocol.go`](./common/protocol.go) //TODO
+[`protocol.go`](./common/protocol.go) houses the `Peer` and `WakuHost` interfaces.
+
+`Peer` represents a remote Waku client with which the local host waku instance exchanges data / messages. 
+
+`WakuHost` is the local instance of waku, which both interacts with remote clients (peers) and local clients (like `status-react`, via a RPC API).
 
 ---
 
