@@ -84,7 +84,7 @@ type WakuHost interface {
 	OnNewEnvelopes([]*Envelope, Peer) ([]EnvelopeError, error)
 	// OnNewP2PEnvelopes handles envelopes received though the P2P
 	// protocol (i.e from a mailserver in most cases)
-	OnNewP2PEnvelopes([]*Envelope, Peer) error
+	OnNewP2PEnvelopes([]*Envelope) error
 	// OnMessagesResponse handles when the peer receive a message response
 	// from a mailserver
 	OnMessagesResponse(MessagesResponse, Peer) error

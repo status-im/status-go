@@ -1087,12 +1087,13 @@ func (w *Waku) OnNewEnvelopes(envelopes []*common.Envelope, peer common.Peer) ([
 	return envelopeErrors, nil
 }
 
-func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope, p common.Peer) error {
+func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope) error {
 	for _, envelope := range envelopes {
 		w.postP2P(envelope)
 	}
 	return nil
 }
+
 func (w *Waku) Mailserver() bool {
 	return w.mailServer != nil
 }
