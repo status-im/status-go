@@ -98,13 +98,17 @@ Additionally this package is home to `MailServerResponse{}` which represents the
 
 ### `bloomfilter.go`
 
-[`bloomfilter.go`](./common/bloomfilter.go) //TODO
+[`bloomfilter.go`](./common/bloomfilter.go) holds a few bloomfilter specific functions.
 
 ---
 
 ### `const.go`
 
-[`const.go`](./common/const.go), originally a hangover from the [`go-ethereum` `whisperv6/doc.go` package file](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go) later [refactored](https://github.com/status-im/status-go/pull/1950), is home to the package's constants.
+[`const.go`](./common/const.go), originally a hangover from the [`go-ethereum` `whisperv6/doc.go` package file](https://github.com/ethereum/go-ethereum/blob/master/whisper/whisperv6/doc.go) later [refactored](https://github.com/status-im/status-go/pull/1950), is home to the common Waku constants.
+
+#### Notes
+
+Versions also have version specific `const.go` files.
 
 ---
 
