@@ -199,13 +199,33 @@ Waku, by default, does not send a BloomFilter, instead sends the topic in a clea
 
 ### `rate_limiter.go`
 
-[`rate_limiter.go`](./common/rate_limiter.go) //TODO
+[`rate_limiter.go`](./common/rate_limiter.go) was introduced as an improvement to Whisper allowing Waku nodes to limit the rate at which data is transferred. These limits are defined by the `RateLimits{}` which allows nodes to limit the following:
+
+|Limit Type|Description|
+|---|---|
+|`IPLimits`|Messages per second from a single IP (default 0, no limits)|
+|`PeerIDLimits`|Messages per second from a single peer ID (default 0, no limits)|
+|`TopicLimits`|Messages per second from a single topic (default 0, no limits)|
+
+In addition to the `RateLimits{}` this file also contains the following interfaces and structs.
+
+|Name|Description|
+|`RateLimiterPeer` `interface`|// TODO|
+|`RateLimiterHandler` `interface`|// TODO|
+|`MetricsRateLimiterHandler{}`|Implements `RateLimiterHandler`, // TODO|
+|`DropPeerRateLimiterHandler{}`|// TODO|
+|`PeerRateLimiterConfig{}`|// TODO|
+|`PeerRateLimiter{}`|// TODO|
 
 ---
 
 ### `topic.go`
 
-[`topic.go`](./common/topic.go) //TODO
+[`topic.go`](./common/topic.go) houses the `TopicType` type.
+
+`TopicType` represents a cryptographically secure, probabilistic partial classification of a message, determined as the first (leftmost) 4 bytes of the SHA3 hash of some arbitrary data given by the original author of a message.
+
+Topics are used to filter incoming messages that the host's user has registered interest in. For further details on filtering see [filter.go](#filtergo).
 
 ---
 
@@ -215,6 +235,8 @@ For details about the divergence between versions please consult the `README`s o
 
 - [version 0](./v0)
 - [version 1](./v1)
+
+---
 
 ### Version `const.go`
 
