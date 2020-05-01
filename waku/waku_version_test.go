@@ -588,7 +588,7 @@ func (s *WakuTestSuite) TestPeerHandshakeWithTwoFullNode() {
 	defer func() { handleError(s.T(), rw2.Close()) }()
 
 	w1 := New(nil, nil)
-	var pow float64 = 0.1
+	var pow = 0.1
 	err := w1.SetMinimumPoW(pow, true)
 	s.Require().NoError(err)
 
