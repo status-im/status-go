@@ -100,7 +100,6 @@ var unexpectedMessage = []byte("per rectum ad astra")
 var masterBloomFilter []byte
 var masterPow = 0.00000001
 var round = 1
-var prevTime time.Time
 
 func TestSimulationBloomFilter(t *testing.T) {
 	// create a chain of waku nodes,
@@ -255,7 +254,6 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 		return
 	}
 
-	prevTime = time.Now()
 	// (cycle * iterations) should not exceed 50 seconds, since TTL=50
 	const cycle = 200 // time in milliseconds
 	const iterations = 250
