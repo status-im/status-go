@@ -22,7 +22,18 @@ Waku was [created to solve scaling issues with Whisper](https://discuss.status.i
 
 ## Waku versioning
 
+This package follows a versioning pattern that makes clean separation between breaking versions. As [detailed in the PR](https://github.com/status-im/status-go/pull/1947#issue-407073908) that introduced this strategy to the package.
 
+>... the way we will move across versions is to maintain completely separate codebases and eventually remove those that are not supported anymore.
+>
+>This has the drawback of some code duplication, but the advantage is that is more explicit what each version requires, and changes in one version will not impact the other, so we won't pile up backward compatible code. This is the same strategy used by whisper in go ethereum and is influenced by https://www.youtube.com/watch?v=oyLBGkS5ICk.
+
+This means that breaking changes will necessitate a new protocol version and a new version sub-package. The packages follow the naming convention of `v*` where `*` represents the major / breaking version number of the protocol.
+
+Currently the package has the following version sub-packages:
+
+- [version 0 - `v0`](./v0)
+- [version 1 - `v1`](./v1)
 
 ## What does this package do? 
 
