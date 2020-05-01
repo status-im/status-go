@@ -122,7 +122,7 @@ Versions also have version specific `const.go` files.
 
 ### `errors.go`
 
-[`errors.go`](./common/errors.go) //TODO
+[`errors.go`](./common/errors.go) holds generic package errors.
 
 ---
 
@@ -161,13 +161,23 @@ Waku, by default, does not send a BloomFilter, instead sends the topic in a clea
 
 ### `helpers.go`
 
-[`helpers.go`](./common/helpers.go) //TODO
+[`helpers.go`](./common/helpers.go) holds the package's generic functions.
 
 ---
 
 ### `message.go`
 
-[`message.go`](./common/message.go) //TODO
+[`message.go`](./common/message.go) is home to all message related functionality and contains a number of structs:
+
+|Name|Description|
+|---|---|
+|`MessageParams{}`|Specifies the exact way a message should be wrapped into an Envelope|
+|`sentMessage{}`|Represents an end-user data packet to transmit through the Waku protocol. These are wrapped into Envelopes that need not be understood by intermediate nodes, just forwarded.|
+|`ReceivedMessage{}`|Represents a data packet to be received through the Waku protocol and successfully decrypted.|
+|`MessagesRequest{}`|Contains details of a request for historic messages.|
+|`MessagesResponse{}`|Represents a request response sent after processing batch of envelopes.|
+|`MessageStore` `interface`|Implemented by `MemoryMessageStore{}`|
+|`MemoryMessageStore{}`|Represents messages stored in a memory hash table.|
 
 ---
 

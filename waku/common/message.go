@@ -81,7 +81,7 @@ type ReceivedMessage struct {
 	P2P bool // is set to true if this message was received from mail server.
 }
 
-// MessagesRequest contains details of a request of historic messages.
+// MessagesRequest contains details of a request for historic messages.
 type MessagesRequest struct {
 	// ID of the request. The current implementation requires ID to be 32-byte array,
 	// however, it's not enforced for future implementation.
@@ -431,7 +431,7 @@ func NewMemoryMessageStore() *MemoryMessageStore {
 	}
 }
 
-// MemoryMessageStore stores massages in memory hash table.
+// MemoryMessageStore represents messages stored in a memory hash table.
 type MemoryMessageStore struct {
 	mu       sync.Mutex
 	messages map[common.Hash]*ReceivedMessage
