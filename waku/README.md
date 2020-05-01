@@ -210,6 +210,7 @@ Waku, by default, does not send a BloomFilter, instead sends the topic in a clea
 In addition to the `RateLimits{}` this file also contains the following interfaces and structs.
 
 |Name|Description|
+|---|---|
 |`RateLimiterPeer` `interface`|// TODO|
 |`RateLimiterHandler` `interface`|// TODO|
 |`MetricsRateLimiterHandler{}`|Implements `RateLimiterHandler`, // TODO|
