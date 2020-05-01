@@ -940,7 +940,7 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 
 func TestBloom(t *testing.T) {
 	topic := common.TopicType{0, 0, 255, 6}
-	b := common.TopicToBloom(topic)
+	b := topic.ToBloom()
 	x := make([]byte, common.BloomFilterSize)
 	x[0] = byte(1)
 	x[32] = byte(1)

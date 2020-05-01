@@ -17,7 +17,7 @@ func TestEncodeDecodeRLP(t *testing.T) {
 
 	opts := StatusOptions{
 		PoWRequirement:       &pow,
-		BloomFilter:          common.TopicToBloom(common.TopicType{0xaa, 0xbb, 0xcc, 0xdd}),
+		BloomFilter:          common.TopicType{0xaa, 0xbb, 0xcc, 0xdd}.ToBloom(),
 		LightNodeEnabled:     &lightNodeEnabled,
 		ConfirmationsEnabled: &confirmationsEnabled,
 		RateLimits: &common.RateLimits{

@@ -952,7 +952,7 @@ func (w *Waku) updateBloomFilter(f *common.Filter) error {
 	aggregate := make([]byte, common.BloomFilterSize)
 	for _, t := range f.Topics {
 		top := common.BytesToTopic(t)
-		b := common.TopicToBloom(top)
+		b := top.ToBloom()
 		aggregate = addBloom(aggregate, b)
 	}
 
