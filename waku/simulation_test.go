@@ -36,9 +36,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 
 	"github.com/status-im/status-go/waku/common"
-	v0 "github.com/status-im/status-go/waku/v0"
-
-	"github.com/stretchr/testify/require"
 )
 
 var keys = []string{
@@ -103,7 +100,6 @@ var unexpectedMessage = []byte("per rectum ad astra")
 var masterBloomFilter []byte
 var masterPow = 0.00000001
 var round = 1
-var prevTime time.Time
 
 func TestSimulationBloomFilter(t *testing.T) {
 	// create a chain of waku nodes,
@@ -147,7 +143,7 @@ func resetParams() {
 	_ = nodes[0].waku.SetMinimumPoW(masterPow, true)
 
 	// change bloom for all nodes
-	masterBloomFilter = common.TopicToBloom(sharedTopic)
+	masterBloomFilter = sharedTopic.ToBloom()
 	for i := 0; i < NumNodes; i++ {
 		_ = nodes[i].waku.SetBloomFilter(masterBloomFilter)
 	}
@@ -162,7 +158,7 @@ func initBloom(t *testing.T) {
 		t.Fatalf("rand failed: %s.", err)
 	}
 
-	msgBloom := common.TopicToBloom(sharedTopic)
+	msgBloom := sharedTopic.ToBloom()
 	masterBloomFilter = addBloom(masterBloomFilter, msgBloom)
 	for i := 0; i < 32; i++ {
 		masterBloomFilter[i] = 0xFF
@@ -258,7 +254,6 @@ func checkPropagation(t *testing.T, includingNodeZero bool) {
 		return
 	}
 
-	prevTime = time.Now()
 	// (cycle * iterations) should not exceed 50 seconds, since TTL=50
 	const cycle = 200 // time in milliseconds
 	const iterations = 250
@@ -372,7 +367,7 @@ func sendMsg(t *testing.T, expected bool, id int) {
 
 	msg, err := common.NewSentMessage(&opt)
 	if err != nil {
-		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
+		t.Fatalf("failed to create new message: %s.", err)
 	}
 	envelope, err := msg.Wrap(&opt, time.Now())
 	if err != nil {
@@ -382,31 +377,6 @@ func sendMsg(t *testing.T, expected bool, id int) {
 	err = nodes[id].waku.Send(envelope)
 	if err != nil {
 		t.Fatalf("failed to send message: %s", err)
-	}
-}
-
-func TestPeerBasic(t *testing.T) {
-	InitSingleTest()
-
-	params, err := generateMessageParams()
-	if err != nil {
-		t.Fatalf("failed generateMessageParams with seed %d.", seed)
-	}
-
-	params.PoW = 0.001
-	msg, err := common.NewSentMessage(params)
-	if err != nil {
-		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
-	}
-	env, err := msg.Wrap(params, time.Now())
-	if err != nil {
-		t.Fatalf("failed Wrap with seed %d.", seed)
-	}
-
-	p := v0.NewPeer(nil, nil, nil, nil)
-	p.Mark(env)
-	if !p.Marked(env) {
-		t.Fatalf("failed mark with seed %d.", seed)
 	}
 }
 
@@ -498,86 +468,4 @@ func waitForServersToStart(t *testing.T) {
 		}
 	}
 	t.Fatalf("Failed to start all the servers, running: %d", started)
-}
-
-//two generic waku node handshake
-func TestPeerHandshakeWithTwoFullNode(t *testing.T) {
-	rw1, rw2 := p2p.MsgPipe()
-	defer rw1.Close()
-	defer rw2.Close()
-
-	w1 := New(nil, nil)
-	var pow float64 = 0.1
-	err := w1.SetMinimumPoW(pow, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w2 := New(nil, nil)
-
-	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
-
-	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
-	err = p2.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-	require.Equal(t, pow, p2.PoWRequirement())
-}
-
-//two generic waku node handshake. one don't send light flag
-func TestHandshakeWithOldVersionWithoutLightModeFlag(t *testing.T) {
-	rw1, rw2 := p2p.MsgPipe()
-	defer rw1.Close()
-	defer rw2.Close()
-
-	w1 := New(nil, nil)
-	w1.SetLightClientMode(true)
-
-	w2 := New(nil, nil)
-
-	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
-
-	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
-	err := p2.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-//two light nodes handshake. restriction enable
-func TestTwoLightPeerHandshakeRestrictionOff(t *testing.T) {
-	rw1, rw2 := p2p.MsgPipe()
-	defer rw1.Close()
-	defer rw2.Close()
-
-	w1 := New(nil, nil)
-	w1.SetLightClientMode(true)
-	w1.settings.RestrictLightClientsConn = false
-
-	w2 := New(nil, nil)
-	w2.SetLightClientMode(true)
-	w2.settings.RestrictLightClientsConn = false
-
-	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
-
-	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
-	require.NoError(t, p2.Start())
-}
-
-//two light nodes handshake. restriction enabled
-func TestTwoLightPeerHandshakeError(t *testing.T) {
-	rw1, rw2 := p2p.MsgPipe()
-	w1 := New(nil, nil)
-	w1.SetLightClientMode(true)
-	w1.settings.RestrictLightClientsConn = true
-
-	w2 := New(nil, nil)
-	w2.SetLightClientMode(true)
-	w2.settings.RestrictLightClientsConn = true
-
-	go w1.HandlePeer(p2p.NewPeer(enode.ID{}, "test-1", []p2p.Cap{}), rw1) // nolint: errcheck
-
-	p2 := v0.NewPeer(w2, p2p.NewPeer(enode.ID{}, "test-2", []p2p.Cap{}), rw2, nil)
-	require.Error(t, p2.Start())
 }

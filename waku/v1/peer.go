@@ -1,4 +1,4 @@
-package v0
+package v1
 
 import (
 	"bytes"
@@ -24,8 +24,6 @@ import (
 	"github.com/status-im/status-go/waku/common"
 )
 
-// Peer is the implementation of the Peer interface and represents a remote Waku client with which the local host Waku
-// instance exchanges data / messages.
 type Peer struct {
 	host    common.WakuHost
 	rw      p2p.MsgReadWriter
@@ -391,7 +389,7 @@ func (p *Peer) handshake() error {
 	errc := make(chan error, 1)
 	opts := StatusOptionsFromHost(p.host)
 	go func() {
-		errc <- p2p.SendItems(p.rw, statusCode, Version, opts)
+		errc <- p2p.Send(p.rw, statusCode, opts)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -403,27 +401,12 @@ func (p *Peer) handshake() error {
 		return fmt.Errorf("p [%x] sent packet %x before status packet", p.ID(), packet.Code)
 	}
 
-	var (
-		peerProtocolVersion uint64
-		peerOptions         StatusOptions
-	)
+	var peerOptions StatusOptions
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-	if _, err := s.List(); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
-	}
-	// Validate protocol version.
-	if err := s.Decode(&peerProtocolVersion); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode peer protocol version: %v", p.ID(), err)
-	}
-	if peerProtocolVersion != Version {
-		return fmt.Errorf("p [%x]: protocol version mismatch %d != %d", p.ID(), peerProtocolVersion, Version)
-	}
+
 	// Decode and validate other status packet options.
 	if err := s.Decode(&peerOptions); err != nil {
 		return fmt.Errorf("p [%x]: failed to decode status options: %v", p.ID(), err)
-	}
-	if err := s.ListEnd(); err != nil {
-		return fmt.Errorf("p [%x]: failed to decode status packet: %v", p.ID(), err)
 	}
 	if err := p.setOptions(peerOptions.WithDefaults()); err != nil {
 		return fmt.Errorf("p [%x]: failed to set options: %v", p.ID(), err)
@@ -431,6 +414,8 @@ func (p *Peer) handshake() error {
 	if err := <-errc; err != nil {
 		return fmt.Errorf("p [%x] failed to send status packet: %v", p.ID(), err)
 	}
+
+	_ = packet.Discard()
 	return nil
 }
 

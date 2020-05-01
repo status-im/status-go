@@ -247,28 +247,9 @@ func (e *Envelope) Open(watcher *Filter) (msg *ReceivedMessage) {
 // Bloom maps 4-bytes Topic into 64-byte bloom filter with 3 bits set (at most).
 func (e *Envelope) Bloom() []byte {
 	if e.bloom == nil {
-		e.bloom = TopicToBloom(e.Topic)
+		e.bloom = e.Topic.ToBloom()
 	}
 	return e.bloom
-}
-
-// TopicToBloom converts the topic (4 bytes) to the bloom filter (64 bytes)
-func TopicToBloom(topic TopicType) []byte {
-	b := make([]byte, BloomFilterSize)
-	var index [3]int
-	for j := 0; j < 3; j++ {
-		index[j] = int(topic[j])
-		if (topic[3] & (1 << uint(j))) != 0 {
-			index[j] += 256
-		}
-	}
-
-	for j := 0; j < 3; j++ {
-		byteIndex := index[j] / 8
-		bitIndex := index[j] % 8
-		b[byteIndex] = 1 << uint(bitIndex)
-	}
-	return b
 }
 
 // EnvelopeError code and optional description of the error.

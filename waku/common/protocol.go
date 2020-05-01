@@ -54,6 +54,8 @@ type Peer interface {
 // WakuHost is the local instance of waku, which both interacts with remote clients
 // (peers) and local clients (through RPC API)
 type WakuHost interface {
+	// HandlePeer handles the connection of a new peer
+	HandlePeer(Peer, p2p.MsgReadWriter) error
 	// MaxMessageSize returns the maximum accepted message size.
 	MaxMessageSize() uint32
 	// LightClientMode returns whether the host is running in light client mode
@@ -83,7 +85,7 @@ type WakuHost interface {
 	OnNewEnvelopes([]*Envelope, Peer) ([]EnvelopeError, error)
 	// OnNewP2PEnvelopes handles envelopes received though the P2P
 	// protocol (i.e from a mailserver in most cases)
-	OnNewP2PEnvelopes([]*Envelope, Peer) error
+	OnNewP2PEnvelopes([]*Envelope) error
 	// OnMessagesResponse handles when the peer receive a message response
 	// from a mailserver
 	OnMessagesResponse(MessagesResponse, Peer) error
