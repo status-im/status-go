@@ -1,0 +1,36 @@
+{
+    "APIModules": "eth,net,web3,admin,shh,shhext",
+    "ClusterConfig": {
+        "BootNodes": [
+            "enode://436cc6f674928fdc9a9f7990f2944002b685d1c37f025c1be425185b5b1f0900feaf1ccc2a6130268f9901be4a7d252f37302c8335a2c1a62736e9232691cc3a@178.128.138.128:443"
+        ]
+    },
+    "DataDir": "/data",
+    "EnableNTPSync": true,
+    "NodeKey": "12315a1434f72df2266a404a482614238e4c4e44530c92ba4e9a245a36a11c7c",
+    "HTTPEnabled": true,
+    "HTTPHost": "0.0.0.0",
+    "HTTPPort": 8545,
+    "IPCEnabled": true,
+    "ListenAddr": "0.0.0.0:30504",
+    "LogLevel": "INFO",
+    "MaxPeers": 5000,
+    "NetworkID": 1,
+    "RegisterTopics": [
+        "whispermail"
+    ],
+    "Rendezvous": true,
+    "RequireTopics": {
+        "whisper": {
+            "max": 4,
+            "min": 3
+        }
+    },
+    "WakuConfig": {
+        "DataDir": "/data/waku",
+        "Enabled": true
+    },
+    "WhisperConfig": {
+      "Enabled": false
+    }
+}
