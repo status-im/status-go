@@ -14,11 +14,15 @@ Waku is a communication protocol for sending messages between Dapps. Waku is a f
 Waku was [created to solve scaling issues with Whisper](https://discuss.status.im/t/fixing-whisper-for-great-profit/1419) and [currently diverges](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md#differences-between-shh6-and-waku1) from Whisper in the following ways:
 
 - RLPx subprotocol is changed from `shh/6` to `waku/1`.
-- Light node capability is added.
+- Light node capability is added.*
 - Optional rate limiting is added.
 - Status packet has following additional parameters: light-node, confirmations-enabled and rate-limits
 - Mail Server and Mail Client functionality is now part of the specification.
 - P2P Message packet contains a list of envelopes instead of a single envelope.
+
+*As per [vacp2p/specs#117](https://github.com/vacp2p/specs/pull/117) Waku de jure introduced light nodes as far as updates to the written Whisper specifications. Though the de facto case is that the `go-ethereum` Whisper implementation had [already implemented light nodes](https://github.com/ethereum/go-ethereum/blob/510b6f90db406b697610fe0ff2eee66d173673b2/whisper/whisperv6/whisper.go#L291) and weren't a new feature in code.
+
+Although `status-go`'s Waku light node functionality is a direct fork of `go-ethereum`'s Whisper light node functionality, technically, as far as specifications are concerned, light nodes are considered a new feature introduced in Waku.  
 
 ## Waku versioning
 
