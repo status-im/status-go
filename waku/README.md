@@ -153,16 +153,28 @@ Additionally, the file contains `EnvelopeEvent{}`, which serves as a representat
 
 #### Usage
 
-A `status-go` node will install / register filters through RPC calls from a client (eg `status-react`). When the client installs a filter, it will specify 2 things:
+A `status-go` node will install / register filters through RPC calls from a client (eg `status-react`). The basic implementation of a filter requires at least 2 things:
 
 1) An encryption key, example "`superSafeEncryptionKey`"
 2) A 4 byte topic (`TopicType`), example "`0x1234`"
 
-The node will install the filter `["superSafeEncryptionKey", 0x1234]` and will notify its peers of this event
+The node will install the filter `[0x1234][{"superSafeEncryptionKey"}]` on an instance of `Filters{}` and will notify its peers of this event
 
 When a node receives an envelope it will attempt to match the topics against the installed filters, and then try to decrypt the envelope if the topic matches.
 
 For example, if a node receives an envelope with topic `0x1234`, the node will try to use the installed filter key `superSafeEncryptionKey` to decrypt the message. On success the node passes the decrypted message to the client.
+
+In addition to the basic example above `Filter{}` allows for richer filtering:
+
+|Field Name  |Type               |Description                                |
+|------------|-------------------|-------------------------------------------|
+|`Src`       |`*ecdsa.PublicKey` |Sender of the message. *Currently not used*|
+|`KeyAsym`   |`*ecdsa.PrivateKey`|Private Key of recipient                   |
+|`KeySym`    |`[]byte`           |Key associated with the Topic              |
+|`Topics`    |`[][]byte`         |Topics to filter messages with             |
+|`PoW`       |`float64`          |Proof of work as [described in the Waku specs](https://github.com/vacp2p/specs/blob/master/specs/waku/waku-1.md#pow-requirement-update) .<br/><br/>**Note:** *In `status-react` each client listens to the topic hash(pk), if a client wants to send a message to hash(pk1) they will also need to listen the hash(pk1) topic. However if the client doesn't want to receive envelopes for topic hash(pk1), the client may set the PoW to 1 so that all envelopes for topic hash(pk1) are discarded.*|
+|`AllowP2P`  |`bool`             |Indicates whether this filter is interested in direct peer-to-peer messages.<br/><br/>**Note:** *Typically set to true, we always want to receive P2P envelopes on a filter from trusted peers*|
+|`SymKeyHash`|`common.Hash`      |The Keccak256Hash of the symmetric key, needed for optimization|   
 
 **Waku / Whisper divergence**
 
