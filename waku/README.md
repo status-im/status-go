@@ -101,6 +101,26 @@ It is worth noting that each function of `PublicWakuAPI{}` received an unused `c
 
 `Config{}` is used to initialise the settings of an instantiated `Waku{}`. `waku.New()` creates a new instance of a `Waku{}` and takes a `Config{}` as a parameter, if nil is passed instead of an instance of `Config{}`, `DefaultConfig` is used. 
 
+#### Configuration values
+
+|Name                      |Type     |Description|
+|--------------------------|---------|---|
+|`MaxMessageSize`          |`uint32` |Sets the maximum size of a waku message in bytes|
+|`MinimumAcceptedPoW`      |`float64`|Sets the minimum amount of work a message needs to have to be accepted by the waku node|
+|`BloomFilterMode`         |`bool`   |When true, the waku node only matches against bloom filter|
+|`LightClient`             |`bool`   |When true, the waku node does not forward messages|
+|`FullNode`                |`bool`   |When true, the waku node forwards all messages|
+|`RestrictLightClientsConn`|`bool`   |When true, the waku node does not accept light clients as peers if it is a light client itself|
+|`EnableConfirmations`     |`bool`   |When true, sends message confirmations|
+
+#### Default
+
+The default configuration for a `status-go` Waku node is:
+
+	MaxMessageSize           : 1Mb
+	MinimumAcceptedPoW       : 0.2
+	RestrictLightClientsConn : true
+
 ---
 
 ### `mailserver.go`
