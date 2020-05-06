@@ -302,7 +302,29 @@ For details about the divergence between versions please consult the `README`s o
 
 ### Version `message.go`
 
-`message.go` // TODO - I don't really understand what this does.
+`message.go` is home to the `MultiVersionResponse{}` and `Version1MessageResponse{}` structs, both of which are exclusively consumed by the version subpackage's `Peer{}`.
+
+Both of these structs are used for handling Waku message responses, also known as message confirmations.
+
+`Version1MessageResponse{}` is used for sending message responses. `MultiVersionResponse{}` is used for handling incoming message responses. 
+
+#### Usage
+
+Message confirmations are used to inform a user, via the UI, that a message has been sent.
+Initially the message is marked as "Pending" and eventually as "Sent".
+
+In order to trigger the message state transition from "pending" to "sent",
+Waku uses `MessageResponse{}`. Each peer on receiving a message will send back a `MessageResponse`,
+see the [`NewMessagesResponse()` function](https://github.com/status-im/status-go/blob/4d00656c41909ccdd80a8a77a0982bd66f74d29e/waku/v1/message.go#L31).
+
+The Waku host checks that the peer is a mailserver and if this mailserver was selected by the user,
+if so the message will be marked as "Sent" in the UI.
+
+For further details [read the Waku specification section](https://github.com/status-im/specs/blob/master/docs/stable/3-whisper-usage.md#message-confirmations) on the subject.
+
+#### Notes
+
+Versioning at the `MessageResponse` level (see the struct Version field) should be phased out and defer to the subpackage's version number. Consider removal once we decide to move to a new major Waku version (i.e. `waku/2`).
 
 ---
 
