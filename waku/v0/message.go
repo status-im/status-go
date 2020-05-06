@@ -1,11 +1,7 @@
 package v0
 
 import (
-	"bytes"
-
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/status-im/status-go/waku/common"
 )
@@ -36,20 +32,4 @@ func NewMessagesResponse(batch gethcommon.Hash, errors []common.EnvelopeError) V
 			Errors: errors,
 		},
 	}
-}
-
-func sendBundle(rw p2p.MsgWriter, bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
-	data, err := rlp.EncodeToBytes(bundle)
-	if err != nil {
-		return
-	}
-	err = rw.WriteMsg(p2p.Msg{
-		Code:    messagesCode,
-		Size:    uint32(len(data)),
-		Payload: bytes.NewBuffer(data),
-	})
-	if err != nil {
-		return
-	}
-	return crypto.Keccak256Hash(data), nil
 }
