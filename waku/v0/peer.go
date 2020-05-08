@@ -557,6 +557,22 @@ func (p *Peer) broadcast() error {
 	return nil
 }
 
+func sendBundle(rw p2p.MsgWriter, bundle []*common.Envelope) (rst gethcommon.Hash, err error) {
+	data, err := rlp.EncodeToBytes(bundle)
+	if err != nil {
+		return
+	}
+	err = rw.WriteMsg(p2p.Msg{
+		Code:    messagesCode,
+		Size:    uint32(len(data)),
+		Payload: bytes.NewBuffer(data),
+	})
+	if err != nil {
+		return
+	}
+	return crypto.Keccak256Hash(data), nil
+}
+
 func (p *Peer) setBloomFilter(bloom []byte) {
 	p.bloomMu.Lock()
 	defer p.bloomMu.Unlock()

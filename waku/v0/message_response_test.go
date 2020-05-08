@@ -26,7 +26,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/status-im/status-go/waku/common"
 )
 
@@ -40,30 +39,4 @@ func TestEncodeDecodeVersionedResponse(t *testing.T) {
 	v1resp, err := mresponse.DecodeResponse1()
 	require.NoError(t, err)
 	require.Equal(t, response.Response.Hash, v1resp.Hash)
-}
-
-func TestSendBundle(t *testing.T) {
-	rw1, rw2 := p2p.MsgPipe()
-	defer func() { handleError(t, rw1.Close()) }()
-	defer func() { handleError(t, rw2.Close()) }()
-	envelopes := []*common.Envelope{{
-		Expiry: 0,
-		TTL:    30,
-		Topic:  common.TopicType{1},
-		Data:   []byte{1, 1, 1},
-	}}
-
-	errc := make(chan error)
-	go func() {
-		_, err := sendBundle(rw1, envelopes)
-		errc <- err
-	}()
-	require.NoError(t, p2p.ExpectMsg(rw2, messagesCode, envelopes))
-	require.NoError(t, <-errc)
-}
-
-func handleError(t *testing.T, err error) {
-	if err != nil {
-		t.Logf("deferred function error: '%s'", err)
-	}
 }
