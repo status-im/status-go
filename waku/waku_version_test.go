@@ -19,6 +19,7 @@
 package waku
 
 import (
+	"errors"
 	mrand "math/rand"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestWakuV0(t *testing.T) {
@@ -455,6 +457,65 @@ func (s *WakuTestSuite) TestRequestSentEventWithExpiry() {
 	}
 	verifyEvent(common.EventMailServerRequestSent)
 	verifyEvent(common.EventMailServerRequestExpired)
+}
+
+type MockMailserver struct {
+	deliverMail func([]byte, *common.Envelope)
+}
+
+func (*MockMailserver) Archive(e *common.Envelope) {
+}
+
+func (*MockMailserver) Deliver(peerID []byte, r common.MessagesRequest) {
+}
+
+func (m *MockMailserver) DeliverMail(peerID []byte, e *common.Envelope) {
+
+	if m.deliverMail != nil {
+		m.deliverMail(peerID, e)
+	}
+}
+
+func (s *WakuTestSuite) TestDeprecatedDeliverMail() {
+
+	w1 := New(nil, nil)
+	w2 := New(nil, nil)
+
+	var deliverMailCalled bool
+
+	w2.RegisterMailServer(&MockMailserver{
+		deliverMail: func(peerID []byte, e *common.Envelope) {
+			deliverMailCalled = true
+		},
+	})
+
+	rw1, rw2 := p2p.MsgPipe()
+	p1 := s.newPeer(w1, p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}}), rw2, nil)
+
+	go func() { handleError(s.T(), w1.HandlePeer(p1, rw2)) }()
+
+	timer := time.AfterFunc(5*time.Second, func() {
+		handleError(s.T(), rw1.Close())
+	})
+	peer2 := s.newPeer(w2, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
+	s.Require().NoError(peer2.Start())
+
+	go func() { handleError(s.T(), peer2.Run()) }()
+
+	s.Require().NoError(w1.RequestHistoricMessages(p1.ID(), &common.Envelope{Data: []byte{1}}))
+
+	err := tt.RetryWithBackOff(func() error {
+		if !deliverMailCalled {
+			return errors.New("DeliverMail not called")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
+	s.Require().NoError(rw1.Close())
+	s.Require().NoError(rw2.Close())
+
+	timer.Stop()
+
 }
 
 func (s *WakuTestSuite) TestSendMessagesRequest() {

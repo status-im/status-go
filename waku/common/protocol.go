@@ -91,6 +91,11 @@ type WakuHost interface {
 	// OnMessagesRequest handles when the peer receive a message request
 	// this only works if the peer is a mailserver
 	OnMessagesRequest(MessagesRequest, Peer) error
+	// OnDeprecatedMessagesRequest handles when the peer receive a message request
+	// using the *Envelope format. Currently the only production client (status-react)
+	// is exclusively using this one.
+	OnDeprecatedMessagesRequest(*Envelope, Peer) error
+
 	OnBatchAcknowledged(common.Hash, Peer) error
 	OnP2PRequestCompleted([]byte, Peer) error
 }
