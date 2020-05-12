@@ -301,6 +301,13 @@ func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {
 	r := bytes.NewReader(data)
 	packet.Payload = r
 
+	var requestDeprecated common.Envelope
+	errDepReq := packet.Decode(&requestDeprecated)
+	if errDepReq == nil {
+		return p.host.OnDeprecatedMessagesRequest(&requestDeprecated, p)
+	}
+	p.logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", p.ID()), zap.Error(errDepReq))
+
 	// As we failed to decode the request, let's set the offset
 	// to the beginning and try decode it again.
 	if _, err := r.Seek(0, io.SeekStart); err != nil {

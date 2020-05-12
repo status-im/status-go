@@ -1103,6 +1103,11 @@ func (w *Waku) OnMessagesRequest(request common.MessagesRequest, p common.Peer) 
 	return nil
 }
 
+func (w *Waku) OnDeprecatedMessagesRequest(request *common.Envelope, p common.Peer) error {
+	w.mailServer.DeliverMail(p.ID(), request)
+	return nil
+}
+
 func (w *Waku) OnP2PRequestCompleted(payload []byte, p common.Peer) error {
 	msEvent, err := CreateMailServerEvent(p.EnodeID(), payload)
 	if err != nil {
