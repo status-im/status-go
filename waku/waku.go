@@ -28,15 +28,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"go.uber.org/zap"
 
 	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -76,7 +73,6 @@ type Waku struct {
 	protocols []p2p.Protocol  // Peer description and parameters
 	filters   *common.Filters // Message filters installed with Subscribe function
 
-	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
@@ -121,7 +117,6 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	}
 
 	waku := &Waku{
-		privateKeys: make(map[string]*ecdsa.PrivateKey),
 		symKeys:     make(map[string][]byte),
 		envelopes:   make(map[gethcommon.Hash]*common.Envelope),
 		expirations: make(map[uint32]mapset.Set),
@@ -673,125 +668,6 @@ func (w *Waku) SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error 
 		return err
 	}
 	return p.SendRawP2PDirect(envelopes)
-}
-
-// NewKeyPair generates a new cryptographic identity for the client, and injects
-// it into the known identities for message decryption. Returns ID of the new key pair.
-func (w *Waku) NewKeyPair() (string, error) {
-	key, err := crypto.GenerateKey()
-	if err != nil || !validatePrivateKey(key) {
-		key, err = crypto.GenerateKey() // retry once
-	}
-	if err != nil {
-		return "", err
-	}
-	if !validatePrivateKey(key) {
-		return "", fmt.Errorf("failed to generate valid key")
-	}
-
-	id, err := toDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[id] != nil {
-		return "", fmt.Errorf("failed to generate unique ID")
-	}
-	w.privateKeys[id] = key
-	return id, nil
-}
-
-// DeleteKeyPair deletes the specified key if it exists.
-func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, common.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	if w.privateKeys[deterministicID] != nil {
-		delete(w.privateKeys, deterministicID)
-		return true
-	}
-	return false
-}
-
-// AddKeyPair imports a asymmetric private key and returns it identifier.
-func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return "", err
-	}
-	if w.HasKeyPair(id) {
-		return id, nil // no need to re-inject
-	}
-
-	w.keyMu.Lock()
-	w.privateKeys[id] = key
-	w.keyMu.Unlock()
-
-	return id, nil
-}
-
-// SelectKeyPair adds cryptographic identity, and makes sure
-// that it is the only private key known to the node.
-func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
-	if err != nil {
-		return err
-	}
-
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	w.privateKeys = make(map[string]*ecdsa.PrivateKey) // reset key store
-	w.privateKeys[id] = key
-
-	return nil
-}
-
-// DeleteKeyPairs removes all cryptographic identities known to the node
-func (w *Waku) DeleteKeyPairs() error {
-	w.keyMu.Lock()
-	defer w.keyMu.Unlock()
-
-	w.privateKeys = make(map[string]*ecdsa.PrivateKey)
-
-	return nil
-}
-
-// HasKeyPair checks if the waku node is configured with the private key
-// of the specified public pair.
-func (w *Waku) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return false
-	}
-
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	return w.privateKeys[deterministicID] != nil
-}
-
-// GetPrivateKey retrieves the private key of the specified identity.
-func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
-	if err != nil {
-		return nil, err
-	}
-
-	w.keyMu.RLock()
-	defer w.keyMu.RUnlock()
-	key := w.privateKeys[deterministicID]
-	if key == nil {
-		return nil, fmt.Errorf("invalid id")
-	}
-	return key, nil
 }
 
 // GenerateSymKey generates a random symmetric key and stores it under id,

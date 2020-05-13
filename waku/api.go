@@ -107,54 +107,6 @@ func (api *PublicWakuAPI) MarkTrustedPeer(ctx context.Context, url string) (bool
 	return true, api.w.AllowP2PMessagesFromPeer(n.ID().Bytes())
 }
 
-// NewKeyPair generates a new public and private key pair for message decryption and encryption.
-// It returns an ID that can be used to refer to the keypair.
-func (api *PublicWakuAPI) NewKeyPair(ctx context.Context) (string, error) {
-	return api.w.NewKeyPair()
-}
-
-// AddPrivateKey imports the given private key.
-func (api *PublicWakuAPI) AddPrivateKey(ctx context.Context, privateKey hexutil.Bytes) (string, error) {
-	key, err := crypto.ToECDSA(privateKey)
-	if err != nil {
-		return "", err
-	}
-	return api.w.AddKeyPair(key)
-}
-
-// DeleteKeyPair removes the key with the given key if it exists.
-func (api *PublicWakuAPI) DeleteKeyPair(ctx context.Context, key string) (bool, error) {
-	if ok := api.w.DeleteKeyPair(key); ok {
-		return true, nil
-	}
-	return false, fmt.Errorf("key pair %s not found", key)
-}
-
-// HasKeyPair returns an indication if the node has a key pair that is associated with the given id.
-func (api *PublicWakuAPI) HasKeyPair(ctx context.Context, id string) bool {
-	return api.w.HasKeyPair(id)
-}
-
-// GetPublicKey returns the public key associated with the given key. The key is the hex
-// encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWakuAPI) GetPublicKey(ctx context.Context, id string) (hexutil.Bytes, error) {
-	key, err := api.w.GetPrivateKey(id)
-	if err != nil {
-		return hexutil.Bytes{}, err
-	}
-	return crypto.FromECDSAPub(&key.PublicKey), nil
-}
-
-// GetPrivateKey returns the private key associated with the given key. The key is the hex
-// encoded representation of a key in the form specified in section 4.3.6 of ANSI X9.62.
-func (api *PublicWakuAPI) GetPrivateKey(ctx context.Context, id string) (hexutil.Bytes, error) {
-	key, err := api.w.GetPrivateKey(id)
-	if err != nil {
-		return hexutil.Bytes{}, err
-	}
-	return crypto.FromECDSA(key), nil
-}
-
 // NewSymKey generate a random symmetric key.
 // It returns an ID that can be used to refer to the key.
 // Can be used encrypting and decrypting messages where the key is known to both parties.
@@ -241,13 +193,6 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Topic:    req.Topic,
 	}
 
-	// Set key that is used to sign the message
-	if len(req.Sig) > 0 {
-		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
-			return nil, err
-		}
-	}
-
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
 		if params.Topic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
@@ -320,7 +265,6 @@ func (api *PublicWakuAPI) Unsubscribe(id string) {
 // Criteria holds various filter options for inbound messages.
 type Criteria struct {
 	SymKeyID     string             `json:"symKeyID"`
-	PrivateKeyID string             `json:"privateKeyID"`
 	Sig          []byte             `json:"sig"`
 	MinPow       float64            `json:"minPow"`
 	Topics       []common.TopicType `json:"topics"`
@@ -332,7 +276,6 @@ type Criteria struct {
 func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Subscription, error) {
 	var (
 		symKeyGiven = len(crit.SymKeyID) > 0
-		pubKeyGiven = len(crit.PrivateKeyID) > 0
 		err         error
 	)
 
@@ -343,7 +286,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	}
 
 	// user must specify either a symmetric or an asymmetric key
-	if (symKeyGiven && pubKeyGiven) || (!symKeyGiven && !pubKeyGiven) {
+	if !symKeyGiven {
 		return nil, ErrSymAsym
 	}
 
@@ -377,14 +320,6 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 		}
 		filter.KeySym = key
 		filter.SymKeyHash = crypto.Keccak256Hash(filter.KeySym)
-	}
-
-	// listen for messages that are encrypted with the given public key
-	if pubKeyGiven {
-		filter.KeyAsym, err = api.w.GetPrivateKey(crit.PrivateKeyID)
-		if err != nil || filter.KeyAsym == nil {
-			return nil, ErrInvalidPublicKey
-		}
 	}
 
 	id, err := api.w.Subscribe(&filter)
@@ -510,17 +445,15 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	var (
 		src     *ecdsa.PublicKey
 		keySym  []byte
-		keyAsym *ecdsa.PrivateKey
 		topics  [][]byte
 
 		symKeyGiven  = len(req.SymKeyID) > 0
-		asymKeyGiven = len(req.PrivateKeyID) > 0
 
 		err error
 	)
 
 	// user must specify either a symmetric or an asymmetric key
-	if (symKeyGiven && asymKeyGiven) || (!symKeyGiven && !asymKeyGiven) {
+	if !symKeyGiven {
 		return "", ErrSymAsym
 	}
 
@@ -530,20 +463,12 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		}
 	}
 
-	if symKeyGiven {
-		if keySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
+	if keySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return "", err
 		}
-		if !common.ValidateDataIntegrity(keySym, common.AESKeyLength) {
+	if !common.ValidateDataIntegrity(keySym, common.AESKeyLength) {
 			return "", ErrInvalidSymmetricKey
 		}
-	}
-
-	if asymKeyGiven {
-		if keyAsym, err = api.w.GetPrivateKey(req.PrivateKeyID); err != nil {
-			return "", err
-		}
-	}
 
 	if len(req.Topics) > 0 {
 		topics = make([][]byte, len(req.Topics))
@@ -556,7 +481,6 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	f := &common.Filter{
 		Src:      src,
 		KeySym:   keySym,
-		KeyAsym:  keyAsym,
 		PoW:      req.MinPow,
 		AllowP2P: req.AllowP2P,
 		Topics:   topics,
