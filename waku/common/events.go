@@ -62,7 +62,7 @@ const (
 	EventMailServerSyncFinished EventType = "mailserver.sync.finished"
 )
 
-// EnvelopeEvent represents an envelope events.
+// EnvelopeEvent represents an envelope event.
 type EnvelopeEvent struct {
 	Event EventType
 	Topic TopicType
