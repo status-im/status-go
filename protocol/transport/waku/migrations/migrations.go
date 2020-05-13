@@ -86,7 +86,7 @@ func _1561059284_add_waku_keysDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059284_add_waku_keys.down.sql", size: 22, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "1561059284_add_waku_keys.down.sql", size: 22, mode: os.FileMode(0644), modTime: time.Unix(1579069853, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe5, 0x2a, 0x7e, 0x9, 0xa3, 0xdd, 0xc6, 0x3, 0xfa, 0xaa, 0x98, 0xa0, 0x26, 0x5e, 0x67, 0x43, 0xe6, 0x20, 0xfd, 0x10, 0xfd, 0x60, 0x89, 0x17, 0x13, 0x87, 0x1b, 0x44, 0x36, 0x79, 0xb6, 0x60}}
 	return a, nil
 }
@@ -106,7 +106,7 @@ func _1561059284_add_waku_keysUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1561059284_add_waku_keys.up.sql", size: 109, mode: os.FileMode(0644), modTime: time.Unix(1581443166, 0)}
+	info := bindataFileInfo{name: "1561059284_add_waku_keys.up.sql", size: 109, mode: os.FileMode(0644), modTime: time.Unix(1579069853, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0x5c, 0x8, 0x32, 0xef, 0x12, 0x88, 0x21, 0xd, 0x7a, 0x42, 0x4d, 0xe7, 0x2d, 0x6c, 0x99, 0xb6, 0x1, 0xf1, 0xba, 0x2c, 0x40, 0x8d, 0xa9, 0x4b, 0xe6, 0xc4, 0x21, 0xec, 0x47, 0x6b, 0xf7}}
 	return a, nil
 }

@@ -1279,11 +1279,11 @@ func (m *Messenger) hasPairedDevices() bool {
 }
 
 // sendToPairedDevices will check if we have any paired devices and send to them if necessary
-func (m *Messenger) sendToPairedDevices(ctx context.Context, payload []byte, messageType protobuf.ApplicationMetadataMessage_Type) error {
+func (m *Messenger) sendToPairedDevices(ctx context.Context, spec *RawMessage) error {
 	hasPairedDevices := m.hasPairedDevices()
 	// We send a message to any paired device
 	if hasPairedDevices {
-		_, err := m.processor.SendPrivateRaw(ctx, &m.identity.PublicKey, payload, messageType)
+		_, err := m.processor.SendPrivate(ctx, &m.identity.PublicKey, spec)
 		if err != nil {
 			return err
 		}
@@ -1295,7 +1295,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec *R
 	var err error
 	var id []byte
 
-	id, err = m.processor.SendPairInstallation(ctx, &m.identity.PublicKey, spec.Payload, spec.MessageType)
+	id, err = m.processor.SendPairInstallation(ctx, &m.identity.PublicKey, spec)
 
 	if err != nil {
 		return nil, err
@@ -1326,14 +1326,14 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 			return nil, err
 		}
 		if !isPubKeyEqual(publicKey, &m.identity.PublicKey) {
-			id, err = m.processor.SendPrivateRaw(ctx, publicKey, spec.Payload, spec.MessageType)
+			id, err = m.processor.SendPrivate(ctx, publicKey, spec)
 
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		err = m.sendToPairedDevices(ctx, spec.Payload, spec.MessageType)
+		err = m.sendToPairedDevices(ctx, spec)
 
 		if err != nil {
 			return nil, err
@@ -1341,7 +1341,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 
 	case ChatTypePublic:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		id, err = m.processor.SendPublicRaw(ctx, chat.ID, spec.Payload, spec.MessageType)
+		id, err = m.processor.SendPublic(ctx, chat.ID, spec)
 		if err != nil {
 			return nil, err
 		}
@@ -1368,8 +1368,9 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 			spec.Recipients = spec.Recipients[:n]
 		}
 
+		spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
 		// We always wrap in group information
-		id, err = m.processor.SendGroupRaw(ctx, spec.Recipients, spec.Payload, protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE)
+		id, err = m.processor.SendGroup(ctx, spec.Recipients, spec)
 		if err != nil {
 			return nil, err
 		}
