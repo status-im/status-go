@@ -3,7 +3,6 @@
 package node
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,11 +13,9 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/les"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
@@ -33,7 +30,6 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/services/incentivisation"
 	"github.com/status-im/status-go/services/nodebridge"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
@@ -57,7 +53,6 @@ var (
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
 	ErrStatusServiceRegistrationFailure           = errors.New("failed to register the Status service")
 	ErrPeerServiceRegistrationFailure             = errors.New("failed to register the Peer service")
-	ErrIncentivisationServiceRegistrationFailure  = errors.New("failed to register the Incentivisation service")
 )
 
 // All general log messages in this package should be routed through this logger.
@@ -152,11 +147,6 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 	// start Waku service
 	if err := activateWakuService(stack, config, db); err != nil {
 		return fmt.Errorf("%v: %v", ErrWakuServiceRegistrationFailure, err)
-	}
-
-	// start incentivisation service
-	if err := activateIncentivisationService(stack, config); err != nil {
-		return fmt.Errorf("%v: %v", ErrIncentivisationServiceRegistrationFailure, err)
 	}
 
 	// start status service.
@@ -495,49 +485,6 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 	}
 
 	return w, nil
-}
-
-// activateIncentivisationService configures Whisper and adds it to the given node.
-func activateIncentivisationService(stack *node.Node, config *params.NodeConfig) (err error) {
-	if !config.WhisperConfig.Enabled {
-		logger.Info("SHH protocol is disabled")
-		return nil
-	}
-
-	if !config.IncentivisationConfig.Enabled {
-		logger.Info("Incentivisation is disabled")
-		return nil
-	}
-
-	logger.Info("activating incentivisation")
-	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
-	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		var w *nodebridge.WhisperService
-		if err := ctx.Service(&w); err != nil {
-			return nil, err
-		}
-		incentivisationConfig := &incentivisation.ServiceConfig{
-			ContractAddress: config.IncentivisationConfig.ContractAddress,
-			RPCEndpoint:     config.IncentivisationConfig.RPCEndpoint,
-			IP:              config.IncentivisationConfig.IP,
-			Port:            config.IncentivisationConfig.Port,
-		}
-		privateKey, err := crypto.HexToECDSA(config.NodeKey)
-		if err != nil {
-			return nil, err
-		}
-		client, err := ethclient.DialContext(context.TODO(), incentivisationConfig.RPCEndpoint)
-		if err != nil {
-			return nil, err
-		}
-
-		contract, err := incentivisation.NewContract(gethcommon.HexToAddress(incentivisationConfig.ContractAddress), client, client)
-		if err != nil {
-			return nil, err
-		}
-
-		return incentivisation.New(privateKey, w.Whisper.PublicWhisperAPI(), incentivisationConfig, contract), nil
-	})
 }
 
 // parseNodes creates list of enode.Node out of enode strings.
