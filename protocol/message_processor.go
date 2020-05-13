@@ -91,43 +91,41 @@ func (p *messageProcessor) Stop() {
 	p.datasync.Stop() // idempotent op
 }
 
-// SendPrivateRaw takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPrivateRaw(
+// SendPrivate takes encoded data, encrypts it and sends through the wire.
+func (p *messageProcessor) SendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
-	data []byte,
-	messageType protobuf.ApplicationMetadataMessage_Type,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private message",
 		zap.Binary("public-key", crypto.FromECDSAPub(recipient)),
-		zap.String("site", "SendPrivateRaw"),
+		zap.String("site", "SendPrivate"),
 	)
-	return p.sendPrivate(ctx, recipient, data, messageType)
+	return p.sendPrivate(ctx, recipient, rawMessage)
 }
 
 // SendGroupRaw takes encoded data, encrypts it and sends through the wire,
 // always return the messageID
-func (p *messageProcessor) SendGroupRaw(
+func (p *messageProcessor) SendGroup(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
-	data []byte,
-	messageType protobuf.ApplicationMetadataMessage_Type,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private group message",
-		zap.String("site", "SendGroupRaw"),
+		zap.String("site", "SendGroup"),
 	)
 	// Calculate messageID first
-	wrappedMessage, err := p.wrapMessageV1(data, messageType)
+	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
-
 	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
 
+	// Send to each recipients
 	for _, recipient := range recipients {
-		_, err = p.sendPrivate(ctx, recipient, data, messageType)
+		_, err = p.sendPrivate(ctx, recipient, rawMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message")
 		}
@@ -139,12 +137,11 @@ func (p *messageProcessor) SendGroupRaw(
 func (p *messageProcessor) sendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
-	data []byte,
-	messageType protobuf.ApplicationMetadataMessage_Type,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
 
-	wrappedMessage, err := p.wrapMessageV1(data, messageType)
+	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -179,12 +176,11 @@ func (p *messageProcessor) sendPrivate(
 func (p *messageProcessor) SendPairInstallation(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
-	data []byte,
-	messageType protobuf.ApplicationMetadataMessage_Type,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
 
-	wrappedMessage, err := p.wrapMessageV1(data, messageType)
+	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -225,16 +221,15 @@ func (p *messageProcessor) EncodeMembershipUpdate(
 	return encodedMessage, nil
 }
 
-// SendPublicRaw takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPublicRaw(
+// SendPublic takes encoded data, encrypts it and sends through the wire.
+func (p *messageProcessor) SendPublic(
 	ctx context.Context,
 	chatName string,
-	data []byte,
-	messageType protobuf.ApplicationMetadataMessage_Type,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	var newMessage *types.NewMessage
 
-	wrappedMessage, err := p.wrapMessageV1(data, messageType)
+	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -242,7 +237,7 @@ func (p *messageProcessor) SendPublicRaw(
 	newMessage = &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   wrappedMessage,
-		PowTarget: whisperPoW,
+		PowTarget: calculatePoW(wrappedMessage),
 		PowTime:   whisperPoWTime,
 	}
 
@@ -345,8 +340,8 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 	return nil
 }
 
-func (p *messageProcessor) wrapMessageV1(encodedMessage []byte, messageType protobuf.ApplicationMetadataMessage_Type) ([]byte, error) {
-	wrappedMessage, err := v1protocol.WrapMessageV1(encodedMessage, messageType, p.identity)
+func (p *messageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
+	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, p.identity)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
