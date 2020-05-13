@@ -25,8 +25,10 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
 
+	"github.com/status-im/status-go/bridge"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
@@ -68,6 +70,8 @@ type StatusNode struct {
 	register  *peers.Register
 	peerPool  *peers.PeerPool
 	db        *leveldb.DB // used as a cache for PeerPool
+
+	bridge *bridge.Bridge // Whisper-Waku bridge
 
 	log log.Logger
 }
@@ -131,11 +135,11 @@ func (n *StatusNode) StartWithOptions(config *params.NodeConfig, options StartOp
 	defer n.mu.Unlock()
 
 	if n.isRunning() {
-		n.log.Debug("cannot start, node already running")
+		n.log.Debug("node is already running")
 		return ErrNodeRunning
 	}
 
-	n.log.Debug("starting with NodeConfig", "ClusterConfig", config.ClusterConfig)
+	n.log.Debug("starting with options", "ClusterConfig", config.ClusterConfig)
 
 	db, err := db.Create(config.DataDir, params.StatusDatabase)
 	if err != nil {
@@ -168,11 +172,15 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 	}
 	n.config = config
 
-	if err := n.start(services); err != nil {
+	if err := n.startGethNode(services); err != nil {
 		return err
 	}
 
 	if err := n.setupRPCClient(); err != nil {
+		return err
+	}
+
+	if err := n.setupBridge(); err != nil {
 		return err
 	}
 
@@ -184,8 +192,8 @@ func (n *StatusNode) createNode(config *params.NodeConfig, accs *accounts.Manage
 	return err
 }
 
-// start starts current StatusNode, will fail if it's already started.
-func (n *StatusNode) start(services []node.ServiceConstructor) error {
+// startGethNode starts current StatusNode, will fail if it's already started.
+func (n *StatusNode) startGethNode(services []node.ServiceConstructor) error {
 	for _, service := range services {
 		if err := n.gethNode.Register(service); err != nil {
 			return err
@@ -214,6 +222,28 @@ func (n *StatusNode) setupRPCClient() (err error) {
 	n.rpcPrivateClient, err = rpc.NewClient(gethNodePrivateClient, n.config.UpstreamConfig)
 
 	return
+}
+
+func (n *StatusNode) setupBridge() error {
+	if !n.config.BridgeConfig.Enabled {
+		log.Info("Whisper-Waku bridge is disabled")
+		return nil
+	}
+	var shh *whisper.Whisper
+	if err := n.gethService(&shh); err != nil {
+		return fmt.Errorf("setup bridge: failed to get Whisper: %v", err)
+	}
+	var wak *waku.Waku
+	if err := n.gethService(&wak); err != nil {
+		return fmt.Errorf("setup bridge: failed to get Waku: %v", err)
+	}
+
+	n.bridge = bridge.New(shh, wak, logutils.ZapLogger())
+	n.bridge.Start()
+
+	log.Info("setup a Whisper-Waku bridge successfully")
+
+	return nil
 }
 
 func (n *StatusNode) discoveryEnabled() bool {
@@ -353,6 +383,11 @@ func (n *StatusNode) stop() error {
 		n.register = nil
 		n.peerPool = nil
 		n.discovery = nil
+	}
+
+	if n.bridge != nil {
+		n.bridge.Cancel()
+		n.bridge = nil
 	}
 
 	if err := n.gethNode.Stop(); err != nil {
@@ -693,7 +728,7 @@ func (n *StatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
 
 	if on {
 		if strings.Contains(url, "infura.io") {
-			url = "https://httpstat.us/500"
+			url = "https://httpbin.org/status/500"
 		}
 	}
 

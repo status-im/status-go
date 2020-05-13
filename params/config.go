@@ -187,6 +187,10 @@ type WakuConfig struct {
 	// in order to drop a peer.
 	// If equal to 0, the peers are never dropped.
 	RateLimitTolerance int64
+
+	// BloomFilterMode tells us whether we should be sending a bloom
+	// filter rather than TopicInterest
+	BloomFilterMode bool
 }
 
 // IncentivisationConfig holds incentivisation-related configuration
@@ -334,7 +338,7 @@ type NodeConfig struct {
 	Version string
 
 	// APIModules is a comma-separated list of API modules exposed via *any* (HTTP/WS/IPC) RPC interface.
-	APIModules string
+	APIModules string `validate:"required"`
 
 	// HTTPEnabled specifies whether the http RPC server is to be enabled by default.
 	HTTPEnabled bool
@@ -386,6 +390,9 @@ type NodeConfig struct {
 	// LogMobileSystem enables log redirection to android/ios system logger.
 	LogMobileSystem bool
 
+	// LogFile is a folder which contains LogFile
+	LogDir string
+
 	// LogFile is filename where exposed logs get written to
 	LogFile string
 
@@ -424,6 +431,9 @@ type NodeConfig struct {
 
 	// WakuConfig provides a configuration for Waku subprotocol.
 	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
+
+	// BridgeConfig provides a configuration for Whisper-Waku bridge.
+	BridgeConfig BridgeConfig `json:"BridgeConfig" validate:"structonly"`
 
 	// IncentivisationConfig extra configuration for incentivisation service
 	IncentivisationConfig IncentivisationConfig `json:"IncentivisationConfig," validate:"structonly"`
@@ -479,6 +489,11 @@ type MailserversConfig struct {
 	Enabled bool
 }
 
+// BridgeConfig provides configuration for Whisper-Waku bridge.
+type BridgeConfig struct {
+	Enabled bool
+}
+
 // ShhextConfig defines options used by shhext service.
 type ShhextConfig struct {
 	PFSEnabled bool
@@ -523,6 +538,10 @@ type ShhextConfig struct {
 	// VerifyENSURL is the URL for verifying ens names.
 	// IMPORTANT: It should always be mainnet unless used for testing
 	VerifyENSURL string
+
+	// VerifyENSContractAddress is the address of the contract used to verify ENS
+	// No default is provided and if not set ENS resolution is disabled
+	VerifyENSContractAddress string
 
 	VerifyTransactionChainID int64
 }
@@ -601,6 +620,19 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	}
 
 	return c, nil
+}
+
+// UpdateWithMobileDefaults updates config with missing default values
+// tailored for the mobile nodes.
+func (c *NodeConfig) UpdateWithMobileDefaults() {
+	// Empty APIModules will fallback to services' APIs definition.
+	// If any API is defined as public, it will be exposed.
+	// We disallow empty APIModules to avoid confusion
+	// when some APIs suddenly become available for Dapps.
+	// More: https://github.com/status-im/status-go/issues/1870.
+	if c.APIModules == "" {
+		c.APIModules = "net,web3,eth"
+	}
 }
 
 // NewNodeConfigWithDefaultsAndFiles creates new node configuration object
@@ -750,7 +782,6 @@ func loadConfigFromAsset(name string, config *NodeConfig) error {
 //
 //   Key: 'TestStruct.TestField' Error:Field validation for 'TestField' failed on the 'required' tag
 //
-// nolint: gocyclo
 func (c *NodeConfig) Validate() error {
 	validate := NewValidator()
 
@@ -794,12 +825,8 @@ func (c *NodeConfig) Validate() error {
 		return fmt.Errorf("PFSEnabled is true, but InstallationID is empty")
 	}
 
-	if len(c.ClusterConfig.RendezvousNodes) == 0 {
-		if c.Rendezvous {
-			return fmt.Errorf("Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty")
-		}
-	} else if !c.Rendezvous {
-		return fmt.Errorf("Rendezvous is disabled, but ClusterConfig.RendezvousNodes is not empty")
+	if len(c.ClusterConfig.RendezvousNodes) == 0 && c.Rendezvous {
+		return fmt.Errorf("Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty")
 	}
 
 	return nil

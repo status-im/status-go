@@ -18,7 +18,6 @@ func NewMessageDecoder(r io.Reader) *transit.Decoder {
 }
 
 const (
-	messageTag     = "c4"
 	pairMessageTag = "p2"
 )
 
@@ -55,16 +54,4 @@ func pairMessageHandler(d transit.Decoder, value interface{}) (interface{}, erro
 		}
 	}
 	return pm, nil
-}
-
-func setToString(set *transit.Set) ([]string, bool) {
-	result := make([]string, 0, len(set.Contents))
-	for _, item := range set.Contents {
-		val, ok := item.(string)
-		if !ok {
-			return nil, false
-		}
-		result = append(result, val)
-	}
-	return result, true
 }

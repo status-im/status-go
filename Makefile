@@ -13,17 +13,16 @@ help: ##@other Show this help
 
 CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
+GOPATH ?= $(HOME)/go
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
 AUTHOR = $(shell echo $$USER)
 
 ENABLE_METRICS ?= true
-BUILD_FLAGS ?= $(shell echo "-ldflags '\
-	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+BUILD_FLAGS ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
-BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags '\
-	-X main.buildStamp=`date -u '+%Y-%m-%d.%H:%M:%S'` \
+BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags='\
 	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT)'")
 
@@ -70,7 +69,7 @@ nimbus-statusgo: nimbus ##@build Build status-go (based on Nimbus node) as statu
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
 statusgo: ##@build Build status-go as statusd server
-	go build -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
+	go build -mod=vendor -i -o $(GOBIN)/statusd -v -tags '$(BUILD_TAGS)' $(BUILD_FLAGS) ./cmd/statusd
 	@echo "Compilation done."
 	@echo "Run \"build/bin/statusd -h\" to view available commands."
 
@@ -165,7 +164,7 @@ endif
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
 
-setup-dev: setup-build mock-install install-os-dependencies gen-install ##@other Prepare project for development
+setup-dev: lint-install mock-install modvendor-install gen-install tidy install-os-dependencies ##@other Prepare project for development
 
 setup-build: lint-install release-install gomobile-install ##@other Prepare project for build
 
@@ -186,7 +185,15 @@ clean-release:
 	rm -rf $(RELEASE_DIR)
 
 lint-fix:
-	find . -name '*.go' -and -not -name '*.pb.go' -and -not -name 'bindata*' -and -not -name 'migrations.go' -and -not -wholename '*/vendor/*' -exec goimports -local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go' -w {} \;
+	find . \
+		-name '*.go' \
+		-and -not -name '*.pb.go' \
+		-and -not -name 'bindata*' \
+		-and -not -name 'migrations.go' \
+		-and -not -wholename '*/vendor/*' \
+		-exec goimports \
+		-local 'github.com/ethereum/go-ethereum,github.com/status-im/status-go,github.com/status-im/markdown' \
+		-w {} \;
 	$(MAKE) vendor
 
 check-existing-release:
@@ -220,8 +227,8 @@ release-install:
 	go get -u github.com/c4milo/github-release
 
 gen-install:
-	go get -u github.com/kevinburke/go-bindata/go-bindata@v3.13.0
-	go get -u github.com/golang/protobuf/protoc-gen-go@v1.3.1
+	go get github.com/kevinburke/go-bindata/go-bindata@v3.13.0
+	go get github.com/golang/protobuf/protoc-gen-go@v1.3.4
 
 xtools-install:
 	# special fix for gomobile issues
@@ -233,8 +240,8 @@ modvendor-install:
 	GO111MODULE=off go get -u github.com/adambabik/modvendor
 
 mock-install: ##@other Install mocking tools
-	go get -u github.com/golang/mock/mockgen
-	go get -u github.com/golang/mock
+	# keep in sync with go.mod and github.com/golang/mock
+	go get github.com/golang/mock/mockgen@v1.4.1
 
 mock: ##@other Regenerate mocks
 	mockgen -package=fake         -destination=transactions/fake/mock.go             -source=transactions/fake/txservice.go
@@ -253,7 +260,8 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /lib | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags) && cd ./protocol && $(MAKE) test
+	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	cd ./waku && go test -v -failfast ./... $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
 test-unit-race: test-unit ##@tests Run unit and integration tests with -race flag
@@ -276,7 +284,7 @@ test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
 
 canary-test: node-canary
 	# TODO: uncomment that!
-	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.beta.json
+	#_assets/scripts/canary_test_mailservers.sh ./config/cli/fleet-eth.prod.json
 
 lint-install:
 	@# The following installs a specific version of golangci-lint, which is appropriate for a CI server to avoid different results from build to build
@@ -307,7 +315,7 @@ vendor:
 .PHONY: vendor
 
 update-fleet-config: ##@other Update fleets configuration from fleets.status.im
-	./_assets/ci/update-fleet-config.sh
+	./_assets/scripts/update-fleet-config.sh
 	@echo "Updating static assets..."
 	@go generate ./static
 	@echo "Done"

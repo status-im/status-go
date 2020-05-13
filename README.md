@@ -5,11 +5,12 @@
 
 # Docs
 
-- [How to Build](https://status.im/build_status/status_go.html)
+- [How to Build](https://status.im/technical/build_status/status_go.html)
 - [How to Contribute](CONTRIBUTING.md)
 - [How to Release](RELEASING.md)
 - [How to run a Bootnode](BOOTNODE.md)
 - [How to run a Mailserver](MAILSERVER.md)
+- [How to run a Waku node](./_examples/README.md#run-waku-node)
 - [How to configure status-go](/config)
 
 # License

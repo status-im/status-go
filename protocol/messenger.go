@@ -31,11 +31,12 @@ import (
 
 const PubKeyStringLength = 132
 
+const transactionSentTxt = "Transaction sent"
+
 var (
 	ErrChatIDEmpty    = errors.New("chat ID is empty")
+	ErrChatNotFound   = errors.New("can't find chat")
 	ErrNotImplemented = errors.New("not implemented")
-
-	errChatNotFound = errors.New("chat not found")
 )
 
 // Messenger is a entity managing chats and messages.
@@ -74,16 +75,14 @@ type RawResponse struct {
 }
 
 type MessengerResponse struct {
-	Chats         []*Chat                     `json:"chats,omitEmpty"`
-	Messages      []*Message                  `json:"messages,omitEmpty"`
-	Contacts      []*Contact                  `json:"contacts,omitEmpty"`
-	Installations []*multidevice.Installation `json:"installations,omitEmpty"`
-	// Raw unprocessed messages
-	RawMessages []*RawResponse `json:"rawMessages,omitEmpty"`
+	Chats         []*Chat                     `json:"chats,omitempty"`
+	Messages      []*Message                  `json:"messages,omitempty"`
+	Contacts      []*Contact                  `json:"contacts,omitempty"`
+	Installations []*multidevice.Installation `json:"installations,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.RawMessages) == 0 && len(m.Installations) == 0
+	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0
 }
 
 type featureFlags struct {
@@ -126,6 +125,8 @@ type config struct {
 
 type Option func(*config) error
 
+// WithSystemMessagesTranslations is required for Group Chats which are currently disabled.
+// nolint: unused
 func WithSystemMessagesTranslations(t map[protobuf.MembershipUpdateEvent_EventType]string) Option {
 	return func(c *config) error {
 		c.systemMessagesTranslations = t
@@ -284,7 +285,7 @@ func NewMessenger(
 	// Initialize transport layer.
 	var transp transport.Transport
 	if shh, err := node.GetWhisper(nil); err == nil && shh != nil {
-		transp, err = shhtransp.NewWhisperServiceTransport(
+		transp, err = shhtransp.NewTransport(
 			shh,
 			identity,
 			database,
@@ -293,7 +294,7 @@ func NewMessenger(
 			logger,
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create WhisperServiceTransport")
+			return nil, errors.Wrap(err, "failed to create Transport")
 		}
 	} else {
 		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
@@ -301,7 +302,7 @@ func NewMessenger(
 		if err != nil || waku == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
 		}
-		transp, err = wakutransp.NewWakuServiceTransport(
+		transp, err = wakutransp.NewTransport(
 			waku,
 			identity,
 			database,
@@ -310,7 +311,7 @@ func NewMessenger(
 			logger,
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create  WakuServiceTransport")
+			return nil, errors.Wrap(err, "failed to create  Transport")
 		}
 	}
 
@@ -367,15 +368,13 @@ func NewMessenger(
 		logger: logger,
 	}
 
-	// Start all services immediately.
-	// TODO: consider removing identity as an argument to Start().
-	if err := encryptionProtocol.Start(identity); err != nil {
-		return nil, err
-	}
-
 	logger.Debug("messages persistence", zap.Bool("enabled", c.messagesPersistenceEnabled))
 
 	return messenger, nil
+}
+
+func (m *Messenger) Start() error {
+	return m.encryptor.Start(m.identity)
 }
 
 // Init analyzes chats and contacts in order to setup filters
@@ -401,6 +400,11 @@ func (m *Messenger) Init() error {
 		return err
 	}
 	for _, chat := range chats {
+		if err := chat.Validate(); err != nil {
+			logger.Warn("failed to validate chat", zap.Error(err))
+			continue
+		}
+
 		m.allChats[chat.ID] = chat
 		if !chat.Active {
 			continue
@@ -631,14 +635,19 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
 	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
-	chat := createGroupChat(m.getTimesource())
-	group, err := v1protocol.NewGroupWithCreator(name, m.identity)
+	chat := CreateGroupChat(m.getTimesource())
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	group, err := v1protocol.NewGroupWithCreator(name, clock, m.identity)
 	if err != nil {
 		return nil, err
 	}
-	chat.updateChatFromProtocolGroup(group)
+	chat.LastClockValue = clock
 
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
+	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 	// Add members
 	event := v1protocol.NewMembersAddedEvent(members, clock)
 	event.ChatID = chat.ID
@@ -674,7 +683,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{&chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
@@ -695,7 +704,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	group, err := newProtocolGroupFromChat(chat)
@@ -739,7 +748,8 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
 	err = m.persistence.SaveMessagesLegacy(response.Messages)
@@ -759,7 +769,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	group, err := newProtocolGroupFromChat(chat)
@@ -802,8 +812,74 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
+	response.Chats = []*Chat{chat}
+	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, m.saveChat(chat)
+}
+
+func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name string) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "ChangeGroupChatName"))
+	logger.Info("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	group, err := newProtocolGroupFromChat(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+	// Add members
+	event := v1protocol.NewNameChangedEvent(name, clock)
+	event.ChatID = chat.ID
+	err = event.Sign(m.identity)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update in-memory group
+	err = group.ProcessEvent(event)
+	if err != nil {
+		return nil, err
+	}
+
+	recipients, err := stringSliceToPublicKeys(group.Members(), true)
+	if err != nil {
+		return nil, err
+	}
+
+	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+	if err != nil {
+		return nil, err
+	}
+	_, err = m.dispatchMessage(ctx, &RawMessage{
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
+		Recipients:          recipients,
+		ResendAutomatically: true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
+	var response MessengerResponse
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
 	err = m.persistence.SaveMessagesLegacy(response.Messages)
@@ -824,7 +900,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	group, err := newProtocolGroupFromChat(chat)
@@ -867,7 +943,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -887,7 +963,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	err := m.Join(*chat)
@@ -934,7 +1010,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -946,7 +1022,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	return &response, m.saveChat(chat)
 }
 
-func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*MessengerResponse, error) {
+func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -954,7 +1030,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
-		return nil, errors.New("can't find chat")
+		return nil, ErrChatNotFound
 	}
 
 	err := m.Leave(*chat)
@@ -1002,8 +1078,11 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string) (*Messeng
 		return nil, err
 	}
 
-	chat.updateChatFromProtocolGroup(group)
-	chat.Active = false
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
+	if remove {
+		chat.Active = false
+	}
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -1140,10 +1219,22 @@ func (m *Messenger) Contacts() []*Contact {
 	defer m.mutex.Unlock()
 	var contacts []*Contact
 	for _, contact := range m.allContacts {
-		contacts = append(contacts, contact)
+		if contact.HasCustomFields() {
+			contacts = append(contacts, contact)
+		}
 	}
-
 	return contacts
+}
+
+// GetContactByID assumes pubKey includes 0x prefix
+func (m *Messenger) GetContactByID(pubKey string) (*Contact, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	contact, ok := m.allContacts[pubKey]
+	if !ok {
+		return nil, errors.New("no contact found")
+	}
+	return contact, nil
 }
 
 // ReSendChatMessage pulls a message from the database and sends it again
@@ -1174,7 +1265,7 @@ func (m *Messenger) hasPairedDevices() bool {
 	var count int
 	for _, i := range m.allInstallations {
 		if i.Enabled {
-			count += 1
+			count++
 		}
 	}
 	return count > 1
@@ -1203,7 +1294,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec *R
 		return nil, err
 	}
 	spec.ID = types.EncodeHex(id)
-	spec.SendCount += 1
+	spec.SendCount++
 	err = m.persistence.SaveRawMessage(spec)
 	if err != nil {
 		return nil, err
@@ -1280,7 +1371,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 		return nil, errors.New("chat type not supported")
 	}
 	spec.ID = types.EncodeHex(id)
-	spec.SendCount += 1
+	spec.SendCount++
 	err = m.persistence.SaveRawMessage(spec)
 	if err != nil {
 		return nil, err
@@ -1367,8 +1458,12 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
+	response.Messages, err = m.pullMessagesAndResponsesFromDB([]*Message{message})
+	if err != nil {
+		return nil, err
+	}
+
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -1643,21 +1738,6 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	return m.saveChat(chat)
 }
 
-// SendRaw takes encoded data, encrypts it and sends through the wire.
-// DEPRECATED
-func (m *Messenger) SendRaw(ctx context.Context, chat Chat, data []byte) ([]byte, error) {
-	publicKey, err := chat.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-	if publicKey != nil {
-		return m.processor.SendPrivateRaw(ctx, publicKey, data, protobuf.ApplicationMetadataMessage_UNKNOWN)
-	} else if chat.Name != "" {
-		return m.processor.SendPublicRaw(ctx, chat.Name, data, protobuf.ApplicationMetadataMessage_UNKNOWN)
-	}
-	return nil, errors.New("chat is neither public nor private")
-}
-
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
@@ -1691,7 +1771,7 @@ type ReceivedMessageState struct {
 	ModifiedChats map[string]bool
 	// All contacts in memory
 	AllContacts map[string]*Contact
-	// List of contacs modified
+	// List of contacts modified
 	ModifiedContacts map[string]bool
 	// All installations in memory
 	AllInstallations map[string]*multidevice.Installation
@@ -1701,8 +1781,8 @@ type ReceivedMessageState struct {
 	ExistingMessagesMap map[string]bool
 	// Response to the client
 	Response *MessengerResponse
-	// Timesource is a timesource for clock values/timestamps
-	Timesource ClockValueTimesource
+	// Timesource is a time source for clock values/timestamps.
+	Timesource TimeSource
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
@@ -1721,9 +1801,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	logger := m.logger.With(zap.String("site", "RetrieveAll"))
-	rawMessages := make(map[transport.Filter][]*v1protocol.StatusMessage)
-
-	for chat, messages := range chatWithMessages {
+	for _, messages := range chatWithMessages {
 		for _, shhMessage := range messages {
 			// TODO: fix this to use an exported method.
 			statusMessages, err := m.processor.handleMessages(shhMessage, true)
@@ -1731,6 +1809,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
 			}
+
+			logger.Debug("processing messages further", zap.Int("count", len(statusMessages)))
 
 			for _, msg := range statusMessages {
 				publicKey := msg.SigPubKey()
@@ -1892,15 +1972,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
 							continue
 						}
-
 					default:
-						// RawMessage, not processed here, pass straight to the client
-						rawMessages[chat] = append(rawMessages[chat], msg)
+						logger.Debug("message not handled")
 
 					}
-				} else {
-					logger.Debug("Adding raw message", zap.Any("msg", msg))
-					rawMessages[chat] = append(rawMessages[chat], msg)
 				}
 			}
 		}
@@ -1910,11 +1985,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.Chats = append(messageState.Response.Chats, messageState.AllChats[id])
 	}
 
+	var contactsToSave []*Contact
 	for id := range messageState.ModifiedContacts {
-		messageState.Response.Contacts = append(messageState.Response.Contacts, messageState.AllContacts[id])
+		contact := messageState.AllContacts[id]
+		if contact != nil {
+			// We save all contacts so we can pull back name/image,
+			// but we only send to client those
+			// that have some custom fields
+			contactsToSave = append(contactsToSave, contact)
+			if contact.HasCustomFields() {
+				messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
+			}
+		}
 	}
 
-	for id, _ := range messageState.ModifiedInstallations {
+	for id := range messageState.ModifiedInstallations {
 		installation := messageState.AllInstallations[id]
 		messageState.Response.Installations = append(messageState.Response.Installations, installation)
 		if installation.InstallationMetadata != nil {
@@ -1939,16 +2024,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
-	if len(messageState.Response.Contacts) > 0 {
-		err = m.persistence.SaveContacts(messageState.Response.Contacts)
+	if len(contactsToSave) > 0 {
+		err = m.persistence.SaveContacts(contactsToSave)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for filter, messages := range rawMessages {
-		messageState.Response.RawMessages = append(messageState.Response.RawMessages, &RawResponse{Filter: &filter, Messages: messages})
+	messagesWithResponses, err := m.pullMessagesAndResponsesFromDB(messageState.Response.Messages)
+	if err != nil {
+		return nil, err
 	}
+	messageState.Response.Messages = messagesWithResponses
 
 	// Reset installations
 	m.modifiedInstallations = make(map[string]bool)
@@ -1965,17 +2052,14 @@ func (m *Messenger) RequestHistoricMessages(
 	return m.transport.SendMessagesRequest(ctx, peer, from, to, cursor)
 }
 
-// DEPRECATED
 func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return m.transport.LoadFilters(filters)
 }
 
-// DEPRECATED
 func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
 	return m.transport.RemoveFilters(filters)
 }
 
-// DEPRECATED
 func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 	for _, id := range messageIDs {
 		if err := m.encryptor.ConfirmMessageProcessed(id); err != nil {
@@ -1985,54 +2069,67 @@ func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 	return nil
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MessageByID(id string) (*Message, error) {
 	return m.persistence.MessageByID(id)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 	return m.persistence.MessagesExist(ids)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*Message, string, error) {
 	return m.persistence.MessageByChatID(chatID, cursor, limit)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) SaveMessages(messages []*Message) error {
 	return m.persistence.SaveMessagesLegacy(messages)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) DeleteMessage(id string) error {
 	return m.persistence.DeleteMessage(id)
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
-// DEPRECATED: required by status-react.
-func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) error {
+// MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.
+// It returns the number of affected messages or error. If there is an error,
+// the number of affected messages is always zero.
+func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	err := m.persistence.MarkMessagesSeen(chatID, ids)
+	count, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	m.allChats[chatID] = chat
+	return count, nil
+}
+
+func (m *Messenger) MarkAllRead(chatID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	err := m.persistence.MarkAllRead(chatID)
+	if err != nil {
+		return err
+	}
+
+	chat.UnviewedMessagesCount = 0
+	m.allChats[chat.ID] = chat
 	return nil
 }
 
-// DEPRECATED: required by status-react.
 func (m *Messenger) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
 	return m.persistence.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }
@@ -2043,50 +2140,65 @@ func Identicon(id string) (string, error) {
 }
 
 // VerifyENSNames verifies that a registered ENS name matches the expected public key
-func (m *Messenger) VerifyENSNames(rpcEndpoint, contractAddress string, ensDetails []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
+func (m *Messenger) VerifyENSNames(ctx context.Context, rpcEndpoint, contractAddress string) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	m.logger.Debug("verifying ENS Names", zap.String("endpoint", rpcEndpoint))
 	verifier := m.node.NewENSVerifier(m.logger)
+
+	var response MessengerResponse
+
+	var ensDetails []enstypes.ENSDetails
+
+	// Now in seconds
+	now := m.getTimesource().GetCurrentTime() / 1000
+	for _, contact := range m.allContacts {
+		if shouldENSBeVerified(contact, now) {
+			ensDetails = append(ensDetails, enstypes.ENSDetails{
+				PublicKeyString: contact.ID[2:],
+				Name:            contact.Name,
+			})
+		}
+	}
 
 	ensResponse, err := verifier.CheckBatch(ensDetails, rpcEndpoint, contractAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	// Update contacts
-	var contacts []*Contact
 	for _, details := range ensResponse {
-		if details.Error == nil {
-			contact, ok := m.allContacts[details.PublicKeyString]
-			if !ok {
-				contact, err = buildContact(details.PublicKey)
-				if err != nil {
-					return nil, err
-				}
-			}
-			contact.ENSVerified = details.Verified
-			contact.ENSVerifiedAt = details.VerifiedAt
-			contact.Name = details.Name
+		contact, ok := m.allContacts["0x"+details.PublicKeyString]
+		if !ok {
+			return nil, errors.New("contact must be existing")
+		}
 
+		m.logger.Debug("verifying ENS Name", zap.Any("details", details), zap.Any("contact", contact))
+
+		contact.ENSVerifiedAt = uint64(details.VerifiedAt)
+
+		if details.Error == nil {
+			contact.ENSVerified = details.Verified
 			m.allContacts[contact.ID] = contact
-			contacts = append(contacts, contact)
 		} else {
 			m.logger.Warn("Failed to resolve ens name",
 				zap.String("name", details.Name),
 				zap.String("publicKey", details.PublicKeyString),
 				zap.Error(details.Error),
 			)
+			contact.ENSVerificationRetries++
 		}
+		response.Contacts = append(response.Contacts, contact)
 	}
 
-	if len(contacts) != 0 {
-		err = m.persistence.SaveContacts(contacts)
+	if len(response.Contacts) != 0 {
+		err = m.persistence.SaveContacts(response.Contacts)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return ensResponse, nil
+	return &response, nil
 }
 
 // GenerateAlias name returns the generated name given a public key hex encoded prefixed with 0x
@@ -2536,7 +2648,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
-	message.Text = "Transaction sent"
+	message.Text = transactionSentTxt
 	message.OutgoingStatus = OutgoingStatusSending
 
 	// Hide previous message
@@ -2634,7 +2746,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
-	message.Text = "Transaction sent"
+	message.Text = transactionSentTxt
 
 	request := &protobuf.SendTransaction{
 		Clock:           message.Clock,
@@ -2737,6 +2849,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		message.Timestamp = timestamp
 		message.WhisperTimestamp = timestamp
 		message.Text = "Transaction received"
+		message.Seen = false
 
 		message.ID = validationResult.Transaction.MessageID
 		if message.CommandParameters == nil {
@@ -2782,7 +2895,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		modifiedChats[chat.ID] = true
 
 	}
-	for id, _ := range modifiedChats {
+	for id := range modifiedChats {
 		response.Chats = append(response.Chats, m.allChats[id])
 	}
 
@@ -2795,6 +2908,26 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	return &response, nil
 }
 
-func (m *Messenger) getTimesource() ClockValueTimesource {
+// pullMessagesAndResponsesFromDB pulls all the messages and the one that have
+// been replied to from the database
+func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*Message) ([]*Message, error) {
+	var messageIDs []string
+	for _, message := range messages {
+		messageIDs = append(messageIDs, message.ID)
+		if len(message.ResponseTo) != 0 {
+			messageIDs = append(messageIDs, message.ResponseTo)
+		}
+
+	}
+	// We pull from the database all the messages & replies involved,
+	// so we let the db build the correct messages
+	return m.persistence.MessagesByIDs(messageIDs)
+}
+
+func (m *Messenger) getTimesource() TimeSource {
 	return m.transport
+}
+
+func (m *Messenger) Timesource() TimeSource {
+	return m.getTimesource()
 }

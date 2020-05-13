@@ -268,7 +268,10 @@ func (m *Mnemonic) ValidateMnemonic(mnemonic string, language Language) error {
 
 	// Calculate checksum from entropy derived above
 	hasher := sha256.New()
-	hasher.Write(entropy)
+	if _, err := hasher.Write(entropy); err != nil {
+		return err
+	}
+
 	computedChecksumBytes := hasher.Sum(nil)
 	computedChecksum := big.NewInt(int64(computedChecksumBytes[0]))
 
@@ -295,33 +298,6 @@ func (m *Mnemonic) WordList(language Language) (*WordList, error) {
 		return nil, fmt.Errorf("language word list is missing (language id: %d)", language)
 	}
 	return m.wordLists[language], nil
-}
-
-func contains(wordList *WordList, e string) bool {
-	// tries binary search first, then resorts to full list traversal
-	i, j := 0, len(wordList)
-	for i < j {
-		h := i + (j-i)/2
-
-		// i < h < j
-		if wordList[h] >= e {
-			j = h
-		} else {
-			i = h + 1
-		}
-	}
-
-	if j > 0 && j < len(wordList) && wordList[j] == e {
-		return true
-	}
-
-	// traverse list
-	for _, a := range wordList {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }
 
 func padByteSlice(slice []byte, length int) []byte { //nolint: unparam

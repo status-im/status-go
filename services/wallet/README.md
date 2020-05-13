@@ -25,77 +25,6 @@ To correctly start the service two values need to be changed in the config:
 API
 ----------
 
-#### wallet_getTransfers
-
-Returns avaiable transfers in a given range.
-
-##### Parameters
-
-- `start`: `BIGINT` - start of the range
-- `end`: `BIGINT` - end of the range. if nil query will return all transfers from start.
-
-##### Examples
-
-```json
-{"jsonrpc":"2.0","id":14,"method":"wallet_getTransfers","params":[0,20]}
-{"jsonrpc":"2.0","id":14,"method":"wallet_getTransfers","params":[0,null]}
-{"jsonrpc":"2.0","id":13,"method":"wallet_getTransfers","params":[0]}
-```
-
-##### Returns
-
-List of objects like:
-
-```
-[
-
-  {
-    "id": "0xac14e5fb9a81fd7d0517e51e23c4f3a8040459bfe0c4bee97b813db2d0438e2e",
-    "type": "eth",
-    "blockNumber": "0x1",
-    "blockhash": "0x1471b02682f2308ce74314d89009251afb1f2d5dedc6835d069b1ad6edf98257",
-    "timestamp": "0x5d25a873",
-    "gasPrice": "0xa",
-    "gasLimit": "0xf4240",
-    "gasUsed": "0x5208",
-    "nonce": "0x0",
-    "input": "0x",
-    "txStatus": "0x1",
-    "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "value": "0xde0b6b3a7640000",
-    "from": "0xd1c9bfa31ae8c085ba4672b165151245b9bfc25e",
-    "to": "0x9dfc85106d84405a83271c2fe0cdfc1ca311a1f5",
-    "contract": "0x0000000000000000000000000000000000000000"
-  },
-  {
-    "id": "0x2629ee5f443d558ee4ae9e1cf202d76c04e262051b8d8acde7b766bb9d95068e",
-    "type": "erc20",
-    "blockNumber": "0x2",
-    "blockhash": "0x046ad915b86a5eaa6026c8cdd09ea2f09fd3e603dd6e1ea86e8318f4a4b7d4e0",
-    "timestamp": "0x5d25a88a",
-    "gasPrice": "0x1",
-    "gasLimit": "0xb0b8",
-    "gasUsed": "0xb0b8",
-    "nonce": "0x1",
-    "txStatus": "0x1",
-    "input": "0xa9059cbb000000000000000000000000f759c6683dfc5dad899eb86529dfaf4d0b25af1b0000000000000000000000000000000000000000000000000000000000000064",
-    "txHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "value": "0x64",
-    "from": "0xbd691e87d65b2857de55ac44598161ea135f73f6",
-    "to": "0xf759c6683dfc5dad899eb86529dfaf4d0b25af1b",
-    "contract": "0xd2439b0e20823e1e4c08df2d19c3b6a4c5f8f2d1"
-  }
-]
-```
-
-##### Examples
-
-```json
-{"jsonrpc":"2.0","id":14,"method":"wallet_getTransfers","params":[0,20]}
-{"jsonrpc":"2.0","id":14,"method":"wallet_getTransfers","params":[0,null]}
-{"jsonrpc":"2.0","id":13,"method":"wallet_getTransfers","params":[0]}
-```
-
 #### wallet_getTransfersByAddress
 
 Returns avaiable transfers in a given range.
@@ -103,13 +32,13 @@ Returns avaiable transfers in a given range.
 ##### Parameters
 
 - `address`: `HEX` - ethereum address encoded in hex
-- `start`: `BIGINT` - start of the range
-- `end`: `BIGINT` - end of the range. if nil query will return all transfers from start.
+- `toBlock`: `BIGINT` - end of the range. if nil query will return last transfers.
+- `limit`: `BIGINT` - limit of returned transfers.
 
 ##### Examples
 
 ```json
-{"jsonrpc":"2.0","id":7,"method":"wallet_getTransfersByAddress","params":["0xb81a6845649fa8c042dfaceb3f7a684873406993","0x0"]}
+{"jsonrpc":"2.0","id":7,"method":"wallet_getTransfersByAddress","params":["0xb81a6845649fa8c042dfaceb3f7a684873406993","0x0","0x5"]}
 ```
 
 ##### Returns

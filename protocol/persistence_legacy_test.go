@@ -37,6 +37,24 @@ func TestSaveMessages(t *testing.T) {
 	}
 }
 
+func TestMessagesByIDs(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	var ids []string
+	for i := 0; i < 10; i++ {
+		id := strconv.Itoa(i)
+		err := insertMinimalMessage(p, id)
+		require.NoError(t, err)
+		ids = append(ids, id)
+
+	}
+	m, err := p.MessagesByIDs(ids)
+	require.NoError(t, err)
+	require.Len(t, m, 10)
+}
+
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -79,7 +97,7 @@ func TestMessageByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
-	chatID := "super-chat"
+	chatID := testPublicChatID
 	count := 1000
 	pageSize := 50
 
@@ -162,7 +180,7 @@ func TestMessageReplies(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
-	chatID := "super-chat"
+	chatID := testPublicChatID
 	message1 := &Message{
 		ID:          "id-1",
 		LocalChatID: chatID,
@@ -217,7 +235,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
-	chatID := "super-chat"
+	chatID := testPublicChatID
 	clockValues := []uint64{10, 10, 9, 9, 9, 11, 12, 11, 100000, 6, 4, 5, 5, 5, 5}
 	count := len(clockValues)
 	pageSize := 2
@@ -331,8 +349,9 @@ func TestMarkMessageSeen(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, m.Seen)
 
-	err = p.MarkMessagesSeen(chatID, []string{m.ID})
+	count, err := p.MarkMessagesSeen(chatID, []string{m.ID})
 	require.NoError(t, err)
+	require.Equal(t, uint64(1), count)
 
 	m, err = p.MessageByID(id)
 	require.NoError(t, err)

@@ -9,12 +9,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/status-im/status-go/eth-node/types"
-	enstypes "github.com/status-im/status-go/eth-node/types/ens"
 	"github.com/status-im/status-go/mailserver"
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/transport"
@@ -24,9 +23,6 @@ import (
 const (
 	// defaultRequestTimeout is the default request timeout in seconds
 	defaultRequestTimeout = 10
-
-	// ensContractAddress is the address of the ENS resolver
-	ensContractAddress = "0x314159265dd8dbb310642f98f50c066173c1259b"
 )
 
 var (
@@ -198,30 +194,6 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*Metad
 	return api.service.ConfirmMessagesProcessed(encryptionIDs)
 }
 
-// SendPublicMessage sends a public chat message to the underlying transport.
-// Message's payload is a transit encoded message.
-// It's important to call PublicAPI.afterSend() so that the client receives a signal
-// with confirmation that the message left the device.
-func (api *PublicAPI) SendPublicMessage(ctx context.Context, msg SendPublicMessageRPC) (types.HexBytes, error) {
-	chat := protocol.Chat{
-		Name: msg.Chat,
-	}
-	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
-}
-
-// SendDirectMessage sends a 1:1 chat message to the underlying transport
-// Message's payload is a transit encoded message.
-// It's important to call PublicAPI.afterSend() so that the client receives a signal
-// with confirmation that the message left the device.
-func (api *PublicAPI) SendDirectMessage(ctx context.Context, msg SendDirectMessageRPC) (types.HexBytes, error) {
-	chat := protocol.Chat{
-		ChatType: protocol.ChatTypeOneToOne,
-		ID:       types.EncodeHex(msg.PubKey),
-	}
-
-	return api.service.messenger.SendRaw(ctx, chat, msg.Payload)
-}
-
 func (api *PublicAPI) Join(chat protocol.Chat) error {
 	return api.service.messenger.Join(chat)
 }
@@ -230,8 +202,8 @@ func (api *PublicAPI) Leave(chat protocol.Chat) error {
 	return api.service.messenger.Leave(chat)
 }
 
-func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.LeaveGroupChat(ctx, chatID)
+func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.LeaveGroupChat(ctx, chatID, remove)
 }
 
 func (api *PublicAPI) CreateGroupChatWithMembers(ctx Context, name string, members []string) (*protocol.MessengerResponse, error) {
@@ -252,6 +224,10 @@ func (api *PublicAPI) AddAdminsToGroupChat(ctx Context, chatID string, members [
 
 func (api *PublicAPI) ConfirmJoiningGroup(ctx context.Context, chatID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.ConfirmJoiningGroup(ctx, chatID)
+}
+
+func (api *PublicAPI) ChangeGroupChatName(ctx Context, chatID string, name string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ChangeGroupChatName(ctx, chatID, name)
 }
 
 func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {
@@ -308,11 +284,6 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
-// VerifyENSNames takes a list of ensdetails and returns whether they match the public key specified
-func (api *PublicAPI) VerifyENSNames(details []enstypes.ENSDetails) (map[string]enstypes.ENSResponse, error) {
-	return api.service.messenger.VerifyENSNames(params.MainnetEthereumNetworkURL, ensContractAddress, details)
-}
-
 type ApplicationMessagesResponse struct {
 	Messages []*protocol.Message `json:"messages"`
 	Cursor   string              `json:"cursor"`
@@ -330,6 +301,10 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
+func (api *PublicAPI) StartMessenger() error {
+	return api.service.StartMessenger()
+}
+
 func (api *PublicAPI) DeleteMessage(id string) error {
 	return api.service.messenger.DeleteMessage(id)
 }
@@ -338,8 +313,12 @@ func (api *PublicAPI) DeleteMessagesByChatID(id string) error {
 	return api.service.messenger.DeleteMessagesByChatID(id)
 }
 
-func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) error {
+func (api *PublicAPI) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
 	return api.service.messenger.MarkMessagesSeen(chatID, ids)
+}
+
+func (api *PublicAPI) MarkAllRead(chatID string) error {
+	return api.service.messenger.MarkAllRead(chatID)
 }
 
 func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
@@ -396,6 +375,18 @@ func (api *PublicAPI) SendPairInstallation(ctx context.Context) (*protocol.Messe
 
 func (api *PublicAPI) SyncDevices(ctx context.Context, name, picture string) error {
 	return api.service.messenger.SyncDevices(ctx, name, picture)
+}
+
+func (api *PublicAPI) UpdateMailservers(enodes []string) error {
+	nodes := make([]*enode.Node, len(enodes))
+	for i, rawurl := range enodes {
+		node, err := enode.ParseV4(rawurl)
+		if err != nil {
+			return err
+		}
+		nodes[i] = node
+	}
+	return api.service.UpdateMailservers(nodes)
 }
 
 // Echo is a method for testing purposes.

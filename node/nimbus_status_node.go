@@ -135,7 +135,7 @@ func (n *NimbusStatusNode) StartWithOptions(config *params.NodeConfig, options N
 	defer n.mu.Unlock()
 
 	if n.isRunning() {
-		n.log.Debug("cannot start, node already running")
+		n.log.Debug("node is already running")
 		return ErrNodeRunning
 	}
 
@@ -697,13 +697,13 @@ func (n *NimbusStatusNode) RPCPrivateClient() *rpc.Client {
 
 // ChaosModeCheckRPCClientsUpstreamURL updates RPCClient and RPCPrivateClient upstream URLs,
 // if defined, without restarting the node. This is required for the Chaos Unicorn Day.
-// Additionally, if the passed URL is Infura, it changes it to httpstat.us/500.
+// Additionally, if the passed URL is Infura, it changes it to httpbin.org/status/500.
 func (n *NimbusStatusNode) ChaosModeCheckRPCClientsUpstreamURL(on bool) error {
 	url := n.config.UpstreamConfig.URL
 
 	if on {
 		if strings.Contains(url, "infura.io") {
-			url = "https://httpstat.us/500"
+			url = "https://httpbin.org/status/500"
 		}
 	}
 

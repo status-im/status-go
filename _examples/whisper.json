@@ -1,0 +1,10 @@
+{
+	"APIModules": "shh",
+	"HTTPEnabled": true,
+	"HTTPHost": "localhost",
+	"HTTPPort": 8545,	
+	"WhisperConfig": {
+		"Enabled": true
+	},
+	"IPCEnabled": true
+}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/event"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 )
@@ -20,6 +21,7 @@ type API struct {
 }
 
 func (api *API) SaveAccounts(ctx context.Context, accounts []accounts.Account) error {
+	log.Info("[AccountsAPI::SaveAccounts]")
 	err := api.db.SaveAccounts(accounts)
 	if err != nil {
 		return err

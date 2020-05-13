@@ -30,6 +30,18 @@ func (MetricsRateLimiterHandler) ExceedIPLimit() error {
 	return nil
 }
 
+// RateLimits contains information about rate limit settings.
+// It is exchanged using rateLimitingCode packet or in the handshake.
+type RateLimits struct {
+	IPLimits     uint64 // messages per second from a single IP (default 0, no limits)
+	PeerIDLimits uint64 // messages per second from a single peer ID (default 0, no limits)
+	TopicLimits  uint64 // messages per second from a single topic (default 0, no limits)
+}
+
+func (r RateLimits) IsZero() bool {
+	return r == (RateLimits{})
+}
+
 var ErrRateLimitExceeded = errors.New("rate limit has been exceeded")
 
 type DropPeerRateLimiterHandler struct {
@@ -125,7 +137,7 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttleIP(ip); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedIPLimit(); err != nil {
-						errC <- fmt.Errorf("exceed rate limit by IP: %w", err)
+						errC <- fmt.Errorf("exceed rate limit by IP: %v", err)
 						return
 					}
 				}
@@ -138,7 +150,7 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttlePeer(peerID); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedPeerLimit(); err != nil {
-						errC <- fmt.Errorf("exceeded rate limit by peer: %w", err)
+						errC <- fmt.Errorf("exceeded rate limit by peer: %v", err)
 						return
 					}
 				}

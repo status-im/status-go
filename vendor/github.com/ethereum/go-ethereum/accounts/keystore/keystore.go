@@ -24,8 +24,6 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
-	"fmt"
-	"github.com/pborman/uuid"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -39,13 +37,15 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/pborman/uuid"
 	"github.com/status-im/status-go/extkeys"
 )
 
 var (
-	ErrLocked  = accounts.NewAuthNeededError("password or unlock")
-	ErrNoMatch = errors.New("no key for given address or file")
-	ErrDecrypt = errors.New("could not decrypt key with given password")
+	ErrLocked        = accounts.NewAuthNeededError("password or unlock")
+	ErrNoMatch       = errors.New("no key for given address or file")
+	ErrDecrypt       = errors.New("could not decrypt key with given password")
+	ErrAccountExists = errors.New("account already exists")
 )
 
 // KeyStoreType is the reflect type of a keystore backend.
@@ -457,7 +457,7 @@ func (ks *KeyStore) Import(keyJSON []byte, passphrase, newPassphrase string) (ac
 func (ks *KeyStore) ImportECDSA(priv *ecdsa.PrivateKey, passphrase string) (accounts.Account, error) {
 	key := newKeyFromECDSA(priv)
 	if ks.cache.hasAddress(key.Address) {
-		return accounts.Account{}, fmt.Errorf("account already exists")
+		return accounts.Account{}, ErrAccountExists
 	}
 	return ks.importKey(key, passphrase)
 }
@@ -476,20 +476,8 @@ func (ks *KeyStore) ImportSingleExtendedKey(extKey *extkeys.ExtendedKey, passphr
 		ExtendedKey: extKey,
 	}
 
-	// if account is already imported, return cached version
 	if ks.cache.hasAddress(key.Address) {
-		a := accounts.Account{
-			Address: key.Address,
-		}
-		ks.cache.maybeReload()
-		ks.cache.mu.Lock()
-		a, err := ks.cache.find(a)
-		ks.cache.mu.Unlock()
-		if err != nil {
-			zeroKey(key.PrivateKey)
-			return a, err
-		}
-		return a, nil
+		return accounts.Account{}, ErrAccountExists
 	}
 
 	return ks.importKey(key, passphrase)

@@ -1,0 +1,10 @@
+{
+	"APIModules": "waku",
+	"HTTPEnabled": true,
+	"HTTPHost": "localhost",
+	"HTTPPort": 8545,
+	"WakuConfig": {
+		"Enabled": true
+	},
+	"IPCEnabled": true
+}

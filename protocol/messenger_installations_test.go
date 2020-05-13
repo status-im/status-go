@@ -28,12 +28,13 @@ type MessengerInstallationSuite struct {
 	suite.Suite
 	m          *Messenger        // main instance of Messenger
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
+
 	// If one wants to send messages between different instances of Messenger,
 	// a single Whisper service should be shared.
-	shh            types.Whisper
-	tmpFiles       []*os.File // files to clean up
-	logger         *zap.Logger
-	installationID string
+	shh types.Whisper
+
+	tmpFiles []*os.File // files to clean up
+	logger   *zap.Logger
 }
 
 func (s *MessengerInstallationSuite) SetupTest() {
@@ -98,14 +99,12 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().False(response.Chats[0].Active)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Installations) == 0 {
-			err = errors.New("installation not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
 	s.Require().NoError(err)
 	actualInstallation := response.Installations[0]
 	s.Require().Equal(theirMessenger.installationID, actualInstallation.ID)
@@ -126,17 +125,11 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Contacts) == 0 {
-			err = errors.New("contact not received")
-		}
-		if len(response.Contacts) != 0 && response.Contacts[0].ID != contact.ID {
-			err = errors.New("contact not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 && r.Contacts[0].ID == contact.ID },
+		"contact not received",
+	)
 	s.Require().NoError(err)
 
 	actualContact := response.Contacts[0]
@@ -147,15 +140,12 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
-	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("sync chat not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"sync chat not received",
+	)
+
 	s.Require().NoError(err)
 
 	actualChat := response.Chats[0]
@@ -195,14 +185,12 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().False(response.Chats[0].Active)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Installations) == 0 {
-			err = errors.New("installation not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
 	s.Require().NoError(err)
 	actualInstallation := response.Installations[0]
 	s.Require().Equal(theirMessenger.installationID, actualInstallation.ID)
@@ -218,7 +206,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	var allChats []*Chat
-	var allContacts []*Contact
+	var actualContact *Contact
 	// Wait for the message to reach its destination
 	err = tt.RetryWithBackOff(func() error {
 		var err error
@@ -228,9 +216,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 		}
 
 		allChats = append(allChats, response.Chats...)
-		allContacts = append(allContacts, response.Contacts...)
 
-		if len(allChats) >= 2 && len(allContacts) >= 3 {
+		if len(allChats) >= 2 && len(response.Contacts) == 1 {
+			actualContact = response.Contacts[0]
 			return nil
 		}
 
@@ -249,28 +237,5 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().NotNil(statusChat)
 
-	var actualContact *Contact
-	for _, c := range allContacts {
-		if c.ID == contact.ID {
-			actualContact = c
-		}
-	}
-
 	s.Require().True(actualContact.IsAdded())
-
-	var ourContact *Contact
-
-	myID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	for _, c := range allContacts {
-		if c.ID == myID {
-			if ourContact == nil || ourContact.LastUpdated < c.LastUpdated {
-				ourContact = c
-			}
-		}
-	}
-
-	s.Require().NotNil(ourContact)
-	s.Require().Equal("ens-name", ourContact.Name)
-	s.Require().Equal("profile-image", ourContact.Photo)
-
 }

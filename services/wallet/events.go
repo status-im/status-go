@@ -16,11 +16,17 @@ const (
 	EventReorg EventType = "reorg"
 	// EventNewHistory emitted if transfer from older block was added.
 	EventNewHistory EventType = "history"
+	// EventFetchingRecentHistory emitted when fetching of lastest tx history is started
+	EventFetchingRecentHistory EventType = "recent-history-fetching"
+	// EventRecentHistoryFetched emitted when fetching of lastest tx history is started
+	EventRecentHistoryReady EventType = "recent-history-ready"
 )
 
 // Event is a type for wallet events.
 type Event struct {
-	Type        EventType        `json:"type"`
-	BlockNumber *big.Int         `json:"blockNumber"`
-	Accounts    []common.Address `json:"accounts"`
+	Type                      EventType              `json:"type"`
+	BlockNumber               *big.Int               `json:"blockNumber"`
+	Accounts                  []common.Address       `json:"accounts"`
+	NewTransactionsPerAccount map[common.Address]int `json:"newTransactions"`
+	ERC20                     bool                   `json:"erc20"`
 }

@@ -134,11 +134,16 @@ func (s *BackendTestSuite) StartTestBackendWithAccount(account multiaccounts.Acc
 	for i := range opts {
 		opts[i](nodeConfig)
 	}
+
+	keystoreDir := nodeConfig.KeyStoreDir
+	dataDir := nodeConfig.DataDir
+	nodeConfig.KeyStoreDir = "keystore"
+	nodeConfig.DataDir = "/"
 	// accounts must be imported before keystore is initialized
-	s.NoError(importTestAccounts(nodeConfig.KeyStoreDir))
-	s.Backend.UpdateRootDataDir(nodeConfig.DataDir)
+	s.NoError(importTestAccounts(keystoreDir))
+	s.Backend.UpdateRootDataDir(dataDir)
 	s.NoError(s.Backend.OpenAccounts())
-	s.NoError(s.Backend.AccountManager().InitKeystore(nodeConfig.KeyStoreDir))
+	s.NoError(s.Backend.AccountManager().InitKeystore(keystoreDir))
 
 	s.Require().NoError(s.Backend.StartNodeWithAccountAndConfig(account, password, settings, nodeConfig, subaccs))
 }

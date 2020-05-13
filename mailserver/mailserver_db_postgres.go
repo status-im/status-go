@@ -24,7 +24,9 @@ import (
 )
 
 type PostgresDB struct {
-	db *sql.DB
+	db   *sql.DB
+	name string
+	done chan struct{}
 }
 
 func NewPostgresDB(uri string) (*PostgresDB, error) {
@@ -33,16 +35,57 @@ func NewPostgresDB(uri string) (*PostgresDB, error) {
 		return nil, err
 	}
 
-	instance := &PostgresDB{db: db}
+	instance := &PostgresDB{
+		db:   db,
+		done: make(chan struct{}),
+	}
 	if err := instance.setup(); err != nil {
 		return nil, err
 	}
 
+	// name is used for metrics labels
+	if name, err := instance.getDBName(uri); err == nil {
+		instance.name = name
+	}
+
+	// initialize the metric value
+	instance.updateArchivedEnvelopesCount()
+	// checking count on every insert is inefficient
+	go func() {
+		for {
+			select {
+			case <-instance.done:
+				return
+			case <-time.After(time.Second * envelopeCountCheckInterval):
+				instance.updateArchivedEnvelopesCount()
+			}
+		}
+	}()
 	return instance, nil
 }
 
 type postgresIterator struct {
 	*sql.Rows
+}
+
+func (i *PostgresDB) getDBName(uri string) (string, error) {
+	query := "SELECT current_database()"
+	var dbName string
+	return dbName, i.db.QueryRow(query).Scan(&dbName)
+}
+
+func (i *PostgresDB) envelopesCount() (int, error) {
+	query := "SELECT count(*) FROM envelopes"
+	var count int
+	return count, i.db.QueryRow(query).Scan(&count)
+}
+
+func (i *PostgresDB) updateArchivedEnvelopesCount() {
+	if count, err := i.envelopesCount(); err != nil {
+		log.Warn("db query for envelopes count failed", "err", err)
+	} else {
+		archivedEnvelopesGauge.WithLabelValues(i.name).Set(float64(count))
+	}
 }
 
 func (i *postgresIterator) DBKey() (*DBKey, error) {
@@ -145,6 +188,11 @@ func (i *PostgresDB) setup() error {
 }
 
 func (i *PostgresDB) Close() error {
+	select {
+	case <-i.done:
+	default:
+		close(i.done)
+	}
 	return i.db.Close()
 }
 
@@ -196,11 +244,11 @@ func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
 	rawEnvelope, err := rlp.EncodeToBytes(env.Unwrap())
 	if err != nil {
 		log.Error(fmt.Sprintf("rlp.EncodeToBytes failed: %s", err))
-		archivedErrorsCounter.Inc()
+		archivedErrorsCounter.WithLabelValues(i.name).Inc()
 		return err
 	}
 	if rawEnvelope == nil {
-		archivedErrorsCounter.Inc()
+		archivedErrorsCounter.WithLabelValues(i.name).Inc()
 		return errors.New("failed to encode envelope to bytes")
 	}
 
@@ -220,12 +268,13 @@ func (i *PostgresDB) SaveEnvelope(env types.Envelope) error {
 	)
 
 	if err != nil {
-		archivedErrorsCounter.Inc()
+		archivedErrorsCounter.WithLabelValues(i.name).Inc()
 		return err
 	}
 
-	archivedEnvelopesCounter.Inc()
-	archivedEnvelopeSizeMeter.Observe(float64(whisper.EnvelopeHeaderLength + env.Size()))
+	archivedEnvelopesGauge.WithLabelValues(i.name).Inc()
+	archivedEnvelopeSizeMeter.WithLabelValues(i.name).Observe(
+		float64(whisper.EnvelopeHeaderLength + env.Size()))
 
 	return nil
 }

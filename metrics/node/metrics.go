@@ -15,10 +15,6 @@ var (
 		Name: "p2p_peers_count",
 		Help: "Current numbers of peers split by name.",
 	}, []string{"type", "version", "platform"})
-	nodePeersChanges = prom.NewGauge(prom.GaugeOpts{
-		Name: "p2p_peers_changes",
-		Help: "Current changes to connected peers.",
-	})
 	nodePeersAbsolute = prom.NewGauge(prom.GaugeOpts{
 		Name: "p2p_peers_absolute",
 		Help: "Absolute number of connected peers.",
@@ -31,7 +27,6 @@ var (
 
 func init() {
 	prom.MustRegister(nodePeersGauge)
-	prom.MustRegister(nodePeersChanges)
 	prom.MustRegister(nodePeersAbsolute)
 	prom.MustRegister(nodeMaxPeersGauge)
 }
@@ -43,23 +38,10 @@ func updateNodeMetrics(node *node.Node, evType p2p.PeerEventType) error {
 	}
 
 	calculatePeerCounts(server)
-
-	change, err := computeMetrics(server, evType)
-	if err != nil {
-		return err
-	}
-
-	nodePeersChanges.Add(change.Counter)
-	nodePeersAbsolute.Set(change.Absolute)
-	nodeMaxPeersGauge.Set(change.Max)
+	nodePeersAbsolute.Set(float64(server.PeerCount()))
+	nodeMaxPeersGauge.Set(float64(server.MaxPeers))
 
 	return nil
-}
-
-type peersChange struct {
-	Counter  float64
-	Absolute float64
-	Max      float64
 }
 
 func labelsFromNodeName(name string) (prom.Labels, error) {
@@ -94,17 +76,4 @@ func calculatePeerCounts(server *p2p.Server) {
 		}
 		nodePeersGauge.With(labels).Inc()
 	}
-}
-
-func computeMetrics(server *p2p.Server, evType p2p.PeerEventType) (result peersChange, err error) {
-	switch evType {
-	case p2p.PeerEventTypeAdd:
-		result.Counter = 1
-	case p2p.PeerEventTypeDrop:
-		result.Counter = -1
-	}
-
-	result.Absolute = float64(server.PeerCount())
-	result.Max = float64(server.MaxPeers)
-	return
 }

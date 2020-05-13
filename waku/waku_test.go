@@ -22,48 +22,50 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"errors"
-	"math"
 	mrand "math/rand"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/pbkdf2"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/status-im/status-go/waku/common"
+	v0 "github.com/status-im/status-go/waku/v0"
 )
+
+var seed int64
+
+// InitSingleTest should be called in the beginning of every
+// test, which uses RNG, in order to make the tests
+// reproducibility independent of their sequence.
+func InitSingleTest() {
+	seed = time.Now().Unix()
+	mrand.Seed(seed)
+}
 
 func TestBasic(t *testing.T) {
 	w := New(nil, nil)
 	p := w.Protocols()
-	shh := p[0]
-	if shh.Name != ProtocolName {
-		t.Fatalf("failed Protocol Name: %v.", shh.Name)
+	waku := p[0]
+	if waku.Name != v0.Name {
+		t.Fatalf("failed Peer Name: %v.", waku.Name)
 	}
-	if uint64(shh.Version) != ProtocolVersion {
-		t.Fatalf("failed Protocol Version: %v.", shh.Version)
+	if uint64(waku.Version) != v0.Version {
+		t.Fatalf("failed Peer Version: %v.", waku.Version)
 	}
-	if shh.Length != NumberOfMessageCodes {
-		t.Fatalf("failed Protocol Length: %v.", shh.Length)
+	if waku.Length != v0.NumberOfMessageCodes {
+		t.Fatalf("failed Peer Length: %v.", waku.Length)
 	}
-	if shh.Run == nil {
-		t.Fatalf("failed shh.Run.")
-	}
-	if uint64(w.Version()) != ProtocolVersion {
-		t.Fatalf("failed waku Version: %v.", shh.Version)
+	if waku.Run == nil {
+		t.Fatalf("failed waku.Run.")
 	}
 	if w.GetFilter("non-existent") != nil {
 		t.Fatalf("failed GetFilter.")
 	}
 
 	peerID := make([]byte, 64)
-	mrand.Read(peerID)
+	mrand.Read(peerID) // nolint: gosec
 	peer, _ := w.getPeer(peerID)
 	if peer != nil {
 		t.Fatal("found peer for random key.")
@@ -87,17 +89,17 @@ func TestBasic(t *testing.T) {
 		t.Fatalf("failed w.Envelopes().")
 	}
 
-	derived := pbkdf2.Key(peerID, nil, 65356, aesKeyLength, sha256.New)
-	if !validateDataIntegrity(derived, aesKeyLength) {
+	derived := pbkdf2.Key(peerID, nil, 65356, common.AESKeyLength, sha256.New)
+	if !common.ValidateDataIntegrity(derived, common.AESKeyLength) {
 		t.Fatalf("failed validateSymmetricKey with param = %v.", derived)
 	}
-	if containsOnlyZeros(derived) {
+	if common.ContainsOnlyZeros(derived) {
 		t.Fatalf("failed containsOnlyZeros with param = %v.", derived)
 	}
 
 	buf := []byte{0xFF, 0xE5, 0x80, 0x2, 0}
-	le := bytesToUintLittleEndian(buf)
-	be := BytesToUintBigEndian(buf)
+	le := common.BytesToUintLittleEndian(buf)
+	be := common.BytesToUintBigEndian(buf)
 	if le != uint64(0x280e5ff) {
 		t.Fatalf("failed bytesToIntLittleEndian: %d.", le)
 	}
@@ -116,7 +118,7 @@ func TestBasic(t *testing.T) {
 	if !validatePrivateKey(pk) {
 		t.Fatalf("failed validatePrivateKey: %v.", pk)
 	}
-	if !ValidatePublicKey(&pk.PublicKey) {
+	if !common.ValidatePublicKey(&pk.PublicKey) {
 		t.Fatalf("failed ValidatePublicKey: %v.", pk)
 	}
 }
@@ -276,10 +278,9 @@ func TestSymKeyManagement(t *testing.T) {
 	var err error
 	var k1, k2 []byte
 	w := New(nil, nil)
-	id1 := string("arbitrary-string-1")
-	id2 := string("arbitrary-string-2")
+	id2 := "arbitrary-string-2"
 
-	id1, err = w.GenerateSymKey()
+	id1, err := w.GenerateSymKey()
 	if err != nil {
 		t.Fatalf("failed GenerateSymKey with seed %d: %s.", seed, err)
 	}
@@ -306,8 +307,8 @@ func TestSymKeyManagement(t *testing.T) {
 	}
 
 	// add existing id, nothing should change
-	randomKey := make([]byte, aesKeyLength)
-	mrand.Read(randomKey)
+	randomKey := make([]byte, common.AESKeyLength)
+	mrand.Read(randomKey) // nolint: gosec
 	id1, err = w.AddSymKeyDirect(randomKey)
 	if err != nil {
 		t.Fatalf("failed AddSymKey with seed %d: %s.", seed, err)
@@ -367,10 +368,10 @@ func TestSymKeyManagement(t *testing.T) {
 	if !bytes.Equal(k1, randomKey) {
 		t.Fatalf("k1 != randomKey.")
 	}
-	if len(k1) != aesKeyLength {
+	if len(k1) != common.AESKeyLength {
 		t.Fatalf("wrong length of k1.")
 	}
-	if len(k2) != aesKeyLength {
+	if len(k2) != common.AESKeyLength {
 		t.Fatalf("wrong length of k2.")
 	}
 
@@ -391,9 +392,6 @@ func TestSymKeyManagement(t *testing.T) {
 	}
 	if !w.HasSymKey(id2) {
 		t.Fatalf("failed to delete first key: second key does not exist.")
-	}
-	if k1 != nil {
-		t.Fatalf("failed to delete first key.")
 	}
 	if k2 == nil {
 		t.Fatalf("failed to delete first key: second key is nil.")
@@ -418,15 +416,9 @@ func TestSymKeyManagement(t *testing.T) {
 	if w.HasSymKey(id2) {
 		t.Fatalf("failed to delete second key: still exist.")
 	}
-	if k1 != nil {
-		t.Fatalf("failed to delete second key: first key is not nil.")
-	}
-	if k2 != nil {
-		t.Fatalf("failed to delete second key: second key is not nil.")
-	}
 
-	randomKey = make([]byte, aesKeyLength+1)
-	mrand.Read(randomKey)
+	randomKey = make([]byte, common.AESKeyLength+1)
+	mrand.Read(randomKey) // nolint: gosec
 	_, err = w.AddSymKeyDirect(randomKey)
 	if err == nil {
 		t.Fatalf("added the key with wrong size, seed %d.", seed)
@@ -455,7 +447,7 @@ func TestSymKeyManagement(t *testing.T) {
 	if !w.HasSymKey(id2) {
 		t.Fatalf("HasSymKey(id2) failed.")
 	}
-	if !validateDataIntegrity(k2, aesKeyLength) {
+	if !common.ValidateDataIntegrity(k2, common.AESKeyLength) {
 		t.Fatalf("key validation failed.")
 	}
 	if !bytes.Equal(k1, k2) {
@@ -467,10 +459,15 @@ func TestExpiry(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	_ = w.SetMinimumPoW(0.0000001, false)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	_ = w.Start(nil)
-	defer w.Stop()
+	if err := w.SetMinimumPoW(0.0000001, false); err != nil {
+		t.Fatal("failed to set min pow")
+	}
+
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	if err := w.Start(nil); err != nil {
+		t.Fatal("failed to start waku")
+	}
+	defer func() { handleError(t, w.Stop()) }()
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -484,7 +481,7 @@ func TestExpiry(t *testing.T) {
 	// with one second resolution, it covers a case when there are multiple items
 	// in a single expiration bucket.
 	for i := 0; i < messagesCount; i++ {
-		msg, err := NewSentMessage(params)
+		msg, err := common.NewSentMessage(params)
 		if err != nil {
 			t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 		}
@@ -531,10 +528,12 @@ func TestCustomization(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
-	defer w.Stop()
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	if err := w.Start(nil); err != nil {
+		t.Fatal("failed to start node")
+	}
+	defer func() { handleError(t, w.Stop()) }()
 
 	const smallPoW = 0.00001
 
@@ -548,10 +547,10 @@ func TestCustomization(t *testing.T) {
 	}
 
 	params.KeySym = f.KeySym
-	params.Topic = BytesToTopic(f.Topics[2])
+	params.Topic = common.BytesToTopic(f.Topics[2])
 	params.PoW = smallPoW
 	params.TTL = 3600 * 24 // one day
-	msg, err := NewSentMessage(params)
+	msg, err := common.NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -572,7 +571,7 @@ func TestCustomization(t *testing.T) {
 	}
 
 	params.TTL++
-	msg, err = NewSentMessage(params)
+	msg, err = common.NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -580,13 +579,13 @@ func TestCustomization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
-	_ = w.SetMaxMessageSize(uint32(env.size() - 1))
+	_ = w.SetMaxMessageSize(uint32(env.Size() - 1))
 	err = w.Send(env)
 	if err == nil {
 		t.Fatalf("successfully sent oversized envelope (seed %d): false positive.", seed)
 	}
 
-	_ = w.SetMaxMessageSize(DefaultMaxMessageSize)
+	_ = w.SetMaxMessageSize(common.DefaultMaxMessageSize)
 	err = w.Send(env)
 	if err != nil {
 		t.Fatalf("failed to send second envelope with seed %d: %s.", seed, err)
@@ -622,25 +621,27 @@ func TestSymmetricSendCycle(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	_ = w.Start(nil)
-	defer w.Stop()
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	if err := w.Start(nil); err != nil {
+		t.Fatal("failed to start node")
+	}
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter1, err := generateFilter(t, true)
 	if err != nil {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
-	filter1.PoW = DefaultMinimumPoW
+	filter1.PoW = common.DefaultMinimumPoW
 
 	// Copy the first filter since some of its fields
 	// are randomly generated.
-	filter2 := &Filter{
+	filter2 := &common.Filter{
 		KeySym:   filter1.KeySym,
 		Topics:   filter1.Topics,
 		PoW:      filter1.PoW,
 		AllowP2P: filter1.AllowP2P,
-		Messages: NewMemoryMessageStore(),
+		Messages: common.NewMemoryMessageStore(),
 	}
 
 	params, err := generateMessageParams()
@@ -652,11 +653,102 @@ func TestSymmetricSendCycle(t *testing.T) {
 	filter2.Src = &params.Src.PublicKey
 
 	params.KeySym = filter1.KeySym
-	params.Topic = BytesToTopic(filter1.Topics[2])
+	params.Topic = common.BytesToTopic(filter1.Topics[2])
 	params.PoW = filter1.PoW
 	params.WorkTime = 10
 	params.TTL = 50
-	msg, err := NewSentMessage(params)
+	msg, err := common.NewSentMessage(params)
+	if err != nil {
+		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
+	}
+	env, err := msg.Wrap(params, time.Now())
+	if err != nil {
+		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
+	}
+
+	_, err = w.Subscribe(filter1)
+	if err != nil {
+		t.Fatalf("failed subscribe 1 with seed %d: %s.", seed, err)
+	}
+
+	_, err = w.Subscribe(filter2)
+	if err != nil {
+		t.Fatalf("failed subscribe 2 with seed %d: %s.", seed, err)
+	}
+
+	err = w.Send(env)
+	if err != nil {
+		t.Fatalf("Failed sending envelope with PoW %.06f (seed %d): %s", env.PoW(), seed, err)
+	}
+
+	// wait till received or timeout
+	var received bool
+	for j := 0; j < 200; j++ {
+		time.Sleep(10 * time.Millisecond)
+		if len(w.Envelopes()) > 0 {
+			received = true
+			break
+		}
+	}
+
+	if !received {
+		t.Fatalf("did not receive the sent envelope, seed: %d.", seed)
+	}
+
+	// check w.messages()
+	time.Sleep(5 * time.Millisecond)
+	mail1 := filter1.Retrieve()
+	mail2 := filter2.Retrieve()
+	if len(mail2) == 0 {
+		t.Fatalf("did not receive any email for filter 2")
+	}
+	if len(mail1) == 0 {
+		t.Fatalf("did not receive any email for filter 1")
+	}
+
+}
+
+func TestSymmetricSendCycleWithTopicInterest(t *testing.T) {
+	InitSingleTest()
+
+	w := New(nil, nil)
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	if err := w.Start(nil); err != nil {
+		t.Fatal("could not start node")
+	}
+	defer func() { handleError(t, w.Stop()) }()
+
+	filter1, err := generateFilter(t, true)
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+	filter1.PoW = common.DefaultMinimumPoW
+
+	// Copy the first filter since some of its fields
+	// are randomly generated.
+	filter2 := &common.Filter{
+		KeySym:   filter1.KeySym,
+		Topics:   filter1.Topics,
+		PoW:      filter1.PoW,
+		AllowP2P: filter1.AllowP2P,
+		Messages: common.NewMemoryMessageStore(),
+	}
+
+	params, err := generateMessageParams()
+	if err != nil {
+		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
+	}
+
+	filter1.Src = &params.Src.PublicKey
+	filter2.Src = &params.Src.PublicKey
+
+	params.KeySym = filter1.KeySym
+	params.Topic = common.BytesToTopic(filter1.Topics[2])
+	params.PoW = filter1.PoW
+	params.WorkTime = 10
+	params.TTL = 50
+	msg, err := common.NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -711,16 +803,19 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
-	defer w.Stop()
+	if err := w.Start(nil); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
-	filter.PoW = DefaultMinimumPoW
+	filter.PoW = common.DefaultMinimumPoW
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -730,11 +825,11 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 	filter.Src = nil
 
 	params.KeySym = filter.KeySym
-	params.Topic = BytesToTopic(filter.Topics[2])
+	params.Topic = common.BytesToTopic(filter.Topics[2])
 	params.PoW = filter.PoW
 	params.WorkTime = 10
 	params.TTL = 50
-	msg, err := NewSentMessage(params)
+	msg, err := common.NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -779,16 +874,18 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	InitSingleTest()
 
 	w := New(nil, nil)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(nil)
-	defer w.Stop()
+	if err := w.Start(nil); err != nil {
+		t.Errorf("failed to start waku: '%s'", err)
+	}
+	defer func() { handleError(t, w.SetMinimumPoW(common.DefaultMinimumPoW, false)) }()
+	defer func() { handleError(t, w.SetMaxMessageSize(common.DefaultMaxMessageSize)) }()
+	defer func() { handleError(t, w.Stop()) }()
 
 	filter, err := generateFilter(t, true)
 	if err != nil {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
-	filter.PoW = DefaultMinimumPoW
+	filter.PoW = common.DefaultMinimumPoW
 
 	params, err := generateMessageParams()
 	if err != nil {
@@ -796,11 +893,11 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	}
 
 	params.KeySym = filter.KeySym
-	params.Topic = BytesToTopic(filter.Topics[2])
+	params.Topic = common.BytesToTopic(filter.Topics[2])
 	params.PoW = filter.PoW
 	params.WorkTime = 10
 	params.TTL = 50
-	msg, err := NewSentMessage(params)
+	msg, err := common.NewSentMessage(params)
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
@@ -842,48 +939,48 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 }
 
 func TestBloom(t *testing.T) {
-	topic := TopicType{0, 0, 255, 6}
-	b := TopicToBloom(topic)
-	x := make([]byte, BloomFilterSize)
+	topic := common.TopicType{0, 0, 255, 6}
+	b := topic.ToBloom()
+	x := make([]byte, common.BloomFilterSize)
 	x[0] = byte(1)
 	x[32] = byte(1)
-	x[BloomFilterSize-1] = byte(128)
-	if !BloomFilterMatch(x, b) || !BloomFilterMatch(b, x) {
+	x[common.BloomFilterSize-1] = byte(128)
+	if !common.BloomFilterMatch(x, b) || !common.BloomFilterMatch(b, x) {
 		t.Fatalf("bloom filter does not match the mask")
 	}
 
-	_, err := mrand.Read(b)
+	_, err := mrand.Read(b) // nolint: gosec
 	if err != nil {
 		t.Fatalf("math rand error")
 	}
-	_, err = mrand.Read(x)
+	_, err = mrand.Read(x) // nolint: gosec
 	if err != nil {
 		t.Fatalf("math rand error")
 	}
-	if !BloomFilterMatch(b, b) {
+	if !common.BloomFilterMatch(b, b) {
 		t.Fatalf("bloom filter does not match self")
 	}
 	x = addBloom(x, b)
-	if !BloomFilterMatch(x, b) {
+	if !common.BloomFilterMatch(x, b) {
 		t.Fatalf("bloom filter does not match combined bloom")
 	}
-	if !isFullNode(nil) {
-		t.Fatalf("isFullNode did not recognize nil as full node")
+	if !common.IsFullNode(nil) {
+		t.Fatalf("common.IsFullNode did not recognize nil as full node")
 	}
 	x[17] = 254
-	if isFullNode(x) {
-		t.Fatalf("isFullNode false positive")
+	if common.IsFullNode(x) {
+		t.Fatalf("common.IsFullNode false positive")
 	}
-	for i := 0; i < BloomFilterSize; i++ {
+	for i := 0; i < common.BloomFilterSize; i++ {
 		b[i] = byte(255)
 	}
-	if !isFullNode(b) {
-		t.Fatalf("isFullNode false negative")
+	if !common.IsFullNode(b) {
+		t.Fatalf("common.IsFullNode false negative")
 	}
-	if BloomFilterMatch(x, b) {
+	if common.BloomFilterMatch(x, b) {
 		t.Fatalf("bloomFilterMatch false positive")
 	}
-	if !BloomFilterMatch(b, x) {
+	if !common.BloomFilterMatch(b, x) {
 		t.Fatalf("bloomFilterMatch false negative")
 	}
 
@@ -897,645 +994,87 @@ func TestBloom(t *testing.T) {
 		t.Fatalf("failed to set bloom filter: %s", err)
 	}
 	f = w.BloomFilter()
-	if !BloomFilterMatch(f, x) || !BloomFilterMatch(x, f) {
+	if !common.BloomFilterMatch(f, x) || !common.BloomFilterMatch(x, f) {
 		t.Fatalf("retireved wrong bloom filter")
 	}
 }
 
-func TestSendP2PDirect(t *testing.T) {
-	InitSingleTest()
-
+func TestTopicInterest(t *testing.T) {
 	w := New(nil, nil)
-	_ = w.SetMinimumPoW(0.0000001, false)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	_ = w.Start(nil)
-	defer w.Stop()
+	topicInterest := w.TopicInterest()
+	if topicInterest != nil {
+		t.Fatalf("wrong topic on creation")
+	}
 
-	rwStub := &rwP2PMessagesStub{}
-	peerW := newPeer(w, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), rwStub, nil)
-
-	params, err := generateMessageParams()
+	filter1, err := generateFilter(t, true)
 	if err != nil {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
-	params.TTL = 1
 
-	msg, err := NewSentMessage(params)
+	_, err = w.Subscribe(filter1)
 	if err != nil {
-		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
-	}
-	env, err := msg.Wrap(params, time.Now())
-	if err != nil {
-		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
+		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
 	}
 
-	err = w.SendP2PDirect(peerW, env, env, env)
-	if err != nil {
-		t.Fatalf("failed to send envelope with seed %d: %s.", seed, err)
+	topicInterest = w.TopicInterest()
+	if len(topicInterest) != len(filter1.Topics) {
+		t.Fatalf("wrong number of topics created")
 	}
-	if len(rwStub.messages) != 1 {
-		t.Fatalf("invalid number of messages sent to peer: %d, expected 1", len(rwStub.messages))
-	}
-	var envelopes []*Envelope
-	if err := rwStub.messages[0].Decode(&envelopes); err != nil {
-		t.Fatalf("failed to decode envelopes: %s", err)
-	}
-	if len(envelopes) != 3 {
-		t.Fatalf("invalid number of envelopes in a message: %d, expected 3", len(envelopes))
-	}
-	rwStub.messages = nil
-	envelopes = nil
-}
 
-func TestHandleP2PMessageCode(t *testing.T) {
-	InitSingleTest()
-
-	w := New(nil, nil)
-	w.SetMinimumPoW(0.0000001, false)
-	defer w.SetMinimumPoW(DefaultMinimumPoW, false)
-	w.Start(nil)
-	defer w.Stop()
-
-	envelopeEvents := make(chan EnvelopeEvent, 10)
-	sub := w.SubscribeEnvelopeEvents(envelopeEvents)
-	defer sub.Unsubscribe()
-
-	params, err := generateMessageParams()
+	filter2, err := generateFilter(t, true)
 	if err != nil {
 		t.Fatalf("failed generateMessageParams with seed %d: %s.", seed, err)
 	}
-	params.TTL = 1
 
-	msg, err := NewSentMessage(params)
+	_, err = w.Subscribe(filter2)
 	if err != nil {
-		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
+		t.Fatalf("failed subscribe with seed %d: %s.", seed, err)
 	}
-	env, err := msg.Wrap(params, time.Now())
+
+	topicInterest = w.TopicInterest()
+	if len(topicInterest) != len(filter1.Topics)+len(filter2.Topics) {
+		t.Fatalf("wrong number of topics created")
+	}
+
+}
+
+func handleError(t *testing.T, err error) {
 	if err != nil {
-		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
-	}
-
-	// read a single envelope
-	rwStub := &rwP2PMessagesStub{}
-	rwStub.payload = []interface{}{[]*Envelope{env}}
-
-	peer := newPeer(nil, p2p.NewPeer(enode.ID{}, "test", []p2p.Cap{}), nil, nil)
-	peer.trusted = true
-
-	err = w.runMessageLoop(peer, rwStub)
-	if err != nil && err != errRWStub {
-		t.Fatalf("failed run message loop: %s", err)
-	}
-	if e := <-envelopeEvents; e.Hash != env.Hash() {
-		t.Fatalf("received envelope %s while expected %s", e.Hash, env.Hash())
-	}
-
-	// read a batch of envelopes
-	rwStub = &rwP2PMessagesStub{}
-	rwStub.payload = []interface{}{[]*Envelope{env, env, env}}
-
-	err = w.runMessageLoop(peer, rwStub)
-	if err != nil && err != errRWStub {
-		t.Fatalf("failed run message loop: %s", err)
-	}
-	for i := 0; i < 3; i++ {
-		if e := <-envelopeEvents; e.Hash != env.Hash() {
-			t.Fatalf("received envelope %s while expected %s", e.Hash, env.Hash())
-		}
+		t.Logf("deferred function error: '%s'", err)
 	}
 }
 
-var errRWStub = errors.New("no more messages")
+func generateFilter(t *testing.T, symmetric bool) (*common.Filter, error) {
+	var f common.Filter
+	f.Messages = common.NewMemoryMessageStore()
 
-type rwP2PMessagesStub struct {
-	// payload stores individual messages that will be sent returned
-	// on ReadMsg() class
-	payload  []interface{}
-	messages []p2p.Msg
-}
-
-func (stub *rwP2PMessagesStub) ReadMsg() (p2p.Msg, error) {
-	if len(stub.payload) == 0 {
-		return p2p.Msg{}, errRWStub
+	const topicNum = 8
+	f.Topics = make([][]byte, topicNum)
+	for i := 0; i < topicNum; i++ {
+		f.Topics[i] = make([]byte, 4)
+		mrand.Read(f.Topics[i]) // nolint: gosec
+		f.Topics[i][0] = 0x01
 	}
-	size, r, err := rlp.EncodeToReader(stub.payload[0])
+
+	key, err := crypto.GenerateKey()
 	if err != nil {
-		return p2p.Msg{}, err
+		t.Fatalf("generateFilter 1 failed with seed %d.", seed)
+		return nil, err
 	}
-	stub.payload = stub.payload[1:]
-	return p2p.Msg{Code: p2pMessageCode, Size: uint32(size), Payload: r}, nil
-}
+	f.Src = &key.PublicKey
 
-func (stub *rwP2PMessagesStub) WriteMsg(m p2p.Msg) error {
-	stub.messages = append(stub.messages, m)
-	return nil
-}
-
-func testConfirmationsHandshake(t *testing.T, expectConfirmations bool) {
-	conf := &Config{
-		MinimumAcceptedPoW:  0,
-		EnableConfirmations: expectConfirmations,
-	}
-	w := New(conf, nil)
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
-	// so that actual read won't hang forever
-	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
-	})
-	require.NoError(
-		t,
-		p2p.ExpectMsg(
-			rw1,
-			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, expectConfirmations, RateLimits{}},
-		),
-	)
-}
-
-func TestConfirmationHadnshakeExtension(t *testing.T) {
-	testConfirmationsHandshake(t, true)
-}
-
-func TestHandshakeWithConfirmationsDisabled(t *testing.T) {
-	testConfirmationsHandshake(t, false)
-}
-
-func TestConfirmationReceived(t *testing.T) {
-	conf := &Config{
-		MinimumAcceptedPoW:  0,
-		MaxMessageSize:      10 << 20,
-		EnableConfirmations: true,
-	}
-	w := New(conf, nil)
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
-	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
-	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
-	})
-	require.NoError(
-		t,
-		p2p.ExpectMsg(
-			rw1,
-			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
-		),
-	)
-	require.NoError(
-		t,
-		p2p.SendItems(
-			rw1,
-			statusCode,
-			ProtocolVersion,
-			math.Float64bits(w.MinPow()),
-			w.BloomFilter(),
-			true,
-			true,
-		),
-	)
-
-	e := Envelope{
-		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-	data, err := rlp.EncodeToBytes([]*Envelope{&e})
-	require.NoError(t, err)
-	hash := crypto.Keccak256Hash(data)
-	require.NoError(t, p2p.SendItems(rw1, messagesCode, &e))
-	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, nil))
-	require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
-}
-
-func TestMessagesResponseWithError(t *testing.T) {
-	conf := &Config{
-		MinimumAcceptedPoW:  0,
-		MaxMessageSize:      10 << 20,
-		EnableConfirmations: true,
-	}
-	w := New(conf, nil)
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
-	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		rw1.Close()
-		rw2.Close()
-	}()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
-	require.NoError(
-		t,
-		p2p.ExpectMsg(
-			rw1,
-			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}},
-		),
-	)
-	require.NoError(
-		t,
-		p2p.SendItems(
-			rw1,
-			statusCode,
-			ProtocolVersion,
-			math.Float64bits(w.MinPow()), w.BloomFilter(),
-			true,
-			true,
-			RateLimits{},
-		),
-	)
-
-	failed := Envelope{
-		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-	normal := Envelope{
-		Expiry: uint32(time.Now().Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-
-	data, err := rlp.EncodeToBytes([]*Envelope{&failed, &normal})
-	require.NoError(t, err)
-	hash := crypto.Keccak256Hash(data)
-	require.NoError(t, p2p.SendItems(rw1, messagesCode, &failed, &normal))
-	require.NoError(t, p2p.ExpectMsg(rw1, messageResponseCode, NewMessagesResponse(hash, []EnvelopeError{
-		{Hash: failed.Hash(), Code: EnvelopeTimeNotSynced, Description: "envelope from future"},
-	})))
-	require.NoError(t, p2p.ExpectMsg(rw1, batchAcknowledgedCode, hash))
-}
-
-func testConfirmationEvents(t *testing.T, envelope Envelope, envelopeErrors []EnvelopeError) {
-	conf := &Config{
-		MinimumAcceptedPoW:  0,
-		MaxMessageSize:      10 << 20,
-		EnableConfirmations: true,
-	}
-	w := New(conf, nil)
-	events := make(chan EnvelopeEvent, 2)
-	sub := w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
-	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
-	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
-	})
-	require.NoError(t, p2p.ExpectMsg(rw1, statusCode, []interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, true, RateLimits{}}))
-	require.NoError(t, p2p.SendItems(rw1, statusCode, ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), true, true))
-
-	require.NoError(t, w.Send(&envelope))
-	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&envelope}))
-
-	var hash common.Hash
-	select {
-	case ev := <-events:
-		require.Equal(t, EventEnvelopeSent, ev.Event)
-		require.Equal(t, p.ID(), ev.Peer)
-		require.NotEqual(t, common.Hash{}, ev.Batch)
-		hash = ev.Batch
-	case <-time.After(5 * time.Second):
-		require.FailNow(t, "timed out waiting for an envelope.sent event")
-	}
-	require.NoError(t, p2p.Send(rw1, messageResponseCode, NewMessagesResponse(hash, envelopeErrors)))
-	require.NoError(t, p2p.Send(rw1, batchAcknowledgedCode, hash))
-	select {
-	case ev := <-events:
-		require.Equal(t, EventBatchAcknowledged, ev.Event)
-		require.Equal(t, p.ID(), ev.Peer)
-		require.Equal(t, hash, ev.Batch)
-		require.Equal(t, envelopeErrors, ev.Data)
-	case <-time.After(5 * time.Second):
-		require.FailNow(t, "timed out waiting for an batch.acknowledged event")
-	}
-}
-
-func TestConfirmationEventsReceived(t *testing.T) {
-	e := Envelope{
-		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-	testConfirmationEvents(t, e, []EnvelopeError{})
-}
-
-func TestConfirmationEventsExtendedWithErrors(t *testing.T) {
-	e := Envelope{
-		Expiry: uint32(time.Now().Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-	testConfirmationEvents(t, e, []EnvelopeError{
-		{
-			Hash:        e.Hash(),
-			Code:        EnvelopeTimeNotSynced,
-			Description: "test error",
-		}},
-	)
-}
-
-func TestEventsWithoutConfirmation(t *testing.T) {
-	conf := &Config{
-		MinimumAcceptedPoW: 0,
-		MaxMessageSize:     10 << 20,
-	}
-	w := New(conf, nil)
-	events := make(chan EnvelopeEvent, 2)
-	sub := w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
-	rw1, rw2 := p2p.MsgPipe()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
-	time.AfterFunc(5*time.Second, func() {
-		rw1.Close()
-	})
-	require.NoError(
-		t,
-		p2p.ExpectMsg(
-			rw1,
-			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, false, RateLimits{}},
-		),
-	)
-	require.NoError(
-		t,
-		p2p.SendItems(
-			rw1,
-			statusCode,
-			ProtocolVersion,
-			math.Float64bits(w.MinPow()),
-			w.BloomFilter(),
-			true,
-			false,
-			RateLimits{},
-		),
-	)
-
-	e := Envelope{
-		Expiry: uint32(time.Now().Add(10 * time.Second).Unix()),
-		TTL:    10,
-		Topic:  TopicType{1},
-		Data:   make([]byte, 1<<10),
-		Nonce:  1,
-	}
-	require.NoError(t, w.Send(&e))
-	require.NoError(t, p2p.ExpectMsg(rw1, messagesCode, []*Envelope{&e}))
-
-	select {
-	case ev := <-events:
-		require.Equal(t, EventEnvelopeSent, ev.Event)
-		require.Equal(t, p.ID(), ev.Peer)
-		require.Equal(t, common.Hash{}, ev.Batch)
-	case <-time.After(5 * time.Second):
-		require.FailNow(t, "timed out waiting for an envelope.sent event")
-	}
-}
-
-func discardPipe() *p2p.MsgPipeRW {
-	rw1, rw2 := p2p.MsgPipe()
-	go func() {
-		for {
-			msg, err := rw1.ReadMsg()
-			if err != nil {
-				return
-			}
-			msg.Discard()
-		}
-	}()
-	return rw2
-}
-
-func TestWakuTimeDesyncEnvelopeIgnored(t *testing.T) {
-	c := &Config{
-		MaxMessageSize:     DefaultMaxMessageSize,
-		MinimumAcceptedPoW: 0,
-	}
-	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		rw1.Close()
-		rw2.Close()
-	}()
-	p1 := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-	p2 := p2p.NewPeer(enode.ID{2}, "2", []p2p.Cap{{"shh", 6}})
-	w1, w2 := New(c, nil), New(c, nil)
-	errc := make(chan error)
-	go func() {
-		w1.HandlePeer(p2, rw2)
-	}()
-	go func() {
-		errc <- w2.HandlePeer(p1, rw1)
-	}()
-	w1.SetTimeSource(func() time.Time {
-		return time.Now().Add(time.Hour)
-	})
-	env := &Envelope{
-		Expiry: uint32(time.Now().Add(time.Hour).Unix()),
-		TTL:    30,
-		Topic:  TopicType{1},
-		Data:   []byte{1, 1, 1},
-	}
-	require.NoError(t, w1.Send(env))
-	select {
-	case err := <-errc:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-	}
-	rw2.Close()
-	select {
-	case err := <-errc:
-		require.Error(t, err, "p2p: read or write on closed message pipe")
-	case <-time.After(time.Second):
-		require.FailNow(t, "connection wasn't closed in expected time")
-	}
-}
-
-func TestRequestSentEventWithExpiry(t *testing.T) {
-	w := New(nil, nil)
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"shh", 6}})
-	rw := discardPipe()
-	defer rw.Close()
-	w.peers[newPeer(w, p, rw, nil)] = struct{}{}
-	events := make(chan EnvelopeEvent, 1)
-	sub := w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-	e := &Envelope{Nonce: 1}
-	require.NoError(t, w.RequestHistoricMessagesWithTimeout(p.ID().Bytes(), e, time.Millisecond))
-	verifyEvent := func(etype EventType) {
-		select {
-		case <-time.After(time.Second):
-			require.FailNow(t, "error waiting for a event type %s", etype)
-		case ev := <-events:
-			require.Equal(t, etype, ev.Event)
-			require.Equal(t, p.ID(), ev.Peer)
-			require.Equal(t, e.Hash(), ev.Hash)
+	if symmetric {
+		f.KeySym = make([]byte, common.AESKeyLength)
+		mrand.Read(f.KeySym) // nolint: gosec
+		f.SymKeyHash = crypto.Keccak256Hash(f.KeySym)
+	} else {
+		f.KeyAsym, err = crypto.GenerateKey()
+		if err != nil {
+			t.Fatalf("generateFilter 2 failed with seed %d.", seed)
+			return nil, err
 		}
 	}
-	verifyEvent(EventMailServerRequestSent)
-	verifyEvent(EventMailServerRequestExpired)
-}
 
-func TestSendMessagesRequest(t *testing.T) {
-	validMessagesRequest := MessagesRequest{
-		ID:    make([]byte, 32),
-		From:  0,
-		To:    10,
-		Bloom: []byte{0x01},
-	}
-
-	t.Run("InvalidID", func(t *testing.T) {
-		w := New(nil, nil)
-		err := w.SendMessagesRequest([]byte{0x01, 0x02}, MessagesRequest{})
-		require.EqualError(t, err, "invalid 'ID', expected a 32-byte slice")
-	})
-
-	t.Run("WithoutPeer", func(t *testing.T) {
-		w := New(nil, nil)
-		err := w.SendMessagesRequest([]byte{0x01, 0x02}, validMessagesRequest)
-		require.EqualError(t, err, "could not find peer with ID: 0102")
-	})
-
-	t.Run("AllGood", func(t *testing.T) {
-		p := p2p.NewPeer(enode.ID{0x01}, "peer01", nil)
-		rw1, rw2 := p2p.MsgPipe()
-		w := New(nil, nil)
-		w.peers[newPeer(w, p, rw1, nil)] = struct{}{}
-
-		go func() {
-			err := w.SendMessagesRequest(p.ID().Bytes(), validMessagesRequest)
-			require.NoError(t, err)
-		}()
-
-		require.NoError(t, p2p.ExpectMsg(rw2, p2pRequestCode, nil))
-	})
-}
-
-func TestRateLimiterIntegration(t *testing.T) {
-	conf := &Config{
-		MinimumAcceptedPoW: 0,
-		MaxMessageSize:     10 << 20,
-	}
-	w := New(conf, nil)
-	w.RegisterRateLimiter(NewPeerRateLimiter(nil, &MetricsRateLimiterHandler{}))
-	p := p2p.NewPeer(enode.ID{1}, "1", []p2p.Cap{{"waku", 0}})
-	rw1, rw2 := p2p.MsgPipe()
-	defer func() {
-		rw1.Close()
-		rw2.Close()
-	}()
-	errorc := make(chan error, 1)
-	go func() {
-		err := w.HandlePeer(p, rw2)
-		errorc <- err
-	}()
-	require.NoError(
-		t,
-		p2p.ExpectMsg(
-			rw1,
-			statusCode,
-			[]interface{}{ProtocolVersion, math.Float64bits(w.MinPow()), w.BloomFilter(), false, false, RateLimits{
-				IPLimits:     10,
-				PeerIDLimits: 5,
-			}},
-		),
-	)
-	select {
-	case err := <-errorc:
-		require.NoError(t, err)
-	default:
-	}
-}
-
-type stubMailServer struct{}
-
-func (stubMailServer) Archive(*Envelope)              {}
-func (stubMailServer) DeliverMail(*Peer, *Envelope)   {}
-func (stubMailServer) Deliver(*Peer, MessagesRequest) {}
-
-type mockMailServer struct {
-	mock.Mock
-}
-
-func (m *mockMailServer) Archive(env *Envelope) {
-	m.Called(env)
-}
-
-func (m *mockMailServer) DeliverMail(p *Peer, env *Envelope) {
-	m.Called(p, env)
-}
-
-func (m *mockMailServer) Deliver(p *Peer, r MessagesRequest) {
-	m.Called(p, r)
-}
-
-func TestMailserverCompletionEvent(t *testing.T) {
-	w := New(nil, nil)
-	require.NoError(t, w.Start(nil))
-	defer w.Stop()
-
-	rw1, rw2 := p2p.MsgPipe()
-	peer := newPeer(w, p2p.NewPeer(enode.ID{1}, "1", nil), rw1, nil)
-	peer.trusted = true
-	w.peers[peer] = struct{}{}
-
-	events := make(chan EnvelopeEvent)
-	sub := w.SubscribeEnvelopeEvents(events)
-	defer sub.Unsubscribe()
-
-	envelopes := []*Envelope{{Data: []byte{1}}, {Data: []byte{2}}}
-	go func() {
-		require.NoError(t, p2p.Send(rw2, p2pMessageCode, envelopes))
-		require.NoError(t, p2p.Send(rw2, p2pRequestCompleteCode, [100]byte{})) // 2 hashes + cursor size
-		rw2.Close()
-	}()
-	require.EqualError(t, w.runMessageLoop(peer, rw1), "p2p: read or write on closed message pipe")
-
-	after := time.After(2 * time.Second)
-	count := 0
-	for {
-		select {
-		case <-after:
-			require.FailNow(t, "timed out waiting for all events")
-		case ev := <-events:
-			switch ev.Event {
-			case EventEnvelopeAvailable:
-				count++
-			case EventMailServerRequestCompleted:
-				require.Equal(t, count, len(envelopes),
-					"all envelope.avaiable events mut be recevied before request is compelted")
-				return
-			}
-		}
-	}
+	// AcceptP2P & PoW are not set
+	return &f, nil
 }

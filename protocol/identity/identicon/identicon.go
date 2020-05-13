@@ -1,10 +1,10 @@
 package identicon
 
 import (
-	"crypto/md5"
+	"crypto/md5" // nolint: gosec
 	"image/color"
 
-	colorful "github.com/lucasb-eyer/go-colorful"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 const (
@@ -18,7 +18,7 @@ type Identicon struct {
 }
 
 func generate(key string) Identicon {
-	hash := md5.Sum([]byte(key))
+	hash := md5.Sum([]byte(key)) // nolint: gosec
 	return Identicon{
 		convertPatternToBinarySwitch(generatePatternFromHash(hash)),
 		getColorFromHash(hash),
@@ -27,7 +27,7 @@ func generate(key string) Identicon {
 
 func getColorFromHash(h [16]byte) color.Color {
 	// Take the last 3 relevant bytes, and convert to a float between [0..360]
-	var sum float64 = float64(h[13]) + float64(h[14]) + float64(h[15])
+	sum := float64(h[13]) + float64(h[14]) + float64(h[15])
 	t := (sum / 765) * 360
 	return colorful.Hsl(t, defaultSaturation, defaultLightness)
 }

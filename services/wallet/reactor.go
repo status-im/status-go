@@ -23,15 +23,26 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 	case int64(params.MainNetworkID):
 		return 10 * time.Second
 	case int64(params.RopstenNetworkID):
-		return 2 * time.Second
+		return 4 * time.Second
 	default:
 		return 500 * time.Millisecond
 	}
 }
 
+func reorgSafetyDepth(chain *big.Int) *big.Int {
+	switch chain.Int64() {
+	case int64(params.MainNetworkID):
+		return big.NewInt(5)
+	case int64(params.RopstenNetworkID):
+		return big.NewInt(15)
+	default:
+		return big.NewInt(15)
+	}
+}
+
 var (
-	reorgSafetyDepth = big.NewInt(15)
-	erc20BatchSize   = big.NewInt(100000)
+	erc20BatchSize    = big.NewInt(100000)
+	errAlreadyRunning = errors.New("already running")
 )
 
 // HeaderReader interface for reading headers using block number or hash.
@@ -43,6 +54,7 @@ type HeaderReader interface {
 // BalanceReader interface for reading balance at a specifeid address.
 type BalanceReader interface {
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
 }
 
 type reactorClient interface {
@@ -71,14 +83,7 @@ type Reactor struct {
 	group *Group
 }
 
-// Start runs reactor loop in background.
-func (r *Reactor) Start(accounts []common.Address) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.group != nil {
-		return errors.New("already running")
-	}
-	r.group = NewGroup(context.Background())
+func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 	signer := types.NewEIP155Signer(r.chain)
 	ctl := &controlCommand{
 		db:       r.db,
@@ -89,11 +94,25 @@ func (r *Reactor) Start(accounts []common.Address) error {
 			client:   r.client,
 			accounts: accounts,
 			signer:   signer,
+			db:       r.db,
 		},
 		erc20:       NewERC20TransfersDownloader(r.client, accounts, signer),
 		feed:        r.feed,
-		safetyDepth: reorgSafetyDepth,
+		safetyDepth: reorgSafetyDepth(r.chain),
 	}
+
+	return ctl
+}
+
+// Start runs reactor loop in background.
+func (r *Reactor) Start(accounts []common.Address) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.group != nil {
+		return errAlreadyRunning
+	}
+	r.group = NewGroup(context.Background())
+	ctl := r.newControlCommand(accounts)
 	r.group.Add(ctl.Command())
 	return nil
 }

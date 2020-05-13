@@ -107,6 +107,24 @@ func (r *DNSResolver) ClearDNSZone(opts *bind.TransactOpts) (*types.Transaction,
 	return r.Contract.ClearDNSZone(opts, nameHash)
 }
 
+// Zonehash returns the zone hash of the domain
+func (r *DNSResolver) Zonehash() ([]byte, error) {
+	nameHash, err := NameHash(r.domain)
+	if err != nil {
+		return nil, err
+	}
+	return r.Contract.Zonehash(nil, nameHash)
+}
+
+// SetZonehash sets the zone hash of the domain
+func (r *DNSResolver) SetZonehash(opts *bind.TransactOpts, zonehash []byte) (*types.Transaction, error) {
+	nameHash, err := NameHash(r.domain)
+	if err != nil {
+		return nil, err
+	}
+	return r.Contract.SetZonehash(opts, nameHash, zonehash)
+}
+
 // DNSWireFormatDomainHash hashes a domain name in wire format
 func DNSWireFormatDomainHash(domain string) (hash [32]byte) {
 	sha := sha3.NewLegacyKeccak256()

@@ -3,6 +3,7 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -11,6 +12,12 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+)
+
+const (
+	transactionRequestDeclinedMessage           = "Transaction request declined"
+	requestAddressForTransactionAcceptedMessage = "Request address for transaction accepted"
+	requestAddressForTransactionDeclinedMessage = "Request address for transaction declined"
 )
 
 type MessageHandler struct {
@@ -59,7 +66,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		if !group.IsMember(contactIDFromPublicKey(&m.identity.PublicKey)) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
-		newChat := createGroupChat(messageState.Timesource)
+		newChat := CreateGroupChat(messageState.Timesource)
 		chat = &newChat
 
 	} else {
@@ -72,13 +79,14 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 			return errors.Wrap(err, "invalid membership update")
 		}
 		merged := v1protocol.MergeMembershipUpdateEvents(existingGroup.Events(), updateGroup.Events())
-		group, err = v1protocol.NewGroup(chat.ID, merged)
+		group, err = v1protocol.NewGroupWithEvents(chat.ID, merged)
 		if err != nil {
 			return errors.Wrap(err, "failed to create a group with new membership updates")
 		}
 	}
 
-	chat.updateChatFromProtocolGroup(group)
+	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
 	systemMessages := buildSystemMessages(message.Events, translations)
 
 	for _, message := range systemMessages {
@@ -114,7 +122,9 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	message.Identicon = state.CurrentMessageState.Contact.Identicon
 	message.WhisperTimestamp = state.CurrentMessageState.WhisperTimestamp
 
-	message.PrepareContent()
+	if err := message.PrepareContent(); err != nil {
+		return fmt.Errorf("failed to prepare content: %v", err)
+	}
 	chat, err := m.matchMessage(message, state.AllChats, state.Timesource)
 	if err != nil {
 		return err
@@ -297,10 +307,13 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 	}
 
-	receivedMessage.PrepareContent()
+	err := receivedMessage.PrepareContent()
+	if err != nil {
+		return fmt.Errorf("failed to prepare message content: %v", err)
+	}
 	chat, err := m.matchMessage(receivedMessage, state.AllChats, state.Timesource)
 	if err != nil {
-		return err
+		return err // matchMessage returns a descriptive error message
 	}
 
 	// If deleted-at is greater, ignore message
@@ -336,6 +349,13 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set in the modified maps chat
 	state.ModifiedChats[chat.ID] = true
 	state.AllChats[chat.ID] = chat
+
+	contact := state.CurrentMessageState.Contact
+	if hasENSNameChanged(contact, receivedMessage.EnsName, receivedMessage.Clock) {
+		contact.ResetENSVerification(receivedMessage.Clock, receivedMessage.EnsName)
+		state.ModifiedContacts[contact.ID] = true
+		state.AllContacts[contact.ID] = contact
+	}
 
 	// Add to response
 	if receivedMessage != nil {
@@ -421,8 +441,9 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 
 	initialMessage.Clock = command.Clock
 	initialMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
-	initialMessage.Text = "Request address for transaction accepted"
+	initialMessage.Text = requestAddressForTransactionAcceptedMessage
 	initialMessage.CommandParameters.Address = command.Address
+	initialMessage.Seen = false
 	initialMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionAccepted
 
 	// Hide previous message
@@ -490,7 +511,8 @@ func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState 
 
 	oldMessage.Clock = command.Clock
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
-	oldMessage.Text = "Request address for transaction declined"
+	oldMessage.Text = requestAddressForTransactionDeclinedMessage
+	oldMessage.Seen = false
 	oldMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionDeclined
 
 	// Hide previous message
@@ -530,7 +552,8 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 
 	oldMessage.Clock = command.Clock
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
-	oldMessage.Text = "Transaction request declined"
+	oldMessage.Text = transactionRequestDeclinedMessage
+	oldMessage.Seen = false
 	oldMessage.CommandParameters.CommandState = CommandStateRequestTransactionDeclined
 
 	// Hide previous message
@@ -543,7 +566,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, timesource ClockValueTimesource) (*Chat, error) {
+func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
 	if message.SigPubKey == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a message with empty public key")
@@ -560,7 +583,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 		}
 		return chat, nil
 	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && isPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
-		// It's a private message coming from us so we rely on Message.ChatId
+		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := message.ChatId
 		chat := chats[chatID]

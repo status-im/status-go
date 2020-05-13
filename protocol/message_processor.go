@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -48,7 +47,7 @@ func newMessageProcessor(
 	logger *zap.Logger,
 	features featureFlags,
 ) (*messageProcessor, error) {
-	dataSyncTransport := datasync.NewDataSyncNodeTransport()
+	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
 		database,
 		dataSyncTransport,
@@ -201,6 +200,8 @@ func (p *messageProcessor) SendPairInstallation(
 	return messageID, nil
 }
 
+// EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
+// All the events in a group are encoded and added to the payload
 func (p *messageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatMessage *protobuf.ChatMessage,
@@ -250,15 +251,6 @@ func (p *messageProcessor) SendPublicRaw(
 	p.transport.Track([][]byte{messageID}, hash, newMessage)
 
 	return messageID, nil
-}
-
-func (p *messageProcessor) processPairMessage(m v1protocol.PairMessage) error {
-	metadata := &multidevice.InstallationMetadata{
-		Name:       m.Name,
-		FCMToken:   m.FCMToken,
-		DeviceType: m.DeviceType,
-	}
-	return p.protocol.SetInstallationMetadata(&p.identity.PublicKey, m.InstallationID, metadata)
 }
 
 // handleMessages expects a whisper message as input, and it will go through

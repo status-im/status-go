@@ -29,6 +29,7 @@ import (
 
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
@@ -42,6 +43,7 @@ import (
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
+	wakucommon "github.com/status-im/status-go/waku/common"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -87,14 +89,6 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 		return nil, fmt.Errorf(ErrNodeMakeFailureFormat, err.Error())
 	}
 
-	if config.EnableNTPSync {
-		if err = stack.Register(func(*node.ServiceContext) (node.Service, error) {
-			return timesource.Default(), nil
-		}); err != nil {
-			return nil, fmt.Errorf("failed to register NTP time source: %v", err)
-		}
-	}
-
 	err = activateServices(stack, config, accs, db)
 	if err != nil {
 		return nil, err
@@ -103,6 +97,15 @@ func MakeNode(config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB)
 }
 
 func activateServices(stack *node.Node, config *params.NodeConfig, accs *accounts.Manager, db *leveldb.DB) error {
+	if config.EnableNTPSync {
+		err := stack.Register(func(*node.ServiceContext) (node.Service, error) {
+			return timesource.Default(), nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to register NTP time source: %v", err)
+		}
+	}
+
 	// start Ethereum service if we are not expected to use an upstream server
 	if !config.UpstreamConfig.Enabled {
 		if err := activateLightEthService(stack, accs, config); err != nil {
@@ -385,6 +388,22 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 		return
 	}
 
+	// Register Whisper eth-node bridge
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		w, err := ethnode.Node.GetWaku(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &nodebridge.WakuService{Waku: w}, nil
+	})
+	if err != nil {
+		return
+	}
+
 	// TODO(dshulyak) add a config option to enable it by default, but disable if app is started from statusd
 	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		var ethnode *nodebridge.NodeService
@@ -438,7 +457,8 @@ func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperCon
 
 func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*waku.Waku, error) {
 	cfg := &waku.Config{
-		MaxMessageSize:     waku.DefaultMaxMessageSize,
+		MaxMessageSize:     wakucommon.DefaultMaxMessageSize,
+		BloomFilterMode:    wakuCfg.BloomFilterMode,
 		MinimumAcceptedPoW: params.WakuMinimumPoW,
 	}
 
@@ -449,8 +469,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 		cfg.MinimumAcceptedPoW = wakuCfg.MinimumPoW
 	}
 
-	// TODO: provide a logger
-	w := waku.New(cfg, nil)
+	w := waku.New(cfg, logutils.ZapLogger())
 
 	if wakuCfg.EnableRateLimiter {
 		r := wakuRateLimiter(wakuCfg, clusterCfg)
@@ -595,7 +614,7 @@ func whisperRateLimiter(whisperConfig *params.WhisperConfig, clusterConfig *para
 	)
 }
 
-func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *waku.PeerRateLimiter {
+func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) *wakucommon.PeerRateLimiter {
 	enodes := append(
 		parseNodes(clusterCfg.StaticNodes),
 		parseNodes(clusterCfg.TrustedMailServers)...,
@@ -608,8 +627,8 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 		ips = append(ips, item.IP().String())
 		peerIDs = append(peerIDs, item.ID())
 	}
-	return waku.NewPeerRateLimiter(
-		&waku.PeerRateLimiterConfig{
+	return wakucommon.NewPeerRateLimiter(
+		&wakucommon.PeerRateLimiterConfig{
 			LimitPerSecIP:      wakuCfg.RateLimitIP,
 			LimitPerSecPeerID:  wakuCfg.RateLimitPeerID,
 			WhitelistedIPs:     ips,

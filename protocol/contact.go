@@ -38,7 +38,12 @@ type Contact struct {
 	// EnsVerified whether we verified the name of the contact
 	ENSVerified bool `json:"ensVerified"`
 	// EnsVerifiedAt the time we last verified the name
-	ENSVerifiedAt int64 `json:"ensVerifiedAt"`
+	ENSVerifiedAt uint64 `json:"ensVerifiedAt"`
+	// LastENSClockValue is the last clock value of when we
+	// received an ENS name for the user
+	LastENSClockValue uint64 `json:"lastENSClockValue"`
+	// ENSVerificationRetries is how many times we retried the ENS
+	ENSVerificationRetries uint64 `json:"ensVerificationRetries"`
 	// Generated username name of the contact
 	Alias string `json:"alias,omitempty"`
 	// Identicon generated from public key
@@ -53,7 +58,7 @@ type Contact struct {
 	SystemTags []string `json:"systemTags"`
 
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
-	TributeToTalk string              `json:"tributeToTalk,omitEmpty"`
+	TributeToTalk string              `json:"tributeToTalk,omitempty"`
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
@@ -74,6 +79,14 @@ func (c Contact) HasBeenAdded() bool {
 
 func (c Contact) IsBlocked() bool {
 	return existsInStringSlice(c.SystemTags, contactBlocked)
+}
+
+func (c *Contact) ResetENSVerification(clock uint64, name string) {
+	c.ENSVerifiedAt = 0
+	c.ENSVerified = false
+	c.ENSVerificationRetries = 0
+	c.LastENSClockValue = clock
+	c.Name = name
 }
 
 // existsInStringSlice checks if a string is in a set.
@@ -101,6 +114,12 @@ func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
 	}
 
 	return contact, nil
+}
+
+// HasCustomFields returns whether the the contact has any field that is valuable
+// to the client other than the computed name/image
+func (c Contact) HasCustomFields() bool {
+	return c.IsAdded() || c.HasBeenAdded() || c.IsBlocked() || c.ENSVerified
 }
 
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {

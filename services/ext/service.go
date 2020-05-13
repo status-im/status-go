@@ -13,8 +13,6 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 
-	"github.com/status-im/status-go/logutils"
-
 	commongethtypes "github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -115,7 +113,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { // nolint: gocyclo
+func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *zap.Logger) error {
 	if !s.config.PFSEnabled {
 		return nil
 	}
@@ -137,12 +135,6 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { /
 		return err
 	}
 
-	// Create a custom zap.Logger which will forward logs from status-go/protocol to status-go logger.
-	zapLogger, err := logutils.NewZapLoggerWithAdapter(logutils.Logger())
-	if err != nil {
-		return err
-	}
-
 	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
 		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
 		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
@@ -150,9 +142,9 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { /
 			return s.peerStore.Exist(peer)
 		},
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
-		Logger:                zapLogger,
+		Logger:                logger,
 	}
-	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, zapLogger)
+	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, logger)
 
 	messenger, err := protocol.NewMessenger(
 		identity,
@@ -165,12 +157,16 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB) error { /
 	}
 	s.accountsDB = accounts.NewDB(db)
 	s.messenger = messenger
+	return messenger.Init()
+}
+
+func (s *Service) StartMessenger() error {
 	// Start a loop that retrieves all messages and propagates them to status-react.
 	s.cancelMessenger = make(chan struct{})
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
-
-	return s.messenger.Init()
+	go s.verifyENSLoop(30*time.Second, s.cancelMessenger)
+	return s.messenger.Start()
 }
 
 func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
@@ -256,6 +252,35 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 	}
 
 	return coremessage, coretypes.TransactionStatus(receipt.Status), nil
+}
+
+func (s *Service) verifyENSLoop(tick time.Duration, cancel <-chan struct{}) {
+	if s.config.VerifyENSURL == "" || s.config.VerifyENSContractAddress == "" {
+		log.Warn("not starting ENS loop")
+		return
+	}
+
+	ticker := time.NewTicker(tick)
+	defer ticker.Stop()
+
+	ctx, cancelVerifyENS := context.WithCancel(context.Background())
+
+	for {
+		select {
+		case <-ticker.C:
+			response, err := s.messenger.VerifyENSNames(ctx, s.config.VerifyENSURL, s.config.VerifyENSContractAddress)
+			if err != nil {
+				log.Error("failed to validate ens", "err", err)
+				continue
+			}
+			if !response.IsEmpty() {
+				PublisherSignalHandler{}.NewMessages(response)
+			}
+		case <-cancel:
+			cancelVerifyENS()
+			return
+		}
+	}
 }
 
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {

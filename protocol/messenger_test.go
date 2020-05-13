@@ -30,6 +30,17 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
+const (
+	testPK              = "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
+	testPublicChatID    = "super-chat"
+	testContract        = "0x314159265dd8dbb310642f98f50c066173c1259b"
+	testValue           = "2000"
+	testTransactionHash = "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	testIdenticon       = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
+	testAlias           = "Concrete Lavender Xiphias"
+	newName             = "new-name"
+)
+
 func TestMessengerSuite(t *testing.T) {
 	suite.Run(t, new(MessengerSuite))
 }
@@ -124,8 +135,7 @@ func (s *MessengerSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecds
 func (s *MessengerSuite) newMessenger(shh types.Whisper) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-
-	return s.newMessengerWithKey(s.shh, privateKey)
+	return s.newMessengerWithKey(shh, privateKey)
 }
 
 func (s *MessengerSuite) TearDownTest() {
@@ -183,6 +193,7 @@ func (s *MessengerSuite) TestInit() {
 				key2, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				groupChat := Chat{
+					ID:       "some-id",
 					ChatType: ChatTypePrivateGroupChat,
 					Active:   true,
 					Members: []ChatMember{
@@ -309,12 +320,36 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
-	err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	count, err := s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
 	s.Require().NoError(err)
+	s.Require().Equal(uint64(1), count)
 
 	chats := s.m.Chats()
 	s.Require().Len(chats, 1)
 	s.Require().Equal(uint(1), chats[0].UnviewedMessagesCount)
+}
+
+func (s *MessengerSuite) TestMarkAllRead() {
+	chat := CreatePublicChat("test-chat", s.m.transport)
+	chat.UnviewedMessagesCount = 2
+	err := s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+	inputMessage1 := buildTestMessage(chat)
+	inputMessage1.ID = "1"
+	inputMessage1.Seen = false
+	inputMessage2 := buildTestMessage(chat)
+	inputMessage2.ID = "2"
+	inputMessage2.Seen = false
+
+	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
+	s.Require().NoError(err)
+
+	err = s.m.MarkAllRead(chat.ID)
+	s.Require().NoError(err)
+
+	chats := s.m.Chats()
+	s.Require().Len(chats, 1)
+	s.Require().Equal(uint(0), chats[0].UnviewedMessagesCount)
 }
 
 func (s *MessengerSuite) TestSendPublic() {
@@ -487,15 +522,12 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	sentMessage := sendResponse.Messages[0]
 
 	// Wait for the message to reach its destination
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
+
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Messages, 1)
@@ -600,15 +632,11 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Messages, 1)
@@ -654,15 +682,11 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 
 	sentMessage := sendResponse.Messages[0]
 
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Equal(len(response.Chats), 1)
@@ -692,15 +716,12 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	sentMessage := sendResponse.Messages[0]
 
 	// Wait for the message to reach its destination
-	var response *MessengerResponse
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err := WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
+
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -737,40 +758,6 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	s.Require().Equal(len(response.Chats), 0)
 }
 
-// Test receiving a message on an non-existing private public chat
-func (s *MessengerSuite) TestRetrieveTheirGroupChatNonExisting() {
-	theirMessenger := s.newMessenger(s.shh)
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", []string{})
-	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
-
-	chat := response.Chats[0]
-
-	err = theirMessenger.SaveChat(chat)
-	s.NoError(err)
-
-	inputMessage := buildTestMessage(*chat)
-
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
-
-	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Chats) == 1 {
-			err = errors.New("chat membership update not received")
-		}
-		return err
-	})
-	s.Require().NoError(err)
-
-	// The message is discarded
-	s.Require().Equal(0, len(response.Messages))
-	s.Require().Equal(0, len(response.Chats))
-}
-
 // Test receiving a message on an existing private group chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	var response *MessengerResponse
@@ -789,27 +776,22 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("chat invitation not received")
-		}
-		return err
-	})
+	_, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
 
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("no joining group event received")
-		}
-		return err
-	})
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
 	s.Require().NoError(err)
 
 	inputMessage := buildTestMessage(*ourChat)
@@ -820,14 +802,11 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 
 	sentMessage := sendResponse.Messages[0]
 
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -840,12 +819,11 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.Require().NotNil(actualChat.LastMessage)
 }
 
-// Test receiving a message on an existing private group chat, if messages
-// are not wrapped this will fail as they'll likely come out of order
-func (s *MessengerSuite) TestRetrieveTheirPrivateGroupWrappedMessageChat() {
+// Test receiving a message on an existing private group chat
+func (s *MessengerSuite) TestChangeNameGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger(s.shh)
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
 
@@ -859,45 +837,97 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupWrappedMessageChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Chats) == 0 {
-			err = errors.New("chat invitation not received")
-		}
-		return err
-	})
+	_, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
 
-	inputMessage := buildTestMessage(*ourChat)
+	// Wait for join group event
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
+	s.Require().NoError(err)
 
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	_, err = s.m.ChangeGroupChatName(context.Background(), ourChat.ID, newName)
 	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
 
-	sentMessage := sendResponse.Messages[0]
-
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	// Retrieve their messages so that the chat is created
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
 	actualChat := response.Chats[0]
-	// It updates the unviewed messages count
-	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
-	// It updates the last message clock value
-	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
-	// It sets the last message
-	s.Require().NotNil(actualChat.LastMessage)
+	s.Require().Equal(newName, actualChat.Name)
+}
+
+// Test being re-invited to a group chat
+func (s *MessengerSuite) TestReInvitedToGroupChat() {
+	var response *MessengerResponse
+	theirMessenger := s.newMessenger(s.shh)
+	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
+	s.NoError(err)
+	s.Require().Len(response.Chats, 1)
+
+	ourChat := response.Chats[0]
+
+	err = s.m.SaveChat(ourChat)
+	s.NoError(err)
+
+	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))}
+	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	_, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+
+	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
+	s.NoError(err)
+
+	// Wait for join group event
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
+	s.Require().NoError(err)
+
+	response, err = theirMessenger.LeaveGroupChat(context.Background(), ourChat.ID, true)
+	s.NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	s.Require().False(response.Chats[0].Active)
+
+	// And we get re-invited
+	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
+
+	s.Require().NoError(err)
+
+	s.Require().Len(response.Chats, 1)
+	s.Require().True(response.Chats[0].Active)
 }
 
 func (s *MessengerSuite) TestChatPersistencePublic() {
@@ -971,7 +1001,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 
 	s.Require().Equal(expectedChat, actualChat)
 
-	chat.Name = "updated-name"
+	chat.Name = "updated-name-1"
 	s.Require().NoError(s.m.SaveChat(&chat))
 	updatedChats := s.m.Chats()
 	s.Require().Equal(1, len(updatedChats))
@@ -983,10 +1013,9 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 }
 
 func (s *MessengerSuite) TestChatPersistenceOneToOne() {
-	pkStr := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
 	chat := Chat{
-		ID:                    pkStr,
-		Name:                  pkStr,
+		ID:                    testPK,
+		Name:                  testPK,
 		Color:                 "#fffff",
 		Active:                true,
 		ChatType:              ChatTypeOneToOne,
@@ -996,7 +1025,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		UnviewedMessagesCount: 40,
 		LastMessage:           []byte("test"),
 	}
-	publicKeyBytes, err := hex.DecodeString(pkStr[2:])
+	publicKeyBytes, err := hex.DecodeString(testPK[2:])
 	s.Require().NoError(err)
 
 	pk, err := crypto.UnmarshalPubkey(publicKeyBytes)
@@ -1089,14 +1118,12 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 }
 
 func (s *MessengerSuite) TestBlockContact() {
-	pk := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
-
 	contact := Contact{
-		ID:          pk,
+		ID:          testPK,
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
+		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
 			{
 				InstallationID: "1",
@@ -1279,12 +1306,12 @@ func (s *MessengerSuite) TestBlockContact() {
 
 func (s *MessengerSuite) TestContactPersistence() {
 	contact := Contact{
-		ID: "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1",
+		ID: testPK,
 
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
+		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
 			{
 				InstallationID: "1",
@@ -1306,92 +1333,20 @@ func (s *MessengerSuite) TestContactPersistence() {
 
 	actualContact := savedContacts[0]
 	expectedContact := &contact
-	expectedContact.Alias = "Concrete Lavender Xiphias"
-	expectedContact.Identicon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
+	expectedContact.Alias = testAlias
+	expectedContact.Identicon = testIdenticon
 	s.Require().Equal(expectedContact, actualContact)
 }
 
-func (s *MessengerSuite) TestVerifyENSNames() {
-	rpcEndpoint := os.Getenv("RPC_ENDPOINT")
-	if rpcEndpoint == "" {
-		s.T().Skip()
-	}
-	contractAddress := "0x314159265dd8dbb310642f98f50c066173c1259b"
-	pk1 := "04325367620ae20dd878dbb39f69f02c567d789dd21af8a88623dc5b529827c2812571c380a2cd8236a2851b8843d6486481166c39debf60a5d30b9099c66213e4"
-	pk2 := "044580b6aef9ddebd88c373b43c91237dcc95a8307bc5837d11d3ad2fa5d1dc696b598e7ccc498b414ba80b86b129c48e1eb9464cc9ea26224321539f2f54024cc"
-	pk3 := "044fee950d9748606da2f77d3c51bf16134a59bde4903aa68076a45d9eefbb54182a24f0c74b381bad0525a90e78770d11559aa02f77343d172f386e3b521c277a"
-	pk4 := "not a valid pk"
-
-	ensDetails := []enstypes.ENSDetails{
-		{
-			Name:            "pedro.stateofus.eth",
-			PublicKeyString: pk1,
-		},
-		// Not matching pk -> name
-		{
-			Name:            "pedro.stateofus.eth",
-			PublicKeyString: pk2,
-		},
-		// Not existing name
-		{
-			Name:            "definitelynotpedro.stateofus.eth",
-			PublicKeyString: pk3,
-		},
-		// Malformed pk
-		{
-			Name:            "pedro.stateofus.eth",
-			PublicKeyString: pk4,
-		},
-	}
-
-	response, err := s.m.VerifyENSNames(rpcEndpoint, contractAddress, ensDetails)
-	s.Require().NoError(err)
-	s.Require().Equal(4, len(response))
-
-	s.Require().Nil(response[pk1].Error)
-	s.Require().Nil(response[pk2].Error)
-	s.Require().NotNil(response[pk3].Error)
-	s.Require().NotNil(response[pk4].Error)
-
-	s.Require().True(response[pk1].Verified)
-	s.Require().False(response[pk2].Verified)
-	s.Require().False(response[pk3].Verified)
-	s.Require().False(response[pk4].Verified)
-
-	// The contacts are updated
-	savedContacts := s.m.Contacts()
-
-	s.Require().Equal(2, len(savedContacts))
-
-	var verifiedContact *Contact
-	var notVerifiedContact *Contact
-
-	if savedContacts[0].ID == pk1 {
-		verifiedContact = savedContacts[0]
-		notVerifiedContact = savedContacts[1]
-	} else {
-		notVerifiedContact = savedContacts[0]
-		verifiedContact = savedContacts[1]
-	}
-
-	s.Require().Equal("pedro.stateofus.eth", verifiedContact.Name)
-	s.Require().NotEqual(0, verifiedContact.ENSVerifiedAt)
-	s.Require().True(verifiedContact.ENSVerified)
-
-	s.Require().Equal("pedro.stateofus.eth", notVerifiedContact.Name)
-	s.Require().NotEqual(0, notVerifiedContact.ENSVerifiedAt)
-	s.Require().True(notVerifiedContact.ENSVerified)
-}
-
 func (s *MessengerSuite) TestContactPersistenceUpdate() {
-	contactID := "0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"
+	contactID := testPK
 
 	contact := Contact{
 		ID:          contactID,
 		Name:        "contact-name",
 		Photo:       "contact-photo",
 		LastUpdated: 20,
-		SystemTags:  []string{"1", "2"},
+		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
 			{
 				InstallationID: "1",
@@ -1414,12 +1369,12 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 	actualContact := savedContacts[0]
 	expectedContact := &contact
 
-	expectedContact.Alias = "Concrete Lavender Xiphias"
-	expectedContact.Identicon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAnElEQVR4nOzXQaqDMBRG4bZkLR10e12H23PgZuJUjJAcE8kdnG/44IXDhZ9iyjm/4vnMDrhmFmEWYRZhFpH6n1jW7fSX/+/b+WbQa5lFmEVUljhqZfSdoNcyizCLeNMvn3JTLeh+g17LLMIsorLElt2VK7v3X0dBr2UWYRaBfxNLfifOZhYRNGvAEp8Q9FpmEWYRZhFmEXsAAAD//5K5JFhu0M0nAAAAAElFTkSuQmCC"
+	expectedContact.Alias = testAlias
+	expectedContact.Identicon = testIdenticon
 
 	s.Require().Equal(expectedContact, actualContact)
 
-	contact.Name = "updated-name"
+	contact.Name = "updated-name-2"
 	s.Require().NoError(s.m.SaveContact(&contact))
 	updatedContact := s.m.Contacts()
 	s.Require().Equal(1, len(updatedContact))
@@ -1436,7 +1391,7 @@ func (s *MessengerSuite) TestSharedSecretHandler() {
 }
 
 func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
-	members := []string{"0x0424a68f89ba5fcd5e0640c1e1f591d561fa4125ca4e2a43592bc4123eca10ce064e522c254bb83079ba404327f6eafc01ec90a1444331fe769d3f3a7f90b0dde1"}
+	members := []string{testPK}
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", members)
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
@@ -1474,8 +1429,8 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 }
 
 func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
-	value := "0.01"
-	contract := "some-contract"
+	value := testValue
+	contract := testContract
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
@@ -1503,14 +1458,11 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1528,6 +1480,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 
 	// We decline the request
 	response, err = theirMessenger.DeclineRequestAddressForTransaction(context.Background(), receiverMessage.ID)
+	s.Require().NoError(err)
 	s.Require().Len(response.Chats, 1)
 	s.Require().Len(response.Messages, 1)
 
@@ -1542,14 +1495,11 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -1567,8 +1517,8 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 }
 
 func (s *MessengerSuite) TestSendEthTransaction() {
-	value := "2000"
-	contract := "some-contract"
+	value := testValue
+	contract := testContract
 
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1580,7 +1530,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	err := s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
-	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	transactionHash := testTransactionHash
 	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
 	s.Require().NoError(err)
 
@@ -1668,8 +1618,8 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 }
 
 func (s *MessengerSuite) TestSendTokenTransaction() {
-	value := "2000"
-	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	value := testValue
+	contract := testContract
 
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
@@ -1681,7 +1631,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	err := s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
-	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
+	transactionHash := testTransactionHash
 	signature, err := buildSignature(s.m.identity, &s.m.identity.PublicKey, transactionHash)
 	s.Require().NoError(err)
 
@@ -1769,8 +1719,8 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 }
 
 func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
-	value := "0.01"
-	contract := "some-contract"
+	value := testValue
+	contract := testContract
 	theirMessenger := s.newMessenger(s.shh)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
@@ -1798,14 +1748,11 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1823,6 +1770,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 
 	// We accept the request
 	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
+	s.Require().NoError(err)
 	s.Require().Len(response.Chats, 1)
 	s.Require().Len(response.Messages, 1)
 
@@ -1838,14 +1786,11 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats, 1)
@@ -1864,8 +1809,8 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 }
 
 func (s *MessengerSuite) TestDeclineRequestTransaction() {
-	value := "2000"
-	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	value := testValue
+	contract := testContract
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 	theirMessenger := s.newMessenger(s.shh)
@@ -1894,14 +1839,11 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1933,14 +1875,11 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal(CommandStateRequestTransactionDeclined, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -1957,8 +1896,8 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 }
 
 func (s *MessengerSuite) TestRequestTransaction() {
-	value := "2000"
-	contract := "0x314159265dd8dbb310642f98f50c066173c1259b"
+	value := testValue
+	contract := testContract
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 	theirMessenger := s.newMessenger(s.shh)
@@ -1987,14 +1926,11 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = theirMessenger.RetrieveAll()
-		if err == nil && len(response.Messages) == 0 {
-			err = errors.New("no messages")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		theirMessenger,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no messages",
+	)
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
@@ -2121,9 +2057,8 @@ func (m MockEthClient) TransactionByHash(ctx context.Context, hash types.Hash) (
 	mockTransaction, ok := m.messages[hash.Hex()]
 	if !ok {
 		return coretypes.Message{}, coretypes.TransactionStatusFailed, nil
-	} else {
-		return mockTransaction.Message, mockTransaction.Status, nil
 	}
+	return mockTransaction.Message, mockTransaction.Status, nil
 }
 
 func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request types.MessagesRequest) error {
@@ -2157,8 +2092,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 	s.Require().Equal(message, decodedMessage)
 }
 
-// TODO: For some reason is not mocking the method anymore, help?
-func (s *MessengerSuite) testRequestHistoricMessagesRequest() {
+func (s *MessengerSuite) TestRequestHistoricMessagesRequest() {
 	shh := &mockSendMessagesRequest{
 		Whisper: s.shh,
 	}
@@ -2325,4 +2259,16 @@ func (s *MessageHandlerSuite) TestRun() {
 			}
 		})
 	}
+}
+
+func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bool, errorMessage string) (*MessengerResponse, error) {
+	var response *MessengerResponse
+	return response, tt.RetryWithBackOff(func() error {
+		var err error
+		response, err = m.RetrieveAll()
+		if err == nil && !condition(response) {
+			err = errors.New(errorMessage)
+		}
+		return err
+	})
 }

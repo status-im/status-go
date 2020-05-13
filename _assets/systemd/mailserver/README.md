@@ -18,6 +18,7 @@ In order to manage the new `statusd` service you use other `Makefile` targets:
 
 * `make info` - Info about service
 * `make enode` - Get enode address
+* `make enode-qr` - Get enode address as QR code
 * `make start` - Start the service
 * `make stop` - Stop the service
 * `make status` - Check service status
@@ -35,6 +36,7 @@ All settings are passed through environment variables:
 * `SERVICE_NAME` - Name of the `systemd` service to be created. (Default: `statusd`)
 * `PUBLIC_IP` - Your IP visible from the internet and advertised by the Mailserver.
 * `LISTEN_PORT` - Mailserver TCP & UDP port, by default it's `30303` but you might want to use `443`.
+* `METRICS_PORT` - Port exposing metrics in [Prometheus](https://prometheus.io/docs/concepts/data_model/) format
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).
 * `API_MODULES` - API modules to be made available via the `RPC_PORT`.
 * `DATA_PATH` - Location of Mailserver storage and keys. (Default: `/var/tmp/status-go-mail`)

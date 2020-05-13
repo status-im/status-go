@@ -151,7 +151,6 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 
 	clientRPCClient := clientNode.RPCClient()
 
-	// TODO: Replace chat implementation with github.com/status-im/status-go-sdk
 	_, topic, _, err := joinPublicChat(clientWhisperService, clientRPCClient, *publicChannel)
 	if err != nil {
 		logger.Error("Failed to join public chat", "error", err)

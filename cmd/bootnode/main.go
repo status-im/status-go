@@ -43,7 +43,7 @@ func (f *bootnodes) Set(value string) error {
 	return nil
 }
 
-func main() { // nolint: gocyclo
+func main() {
 	flag.Var(&nursery, "n", "These nodes are used to connect to the network if the table is empty and there are no known nodes in the database.")
 	flag.Parse()
 

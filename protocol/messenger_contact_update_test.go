@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -101,14 +100,11 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().False(chat.Active, "It does not create an active chat")
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Contacts) == 0 {
-			err = errors.New("contact request not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 },
+		"contact request not received",
+	)
 	s.Require().NoError(err)
 
 	receivedContact := response.Contacts[0]
@@ -118,20 +114,19 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 
-	newName := "new-name"
 	newPicture := "new-picture"
 	err = theirMessenger.SendContactUpdates(context.Background(), newName, newPicture)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	err = tt.RetryWithBackOff(func() error {
-		var err error
-		response, err = s.m.RetrieveAll()
-		if err == nil && len(response.Contacts) == 0 || (len(response.Contacts) == 1 && response.Contacts[0].ID != theirContactID) {
-			err = errors.New("contact request not received")
-		}
-		return err
-	})
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool {
+			return len(r.Contacts) > 0 && response.Contacts[0].ID == theirContactID
+		},
+		"contact request not received",
+	)
+
 	s.Require().NoError(err)
 
 	receivedContact = response.Contacts[0]

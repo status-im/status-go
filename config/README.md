@@ -90,7 +90,7 @@ This config manages what peers and bootstrap nodes your `status-go` instance con
 {
   "ClusterConfig": {
     "Enabled": true,
-    "Fleet": "eth.beta",
+    "Fleet": "eth.prod",
     "BootNodes": [
       "enode://345ert345ert@23.45.67.89:30404"
     ],

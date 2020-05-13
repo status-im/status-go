@@ -1,9 +1,10 @@
 package ext
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
-	"go.uber.org/zap"
 )
 
 type TestNodeWrapper struct {

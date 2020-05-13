@@ -28,7 +28,7 @@ type TransfersSuite struct {
 }
 
 func (s *TransfersSuite) getAllTranfers() (rst []wallet.TransferView, err error) {
-	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.DevAccountAddress, (*hexutil.Big)(big.NewInt(0)))
+	return rst, s.Local.Call(&rst, "wallet_getTransfersByAddress", s.DevAccountAddress, (*hexutil.Big)(big.NewInt(1000)), (*hexutil.Big)(big.NewInt(40)))
 }
 
 func (s *TransfersSuite) sendTx(nonce uint64, to types.Address) {

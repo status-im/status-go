@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN appearance INT NOT NULL DEFAULT 0;

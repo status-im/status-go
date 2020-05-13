@@ -39,6 +39,19 @@ var (
 		Name: "whisper_rate_limits_exceeded_total",
 		Help: "Number of times the Waku rate limits were exceeded",
 	}, []string{"type"})
+	// bridging
+	bridgeSent = prom.NewCounter(prom.CounterOpts{
+		Name: "whisper_bridge_sent_total",
+		Help: "Number of envelopes bridged from Whisper",
+	})
+	bridgeReceivedSucceed = prom.NewCounter(prom.CounterOpts{
+		Name: "whisper_bridge_received_success_total",
+		Help: "Number of envelopes bridged to Whisper and successfully added",
+	})
+	bridgeReceivedFailed = prom.NewCounter(prom.CounterOpts{
+		Name: "whisper_bridge_received_failure_total",
+		Help: "Number of envelopes bridged to Whisper and failed to be added",
+	})
 )
 
 func init() {
@@ -49,4 +62,7 @@ func init() {
 	prom.MustRegister(envelopesSizeMeter)
 	prom.MustRegister(rateLimitsProcessed)
 	prom.MustRegister(rateLimitsExceeded)
+	prom.MustRegister(bridgeSent)
+	prom.MustRegister(bridgeReceivedSucceed)
+	prom.MustRegister(bridgeReceivedFailed)
 }

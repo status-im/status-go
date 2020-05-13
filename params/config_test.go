@@ -22,7 +22,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	c, err := params.NewNodeConfigWithDefaults(
 		"/some/data/path",
 		params.RopstenNetworkID,
-		params.WithFleet(params.FleetBeta),
+		params.WithFleet(params.FleetProd),
 		params.WithLES(),
 		params.WithMailserver(),
 	)
@@ -38,7 +38,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.NotEmpty(t, c.WhisperConfig.MailServerPassword)
 	// assert cluster
 	assert.Equal(t, false, c.NoDiscovery)
-	assert.Equal(t, params.FleetBeta, c.ClusterConfig.Fleet)
+	assert.Equal(t, params.FleetProd, c.ClusterConfig.Fleet)
 	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
 	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
 	assert.NotEmpty(t, c.ClusterConfig.RendezvousNodes)
@@ -213,20 +213,6 @@ func TestNodeConfigValidate(t *testing.T) {
 				"Rendezvous": true
 			}`,
 			Error: "Rendezvous is enabled, but ClusterConfig.RendezvousNodes is empty",
-		},
-		{
-			Name: "Validate that ClusterConfig.RendezvousNodes is verified to contain nodes if Rendezvous is enabled",
-			Config: `{
-				"NetworkId": 1,
-				"DataDir": "/some/dir",
-				"KeyStoreDir": "/some/dir",
-				"NoDiscovery": true,
-				"Rendezvous": false,
-				"ClusterConfig": {
-					"RendezvousNodes": ["a"]
-				}
-			}`,
-			Error: "Rendezvous is disabled, but ClusterConfig.RendezvousNodes is not empty",
 		},
 		{
 			Name: "Validate that WhisperConfig.DataDir is checked to not be empty if mailserver is enabled",
@@ -486,6 +472,13 @@ func TestNodeConfigValidate(t *testing.T) {
 				"Port": "required",
 			},
 			Error: "field Port is required if incentivisation is enabled",
+		},
+		{
+			Name:   "Missing APIModules",
+			Config: `{"NetworkId": 1, "DataDir": "/tmp/data", "KeyStoreDir": "/tmp/data", "APIModules" :""}`,
+			FieldErrors: map[string]string{
+				"APIModules": "required",
+			},
 		},
 	}
 

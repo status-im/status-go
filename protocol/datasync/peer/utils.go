@@ -3,9 +3,9 @@ package peer
 import (
 	"crypto/ecdsa"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-
 	"github.com/vacp2p/mvds/state"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 func PublicKeyToPeerID(k ecdsa.PublicKey) state.PeerID {
@@ -14,6 +14,6 @@ func PublicKeyToPeerID(k ecdsa.PublicKey) state.PeerID {
 	return p
 }
 
-func PeerIDToPublicKey(p state.PeerID) (*ecdsa.PublicKey, error) {
+func IDToPublicKey(p state.PeerID) (*ecdsa.PublicKey, error) {
 	return crypto.UnmarshalPubkey(p[:])
 }

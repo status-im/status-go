@@ -53,14 +53,14 @@ func NewBaseRegistrar(backend bind.ContractBackend, domain string) (*BaseRegistr
 
 	// Ensure this really is a base registrar.  To do this confirm that it supports
 	// the expected interfaces.
-	supported, err := contract.SupportsInterface(nil, [4]byte{0x6c, 0xcb, 0x2d, 0xf4})
-	if err != nil {
-		return nil, err
-	}
-	if !supported {
-		return nil, fmt.Errorf("purported registrar for domain %s does not support nametoken functionality", domain)
-	}
-	supported, err = contract.SupportsInterface(nil, [4]byte{0x28, 0xed, 0x4f, 0x6c})
+	//supported, err := contract.SupportsInterface(nil, [4]byte{0x01, 0x8f, 0xac, 0x06})
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if !supported {
+	//	return nil, fmt.Errorf("purported registrar for domain %s does not support nametoken functionality", domain)
+	//}
+	supported, err := contract.SupportsInterface(nil, [4]byte{0x28, 0xed, 0x4f, 0x6c})
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,8 @@ func NewBaseRegistrar(backend bind.ContractBackend, domain string) (*BaseRegistr
 func (r *BaseRegistrar) PriorAuctionContract() (*AuctionRegistrar, error) {
 	address, err := r.Contract.PreviousRegistrar(nil)
 	if err != nil {
-		return nil, errors.New("no prior auction contract")
+		// Means there is no prior registrar.
+		return nil, nil
 	}
 	auctionContract, err := NewAuctionRegistrarAt(r.backend, r.domain, address)
 	if err != nil {
@@ -91,18 +92,26 @@ func (r *BaseRegistrar) PriorAuctionContract() (*AuctionRegistrar, error) {
 	var shaBid [32]byte
 	var emptyHash [32]byte
 	sha := sha3.NewLegacyKeccak256()
-	sha.Write(emptyHash[:])
-	sha.Write(UnknownAddress.Bytes())
+	if _, err := sha.Write(emptyHash[:]); err != nil {
+		return nil, err
+	}
+	if _, err := sha.Write(UnknownAddress.Bytes()); err != nil {
+		return nil, err
+	}
 	var amountBytes [32]byte
-	sha.Write(amountBytes[:])
-	sha.Write(emptyHash[:])
+	if _, err := sha.Write(amountBytes[:]); err != nil {
+		return nil, err
+	}
+	if _, err := sha.Write(emptyHash[:]); err != nil {
+		return nil, err
+	}
 	sha.Sum(shaBid[:0])
 
 	contractShaBid, err := auctionContract.ShaBid(emptyHash, UnknownAddress, big.NewInt(0), emptyHash)
 	if err != nil {
 		return nil, errors.New("failed to confirm auction contract")
 	}
-	if bytes.Compare(contractShaBid[:], shaBid[:]) != 0 {
+	if !bytes.Equal(contractShaBid[:], shaBid[:]) {
 		return nil, errors.New("failed to confirm auction contract")
 	}
 

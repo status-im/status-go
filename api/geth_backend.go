@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
@@ -54,6 +53,10 @@ var (
 	ErrWhisperClearIdentitiesFailure = errors.New("failed to clear whisper identities")
 	// ErrWhisperIdentityInjectionFailure injecting whisper identities has failed.
 	ErrWhisperIdentityInjectionFailure = errors.New("failed to inject identity into Whisper")
+	// ErrWakuClearIdentitiesFailure clearing whisper identities has failed.
+	ErrWakuClearIdentitiesFailure = errors.New("failed to clear waku identities")
+	// ErrWakuIdentityInjectionFailure injecting whisper identities has failed.
+	ErrWakuIdentityInjectionFailure = errors.New("failed to inject identity into waku")
 	// ErrUnsupportedRPCMethod is for methods not supported by the RPC interface
 	ErrUnsupportedRPCMethod = errors.New("method is unsupported by RPC interface")
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
@@ -67,19 +70,19 @@ var _ StatusBackend = (*GethStatusBackend)(nil)
 type GethStatusBackend struct {
 	mu sync.Mutex
 	// rootDataDir is the same for all networks.
-	rootDataDir             string
-	appDB                   *sql.DB
-	statusNode              *node.StatusNode
-	personalAPI             *personal.PublicAPI
-	rpcFilters              *rpcfilters.Service
-	multiaccountsDB         *multiaccounts.Database
-	accountManager          *account.GethManager
-	transactor              *transactions.Transactor
-	connectionState         connectionState
-	appState                appState
-	selectedAccountShhKeyID string
-	log                     log.Logger
-	allowAllRPC             bool // used only for tests, disables api method restrictions
+	rootDataDir          string
+	appDB                *sql.DB
+	statusNode           *node.StatusNode
+	personalAPI          *personal.PublicAPI
+	rpcFilters           *rpcfilters.Service
+	multiaccountsDB      *multiaccounts.Database
+	accountManager       *account.GethManager
+	transactor           *transactions.Transactor
+	connectionState      connectionState
+	appState             appState
+	selectedAccountKeyID string
+	log                  log.Logger
+	allowAllRPC          bool // used only for tests, disables api method restrictions
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -116,9 +119,9 @@ func (b *GethStatusBackend) Transactor() *transactions.Transactor {
 	return b.transactor
 }
 
-// SelectedAccountShhKeyID returns a Whisper key ID of the selected chat key pair.
-func (b *GethStatusBackend) SelectedAccountShhKeyID() string {
-	return b.selectedAccountShhKeyID
+// SelectedAccountKeyID returns a Whisper key ID of the selected chat key pair.
+func (b *GethStatusBackend) SelectedAccountKeyID() string {
+	return b.selectedAccountKeyID
 }
 
 // IsNodeRunning confirm that node is running
@@ -205,6 +208,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err != nil {
 		return err
 	}
+
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
@@ -233,6 +237,9 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
 	err = b.injectAccountIntoServices()
 	if err != nil {
+		return err
+	}
+	if err := b.startWallet(); err != nil {
 		return err
 	}
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
@@ -273,7 +280,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
-	watchAddrs, err := accountsDB.GetAddresses()
+	watchAddrs, err := accountsDB.GetWalletAddresses()
 	if err != nil {
 		return err
 	}
@@ -364,14 +371,39 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	var conf params.NodeConfig
-	err := accounts.NewDB(b.appDB).GetNodeConfig(&conf)
+	accountDB := accounts.NewDB(b.appDB)
+	err := accountDB.GetNodeConfig(&conf)
 	if err != nil {
 		return nil, err
+	}
+	settings, err := accountDB.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	// NodeConfig is denormalized and we can't migrate it easily
+	// WakuEnabled is pulled from settings and it's the source
+	// of truth on whether `WakuConfig` or `WhisperConfig` should be enabled
+	if settings.WakuEnabled {
+		conf.WakuConfig.Enabled = true
+		conf.WhisperConfig.Enabled = false
+	} else {
+		conf.WakuConfig.Enabled = false
+		conf.WhisperConfig.Enabled = true
 	}
 	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
 	conf.Version = params.Version
+	conf.DataDir = filepath.Join(b.rootDataDir, conf.DataDir)
+	conf.ShhextConfig.BackupDisabledDataDir = filepath.Join(b.rootDataDir, conf.ShhextConfig.BackupDisabledDataDir)
+	if len(conf.LogDir) == 0 {
+		conf.LogFile = filepath.Join(b.rootDataDir, conf.LogFile)
+	} else {
+		conf.LogFile = filepath.Join(conf.LogDir, conf.LogFile)
+	}
+	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
+
 	return &conf, nil
 }
 
@@ -423,6 +455,9 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 			err = fmt.Errorf("node crashed on start: %v", err)
 		}
 	}()
+
+	// Update config with some defaults.
+	config.UpdateWithMobileDefaults()
 
 	// Start by validating configuration
 	if err := config.Validate(); err != nil {
@@ -764,6 +799,37 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
+	if s == appStateForeground {
+		wallet, err := b.statusNode.WalletService()
+		if err != nil {
+			b.log.Error("Retrieving of wallet service failed on app state change to active", "error", err)
+			return
+		}
+		if !wallet.IsStarted() {
+			err = wallet.Start(b.statusNode.Server())
+			if err != nil {
+				b.log.Error("Wallet service start failed on app state change to active", "error", err)
+				return
+			}
+
+			err = b.startWallet()
+			if err != nil {
+				b.log.Error("Wallet reactor start failed on app state change to active", "error", err)
+				return
+			}
+		}
+	} else if s == appStateBackground {
+		wallet, err := b.statusNode.WalletService()
+		if err != nil {
+			b.log.Error("Retrieving of wallet service failed on app state change to background", "error", err)
+			return
+		}
+		err = wallet.Stop()
+		if err != nil {
+			b.log.Error("Wallet service stop failed on app state change to background", "error", err)
+			return
+		}
+	}
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }
@@ -796,10 +862,22 @@ func (b *GethStatusBackend) cleanupServices() error {
 		if err := whisperService.DeleteKeyPairs(); err != nil {
 			return fmt.Errorf("%s: %v", ErrWhisperClearIdentitiesFailure, err)
 		}
-		b.selectedAccountShhKeyID = ""
+		b.selectedAccountKeyID = ""
 	default:
 		return err
 	}
+	wakuService, err := b.statusNode.WakuService()
+	switch err {
+	case node.ErrServiceUnknown: // Waku was never registered
+	case nil:
+		if err := wakuService.DeleteKeyPairs(); err != nil {
+			return fmt.Errorf("%s: %v", ErrWakuClearIdentitiesFailure, err)
+		}
+		b.selectedAccountKeyID = ""
+	default:
+		return err
+	}
+
 	if b.statusNode.Config().WalletConfig.Enabled {
 		wallet, err := b.statusNode.WalletService()
 		switch err {
@@ -868,7 +946,7 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 		if err := whisperService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
 			return err
 		}
-		b.selectedAccountShhKeyID, err = whisperService.AddKeyPair(identity)
+		b.selectedAccountKeyID, err = whisperService.AddKeyPair(identity)
 		if err != nil {
 			return ErrWhisperIdentityInjectionFailure
 		}
@@ -882,7 +960,35 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 			return err
 		}
 
-		if err := st.InitProtocol(identity, b.appDB); err != nil {
+		if err := st.InitProtocol(identity, b.appDB, logutils.ZapLogger()); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	wakuService, err := b.statusNode.WakuService()
+
+	switch err {
+	case node.ErrServiceUnknown: // Waku was never registered
+	case nil:
+		if err := wakuService.DeleteKeyPairs(); err != nil { // err is not possible; method return value is incorrect
+			return err
+		}
+		b.selectedAccountKeyID, err = wakuService.AddKeyPair(identity)
+		if err != nil {
+			return ErrWakuIdentityInjectionFailure
+		}
+	default:
+		return err
+	}
+
+	if wakuService != nil {
+		st, err := b.statusNode.WakuExtService()
+		if err != nil {
+			return err
+		}
+
+		if err := st.InitProtocol(identity, b.appDB, logutils.ZapLogger()); err != nil {
 			return err
 		}
 	}
@@ -905,16 +1011,23 @@ func (b *GethStatusBackend) startWallet() error {
 		return err
 	}
 
-	allAddresses := make([]common.Address, len(watchAddresses)+1)
-	allAddresses[0] = common.Address(mainAccountAddress)
-	for i, addr := range watchAddresses {
-		allAddresses[1+i] = common.Address(addr)
+	uniqAddressesMap := map[common.Address]struct{}{}
+	allAddresses := []common.Address{}
+	mainAddress := common.Address(mainAccountAddress)
+	uniqAddressesMap[mainAddress] = struct{}{}
+	allAddresses = append(allAddresses, mainAddress)
+	for _, addr := range watchAddresses {
+		address := common.Address(addr)
+		if _, ok := uniqAddressesMap[address]; !ok {
+			uniqAddressesMap[address] = struct{}{}
+			allAddresses = append(allAddresses, address)
+		}
 	}
+
 	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,
-		new(big.Int).SetUint64(b.statusNode.Config().NetworkID),
-	)
+		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
 }
 
 // InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.
@@ -954,53 +1067,6 @@ func (b *GethStatusBackend) SignGroupMembership(content string) (string, error) 
 	}
 
 	return crypto.SignStringAsHex(content, selectedChatAccount.AccountKey.PrivateKey)
-}
-
-// EnableInstallation enables an installation for multi-device sync.
-func (b *GethStatusBackend) EnableInstallation(installationID string) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	if err := st.EnableInstallation(installationID); err != nil {
-		b.log.Error("error enabling installation", "err", err)
-		return err
-	}
-
-	return nil
-}
-
-// DisableInstallation disables an installation for multi-device sync.
-func (b *GethStatusBackend) DisableInstallation(installationID string) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-
-	if err := st.DisableInstallation(installationID); err != nil {
-		b.log.Error("error disabling installation", "err", err)
-		return err
-	}
-
-	return nil
-}
-
-// UpdateMailservers on ShhExtService.
-func (b *GethStatusBackend) UpdateMailservers(enodes []string) error {
-	st, err := b.statusNode.ShhExtService()
-	if err != nil {
-		return err
-	}
-	nodes := make([]*enode.Node, len(enodes))
-	for i, rawurl := range enodes {
-		node, err := enode.ParseV4(rawurl)
-		if err != nil {
-			return err
-		}
-		nodes[i] = node
-	}
-	return st.UpdateMailservers(nodes)
 }
 
 // SignHash exposes vanilla ECDSA signing for signing a message for Swarm

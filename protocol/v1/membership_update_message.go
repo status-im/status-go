@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
@@ -103,14 +102,14 @@ type MembershipUpdateEvent struct {
 	ClockValue uint64                                   `json:"clockValue"`
 	Members    []string                                 `json:"members,omitempty"` // in "members-added" and "admins-added" events
 	Name       string                                   `json:"name,omitempty"`    // name of the group chat
-	From       string
-	Signature  []byte
-	ChatID     string
-	RawPayload []byte
+	From       string                                   `json:"from,omitempty"`
+	Signature  []byte                                   `json:"signature,omitempty"`
+	ChatID     string                                   `json:"chatId"`
+	RawPayload []byte                                   `json:"rawPayload"`
 }
 
 func (u *MembershipUpdateEvent) Equal(update MembershipUpdateEvent) bool {
-	return bytes.Compare(u.Signature, update.Signature) == 0
+	return bytes.Equal(u.Signature, update.Signature)
 }
 
 func (u *MembershipUpdateEvent) Sign(key *ecdsa.PrivateKey) error {
@@ -232,9 +231,8 @@ func NewGroupWithEvents(chatID string, events []MembershipUpdateEvent) (*Group, 
 	return newGroup(chatID, events)
 }
 
-func NewGroupWithCreator(name string, creator *ecdsa.PrivateKey) (*Group, error) {
+func NewGroupWithCreator(name string, clock uint64, creator *ecdsa.PrivateKey) (*Group, error) {
 	chatID := groupChatID(&creator.PublicKey)
-	clock := TimestampInMsFromTime(time.Now())
 	chatCreated := NewChatCreatedEvent(name, clock)
 	chatCreated.ChatID = chatID
 	err := chatCreated.Sign(creator)
@@ -242,10 +240,6 @@ func NewGroupWithCreator(name string, creator *ecdsa.PrivateKey) (*Group, error)
 		return nil, err
 	}
 	return newGroup(chatID, []MembershipUpdateEvent{chatCreated})
-}
-
-func NewGroup(chatID string, events []MembershipUpdateEvent) (*Group, error) {
-	return newGroup(chatID, events)
 }
 
 func newGroup(chatID string, events []MembershipUpdateEvent) (*Group, error) {
@@ -295,12 +289,12 @@ func (g Group) ChatID() string {
 	return g.chatID
 }
 
-func (g Group) Events() []MembershipUpdateEvent {
-	return g.events
-}
-
 func (g Group) Name() string {
 	return g.name
+}
+
+func (g Group) Events() []MembershipUpdateEvent {
+	return g.events
 }
 
 func (g Group) Members() []string {
@@ -437,20 +431,6 @@ func stringSliceSubset(subset []string, set []string) bool {
 		}
 	}
 	return false
-}
-
-func stringSliceEquals(slice1, slice2 []string) bool {
-	set := map[string]struct{}{}
-	for _, s := range slice1 {
-		set[s] = struct{}{}
-	}
-	for _, s := range slice2 {
-		_, ok := set[s]
-		if !ok {
-			return false
-		}
-	}
-	return true
 }
 
 func publicKeyToString(publicKey *ecdsa.PublicKey) string {

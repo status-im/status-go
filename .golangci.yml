@@ -11,6 +11,8 @@ run:
     - bindata.go
     - .*_mock.go
     - contracts/
+    - eth-node/crypto/ecies/ # copied
+    - eth-node/keystore/ # copied
 
 output:
   format: colored-line-number
@@ -29,8 +31,6 @@ linters-settings:
     simplify: true
   goimports:
     local-prefixes: github.com/ethereum/go-ethereum,github.com/status-im/status-go
-  gocyclo:
-    min-complexity: 16
   maligned:
     suggest-new: true
   dupl:
@@ -46,7 +46,6 @@ linters:
     - errcheck
     - gosec
     - goconst
-    - gocyclo
     - goimports
     - golint
     - govet
@@ -65,3 +64,16 @@ issues:
     - "G304: Potential file inclusion via variable" # gosec
     - "G104: Errors unhandled." #gosec
     - "lib._Ctype_char, which can be annoying to use" # golint
+  exclude-rules:
+    - path: eth-node/keystore/passphrase\.go
+      text: "make it a constant"
+      linters:
+        - goconst
+    - path: protocol/message_handler\.go
+      text: "make it a constant"
+      linters:
+        - goconst
+    - path: protocol/.*_test\.go
+      text: "make it a constant"
+      linters:
+        - goconst

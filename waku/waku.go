@@ -24,9 +24,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"math"
 	"runtime"
 	"sync"
 	"time"
@@ -38,7 +35,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	"golang.org/x/crypto/pbkdf2"
 
-	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -46,54 +43,68 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+
+	"github.com/status-im/status-go/waku/common"
+	v0 "github.com/status-im/status-go/waku/v0"
+	v1 "github.com/status-im/status-go/waku/v1"
 )
 
-// TimeSyncError error for clock skew errors.
-type TimeSyncError error
+const messageQueueLimit = 1024
+
+type Bridge interface {
+	Pipe() (<-chan *common.Envelope, chan<- *common.Envelope)
+}
 
 type settings struct {
-	MaxMsgSize               uint32  // Maximal message length allowed by the waku node
-	EnableConfirmations      bool    // Enable sending message confirmations
-	MinPow                   float64 // Minimal PoW required by the waku node
-	MinPowTolerance          float64 // Minimal PoW tolerated by the waku node for a limited time
-	BloomFilter              []byte  // Bloom filter for topics of interest for this node
-	BloomFilterTolerance     []byte  // Bloom filter tolerated by the waku node for a limited time
-	LightClient              bool    // Light client mode enabled does not forward messages
-	RestrictLightClientsConn bool    // Restrict connection between two light clients
-	SyncAllowance            int     // Maximum time in seconds allowed to process the waku-related messages
+	MaxMsgSize               uint32                    // Maximal message length allowed by the waku node
+	EnableConfirmations      bool                      // Enable sending message confirmations
+	MinPow                   float64                   // Minimal PoW required by the waku node
+	MinPowTolerance          float64                   // Minimal PoW tolerated by the waku node for a limited time
+	BloomFilter              []byte                    // Bloom filter for topics of interest for this node
+	BloomFilterTolerance     []byte                    // Bloom filter tolerated by the waku node for a limited time
+	TopicInterest            map[common.TopicType]bool // Topic interest for this node
+	TopicInterestTolerance   map[common.TopicType]bool // Topic interest tolerated by the waku node for a limited time
+	BloomFilterMode          bool                      // Whether we should match against bloom-filter only
+	LightClient              bool                      // Light client mode enabled does not forward messages
+	RestrictLightClientsConn bool                      // Restrict connection between two light clients
+	SyncAllowance            int                       // Maximum time in seconds allowed to process the waku-related messages
 }
 
 // Waku represents a dark communication interface through the Ethereum
 // network, using its very own P2P communication layer.
 type Waku struct {
-	protocol p2p.Protocol // Protocol description and parameters
-	filters  *Filters     // Message filters installed with Subscribe function
+	protocols []p2p.Protocol  // Peer description and parameters
+	filters   *common.Filters // Message filters installed with Subscribe function
 
 	privateKeys map[string]*ecdsa.PrivateKey // Private key storage
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
-	envelopes   map[common.Hash]*Envelope // Pool of envelopes currently tracked by this node
-	expirations map[uint32]mapset.Set     // Message expiration pool
-	poolMu      sync.RWMutex              // Mutex to sync the message and expiration pools
+	envelopes   map[gethcommon.Hash]*common.Envelope // Pool of envelopes currently tracked by this node
+	expirations map[uint32]mapset.Set                // Message expiration pool
+	poolMu      sync.RWMutex                         // Mutex to sync the message and expiration pools
 
-	peers  map[*Peer]struct{} // Set of currently active peers
-	peerMu sync.RWMutex       // Mutex to sync the active peer set
+	peers  map[common.Peer]struct{} // Set of currently active peers
+	peerMu sync.RWMutex             // Mutex to sync the active peer set
 
-	msgQueue    chan *Envelope   // Message queue for normal waku messages
-	p2pMsgQueue chan interface{} // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
-	quit        chan struct{}    // Channel used for graceful exit
+	msgQueue    chan *common.Envelope // Message queue for normal waku messages
+	p2pMsgQueue chan interface{}      // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
+	quit        chan struct{}         // Channel used for graceful exit
 
 	settings   settings     // Holds configuration settings that can be dynamically changed
 	settingsMu sync.RWMutex // Mutex to sync the settings access
 
 	mailServer MailServer
 
-	rateLimiter *PeerRateLimiter
+	rateLimiter *common.PeerRateLimiter
 
 	envelopeFeed event.Feed
 
 	timeSource func() time.Time // source of time for waku
+
+	bridge       Bridge
+	bridgeWg     sync.WaitGroup
+	cancelBridge chan struct{}
 
 	logger *zap.Logger
 }
@@ -112,10 +123,10 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 	waku := &Waku{
 		privateKeys: make(map[string]*ecdsa.PrivateKey),
 		symKeys:     make(map[string][]byte),
-		envelopes:   make(map[common.Hash]*Envelope),
+		envelopes:   make(map[gethcommon.Hash]*common.Envelope),
 		expirations: make(map[uint32]mapset.Set),
-		peers:       make(map[*Peer]struct{}),
-		msgQueue:    make(chan *Envelope, messageQueueLimit),
+		peers:       make(map[common.Peer]struct{}),
+		msgQueue:    make(chan *common.Envelope, messageQueueLimit),
 		p2pMsgQueue: make(chan interface{}, messageQueueLimit),
 		quit:        make(chan struct{}),
 		timeSource:  time.Now,
@@ -128,38 +139,48 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 		MinPowTolerance:          cfg.MinimumAcceptedPoW,
 		EnableConfirmations:      cfg.EnableConfirmations,
 		LightClient:              cfg.LightClient,
+		BloomFilterMode:          cfg.BloomFilterMode,
 		RestrictLightClientsConn: cfg.RestrictLightClientsConn,
-		SyncAllowance:            DefaultSyncAllowance,
+		SyncAllowance:            common.DefaultSyncAllowance,
 	}
 
 	if cfg.FullNode {
-		waku.settings.BloomFilter = MakeFullNodeBloom()
-		waku.settings.BloomFilterTolerance = MakeFullNodeBloom()
+		waku.settings.BloomFilter = common.MakeFullNodeBloom()
+		waku.settings.BloomFilterTolerance = common.MakeFullNodeBloom()
 	}
 
-	waku.filters = NewFilters(waku)
+	waku.filters = common.NewFilters()
 
 	// p2p waku sub-protocol handler
-	waku.protocol = p2p.Protocol{
-		Name:    ProtocolName,
-		Version: uint(ProtocolVersion),
-		Length:  NumberOfMessageCodes,
-		Run:     waku.HandlePeer,
+	waku.protocols = []p2p.Protocol{{
+		Name:    v0.Name,
+		Version: uint(v0.Version),
+		Length:  v0.NumberOfMessageCodes,
+		Run:     waku.handlePeerV0,
 		NodeInfo: func() interface{} {
 			return map[string]interface{}{
-				"version":        ProtocolVersionStr,
+				"version":        v0.VersionStr,
 				"maxMessageSize": waku.MaxMessageSize(),
 				"minimumPoW":     waku.MinPow(),
 			}
 		},
+	},
+		{
+			Name:    v1.Name,
+			Version: uint(v1.Version),
+			Length:  v1.NumberOfMessageCodes,
+			Run:     waku.handlePeerV1,
+			NodeInfo: func() interface{} {
+				return map[string]interface{}{
+					"version":        v1.VersionStr,
+					"maxMessageSize": waku.MaxMessageSize(),
+					"minimumPoW":     waku.MinPow(),
+				}
+			},
+		},
 	}
 
 	return waku
-}
-
-// Version returns the waku sub-protocol version number.
-func (w *Waku) Version() uint {
-	return w.protocol.Version
 }
 
 // MinPow returns the PoW value required by this node.
@@ -184,10 +205,14 @@ func (w *Waku) SetMinimumPoW(val float64, tolerate bool) error {
 	if tolerate {
 		go func() {
 			// allow some time before all the peers have processed the notification
-			time.Sleep(time.Duration(w.settings.SyncAllowance) * time.Second)
-			w.settingsMu.Lock()
-			w.settings.MinPowTolerance = val
-			w.settingsMu.Unlock()
+			select {
+			case <-w.quit:
+				return
+			case <-time.After(time.Duration(w.settings.SyncAllowance) * time.Second):
+				w.settingsMu.Lock()
+				w.settings.MinPowTolerance = val
+				w.settingsMu.Unlock()
+			}
 		}()
 	}
 
@@ -223,26 +248,108 @@ func (w *Waku) BloomFilterTolerance() []byte {
 	return w.settings.BloomFilterTolerance
 }
 
+// BloomFilterMode returns whether the node is running in bloom filter mode
+func (w *Waku) BloomFilterMode() bool {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	return w.settings.BloomFilterMode
+}
+
 // SetBloomFilter sets the new bloom filter
 func (w *Waku) SetBloomFilter(bloom []byte) error {
-	if len(bloom) != BloomFilterSize {
+	if len(bloom) != common.BloomFilterSize {
 		return fmt.Errorf("invalid bloom filter size: %d", len(bloom))
 	}
 
-	b := make([]byte, BloomFilterSize)
+	b := make([]byte, common.BloomFilterSize)
 	copy(b, bloom)
 
 	w.settingsMu.Lock()
 	w.settings.BloomFilter = b
+	// Setting bloom filter reset topic interest
+	w.settings.TopicInterest = nil
 	w.settingsMu.Unlock()
 	w.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
-		time.Sleep(time.Duration(w.settings.SyncAllowance) * time.Second)
-		w.settingsMu.Lock()
-		w.settings.BloomFilterTolerance = b
-		w.settingsMu.Unlock()
+		select {
+		case <-w.quit:
+			return
+		case <-time.After(time.Duration(w.settings.SyncAllowance) * time.Second):
+			w.settingsMu.Lock()
+			w.settings.BloomFilterTolerance = b
+			w.settingsMu.Unlock()
+		}
+
+	}()
+
+	return nil
+}
+
+// TopicInterest returns the all the topics of interest.
+// The nodes are required to send only messages that match the advertised topics.
+// If a message does not match the topic-interest, it will tantamount to spam, and the peer will
+// be disconnected.
+func (w *Waku) TopicInterest() []common.TopicType {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	if w.settings.TopicInterest == nil {
+		return nil
+	}
+	topicInterest := make([]common.TopicType, len(w.settings.TopicInterest))
+
+	i := 0
+	for topic := range w.settings.TopicInterest {
+		topicInterest[i] = topic
+		i++
+	}
+	return topicInterest
+}
+
+// updateTopicInterest adds a new topic interest
+// and informs the peers
+func (w *Waku) updateTopicInterest(f *common.Filter) error {
+	newTopicInterest := w.TopicInterest()
+	for _, t := range f.Topics {
+		top := common.BytesToTopic(t)
+		newTopicInterest = append(newTopicInterest, top)
+	}
+
+	return w.SetTopicInterest(newTopicInterest)
+}
+
+// SetTopicInterest sets the new topicInterest
+func (w *Waku) SetTopicInterest(topicInterest []common.TopicType) error {
+	var topicInterestMap map[common.TopicType]bool
+	if len(topicInterest) > common.MaxTopicInterest {
+		return fmt.Errorf("invalid topic interest: %d", len(topicInterest))
+	}
+
+	if topicInterest != nil {
+		topicInterestMap = make(map[common.TopicType]bool, len(topicInterest))
+		for _, topic := range topicInterest {
+			topicInterestMap[topic] = true
+		}
+	}
+
+	w.settingsMu.Lock()
+	w.settings.TopicInterest = topicInterestMap
+	// Setting topic interest resets bloom filter
+	w.settings.BloomFilter = nil
+	w.settingsMu.Unlock()
+	w.notifyPeersAboutTopicInterestChange(topicInterest)
+
+	go func() {
+		// allow some time before all the peers have processed the notification
+		select {
+		case <-w.quit:
+			return
+		case <-time.After(time.Duration(w.settings.SyncAllowance) * time.Second):
+			w.settingsMu.Lock()
+			w.settings.TopicInterestTolerance = topicInterestMap
+			w.settingsMu.Unlock()
+		}
 	}()
 
 	return nil
@@ -257,8 +364,8 @@ func (w *Waku) MaxMessageSize() uint32 {
 
 // SetMaxMessageSize sets the maximal message size allowed by this node
 func (w *Waku) SetMaxMessageSize(size uint32) error {
-	if size > MaxMessageSize {
-		return fmt.Errorf("message size too large [%d>%d]", size, MaxMessageSize)
+	if size > common.MaxMessageSize {
+		return fmt.Errorf("message size too large [%d>%d]", size, common.MaxMessageSize)
 	}
 	w.settingsMu.Lock()
 	w.settings.MaxMsgSize = size
@@ -288,13 +395,13 @@ func (w *Waku) LightClientModeConnectionRestricted() bool {
 }
 
 // RateLimiting returns RateLimits information.
-func (w *Waku) RateLimits() RateLimits {
+func (w *Waku) RateLimits() common.RateLimits {
 	if w.rateLimiter == nil {
-		return RateLimits{}
+		return common.RateLimits{}
 	}
-	return RateLimits{
-		IPLimits:     uint64(w.rateLimiter.limitPerSecIP),
-		PeerIDLimits: uint64(w.rateLimiter.limitPerSecPeerID),
+	return common.RateLimits{
+		IPLimits:     uint64(w.rateLimiter.LimitPerSecIP),
+		PeerIDLimits: uint64(w.rateLimiter.LimitPerSecPeerID),
 	}
 }
 
@@ -319,17 +426,17 @@ func (w *Waku) SetTimeSource(timesource func() time.Time) {
 func (w *Waku) APIs() []rpc.API {
 	return []rpc.API{
 		{
-			Namespace: ProtocolName,
-			Version:   ProtocolVersionStr,
+			Namespace: v0.Name,
+			Version:   v0.VersionStr,
 			Service:   NewPublicWakuAPI(w),
-			Public:    true,
+			Public:    false,
 		},
 	}
 }
 
 // Protocols returns the waku sub-protocols ran by this particular client.
 func (w *Waku) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{w.protocol}
+	return w.protocols
 }
 
 // RegisterMailServer registers MailServer interface.
@@ -339,23 +446,70 @@ func (w *Waku) RegisterMailServer(server MailServer) {
 }
 
 // SetRateLimiter registers a rate limiter.
-func (w *Waku) RegisterRateLimiter(r *PeerRateLimiter) {
+func (w *Waku) RegisterRateLimiter(r *common.PeerRateLimiter) {
 	w.rateLimiter = r
+}
+
+// RegisterBridge registers a new Bridge that moves envelopes
+// between different subprotocols.
+// It's important that a bridge is registered before the service
+// is started, otherwise, it won't read and propagate envelopes.
+func (w *Waku) RegisterBridge(b Bridge) {
+	if w.cancelBridge != nil {
+		close(w.cancelBridge)
+	}
+	w.bridge = b
+	w.cancelBridge = make(chan struct{})
+	w.bridgeWg.Add(1)
+	go w.readBridgeLoop()
+}
+
+func (w *Waku) readBridgeLoop() {
+	defer w.bridgeWg.Done()
+	out, _ := w.bridge.Pipe()
+	for {
+		select {
+		case <-w.cancelBridge:
+			return
+		case env := <-out:
+			_, err := w.addAndBridge(env, false, true)
+			if err != nil {
+				common.BridgeReceivedFailed.Inc()
+				w.logger.Warn(
+					"failed to add a bridged envelope",
+					zap.Binary("ID", env.Hash().Bytes()),
+					zap.Error(err),
+				)
+			} else {
+				common.BridgeReceivedSucceed.Inc()
+				w.logger.Debug("bridged envelope successfully", zap.Binary("ID", env.Hash().Bytes()))
+				w.envelopeFeed.Send(common.EnvelopeEvent{
+					Event: common.EventEnvelopeReceived,
+					Topic: env.Topic,
+					Hash:  env.Hash(),
+				})
+			}
+		}
+	}
+}
+
+func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
+	return w.envelopeFeed.Send(event)
 }
 
 // SubscribeEnvelopeEvents subscribes to envelopes feed.
 // In order to prevent blocking waku producers events must be amply buffered.
-func (w *Waku) SubscribeEnvelopeEvents(events chan<- EnvelopeEvent) event.Subscription {
+func (w *Waku) SubscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
 	return w.envelopeFeed.Subscribe(events)
 }
 
 func (w *Waku) notifyPeersAboutPowRequirementChange(pow float64) {
 	arr := w.getPeers()
 	for _, p := range arr {
-		err := p.notifyAboutPowRequirementChange(pow)
+		err := p.NotifyAboutPowRequirementChange(pow)
 		if err != nil {
 			// allow one retry
-			err = p.notifyAboutPowRequirementChange(pow)
+			err = p.NotifyAboutPowRequirementChange(pow)
 		}
 		if err != nil {
 			w.logger.Warn("failed to notify peer about new pow requirement", zap.Binary("peer", p.ID()), zap.Error(err))
@@ -366,19 +520,33 @@ func (w *Waku) notifyPeersAboutPowRequirementChange(pow float64) {
 func (w *Waku) notifyPeersAboutBloomFilterChange(bloom []byte) {
 	arr := w.getPeers()
 	for _, p := range arr {
-		err := p.notifyAboutBloomFilterChange(bloom)
+		err := p.NotifyAboutBloomFilterChange(bloom)
 		if err != nil {
 			// allow one retry
-			err = p.notifyAboutBloomFilterChange(bloom)
+			err = p.NotifyAboutBloomFilterChange(bloom)
 		}
 		if err != nil {
-			w.logger.Warn("failed to notify peer about new pow requirement", zap.Binary("peer", p.ID()), zap.Error(err))
+			w.logger.Warn("failed to notify peer about new bloom filter change", zap.Binary("peer", p.ID()), zap.Error(err))
 		}
 	}
 }
 
-func (w *Waku) getPeers() []*Peer {
-	arr := make([]*Peer, len(w.peers))
+func (w *Waku) notifyPeersAboutTopicInterestChange(topicInterest []common.TopicType) {
+	arr := w.getPeers()
+	for _, p := range arr {
+		err := p.NotifyAboutTopicInterestChange(topicInterest)
+		if err != nil {
+			// allow one retry
+			err = p.NotifyAboutTopicInterestChange(topicInterest)
+		}
+		if err != nil {
+			w.logger.Warn("failed to notify peer about new topic interest", zap.Binary("peer", p.ID()), zap.Error(err))
+		}
+	}
+}
+
+func (w *Waku) getPeers() []common.Peer {
+	arr := make([]common.Peer, len(w.peers))
 	i := 0
 	w.peerMu.Lock()
 	for p := range w.peers {
@@ -390,12 +558,11 @@ func (w *Waku) getPeers() []*Peer {
 }
 
 // getPeer retrieves peer by ID
-func (w *Waku) getPeer(peerID []byte) (*Peer, error) {
+func (w *Waku) getPeer(peerID []byte) (common.Peer, error) {
 	w.peerMu.Lock()
 	defer w.peerMu.Unlock()
 	for p := range w.peers {
-		id := p.peer.ID()
-		if bytes.Equal(peerID, id[:]) {
+		if bytes.Equal(peerID, p.ID()) {
 			return p, nil
 		}
 	}
@@ -409,7 +576,7 @@ func (w *Waku) AllowP2PMessagesFromPeer(peerID []byte) error {
 	if err != nil {
 		return err
 	}
-	p.trusted = true
+	p.SetPeerTrusted(true)
 	return nil
 }
 
@@ -418,34 +585,34 @@ func (w *Waku) AllowP2PMessagesFromPeer(peerID []byte) error {
 // request and respond with a number of peer-to-peer messages (possibly expired),
 // which are not supposed to be forwarded any further.
 // The waku protocol is agnostic of the format and contents of envelope.
-func (w *Waku) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
+func (w *Waku) RequestHistoricMessages(peerID []byte, envelope *common.Envelope) error {
 	return w.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
 }
 
 // RequestHistoricMessagesWithTimeout acts as RequestHistoricMessages but requires to pass a timeout.
 // It sends an event EventMailServerRequestExpired after the timeout.
-func (w *Waku) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *Envelope, timeout time.Duration) error {
+func (w *Waku) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *common.Envelope, timeout time.Duration) error {
 	p, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	p.trusted = true
+	p.SetPeerTrusted(true)
 
-	w.envelopeFeed.Send(EnvelopeEvent{
-		Peer:  p.peer.ID(),
+	w.envelopeFeed.Send(common.EnvelopeEvent{
+		Peer:  p.EnodeID(),
 		Topic: envelope.Topic,
 		Hash:  envelope.Hash(),
-		Event: EventMailServerRequestSent,
+		Event: common.EventMailServerRequestSent,
 	})
 
-	err = p2p.Send(p.ws, p2pRequestCode, envelope)
+	err = p.RequestHistoricMessages(envelope)
 	if timeout != 0 {
-		go w.expireRequestHistoricMessages(p.peer.ID(), envelope.Hash(), timeout)
+		go w.expireRequestHistoricMessages(p.EnodeID(), envelope.Hash(), timeout)
 	}
 	return err
 }
 
-func (w *Waku) SendMessagesRequest(peerID []byte, request MessagesRequest) error {
+func (w *Waku) SendMessagesRequest(peerID []byte, request common.MessagesRequest) error {
 	if err := request.Validate(); err != nil {
 		return err
 	}
@@ -453,73 +620,59 @@ func (w *Waku) SendMessagesRequest(peerID []byte, request MessagesRequest) error
 	if err != nil {
 		return err
 	}
-	p.trusted = true
-	if err := p2p.Send(p.ws, p2pRequestCode, request); err != nil {
+	p.SetPeerTrusted(true)
+	if err := p.SendMessagesRequest(request); err != nil {
 		return err
 	}
-	w.envelopeFeed.Send(EnvelopeEvent{
-		Peer:  p.peer.ID(),
-		Hash:  common.BytesToHash(request.ID),
-		Event: EventMailServerRequestSent,
+	w.envelopeFeed.Send(common.EnvelopeEvent{
+		Peer:  p.EnodeID(),
+		Hash:  gethcommon.BytesToHash(request.ID),
+		Event: common.EventMailServerRequestSent,
 	})
 	return nil
 }
 
-func (w *Waku) expireRequestHistoricMessages(peer enode.ID, hash common.Hash, timeout time.Duration) {
+func (w *Waku) expireRequestHistoricMessages(peer enode.ID, hash gethcommon.Hash, timeout time.Duration) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case <-w.quit:
 		return
 	case <-timer.C:
-		w.envelopeFeed.Send(EnvelopeEvent{
+		w.envelopeFeed.Send(common.EnvelopeEvent{
 			Peer:  peer,
 			Hash:  hash,
-			Event: EventMailServerRequestExpired,
+			Event: common.EventMailServerRequestExpired,
 		})
 	}
 }
 
 func (w *Waku) SendHistoricMessageResponse(peerID []byte, payload []byte) error {
-	size, r, err := rlp.EncodeToReader(payload)
-	if err != nil {
-		return err
-	}
 	peer, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return peer.ws.WriteMsg(p2p.Msg{Code: p2pRequestCompleteCode, Size: uint32(size), Payload: r})
+	return peer.SendHistoricMessageResponse(payload)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
 // It sends one or more envelopes in a single batch.
-func (w *Waku) SendP2PMessages(peerID []byte, envelopes ...*Envelope) error {
+func (w *Waku) SendP2PMessages(peerID []byte, envelopes ...*common.Envelope) error {
 	p, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return p2p.Send(p.ws, p2pMessageCode, envelopes)
-}
-
-// SendP2PDirect sends a peer-to-peer message to a specific peer.
-// It sends one or more envelopes in a single batch.
-func (w *Waku) SendP2PDirect(peerID []byte, envelopes ...*Envelope) error {
-	peer, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
+	return p.SendP2PMessages(envelopes)
 }
 
 // SendRawP2PDirect sends a peer-to-peer message to a specific peer.
 // It sends one or more envelopes in a single batch.
 func (w *Waku) SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error {
-	peer, err := w.getPeer(peerID)
+	p, err := w.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return p2p.Send(peer.ws, p2pMessageCode, envelopes)
+	return p.SendRawP2PDirect(envelopes)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -536,7 +689,7 @@ func (w *Waku) NewKeyPair() (string, error) {
 		return "", fmt.Errorf("failed to generate valid key")
 	}
 
-	id, err := toDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := toDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
 	if err != nil {
 		return "", err
 	}
@@ -553,7 +706,7 @@ func (w *Waku) NewKeyPair() (string, error) {
 
 // DeleteKeyPair deletes the specified key if it exists.
 func (w *Waku) DeleteKeyPair(key string) bool {
-	deterministicID, err := toDeterministicID(key, keyIDSize)
+	deterministicID, err := toDeterministicID(key, common.KeyIDSize)
 	if err != nil {
 		return false
 	}
@@ -570,7 +723,7 @@ func (w *Waku) DeleteKeyPair(key string) bool {
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
 func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
 	if err != nil {
 		return "", err
 	}
@@ -588,7 +741,7 @@ func (w *Waku) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 // SelectKeyPair adds cryptographic identity, and makes sure
 // that it is the only private key known to the node.
 func (w *Waku) SelectKeyPair(key *ecdsa.PrivateKey) error {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := makeDeterministicID(hexutil.Encode(crypto.FromECDSAPub(&key.PublicKey)), common.KeyIDSize)
 	if err != nil {
 		return err
 	}
@@ -615,7 +768,7 @@ func (w *Waku) DeleteKeyPairs() error {
 // HasKeyPair checks if the waku node is configured with the private key
 // of the specified public pair.
 func (w *Waku) HasKeyPair(id string) bool {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
+	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
 	if err != nil {
 		return false
 	}
@@ -627,7 +780,7 @@ func (w *Waku) HasKeyPair(id string) bool {
 
 // GetPrivateKey retrieves the private key of the specified identity.
 func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
+	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
 	if err != nil {
 		return nil, err
 	}
@@ -644,14 +797,14 @@ func (w *Waku) GetPrivateKey(id string) (*ecdsa.PrivateKey, error) {
 // GenerateSymKey generates a random symmetric key and stores it under id,
 // which is then returned. Will be used in the future for session key exchange.
 func (w *Waku) GenerateSymKey() (string, error) {
-	key, err := generateSecureRandomData(aesKeyLength)
+	key, err := common.GenerateSecureRandomData(common.AESKeyLength)
 	if err != nil {
 		return "", err
-	} else if !validateDataIntegrity(key, aesKeyLength) {
+	} else if !common.ValidateDataIntegrity(key, common.AESKeyLength) {
 		return "", fmt.Errorf("error in GenerateSymKey: crypto/rand failed to generate random data")
 	}
 
-	id, err := GenerateRandomID()
+	id, err := common.GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
@@ -668,7 +821,7 @@ func (w *Waku) GenerateSymKey() (string, error) {
 
 // AddSymKey stores the key with a given id.
 func (w *Waku) AddSymKey(id string, key []byte) (string, error) {
-	deterministicID, err := toDeterministicID(id, keyIDSize)
+	deterministicID, err := toDeterministicID(id, common.KeyIDSize)
 	if err != nil {
 		return "", err
 	}
@@ -685,11 +838,11 @@ func (w *Waku) AddSymKey(id string, key []byte) (string, error) {
 
 // AddSymKeyDirect stores the key, and returns its id.
 func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
-	if len(key) != aesKeyLength {
+	if len(key) != common.AESKeyLength {
 		return "", fmt.Errorf("wrong key size: %d", len(key))
 	}
 
-	id, err := GenerateRandomID()
+	id, err := common.GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
@@ -706,7 +859,7 @@ func (w *Waku) AddSymKeyDirect(key []byte) (string, error) {
 
 // AddSymKeyFromPassword generates the key from password, stores it, and returns its id.
 func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
-	id, err := GenerateRandomID()
+	id, err := common.GenerateRandomID()
 	if err != nil {
 		return "", fmt.Errorf("failed to generate ID: %s", err)
 	}
@@ -716,10 +869,7 @@ func (w *Waku) AddSymKeyFromPassword(password string) (string, error) {
 
 	// kdf should run no less than 0.1 seconds on an average computer,
 	// because it's an once in a session experience
-	derived := pbkdf2.Key([]byte(password), nil, 65356, aesKeyLength, sha256.New)
-	if err != nil {
-		return "", err
-	}
+	derived := pbkdf2.Key([]byte(password), nil, 65356, common.AESKeyLength, sha256.New)
 
 	w.keyMu.Lock()
 	defer w.keyMu.Unlock()
@@ -763,48 +913,79 @@ func (w *Waku) GetSymKey(id string) ([]byte, error) {
 
 // Subscribe installs a new message handler used for filtering, decrypting
 // and subsequent storing of incoming messages.
-func (w *Waku) Subscribe(f *Filter) (string, error) {
+func (w *Waku) Subscribe(f *common.Filter) (string, error) {
 	s, err := w.filters.Install(f)
-	if err == nil {
-		w.updateBloomFilter(f)
+	if err != nil {
+		return s, err
 	}
-	return s, err
+
+	err = w.updateSettingsForFilter(f)
+	if err != nil {
+		w.filters.Uninstall(s)
+		return s, err
+	}
+	return s, nil
+}
+
+func (w *Waku) updateSettingsForFilter(f *common.Filter) error {
+	w.settingsMu.RLock()
+	topicInterestMode := !w.settings.BloomFilterMode
+	w.settingsMu.RUnlock()
+
+	if topicInterestMode {
+		err := w.updateTopicInterest(f)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := w.updateBloomFilter(f)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // updateBloomFilter recalculates the new value of bloom filter,
 // and informs the peers if necessary.
-func (w *Waku) updateBloomFilter(f *Filter) {
-	aggregate := make([]byte, BloomFilterSize)
+func (w *Waku) updateBloomFilter(f *common.Filter) error {
+	aggregate := make([]byte, common.BloomFilterSize)
 	for _, t := range f.Topics {
-		top := BytesToTopic(t)
-		b := TopicToBloom(top)
+		top := common.BytesToTopic(t)
+		b := top.ToBloom()
 		aggregate = addBloom(aggregate, b)
 	}
 
-	if !BloomFilterMatch(w.BloomFilter(), aggregate) {
+	if !common.BloomFilterMatch(w.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(w.BloomFilter(), aggregate)
-		w.SetBloomFilter(aggregate)
+		return w.SetBloomFilter(aggregate)
 	}
+	return nil
 }
 
 // GetFilter returns the filter by id.
-func (w *Waku) GetFilter(id string) *Filter {
+func (w *Waku) GetFilter(id string) *common.Filter {
 	return w.filters.Get(id)
 }
 
 // Unsubscribe removes an installed message handler.
+// TODO: This does not seem to update the bloom filter, nor topic-interest
+// Note that the filter/topic-interest needs to take into account that there
+// might be filters with duplicated topics, so it's not just a matter of removing
+// from the map, in the topic-interest case, while the bloom filter might need to
+// be rebuilt from scratch
 func (w *Waku) Unsubscribe(id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
-		return fmt.Errorf("Unsubscribe: Invalid ID")
+		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
 	return nil
 }
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(envelope *Envelope) error {
+func (w *Waku) Send(envelope *common.Envelope) error {
 	ok, err := w.add(envelope, false)
 	if err == nil && !ok {
 		return fmt.Errorf("failed to add envelope")
@@ -829,355 +1010,243 @@ func (w *Waku) Start(*p2p.Server) error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
+	if w.cancelBridge != nil {
+		close(w.cancelBridge)
+		w.cancelBridge = nil
+		w.bridgeWg.Wait()
+	}
 	close(w.quit)
 	return nil
 }
 
+func (w *Waku) handlePeerV0(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	return w.HandlePeer(v0.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv0")), rw)
+}
+
+func (w *Waku) handlePeerV1(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
+	return w.HandlePeer(v1.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv1")), rw)
+}
+
 // HandlePeer is called by the underlying P2P layer when the waku sub-protocol
 // connection is negotiated.
-func (w *Waku) HandlePeer(peer *p2p.Peer, rw p2p.MsgReadWriter) error {
-	// Create the new peer and start tracking it
-	wakuPeer := newPeer(w, peer, rw, w.logger.Named("waku/peer"))
-
+func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	w.peerMu.Lock()
-	w.peers[wakuPeer] = struct{}{}
+	w.peers[peer] = struct{}{}
 	w.peerMu.Unlock()
 
 	defer func() {
 		w.peerMu.Lock()
-		delete(w.peers, wakuPeer)
+		delete(w.peers, peer)
 		w.peerMu.Unlock()
 	}()
 
-	// Run the peer handshake and state updates
-	if err := wakuPeer.handshake(); err != nil {
+	if err := peer.Start(); err != nil {
 		return err
 	}
-	wakuPeer.start()
-	defer wakuPeer.stop()
+	defer peer.Stop()
 
 	if w.rateLimiter != nil {
-		return w.rateLimiter.decorate(wakuPeer, rw, w.runMessageLoop)
+		runLoop := func(out p2p.MsgReadWriter) error {
+			peer.SetRWWriter(out)
+			return peer.Run()
+		}
+		return w.rateLimiter.Decorate(peer, rw, runLoop)
 	}
-	return w.runMessageLoop(wakuPeer, rw)
+
+	return peer.Run()
 }
 
-// sendConfirmation sends messageResponseCode and batchAcknowledgedCode messages.
-func (w *Waku) sendConfirmation(rw p2p.MsgReadWriter, data []byte, envelopeErrors []EnvelopeError) (err error) {
-	batchHash := crypto.Keccak256Hash(data)
-	err = p2p.Send(rw, messageResponseCode, NewMessagesResponse(batchHash, envelopeErrors))
-	err = p2p.Send(rw, batchAcknowledgedCode, batchHash) // DEPRECATED
-	return
-}
-
-// runMessageLoop reads and processes inbound messages directly to merge into client-global state.
-func (w *Waku) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
-	logger := w.logger.Named("runMessageLoop")
-	peerID := p.peer.ID()
-
-	for {
-		// fetch the next packet
-		packet, err := rw.ReadMsg()
-		if err != nil {
-			logger.Info("failed to read a message", zap.Binary("peer", peerID[:]), zap.Error(err))
-			return err
-		}
-
-		if packet.Size > w.MaxMessageSize() {
-			logger.Warn("oversize message received", zap.Binary("peer", peerID[:]), zap.Uint32("size", packet.Size))
-			return errors.New("oversize message received")
-		}
-
-		switch packet.Code {
-		case messagesCode:
-			if err := w.handleMessagesCode(p, rw, packet, logger); err != nil {
-				logger.Warn("failed to handle messagesCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case messageResponseCode:
-			if err := w.handleMessageResponseCode(p, packet, logger); err != nil {
-				logger.Warn("failed to handle messageResponseCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case batchAcknowledgedCode:
-			if err := w.handleBatchAcknowledgeCode(p, packet, logger); err != nil {
-
-			}
-		case powRequirementCode:
-			if err := w.handlePowRequirementCode(p, packet, logger); err != nil {
-				logger.Warn("failed to handle powRequirementCode message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case bloomFilterExCode:
-			if err := w.handleBloomFilterExCode(p, packet, logger); err != nil {
-				logger.Warn("failed to decode bloom filter exchange message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case p2pMessageCode:
-			if err := w.handleP2PMessageCode(p, packet, logger); err != nil {
-				logger.Warn("failed to decode direct message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case p2pRequestCode:
-			if err := w.handleP2PRequestCode(p, packet, logger); err != nil {
-				logger.Warn("failed to decode p2p request message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		case p2pRequestCompleteCode:
-			if err := w.handleP2PRequestCompleteCode(p, packet, logger); err != nil {
-				logger.Warn("failed to decode p2p request complete message, peer will be disconnected", zap.Binary("peer", peerID[:]), zap.Error(err))
-				return err
-			}
-		default:
-			// New message types might be implemented in the future versions of Waku.
-			// For forward compatibility, just ignore.
-			logger.Debug("ignored packet with message code", zap.Uint64("code", packet.Code))
-		}
-
-		_ = packet.Discard()
-	}
-}
-
-func (w *Waku) handleMessagesCode(p *Peer, rw p2p.MsgReadWriter, packet p2p.Msg, logger *zap.Logger) error {
-	peerID := p.peer.ID()
-
-	// decode the contained envelopes
-	data, err := ioutil.ReadAll(packet.Payload)
-	if err != nil {
-		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		return fmt.Errorf("failed to read packet payload: %w", err)
-	}
-
-	var envelopes []*Envelope
-	if err := rlp.DecodeBytes(data, &envelopes); err != nil {
-		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		return fmt.Errorf("invalid payload: %w", err)
-	}
-
-	envelopeErrors := make([]EnvelopeError, 0)
+func (w *Waku) OnNewEnvelopes(envelopes []*common.Envelope, peer common.Peer) ([]common.EnvelopeError, error) {
+	envelopeErrors := make([]common.EnvelopeError, 0)
 	trouble := false
 	for _, env := range envelopes {
 		cached, err := w.add(env, w.LightClientMode())
 		if err != nil {
-			_, isTimeSyncError := err.(TimeSyncError)
+			_, isTimeSyncError := err.(common.TimeSyncError)
 			if !isTimeSyncError {
 				trouble = true
-				logger.Info("invalid envelope received", zap.Binary("peer", peerID[:]), zap.Error(err))
+				w.logger.Info("invalid envelope received", zap.Binary("peer", peer.ID()), zap.Error(err))
 			}
-			envelopeErrors = append(envelopeErrors, ErrorToEnvelopeError(env.Hash(), err))
+			envelopeErrors = append(envelopeErrors, common.ErrorToEnvelopeError(env.Hash(), err))
 		} else if cached {
-			p.mark(env)
+			peer.Mark(env)
 		}
 
-		w.envelopeFeed.Send(EnvelopeEvent{
-			Event: EventEnvelopeReceived,
+		w.envelopeFeed.Send(common.EnvelopeEvent{
+			Event: common.EventEnvelopeReceived,
 			Topic: env.Topic,
 			Hash:  env.Hash(),
-			Peer:  p.peer.ID(),
+			Peer:  peer.EnodeID(),
 		})
-		envelopesValidatedCounter.Inc()
-	}
-
-	if w.ConfirmationsEnabled() {
-		go w.sendConfirmation(rw, data, envelopeErrors)
+		common.EnvelopesValidatedCounter.Inc()
 	}
 
 	if trouble {
-		return errors.New("received invalid envelope")
+		return envelopeErrors, errors.New("received invalid envelope")
 	}
-	return nil
+	return envelopeErrors, nil
 }
 
-func (w *Waku) handlePowRequirementCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-	i, err := s.Uint()
-	if err != nil {
-		envelopesRejectedCounter.WithLabelValues("invalid_pow_req").Inc()
-		return fmt.Errorf("invalid powRequirementCode message: %w", err)
-	}
-	f := math.Float64frombits(i)
-	if math.IsInf(f, 0) || math.IsNaN(f) || f < 0.0 {
-		envelopesRejectedCounter.WithLabelValues("invalid_pow_req").Inc()
-		return errors.New("invalid value in powRequirementCode message")
-	}
-	p.powRequirement = f
-	return nil
-}
-
-func (w *Waku) handleBloomFilterExCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	var bloom []byte
-	err := packet.Decode(&bloom)
-	if err == nil && len(bloom) != BloomFilterSize {
-		err = fmt.Errorf("wrong bloom filter size %d", len(bloom))
-	}
-	if err != nil {
-		envelopesRejectedCounter.WithLabelValues("invalid_bloom").Inc()
-		return errors.New("invalid bloom filter exchange message")
-	}
-
-	p.setBloomFilter(bloom)
-	return nil
-}
-
-func (w *Waku) handleP2PMessageCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	// peer-to-peer message, sent directly to peer bypassing PoW checks, etc.
-	// this message is not supposed to be forwarded to other peers, and
-	// therefore might not satisfy the PoW, expiry and other requirements.
-	// these messages are only accepted from the trusted peer.
-	if !p.trusted {
-		return nil
-	}
-
-	var (
-		envelopes []*Envelope
-		err       error
-	)
-
-	if err = packet.Decode(&envelopes); err != nil {
-		return fmt.Errorf("invalid direct message payload: %w", err)
-	}
-
+func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope) error {
 	for _, envelope := range envelopes {
 		w.postP2P(envelope)
 	}
 	return nil
 }
 
-func (w *Waku) handleP2PRequestCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	peerID := p.peer.ID()
-
-	// Must be processed if mail server is implemented. Otherwise ignore.
-	if w.mailServer == nil {
-		return nil
-	}
-
-	// Read all data as we will try to decode it possibly twice.
-	data, err := ioutil.ReadAll(packet.Payload)
-	if err != nil {
-		return fmt.Errorf("invalid p2p request messages: %w", err)
-	}
-	r := bytes.NewReader(data)
-	packet.Payload = r
-
-	var requestDeprecated Envelope
-	errDepReq := packet.Decode(&requestDeprecated)
-	if errDepReq == nil {
-		w.mailServer.DeliverMail(p.ID(), &requestDeprecated)
-		return nil
-	} else {
-		logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
-	}
-
-	// As we failed to decode the request, let's set the offset
-	// to the beginning and try decode it again.
-	if _, err := r.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("invalid p2p request message: %w", err)
-	}
-
-	var request MessagesRequest
-	errReq := packet.Decode(&request)
-	if errReq == nil {
-		w.mailServer.Deliver(p.ID(), request)
-		return nil
-	} else {
-		logger.Info("failed to decode p2p request message", zap.Binary("peer", peerID[:]), zap.Error(errDepReq))
-	}
-
-	return errors.New("invalid p2p request message")
+func (w *Waku) Mailserver() bool {
+	return w.mailServer != nil
 }
 
-func (w *Waku) handleP2PRequestCompleteCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	if !p.trusted {
-		return nil
-	}
-
-	var payload []byte
-	if err := packet.Decode(&payload); err != nil {
-		return fmt.Errorf("invalid p2p request complete message: %w", err)
-	}
-
-	event, err := CreateMailServerEvent(p.peer.ID(), payload)
-	if err != nil {
-		return fmt.Errorf("invalid p2p request complete payload: %w", err)
-	}
-
-	w.postP2P(*event)
+func (w *Waku) OnMessagesRequest(request common.MessagesRequest, p common.Peer) error {
+	w.mailServer.Deliver(p.ID(), request)
 	return nil
 }
 
-func (w *Waku) handleMessageResponseCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	var resp MultiVersionResponse
-	if err := packet.Decode(&resp); err != nil {
-		envelopesRejectedCounter.WithLabelValues("failed_read").Inc()
-		return fmt.Errorf("invalid response message: %w", err)
-	}
-	if resp.Version != 1 {
-		logger.Info("received unsupported version of MultiVersionResponse for messageResponseCode packet", zap.Uint("version", resp.Version))
-		return nil
-	}
+func (w *Waku) OnDeprecatedMessagesRequest(request *common.Envelope, p common.Peer) error {
+	w.mailServer.DeliverMail(p.ID(), request)
+	return nil
+}
 
-	response, err := resp.DecodeResponse1()
+func (w *Waku) OnP2PRequestCompleted(payload []byte, p common.Peer) error {
+	msEvent, err := CreateMailServerEvent(p.EnodeID(), payload)
 	if err != nil {
-		envelopesRejectedCounter.WithLabelValues("invalid_data").Inc()
-		return fmt.Errorf("failed to decode response message: %w", err)
+		return fmt.Errorf("invalid p2p request complete payload: %v", err)
 	}
 
-	w.envelopeFeed.Send(EnvelopeEvent{
+	w.postP2P(*msEvent)
+	return nil
+}
+
+func (w *Waku) OnMessagesResponse(response common.MessagesResponse, p common.Peer) error {
+	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Batch: response.Hash,
-		Event: EventBatchAcknowledged,
-		Peer:  p.peer.ID(),
+		Event: common.EventBatchAcknowledged,
+		Peer:  p.EnodeID(),
 		Data:  response.Errors,
 	})
 
 	return nil
 }
 
-func (w *Waku) handleBatchAcknowledgeCode(p *Peer, packet p2p.Msg, logger *zap.Logger) error {
-	var batchHash common.Hash
-	if err := packet.Decode(&batchHash); err != nil {
-		return fmt.Errorf("invalid batch ack message: %w", err)
-	}
-	w.envelopeFeed.Send(EnvelopeEvent{
+func (w *Waku) OnBatchAcknowledged(batchHash gethcommon.Hash, p common.Peer) error {
+	w.envelopeFeed.Send(common.EnvelopeEvent{
 		Batch: batchHash,
-		Event: EventBatchAcknowledged,
-		Peer:  p.peer.ID(),
+		Event: common.EventBatchAcknowledged,
+		Peer:  p.EnodeID(),
 	})
 	return nil
 }
 
-// add inserts a new envelope into the message pool to be distributed within the
+func (w *Waku) add(envelope *common.Envelope, isP2P bool) (bool, error) {
+	return w.addAndBridge(envelope, isP2P, false)
+}
+
+func (w *Waku) bloomMatch(envelope *common.Envelope) (bool, error) {
+	if !common.BloomFilterMatch(w.BloomFilter(), envelope.Bloom()) {
+		// maybe the value was recently changed, and the peers did not adjust yet.
+		// in this case the previous value is retrieved by BloomFilterTolerance()
+		// for a short period of peer synchronization.
+		if !common.BloomFilterMatch(w.BloomFilterTolerance(), envelope.Bloom()) {
+			common.EnvelopesCacheFailedCounter.WithLabelValues("no_bloom_match").Inc()
+			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
+				envelope.Hash().Hex(), w.BloomFilter(), envelope.Bloom(), envelope.Topic)
+		}
+	}
+	return true, nil
+}
+
+func (w *Waku) topicInterestMatch(envelope *common.Envelope) (bool, error) {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	if w.settings.TopicInterest == nil {
+		return false, nil
+	}
+	if !w.settings.TopicInterest[envelope.Topic] {
+		if !w.settings.TopicInterestTolerance[envelope.Topic] {
+			common.EnvelopesCacheFailedCounter.WithLabelValues("no_topic_interest_match").Inc()
+			return false, fmt.Errorf("envelope does not match topic interest, hash=[%v], bloom: \n%x \n%x",
+				envelope.Hash().Hex(), envelope.Bloom(), envelope.Topic)
+
+		}
+	}
+
+	return true, nil
+}
+
+func (w *Waku) topicInterestOrBloomMatch(envelope *common.Envelope) (bool, error) {
+	w.settingsMu.RLock()
+	topicInterestMode := !w.settings.BloomFilterMode
+	w.settingsMu.RUnlock()
+
+	if topicInterestMode {
+		match, err := w.topicInterestMatch(envelope)
+		if err != nil {
+			return false, err
+		}
+		if match {
+			return true, nil
+		}
+	}
+	return w.bloomMatch(envelope)
+}
+
+func (w *Waku) SetBloomFilterMode(mode bool) {
+	w.settingsMu.Lock()
+	w.settings.BloomFilterMode = mode
+	w.settingsMu.Unlock()
+	// Recalculate and notify topic interest or bloom, currently not implemented
+}
+
+// addEnvelope adds an envelope to the envelope map, used for sending
+func (w *Waku) addEnvelope(envelope *common.Envelope) {
+
+	hash := envelope.Hash()
+
+	w.poolMu.Lock()
+	w.envelopes[hash] = envelope
+	if w.expirations[envelope.Expiry] == nil {
+		w.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
+	}
+	if !w.expirations[envelope.Expiry].Contains(hash) {
+		w.expirations[envelope.Expiry].Add(hash)
+	}
+	w.poolMu.Unlock()
+}
+
+// addAndBridge inserts a new envelope into the message pool to be distributed within the
 // waku network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
 // param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
-func (w *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
+func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool) (bool, error) {
 	now := uint32(w.timeSource().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
-	envelopesReceivedCounter.Inc()
+	common.EnvelopesReceivedCounter.Inc()
 	if sent > now {
-		if sent-DefaultSyncAllowance > now {
-			envelopesCacheFailedCounter.WithLabelValues("in_future").Inc()
+		if sent-common.DefaultSyncAllowance > now {
+			common.EnvelopesCacheFailedCounter.WithLabelValues("in_future").Inc()
 			log.Warn("envelope created in the future", "hash", envelope.Hash())
-			return false, TimeSyncError(errors.New("envelope from future"))
+			return false, common.TimeSyncError(errors.New("envelope from future"))
 		}
 		// recalculate PoW, adjusted for the time difference, plus one second for latency
-		envelope.calculatePoW(sent - now + 1)
+		envelope.CalculatePoW(sent - now + 1)
 	}
 
 	if envelope.Expiry < now {
-		if envelope.Expiry+DefaultSyncAllowance*2 < now {
-			envelopesCacheFailedCounter.WithLabelValues("very_old").Inc()
+		if envelope.Expiry+common.DefaultSyncAllowance*2 < now {
+			common.EnvelopesCacheFailedCounter.WithLabelValues("very_old").Inc()
 			log.Warn("very old envelope", "hash", envelope.Hash())
-			return false, TimeSyncError(errors.New("very old envelope"))
+			return false, common.TimeSyncError(errors.New("very old envelope"))
 		}
 		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
-		envelopesCacheFailedCounter.WithLabelValues("expired").Inc()
+		common.EnvelopesCacheFailedCounter.WithLabelValues("expired").Inc()
 		return false, nil // drop envelope without error
 	}
 
-	if uint32(envelope.size()) > w.MaxMessageSize() {
-		envelopesCacheFailedCounter.WithLabelValues("oversized").Inc()
-		return false, fmt.Errorf("huge messages are not allowed [%x]", envelope.Hash())
+	if uint32(envelope.Size()) > w.MaxMessageSize() {
+		common.EnvelopesCacheFailedCounter.WithLabelValues("oversized").Inc()
+		return false, fmt.Errorf("huge messages are not allowed [%x][%d][%d]", envelope.Hash(), envelope.Size(), w.MaxMessageSize())
 	}
 
 	if envelope.PoW() < w.MinPow() {
@@ -1185,52 +1254,53 @@ func (w *Waku) add(envelope *Envelope, isP2P bool) (bool, error) {
 		// in this case the previous value is retrieved by MinPowTolerance()
 		// for a short period of peer synchronization.
 		if envelope.PoW() < w.MinPowTolerance() {
-			envelopesCacheFailedCounter.WithLabelValues("low_pow").Inc()
+			common.EnvelopesCacheFailedCounter.WithLabelValues("low_pow").Inc()
 			return false, fmt.Errorf("envelope with low PoW received: PoW=%f, hash=[%v]", envelope.PoW(), envelope.Hash().Hex())
 		}
 	}
 
-	if !BloomFilterMatch(w.BloomFilter(), envelope.Bloom()) {
-		// maybe the value was recently changed, and the peers did not adjust yet.
-		// in this case the previous value is retrieved by BloomFilterTolerance()
-		// for a short period of peer synchronization.
-		if !BloomFilterMatch(w.BloomFilterTolerance(), envelope.Bloom()) {
-			envelopesCacheFailedCounter.WithLabelValues("no_bloom_match").Inc()
-			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
-				envelope.Hash().Hex(), w.BloomFilter(), envelope.Bloom(), envelope.Topic)
-		}
+	match, err := w.topicInterestOrBloomMatch(envelope)
+	if err != nil {
+		return false, err
+	}
+
+	if !match {
+		return false, nil
 	}
 
 	hash := envelope.Hash()
 
 	w.poolMu.Lock()
 	_, alreadyCached := w.envelopes[hash]
-	if !alreadyCached {
-		w.envelopes[hash] = envelope
-		if w.expirations[envelope.Expiry] == nil {
-			w.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
-		}
-		if !w.expirations[envelope.Expiry].Contains(hash) {
-			w.expirations[envelope.Expiry].Add(hash)
-		}
-	}
 	w.poolMu.Unlock()
+	if !alreadyCached {
+		w.addEnvelope(envelope)
+	}
 
 	if alreadyCached {
 		log.Trace("w envelope already cached", "hash", envelope.Hash().Hex())
-		envelopesCachedCounter.WithLabelValues("hit").Inc()
+		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
 		log.Trace("cached w envelope", "hash", envelope.Hash().Hex())
-		envelopesCachedCounter.WithLabelValues("miss").Inc()
-		envelopesSizeMeter.Observe(float64(envelope.size()))
+		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
+		common.EnvelopesSizeMeter.Observe(float64(envelope.Size()))
 		w.postEvent(envelope, isP2P) // notify the local node about the new message
 		if w.mailServer != nil {
 			w.mailServer.Archive(envelope)
-			w.envelopeFeed.Send(EnvelopeEvent{
+			w.envelopeFeed.Send(common.EnvelopeEvent{
 				Topic: envelope.Topic,
 				Hash:  envelope.Hash(),
-				Event: EventMailServerEnvelopeArchived,
+				Event: common.EventMailServerEnvelopeArchived,
 			})
+		}
+		// Bridge only envelopes that are not p2p messages.
+		// In particular, if a node is a lightweight node,
+		// it should not bridge any envelopes.
+		if !isP2P && !bridged && w.bridge != nil {
+			log.Debug("bridging envelope from Waku", "hash", envelope.Hash().Hex())
+			_, in := w.bridge.Pipe()
+			in <- envelope
+			common.BridgeSent.Inc()
 		}
 	}
 	return true, nil
@@ -1241,7 +1311,7 @@ func (w *Waku) postP2P(event interface{}) {
 }
 
 // postEvent queues the message for further processing.
-func (w *Waku) postEvent(envelope *Envelope, isP2P bool) {
+func (w *Waku) postEvent(envelope *common.Envelope, isP2P bool) {
 	if isP2P {
 		w.postP2P(envelope)
 	} else {
@@ -1257,10 +1327,10 @@ func (w *Waku) processQueue() {
 			return
 		case e := <-w.msgQueue:
 			w.filters.NotifyWatchers(e, false)
-			w.envelopeFeed.Send(EnvelopeEvent{
+			w.envelopeFeed.Send(common.EnvelopeEvent{
 				Topic: e.Topic,
 				Hash:  e.Hash(),
-				Event: EventEnvelopeAvailable,
+				Event: common.EventEnvelopeAvailable,
 			})
 		}
 	}
@@ -1272,16 +1342,16 @@ func (w *Waku) processP2P() {
 		case <-w.quit:
 			return
 		case e := <-w.p2pMsgQueue:
-			switch event := e.(type) {
-			case *Envelope:
-				w.filters.NotifyWatchers(event, true)
-				w.envelopeFeed.Send(EnvelopeEvent{
-					Topic: event.Topic,
-					Hash:  event.Hash(),
-					Event: EventEnvelopeAvailable,
+			switch evn := e.(type) {
+			case *common.Envelope:
+				w.filters.NotifyWatchers(evn, true)
+				w.envelopeFeed.Send(common.EnvelopeEvent{
+					Topic: evn.Topic,
+					Hash:  evn.Hash(),
+					Event: common.EventEnvelopeAvailable,
 				})
-			case EnvelopeEvent:
-				w.envelopeFeed.Send(event)
+			case common.EnvelopeEvent:
+				w.envelopeFeed.Send(evn)
 			}
 		}
 	}
@@ -1291,7 +1361,7 @@ func (w *Waku) processP2P() {
 // state by expiring stale messages from the pool.
 func (w *Waku) update() {
 	// Start a ticker to check for expirations
-	expire := time.NewTicker(expirationCycle)
+	expire := time.NewTicker(common.ExpirationCycle)
 
 	// Repeat updates until termination is requested
 	for {
@@ -1316,11 +1386,11 @@ func (w *Waku) expire() {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
 			hashSet.Each(func(v interface{}) bool {
-				delete(w.envelopes, v.(common.Hash))
-				envelopesCachedCounter.WithLabelValues("clear").Inc()
-				w.envelopeFeed.Send(EnvelopeEvent{
-					Hash:  v.(common.Hash),
-					Event: EventEnvelopeExpired,
+				delete(w.envelopes, v.(gethcommon.Hash))
+				common.EnvelopesCachedCounter.WithLabelValues("clear").Inc()
+				w.envelopeFeed.Send(common.EnvelopeEvent{
+					Hash:  v.(gethcommon.Hash),
+					Event: common.EventEnvelopeExpired,
 				})
 				return false
 			})
@@ -1331,11 +1401,11 @@ func (w *Waku) expire() {
 }
 
 // Envelopes retrieves all the messages currently pooled by the node.
-func (w *Waku) Envelopes() []*Envelope {
+func (w *Waku) Envelopes() []*common.Envelope {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 
-	all := make([]*Envelope, 0, len(w.envelopes))
+	all := make([]*common.Envelope, 0, len(w.envelopes))
 	for _, envelope := range w.envelopes {
 		all = append(all, envelope)
 	}
@@ -1344,14 +1414,14 @@ func (w *Waku) Envelopes() []*Envelope {
 
 // GetEnvelope retrieves an envelope from the message queue by its hash.
 // It returns nil if the envelope can not be found.
-func (w *Waku) GetEnvelope(hash common.Hash) *Envelope {
+func (w *Waku) GetEnvelope(hash gethcommon.Hash) *common.Envelope {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 	return w.envelopes[hash]
 }
 
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.
-func (w *Waku) isEnvelopeCached(hash common.Hash) bool {
+func (w *Waku) IsEnvelopeCached(hash gethcommon.Hash) bool {
 	w.poolMu.Lock()
 	defer w.poolMu.Unlock()
 
@@ -1359,80 +1429,21 @@ func (w *Waku) isEnvelopeCached(hash common.Hash) bool {
 	return exist
 }
 
-// ValidatePublicKey checks the format of the given public key.
-func ValidatePublicKey(k *ecdsa.PublicKey) bool {
-	return k != nil && k.X != nil && k.Y != nil && k.X.Sign() != 0 && k.Y.Sign() != 0
-}
-
 // validatePrivateKey checks the format of the given private key.
 func validatePrivateKey(k *ecdsa.PrivateKey) bool {
 	if k == nil || k.D == nil || k.D.Sign() == 0 {
 		return false
 	}
-	return ValidatePublicKey(&k.PublicKey)
-}
-
-// validateDataIntegrity returns false if the data have the wrong or contains all zeros,
-// which is the simplest and the most common bug.
-func validateDataIntegrity(k []byte, expectedSize int) bool {
-	if len(k) != expectedSize {
-		return false
-	}
-	if expectedSize > 3 && containsOnlyZeros(k) {
-		return false
-	}
-	return true
-}
-
-// containsOnlyZeros checks if the data contain only zeros.
-func containsOnlyZeros(data []byte) bool {
-	for _, b := range data {
-		if b != 0 {
-			return false
-		}
-	}
-	return true
-}
-
-// bytesToUintLittleEndian converts the slice to 64-bit unsigned integer.
-func bytesToUintLittleEndian(b []byte) (res uint64) {
-	mul := uint64(1)
-	for i := 0; i < len(b); i++ {
-		res += uint64(b[i]) * mul
-		mul *= 256
-	}
-	return res
-}
-
-// BytesToUintBigEndian converts the slice to 64-bit unsigned integer.
-func BytesToUintBigEndian(b []byte) (res uint64) {
-	for i := 0; i < len(b); i++ {
-		res *= 256
-		res += uint64(b[i])
-	}
-	return res
-}
-
-// GenerateRandomID generates a random string, which is then returned to be used as a key id
-func GenerateRandomID() (id string, err error) {
-	buf, err := generateSecureRandomData(keyIDSize)
-	if err != nil {
-		return "", err
-	}
-	if !validateDataIntegrity(buf, keyIDSize) {
-		return "", fmt.Errorf("error in generateRandomID: crypto/rand failed to generate random data")
-	}
-	id = common.Bytes2Hex(buf)
-	return id, err
+	return common.ValidatePublicKey(&k.PublicKey)
 }
 
 // makeDeterministicID generates a deterministic ID, based on a given input
 func makeDeterministicID(input string, keyLen int) (id string, err error) {
 	buf := pbkdf2.Key([]byte(input), nil, 4096, keyLen, sha256.New)
-	if !validateDataIntegrity(buf, keyIDSize) {
+	if !common.ValidateDataIntegrity(buf, common.KeyIDSize) {
 		return "", fmt.Errorf("error in GenerateDeterministicID: failed to generate key")
 	}
-	id = common.Bytes2Hex(buf)
+	id = gethcommon.Bytes2Hex(buf)
 	return id, err
 }
 
@@ -1453,37 +1464,9 @@ func toDeterministicID(id string, expectedLen int) (string, error) {
 	return id, nil
 }
 
-func isFullNode(bloom []byte) bool {
-	if bloom == nil {
-		return true
-	}
-	for _, b := range bloom {
-		if b != 255 {
-			return false
-		}
-	}
-	return true
-}
-
-func BloomFilterMatch(filter, sample []byte) bool {
-	if filter == nil {
-		return true
-	}
-
-	for i := 0; i < BloomFilterSize; i++ {
-		f := filter[i]
-		s := sample[i]
-		if (f | s) != f {
-			return false
-		}
-	}
-
-	return true
-}
-
 func addBloom(a, b []byte) []byte {
-	c := make([]byte, BloomFilterSize)
-	for i := 0; i < BloomFilterSize; i++ {
+	c := make([]byte, common.BloomFilterSize)
+	for i := 0; i < common.BloomFilterSize; i++ {
 		c[i] = a[i] | b[i]
 	}
 	return c

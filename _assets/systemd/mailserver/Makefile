@@ -24,6 +24,8 @@ export SERVICE_PATH ?= $(SERVICE_DIR)/$(SERVICE_NAME).service
 export DATA_PATH    ?= /var/tmp/$(SERVICE_NAME)
 export LOG_LEVEL    ?= INFO
 export LISTEN_PORT  ?= 30303
+export METRICS_PORT ?= 9090
+export RPC_PORT     ?= 8545
 # Necessary to make mailserver available publicly
 export PUBLIC_IP    ?= $(shell curl -s https://ipecho.net/plain)
 
@@ -38,7 +40,7 @@ $(shell $(GIT_ROOT)/_assets/scripts/get_enode.sh 2>/dev/null)
 endef
 export INFO_MSG
 
-all: checks build config service enable restart info
+all: checks build config service enable restart info enode-qr
 
 clean: stop disable rm-service forget 
 
@@ -61,6 +63,9 @@ info:
 
 enode:
 	@$(GIT_ROOT)/_assets/scripts/get_enode.sh
+
+enode-qr:
+	@$(GIT_ROOT)/_assets/scripts/get_enode.sh --qr
 
 status:
 	systemctl $(SCTL_OPTS) status --no-pager $(SERVICE_NAME)

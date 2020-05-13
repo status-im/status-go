@@ -221,9 +221,9 @@ func initialize(t *testing.T) {
 
 	for i := 0; i < NumNodes; i++ {
 		for j := 0; j < i; j++ {
-			peerNodeId := nodes[j].id
+			peerNodeID := nodes[j].id
 			address, _ := net.ResolveTCPAddr("tcp", nodes[j].server.ListenAddr)
-			peer := enode.NewV4(&peerNodeId.PublicKey, address.IP, address.Port, address.Port)
+			peer := enode.NewV4(&peerNodeID.PublicKey, address.IP, address.Port, address.Port)
 			nodes[i].server.AddPeer(peer)
 		}
 	}
@@ -418,7 +418,7 @@ func TestPeerBasic(t *testing.T) {
 func checkPowExchangeForNodeZero(t *testing.T) {
 	const iterations = 200
 	for j := 0; j < iterations; j++ {
-		lastCycle := (j == iterations-1)
+		lastCycle := j == iterations-1
 		ok := checkPowExchangeForNodeZeroOnce(t, lastCycle)
 		if ok {
 			break
@@ -485,7 +485,7 @@ func checkBloomFilterExchangeOnce(t *testing.T, mustPass bool) bool {
 func checkBloomFilterExchange(t *testing.T) {
 	const iterations = 200
 	for j := 0; j < iterations; j++ {
-		lastCycle := (j == iterations-1)
+		lastCycle := j == iterations-1
 		ok := checkBloomFilterExchangeOnce(t, lastCycle)
 		if ok {
 			break
