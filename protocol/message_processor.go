@@ -24,9 +24,14 @@ import (
 
 // Whisper message properties.
 const (
-	whisperTTL     = 15
-	whisperPoW     = 0.002
-	whisperPoWTime = 5
+	whisperTTL        = 15
+	whisperDefaultPoW = 0.002
+	// whisperLargeSizePoW is the PoWTarget for larger payload sizes
+	whisperLargeSizePoW = 0.000002
+	// largeSizeInBytes is when should we be using a lower POW.
+	// Roughly this is 50KB
+	largeSizeInBytes = 50000
+	whisperPoWTime   = 5
 )
 
 type messageProcessor struct {
@@ -428,10 +433,21 @@ func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessa
 	newMessage = &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
-		PowTarget: whisperPoW,
+		PowTarget: calculatePoW(payload),
 		PowTime:   whisperPoWTime,
 	}
 	return newMessage, nil
+}
+
+// calculatePoW returns the PoWTarget to be used.
+// We check the size and arbitrarely set it to a lower PoW if the packet is
+// greater than 50KB. We do this as the defaultPoW is to high for clients to send
+// large messages.
+func calculatePoW(payload []byte) float64 {
+	if len(payload) > largeSizeInBytes {
+		return whisperLargeSizePoW
+	}
+	return whisperDefaultPoW
 }
 
 // isPubKeyEqual checks that two public keys are equal
