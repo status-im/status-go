@@ -171,7 +171,7 @@ setup-build: lint-install release-install gomobile-install ##@other Prepare proj
 setup: setup-build setup-dev tidy ##@other Prepare project for development and building
 
 generate: ##@other Regenerate assets and other auto-generated stuff
-	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/...
+	go generate ./static ./static/mailserver_db_migrations ./t ./multiaccounts/... ./appdatabase/... ./protocol/...
 
 prepare-release: clean-release
 	mkdir -p $(RELEASE_DIR)
