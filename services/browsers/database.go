@@ -44,8 +44,8 @@ func (db *Database) InsertBrowser(browser Browser) (err error) {
 	if err != nil {
 		return
 	}
-	defer bInsert.Close()
 	_, err = bInsert.Exec(browser.ID, browser.Name, browser.Timestamp, browser.Dapp, browser.HistoryIndex)
+	bInsert.Close()
 	if err != nil {
 		return
 	}
