@@ -7,11 +7,11 @@ update_configs:
     directory: "/"
     update_schedule: "weekly"
     default_assignees:
-    - "adambabik"
     - "cammellos"
+    - "Samyoul"
   - package_manager: "go:modules"
     directory: "/protocol"
     update_schedule: "weekly"
     default_assignees:
-    - "adambabik"
     - "cammellos"
+    - "Samyoul"
