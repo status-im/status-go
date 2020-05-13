@@ -191,5 +191,23 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 			return errors.New("sticker hash not set")
 		}
 	}
+
+	if message.ContentType == protobuf.ChatMessage_IMAGE {
+		if message.Payload == nil {
+			return errors.New("no image content")
+		}
+		image := message.GetImage()
+		if image == nil {
+			return errors.New("no image content")
+		}
+		if len(image.Payload) == 0 {
+			return errors.New("image payload empty")
+		}
+
+		if image.Type == protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE {
+			return errors.New("image type unknown")
+		}
+	}
+
 	return nil
 }

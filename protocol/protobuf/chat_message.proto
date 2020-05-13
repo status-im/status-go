@@ -7,6 +7,18 @@ message StickerMessage {
   int32 pack = 2;
 }
 
+message ImageMessage {
+  bytes payload = 1;
+  ImageType type = 2;
+  enum ImageType {
+    UNKNOWN_IMAGE_TYPE = 0;
+    PNG = 1;
+    JPEG = 2;
+    WEBP = 3;
+    GIF = 4;
+  }
+}
+
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
@@ -32,6 +44,7 @@ message ChatMessage {
 
   oneof payload {
     StickerMessage sticker = 9;
+    ImageMessage image = 10;
   }
 
   enum MessageType {
@@ -50,5 +63,6 @@ message ChatMessage {
     TRANSACTION_COMMAND = 5;
     // Only local
     SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP = 6;
+    IMAGE = 7;
   }
 }

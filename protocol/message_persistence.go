@@ -33,6 +33,9 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		parsed_text,
 		sticker_pack,
 		sticker_hash,
+		image_payload,
+		image_type,
+		image_base64,
 		command_id,
 		command_value,
 		command_from,
@@ -64,6 +67,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.parsed_text,
 		m1.sticker_pack,
 		m1.sticker_hash,
+		m1.image_base64,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -116,6 +120,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ParsedText,
 		&sticker.Pack,
 		&sticker.Hash,
+		&message.Base64Image,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -162,6 +167,12 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 	if sticker == nil {
 		sticker = &protobuf.StickerMessage{}
 	}
+
+	image := message.GetImage()
+	if image == nil {
+		image = &protobuf.ImageMessage{}
+	}
+
 	command := message.CommandParameters
 	if command == nil {
 		command = &CommandParameters{}
@@ -183,6 +194,9 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 		message.ParsedText,
 		sticker.Pack,
 		sticker.Hash,
+		image.Payload,
+		image.Type,
+		message.Base64Image,
 		command.ID,
 		command.Value,
 		command.From,
