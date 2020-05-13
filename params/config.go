@@ -633,6 +633,16 @@ func (c *NodeConfig) UpdateWithMobileDefaults() {
 	if c.APIModules == "" {
 		c.APIModules = "net,web3,eth"
 	}
+
+	// Override defaultMinPoW passed by the mobile
+	if c.WakuConfig.Enabled {
+		c.WakuConfig.MinimumPoW = WakuMinimumPoW
+	}
+
+	if c.WhisperConfig.Enabled {
+		c.WakuConfig.MinimumPoW = WhisperMinimumPoW
+	}
+
 }
 
 // NewNodeConfigWithDefaultsAndFiles creates new node configuration object
