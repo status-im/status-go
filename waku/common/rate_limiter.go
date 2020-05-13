@@ -31,18 +31,25 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
+var errRateLimitExceeded = errors.New("rate limit has been exceeded")
+
 type runLoop func(rw p2p.MsgReadWriter) error
 
+// RateLimiterPeer interface represents a Peer that is capable of being rate limited
 type RateLimiterPeer interface {
 	ID() []byte
 	IP() net.IP
 }
 
+// RateLimiterHandler interface represents handler functionality for a Rate Limiter in the cases of
+// exceeding a peer limit and exceeding an IP limit
 type RateLimiterHandler interface {
 	ExceedPeerLimit() error
 	ExceedIPLimit() error
 }
 
+// MetricsRateLimiterHandler implements RateLimiterHandler, represents a handler for reporting rate limit Exceed data
+// to the metrics collection service (currently prometheus)
 type MetricsRateLimiterHandler struct{}
 
 func (MetricsRateLimiterHandler) ExceedPeerLimit() error {
@@ -66,11 +73,10 @@ func (r RateLimits) IsZero() bool {
 	return r == (RateLimits{})
 }
 
-var ErrRateLimitExceeded = errors.New("rate limit has been exceeded")
-
+// DropPeerRateLimiterHandler implements RateLimiterHandler, represents a handler that introduces Tolerance to the
+// number of Peer connections before Limit Exceeded errors are returned.
 type DropPeerRateLimiterHandler struct {
-	// Tolerance is a number of how many a limit must be exceeded
-	// in order to drop a peer.
+	// Tolerance is a number by which a limit must be exceeded before a peer is dropped.
 	Tolerance int64
 
 	peerLimitExceeds int64
@@ -80,7 +86,7 @@ type DropPeerRateLimiterHandler struct {
 func (h *DropPeerRateLimiterHandler) ExceedPeerLimit() error {
 	h.peerLimitExceeds++
 	if h.Tolerance > 0 && h.peerLimitExceeds >= h.Tolerance {
-		return ErrRateLimitExceeded
+		return errRateLimitExceeded
 	}
 	return nil
 }
@@ -88,11 +94,12 @@ func (h *DropPeerRateLimiterHandler) ExceedPeerLimit() error {
 func (h *DropPeerRateLimiterHandler) ExceedIPLimit() error {
 	h.ipLimitExceeds++
 	if h.Tolerance > 0 && h.ipLimitExceeds >= h.Tolerance {
-		return ErrRateLimitExceeded
+		return errRateLimitExceeded
 	}
 	return nil
 }
 
+// PeerRateLimiterConfig represents configurations for initialising a PeerRateLimiter
 type PeerRateLimiterConfig struct {
 	LimitPerSecIP      int64
 	LimitPerSecPeerID  int64
@@ -107,6 +114,7 @@ var defaultPeerRateLimiterConfig = PeerRateLimiterConfig{
 	WhitelistedPeerIDs: nil,
 }
 
+// PeerRateLimiter represents a rate limiter that limits communication between Peers
 type PeerRateLimiter struct {
 	peerIDThrottler *tb.Throttler
 	ipThrottler     *tb.Throttler

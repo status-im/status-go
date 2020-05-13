@@ -260,12 +260,22 @@ In addition to the `RateLimits{}` this file also contains the following interfac
 
 |Name|Description|
 |---|---|
-|`RateLimiterPeer` `interface`|// TODO|
-|`RateLimiterHandler` `interface`|// TODO|
-|`MetricsRateLimiterHandler{}`|Implements `RateLimiterHandler`, // TODO|
-|`DropPeerRateLimiterHandler{}`|// TODO|
-|`PeerRateLimiterConfig{}`|// TODO|
-|`PeerRateLimiter{}`|// TODO|
+|`RateLimiterPeer` `interface`|Represents a `Peer{}` that is capable of being rate limited|
+|`RateLimiterHandler` `interface`|Represents handler functionality for a Rate Limiter in the cases of exceeding a peer limit and exceeding an IP limit|
+|`MetricsRateLimiterHandler{}`|Implements `RateLimiterHandler`, represents a handler for reporting rate limit Exceed data to the metrics collection service (currently prometheus)|
+|`DropPeerRateLimiterHandler{}`|Implements `RateLimiterHandler`, represents a handler that introduces Tolerance to the number of Peer connections before Limit Exceeded errors are returned.|
+|`RateLimits{}`|Represents rate limit settings exchanged using rateLimitingCode packet or in the handshake.|
+|`PeerRateLimiterConfig{}`|Represents configurations for initialising a PeerRateLimiter|
+|`PeerRateLimiter{}`|Represents a rate limiter that limits communication between Peers|
+
+The default PeerRateLimiterConfig is:
+
+```text
+LimitPerSecIP:      10,
+LimitPerSecPeerID:  5,
+WhitelistedIPs:     nil,
+WhitelistedPeerIDs: nil,
+```
 
 ---
 
