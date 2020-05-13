@@ -176,6 +176,13 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
+func (s *MessageProcessorSuite) CalculatePoWTest() {
+	largeSizePayload := make([]byte, largeSizeInBytes)
+	s.Require().Equal(whisperLargeSizePoW, calculatePoW(largeSizePayload))
+	normalSizePayload := make([]byte, largeSizeInBytes-1)
+	s.Require().Equal(whisperDefaultPoW, calculatePoW(normalSizePayload))
+
+}
 func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	relayerKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
