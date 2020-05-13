@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
+	"github.com/status-im/status-go/protocol/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
@@ -1389,6 +1392,25 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	if len(message.ImagePath) != 0 {
+		file, err := os.Open(message.ImagePath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		payload, err := ioutil.ReadAll(file)
+		if err != nil {
+			return nil, err
+
+		}
+		image := protobuf.ImageMessage{
+			Payload: payload,
+			Type:    images.ImageType(payload),
+		}
+		message.Payload = &protobuf.ChatMessage_Image{Image: &image}
+
+	}
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
 	var response MessengerResponse
 

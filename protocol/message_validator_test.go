@@ -340,6 +340,68 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				ContentType: protobuf.ChatMessage_STICKER,
 			},
 		},
+		{
+			Name:             "Valid image message",
+			WhisperTimestamp: 2,
+			Valid:            true,
+			Message: protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "valid",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_Image{
+					Image: &protobuf.ImageMessage{
+						Type:    1,
+						Payload: []byte("some-payload"),
+					},
+				},
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_IMAGE,
+			},
+		},
+		{
+			Name:             "Invalid image message, type unknown",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "valid",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_Image{
+					Image: &protobuf.ImageMessage{
+						Type:    protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE,
+						Payload: []byte("some-payload"),
+					},
+				},
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_STICKER,
+			},
+		},
+		{
+			Name:             "Invalid image message, missing payload",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "valid",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_Image{
+					Image: &protobuf.ImageMessage{
+						Type: 1,
+					},
+				},
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_IMAGE,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
