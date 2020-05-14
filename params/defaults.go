@@ -22,12 +22,14 @@ const (
 	DefaultGas = 180000
 
 	// WhisperMinimumPoW amount of work for Whisper message to be added to sending queue
+	// We enforce a minimum as a bland spam prevention mechanism.
 	WhisperMinimumPoW = 0.000002
 
 	// WhisperTTL is time to live for messages, in seconds
 	WhisperTTL = 120
 
 	// WakuMinimumPoW amount of work for Whisper message to be added to sending queue
+	// We enforce a minimum as a bland spam prevention mechanism.
 	WakuMinimumPoW = 0.000002
 
 	// WakuTTL is time to live for messages, in seconds

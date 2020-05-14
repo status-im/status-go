@@ -29,15 +29,16 @@ func webp(buf []byte) bool {
 }
 
 func ImageType(buf []byte) protobuf.ImageMessage_ImageType {
-	if jpeg(buf) {
+	switch {
+	case jpeg(buf):
 		return protobuf.ImageMessage_JPEG
-	} else if png(buf) {
+	case png(buf):
 		return protobuf.ImageMessage_PNG
-	} else if gif(buf) {
+	case gif(buf):
 		return protobuf.ImageMessage_GIF
-	} else if webp(buf) {
+	case webp(buf):
 		return protobuf.ImageMessage_WEBP
+	default:
+		return protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE
 	}
-
-	return protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE
 }

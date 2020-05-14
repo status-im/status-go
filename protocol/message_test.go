@@ -31,3 +31,29 @@ func TestPrepareContentImage(t *testing.T) {
 	require.NoError(t, message.PrepareContent())
 	require.Equal(t, message.Base64Image, expectedJPEG)
 }
+
+func TestGetImageMessageMIME(t *testing.T) {
+	jpeg := &protobuf.ImageMessage{Type: protobuf.ImageMessage_JPEG}
+	mime, err := getImageMessageMIME(jpeg)
+	require.NoError(t, err)
+	require.Equal(t, "jpeg", mime)
+
+	png := &protobuf.ImageMessage{Type: protobuf.ImageMessage_PNG}
+	mime, err = getImageMessageMIME(png)
+	require.NoError(t, err)
+	require.Equal(t, "png", mime)
+
+	webp := &protobuf.ImageMessage{Type: protobuf.ImageMessage_WEBP}
+	mime, err = getImageMessageMIME(webp)
+	require.NoError(t, err)
+	require.Equal(t, "webp", mime)
+
+	gif := &protobuf.ImageMessage{Type: protobuf.ImageMessage_GIF}
+	mime, err = getImageMessageMIME(gif)
+	require.NoError(t, err)
+	require.Equal(t, "gif", mime)
+
+	unknown := &protobuf.ImageMessage{Type: protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE}
+	_, err = getImageMessageMIME(unknown)
+	require.Error(t, err)
+}

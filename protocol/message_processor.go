@@ -435,8 +435,8 @@ func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessa
 }
 
 // calculatePoW returns the PoWTarget to be used.
-// We check the size and arbitrarely set it to a lower PoW if the packet is
-// greater than 50KB. We do this as the defaultPoW is to high for clients to send
+// We check the size and arbitrarily set it to a lower PoW if the packet is
+// greater than 50KB. We do this as the defaultPoW is too high for clients to send
 // large messages.
 func calculatePoW(payload []byte) float64 {
 	if len(payload) > largeSizeInBytes {
