@@ -24,11 +24,7 @@ type DappPermissions struct {
 }
 
 func (db *Database) AddPermissions(perms DappPermissions) (err error) {
-	var (
-		tx     *sql.Tx
-		insert *sql.Stmt
-	)
-	tx, err = db.db.Begin()
+	tx, err := db.db.Begin()
 	if err != nil {
 		return
 	}
@@ -39,25 +35,27 @@ func (db *Database) AddPermissions(perms DappPermissions) (err error) {
 		}
 		_ = tx.Rollback()
 	}()
-	insert, err = tx.Prepare("INSERT OR REPLACE INTO dapps(name) VALUES(?)")
+
+	dInsert, err := tx.Prepare("INSERT OR REPLACE INTO dapps(name) VALUES(?)")
 	if err != nil {
 		return
 	}
-	_, err = insert.Exec(perms.Name)
-	insert.Close()
+	_, err = dInsert.Exec(perms.Name)
+	dInsert.Close()
 	if err != nil {
 		return
 	}
+
 	if len(perms.Permissions) == 0 {
 		return
 	}
-	insert, err = tx.Prepare("INSERT INTO permissions(dapp_name, permission) VALUES(?, ?)")
+	pInsert, err := tx.Prepare("INSERT INTO permissions(dapp_name, permission) VALUES(?, ?)")
 	if err != nil {
 		return
 	}
-	defer insert.Close()
+	defer pInsert.Close()
 	for _, perm := range perms.Permissions {
-		_, err = insert.Exec(perms.Name, perm)
+		_, err = pInsert.Exec(perms.Name, perm)
 		if err != nil {
 			return
 		}
@@ -66,11 +64,7 @@ func (db *Database) AddPermissions(perms DappPermissions) (err error) {
 }
 
 func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
-	var (
-		tx   *sql.Tx
-		rows *sql.Rows
-	)
-	tx, err = db.db.Begin()
+	tx, err := db.db.Begin()
 	if err != nil {
 		return
 	}
@@ -81,30 +75,34 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 		}
 		_ = tx.Rollback()
 	}()
+
 	// FULL and RIGHT joins are not supported
-	rows, err = tx.Query("SELECT name FROM dapps")
+	dRows, err := tx.Query("SELECT name FROM dapps")
 	if err != nil {
 		return
 	}
+	defer dRows.Close()
 	dapps := map[string]*DappPermissions{}
-	for rows.Next() {
+	for dRows.Next() {
 		perms := DappPermissions{}
-		err = rows.Scan(&perms.Name)
+		err = dRows.Scan(&perms.Name)
 		if err != nil {
 			return nil, err
 		}
 		dapps[perms.Name] = &perms
 	}
-	rows, err = tx.Query("SELECT dapp_name, permission from permissions")
+
+	pRows, err := tx.Query("SELECT dapp_name, permission from permissions")
 	if err != nil {
 		return
 	}
+	defer pRows.Close()
 	var (
 		name       string
 		permission string
 	)
-	for rows.Next() {
-		err = rows.Scan(&name, &permission)
+	for pRows.Next() {
+		err = pRows.Scan(&name, &permission)
 		if err != nil {
 			return
 		}
@@ -114,6 +112,7 @@ func (db *Database) GetPermissions() (rst []DappPermissions, err error) {
 	for key := range dapps {
 		rst = append(rst, *dapps[key])
 	}
+
 	return rst, nil
 }
 

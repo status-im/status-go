@@ -77,6 +77,7 @@ func (s *sqlitePersistence) Get(identity []byte, installationIDs []string) (*Res
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var installationID string
@@ -102,6 +103,7 @@ func (s *sqlitePersistence) All() ([][][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var secret []byte

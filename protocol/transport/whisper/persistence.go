@@ -39,6 +39,7 @@ func (s *sqlitePersistence) All() (map[string][]byte, error) {
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var (
