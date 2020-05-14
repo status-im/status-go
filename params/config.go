@@ -82,6 +82,7 @@ type WhisperConfig struct {
 	DataDir string
 
 	// MinimumPoW minimum PoW for Whisper messages
+	// We enforce a minimum as a bland spam prevention mechanism.
 	MinimumPoW float64
 
 	// MailServerPassword for symmetric encryption of whisper message history requests.
@@ -145,14 +146,15 @@ type WakuConfig struct {
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
 
-	// DataDir is the file system folder Whisper should use for any data storage needs.
+	// DataDir is the file system folder Waku should use for any data storage needs.
 	// For instance, MailServer will use this directory to store its data.
 	DataDir string
 
-	// MinimumPoW minimum PoW for Whisper messages
+	// MinimumPoW minimum PoW for Waku messages
+	// We enforce a minimum as a bland spam prevention mechanism.
 	MinimumPoW float64
 
-	// MailServerPassword for symmetric encryption of whisper message history requests.
+	// MailServerPassword for symmetric encryption of waku message history requests.
 	// (if no account file selected, then this password is used for symmetric encryption).
 	MailServerPassword string
 
@@ -165,7 +167,7 @@ type WakuConfig struct {
 	// TTL time to live for messages, in seconds
 	TTL int
 
-	// MaxMessageSize is a maximum size of a devp2p packet handled by the Whisper protocol,
+	// MaxMessageSize is a maximum size of a devp2p packet handled by the Waku protocol,
 	// not only the size of envelopes sent in that packet.
 	MaxMessageSize uint32
 
@@ -603,13 +605,13 @@ func (c *NodeConfig) UpdateWithMobileDefaults() {
 		c.APIModules = "net,web3,eth"
 	}
 
-	// Override defaultMinPoW passed by the mobile
+	// Override defaultMinPoW passed by the client
 	if c.WakuConfig.Enabled {
 		c.WakuConfig.MinimumPoW = WakuMinimumPoW
 	}
 
 	if c.WhisperConfig.Enabled {
-		c.WakuConfig.MinimumPoW = WhisperMinimumPoW
+		c.WhisperConfig.MinimumPoW = WhisperMinimumPoW
 	}
 
 }

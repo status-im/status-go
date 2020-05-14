@@ -82,6 +82,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.response_to,
 		m2.source,
 		m2.text,
+		m2.image_base64,
 		c.alias,
 		c.identicon`
 }
@@ -97,6 +98,7 @@ type scanner interface {
 func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *Message, others ...interface{}) error {
 	var quotedText sql.NullString
 	var quotedFrom sql.NullString
+	var quotedImage sql.NullString
 	var alias sql.NullString
 	var identicon sql.NullString
 
@@ -135,6 +137,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ResponseTo,
 		&quotedFrom,
 		&quotedText,
+		&quotedImage,
 		&alias,
 		&identicon,
 	}
@@ -145,8 +148,9 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if quotedText.Valid {
 		message.QuotedMessage = &QuotedMessage{
-			From: quotedFrom.String,
-			Text: quotedText.String,
+			From:        quotedFrom.String,
+			Text:        quotedText.String,
+			Base64Image: quotedImage.String,
 		}
 	}
 	message.Alias = alias.String
