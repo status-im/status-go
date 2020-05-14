@@ -24,7 +24,7 @@ var (
 
 // StatusOptions defines additional information shared between peers
 // during the handshake.
-// There might be more options provided then fields in StatusOptions
+// There might be more options provided than fields in StatusOptions
 // and they should be ignored during deserialization to stay forward compatible.
 // In the case of RLP, options should be serialized to an array of tuples
 // where the first item is a field name and the second is a RLP-serialized value.

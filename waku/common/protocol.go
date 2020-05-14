@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+// Peer represents a remote Waku client with which the local host waku instance exchanges data / messages.
 type Peer interface {
 	// Start performs the handshake and initialize the broadcasting of messages
 	Start() error
