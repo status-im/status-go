@@ -17,7 +17,7 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
-	github.com/golang/mock v1.4.1
+	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.3.4
 	github.com/google/uuid v1.1.1
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
