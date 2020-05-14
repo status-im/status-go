@@ -24,6 +24,8 @@ import (
 	"github.com/status-im/status-go/waku/common"
 )
 
+var requestMessage uint64 = 100
+
 type Peer struct {
 	host    common.WakuHost
 	rw      p2p.MsgReadWriter
@@ -130,6 +132,10 @@ func (p *Peer) SendRawP2PDirect(envelopes []rlp.RawValue) error {
 	return p2p.Send(p.rw, p2pMessageCode, envelopes)
 }
 
+func (p *Peer) SendMessagesResponse(envelopes []rlp.RawValue) error {
+	return p2p.Send(p.rw, messagesCode, envelopes)
+}
+
 func (p *Peer) SetRWWriter(rw p2p.MsgReadWriter) {
 	p.rw = rw
 }
@@ -225,6 +231,11 @@ func (p *Peer) handlePacket(packet p2p.Msg) error {
 			p.logger.Warn("failed to decode direct message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
 			return err
 		}
+	case requestMessage:
+		if err := p.handleMessageRequest(packet); err != nil {
+			p.logger.Warn("failed to decode p2p request message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			return err
+		}
 	case p2pRequestCode:
 		if err := p.handleP2PRequestCode(packet); err != nil {
 			p.logger.Warn("failed to decode p2p request message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
@@ -285,6 +296,43 @@ func (p *Peer) handleMessageResponseCode(packet p2p.Msg) error {
 	}
 
 	return p.host.OnMessagesResponse(response, p)
+}
+
+func (p *Peer) handleMessageRequest(packet p2p.Msg) error {
+	// Must be processed if mail server is implemented. Otherwise ignore.
+	if !p.host.Mailserver() {
+		return nil
+	}
+
+	// Read all data as we will try to decode it possibly twice.
+	data, err := ioutil.ReadAll(packet.Payload)
+	if err != nil {
+		return fmt.Errorf("invalid p2p request messages: %v", err)
+	}
+	r := bytes.NewReader(data)
+	packet.Payload = r
+
+	var requestDeprecated common.Envelope
+	errDepReq := packet.Decode(&requestDeprecated)
+	if errDepReq == nil {
+		return p.host.OnDeprecatedMessagesRequest(&requestDeprecated, p)
+	}
+	p.logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", p.ID()), zap.Error(errDepReq))
+
+	// As we failed to decode the request, let's set the offset
+	// to the beginning and try decode it again.
+	if _, err := r.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("invalid p2p request message: %v", err)
+	}
+
+	var request common.MessagesRequest
+	errReq := packet.Decode(&request)
+	if errReq == nil {
+		return p.host.OnMessagesRequest(request, p)
+	}
+	p.logger.Info("failed to decode p2p request message", zap.Binary("peer", p.ID()), zap.Error(errReq))
+
+	return errors.New("invalid p2p request message")
 }
 
 func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {

@@ -387,6 +387,18 @@ func (s *WakuMailServer) Deliver(peerID []byte, req wakucommon.MessagesRequest) 
 	})
 }
 
+func (s *WakuMailServer) DeliverResponsively(peerID []byte, req wakucommon.MessagesRequest) {
+	s.ms.DeliverMailResponsively(types.BytesToHash(peerID), types.BytesToHash(req.ID), MessagesRequestPayload{
+		Lower:  req.From,
+		Upper:  req.To,
+		Bloom:  req.Bloom,
+		Topics: req.Topics,
+		Limit:  req.Limit,
+		Cursor: req.Cursor,
+		Batch:  true,
+	})
+}
+
 // DEPRECATED; user Deliver instead
 func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakucommon.Envelope) {
 	payload, err := s.decodeRequest(peerID, req)
@@ -564,6 +576,7 @@ func (wakuAdapter) CreateRawSyncResponse(_ []rlp.RawValue, _ []byte, _ bool, _ s
 type service interface {
 	SendHistoricMessageResponse(peerID []byte, payload []byte) error
 	SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error
+	SendMessagesResponse(peerID []byte, envelopes ...rlp.RawValue) error
 	MaxMessageSize() uint32
 	SendRawSyncResponse(peerID []byte, data interface{}) error // optional
 	SendSyncResponse(peerID []byte, data interface{}) error    // optional
@@ -759,6 +772,144 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 		counter := 0
 		for bundle := range bundles {
 			if err := s.sendRawEnvelopes(peerID, bundle, req.Batch); err != nil {
+				close(cancelProcessing)
+				errCh <- err
+				break
+			}
+			counter++
+		}
+		close(errCh)
+		log.Info(
+			"[mailserver:DeliverMail] finished sending bundles",
+			"peerID", peerID,
+			"requestID", reqID.String(),
+			"counter", counter,
+		)
+	}()
+
+	nextPageCursor, lastEnvelopeHash := s.processRequestInBundles(
+		iter,
+		req.Bloom,
+		req.Topics,
+		int(req.Limit),
+		processRequestTimeout,
+		reqID.String(),
+		bundles,
+		cancelProcessing,
+	)
+
+	// Wait for the goroutine to finish the work. It may return an error.
+	if err := <-errCh; err != nil {
+		deliveryFailuresCounter.WithLabelValues("process").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] error while processing",
+			"err", err,
+			"peerID", peerID,
+			"requestID", reqID,
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, err)
+		return
+	}
+
+	// Processing of the request could be finished earlier due to iterator error.
+	if err := iter.Error(); err != nil {
+		deliveryFailuresCounter.WithLabelValues("iterator").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] iterator failed",
+			"err", err,
+			"peerID", peerID,
+			"requestID", reqID,
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, err)
+		return
+	}
+
+	log.Info(
+		"[mailserver:DeliverMail] sending historic message response",
+		"peerID", peerID,
+		"requestID", reqID,
+		"last", lastEnvelopeHash,
+		"next", nextPageCursor,
+	)
+
+	s.sendHistoricMessageResponse(peerID, reqID, lastEnvelopeHash, nextPageCursor)
+}
+
+
+func (s *mailServer) DeliverMailResponsively(peerID, reqID types.Hash, req MessagesRequestPayload) {
+	timer := prom.NewTimer(mailDeliveryDuration)
+	defer timer.ObserveDuration()
+
+	deliveryAttemptsCounter.Inc()
+	log.Info(
+		"[mailserver:DeliverMail] delivering mail",
+		"peerID", peerID.String(),
+		"requestID", reqID.String(),
+	)
+
+	req.SetDefaults()
+
+	log.Info(
+		"[mailserver:DeliverMail] processing request",
+		"peerID", peerID.String(),
+		"requestID", reqID.String(),
+		"lower", req.Lower,
+		"upper", req.Upper,
+		"bloom", req.Bloom,
+		"topics", req.Topics,
+		"limit", req.Limit,
+		"cursor", req.Cursor,
+		"batch", req.Batch,
+	)
+
+	if err := req.Validate(); err != nil {
+		syncFailuresCounter.WithLabelValues("req_invalid").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] request invalid",
+			"peerID", peerID.String(),
+			"requestID", reqID.String(),
+			"err", err,
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, fmt.Errorf("request is invalid: %v", err))
+		return
+	}
+
+	if s.exceedsPeerRequests(peerID) {
+		deliveryFailuresCounter.WithLabelValues("peer_req_limit").Inc()
+		log.Error(
+			"[mailserver:DeliverMail] peer exceeded the limit",
+			"peerID", peerID.String(),
+			"requestID", reqID.String(),
+		)
+		s.sendHistoricMessageErrorResponse(peerID, reqID, fmt.Errorf("rate limit exceeded"))
+		return
+	}
+
+	if req.Batch {
+		requestsBatchedCounter.Inc()
+	}
+
+	iter, err := s.createIterator(req)
+	if err != nil {
+		log.Error(
+			"[mailserver:DeliverMail] request failed",
+			"peerID", peerID.String(),
+			"requestID", reqID.String(),
+		)
+		return
+	}
+	defer func() { _ = iter.Release() }()
+
+	bundles := make(chan []rlp.RawValue, 5)
+	errCh := make(chan error)
+	cancelProcessing := make(chan struct{})
+
+	// @todo don't bundle
+
+	go func() {
+		counter := 0
+		for bundle := range bundles {
+			if err := s.sendEnvelopes(peerID, bundle, req.Batch); err != nil {
 				close(cancelProcessing)
 				errCh <- err
 				break
@@ -1120,6 +1271,13 @@ func (s *mailServer) sendRawEnvelopes(peerID types.Hash, envelopes []rlp.RawValu
 	}
 
 	return nil
+}
+
+func (s *mailServer) sendEnvelopes(peerID types.Hash, envelopes []rlp.RawValue, batch bool) error {
+	timer := prom.NewTimer(sendRawEnvelopeDuration)
+	defer timer.ObserveDuration()
+
+	return s.service.SendMessagesResponse(peerID.Bytes(), envelopes...)
 }
 
 func (s *mailServer) sendHistoricMessageResponse(peerID, reqID, lastEnvelopeHash types.Hash, cursor []byte) {

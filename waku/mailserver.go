@@ -44,6 +44,7 @@ type MailServer interface {
 	Archive(env *common.Envelope)
 	DeliverMail(peerID []byte, request *common.Envelope) // DEPRECATED; use Deliver()
 	Deliver(peerID []byte, request common.MessagesRequest)
+	DeliverResponsively(peerID []byte, request common.MessagesRequest)
 }
 
 // MailServerResponse is the response payload sent by the mailserver.
