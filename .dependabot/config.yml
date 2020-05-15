@@ -11,7 +11,7 @@ update_configs:
     - "Samyoul"
     allowed_updates:
       - match:
-        update_type: "security"
+          update_type: "security"
   - package_manager: "go:modules"
     directory: "/protocol"
     update_schedule: "weekly"
@@ -20,4 +20,4 @@ update_configs:
     - "Samyoul"
     allowed_updates:
       - match:
-        update_type: "security"
+          update_type: "security"
