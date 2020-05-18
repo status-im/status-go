@@ -12,12 +12,3 @@ update_configs:
     allowed_updates:
       - match:
           update_type: "security"
-  - package_manager: "go:modules"
-    directory: "/protocol"
-    update_schedule: "weekly"
-    default_assignees:
-    - "cammellos"
-    - "Samyoul"
-    allowed_updates:
-      - match:
-          update_type: "security"
