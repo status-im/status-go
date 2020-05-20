@@ -17,8 +17,8 @@ import (
 
 func TestTableUserMessagesAllFieldsCount(t *testing.T) {
 	db := sqlitePersistence{}
-	expected := len(strings.Split(db.tableUserMessagesLegacyAllFields(), ","))
-	require.Equal(t, expected, db.tableUserMessagesLegacyAllFieldsCount())
+	expected := len(strings.Split(db.tableUserMessagesAllFields(), ","))
+	require.Equal(t, expected, db.tableUserMessagesAllFieldsCount())
 }
 
 func TestSaveMessages(t *testing.T) {
@@ -141,7 +141,7 @@ func TestMessageByChatID(t *testing.T) {
 		})
 	}
 
-	err = p.SaveMessagesLegacy(messages)
+	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
 	var (
@@ -215,7 +215,7 @@ func TestMessageReplies(t *testing.T) {
 
 	messages := []*Message{message1, message2, message3}
 
-	err = p.SaveMessagesLegacy(messages)
+	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
 	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
@@ -253,7 +253,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 		})
 	}
 
-	err = p.SaveMessagesLegacy(messages)
+	err = p.SaveMessages(messages)
 	require.NoError(t, err)
 
 	var (
@@ -384,7 +384,7 @@ func openTestDB() (*sql.DB, error) {
 }
 
 func insertMinimalMessage(p sqlitePersistence, id string) error {
-	return p.SaveMessagesLegacy([]*Message{{
+	return p.SaveMessages([]*Message{{
 		ID:          id,
 		LocalChatID: "chat-id",
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},

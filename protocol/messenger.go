@@ -687,7 +687,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 
 	response.Chats = []*Chat{&chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -752,7 +752,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -816,7 +816,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -882,7 +882,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	var response MessengerResponse
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -947,7 +947,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -1014,7 +1014,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -1086,7 +1086,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 
 	response.Chats = []*Chat{chat}
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessagesLegacy(response.Messages)
+	err = m.persistence.SaveMessages(response.Messages)
 	if err != nil {
 		return nil, err
 	}
@@ -1096,6 +1096,15 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 
 func (m *Messenger) saveChat(chat *Chat) error {
 	_, ok := m.allChats[chat.ID]
+	if chat.OneToOne() {
+		name, identicon, err := generateAliasAndIdenticon(chat.ID)
+		if err != nil {
+			return err
+		}
+
+		chat.Alias = name
+		chat.Identicon = identicon
+	}
 	// Sync chat if it's a new active public chat
 	if !ok && chat.Active && chat.Public() {
 		if err := m.syncPublicChat(context.Background(), chat); err != nil {
@@ -1163,18 +1172,12 @@ func (m *Messenger) isNewContact(contact *Contact) bool {
 }
 
 func (m *Messenger) saveContact(contact *Contact) error {
-	identicon, err := identicon.GenerateBase64(contact.ID)
+	name, identicon, err := generateAliasAndIdenticon(contact.ID)
 	if err != nil {
 		return err
 	}
 
 	contact.Identicon = identicon
-
-	name, err := alias.GenerateFromPublicKeyString(contact.ID)
-	if err != nil {
-		return err
-	}
-
 	contact.Alias = name
 
 	if m.isNewContact(contact) {
@@ -1190,9 +1193,10 @@ func (m *Messenger) saveContact(contact *Contact) error {
 	}
 
 	m.allContacts[contact.ID] = contact
-	return nil
 
+	return nil
 }
+
 func (m *Messenger) SaveContact(contact *Contact) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -1453,7 +1457,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -1981,10 +1985,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
-	for id := range messageState.ModifiedChats {
-		messageState.Response.Chats = append(messageState.Response.Chats, messageState.AllChats[id])
-	}
-
 	var contactsToSave []*Contact
 	for id := range messageState.ModifiedContacts {
 		contact := messageState.AllContacts[id]
@@ -1997,6 +1997,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
 			}
 		}
+	}
+
+	for id := range messageState.ModifiedChats {
+		chat := messageState.AllChats[id]
+		if chat.OneToOne() {
+			contact, ok := m.allContacts[chat.ID]
+			if ok {
+				chat.Alias = contact.Alias
+				chat.Identicon = contact.Identicon
+			}
+		}
+
+		messageState.Response.Chats = append(messageState.Response.Chats, chat)
 	}
 
 	for id := range messageState.ModifiedInstallations {
@@ -2082,7 +2095,7 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*Messag
 }
 
 func (m *Messenger) SaveMessages(messages []*Message) error {
-	return m.persistence.SaveMessagesLegacy(messages)
+	return m.persistence.SaveMessages(messages)
 }
 
 func (m *Messenger) DeleteMessage(id string) error {
@@ -2273,7 +2286,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2349,7 +2362,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2444,7 +2457,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2526,7 +2539,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2608,7 +2621,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2707,7 +2720,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2788,7 +2801,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessagesLegacy([]*Message{message})
+	err = m.persistence.SaveMessages([]*Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2930,4 +2943,18 @@ func (m *Messenger) getTimesource() TimeSource {
 
 func (m *Messenger) Timesource() TimeSource {
 	return m.getTimesource()
+}
+
+func generateAliasAndIdenticon(pk string) (string, string, error) {
+	identicon, err := identicon.GenerateBase64(pk)
+	if err != nil {
+		return "", "", err
+	}
+
+	name, err := alias.GenerateFromPublicKeyString(pk)
+	if err != nil {
+		return "", "", err
+	}
+	return name, identicon, nil
+
 }
