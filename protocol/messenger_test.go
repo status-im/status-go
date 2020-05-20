@@ -1025,6 +1025,10 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		UnviewedMessagesCount: 40,
 		LastMessage:           []byte("test"),
 	}
+	contact := Contact{
+		ID: testPK,
+	}
+
 	publicKeyBytes, err := hex.DecodeString(testPK[2:])
 	s.Require().NoError(err)
 
@@ -1032,6 +1036,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	s.Require().NoError(err)
 
 	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveContact(&contact))
 	savedChats := s.m.Chats()
 	s.Require().Equal(1, len(savedChats))
 
@@ -1044,6 +1049,8 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	s.Require().Equal(pk, actualPk)
 
 	s.Require().Equal(expectedChat, actualChat)
+	s.Require().NotEmpty(actualChat.Identicon)
+	s.Require().NotEmpty(actualChat.Alias)
 }
 
 func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {

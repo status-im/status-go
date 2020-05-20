@@ -16,7 +16,7 @@ var (
 	errRecordNotFound = errors.New("record not found")
 )
 
-func (db sqlitePersistence) tableUserMessagesLegacyAllFields() string {
+func (db sqlitePersistence) tableUserMessagesAllFields() string {
 	return `id,
     		whisper_timestamp,
     		source,
@@ -47,7 +47,7 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllFields() string {
 		response_to`
 }
 
-func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsJoin() string {
+func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 	return `m1.id,
     		m1.whisper_timestamp,
     		m1.source,
@@ -82,15 +82,15 @@ func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsJoin() string {
 		c.identicon`
 }
 
-func (db sqlitePersistence) tableUserMessagesLegacyAllFieldsCount() int {
-	return strings.Count(db.tableUserMessagesLegacyAllFields(), ",") + 1
+func (db sqlitePersistence) tableUserMessagesAllFieldsCount() int {
+	return strings.Count(db.tableUserMessagesAllFields(), ",") + 1
 }
 
 type scanner interface {
 	Scan(dest ...interface{}) error
 }
 
-func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, message *Message, others ...interface{}) error {
+func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *Message, others ...interface{}) error {
 	var quotedText sql.NullString
 	var quotedFrom sql.NullString
 	var alias sql.NullString
@@ -157,7 +157,7 @@ func (db sqlitePersistence) tableUserMessagesLegacyScanAllFields(row scanner, me
 	return nil
 }
 
-func (db sqlitePersistence) tableUserMessagesLegacyAllValues(message *Message) ([]interface{}, error) {
+func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]interface{}, error) {
 	sticker := message.GetSticker()
 	if sticker == nil {
 		sticker = &protobuf.StickerMessage{}
@@ -217,7 +217,7 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 
 	var message Message
 
-	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
+	allFields := db.tableUserMessagesAllFieldsJoin()
 	row := tx.QueryRow(
 		fmt.Sprintf(`
 			SELECT
@@ -238,7 +238,7 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 		`, allFields),
 		id,
 	)
-	err = db.tableUserMessagesLegacyScanAllFields(row, &message)
+	err = db.tableUserMessagesScanAllFields(row, &message)
 	switch err {
 	case sql.ErrNoRows:
 		return nil, errRecordNotFound
@@ -253,7 +253,7 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*Message, err
 
 	var message Message
 
-	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
+	allFields := db.tableUserMessagesAllFieldsJoin()
 	row := db.db.QueryRow(
 		fmt.Sprintf(`
 			SELECT
@@ -279,7 +279,7 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*Message, err
 		id,
 		chatID,
 	)
-	err := db.tableUserMessagesLegacyScanAllFields(row, &message)
+	err := db.tableUserMessagesScanAllFields(row, &message)
 	switch err {
 	case sql.ErrNoRows:
 		return nil, errRecordNotFound
@@ -335,7 +335,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
 		idsArgs = append(idsArgs, id)
 	}
 
-	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
+	allFields := db.tableUserMessagesAllFieldsJoin()
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 
 	// nolint: gosec
@@ -362,7 +362,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
 	var result []*Message
 	for rows.Next() {
 		var message Message
-		if err := db.tableUserMessagesLegacyScanAllFields(rows, &message); err != nil {
+		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
 			return nil, err
 		}
 		result = append(result, &message)
@@ -379,7 +379,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?"
 	}
-	allFields := db.tableUserMessagesLegacyAllFieldsJoin()
+	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := []interface{}{chatID}
 	if currCursor != "" {
 		args = append(args, currCursor)
@@ -425,7 +425,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 			message Message
 			cursor  string
 		)
-		if err := db.tableUserMessagesLegacyScanAllFields(rows, &message, &cursor); err != nil {
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
 			return nil, "", err
 		}
 		result = append(result, &message)
@@ -440,7 +440,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
-func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) {
+func (db sqlitePersistence) SaveMessages(messages []*Message) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
@@ -454,8 +454,8 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) 
 		_ = tx.Rollback()
 	}()
 
-	allFields := db.tableUserMessagesLegacyAllFields()
-	valuesVector := strings.Repeat("?, ", db.tableUserMessagesLegacyAllFieldsCount()-1) + "?"
+	allFields := db.tableUserMessagesAllFields()
+	valuesVector := strings.Repeat("?, ", db.tableUserMessagesAllFieldsCount()-1) + "?"
 	query := "INSERT INTO user_messages(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec
 	stmt, err := tx.Prepare(query)
 	if err != nil {
@@ -464,7 +464,7 @@ func (db sqlitePersistence) SaveMessagesLegacy(messages []*Message) (err error) 
 
 	for _, msg := range messages {
 		var allValues []interface{}
-		allValues, err = db.tableUserMessagesLegacyAllValues(msg)
+		allValues, err = db.tableUserMessagesAllValues(msg)
 		if err != nil {
 			return
 		}

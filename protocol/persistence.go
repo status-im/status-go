@@ -158,19 +158,21 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 
 	rows, err := tx.Query(`
 		SELECT
-			id,
-			name,
-			color,
-			active,
-			type,
-			timestamp,
-			deleted_at_clock_value,
-			unviewed_message_count,
-			last_clock_value,
-			last_message,
-			members,
-			membership_updates
-		FROM chats
+			chats.id,
+			chats.name,
+			chats.color,
+			chats.active,
+			chats.type,
+			chats.timestamp,
+			chats.deleted_at_clock_value,
+			chats.unviewed_message_count,
+			chats.last_clock_value,
+			chats.last_message,
+			chats.members,
+			chats.membership_updates,
+			contacts.identicon,
+			contacts.alias
+		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
 		ORDER BY chats.timestamp DESC
 	`)
 	if err != nil {
@@ -180,6 +182,8 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 
 	for rows.Next() {
 		var (
+			alias                    sql.NullString
+			identicon                sql.NullString
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
@@ -197,6 +201,8 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.LastMessage,
 			&encodedMembers,
 			&encodedMembershipUpdates,
+			&identicon,
+			&alias,
 		)
 		if err != nil {
 			return
@@ -215,6 +221,9 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 		if err != nil {
 			return
 		}
+
+		chat.Alias = alias.String
+		chat.Identicon = identicon.String
 
 		chats = append(chats, &chat)
 	}

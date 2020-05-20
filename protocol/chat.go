@@ -59,6 +59,11 @@ type Chat struct {
 	Members []ChatMember `json:"members"`
 	// MembershipUpdates is all the membership events in the chat
 	MembershipUpdates []v1protocol.MembershipUpdateEvent `json:"membershipUpdateEvents"`
+
+	// Generated username name of the chat for one-to-ones
+	Alias string `json:"alias,omitempty"`
+	// Identicon generated from public key
+	Identicon string `json:"identicon"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
