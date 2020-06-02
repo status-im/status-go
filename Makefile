@@ -111,8 +111,10 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
+	mkdir -p $(GOBIN)/statusgo-lib
+	go run cmd/library/* > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building static library..."
-	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) ./lib
+	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
 	@echo "Static library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
@@ -257,7 +259,6 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /vendor | \
 	grep -v /t/e2e | \
 	grep -v /t/benchmarks | \
-	grep -v /lib | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
 	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
@@ -276,8 +277,6 @@ test-e2e: ##@tests Run e2e tests
 	go test -timeout 20m ./t/e2e/whisper/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 10m ./t/e2e/transactions/... -network=$(networkid) $(gotest_extraflags)
 	go test -timeout 10m ./t/e2e/services/... -network=$(networkid) $(gotest_extraflags)
-	# e2e_test tag is required to include some files from ./lib without _test suffix
-	go test -timeout 40m -tags e2e_test ./lib -network=$(networkid) $(gotest_extraflags)
 
 test-e2e-race: gotest_extraflags=-race
 test-e2e-race: test-e2e ##@tests Run e2e tests with -race flag
