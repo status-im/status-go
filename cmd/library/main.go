@@ -41,7 +41,7 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 	results := funcDecl.Type.Results
 
 	// add export tag
-	output := fmt.Sprintf("// export %s\n", name)
+	output := fmt.Sprintf("//export %s\n", name)
 	// add initial func declaration
 	output += fmt.Sprintf("func %s (", name)
 
@@ -56,6 +56,8 @@ func handleFunction(name string, funcDecl *ast.FuncDecl) string {
 			output += paramIdentity.Name
 
 			typeString := fmt.Sprint(paramIdentity.Obj.Decl.(*ast.Field).Type)
+			// We match against the stringified type,
+			// could not find a better way to match this
 			switch typeString {
 			case stringType:
 				output += " *C.char"
