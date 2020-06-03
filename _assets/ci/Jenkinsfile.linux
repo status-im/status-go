@@ -52,6 +52,11 @@ pipeline {
       sh 'make setup-build'
     } } }
 
+    /* Sanity-check C bindings */
+    stage('Sanity check bindings') { steps { dir(env.STATUS_PATH) {
+      sh 'make statusgo-library'
+    } } }
+
     stage('Compress') { steps { dir(env.STATUS_PATH) {
       sh "zip -q -r ${dest}/${artifact} . -x *.git"
     } } }
