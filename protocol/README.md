@@ -16,3 +16,7 @@ The payloads are encoded using [protocol-buffers](https://developers.google.com/
 * `applicationmetadata/` is an outer layer wrapping a payload with an app-specific metadata like a signature.
 * `identity/` implements details related to creating a three-word name and identicon.
 * `migrations/` contains implementation specific migrations for the sqlite database which is used by `Messenger` as a persistent data store.
+
+## History
+
+Originally this package was a dedicated repo called `status-protocol-go` and [was migrated](https://github.com/status-im/status-go/pull/1684) into `status-go`. The new `status-go/protocol` package maintained its own dependencies until [sub modules were removed](https://github.com/status-im/status-go/pull/1835/files) and the root go.mod file managed all dependencies for the entire `status-go` repo.   
