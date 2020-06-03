@@ -111,8 +111,9 @@ statusgo-ios: ##@cross-compile Build status-go for iOS
 	@echo "iOS framework cross compilation done in build/bin/Statusgo.framework"
 
 statusgo-library: ##@cross-compile Build status-go as static library for current platform
+	## cmd/library/README.md explains the magic incantation behind this
 	mkdir -p $(GOBIN)/statusgo-lib
-	go run cmd/library/* > $(GOBIN)/statusgo-lib/main.go
+	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
 	@echo "Building static library..."
 	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
 	@echo "Static library built:"
