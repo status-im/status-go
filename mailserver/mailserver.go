@@ -138,7 +138,7 @@ func (s *WhisperMailServer) DeliverMail(peerID []byte, req *whisper.Envelope) {
 		log.Debug(
 			"[mailserver:DeliverMail] failed to decode request",
 			"err", err,
-			"peerID", peerID,
+			"peerID", types.BytesToHash(peerID),
 			"requestID", req.Hash().String(),
 		)
 		payload, err = s.decompositeRequest(peerID, req)
@@ -147,7 +147,7 @@ func (s *WhisperMailServer) DeliverMail(peerID []byte, req *whisper.Envelope) {
 		deliveryFailuresCounter.WithLabelValues("validation").Inc()
 		log.Error(
 			"[mailserver:DeliverMail] request failed validaton",
-			"peerID", peerID,
+			"peerID", types.BytesToHash(peerID),
 			"requestID", req.Hash().String(),
 			"err", err,
 		)
@@ -394,7 +394,7 @@ func (s *WakuMailServer) DeliverMail(peerID []byte, req *wakucommon.Envelope) {
 		deliveryFailuresCounter.WithLabelValues("validation").Inc()
 		log.Error(
 			"[mailserver:DeliverMail] request failed validaton",
-			"peerID", peerID,
+			"peerID", types.BytesToHash(peerID),
 			"requestID", req.Hash().String(),
 			"err", err,
 		)
