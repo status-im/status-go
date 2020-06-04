@@ -1234,14 +1234,11 @@ func (m *Messenger) Contacts() []*Contact {
 }
 
 // GetContactByID assumes pubKey includes 0x prefix
-func (m *Messenger) GetContactByID(pubKey string) (*Contact, error) {
+func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	contact, ok := m.allContacts[pubKey]
-	if !ok {
-		return nil, errors.New("no contact found")
-	}
-	return contact, nil
+
+	return m.allContacts[pubKey]
 }
 
 // ReSendChatMessage pulls a message from the database and sends it again

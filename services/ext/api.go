@@ -260,6 +260,10 @@ func (api *PublicAPI) Contacts(parent context.Context) []*protocol.Contact {
 	return api.service.messenger.Contacts()
 }
 
+func (api *PublicAPI) GetContactByID(parent context.Context, id string) *protocol.Contact {
+	return api.service.messenger.GetContactByID(id)
+}
+
 func (api *PublicAPI) RemoveFilters(parent context.Context, chats []*transport.Filter) error {
 	return api.service.messenger.RemoveFilters(chats)
 }
