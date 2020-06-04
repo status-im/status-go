@@ -372,7 +372,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
 			ON
 
 			m1.source = c.id
-			WHERE m1.hide != 1 AND m1.id IN (%s)`, allFields, inVector), idsArgs...)
+			WHERE NOT(m1.hide) AND m1.id IN (%s)`, allFields, inVector), idsArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +423,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 
 			m1.source = c.id
 			WHERE
-				m1.hide != 1 AND m1.local_chat_id = ? %s
+				NOT(m1.hide) AND m1.local_chat_id = ? %s
 			ORDER BY cursor DESC
 			LIMIT ?
 		`, allFields, cursorWhere),
