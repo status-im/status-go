@@ -177,13 +177,21 @@ type WakuConfig struct {
 	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
 	EnableRateLimiter bool
 
-	// PacketRateLimitIP sets the limit on the number of messages per second
+	// PacketRateLimitIP sets the limit on the number of packets per second
 	// from a given IP.
 	PacketRateLimitIP int64
 
-	// PacketRateLimitPeerID sets the limit on the number of messages per second
+	// PacketRateLimitPeerID sets the limit on the number of packets per second
 	// from a given peer ID.
 	PacketRateLimitPeerID int64
+
+	// BytesRateLimitIP sets the limit on the number of bytes per second
+	// from a given IP.
+	BytesRateLimitIP int64
+
+	// BytesRateLimitPeerID sets the limit on the number of bytes per second
+	// from a given peer ID.
+	BytesRateLimitPeerID int64
 
 	// RateLimitTolerance is a number of how many a limit must be exceeded
 	// in order to drop a peer.

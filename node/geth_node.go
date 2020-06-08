@@ -578,6 +578,8 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 		&wakucommon.PeerRateLimiterConfig{
 			PacketLimitPerSecIP:     wakuCfg.PacketRateLimitIP,
 			PacketLimitPerSecPeerID: wakuCfg.PacketRateLimitPeerID,
+			BytesLimitPerSecIP:      wakuCfg.BytesRateLimitIP,
+			BytesLimitPerSecPeerID:  wakuCfg.BytesRateLimitPeerID,
 			WhitelistedIPs:          ips,
 			WhitelistedPeerIDs:      peerIDs,
 		},
