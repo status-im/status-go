@@ -400,8 +400,8 @@ func (w *Waku) RateLimits() common.RateLimits {
 		return common.RateLimits{}
 	}
 	return common.RateLimits{
-		IPLimits:     uint64(w.rateLimiter.LimitPerSecIP),
-		PeerIDLimits: uint64(w.rateLimiter.LimitPerSecPeerID),
+		PacketIPLimits:     uint64(w.rateLimiter.PacketLimitPerSecIP),
+		PacketPeerIDLimits: uint64(w.rateLimiter.PacketLimitPerSecPeerID),
 	}
 }
 

@@ -64,9 +64,13 @@ func (MetricsRateLimiterHandler) ExceedIPLimit() error {
 // RateLimits contains information about rate limit settings.
 // It is exchanged using rateLimitingCode packet or in the handshake.
 type RateLimits struct {
-	IPLimits     uint64 // messages per second from a single IP (default 0, no limits)
-	PeerIDLimits uint64 // messages per second from a single peer ID (default 0, no limits)
-	TopicLimits  uint64 // messages per second from a single topic (default 0, no limits)
+	PacketIPLimits     uint64 // packets per second from a single IP (default 0, no limits)
+	PacketPeerIDLimits uint64 // packets per second from a single peer ID (default 0, no limits)
+	PacketTopicLimits  uint64 // packets per second from a single topic (default 0, no limits)
+
+	SizeIPLimits     uint64 // bytes per second from a single IP (default 0, no limits)
+	SizePeerIDLimits uint64 // bytes per second from a single peer ID (default 0, no limits)
+	SizeTopicLimits  uint64 // bytes per second from a single topic (default 0, no limits)
 }
 
 func (r RateLimits) IsZero() bool {
@@ -101,26 +105,26 @@ func (h *DropPeerRateLimiterHandler) ExceedIPLimit() error {
 
 // PeerRateLimiterConfig represents configurations for initialising a PeerRateLimiter
 type PeerRateLimiterConfig struct {
-	LimitPerSecIP      int64
-	LimitPerSecPeerID  int64
-	WhitelistedIPs     []string
-	WhitelistedPeerIDs []enode.ID
+	PacketLimitPerSecIP     int64
+	PacketLimitPerSecPeerID int64
+	WhitelistedIPs          []string
+	WhitelistedPeerIDs      []enode.ID
 }
 
 var defaultPeerRateLimiterConfig = PeerRateLimiterConfig{
-	LimitPerSecIP:      10,
-	LimitPerSecPeerID:  5,
-	WhitelistedIPs:     nil,
-	WhitelistedPeerIDs: nil,
+	PacketLimitPerSecIP:     10,
+	PacketLimitPerSecPeerID: 5,
+	WhitelistedIPs:          nil,
+	WhitelistedPeerIDs:      nil,
 }
 
 // PeerRateLimiter represents a rate limiter that limits communication between Peers
 type PeerRateLimiter struct {
-	peerIDThrottler *tb.Throttler
-	ipThrottler     *tb.Throttler
+	packetPeerIDThrottler *tb.Throttler
+	packetIpThrottler     *tb.Throttler
 
-	LimitPerSecIP     int64
-	LimitPerSecPeerID int64
+	PacketLimitPerSecIP     int64
+	PacketLimitPerSecPeerID int64
 
 	whitelistedPeerIDs []enode.ID
 	whitelistedIPs     []string
@@ -135,13 +139,13 @@ func NewPeerRateLimiter(cfg *PeerRateLimiterConfig, handlers ...RateLimiterHandl
 	}
 
 	return &PeerRateLimiter{
-		peerIDThrottler:    tb.NewThrottler(time.Millisecond * 100),
-		ipThrottler:        tb.NewThrottler(time.Millisecond * 100),
-		LimitPerSecIP:      cfg.LimitPerSecIP,
-		LimitPerSecPeerID:  cfg.LimitPerSecPeerID,
-		whitelistedPeerIDs: cfg.WhitelistedPeerIDs,
-		whitelistedIPs:     cfg.WhitelistedIPs,
-		handlers:           handlers,
+		packetPeerIDThrottler:   tb.NewThrottler(time.Millisecond * 100),
+		packetIpThrottler:       tb.NewThrottler(time.Millisecond * 100),
+		PacketLimitPerSecIP:     cfg.PacketLimitPerSecIP,
+		PacketLimitPerSecPeerID: cfg.PacketLimitPerSecPeerID,
+		whitelistedPeerIDs:      cfg.WhitelistedPeerIDs,
+		whitelistedIPs:          cfg.WhitelistedIPs,
+		handlers:                handlers,
 	}
 }
 
@@ -228,22 +232,22 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 	return <-errC
 }
 
-// throttleIP throttles a number of messages incoming from a given IP.
+// throttleIP throttles a number of packets incoming from a given IP.
 // It allows 10 packets per second.
 func (r *PeerRateLimiter) throttleIP(ip string) bool {
-	if r.LimitPerSecIP == 0 {
+	if r.PacketLimitPerSecIP == 0 {
 		return false
 	}
 	if stringSliceContains(r.whitelistedIPs, ip) {
 		return false
 	}
-	return r.ipThrottler.Halt(ip, 1, r.LimitPerSecIP)
+	return r.packetIpThrottler.Halt(ip, 1, r.PacketLimitPerSecIP)
 }
 
-// throttlePeer throttles a number of messages incoming from a peer.
+// throttlePeer throttles a number of packets incoming from a peer.
 // It allows 3 packets per second.
 func (r *PeerRateLimiter) throttlePeer(peerID []byte) bool {
-	if r.LimitPerSecIP == 0 {
+	if r.PacketLimitPerSecIP == 0 {
 		return false
 	}
 	var id enode.ID
@@ -251,7 +255,7 @@ func (r *PeerRateLimiter) throttlePeer(peerID []byte) bool {
 	if enodeIDSliceContains(r.whitelistedPeerIDs, id) {
 		return false
 	}
-	return r.peerIDThrottler.Halt(id.String(), 1, r.LimitPerSecPeerID)
+	return r.packetPeerIDThrottler.Halt(id.String(), 1, r.PacketLimitPerSecPeerID)
 }
 
 func stringSliceContains(s []string, searched string) bool {
