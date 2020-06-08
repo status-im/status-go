@@ -576,10 +576,10 @@ func wakuRateLimiter(wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfi
 	}
 	return wakucommon.NewPeerRateLimiter(
 		&wakucommon.PeerRateLimiterConfig{
-			LimitPerSecIP:      wakuCfg.RateLimitIP,
-			LimitPerSecPeerID:  wakuCfg.RateLimitPeerID,
-			WhitelistedIPs:     ips,
-			WhitelistedPeerIDs: peerIDs,
+			PacketLimitPerSecIP:     wakuCfg.PacketRateLimitIP,
+			PacketLimitPerSecPeerID: wakuCfg.PacketRateLimitPeerID,
+			WhitelistedIPs:          ips,
+			WhitelistedPeerIDs:      peerIDs,
 		},
 		&whisper.MetricsRateLimiterHandler{},
 		&whisper.DropPeerRateLimiterHandler{
