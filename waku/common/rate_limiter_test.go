@@ -70,14 +70,14 @@ func TestPeerRateLimiterDecorator(t *testing.T) {
 func TestPeerLimiterThrottlingWithZeroLimit(t *testing.T) {
 	r := NewPeerRateLimiter(&PeerRateLimiterConfig{}, &mockRateLimiterHandler{})
 	for i := 0; i < 1000; i++ {
-		throttle := r.throttleIP("<nil>")
+		throttle := r.throttleIP("<nil>", 0)
 		require.False(t, throttle)
-		throttle = r.throttlePeer([]byte{0x01, 0x02, 0x03})
+		throttle = r.throttlePeer([]byte{0x01, 0x02, 0x03}, 0)
 		require.False(t, throttle)
 	}
 }
 
-func TestPeerLimiterHandler(t *testing.T) {
+func TestPeerPacketLimiterHandler(t *testing.T) {
 	h := &mockRateLimiterHandler{}
 	r := NewPeerRateLimiter(nil, h)
 	p := &TestWakuPeer{
@@ -108,17 +108,63 @@ func TestPeerLimiterHandler(t *testing.T) {
 
 	<-done
 
-	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.LimitPerSecIP, h.exceedIPLimit)
-	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.LimitPerSecPeerID, h.exceedPeerLimit)
+	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.PacketLimitPerSecIP, h.exceedIPLimit)
+	require.EqualValues(t, 100-defaultPeerRateLimiterConfig.PacketLimitPerSecPeerID, h.exceedPeerLimit)
 }
 
-func TestPeerLimiterHandlerWithWhitelisting(t *testing.T) {
+func TestPeerBytesLimiterHandler(t *testing.T) {
 	h := &mockRateLimiterHandler{}
 	r := NewPeerRateLimiter(&PeerRateLimiterConfig{
-		LimitPerSecIP:      1,
-		LimitPerSecPeerID:  1,
-		WhitelistedIPs:     []string{"<nil>"}, // no IP is represented as <nil> string
-		WhitelistedPeerIDs: []enode.ID{{0xaa, 0xbb, 0xcc}},
+		BytesLimitPerSecIP:     30,
+		BytesLimitPerSecPeerID: 30,
+	}, h)
+	p := &TestWakuPeer{
+		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
+	}
+	rw1, rw2 := p2p.MsgPipe()
+	count := 6
+
+	go func() {
+		err := echoMessages(r, p, rw2)
+		require.NoError(t, err)
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < count; i++ {
+			msg, err := rw1.ReadMsg()
+			require.NoError(t, err)
+			require.EqualValues(t, 101, msg.Code)
+			msg.Discard()
+		}
+		close(done)
+	}()
+
+	for i := 0; i < count; i++ {
+		payload := make([]byte, 10)
+		msg := p2p.Msg{
+			Code:    101,
+			Size:    uint32(len(payload)),
+			Payload: bytes.NewReader(payload),
+		}
+
+		err := rw1.WriteMsg(msg)
+		require.NoError(t, err)
+	}
+
+	<-done
+
+	require.EqualValues(t, 3, h.exceedIPLimit)
+	require.EqualValues(t, 3, h.exceedPeerLimit)
+}
+
+func TestPeerPacketLimiterHandlerWithWhitelisting(t *testing.T) {
+	h := &mockRateLimiterHandler{}
+	r := NewPeerRateLimiter(&PeerRateLimiterConfig{
+		PacketLimitPerSecIP:     1,
+		PacketLimitPerSecPeerID: 1,
+		WhitelistedIPs:          []string{"<nil>"}, // no IP is represented as <nil> string
+		WhitelistedPeerIDs:      []enode.ID{{0xaa, 0xbb, 0xcc}},
 	}, h)
 	p := &TestWakuPeer{
 		peer: p2p.NewPeer(enode.ID{0xaa, 0xbb, 0xcc}, "test-peer", nil),
