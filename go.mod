@@ -29,6 +29,7 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.0.3
 	github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
 	github.com/multiformats/go-multiaddr v0.1.1
+	github.com/multiformats/go-multibase v0.0.1
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pborman/uuid v1.2.0
