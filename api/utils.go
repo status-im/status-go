@@ -2,7 +2,10 @@ package api
 
 import (
 	"bytes"
+	"crypto/elliptic"
 	"encoding/hex"
+	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/multiformats/go-multibase"
 	"strconv"
 	"strings"
 
@@ -45,11 +48,24 @@ func HashMessage(message string) ([]byte, error) {
 	return crypto.Keccak256(buf.Bytes()), nil
 }
 
-func CompressPublicKey(key []byte) string {
-	// TODO
-	return ""
+// CompressPublicKey
+func CompressPublicKey(base string, key []byte) (string, error) {
+
+	// Create crypto public key from decoded bytes
+	x, y := elliptic.Unmarshal(secp256k1.S256(), key)
+
+	// Compress the key
+	cpk := secp256k1.CompressPubkey(x, y)
+
+	// Encode the key
+	out, err := multibase.Encode(multibase.Encoding(base[0]), cpk)
+	if err != nil {
+		return "", err
+	}
+	return out, nil
 }
 
+// UncompressPublicKey
 func UncompressPublicKey(key string) []byte {
 	// TODO
 	return []byte{}
