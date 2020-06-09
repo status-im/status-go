@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/status-im/status-go/eth-node/crypto"
-
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+
 	"github.com/multiformats/go-multibase"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 // RunAsync runs the specified function asynchronously.
