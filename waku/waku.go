@@ -394,16 +394,25 @@ func (w *Waku) LightClientModeConnectionRestricted() bool {
 	return w.settings.RestrictLightClientsConn
 }
 
-// RateLimiting returns RateLimits information.
-func (w *Waku) RateLimits() common.RateLimits {
+// PacketRateLimiting returns RateLimits information for packets
+func (w *Waku) PacketRateLimits() common.RateLimits {
 	if w.rateLimiter == nil {
 		return common.RateLimits{}
 	}
 	return common.RateLimits{
-		PacketIPLimits:     uint64(w.rateLimiter.PacketLimitPerSecIP),
-		PacketPeerIDLimits: uint64(w.rateLimiter.PacketLimitPerSecPeerID),
-		BytesIPLimits:      uint64(w.rateLimiter.BytesLimitPerSecIP),
-		BytesPeerIDLimits:  uint64(w.rateLimiter.BytesLimitPerSecPeerID),
+		IPLimits:     uint64(w.rateLimiter.PacketLimitPerSecIP),
+		PeerIDLimits: uint64(w.rateLimiter.PacketLimitPerSecPeerID),
+	}
+}
+
+// BytesRateLimiting returns RateLimits information for bytes
+func (w *Waku) BytesRateLimits() common.RateLimits {
+	if w.rateLimiter == nil {
+		return common.RateLimits{}
+	}
+	return common.RateLimits{
+		IPLimits:     uint64(w.rateLimiter.BytesLimitPerSecIP),
+		PeerIDLimits: uint64(w.rateLimiter.BytesLimitPerSecPeerID),
 	}
 }
 

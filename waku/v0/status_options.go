@@ -40,7 +40,7 @@ type StatusOptions struct {
 func StatusOptionsFromHost(host common.WakuHost) StatusOptions {
 	opts := StatusOptions{}
 
-	rateLimits := host.RateLimits()
+	rateLimits := host.PacketRateLimits()
 	opts.RateLimits = &rateLimits
 
 	lightNode := host.LightClientMode()

@@ -135,7 +135,7 @@ func TestPeerBytesLimiterHandler(t *testing.T) {
 			msg, err := rw1.ReadMsg()
 			require.NoError(t, err)
 			require.EqualValues(t, 101, msg.Code)
-			msg.Discard()
+			require.NoError(t, msg.Discard())
 		}
 		close(done)
 	}()

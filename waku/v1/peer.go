@@ -48,8 +48,10 @@ type Peer struct {
 	// In that case no envelope is accepted.
 	fullNode             bool
 	confirmationsEnabled bool
-	rateLimitsMu         sync.Mutex
-	rateLimits           common.RateLimits
+	packetRateLimitsMu   sync.Mutex
+	packetRateLimits     common.RateLimits
+	bytesRateLimitsMu    sync.Mutex
+	bytesRateLimits      common.RateLimits
 
 	known mapset.Set // Messages already known by the peer to avoid wasting bandwidth
 }
@@ -488,8 +490,11 @@ func (p *Peer) setOptions(peerOptions StatusOptions) error {
 	if peerOptions.ConfirmationsEnabled != nil {
 		p.confirmationsEnabled = *peerOptions.ConfirmationsEnabled
 	}
-	if peerOptions.RateLimits != nil {
-		p.setRateLimits(*peerOptions.RateLimits)
+	if peerOptions.PacketRateLimits != nil {
+		p.setPacketRateLimits(*peerOptions.PacketRateLimits)
+	}
+	if peerOptions.BytesRateLimits != nil {
+		p.setBytesRateLimits(*peerOptions.BytesRateLimits)
 	}
 
 	return nil
@@ -591,10 +596,16 @@ func (p *Peer) setTopicInterest(topicInterest []common.TopicType) {
 	p.bloomFilter = nil
 }
 
-func (p *Peer) setRateLimits(r common.RateLimits) {
-	p.rateLimitsMu.Lock()
-	p.rateLimits = r
-	p.rateLimitsMu.Unlock()
+func (p *Peer) setPacketRateLimits(r common.RateLimits) {
+	p.packetRateLimitsMu.Lock()
+	p.packetRateLimits = r
+	p.packetRateLimitsMu.Unlock()
+}
+
+func (p *Peer) setBytesRateLimits(r common.RateLimits) {
+	p.bytesRateLimitsMu.Lock()
+	p.bytesRateLimits = r
+	p.bytesRateLimitsMu.Unlock()
 }
 
 // topicOrBloomMatch matches against topic-interest if topic interest

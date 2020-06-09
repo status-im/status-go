@@ -66,8 +66,10 @@ type WakuHost interface {
 	LightClientModeConnectionRestricted() bool
 	// ConfirmationsEnabled returns true if message confirmations are enabled.
 	ConfirmationsEnabled() bool
-	// RateLimits returns the current rate limits for the host
-	RateLimits() RateLimits
+	// PacketRateLimits returns the current rate limits for the host
+	PacketRateLimits() RateLimits
+	// BytesRateLimits returns the current rate limits for the host
+	BytesRateLimits() RateLimits
 	// MinPow returns the MinPow for the host
 	MinPow() float64
 	// BloomFilterMode returns whether the host is using bloom filter
