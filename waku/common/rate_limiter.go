@@ -113,19 +113,16 @@ type PeerRateLimiterConfig struct {
 var defaultPeerRateLimiterConfig = PeerRateLimiterConfig{
 	PacketLimitPerSecIP:     10,
 	PacketLimitPerSecPeerID: 5,
-	BytesLimitPerSecIP:      1048576, // 2MB
-	BytesLimitPerSecPeerID:  1048576, // 2MB
+	BytesLimitPerSecIP:      1048576, // 1MB
+	BytesLimitPerSecPeerID:  1048576, // 1MB
 	WhitelistedIPs:          nil,
 	WhitelistedPeerIDs:      nil,
 }
 
 // PeerRateLimiter represents a rate limiter that limits communication between Peers
 type PeerRateLimiter struct {
-	packetPeerIDThrottler *tb.Throttler
-	packetIPThrottler     *tb.Throttler
-
-	bytesPeerIDThrottler *tb.Throttler
-	bytesIPThrottler     *tb.Throttler
+	packetThrottler *tb.Throttler
+	bytesThrottler  *tb.Throttler
 
 	PacketLimitPerSecIP     int64
 	PacketLimitPerSecPeerID int64
@@ -146,10 +143,8 @@ func NewPeerRateLimiter(cfg *PeerRateLimiterConfig, handlers ...RateLimiterHandl
 	}
 
 	return &PeerRateLimiter{
-		packetPeerIDThrottler:   tb.NewThrottler(time.Millisecond * 100),
-		packetIPThrottler:       tb.NewThrottler(time.Millisecond * 100),
-		bytesPeerIDThrottler:    tb.NewThrottler(time.Millisecond * 100),
-		bytesIPThrottler:        tb.NewThrottler(time.Millisecond * 100),
+		packetThrottler:         tb.NewThrottler(time.Millisecond * 100),
+		bytesThrottler:          tb.NewThrottler(time.Millisecond * 100),
 		PacketLimitPerSecIP:     cfg.PacketLimitPerSecIP,
 		PacketLimitPerSecPeerID: cfg.PacketLimitPerSecPeerID,
 		BytesLimitPerSecIP:      cfg.BytesLimitPerSecIP,
@@ -253,10 +248,10 @@ func (r *PeerRateLimiter) throttleIP(ip string, size uint32) bool {
 	var bytesLimiterResponse bool
 
 	if r.PacketLimitPerSecIP != 0 {
-		packetLimiterResponse = r.packetIPThrottler.Halt(ip, 1, r.PacketLimitPerSecIP)
+		packetLimiterResponse = r.packetThrottler.Halt(ip, 1, r.PacketLimitPerSecIP)
 	}
 	if r.BytesLimitPerSecIP != 0 {
-		bytesLimiterResponse = r.bytesIPThrottler.Halt(ip, int64(size), r.BytesLimitPerSecIP)
+		bytesLimiterResponse = r.bytesThrottler.Halt(ip, int64(size), r.BytesLimitPerSecIP)
 	}
 
 	return packetLimiterResponse || bytesLimiterResponse
@@ -274,11 +269,11 @@ func (r *PeerRateLimiter) throttlePeer(peerID []byte, size uint32) bool {
 	var bytesLimiterResponse bool
 
 	if r.PacketLimitPerSecPeerID != 0 {
-		packetLimiterResponse = r.packetPeerIDThrottler.Halt(id.String(), 1, r.PacketLimitPerSecPeerID)
+		packetLimiterResponse = r.packetThrottler.Halt(id.String(), 1, r.PacketLimitPerSecPeerID)
 	}
 
 	if r.BytesLimitPerSecPeerID != 0 {
-		bytesLimiterResponse = r.bytesPeerIDThrottler.Halt(id.String(), int64(size), r.BytesLimitPerSecPeerID)
+		bytesLimiterResponse = r.bytesThrottler.Halt(id.String(), int64(size), r.BytesLimitPerSecPeerID)
 	}
 
 	return packetLimiterResponse || bytesLimiterResponse
