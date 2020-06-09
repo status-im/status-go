@@ -45,6 +45,16 @@ func HashMessage(message string) ([]byte, error) {
 	return crypto.Keccak256(buf.Bytes()), nil
 }
 
+func CompressPublicKey(key []byte) string {
+	// TODO
+	return ""
+}
+
+func UncompressPublicKey(key string) []byte {
+	// TODO
+	return []byte{}
+}
+
 func decodeHexStrict(s string) ([]byte, bool) {
 	if !strings.HasPrefix(s, "0x") {
 		return nil, false
