@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+
 	"github.com/multiformats/go-multibase"
 
 	"github.com/status-im/status-go/eth-node/crypto"
