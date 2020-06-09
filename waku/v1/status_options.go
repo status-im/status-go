@@ -34,15 +34,19 @@ type StatusOptions struct {
 	BloomFilter          []byte             `rlp:"key=1"`
 	LightNodeEnabled     *bool              `rlp:"key=2"`
 	ConfirmationsEnabled *bool              `rlp:"key=3"`
-	RateLimits           *common.RateLimits `rlp:"key=4"`
+	PacketRateLimits     *common.RateLimits `rlp:"key=4"`
 	TopicInterest        []common.TopicType `rlp:"key=5"`
+	BytesRateLimits      *common.RateLimits `rlp:"key=6"`
 }
 
 func StatusOptionsFromHost(host common.WakuHost) StatusOptions {
 	opts := StatusOptions{}
 
-	rateLimits := host.RateLimits()
-	opts.RateLimits = &rateLimits
+	packetRateLimits := host.PacketRateLimits()
+	opts.PacketRateLimits = &packetRateLimits
+
+	bytesRateLimits := host.BytesRateLimits()
+	opts.BytesRateLimits = &bytesRateLimits
 
 	lightNode := host.LightClientMode()
 	opts.LightNodeEnabled = &lightNode
@@ -114,8 +118,12 @@ func (o StatusOptions) WithDefaults() StatusOptions {
 		o.ConfirmationsEnabled = &confirmationsEnabled
 	}
 
-	if o.RateLimits == nil {
-		o.RateLimits = &common.RateLimits{}
+	if o.PacketRateLimits == nil {
+		o.PacketRateLimits = &common.RateLimits{}
+	}
+
+	if o.BytesRateLimits == nil {
+		o.BytesRateLimits = &common.RateLimits{}
 	}
 
 	if o.BloomFilter == nil {

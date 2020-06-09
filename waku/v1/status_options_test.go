@@ -20,12 +20,17 @@ func TestEncodeDecodeRLP(t *testing.T) {
 		BloomFilter:          common.TopicType{0xaa, 0xbb, 0xcc, 0xdd}.ToBloom(),
 		LightNodeEnabled:     &lightNodeEnabled,
 		ConfirmationsEnabled: &confirmationsEnabled,
-		RateLimits: &common.RateLimits{
+		PacketRateLimits: &common.RateLimits{
 			IPLimits:     10,
 			PeerIDLimits: 5,
 			TopicLimits:  1,
 		},
 		TopicInterest: []common.TopicType{{0x01}, {0x02}, {0x03}, {0x04}},
+		BytesRateLimits: &common.RateLimits{
+			IPLimits:     10,
+			PeerIDLimits: 5,
+			TopicLimits:  1,
+		},
 	}
 	data, err := rlp.EncodeToBytes(opts)
 	require.NoError(t, err)
@@ -73,6 +78,7 @@ func TestInitRLPKeyFields(t *testing.T) {
 		3: 3,
 		4: 4,
 		5: 5,
+		6: 6,
 	}
 	kfi := map[statusOptionKey]int{
 		0: 0,
@@ -81,6 +87,7 @@ func TestInitRLPKeyFields(t *testing.T) {
 		3: 3,
 		4: 4,
 		5: 5,
+		6: 6,
 	}
 
 	// Test that the kfi length matches the inited global keyFieldIdx length
