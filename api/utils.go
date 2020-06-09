@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/elliptic"
 	"encoding/hex"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,11 @@ func CompressPublicKey(base string, key []byte) (string, error) {
 
 	// Create crypto public key from decoded bytes
 	x, y := elliptic.Unmarshal(secp256k1.S256(), key)
+
+	// Check that the key is valid
+	if x == nil || y == nil {
+		return "", fmt.Errorf("invalid public key format, '%b'", key)
+	}
 
 	// Compress the key
 	cpk := secp256k1.CompressPubkey(x, y)

@@ -78,3 +78,28 @@ func TestHashMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestCompressPublicKey(t *testing.T) {
+	cs := []struct{
+		Description string
+		Base string
+		Key []byte
+		Expected string
+		Error error
+	}{
+		{
+			"Test invalid key",
+			"z",
+			[]byte{255, 66, 234},
+			"",
+			fmt.Errorf("invalid public key format, '[11111111 1000010 11101010]'"),
+		},
+	}
+
+	for _, c := range cs {
+		cpk, err := CompressPublicKey(c.Base, c.Key)
+
+		require.Equal(t, c.Expected, cpk)
+		require.Equal(t, c.Error, err)
+	}
+}
