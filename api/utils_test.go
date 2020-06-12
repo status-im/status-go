@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -80,6 +81,8 @@ func TestHashMessage(t *testing.T) {
 }
 
 func TestCompressPublicKey(t *testing.T) {
+	pk, _ := hex.DecodeString("04261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
+
 	cs := []struct{
 		Description string
 		Base string
@@ -93,6 +96,13 @@ func TestCompressPublicKey(t *testing.T) {
 			[]byte{255, 66, 234},
 			"",
 			fmt.Errorf("invalid public key format, '[11111111 1000010 11101010]'"),
+		},
+		{
+			"Test valid key",
+			"z",
+			pk,
+			"ze2QHwp5qjYj6i3jTCfzKVdB1k1dy7NDuoRngzTrARkpT",
+			nil,
 		},
 	}
 
