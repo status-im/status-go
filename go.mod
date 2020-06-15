@@ -12,6 +12,7 @@ require (
 	github.com/beevik/ntp v0.2.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cenkalti/backoff/v3 v3.2.2
+	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
@@ -30,6 +31,7 @@ require (
 	github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
 	github.com/multiformats/go-multiaddr v0.1.1
 	github.com/multiformats/go-multibase v0.0.1
+	github.com/multiformats/go-varint v0.0.5
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pborman/uuid v1.2.0
