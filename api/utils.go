@@ -207,7 +207,7 @@ func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 	return nil
 }
 
-func decompressBls12p381g1PublicKey(key []byte) ([]byte, error){
+func decompressBls12p381g1PublicKey(key []byte) ([]byte, error) {
 	g1 := bls12381.NewG1()
 	pg1, err := g1.FromCompressed(key)
 	if err != nil {
@@ -218,7 +218,7 @@ func decompressBls12p381g1PublicKey(key []byte) ([]byte, error){
 	return pk, nil
 }
 
-func decompressBls12p381g2PublicKey(key []byte) ([]byte, error){
+func decompressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	g2 := bls12381.NewG2()
 	pg2, err := g2.FromCompressed(key)
 	if err != nil {
