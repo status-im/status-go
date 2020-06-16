@@ -81,20 +81,17 @@ func TestHashMessage(t *testing.T) {
 }
 
 func TestCompressPublicKey(t *testing.T) {
-	secPk, _ := hex.DecodeString(
-			"04" +
+	secPk, _ := hex.DecodeString("04" +
 			"261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc" +
 			"3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
 	secPkt := append([]byte{0xe7, 0x01}, secPk...)
 
-	bls12G1Pk, _ := hex.DecodeString(
-			"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac58" +
+	bls12G1Pk, _ := hex.DecodeString("17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac58" +
 			"6c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4" +
 			"fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1")
 	bls12G1Pkt := append([]byte{0xea, 0x01}, bls12G1Pk...)
 
-	bls12G2Pk, _ := hex.DecodeString(
-			"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049" +
+	bls12G2Pk, _ := hex.DecodeString("13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049" +
 			"334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051" +
 			"c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8" +
 			"0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab" +
