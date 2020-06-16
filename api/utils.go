@@ -11,8 +11,15 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 
 	"github.com/multiformats/go-multibase"
+	"github.com/multiformats/go-varint"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+)
+
+const (
+	SECP256K1_KEY    = 0xe7
+	BLS12_381_G1_KEY = 0xea
+	BLS12_381_G2_KEY = 0xeb
 )
 
 // RunAsync runs the specified function asynchronously.
@@ -54,16 +61,17 @@ func HashMessage(message string) ([]byte, error) {
 // CompressPublicKey
 func CompressPublicKey(base string, key []byte) (string, error) {
 
-	// Create crypto public key from decoded bytes
-	x, y := elliptic.Unmarshal(secp256k1.S256(), key)
-
-	// Check that the key is valid
-	if x == nil || y == nil {
-		return "", fmt.Errorf("invalid public key format, '%b'", key)
+	kt, i, err := getPublicKeyType(key)
+	if err != nil {
+		return "", err
 	}
 
-	// Compress the key
-	cpk := secp256k1.CompressPubkey(x, y)
+	cpk, err := compressPublicKey(key[i:], kt)
+	if err != nil {
+		return "", err
+	}
+
+	cpk = prependKeyIdentifier(cpk, kt, i)
 
 	// Encode the key
 	out, err := multibase.Encode(multibase.Encoding(base[0]), cpk)
@@ -77,6 +85,49 @@ func CompressPublicKey(base string, key []byte) (string, error) {
 func UncompressPublicKey(key string) []byte {
 	// TODO
 	return []byte{}
+}
+
+func getPublicKeyType(key []byte) (uint64, int, error) {
+	return varint.FromUvarint(key)
+}
+
+func compressPublicKey(key []byte, keyType uint64) ([]byte, error) {
+	switch keyType{
+	case SECP256K1_KEY:
+		return compressSecp256k1PublicKey(key)
+
+	case BLS12_381_G1_KEY:
+		return nil, fmt.Errorf("bls12 381 g1 public key not supported")
+
+	case BLS12_381_G2_KEY:
+		return nil, fmt.Errorf("bls12 381 g2 public key not supported")
+
+	default:
+		return nil, fmt.Errorf("unsupported public key type '%X'", keyType)
+	}
+}
+
+func compressSecp256k1PublicKey(key []byte) ([]byte, error) {
+	// Create crypto public key from decoded bytes
+	x, y := elliptic.Unmarshal(secp256k1.S256(), key)
+
+	// Check that the key is valid
+	if x == nil || y == nil {
+		return nil, fmt.Errorf("invalid public key format, '%b'", key)
+	}
+
+	// Compress the key
+	cpk := secp256k1.CompressPubkey(x, y)
+
+	return cpk, nil
+}
+
+func prependKeyIdentifier(key []byte, kt uint64, ktl int) []byte {
+	buf := make([]byte, ktl)
+	varint.PutUvarint(buf, kt)
+
+	key = append(buf, key...)
+	return key
 }
 
 func decodeHexStrict(s string) ([]byte, bool) {

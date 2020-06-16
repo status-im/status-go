@@ -81,7 +81,7 @@ func TestHashMessage(t *testing.T) {
 }
 
 func TestCompressPublicKey(t *testing.T) {
-	pk, _ := hex.DecodeString("04261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
+	pk, _ := hex.DecodeString("e70104261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
 
 	cs := []struct{
 		Description string
@@ -93,15 +93,29 @@ func TestCompressPublicKey(t *testing.T) {
 		{
 			"Test invalid key",
 			"z",
-			[]byte{255, 66, 234},
+			[]byte{0xe7, 0x1, 255, 66, 234},
 			"",
 			fmt.Errorf("invalid public key format, '[11111111 1000010 11101010]'"),
+		},
+		{
+			"Test invalid key type",
+			"z",
+			[]byte{255, 66, 234},
+			"",
+			fmt.Errorf("unsupported public key type '217F'"),
+		},
+		{
+			"Test invalid encoding type",
+			"p",
+			pk,
+			"",
+			fmt.Errorf("selected encoding not supported"),
 		},
 		{
 			"Test valid key",
 			"z",
 			pk,
-			"ze2QHwp5qjYj6i3jTCfzKVdB1k1dy7NDuoRngzTrARkpT",
+			"zQ3shPyZJnxZK4Bwyx9QsaksNKDYTPmpwPvGSjMYVHoXHeEgB",
 			nil,
 		},
 	}
@@ -109,7 +123,7 @@ func TestCompressPublicKey(t *testing.T) {
 	for _, c := range cs {
 		cpk, err := CompressPublicKey(c.Base, c.Key)
 
-		require.Equal(t, c.Expected, cpk)
-		require.Equal(t, c.Error, err)
+		require.Equal(t, c.Error, err, c.Description)
+		require.Equal(t, c.Expected, cpk, c.Description)
 	}
 }
