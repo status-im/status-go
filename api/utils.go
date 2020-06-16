@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"encoding/hex"
 	"fmt"
+	bls12381 "github.com/kilic/bls12-381"
 	"math/big"
 	"strconv"
 	"strings"
@@ -121,10 +122,10 @@ func compressPublicKey(key []byte, keyType uint64) ([]byte, error) {
 		return compressSecp256k1PublicKey(key)
 
 	case bls12p381g1KeyType:
-		return nil, fmt.Errorf("bls12 381 g1 public key not supported")
+		return compressBls12p381g1PublicKey(key)
 
 	case bls12p381g2KeyType:
-		return nil, fmt.Errorf("bls12 381 g2 public key not supported")
+		return compressBls12p381g2PublicKey(key)
 
 	default:
 		return nil, fmt.Errorf("unsupported public key type '%X'", keyType)
@@ -140,6 +141,32 @@ func compressSecp256k1PublicKey(key []byte) ([]byte, error) {
 
 	cpk := secp256k1.CompressPubkey(x, y)
 
+	return cpk, nil
+}
+
+func compressBls12p381g1PublicKey(key []byte) ([]byte, error) {
+	g1 := bls12381.NewG1()
+
+	// Generate the G1 point
+	pg1, err := g1.FromBytes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	cpk := g1.ToCompressed(pg1)
+	return cpk, nil
+}
+
+func compressBls12p381g2PublicKey(key []byte) ([]byte, error) {
+	g2 := bls12381.NewG2()
+
+	// Generate the G2 point
+	pg2, err := g2.FromBytes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	cpk := g2.ToCompressed(pg2)
 	return cpk, nil
 }
 
