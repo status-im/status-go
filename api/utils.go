@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	SECP256K1_KEY    = 0xe7
-	BLS12_381_G1_KEY = 0xea
-	BLS12_381_G2_KEY = 0xeb
+	secp256k1KeyType   = 0xe7
+	bls12p381g1KeyType = 0xea
+	bls12p381g2KeyType = 0xeb
 )
 
 // RunAsync runs the specified function asynchronously.
@@ -116,14 +116,14 @@ func prependKeyIdentifier(key []byte, kt uint64, ktl int) []byte {
 }
 
 func compressPublicKey(key []byte, keyType uint64) ([]byte, error) {
-	switch keyType{
-	case SECP256K1_KEY:
+	switch keyType {
+	case secp256k1KeyType:
 		return compressSecp256k1PublicKey(key)
 
-	case BLS12_381_G1_KEY:
+	case bls12p381g1KeyType:
 		return nil, fmt.Errorf("bls12 381 g1 public key not supported")
 
-	case BLS12_381_G2_KEY:
+	case bls12p381g2KeyType:
 		return nil, fmt.Errorf("bls12 381 g2 public key not supported")
 
 	default:
@@ -144,14 +144,14 @@ func compressSecp256k1PublicKey(key []byte) ([]byte, error) {
 }
 
 func decompressPublicKey(key []byte, keyType uint64) ([]byte, error) {
-	switch keyType{
-	case SECP256K1_KEY:
+	switch keyType {
+	case secp256k1KeyType:
 		return decompressSecp256k1PublicKey(key)
 
-	case BLS12_381_G1_KEY:
+	case bls12p381g1KeyType:
 		return nil, fmt.Errorf("bls12 381 g1 public key not supported")
 
-	case BLS12_381_G2_KEY:
+	case bls12p381g2KeyType:
 		return nil, fmt.Errorf("bls12 381 g2 public key not supported")
 
 	default:
@@ -179,7 +179,7 @@ func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 	return nil
 }
 
-func encode(base string, data []byte) (string, error){
+func encode(base string, data []byte) (string, error) {
 	if base == "0x" {
 		base = "f"
 	}

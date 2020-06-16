@@ -84,12 +84,12 @@ func TestCompressPublicKey(t *testing.T) {
 	pk, _ := hex.DecodeString("e70104261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
 	pk2, _ := hex.DecodeString("04261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
 
-	cs := []struct{
+	cs := []struct {
 		Description string
-		Base string
-		Key []byte
-		Expected string
-		Error error
+		Base        string
+		Key         []byte
+		Expected    string
+		Error       error
 	}{
 		{
 			"invalid key, with valid key type",
@@ -168,9 +168,9 @@ func TestDecompressPublicKey(t *testing.T) {
 
 	cs := []struct {
 		Description string
-		Input string
-		Expected []byte
-		Error error
+		Input       string
+		Expected    []byte
+		Error       error
 	}{
 		{
 			"valid key with valid encoding type '0x'",
