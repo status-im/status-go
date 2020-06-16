@@ -177,10 +177,10 @@ func decompressPublicKey(key []byte, keyType uint64) ([]byte, error) {
 		return decompressSecp256k1PublicKey(key)
 
 	case bls12p381g1KeyType:
-		return nil, fmt.Errorf("bls12 381 g1 public key not supported")
+		return decompressBls12p381g1PublicKey(key)
 
 	case bls12p381g2KeyType:
-		return nil, fmt.Errorf("bls12 381 g2 public key not supported")
+		return decompressBls12p381g2PublicKey(key)
 
 	default:
 		return nil, fmt.Errorf("unsupported public key type '%X'", keyType)
@@ -205,6 +205,28 @@ func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 	}
 
 	return nil
+}
+
+func decompressBls12p381g1PublicKey(key []byte) ([]byte, error){
+	g1 := bls12381.NewG1()
+	pg1, err := g1.FromCompressed(key)
+	if err != nil {
+		return nil, err
+	}
+
+	pk := g1.ToUncompressed(pg1)
+	return pk, nil
+}
+
+func decompressBls12p381g2PublicKey(key []byte) ([]byte, error){
+	g2 := bls12381.NewG2()
+	pg2, err := g2.FromCompressed(key)
+	if err != nil {
+		return nil, err
+	}
+
+	pk := g2.ToUncompressed(pg2)
+	return pk, nil
 }
 
 func encode(base string, data []byte) (string, error) {

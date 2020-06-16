@@ -254,9 +254,6 @@ func TestCompressPublicKey(t *testing.T) {
 }
 
 func TestDecompressPublicKey(t *testing.T) {
-	fmt.Println(bls12G1Pkt)
-	fmt.Println(bls12G2Pkt)
-
 	cs := []struct {
 		Description string
 		Input       string
@@ -292,6 +289,42 @@ func TestDecompressPublicKey(t *testing.T) {
 			"Q3shPyZJnxZK4Bwyx9QsaksNKDYTPmpwPvGSjMYVHoXHeEgB",
 			nil,
 			fmt.Errorf("selected encoding not supported"),
+		},
+		{
+			"valid bls12-381 g1 key encoding type 'z'",
+			"z3tEFUdV4D3tCMG6Fr1deVvt32DCS1Y4SxDGoELedXaMUdTdr5FfZvBnbK9bWMhAGj3RHk",
+			bls12G1Pkt,
+			nil,
+		},
+		{
+			"valid bls12-381 g1 key encoding type 'f'",
+			"fea0197f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
+			bls12G1Pkt,
+			nil,
+		},
+		{
+			"valid bls12-381 g1 key encoding type '0x'",
+			"0xea0197f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
+			bls12G1Pkt,
+			nil,
+		},
+		{
+			"valid bls12-381 g2 key encoding type 'z'",
+			"zUC77n3BqSWuoGMY7ut91NDoWzpithCd4GwPLAnv9fc7drWY4wBTvMX1y9eGSAuiBpktqGAocND2KXdu1HqNgrd6i3vCZKCLqZ3nQFaEA2FpTs7ZEChRpWReLvYyXNYUHvQjyKd",
+			bls12G2Pkt,
+			nil,
+		},
+		{
+			"valid bls12-381 g2 key encoding type 'f'",
+			"feb0193e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
+			bls12G2Pkt,
+			nil,
+		},
+		{
+			"valid bls12-381 g2 key encoding type '0x'",
+			"0xeb0193e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
+			bls12G2Pkt,
+			nil,
 		},
 	}
 
