@@ -5,12 +5,13 @@ import (
 	"crypto/elliptic"
 	"encoding/hex"
 	"fmt"
-	bls12381 "github.com/kilic/bls12-381"
 	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+
+	bls12381 "github.com/kilic/bls12-381"
 
 	"github.com/multiformats/go-multibase"
 	"github.com/multiformats/go-varint"
