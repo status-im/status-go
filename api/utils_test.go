@@ -82,38 +82,25 @@ func TestHashMessage(t *testing.T) {
 
 func TestCompressPublicKey(t *testing.T) {
 	secPk, _ := hex.DecodeString(
-		"e701" +
 			"04" +
 			"261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc" +
 			"3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
-	secPk2, _ := hex.DecodeString(
-		"04" +
-			"261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc" +
-			"3cd4e22200c68daf7493e1f8da6a190a68a671e2d3977809612424c7c3888bc6")
+	secPkt := append([]byte{0xe7, 0x01}, secPk...)
+
 	bls12G1Pk, _ := hex.DecodeString(
-		"ea01" +
 			"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac58" +
 			"6c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4" +
 			"fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1")
-	bls12G1Pk2, _ := hex.DecodeString(
-		"17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac58" +
-			"6c55e83ff97a1aeffb3af00adb22c6bb08b3f481e3aaa0f1a09e30ed741d8ae4" +
-			"fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1")
+	bls12G1Pkt := append([]byte{0xea, 0x01}, bls12G1Pk...)
+
 	bls12G2Pk, _ := hex.DecodeString(
-		"eb01" +
 			"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049" +
 			"334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051" +
 			"c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8" +
 			"0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab" +
 			"3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351a" +
 			"adfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801")
-	bls12G2Pk2, _ := hex.DecodeString(
-		"13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049" +
-			"334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051" +
-			"c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8" +
-			"0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab" +
-			"3f370d275cec1da1aaa9075ff05f79be0ce5d527727d6e118cc9cdc6da2e351a" +
-			"adfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801")
+	bls12G2Pkt := append([]byte{0xeb, 0x01}, bls12G2Pk...)
 
 	cs := []struct {
 		Description string
@@ -139,77 +126,77 @@ func TestCompressPublicKey(t *testing.T) {
 		{
 			"invalid encoding type, with valid key",
 			"p",
-			secPk,
+			secPkt,
 			"",
 			fmt.Errorf("selected encoding not supported"),
 		},
 		{
 			"valid key, no key type defined",
 			"z",
-			secPk2,
+			secPk,
 			"",
 			fmt.Errorf("unsupported public key type '4'"),
 		},
 		{
 			"valid key, with base58 bitcoin encoding",
 			"z",
-			secPk,
+			secPkt,
 			"zQ3shPyZJnxZK4Bwyx9QsaksNKDYTPmpwPvGSjMYVHoXHeEgB",
 			nil,
 		},
 		{
 			"valid key, with traditional hex encoding",
 			"0x",
-			secPk,
+			secPkt,
 			"fe70102261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc",
 			nil,
 		},
 		{
 			"valid secp256k1 key, with multiencoding hex encoding",
 			"f",
-			secPk,
+			secPkt,
 			"fe70102261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc",
 			nil,
 		},
 		{
 			"valid bls12-381 g1 key, with multiencoding hex encoding",
 			"f",
-			bls12G1Pk,
+			bls12G1Pkt,
 			"fea0197f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
 			nil,
 		},
 		{
 			"valid bls12-381 g1 key, with base58 bitcoin encoding",
 			"z",
-			bls12G1Pk,
+			bls12G1Pkt,
 			"z3tEFUdV4D3tCMG6Fr1deVvt32DCS1Y4SxDGoELedXaMUdTdr5FfZvBnbK9bWMhAGj3RHk",
 			nil,
 		},
 		{
 			"valid bls12-381 g1 key, with no key type",
 			"f",
-			bls12G1Pk2,
+			bls12G1Pk,
 			"",
 			fmt.Errorf("unsupported public key type '17'"),
 		},
 		{
 			"valid bls12-381 g2 key, with multiencoding hex encoding",
 			"f",
-			bls12G2Pk,
+			bls12G2Pkt,
 			"feb0193e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
 			nil,
 		},
 		{
 			"valid bls12-381 g2 key, with base58 bitcoin encoding",
 			"z",
-			bls12G2Pk,
+			bls12G2Pkt,
 			"zUC77n3BqSWuoGMY7ut91NDoWzpithCd4GwPLAnv9fc7drWY4wBTvMX1y9eGSAuiBpktqGAocND2KXdu1HqNgrd6i3vCZKCLqZ3nQFaEA2FpTs7ZEChRpWReLvYyXNYUHvQjyKd",
 			nil,
 		},
 		{
 			"valid bls12-381 g2 key, with no key type",
 			"f",
-			bls12G2Pk2,
+			bls12G2Pk,
 			"",
 			fmt.Errorf("unsupported public key type '13'"),
 		},
