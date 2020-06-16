@@ -73,7 +73,7 @@ func CompressPublicKey(base string, key []byte) (string, error) {
 
 	cpk = prependKeyIdentifier(cpk, kt, i)
 
-	out, err := multibase.Encode(multibase.Encoding(base[0]), cpk)
+	out, err := encode(base, cpk)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +83,7 @@ func CompressPublicKey(base string, key []byte) (string, error) {
 
 // DecompressPublicKey
 func DecompressPublicKey(key string) ([]byte, error) {
-	_, cpk, err := multibase.Decode(key)
+	cpk, err := decode(key)
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +177,22 @@ func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 	}
 
 	return nil
+}
+
+func encode(base string, data []byte) (string, error){
+	if base != "0x" {
+		base = "f"
+	}
+	return multibase.Encode(multibase.Encoding(base[0]), data)
+}
+
+func decode(data string) ([]byte, error) {
+	if data[0:2] == "0x" {
+		data = "f" + data[2:]
+	}
+
+	_, dd, err := multibase.Decode(data)
+	return dd, err
 }
 
 func decodeHexStrict(s string) ([]byte, bool) {
