@@ -180,7 +180,7 @@ func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 }
 
 func encode(base string, data []byte) (string, error){
-	if base != "0x" {
+	if base == "0x" {
 		base = "f"
 	}
 	return multibase.Encode(multibase.Encoding(base[0]), data)
