@@ -669,6 +669,8 @@ func ValidateMnemonic(mnemonic string) string {
 	return makeJSONResponse(err)
 }
 
+// CompressPublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
+// For details on usage see specs //TODO add the link to the specs
 func CompressPublicKey(key, outBase string) string {
 	cpk, err := api.CompressPublicKey(key, outBase)
 	if err != nil {
@@ -678,6 +680,8 @@ func CompressPublicKey(key, outBase string) string {
 	return cpk
 }
 
+// DecompressPublicKey decompresses a compressed multibase encoded multicodec identified EC public key
+// For details on usage see specs //TODO add the link to the specs
 func DecompressPublicKey(key, outBase string) string {
 	pk, err := api.DecompressPublicKey(key, outBase)
 	if err != nil {

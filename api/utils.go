@@ -61,7 +61,8 @@ func HashMessage(message string) ([]byte, error) {
 	return crypto.Keccak256(buf.Bytes()), nil
 }
 
-// CompressPublicKey
+// CompressPublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
+// For details on usage see specs //TODO add the link to the specs
 func CompressPublicKey(key, outputBase string) (string, error) {
 	dKey, err := multibaseDecode(key)
 	if err != nil {
@@ -83,7 +84,8 @@ func CompressPublicKey(key, outputBase string) (string, error) {
 	return multibaseEncode(outputBase, cpk)
 }
 
-// DecompressPublicKey
+// DecompressPublicKey decompresses a compressed multibase encoded multicodec identified EC public key
+// For details on usage see specs //TODO add the link to the specs
 func DecompressPublicKey(key, outputBase string) (string, error) {
 	cpk, err := multibaseDecode(key)
 	if err != nil {
@@ -105,10 +107,12 @@ func DecompressPublicKey(key, outputBase string) (string, error) {
 	return multibaseEncode(outputBase, pk)
 }
 
+// getPublicKeyType wrapper for the `varint.FromUvarint()` func
 func getPublicKeyType(key []byte) (uint64, int, error) {
 	return varint.FromUvarint(key)
 }
 
+// prependKeyIdentifier prepends an Unsigned Variable Integer (uvarint) to a given []byte
 func prependKeyIdentifier(key []byte, kt uint64, ktl int) []byte {
 	buf := make([]byte, ktl)
 	varint.PutUvarint(buf, kt)
@@ -117,6 +121,7 @@ func prependKeyIdentifier(key []byte, kt uint64, ktl int) []byte {
 	return key
 }
 
+// compressPublicKey serves as logic switch function to parse key data for compression based on the given keyType
 func compressPublicKey(key []byte, keyType uint64) ([]byte, error) {
 	switch keyType {
 	case secp256k1KeyType:
@@ -133,6 +138,7 @@ func compressPublicKey(key []byte, keyType uint64) ([]byte, error) {
 	}
 }
 
+// compressSecp256k1PublicKey is a dedicated key compression function for secp256k1 pks
 func compressSecp256k1PublicKey(key []byte) ([]byte, error) {
 	x, y := elliptic.Unmarshal(secp256k1.S256(), key)
 
@@ -145,6 +151,7 @@ func compressSecp256k1PublicKey(key []byte) ([]byte, error) {
 	return cpk, nil
 }
 
+// compressBls12p381g1PublicKey is a dedicated key compression function for bls12 381 g1 pks
 func compressBls12p381g1PublicKey(key []byte) ([]byte, error) {
 	g1 := bls12381.NewG1()
 
@@ -158,6 +165,7 @@ func compressBls12p381g1PublicKey(key []byte) ([]byte, error) {
 	return cpk, nil
 }
 
+// compressBls12p381g1PublicKey is a dedicated key compression function for bls12 381 g2 pks
 func compressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	g2 := bls12381.NewG2()
 
@@ -171,6 +179,7 @@ func compressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	return cpk, nil
 }
 
+// decompressPublicKey serves as logic switch function to parse key data for decompression based on the given keyType
 func decompressPublicKey(key []byte, keyType uint64) ([]byte, error) {
 	switch keyType {
 	case secp256k1KeyType:
@@ -187,6 +196,7 @@ func decompressPublicKey(key []byte, keyType uint64) ([]byte, error) {
 	}
 }
 
+// decompressSecp256k1PublicKey is a dedicated key decompression function for secp256k1 pks
 func decompressSecp256k1PublicKey(key []byte) ([]byte, error) {
 	x, y := secp256k1.DecompressPubkey(key)
 
@@ -199,6 +209,9 @@ func decompressSecp256k1PublicKey(key []byte) ([]byte, error) {
 	return k, nil
 }
 
+// isSecp256k1XYValid checks if a given x and y coordinate is nil, returns an error if either x or y is nil
+// secp256k1.DecompressPubkey will not return an error if a compressed pk fails decompression and instead returns
+// nil x, y coordinates
 func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 	if x == nil || y == nil {
 		return fmt.Errorf("invalid public key format, '%b'", key)
@@ -207,6 +220,7 @@ func isSecp256k1XYValid(key []byte, x, y *big.Int) error {
 	return nil
 }
 
+// decompressBls12p381g1PublicKey is a dedicated key decompression function for bls12 381 g1 pks
 func decompressBls12p381g1PublicKey(key []byte) ([]byte, error) {
 	g1 := bls12381.NewG1()
 	pg1, err := g1.FromCompressed(key)
@@ -218,6 +232,7 @@ func decompressBls12p381g1PublicKey(key []byte) ([]byte, error) {
 	return pk, nil
 }
 
+// decompressBls12p381g2PublicKey is a dedicated key decompression function for bls12 381 g2 pks
 func decompressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	g2 := bls12381.NewG2()
 	pg2, err := g2.FromCompressed(key)
@@ -229,6 +244,7 @@ func decompressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	return pk, nil
 }
 
+// multibaseEncode wraps `multibase.Encode()` extending the base functionality to support `0x` prefixed strings
 func multibaseEncode(base string, data []byte) (string, error) {
 	if base == "0x" {
 		base = "f"
@@ -236,6 +252,7 @@ func multibaseEncode(base string, data []byte) (string, error) {
 	return multibase.Encode(multibase.Encoding(base[0]), data)
 }
 
+// multibaseDecode wraps `multibase.Decode()` extending the base functionality to support `0x` prefixed strings
 func multibaseDecode(data string) ([]byte, error) {
 	if data[0:2] == "0x" {
 		data = "f" + data[2:]
