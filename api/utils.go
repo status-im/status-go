@@ -75,7 +75,7 @@ func CompressPublicKey(base string, key []byte) (string, error) {
 
 	cpk = prependKeyIdentifier(cpk, kt, i)
 
-	out, err := encode(base, cpk)
+	out, err := multibaseEncode(base, cpk)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +85,7 @@ func CompressPublicKey(base string, key []byte) (string, error) {
 
 // DecompressPublicKey
 func DecompressPublicKey(key string) ([]byte, error) {
-	cpk, err := decode(key)
+	cpk, err := multibaseDecode(key)
 	if err != nil {
 		return nil, err
 	}
@@ -229,14 +229,14 @@ func decompressBls12p381g2PublicKey(key []byte) ([]byte, error) {
 	return pk, nil
 }
 
-func encode(base string, data []byte) (string, error) {
+func multibaseEncode(base string, data []byte) (string, error) {
 	if base == "0x" {
 		base = "f"
 	}
 	return multibase.Encode(multibase.Encoding(base[0]), data)
 }
 
-func decode(data string) ([]byte, error) {
+func multibaseDecode(data string) ([]byte, error) {
 	if data[0:2] == "0x" {
 		data = "f" + data[2:]
 	}
