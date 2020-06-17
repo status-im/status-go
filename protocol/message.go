@@ -22,6 +22,8 @@ type QuotedMessage struct {
 	Text string `json:"text"`
 	// Base64Image is the converted base64 image
 	Base64Image string `json:"image,omitempty"`
+	// Base64Audio is the converted base64 audio
+	Base64Audio string `json:"audio,omitempty"`
 }
 
 type CommandState int
@@ -102,6 +104,10 @@ type Message struct {
 	Base64Image string `json:"image,omitempty"`
 	// ImagePath is the path of the image to be sent
 	ImagePath string `json:"imagePath,omitempty"`
+	// Base64Audio is the converted base64 audio
+	Base64Audio string `json:"audio,omitempty"`
+	// AudioPath is the path of the audio to be sent
+	AudioPath string `json:"audioPath,omitempty"`
 
 	// Replace indicates that this is a replacement of a message
 	// that has been updated
@@ -134,6 +140,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ResponseTo        string                           `json:"responseTo"`
 		EnsName           string                           `json:"ensName"`
 		Image             string                           `json:"image,omitempty"`
+		Audio             string                           `json:"audio,omitempty"`
 		Sticker           *StickerAlias                    `json:"sticker"`
 		CommandParameters *CommandParameters               `json:"commandParameters"`
 		Timestamp         uint64                           `json:"timestamp"`
@@ -159,6 +166,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		ResponseTo:        m.ResponseTo,
 		EnsName:           m.EnsName,
 		Image:             m.Base64Image,
+		Audio:             m.Base64Audio,
 		Timestamp:         m.Timestamp,
 		ContentType:       m.ContentType,
 		MessageType:       m.MessageType,
@@ -239,6 +247,37 @@ func (m *Message) parseImage() error {
 	return nil
 }
 
+// parseAudio check the message contains an audio, and if so
+// it creates the a base64 encoded version of it.
+func (m *Message) parseAudio() error {
+	if m.ContentType != protobuf.ChatMessage_AUDIO {
+		return nil
+	}
+	audio := m.GetAudio()
+	if audio == nil {
+		return errors.New("audio empty")
+	}
+
+	payload := audio.Payload
+
+	e64 := base64.StdEncoding
+
+	maxEncLen := e64.EncodedLen(len(payload))
+	encBuf := make([]byte, maxEncLen)
+
+	e64.Encode(encBuf, payload)
+
+	mime, err := getAudioMessageMIME(audio)
+
+	if err != nil {
+		return err
+	}
+
+	m.Base64Audio = fmt.Sprintf("data:audio/%s;base64,%s", mime, encBuf)
+
+	return nil
+}
+
 // PrepareContent return the parsed content of the message, the line-count and whether
 // is a right-to-left message
 func (m *Message) PrepareContent() error {
@@ -250,7 +289,10 @@ func (m *Message) PrepareContent() error {
 	m.ParsedText = jsonParsedText
 	m.LineCount = strings.Count(m.Text, "\n")
 	m.RTL = isRTL(m.Text)
-	return m.parseImage()
+	if err := m.parseImage(); err != nil {
+		return err
+	}
+	return m.parseAudio()
 }
 
 func getImageMessageMIME(i *protobuf.ImageMessage) (string, error) {
@@ -265,4 +307,15 @@ func getImageMessageMIME(i *protobuf.ImageMessage) (string, error) {
 		return "gif", nil
 	}
 	return "", errors.New("image format not supported")
+}
+
+func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {
+	switch i.Type {
+	case protobuf.AudioMessage_AAC:
+		return "aac", nil
+	case protobuf.AudioMessage_AMR:
+		return "amr", nil
+	}
+
+	return "", errors.New("audio format not supported")
 }

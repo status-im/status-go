@@ -36,6 +36,9 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		image_payload,
 		image_type,
 		image_base64,
+		audio_payload,
+		audio_type,
+		audio_base64,
 		command_id,
 		command_value,
 		command_from,
@@ -68,6 +71,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.sticker_pack,
 		m1.sticker_hash,
 		m1.image_base64,
+		m1.audio_base64,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -83,6 +87,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.source,
 		m2.text,
 		m2.image_base64,
+		m2.audio_base64,
 		c.alias,
 		c.identicon`
 }
@@ -99,6 +104,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedText sql.NullString
 	var quotedFrom sql.NullString
 	var quotedImage sql.NullString
+	var quotedAudio sql.NullString
 	var alias sql.NullString
 	var identicon sql.NullString
 
@@ -123,6 +129,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Pack,
 		&sticker.Hash,
 		&message.Base64Image,
+		&message.Base64Audio,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -138,6 +145,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedFrom,
 		&quotedText,
 		&quotedImage,
+		&quotedAudio,
 		&alias,
 		&identicon,
 	}
@@ -151,6 +159,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			From:        quotedFrom.String,
 			Text:        quotedText.String,
 			Base64Image: quotedImage.String,
+			Base64Audio: quotedAudio.String,
 		}
 	}
 	message.Alias = alias.String
@@ -177,6 +186,11 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 		image = &protobuf.ImageMessage{}
 	}
 
+	audio := message.GetAudio()
+	if audio == nil {
+		audio = &protobuf.AudioMessage{}
+	}
+
 	command := message.CommandParameters
 	if command == nil {
 		command = &CommandParameters{}
@@ -201,6 +215,9 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 		image.Payload,
 		image.Type,
 		message.Base64Image,
+		audio.Payload,
+		audio.Type,
+		message.Base64Audio,
 		command.ID,
 		command.Value,
 		command.From,

@@ -19,6 +19,16 @@ message ImageMessage {
   }
 }
 
+message AudioMessage {
+  bytes payload = 1;
+  AudioType type = 2;
+  enum AudioType {
+    UNKNOWN_AUDIO_TYPE = 0;
+    AAC = 1;
+    AMR = 2;
+  }
+}
+
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
@@ -45,6 +55,7 @@ message ChatMessage {
   oneof payload {
     StickerMessage sticker = 9;
     ImageMessage image = 10;
+    AudioMessage audio = 11;
   }
 
   enum MessageType {
@@ -64,5 +75,6 @@ message ChatMessage {
     // Only local
     SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP = 6;
     IMAGE = 7;
+    AUDIO = 8;
   }
 }

@@ -402,6 +402,68 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				ContentType: protobuf.ChatMessage_IMAGE,
 			},
 		},
+		{
+			Name:             "Valid audio message",
+			WhisperTimestamp: 2,
+			Valid:            true,
+			Message: protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "valid",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_Audio{
+					Audio: &protobuf.AudioMessage{
+						Type:    1,
+						Payload: []byte("some-payload"),
+					},
+				},
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_AUDIO,
+			},
+		},
+		{
+			Name:             "Invalid audio message, type unknown",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "valid",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_Audio{
+					Audio: &protobuf.AudioMessage{
+						Type:    protobuf.AudioMessage_UNKNOWN_AUDIO_TYPE,
+						Payload: []byte("some-payload"),
+					},
+				},
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_STICKER,
+			},
+		},
+		{
+			Name:             "Invalid audio message, missing payload",
+			WhisperTimestamp: 2,
+			Valid:            false,
+			Message: protobuf.ChatMessage{
+				ChatId:     "a",
+				Text:       "valid",
+				Clock:      2,
+				Timestamp:  3,
+				ResponseTo: "",
+				EnsName:    "",
+				Payload: &protobuf.ChatMessage_Audio{
+					Audio: &protobuf.AudioMessage{
+						Type: 1,
+					},
+				},
+				MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+				ContentType: protobuf.ChatMessage_AUDIO,
+			},
+		},
 	}
 
 	for _, tc := range testCases {

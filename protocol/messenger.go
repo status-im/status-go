@@ -19,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -1382,6 +1383,26 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 
 	}
+
+	if len(message.AudioPath) != 0 {
+		file, err := os.Open(message.AudioPath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		payload, err := ioutil.ReadAll(file)
+		if err != nil {
+			return nil, err
+
+		}
+		audio := protobuf.AudioMessage{
+			Payload: payload,
+			Type:    audio.Type(payload),
+		}
+		message.Payload = &protobuf.ChatMessage_Audio{Audio: &audio}
+	}
+
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
 	var response MessengerResponse
 

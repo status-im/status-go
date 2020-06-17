@@ -32,6 +32,10 @@ func (db sqlitePersistence) SaveChat(chat Chat) error {
 
 func (db sqlitePersistence) SaveChats(chats []*Chat) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		if err == nil {
 			err = tx.Commit()
@@ -52,6 +56,10 @@ func (db sqlitePersistence) SaveChats(chats []*Chat) error {
 
 func (db sqlitePersistence) SaveContacts(contacts []*Contact) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		if err == nil {
 			err = tx.Commit()

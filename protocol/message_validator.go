@@ -209,5 +209,22 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		}
 	}
 
+	if message.ContentType == protobuf.ChatMessage_AUDIO {
+		if message.Payload == nil {
+			return errors.New("no audio content")
+		}
+		audio := message.GetAudio()
+		if audio == nil {
+			return errors.New("no audio content")
+		}
+		if len(audio.Payload) == 0 {
+			return errors.New("audio payload empty")
+		}
+
+		if audio.Type == protobuf.AudioMessage_UNKNOWN_AUDIO_TYPE {
+			return errors.New("audio type unknown")
+		}
+	}
+
 	return nil
 }
