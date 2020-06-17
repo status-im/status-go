@@ -668,3 +668,21 @@ func ValidateMnemonic(mnemonic string) string {
 	err := m.ValidateMnemonic(mnemonic, extkeys.Language(0))
 	return makeJSONResponse(err)
 }
+
+func CompressPublicKey(key, outBase string) string {
+	cpk, err := api.CompressPublicKey(key, outBase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return cpk
+}
+
+func DecompressPublicKey(key, outBase string) string {
+	pk, err := api.DecompressPublicKey(key, outBase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return pk
+}
