@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 
@@ -14,7 +15,8 @@ import (
 )
 
 var (
-	secPk = []byte{
+	// secp256k1 sample public key
+	secPkB = []byte{
 		0x04,
 		0x26, 0x1c, 0x55, 0x67, 0x5e, 0x55, 0xff, 0x25,
 		0xed, 0xb5, 0x0b, 0x34, 0x5c, 0xfb, 0x3a, 0x3f,
@@ -25,9 +27,12 @@ var (
 		0x68, 0xa6, 0x71, 0xe2, 0xd3, 0x97, 0x78, 0x09,
 		0x61, 0x24, 0x24, 0xc7, 0xc3, 0x88, 0x8b, 0xc6,
 	}
-	secPkt = append([]byte{0xe7, 0x01}, secPk...)
+	secPk = "f" + hex.EncodeToString(secPkB)
+	secPkBt = append([]byte{0xe7, 0x01}, secPkB...)
+	secPkt = "f" + hex.EncodeToString(secPkBt)
 
-	bls12G1Pk = []byte{
+	// bls12-381 G1 sample public key
+	bls12G1PkB = []byte{
 		0x17, 0xf1, 0xd3, 0xa7, 0x31, 0x97, 0xd7, 0x94,
 		0x26, 0x95, 0x63, 0x8c, 0x4f, 0xa9, 0xac, 0x0f,
 		0xc3, 0x68, 0x8c, 0x4f, 0x97, 0x74, 0xb9, 0x05,
@@ -41,9 +46,12 @@ var (
 		0xd0, 0x3c, 0xc7, 0x44, 0xa2, 0x88, 0x8a, 0xe4,
 		0x0c, 0xaa, 0x23, 0x29, 0x46, 0xc5, 0xe7, 0xe1,
 	}
-	bls12G1Pkt = append([]byte{0xea, 0x01}, bls12G1Pk...)
+	bls12G1Pk = "f" + hex.EncodeToString(bls12G1PkB)
+	bls12G1PkBt = append([]byte{0xea, 0x01}, bls12G1PkB...)
+	bls12G1Pkt = "f" + hex.EncodeToString(bls12G1PkBt)
 
-	bls12G2Pk = []byte{
+	// bls12 381 G2 sample public key
+	bls12G2PkB = []byte{
 		0x13, 0xe0, 0x2b, 0x60, 0x52, 0x71, 0x9f, 0x60,
 		0x7d, 0xac, 0xd3, 0xa0, 0x88, 0x27, 0x4f, 0x65,
 		0x59, 0x6b, 0xd0, 0xd0, 0x99, 0x20, 0xb6, 0x1a,
@@ -69,7 +77,9 @@ var (
 		0x92, 0x3a, 0xc9, 0xcc, 0x3b, 0xac, 0xa2, 0x89,
 		0xe1, 0x93, 0x54, 0x86, 0x08, 0xb8, 0x28, 0x01,
 	}
-	bls12G2Pkt = append([]byte{0xeb, 0x01}, bls12G2Pk...)
+	bls12G2Pk = "f" + hex.EncodeToString(bls12G2PkB)
+	bls12G2PkBt = append([]byte{0xeb, 0x01}, bls12G2PkB...)
+	bls12G2Pkt = "f" + hex.EncodeToString(bls12G2PkBt)
 )
 
 func TestHashMessage(t *testing.T) {
@@ -141,22 +151,22 @@ func TestHashMessage(t *testing.T) {
 func TestCompressPublicKey(t *testing.T) {
 	cs := []struct {
 		Description string
-		Base        string
-		Key         []byte
+		OutBase     string
+		Key         string
 		Expected    string
 		Error       error
 	}{
 		{
 			"invalid key, with valid key type",
 			"z",
-			[]byte{0xe7, 0x1, 255, 66, 234},
+			"0xe701ff42ea",
 			"",
 			fmt.Errorf("invalid public key format, '[11111111 1000010 11101010]'"),
 		},
 		{
 			"invalid key type, with invalid key",
 			"z",
-			[]byte{0xee, 255, 66, 234},
+			"0xeeff42ea",
 			"",
 			fmt.Errorf("unsupported public key type '10BFEE'"),
 		},
@@ -240,7 +250,7 @@ func TestCompressPublicKey(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		cpk, err := CompressPublicKey(c.Base, c.Key)
+		cpk, err := CompressPublicKey(c.Key, c.OutBase)
 
 		require.Equal(t, c.Expected, cpk, c.Description)
 
@@ -256,80 +266,92 @@ func TestCompressPublicKey(t *testing.T) {
 func TestDecompressPublicKey(t *testing.T) {
 	cs := []struct {
 		Description string
-		Input       string
-		Expected    []byte
+		Key       string
+		OutBase string
+		Expected    string
 		Error       error
 	}{
 		{
 			"valid key with valid encoding type '0x'",
 			"0xe70102261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc",
+			"f",
 			secPkt,
 			nil,
 		},
 		{
 			"valid key with valid encoding type 'f'",
 			"fe70102261c55675e55ff25edb50b345cfb3a3f35f60712d251cbaaab97bd50054c6ebc",
+			"f",
 			secPkt,
 			nil,
 		},
 		{
 			"valid key with valid encoding type 'z'",
 			"zQ3shPyZJnxZK4Bwyx9QsaksNKDYTPmpwPvGSjMYVHoXHeEgB",
+			"f",
 			secPkt,
 			nil,
 		},
 		{
 			"valid key with mismatched encoding type 'f' instead of 'z'",
 			"fQ3shPyZJnxZK4Bwyx9QsaksNKDYTPmpwPvGSjMYVHoXHeEgB",
-			nil,
+			"f",
+			"",
 			fmt.Errorf("encoding/hex: invalid byte: U+0051 'Q'"),
 		},
 		{
 			"valid key with no encoding type, in base58 encoding",
 			"Q3shPyZJnxZK4Bwyx9QsaksNKDYTPmpwPvGSjMYVHoXHeEgB",
-			nil,
+			"f",
+			"",
 			fmt.Errorf("selected encoding not supported"),
 		},
 		{
 			"valid bls12-381 g1 key encoding type 'z'",
 			"z3tEFUdV4D3tCMG6Fr1deVvt32DCS1Y4SxDGoELedXaMUdTdr5FfZvBnbK9bWMhAGj3RHk",
+			"f",
 			bls12G1Pkt,
 			nil,
 		},
 		{
 			"valid bls12-381 g1 key encoding type 'f'",
 			"fea0197f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
+			"f",
 			bls12G1Pkt,
 			nil,
 		},
 		{
 			"valid bls12-381 g1 key encoding type '0x'",
 			"0xea0197f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb",
+			"f",
 			bls12G1Pkt,
 			nil,
 		},
 		{
 			"valid bls12-381 g2 key encoding type 'z'",
 			"zUC77n3BqSWuoGMY7ut91NDoWzpithCd4GwPLAnv9fc7drWY4wBTvMX1y9eGSAuiBpktqGAocND2KXdu1HqNgrd6i3vCZKCLqZ3nQFaEA2FpTs7ZEChRpWReLvYyXNYUHvQjyKd",
+			"f",
 			bls12G2Pkt,
 			nil,
 		},
 		{
 			"valid bls12-381 g2 key encoding type 'f'",
 			"feb0193e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
+			"f",
 			bls12G2Pkt,
 			nil,
 		},
 		{
 			"valid bls12-381 g2 key encoding type '0x'",
 			"0xeb0193e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8",
+			"f",
 			bls12G2Pkt,
 			nil,
 		},
 	}
 
 	for _, c := range cs {
-		key, err := DecompressPublicKey(c.Input)
+		key, err := DecompressPublicKey(c.Key, c.OutBase)
 
 		require.Exactly(t, c.Expected, key, c.Description)
 

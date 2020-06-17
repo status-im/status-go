@@ -62,47 +62,47 @@ func HashMessage(message string) ([]byte, error) {
 }
 
 // CompressPublicKey
-func CompressPublicKey(base string, key []byte) (string, error) {
-	kt, i, err := getPublicKeyType(key)
+func CompressPublicKey(key, outputBase string) (string, error) {
+	dKey, err := multibaseDecode(key)
 	if err != nil {
 		return "", err
 	}
 
-	cpk, err := compressPublicKey(key[i:], kt)
+	kt, i, err := getPublicKeyType(dKey)
+	if err != nil {
+		return "", err
+	}
+
+	cpk, err := compressPublicKey(dKey[i:], kt)
 	if err != nil {
 		return "", err
 	}
 
 	cpk = prependKeyIdentifier(cpk, kt, i)
 
-	out, err := multibaseEncode(base, cpk)
+	return multibaseEncode(outputBase, cpk)
+}
+
+// DecompressPublicKey
+func DecompressPublicKey(key, outputBase string) (string, error) {
+	cpk, err := multibaseDecode(key)
 	if err != nil {
 		return "", err
 	}
 
-	return out, nil
-}
-
-// DecompressPublicKey
-func DecompressPublicKey(key string) ([]byte, error) {
-	cpk, err := multibaseDecode(key)
-	if err != nil {
-		return nil, err
-	}
-
 	kt, i, err := getPublicKeyType(cpk)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	pk, err := decompressPublicKey(cpk[i:], kt)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	pk = prependKeyIdentifier(pk, kt, i)
 
-	return pk, nil
+	return multibaseEncode(outputBase, pk)
 }
 
 func getPublicKeyType(key []byte) (uint64, int, error) {

@@ -669,10 +669,20 @@ func ValidateMnemonic(mnemonic string) string {
 	return makeJSONResponse(err)
 }
 
-func CompressPublicKey(base string, key *[]byte) (string, error) {
-	return api.CompressPublicKey(base, *key)
+func CompressPublicKey(key, outBase string) string {
+	cpk, err := api.CompressPublicKey(key, outBase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return cpk
 }
 
-func DecompressPublicKey(key string) ([]byte, error) {
-	return api.DecompressPublicKey(key)
+func DecompressPublicKey(key, outBase string) string {
+	pk, err := api.DecompressPublicKey(key, outBase)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return pk
 }
