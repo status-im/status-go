@@ -25,10 +25,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/tsenart/tb"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/tsenart/tb"
 )
 
 var errRateLimitExceeded = errors.New("rate limit has been exceeded")
@@ -186,6 +187,14 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 				// this relies on <nil> being the string representation of nil
 				// as IP() might return a nil value
 				ip = p.IP().String()
+
+				// If not the special <nil> case, take the hash of the IP address
+				// so it's not stored on our side
+				if ip != "<nil>" {
+					h := make([]byte, 64)
+					sha3.ShakeSum256(h, []byte(ip))
+					ip = fmt.Sprintf("%x", h)
+				}
 			}
 			if halted := r.throttleIP(ip, packet.Size); halted {
 				for _, h := range r.handlers {
