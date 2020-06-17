@@ -27,9 +27,9 @@ var (
 		0x68, 0xa6, 0x71, 0xe2, 0xd3, 0x97, 0x78, 0x09,
 		0x61, 0x24, 0x24, 0xc7, 0xc3, 0x88, 0x8b, 0xc6,
 	}
-	secPk = "f" + hex.EncodeToString(secPkB)
+	secPk   = "f" + hex.EncodeToString(secPkB)
 	secPkBt = append([]byte{0xe7, 0x01}, secPkB...)
-	secPkt = "f" + hex.EncodeToString(secPkBt)
+	secPkt  = "f" + hex.EncodeToString(secPkBt)
 
 	// bls12-381 G1 sample public key
 	bls12G1PkB = []byte{
@@ -46,9 +46,9 @@ var (
 		0xd0, 0x3c, 0xc7, 0x44, 0xa2, 0x88, 0x8a, 0xe4,
 		0x0c, 0xaa, 0x23, 0x29, 0x46, 0xc5, 0xe7, 0xe1,
 	}
-	bls12G1Pk = "f" + hex.EncodeToString(bls12G1PkB)
+	bls12G1Pk   = "f" + hex.EncodeToString(bls12G1PkB)
 	bls12G1PkBt = append([]byte{0xea, 0x01}, bls12G1PkB...)
-	bls12G1Pkt = "f" + hex.EncodeToString(bls12G1PkBt)
+	bls12G1Pkt  = "f" + hex.EncodeToString(bls12G1PkBt)
 
 	// bls12 381 G2 sample public key
 	bls12G2PkB = []byte{
@@ -77,9 +77,9 @@ var (
 		0x92, 0x3a, 0xc9, 0xcc, 0x3b, 0xac, 0xa2, 0x89,
 		0xe1, 0x93, 0x54, 0x86, 0x08, 0xb8, 0x28, 0x01,
 	}
-	bls12G2Pk = "f" + hex.EncodeToString(bls12G2PkB)
+	bls12G2Pk   = "f" + hex.EncodeToString(bls12G2PkB)
 	bls12G2PkBt = append([]byte{0xeb, 0x01}, bls12G2PkB...)
-	bls12G2Pkt = "f" + hex.EncodeToString(bls12G2PkBt)
+	bls12G2Pkt  = "f" + hex.EncodeToString(bls12G2PkBt)
 )
 
 func TestHashMessage(t *testing.T) {
@@ -266,8 +266,8 @@ func TestCompressPublicKey(t *testing.T) {
 func TestDecompressPublicKey(t *testing.T) {
 	cs := []struct {
 		Description string
-		Key       string
-		OutBase string
+		Key         string
+		OutBase     string
 		Expected    string
 		Error       error
 	}{
