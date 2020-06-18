@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/api/multiformat"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
@@ -671,8 +672,8 @@ func ValidateMnemonic(mnemonic string) string {
 
 // CompressPublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
 // For details on usage see specs //TODO add the link to the specs
-func CompressPublicKey(key, outBase string) string {
-	cpk, err := api.CompressPublicKey(key, outBase)
+func MultiformatCompressPublicKey(key, outBase string) string {
+	cpk, err := multiformat.CompressPublicKey(key, outBase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -682,8 +683,8 @@ func CompressPublicKey(key, outBase string) string {
 
 // DecompressPublicKey decompresses a compressed multibase encoded multicodec identified EC public key
 // For details on usage see specs //TODO add the link to the specs
-func DecompressPublicKey(key, outBase string) string {
-	pk, err := api.DecompressPublicKey(key, outBase)
+func MultiformatDecompressPublicKey(key, outBase string) string {
+	pk, err := multiformat.DecompressPublicKey(key, outBase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
