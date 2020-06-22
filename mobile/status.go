@@ -271,6 +271,22 @@ func VerifyAccountPassword(keyStoreDir, address, password string) string {
 	return makeJSONResponse(err)
 }
 
+// MigrateKeyStoreDir migrates key files to a new directory
+func MigrateKeyStoreDir(accountData, password, oldDir, newDir string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	err = statusBackend.MigrateKeyStoreDir(account, password, oldDir, newDir)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(nil)
+}
+
 // Login loads a key file (for a given address), tries to decrypt it using the password,
 // to verify ownership if verified, purges all the previous identities from Whisper,
 // and injects verified key as shh identity.

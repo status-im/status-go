@@ -330,3 +330,21 @@ func (s *ManagerTestSuite) testAddressToDecryptedAccount(wallet, password string
 		s.Equal(acc.Address, key.Address)
 	}
 }
+
+func (s *ManagerTestSuite) TestMigrateKeyStoreDir() {
+	oldKeyDir := s.keydir
+	newKeyDir := filepath.Join(oldKeyDir, "new_dir")
+	err := os.Mkdir(newKeyDir, 0777)
+	s.Require().NoError(err)
+
+	files, _ := ioutil.ReadDir(newKeyDir)
+	s.Equal(0, len(files))
+
+	address := types.HexToAddress(s.walletAddress).Hex()
+	addresses := []string{address}
+	err = s.accManager.MigrateKeyStoreDir(oldKeyDir, newKeyDir, addresses)
+	s.Require().NoError(err)
+
+	files, _ = ioutil.ReadDir(newKeyDir)
+	s.Equal(1, len(files))
+}

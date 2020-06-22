@@ -305,6 +305,33 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	return nil
 }
 
+func (b *GethStatusBackend) MigrateKeyStoreDir(acc multiaccounts.Account, password, oldDir, newDir string) error {
+	err := b.ensureAppDBOpened(acc, password)
+	if err != nil {
+		return err
+	}
+
+	accountDB := accounts.NewDB(b.appDB)
+	accounts, err := accountDB.GetAccounts()
+	if err != nil {
+		return err
+	}
+	settings, err := accountDB.GetSettings()
+	if err != nil {
+		return err
+	}
+	addresses := []string{settings.EIP1581Address.Hex(), settings.WalletRootAddress.Hex()}
+	for _, account := range accounts {
+		addresses = append(addresses, account.Address.Hex())
+	}
+	err = b.accountManager.MigrateKeyStoreDir(oldDir, newDir, addresses)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, password string) error {
 	err := b.startNodeWithAccount(acc, password)
 	if err != nil {
