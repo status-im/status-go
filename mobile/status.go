@@ -670,10 +670,10 @@ func ValidateMnemonic(mnemonic string) string {
 	return makeJSONResponse(err)
 }
 
-// CompressPublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
+// SerializePublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
 // For details on usage see specs //TODO add the link to the specs
-func MultiformatCompressPublicKey(key, outBase string) string {
-	cpk, err := multiformat.CompressPublicKey(key, outBase)
+func MultiformatSerializePublicKey(key, outBase string) string {
+	cpk, err := multiformat.SerializePublicKey(key, outBase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -681,10 +681,10 @@ func MultiformatCompressPublicKey(key, outBase string) string {
 	return cpk
 }
 
-// DecompressPublicKey decompresses a compressed multibase encoded multicodec identified EC public key
+// DeserializePublicKey decompresses a compressed multibase encoded multicodec identified EC public key
 // For details on usage see specs //TODO add the link to the specs
-func MultiformatDecompressPublicKey(key, outBase string) string {
-	pk, err := multiformat.DecompressPublicKey(key, outBase)
+func MultiformatDeserializePublicKey(key, outBase string) string {
+	pk, err := multiformat.DeserializePublicKey(key, outBase)
 	if err != nil {
 		return makeJSONResponse(err)
 	}

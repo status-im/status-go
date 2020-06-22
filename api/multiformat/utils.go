@@ -19,9 +19,9 @@ const (
 	bls12p381g2KeyType = 0xeb
 )
 
-// CompressPublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
+// SerializePublicKey serialises a non-serialised multibase encoded multicodec identified EC public key
 // For details on usage see specs //TODO add the link to the specs
-func CompressPublicKey(key, outputBase string) (string, error) {
+func SerializePublicKey(key, outputBase string) (string, error) {
 	dKey, err := multibaseDecode(key)
 	if err != nil {
 		return "", err
@@ -42,9 +42,9 @@ func CompressPublicKey(key, outputBase string) (string, error) {
 	return multibaseEncode(outputBase, cpk)
 }
 
-// DecompressPublicKey decompresses a compressed multibase encoded multicodec identified EC public key
+// DeserializePublicKey deserialise a serialised multibase encoded multicodec identified EC public key
 // For details on usage see specs //TODO add the link to the specs
-func DecompressPublicKey(key, outputBase string) (string, error) {
+func DeserializePublicKey(key, outputBase string) (string, error) {
 	cpk, err := multibaseDecode(key)
 	if err != nil {
 		return "", err

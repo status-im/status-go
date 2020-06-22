@@ -76,7 +76,7 @@ var (
 	bls12G2Pkt  = "f" + hex.EncodeToString(bls12G2PkBt)
 )
 
-func TestCompressPublicKey(t *testing.T) {
+func TestSerialisePublicKey(t *testing.T) {
 	cs := []struct {
 		Description string
 		OutBase     string
@@ -178,7 +178,7 @@ func TestCompressPublicKey(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		cpk, err := CompressPublicKey(c.Key, c.OutBase)
+		cpk, err := SerializePublicKey(c.Key, c.OutBase)
 
 		require.Equal(t, c.Expected, cpk, c.Description)
 
@@ -191,7 +191,7 @@ func TestCompressPublicKey(t *testing.T) {
 	}
 }
 
-func TestDecompressPublicKey(t *testing.T) {
+func TestDeserialisePublicKey(t *testing.T) {
 	cs := []struct {
 		Description string
 		Key         string
@@ -279,7 +279,7 @@ func TestDecompressPublicKey(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		key, err := DecompressPublicKey(c.Key, c.OutBase)
+		key, err := DeserializePublicKey(c.Key, c.OutBase)
 
 		require.Exactly(t, c.Expected, key, c.Description)
 
