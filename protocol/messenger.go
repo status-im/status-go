@@ -1396,11 +1396,13 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 			return nil, err
 
 		}
-		audio := protobuf.AudioMessage{
-			Payload: payload,
-			Type:    audio.Type(payload),
+		audioMessage := message.GetAudio()
+		if audioMessage == nil {
+			return nil, errors.New("no audio has been passed")
 		}
-		message.Payload = &protobuf.ChatMessage_Audio{Audio: &audio}
+		audioMessage.Payload = payload
+		audioMessage.Type = audio.Type(payload)
+		message.Payload = &protobuf.ChatMessage_Audio{Audio: audioMessage}
 	}
 
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))

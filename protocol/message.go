@@ -24,6 +24,8 @@ type QuotedMessage struct {
 	Base64Image string `json:"image,omitempty"`
 	// Base64Audio is the converted base64 audio
 	Base64Audio string `json:"audio,omitempty"`
+	// AudioDurationMs is the audio duration in milliseconds
+	AudioDurationMs uint64 `json:"audioDuration,omitempty"`
 }
 
 type CommandState int
@@ -141,6 +143,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName           string                           `json:"ensName"`
 		Image             string                           `json:"image,omitempty"`
 		Audio             string                           `json:"audio,omitempty"`
+		AudioDurationMs   uint64                           `json:"audioDurationMs,omitempty"`
 		Sticker           *StickerAlias                    `json:"sticker"`
 		CommandParameters *CommandParameters               `json:"commandParameters"`
 		Timestamp         uint64                           `json:"timestamp"`
@@ -179,6 +182,11 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 			Hash: sticker.Hash,
 		}
 	}
+
+	if audio := m.GetAudio(); audio != nil {
+		item.AudioDurationMs = audio.DurationMs
+	}
+
 	return json.Marshal(item)
 }
 
@@ -186,11 +194,12 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	type Alias Message
 	aux := struct {
 		*Alias
-		ResponseTo  string                           `json:"responseTo"`
-		EnsName     string                           `json:"ensName"`
-		ChatID      string                           `json:"chatId"`
-		Sticker     *protobuf.StickerMessage         `json:"sticker"`
-		ContentType protobuf.ChatMessage_ContentType `json:"contentType"`
+		ResponseTo      string                           `json:"responseTo"`
+		EnsName         string                           `json:"ensName"`
+		ChatID          string                           `json:"chatId"`
+		Sticker         *protobuf.StickerMessage         `json:"sticker"`
+		AudioDurationMs uint64                           `json:"audioDurationMs"`
+		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
 	}{
 		Alias: (*Alias)(m),
 	}
@@ -199,6 +208,11 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	}
 	if aux.ContentType == protobuf.ChatMessage_STICKER {
 		m.Payload = &protobuf.ChatMessage_Sticker{Sticker: aux.Sticker}
+	}
+	if aux.ContentType == protobuf.ChatMessage_AUDIO {
+		m.Payload = &protobuf.ChatMessage_Audio{
+			Audio: &protobuf.AudioMessage{DurationMs: aux.AudioDurationMs},
+		}
 	}
 	m.ResponseTo = aux.ResponseTo
 	m.EnsName = aux.EnsName
