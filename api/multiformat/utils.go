@@ -20,7 +20,7 @@ const (
 )
 
 // SerializePublicKey serialises a non-serialised multibase encoded multicodec identified EC public key
-// For details on usage see specs //TODO add the link to the specs
+// For details on usage see specs https://specs.status.im/spec/2#public-key-serialization
 func SerializePublicKey(key, outputBase string) (string, error) {
 	dKey, err := multibaseDecode(key)
 	if err != nil {
@@ -43,7 +43,7 @@ func SerializePublicKey(key, outputBase string) (string, error) {
 }
 
 // DeserializePublicKey deserialise a serialised multibase encoded multicodec identified EC public key
-// For details on usage see specs //TODO add the link to the specs
+// For details on usage see specs https://specs.status.im/spec/2#public-key-serialization
 func DeserializePublicKey(key, outputBase string) (string, error) {
 	cpk, err := multibaseDecode(key)
 	if err != nil {

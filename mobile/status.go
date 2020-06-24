@@ -671,7 +671,7 @@ func ValidateMnemonic(mnemonic string) string {
 }
 
 // SerializePublicKey compresses an uncompressed multibase encoded multicodec identified EC public key
-// For details on usage see specs //TODO add the link to the specs
+// For details on usage see specs https://specs.status.im/spec/2#public-key-serialization
 func MultiformatSerializePublicKey(key, outBase string) string {
 	cpk, err := multiformat.SerializePublicKey(key, outBase)
 	if err != nil {
@@ -682,7 +682,7 @@ func MultiformatSerializePublicKey(key, outBase string) string {
 }
 
 // DeserializePublicKey decompresses a compressed multibase encoded multicodec identified EC public key
-// For details on usage see specs //TODO add the link to the specs
+// For details on usage see specs https://specs.status.im/spec/2#public-key-serialization
 func MultiformatDeserializePublicKey(key, outBase string) string {
 	pk, err := multiformat.DeserializePublicKey(key, outBase)
 	if err != nil {
