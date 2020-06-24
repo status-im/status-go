@@ -1400,6 +1400,8 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		if audioMessage == nil {
 			return nil, errors.New("no audio has been passed")
 		}
+		m.logger.Info("Audio", zap.Any("audio", audioMessage))
+		m.logger.Info("Duration", zap.Uint64("duration", audioMessage.DurationMs))
 		audioMessage.Payload = payload
 		audioMessage.Type = audio.Type(payload)
 		message.Payload = &protobuf.ChatMessage_Audio{Audio: audioMessage}
