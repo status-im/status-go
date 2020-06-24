@@ -25,7 +25,7 @@ type QuotedMessage struct {
 	// Base64Audio is the converted base64 audio
 	Base64Audio string `json:"audio,omitempty"`
 	// AudioDurationMs is the audio duration in milliseconds
-	AudioDurationMs uint64 `json:"audioDuration,omitempty"`
+	AudioDurationMs uint64 `json:"audioDurationMs,omitempty"`
 }
 
 type CommandState int
