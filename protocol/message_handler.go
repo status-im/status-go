@@ -146,12 +146,13 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	message.LocalChatID = chat.ID
 
 	// Increase unviewed count
-	if !isPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
+	if !chat.Muted && !isPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
 		chat.UnviewedMessagesCount++
 		message.OutgoingStatus = ""
 	} else {
-		// Our own message, mark as sent
+		// Our own message, mark as sent & seen
 		message.OutgoingStatus = OutgoingStatusSent
+		message.Seen = true
 	}
 
 	err = chat.UpdateFromMessage(message, state.Timesource)
@@ -332,11 +333,12 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	receivedMessage.LocalChatID = chat.ID
 
 	// Increase unviewed count
-	if !isPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
+	if !chat.Muted && !isPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
 		chat.UnviewedMessagesCount++
 	} else {
-		// Our own message, mark as sent
+		// Our own message, mark as sent & seen
 		receivedMessage.OutgoingStatus = OutgoingStatusSent
+		receivedMessage.Seen = true
 	}
 
 	err = chat.UpdateFromMessage(receivedMessage, state.Timesource)

@@ -64,6 +64,10 @@ type Chat struct {
 	Alias string `json:"alias,omitempty"`
 	// Identicon generated from public key
 	Identicon string `json:"identicon"`
+
+	// Muted is used to check whether we want to receive
+	// notifications/new message updates for this chat
+	Muted bool `json:"muted,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
