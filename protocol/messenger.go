@@ -2163,6 +2163,46 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	return nil
 }
 
+// MuteChat signals to the messenger that we don't want to be notified
+// on new messages from this chat
+func (m *Messenger) MuteChat(chatID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	err := m.persistence.MuteChat(chatID)
+	if err != nil {
+		return err
+	}
+
+	chat.Muted = true
+	m.allChats[chat.ID] = chat
+	return nil
+}
+
+// UnmuteChat signals to the messenger that we want to be notified
+// on new messages from this chat
+func (m *Messenger) UnmuteChat(chatID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return errors.New("chat not found")
+	}
+
+	err := m.persistence.UnmuteChat(chatID)
+	if err != nil {
+		return err
+	}
+
+	chat.Muted = false
+	m.allChats[chat.ID] = chat
+	return nil
+}
+
 func (m *Messenger) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
 	return m.persistence.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }
