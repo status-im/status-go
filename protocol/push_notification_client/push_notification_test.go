@@ -7,7 +7,6 @@ import (
 
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
@@ -87,15 +86,10 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 		AccessToken: expectedUUID,
 	}
 
-	// Marshal message
-	marshaledPreferences, err := proto.Marshal(preferences)
+	actualMessage, err := client.buildPushNotificationPreferencesMessage()
 	require.NoError(t, err)
 
-	expectedMessage := &protobuf.PushNotificationRegister{Payload: marshaledPreferences}
-	actualMessage, err := client.buildPushNotificationRegisterMessage()
-	require.NoError(t, err)
-
-	require.Equal(t, expectedMessage, actualMessage)
+	require.Equal(t, preferences, actualMessage)
 }
 
 func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
@@ -123,12 +117,6 @@ func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
 		Version:     1,
 		AccessToken: "some-token",
 	}
-
-	// Marshal message
-	marshaledPreferences2, err := proto.Marshal(preferences2)
-	require.NoError(t, err)
-
-	lastPushNotificationRegister := &protobuf.PushNotificationRegister{Payload: marshaledPreferences2}
 
 	mutedChatList := []string{"a", "b"}
 
@@ -188,7 +176,7 @@ func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
 	client := &Client{}
 	client.config = config
 	client.DeviceToken = deviceToken1
-	client.lastPushNotificationRegister = lastPushNotificationRegister
+	client.lastPushNotificationPreferences = preferences2
 	// Set reader
 	client.reader = bytes.NewReader([]byte(expectedUUID))
 
@@ -207,13 +195,8 @@ func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
 		AccessToken: expectedUUID,
 	}
 
-	// Marshal message
-	marshaledPreferences, err := proto.Marshal(preferences)
+	actualMessage, err := client.buildPushNotificationPreferencesMessage()
 	require.NoError(t, err)
 
-	expectedMessage := &protobuf.PushNotificationRegister{Payload: marshaledPreferences}
-	actualMessage, err := client.buildPushNotificationRegisterMessage()
-	require.NoError(t, err)
-
-	require.Equal(t, expectedMessage, actualMessage)
+	require.Equal(t, preferences, actualMessage)
 }

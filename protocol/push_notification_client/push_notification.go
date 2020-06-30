@@ -9,8 +9,6 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/golang/protobuf/proto"
-
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -51,8 +49,8 @@ type Client struct {
 	persistence *Persistence
 	config      *Config
 
-	// lastPushNotificationRegister is the latest known push notification register message
-	lastPushNotificationRegister *protobuf.PushNotificationRegister
+	// lastPushNotificationPreferences is the latest known push notification preferences message
+	lastPushNotificationPreferences *protobuf.PushNotificationPreferences
 
 	// AccessToken is the access token that is currently being used
 	AccessToken string
@@ -171,13 +169,11 @@ func (p *Client) buildPushNotificationOptionsMessage(token string) (*protobuf.Pu
 	return options, nil
 }
 
-func (p *Client) buildPushNotificationRegisterMessage() (*protobuf.PushNotificationRegister, error) {
+func (p *Client) buildPushNotificationPreferencesMessage() (*protobuf.PushNotificationPreferences, error) {
 	pushNotificationPreferences := &protobuf.PushNotificationPreferences{}
 
-	if p.lastPushNotificationRegister != nil {
-		if err := proto.Unmarshal(p.lastPushNotificationRegister.Payload, pushNotificationPreferences); err != nil {
-			return nil, err
-		}
+	if p.lastPushNotificationPreferences != nil {
+		pushNotificationPreferences = p.lastPushNotificationPreferences
 	}
 
 	// Increment version
@@ -209,14 +205,7 @@ func (p *Client) buildPushNotificationRegisterMessage() (*protobuf.PushNotificat
 
 	pushNotificationPreferences.Options = options
 
-	// Marshal
-	payload, err := proto.Marshal(pushNotificationPreferences)
-	if err != nil {
-		return nil, err
-	}
-
-	message := &protobuf.PushNotificationRegister{Payload: payload}
-	return message, nil
+	return pushNotificationPreferences, nil
 }
 
 func (p *Client) Register(deviceToken string) error {

@@ -28,12 +28,6 @@ message PushNotificationPreferences {
   string access_token = 4;
 }
 
-message PushNotificationRegister {
-  bytes payload = 1;
-  bytes signature = 2;
-}
-
-
 message PushNotificationRegistrationResponse {
   bool success = 1;
   ErrorType error = 2;
