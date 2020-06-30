@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package protobuf;
+
+message PushNotificationTokenPair {
+  bytes token = 1;
+  bytes public_key = 2;
+}
+
+message PushNotificationOptions {
+  enum TokenType {
+    UNKNOWN_TOKEN_TYPE = 0;
+    APN_TOKEN = 1;
+    FIREBASE_TOKEN = 2;
+  }
+  TokenType token_type = 1;
+  string token = 2;
+  string installation_id = 3;
+  bool enabled = 4;
+  repeated PushNotificationTokenPair allowed_user_list = 5;
+  repeated bytes blocked_chat_list = 6;
+}
+
+message PushNotificationPreferences {
+  repeated PushNotificationOptions options = 1;
+  uint64 version = 2;
+  bool unregister = 3;
+  string access_token = 4;
+}
+
+message PushNotificationRegister {
+  bytes payload = 1;
+  bytes signature = 2;
+}
+
+
+message PushNotificationRegistrationResponse {
+  bool success = 1;
+  ErrorType error = 2;
+  bytes request_id = 3;
+  PushNotificationPreferences preferences = 4;
+
+  enum ErrorType {
+    UNKNOWN_ERROR_TYPE = 0;
+    MALFORMED_MESSAGE = 1;
+    VERSION_MISMATCH = 2;
+    UNSUPPORTED_TOKEN_TYPE = 3;
+    INTERNAL_ERROR = 4;
+  }
+}
+
+message PushNotificationAdvertisementInfo {
+  bytes public_key = 1;
+  string access_token = 2;
+  string installation_id = 3;
+}
+
+message ContactCodeAdvertisement {
+  repeated PushNotificationAdvertisementInfo push_notification_info = 1;
+}
+
+message PushNotificationQuery {
+  repeated bytes public_keys = 1;
+}
+
+message PushNotificationQueryInfo {
+  string access_token = 1;
+  string installation_id = 2;
+  bytes public_key = 3;
+  bytes allowed_user_list = 4;
+}
+
+message PushNotificationQueryResponse {
+  repeated PushNotificationQueryInfo info = 1;
+}
+
+message PushNotification {
+  string access_token = 1;
+  string chat_id = 2;
+}
+
+message PushNotificationRequest {
+  repeated PushNotification requests = 1;
+  bytes message = 2;
+  string message_id = 3;
+  string ack_required = 4;
+}
+
+message PushNotificationAcknowledgement {
+  string id = 1;
+}

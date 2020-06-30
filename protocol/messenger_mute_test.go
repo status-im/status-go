@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"io/ioutil"
 	"os"

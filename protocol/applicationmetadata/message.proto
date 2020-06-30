@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package applicationmetadata;
-
-message Message {
-  bytes signature = 4001;
-  bytes payload = 4002;
-}

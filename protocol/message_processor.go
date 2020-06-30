@@ -42,6 +42,11 @@ type messageProcessor struct {
 	logger    *zap.Logger
 
 	featureFlags featureFlags
+	// onMessageSpecSent is a callback that is to be called when
+	// a message spec is sent.
+	// The reason is a callback is that datasync dispatches things asynchronously
+	// through a callback, and therefore return values can't be used
+	onMessageSpecSent func(*ecdsa.PublicKey, *encryption.ProtocolMessageSpec, [][]byte) error
 }
 
 func newMessageProcessor(
@@ -51,6 +56,7 @@ func newMessageProcessor(
 	transport transport.Transport,
 	logger *zap.Logger,
 	features featureFlags,
+	onMessageSpecSent func(*ecdsa.PublicKey, *encryption.ProtocolMessageSpec, [][]byte) error,
 ) (*messageProcessor, error) {
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
@@ -161,12 +167,13 @@ func (p *messageProcessor) sendPrivate(
 			return nil, errors.Wrap(err, "failed to encrypt message")
 		}
 
-		hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec)
+		messageIDs := [][]byte{messageID}
+		hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		p.transport.Track([][]byte{messageID}, hash, newMessage)
+		p.transport.Track(messageIDs, hash, newMessage)
 	}
 
 	return messageID, nil
@@ -190,13 +197,15 @@ func (p *messageProcessor) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to encrypt message")
 	}
 
-	hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec)
+	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+	messageIDs := [][]byte{messageID}
+
+	hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
-	p.transport.Track([][]byte{messageID}, hash, newMessage)
+	p.transport.Track(messageIDs, hash, newMessage)
 
 	return messageID, nil
 }
@@ -330,7 +339,9 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	_, _, err = p.sendMessageSpec(ctx, publicKey, messageSpec)
+	// We don't pass an array of messageIDs as no action needs to be taken
+	// when sending a bundle
+	_, _, err = p.sendMessageSpec(ctx, publicKey, messageSpec, nil)
 	if err != nil {
 		return err
 	}
@@ -381,7 +392,7 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 		return errors.Wrap(err, "failed to encrypt message")
 	}
 
-	hash, newMessage, err := p.sendMessageSpec(ctx, publicKey, messageSpec)
+	hash, newMessage, err := p.sendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
 	if err != nil {
 		return err
 	}
@@ -392,7 +403,7 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec) ([]byte, *types.NewMessage, error) {
+func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage, err := messageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, nil, err
@@ -412,6 +423,13 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 	}
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if p.onMessageSpecSent != nil {
+
+		if err := p.onMessageSpecSent(publicKey, messageSpec, messageIDs); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return hash, newMessage, nil

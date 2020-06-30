@@ -101,6 +101,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 		whisperTransport,
 		s.logger,
 		featureFlags{},
+		nil,
 	)
 	s.Require().NoError(err)
 }
