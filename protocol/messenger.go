@@ -25,6 +25,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/push_notification_client"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
@@ -57,7 +58,7 @@ type Messenger struct {
 	encryptor                  *encryption.Protocol
 	processor                  *messageProcessor
 	handler                    *MessageHandler
-	pushNotificationService    *PushNotificationService
+	pushNotificationClient     *push_notification_client.Client
 	logger                     *zap.Logger
 	verifyTransactionClient    EthClient
 	featureFlags               featureFlags
@@ -329,8 +330,8 @@ func NewMessenger(
 		logger,
 	)
 
-	pushNotificationPersistence := NewPushNotificationPersistence(database)
-	pushNotificationService := NewPushNotificationService(pushNotificationPersistence)
+	pushNotificationClientPersistence := push_notification_client.NewPersistence(database)
+	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence)
 
 	processor, err := newMessageProcessor(
 		identity,
@@ -339,7 +340,7 @@ func NewMessenger(
 		transp,
 		logger,
 		c.featureFlags,
-		pushNotificationService.HandleMessageSent,
+		pushNotificationClient.HandleMessageSent,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create messageProcessor")
@@ -355,7 +356,7 @@ func NewMessenger(
 		encryptor:                  encryptionProtocol,
 		processor:                  processor,
 		handler:                    handler,
-		pushNotificationService:    pushNotificationService,
+		pushNotificationClient:     pushNotificationClient,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
 		allChats:                   make(map[string]*Chat),
@@ -1473,8 +1474,8 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 	}
 
 	// If the chat is not public, we instruct the pushNotificationService to send a notification
-	if !chat.Public() && m.pushNotificationService != nil {
-		if err := m.pushNotificationService.NotifyOnMessageID(id); err != nil {
+	if !chat.Public() && m.pushNotificationClient != nil {
+		if err := m.pushNotificationClient.NotifyOnMessageID(id); err != nil {
 			return nil, err
 		}
 

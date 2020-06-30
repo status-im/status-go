@@ -1,4 +1,4 @@
-package protocol
+package push_notification_client
 
 import (
 	"bytes"
@@ -59,7 +59,7 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 	// Reset random generator
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
 
-	config := &PushNotificationConfig{
+	config := &Config{
 		Identity:                   identity,
 		RemoteNotificationsEnabled: true,
 		MutedChatIDs:               mutedChatList,
@@ -67,11 +67,11 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 		InstallationID:             myInstallationID,
 	}
 
-	service := &PushNotificationService{}
-	service.config = config
-	service.DeviceToken = myDeviceToken
+	client := &Client{}
+	client.config = config
+	client.DeviceToken = myDeviceToken
 	// Set reader
-	service.reader = bytes.NewReader([]byte(expectedUUID))
+	client.reader = bytes.NewReader([]byte(expectedUUID))
 
 	options := &protobuf.PushNotificationOptions{
 		Token:           myDeviceToken,
@@ -92,7 +92,7 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedMessage := &protobuf.PushNotificationRegister{Payload: marshaledPreferences}
-	actualMessage, err := service.buildPushNotificationRegisterMessage()
+	actualMessage, err := client.buildPushNotificationRegisterMessage()
 	require.NoError(t, err)
 
 	require.Equal(t, expectedMessage, actualMessage)
@@ -177,7 +177,7 @@ func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
 	// Reset random generator
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
 
-	config := &PushNotificationConfig{
+	config := &Config{
 		Identity:                   identity,
 		RemoteNotificationsEnabled: true,
 		MutedChatIDs:               mutedChatList,
@@ -185,12 +185,12 @@ func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
 		InstallationID:             installationID1,
 	}
 
-	service := &PushNotificationService{}
-	service.config = config
-	service.DeviceToken = deviceToken1
-	service.lastPushNotificationRegister = lastPushNotificationRegister
+	client := &Client{}
+	client.config = config
+	client.DeviceToken = deviceToken1
+	client.lastPushNotificationRegister = lastPushNotificationRegister
 	// Set reader
-	service.reader = bytes.NewReader([]byte(expectedUUID))
+	client.reader = bytes.NewReader([]byte(expectedUUID))
 
 	options1 := &protobuf.PushNotificationOptions{
 		Token:           deviceToken1,
@@ -212,7 +212,7 @@ func TestBuildPushNotificationRegisterMessageWithPrevious(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedMessage := &protobuf.PushNotificationRegister{Payload: marshaledPreferences}
-	actualMessage, err := service.buildPushNotificationRegisterMessage()
+	actualMessage, err := client.buildPushNotificationRegisterMessage()
 	require.NoError(t, err)
 
 	require.Equal(t, expectedMessage, actualMessage)

@@ -1,4 +1,4 @@
-package protocol
+package push_notification_client
 
 import (
 	"crypto/aes"
@@ -26,7 +26,7 @@ type PushNotificationServer struct {
 	registered bool
 }
 
-type PushNotificationConfig struct {
+type Config struct {
 	// Identity is our identity key
 	Identity *ecdsa.PrivateKey
 	// SendEnabled indicates whether we should be sending push notifications
@@ -47,9 +47,9 @@ type PushNotificationConfig struct {
 	InstallationID string
 }
 
-type PushNotificationService struct {
-	persistence *PushNotificationPersistence
-	config      *PushNotificationConfig
+type Client struct {
+	persistence *Persistence
+	config      *Config
 
 	// lastPushNotificationRegister is the latest known push notification register message
 	lastPushNotificationRegister *protobuf.PushNotificationRegister
@@ -63,8 +63,8 @@ type PushNotificationService struct {
 	reader io.Reader
 }
 
-func NewPushNotificationService(persistence *PushNotificationPersistence) *PushNotificationService {
-	return &PushNotificationService{persistence: persistence, reader: rand.Reader}
+func New(persistence *Persistence) *Client {
+	return &Client{persistence: persistence, reader: rand.Reader}
 }
 
 // This likely will return a channel as it's an asynchrous operation
@@ -81,15 +81,15 @@ func sendPushNotificationTo(publicKey *ecdsa.PublicKey, chatID string) error {
 // 1) Check we have reasonably fresh push notifications info
 // 2) Otherwise it should fetch them
 // 3) Send a push notification to the devices in question
-func (p *PushNotificationService) HandleMessageSent(publicKey *ecdsa.PublicKey, spec *encryption.ProtocolMessageSpec, messageIDs [][]byte) error {
+func (p *Client) HandleMessageSent(publicKey *ecdsa.PublicKey, spec *encryption.ProtocolMessageSpec, messageIDs [][]byte) error {
 	return nil
 }
 
-func (p *PushNotificationService) NotifyOnMessageID(messageID []byte) error {
+func (p *Client) NotifyOnMessageID(messageID []byte) error {
 	return nil
 }
 
-func (p *PushNotificationService) mutedChatIDsHashes() [][]byte {
+func (p *Client) mutedChatIDsHashes() [][]byte {
 	var mutedChatListHashes [][]byte
 
 	for _, chatID := range p.config.MutedChatIDs {
@@ -99,7 +99,7 @@ func (p *PushNotificationService) mutedChatIDsHashes() [][]byte {
 	return mutedChatListHashes
 }
 
-func (p *PushNotificationService) reEncryptTokenPair(token []byte, pair *protobuf.PushNotificationTokenPair) (*protobuf.PushNotificationTokenPair, error) {
+func (p *Client) reEncryptTokenPair(token []byte, pair *protobuf.PushNotificationTokenPair) (*protobuf.PushNotificationTokenPair, error) {
 	publicKey, err := crypto.DecompressPubkey(pair.PublicKey)
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (p *PushNotificationService) reEncryptTokenPair(token []byte, pair *protobu
 	return p.encryptTokenPair(publicKey, token)
 }
 
-func (p *PushNotificationService) encryptTokenPair(publicKey *ecdsa.PublicKey, token []byte) (*protobuf.PushNotificationTokenPair, error) {
+func (p *Client) encryptTokenPair(publicKey *ecdsa.PublicKey, token []byte) (*protobuf.PushNotificationTokenPair, error) {
 	sharedKey, err := ecies.ImportECDSA(p.config.Identity).GenerateShared(
 		ecies.ImportECDSAPublic(publicKey),
 		accessTokenKeyLength,
@@ -127,7 +127,7 @@ func (p *PushNotificationService) encryptTokenPair(publicKey *ecdsa.PublicKey, t
 	}, nil
 }
 
-func (p *PushNotificationService) allowedUserList(token []byte) ([]*protobuf.PushNotificationTokenPair, error) {
+func (p *Client) allowedUserList(token []byte) ([]*protobuf.PushNotificationTokenPair, error) {
 	var tokenPairs []*protobuf.PushNotificationTokenPair
 	for _, publicKey := range p.config.ContactIDs {
 		tokenPair, err := p.encryptTokenPair(publicKey, token)
@@ -141,7 +141,7 @@ func (p *PushNotificationService) allowedUserList(token []byte) ([]*protobuf.Pus
 	return tokenPairs, nil
 }
 
-func (p *PushNotificationService) reEncryptAllowedUserList(token []byte, oldTokenPairs []*protobuf.PushNotificationTokenPair) ([]*protobuf.PushNotificationTokenPair, error) {
+func (p *Client) reEncryptAllowedUserList(token []byte, oldTokenPairs []*protobuf.PushNotificationTokenPair) ([]*protobuf.PushNotificationTokenPair, error) {
 	var tokenPairs []*protobuf.PushNotificationTokenPair
 	for _, tokenPair := range oldTokenPairs {
 		tokenPair, err := p.reEncryptTokenPair(token, tokenPair)
@@ -155,7 +155,7 @@ func (p *PushNotificationService) reEncryptAllowedUserList(token []byte, oldToke
 	return tokenPairs, nil
 }
 
-func (p *PushNotificationService) buildPushNotificationOptionsMessage(token string) (*protobuf.PushNotificationOptions, error) {
+func (p *Client) buildPushNotificationOptionsMessage(token string) (*protobuf.PushNotificationOptions, error) {
 	allowedUserList, err := p.allowedUserList([]byte(token))
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (p *PushNotificationService) buildPushNotificationOptionsMessage(token stri
 	return options, nil
 }
 
-func (p *PushNotificationService) buildPushNotificationRegisterMessage() (*protobuf.PushNotificationRegister, error) {
+func (p *Client) buildPushNotificationRegisterMessage() (*protobuf.PushNotificationRegister, error) {
 	pushNotificationPreferences := &protobuf.PushNotificationPreferences{}
 
 	if p.lastPushNotificationRegister != nil {
@@ -219,37 +219,37 @@ func (p *PushNotificationService) buildPushNotificationRegisterMessage() (*proto
 	return message, nil
 }
 
-func (p *PushNotificationService) Register(deviceToken string) error {
+func (p *Client) Register(deviceToken string) error {
 	return nil
 }
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
-func (p *PushNotificationService) HandlePushNotificationRegistrationResponse(response *protobuf.PushNotificationRegistrationResponse) error {
+func (p *Client) HandlePushNotificationRegistrationResponse(response *protobuf.PushNotificationRegistrationResponse) error {
 	return nil
 }
 
 // HandlePushNotificationAdvertisement should store any info related to push notifications
-func (p *PushNotificationService) HandlePushNotificationAdvertisement(info *protobuf.PushNotificationAdvertisementInfo) error {
+func (p *Client) HandlePushNotificationAdvertisement(info *protobuf.PushNotificationAdvertisementInfo) error {
 	return nil
 }
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
-func (p *PushNotificationService) HandlePushNotificationQueryResponse(response *protobuf.PushNotificationQueryResponse) error {
+func (p *Client) HandlePushNotificationQueryResponse(response *protobuf.PushNotificationQueryResponse) error {
 	return nil
 }
 
 // HandlePushNotificationAcknowledgement should set the request as processed
-func (p *PushNotificationService) HandlePushNotificationAcknowledgement(ack *protobuf.PushNotificationAcknowledgement) error {
+func (p *Client) HandlePushNotificationAcknowledgement(ack *protobuf.PushNotificationAcknowledgement) error {
 	return nil
 }
 
-func (p *PushNotificationService) SetContactIDs(contactIDs []*ecdsa.PublicKey) error {
+func (p *Client) SetContactIDs(contactIDs []*ecdsa.PublicKey) error {
 	p.config.ContactIDs = contactIDs
 	// Update or schedule update
 	return nil
 }
 
-func (p *PushNotificationService) SetMutedChatIDs(chatIDs []string) error {
+func (p *Client) SetMutedChatIDs(chatIDs []string) error {
 	p.config.MutedChatIDs = chatIDs
 	// Update or schedule update
 	return nil
