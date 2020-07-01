@@ -10,6 +10,7 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -18,11 +19,14 @@ import (
 const encryptedPayloadKeyLength = 16
 const nonceLength = 12
 
-var ErrInvalidPushNotificationPreferencesVersion = errors.New("invalid version")
-var ErrEmptyPushNotificationPreferencesPayload = errors.New("empty payload")
-var ErrEmptyPushNotificationPreferencesPublicKey = errors.New("no public key")
-var ErrCouldNotUnmarshalPushNotificationPreferences = errors.New("could not unmarshal preferences")
+var ErrInvalidPushNotificationOptionsVersion = errors.New("invalid version")
+var ErrEmptyPushNotificationOptionsPayload = errors.New("empty payload")
+var ErrMalformedPushNotificationOptionsInstallationID = errors.New("invalid installationID")
+var ErrEmptyPushNotificationOptionsPublicKey = errors.New("no public key")
+var ErrCouldNotUnmarshalPushNotificationOptions = errors.New("could not unmarshal preferences")
 var ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
+var ErrMalformedPushNotificationOptionsAccessToken = errors.New("invalid access token")
+var ErrMalformedPushNotificationOptionsDeviceToken = errors.New("invalid device token")
 
 type Config struct {
 	// Identity is our identity key
@@ -48,13 +52,21 @@ func (p *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 	)
 }
 
-func (p *Server) ValidateRegistration(previousPreferences *protobuf.PushNotificationPreferences, publicKey *ecdsa.PublicKey, payload []byte) error {
+func (p *Server) validateUUID(u string) error {
+	if len(u) == 0 {
+		return errors.New("empty uuid")
+	}
+	_, err := uuid.Parse(u)
+	return err
+}
+
+func (p *Server) ValidateRegistration(previousPreferences *protobuf.PushNotificationOptions, publicKey *ecdsa.PublicKey, payload []byte) error {
 	if payload == nil {
-		return ErrEmptyPushNotificationPreferencesPayload
+		return ErrEmptyPushNotificationOptionsPayload
 	}
 
 	if publicKey == nil {
-		return ErrEmptyPushNotificationPreferencesPublicKey
+		return ErrEmptyPushNotificationOptionsPublicKey
 	}
 
 	sharedKey, err := p.generateSharedKey(publicKey)
@@ -67,19 +79,40 @@ func (p *Server) ValidateRegistration(previousPreferences *protobuf.PushNotifica
 		return err
 	}
 
-	preferences := &protobuf.PushNotificationPreferences{}
+	preferences := &protobuf.PushNotificationOptions{}
 
 	if err := proto.Unmarshal(decryptedPayload, preferences); err != nil {
-		return ErrCouldNotUnmarshalPushNotificationPreferences
+		return ErrCouldNotUnmarshalPushNotificationOptions
 	}
 
 	if preferences.Version < 1 {
-		return ErrInvalidPushNotificationPreferencesVersion
+		return ErrInvalidPushNotificationOptionsVersion
+	}
+
+	if previousPreferences != nil && preferences.Version <= previousPreferences.Version {
+		return ErrInvalidPushNotificationOptionsVersion
+	}
+
+	if err := p.validateUUID(preferences.InstallationId); err != nil {
+		return ErrMalformedPushNotificationOptionsInstallationID
+	}
+
+	// Unregistering message
+	if preferences.Unregister {
+		return nil
+	}
+
+	if err := p.validateUUID(preferences.AccessToken); err != nil {
+		return ErrMalformedPushNotificationOptionsAccessToken
+	}
+
+	if len(preferences.Token) == 0 {
+		return ErrMalformedPushNotificationOptionsDeviceToken
 	}
 	fmt.Println(decryptedPayload)
 
 	/*if newRegistration.Version < 1 {
-		return ErrInvalidPushNotificationPreferencesVersion
+		return ErrInvalidPushNotificationOptionsVersion
 	}*/
 	return nil
 }

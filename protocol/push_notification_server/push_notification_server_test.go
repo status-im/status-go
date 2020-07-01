@@ -12,6 +12,8 @@ import (
 )
 
 func TestPushNotificationServerValidateRegistration(t *testing.T) {
+	accessToken := "b6ae4fde-bb65-11ea-b3de-0242ac130004"
+	installationID := "c6ae4fde-bb65-11ea-b3de-0242ac130004"
 	identity, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
@@ -28,10 +30,10 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Empty payload
-	require.Equal(t, ErrEmptyPushNotificationPreferencesPayload, server.ValidateRegistration(nil, &key.PublicKey, nil))
+	require.Equal(t, ErrEmptyPushNotificationOptionsPayload, server.ValidateRegistration(nil, &key.PublicKey, nil))
 
 	// Empty key
-	require.Equal(t, ErrEmptyPushNotificationPreferencesPublicKey, server.ValidateRegistration(nil, nil, []byte("payload")))
+	require.Equal(t, ErrEmptyPushNotificationOptionsPublicKey, server.ValidateRegistration(nil, nil, []byte("payload")))
 
 	// Invalid cyphertext length
 	require.Equal(t, ErrInvalidCiphertextLength, server.ValidateRegistration(nil, &key.PublicKey, []byte("too short")))
@@ -50,13 +52,100 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 	// Right cyphertext but non unmarshable payload
 	cyphertext, err = encrypt([]byte("plaintext"), sharedKey, rand.Reader)
 	require.NoError(t, err)
-	require.Equal(t, ErrCouldNotUnmarshalPushNotificationPreferences, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+	require.Equal(t, ErrCouldNotUnmarshalPushNotificationOptions, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
 
-	// Version set to 0
-	payload, err := proto.Marshal(&protobuf.PushNotificationPreferences{})
+	// Missing installationID
+	payload, err := proto.Marshal(&protobuf.PushNotificationOptions{
+		AccessToken: accessToken,
+		Version:     1,
+	})
 	require.NoError(t, err)
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	require.Equal(t, ErrInvalidPushNotificationPreferencesVersion, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+	require.Equal(t, ErrMalformedPushNotificationOptionsInstallationID, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
+	// Malformed installationID
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		AccessToken:    accessToken,
+		InstallationId: "abc",
+		Version:        1,
+	})
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Equal(t, ErrMalformedPushNotificationOptionsInstallationID, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
+	// Version set to 0
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+	})
+	require.NoError(t, err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Equal(t, ErrInvalidPushNotificationOptionsVersion, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
+	// Version lower than previous one
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        1,
+	})
+	require.NoError(t, err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Equal(t, ErrInvalidPushNotificationOptionsVersion, server.ValidateRegistration(&protobuf.PushNotificationOptions{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        2}, &key.PublicKey, cyphertext))
+
+	// Unregistering message
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		InstallationId: installationID,
+		Unregister:     true,
+		Version:        1,
+	})
+	require.NoError(t, err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Nil(t, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
+	// Missing access token
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		InstallationId: installationID,
+		Version:        1,
+	})
+	require.NoError(t, err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Equal(t, ErrMalformedPushNotificationOptionsAccessToken, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
+	// Invalid access token
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		AccessToken:    "bc",
+		InstallationId: installationID,
+		Version:        1,
+	})
+	require.NoError(t, err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Equal(t, ErrMalformedPushNotificationOptionsAccessToken, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
+	// Missing device token
+	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        1,
+	})
+	require.NoError(t, err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	require.NoError(t, err)
+	require.Equal(t, ErrMalformedPushNotificationOptionsDeviceToken, server.ValidateRegistration(nil, &key.PublicKey, cyphertext))
+
 }

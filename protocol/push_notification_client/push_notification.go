@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -49,8 +48,8 @@ type Client struct {
 	persistence *Persistence
 	config      *Config
 
-	// lastPushNotificationPreferences is the latest known push notification preferences message
-	lastPushNotificationPreferences *protobuf.PushNotificationPreferences
+	// lastPushNotificationVersion is the latest known push notification version
+	lastPushNotificationVersion uint64
 
 	// AccessToken is the access token that is currently being used
 	AccessToken string
@@ -97,15 +96,7 @@ func (p *Client) mutedChatIDsHashes() [][]byte {
 	return mutedChatListHashes
 }
 
-func (p *Client) reEncryptTokenPair(token []byte, pair *protobuf.PushNotificationTokenPair) (*protobuf.PushNotificationTokenPair, error) {
-	publicKey, err := crypto.DecompressPubkey(pair.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-	return p.encryptTokenPair(publicKey, token)
-}
-
-func (p *Client) encryptTokenPair(publicKey *ecdsa.PublicKey, token []byte) (*protobuf.PushNotificationTokenPair, error) {
+func (p *Client) encryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte, error) {
 	sharedKey, err := ecies.ImportECDSA(p.config.Identity).GenerateShared(
 		ecies.ImportECDSAPublic(publicKey),
 		accessTokenKeyLength,
@@ -118,48 +109,33 @@ func (p *Client) encryptTokenPair(publicKey *ecdsa.PublicKey, token []byte) (*pr
 	if err != nil {
 		return nil, err
 	}
-
-	return &protobuf.PushNotificationTokenPair{
-		Token:     encryptedToken,
-		PublicKey: crypto.CompressPubkey(publicKey),
-	}, nil
+	return encryptedToken, nil
 }
 
-func (p *Client) allowedUserList(token []byte) ([]*protobuf.PushNotificationTokenPair, error) {
-	var tokenPairs []*protobuf.PushNotificationTokenPair
+func (p *Client) allowedUserList(token []byte) ([][]byte, error) {
+	var encryptedTokens [][]byte
 	for _, publicKey := range p.config.ContactIDs {
-		tokenPair, err := p.encryptTokenPair(publicKey, token)
+		encryptedToken, err := p.encryptToken(publicKey, token)
 		if err != nil {
 			return nil, err
 		}
 
-		tokenPairs = append(tokenPairs, tokenPair)
+		encryptedTokens = append(encryptedTokens, encryptedToken)
 
 	}
-	return tokenPairs, nil
+	return encryptedTokens, nil
 }
 
-func (p *Client) reEncryptAllowedUserList(token []byte, oldTokenPairs []*protobuf.PushNotificationTokenPair) ([]*protobuf.PushNotificationTokenPair, error) {
-	var tokenPairs []*protobuf.PushNotificationTokenPair
-	for _, tokenPair := range oldTokenPairs {
-		tokenPair, err := p.reEncryptTokenPair(token, tokenPair)
-		if err != nil {
-			return nil, err
-		}
-
-		tokenPairs = append(tokenPairs, tokenPair)
-
-	}
-	return tokenPairs, nil
-}
-
-func (p *Client) buildPushNotificationOptionsMessage(token string) (*protobuf.PushNotificationOptions, error) {
+func (p *Client) buildPushNotificationOptionsMessage() (*protobuf.PushNotificationOptions, error) {
+	token := uuid.New().String()
 	allowedUserList, err := p.allowedUserList([]byte(token))
 	if err != nil {
 		return nil, err
 	}
 
 	options := &protobuf.PushNotificationOptions{
+		AccessToken:     token,
+		Version:         p.lastPushNotificationVersion + 1,
 		InstallationId:  p.config.InstallationID,
 		Token:           p.DeviceToken,
 		Enabled:         p.config.RemoteNotificationsEnabled,
@@ -167,45 +143,6 @@ func (p *Client) buildPushNotificationOptionsMessage(token string) (*protobuf.Pu
 		AllowedUserList: allowedUserList,
 	}
 	return options, nil
-}
-
-func (p *Client) buildPushNotificationPreferencesMessage() (*protobuf.PushNotificationPreferences, error) {
-	pushNotificationPreferences := &protobuf.PushNotificationPreferences{}
-
-	if p.lastPushNotificationPreferences != nil {
-		pushNotificationPreferences = p.lastPushNotificationPreferences
-	}
-
-	// Increment version
-	pushNotificationPreferences.Version += 1
-
-	// Generate new token
-	token := uuid.New().String()
-	pushNotificationPreferences.AccessToken = token
-
-	// build options for this device
-	ourOptions, err := p.buildPushNotificationOptionsMessage(token)
-	if err != nil {
-		return nil, err
-	}
-
-	options := []*protobuf.PushNotificationOptions{ourOptions}
-	// Re-encrypt token for previous options that don't belong to this
-	// device
-	for _, option := range pushNotificationPreferences.Options {
-		if option.InstallationId != p.config.InstallationID {
-			newAllowedUserList, err := p.reEncryptAllowedUserList([]byte(token), option.AllowedUserList)
-			if err != nil {
-				return nil, err
-			}
-			option.AllowedUserList = newAllowedUserList
-			options = append(options, option)
-		}
-	}
-
-	pushNotificationPreferences.Options = options
-
-	return pushNotificationPreferences, nil
 }
 
 func (p *Client) Register(deviceToken string) error {
