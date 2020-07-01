@@ -60,61 +60,60 @@ func (p *Server) validateUUID(u string) error {
 	return err
 }
 
-func (p *Server) ValidateRegistration(previousPreferences *protobuf.PushNotificationOptions, publicKey *ecdsa.PublicKey, payload []byte) error {
+// ValidateRegistration validates a new message against the last one received for a given installationID and and public key
+// and return the decrypted message
+func (p *Server) ValidateRegistration(previousOptions *protobuf.PushNotificationOptions, publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationOptions, error) {
 	if payload == nil {
-		return ErrEmptyPushNotificationOptionsPayload
+		return nil, ErrEmptyPushNotificationOptionsPayload
 	}
 
 	if publicKey == nil {
-		return ErrEmptyPushNotificationOptionsPublicKey
+		return nil, ErrEmptyPushNotificationOptionsPublicKey
 	}
 
 	sharedKey, err := p.generateSharedKey(publicKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	decryptedPayload, err := decrypt(payload, sharedKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	preferences := &protobuf.PushNotificationOptions{}
+	options := &protobuf.PushNotificationOptions{}
 
-	if err := proto.Unmarshal(decryptedPayload, preferences); err != nil {
-		return ErrCouldNotUnmarshalPushNotificationOptions
+	if err := proto.Unmarshal(decryptedPayload, options); err != nil {
+		return nil, ErrCouldNotUnmarshalPushNotificationOptions
 	}
 
-	if preferences.Version < 1 {
-		return ErrInvalidPushNotificationOptionsVersion
+	if options.Version < 1 {
+		return nil, ErrInvalidPushNotificationOptionsVersion
 	}
 
-	if previousPreferences != nil && preferences.Version <= previousPreferences.Version {
-		return ErrInvalidPushNotificationOptionsVersion
+	if previousOptions != nil && options.Version <= previousOptions.Version {
+		return nil, ErrInvalidPushNotificationOptionsVersion
 	}
 
-	if err := p.validateUUID(preferences.InstallationId); err != nil {
-		return ErrMalformedPushNotificationOptionsInstallationID
+	if err := p.validateUUID(options.InstallationId); err != nil {
+		return nil, ErrMalformedPushNotificationOptionsInstallationID
 	}
 
 	// Unregistering message
-	if preferences.Unregister {
-		return nil
+	if options.Unregister {
+		return options, nil
 	}
 
-	if err := p.validateUUID(preferences.AccessToken); err != nil {
-		return ErrMalformedPushNotificationOptionsAccessToken
+	if err := p.validateUUID(options.AccessToken); err != nil {
+		return nil, ErrMalformedPushNotificationOptionsAccessToken
 	}
 
-	if len(preferences.Token) == 0 {
-		return ErrMalformedPushNotificationOptionsDeviceToken
+	if len(options.Token) == 0 {
+		return nil, ErrMalformedPushNotificationOptionsDeviceToken
 	}
 	fmt.Println(decryptedPayload)
 
-	/*if newRegistration.Version < 1 {
-		return ErrInvalidPushNotificationOptionsVersion
-	}*/
-	return nil
+	return options, nil
 }
 
 func decrypt(cyphertext []byte, key []byte) ([]byte, error) {
