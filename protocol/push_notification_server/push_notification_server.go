@@ -1,4 +1,4 @@
-package protocol
+package push_notification_server
 
 import (
 	"errors"
