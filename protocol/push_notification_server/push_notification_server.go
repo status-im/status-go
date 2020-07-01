@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"errors"
-	"fmt"
 	"io"
 
 	"crypto/aes"
@@ -36,12 +35,12 @@ type Config struct {
 }
 
 type Server struct {
-	persistence *Persistence
+	persistence Persistence
 	config      *Config
 }
 
-func New(persistence *Persistence) *Server {
-	return &Server{persistence: persistence}
+func New(config *Config, persistence Persistence) *Server {
+	return &Server{persistence: persistence, config: config}
 }
 
 func (p *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
@@ -60,9 +59,18 @@ func (p *Server) validateUUID(u string) error {
 	return err
 }
 
+func (p *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+	sharedKey, err := p.generateSharedKey(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return decrypt(payload, sharedKey)
+}
+
 // ValidateRegistration validates a new message against the last one received for a given installationID and and public key
 // and return the decrypted message
-func (p *Server) ValidateRegistration(previousOptions *protobuf.PushNotificationOptions, publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationOptions, error) {
+func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationOptions, error) {
 	if payload == nil {
 		return nil, ErrEmptyPushNotificationOptionsPayload
 	}
@@ -71,12 +79,7 @@ func (p *Server) ValidateRegistration(previousOptions *protobuf.PushNotification
 		return nil, ErrEmptyPushNotificationOptionsPublicKey
 	}
 
-	sharedKey, err := p.generateSharedKey(publicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	decryptedPayload, err := decrypt(payload, sharedKey)
+	decryptedPayload, err := p.decryptRegistration(publicKey, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -91,12 +94,17 @@ func (p *Server) ValidateRegistration(previousOptions *protobuf.PushNotification
 		return nil, ErrInvalidPushNotificationOptionsVersion
 	}
 
-	if previousOptions != nil && options.Version <= previousOptions.Version {
-		return nil, ErrInvalidPushNotificationOptionsVersion
-	}
-
 	if err := p.validateUUID(options.InstallationId); err != nil {
 		return nil, ErrMalformedPushNotificationOptionsInstallationID
+	}
+
+	previousOptions, err := p.persistence.GetPushNotificationOptions(publicKey, options.InstallationId)
+	if err != nil {
+		return nil, err
+	}
+
+	if previousOptions != nil && options.Version <= previousOptions.Version {
+		return nil, ErrInvalidPushNotificationOptionsVersion
 	}
 
 	// Unregistering message
@@ -111,9 +119,17 @@ func (p *Server) ValidateRegistration(previousOptions *protobuf.PushNotification
 	if len(options.Token) == 0 {
 		return nil, ErrMalformedPushNotificationOptionsDeviceToken
 	}
-	fmt.Println(decryptedPayload)
 
 	return options, nil
+}
+
+func (p *Server) HandlePushNotificationOptions(publicKey *ecdsa.PublicKey, payload []byte) error {
+
+	_, err := p.ValidateRegistration(publicKey, payload)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func decrypt(cyphertext []byte, key []byte) ([]byte, error) {

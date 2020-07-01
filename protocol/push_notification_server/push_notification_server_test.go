@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"testing"
 
@@ -10,6 +11,14 @@ import (
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
+
+type MockPersistence struct {
+	pno *protobuf.PushNotificationOptions
+}
+
+func (p *MockPersistence) GetPushNotificationOptions(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationOptions, error) {
+	return p.pno, nil
+}
 
 func TestPushNotificationServerValidateRegistration(t *testing.T) {
 	accessToken := "b6ae4fde-bb65-11ea-b3de-0242ac130004"
@@ -21,7 +30,8 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 		Identity: identity,
 	}
 
-	server := Server{config: config}
+	mockPersistence := &MockPersistence{}
+	server := New(config, mockPersistence)
 
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -30,35 +40,35 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Empty payload
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, nil)
+	_, err = server.ValidateRegistration(&key.PublicKey, nil)
 	require.Equal(t, ErrEmptyPushNotificationOptionsPayload, err)
 
 	// Empty key
-	_, err = server.ValidateRegistration(nil, nil, []byte("payload"))
+	_, err = server.ValidateRegistration(nil, []byte("payload"))
 	require.Equal(t, ErrEmptyPushNotificationOptionsPublicKey, err)
 
 	// Invalid cyphertext length
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, []byte("too short"))
+	_, err = server.ValidateRegistration(&key.PublicKey, []byte("too short"))
 	require.Equal(t, ErrInvalidCiphertextLength, err)
 
 	// Invalid cyphertext length
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, []byte("too short"))
+	_, err = server.ValidateRegistration(&key.PublicKey, []byte("too short"))
 	require.Equal(t, ErrInvalidCiphertextLength, err)
 
 	// Invalid ciphertext
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, []byte("not too short but invalid"))
+	_, err = server.ValidateRegistration(&key.PublicKey, []byte("not too short but invalid"))
 	require.Error(t, ErrInvalidCiphertextLength, err)
 
 	// Different key ciphertext
 	cyphertext, err := encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Error(t, err)
 
 	// Right cyphertext but non unmarshable payload
 	cyphertext, err = encrypt([]byte("plaintext"), sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrCouldNotUnmarshalPushNotificationOptions, err)
 
 	// Missing installationID
@@ -70,7 +80,7 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrMalformedPushNotificationOptionsInstallationID, err)
 
 	// Malformed installationID
@@ -81,7 +91,7 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 	})
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrMalformedPushNotificationOptionsInstallationID, err)
 
 	// Version set to 0
@@ -93,7 +103,7 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrInvalidPushNotificationOptionsVersion, err)
 
 	// Version lower than previous one
@@ -106,11 +116,18 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(&protobuf.PushNotificationOptions{
+
+	// Setup mock
+	mockPersistence.pno = &protobuf.PushNotificationOptions{
 		AccessToken:    accessToken,
 		InstallationId: installationID,
-		Version:        2}, &key.PublicKey, cyphertext)
+		Version:        2}
+
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrInvalidPushNotificationOptionsVersion, err)
+
+	// Cleanup mock
+	mockPersistence.pno = nil
 
 	// Unregistering message
 	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
@@ -122,7 +139,7 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Nil(t, err)
 
 	// Missing access token
@@ -134,7 +151,7 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrMalformedPushNotificationOptionsAccessToken, err)
 
 	// Invalid access token
@@ -147,7 +164,7 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrMalformedPushNotificationOptionsAccessToken, err)
 
 	// Missing device token
@@ -160,7 +177,6 @@ func TestPushNotificationServerValidateRegistration(t *testing.T) {
 
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	require.NoError(t, err)
-	_, err = server.ValidateRegistration(nil, &key.PublicKey, cyphertext)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
 	require.Equal(t, ErrMalformedPushNotificationOptionsDeviceToken, err)
-
 }
