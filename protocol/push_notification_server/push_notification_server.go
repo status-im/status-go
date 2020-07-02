@@ -112,6 +112,10 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationDeviceToken
 	}
 
+	if registration.TokenType == protobuf.PushNotificationRegistration_UNKNOWN_TOKEN_TYPE {
+		return nil, ErrUnknownPushNotificationRegistrationTokenType
+	}
+
 	return registration, nil
 }
 
