@@ -51,11 +51,12 @@ message PushNotificationQueryInfo {
   string access_token = 1;
   string installation_id = 2;
   bytes public_key = 3;
-  bytes allowed_user_list = 4;
+  repeated bytes allowed_user_list = 4;
 }
 
 message PushNotificationQueryResponse {
   repeated PushNotificationQueryInfo info = 1;
+  bool success = 2;
 }
 
 message PushNotification {

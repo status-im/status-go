@@ -90,7 +90,7 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousRegistration, err := p.persistence.GetPushNotificationRegistration(publicKey, registration.InstallationId)
+	previousRegistration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey, registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +113,38 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 	}
 
 	return registration, nil
+}
+
+func (p *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
+	response := &protobuf.PushNotificationQueryResponse{}
+	if query == nil || len(query.PublicKeys) == 0 {
+		return response
+	}
+
+	registrations, err := p.persistence.GetPushNotificationRegistrationByPublicKeys(query.PublicKeys)
+	if err != nil {
+		// TODO: log errors
+		return response
+	}
+
+	for _, idAndResponse := range registrations {
+
+		registration := idAndResponse.Registration
+		info := &protobuf.PushNotificationQueryInfo{
+			PublicKey:      idAndResponse.ID,
+			InstallationId: registration.InstallationId,
+		}
+
+		if len(registration.AllowedUserList) > 0 {
+			info.AllowedUserList = registration.AllowedUserList
+		} else {
+			info.AccessToken = registration.AccessToken
+		}
+		response.Info = append(response.Info, info)
+	}
+
+	response.Success = true
+	return response
 }
 
 func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
