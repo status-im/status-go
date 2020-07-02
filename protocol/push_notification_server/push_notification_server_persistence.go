@@ -11,12 +11,12 @@ import (
 )
 
 type Persistence interface {
-	// GetPushNotificationOptions retrieve a push notification options from storage given a public key and installation id
-	GetPushNotificationOptions(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationOptions, error)
-	// DeletePushNotificationOptions deletes a push notification options from storage given a public key and installation id
-	DeletePushNotificationOptions(publicKey *ecdsa.PublicKey, installationID string) error
-	// SavePushNotificationOptions saves a push notification option to the db
-	SavePushNotificationOptions(publicKey *ecdsa.PublicKey, options *protobuf.PushNotificationOptions) error
+	// GetPushNotificationRegistration retrieve a push notification registration from storage given a public key and installation id
+	GetPushNotificationRegistration(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationRegistration, error)
+	// DeletePushNotificationRegistration deletes a push notification registration from storage given a public key and installation id
+	DeletePushNotificationRegistration(publicKey *ecdsa.PublicKey, installationID string) error
+	// SavePushNotificationRegistration saves a push notification option to the db
+	SavePushNotificationRegistration(publicKey *ecdsa.PublicKey, registration *protobuf.PushNotificationRegistration) error
 }
 
 type SQLitePersistence struct {
@@ -27,9 +27,9 @@ func NewSQLitePersistence(db *sql.DB) Persistence {
 	return &SQLitePersistence{db: db}
 }
 
-func (p *SQLitePersistence) GetPushNotificationOptions(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationOptions, error) {
-	var marshaledOptions []byte
-	err := p.db.QueryRow(`SELECT registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, crypto.CompressPubkey(publicKey), installationID).Scan(&marshaledOptions)
+func (p *SQLitePersistence) GetPushNotificationRegistration(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationRegistration, error) {
+	var marshaledRegistration []byte
+	err := p.db.QueryRow(`SELECT registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, crypto.CompressPubkey(publicKey), installationID).Scan(&marshaledRegistration)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -37,26 +37,26 @@ func (p *SQLitePersistence) GetPushNotificationOptions(publicKey *ecdsa.PublicKe
 		return nil, err
 	}
 
-	options := &protobuf.PushNotificationOptions{}
+	registration := &protobuf.PushNotificationRegistration{}
 
-	if err := proto.Unmarshal(marshaledOptions, options); err != nil {
+	if err := proto.Unmarshal(marshaledRegistration, registration); err != nil {
 		return nil, err
 	}
-	return options, nil
+	return registration, nil
 }
 
-func (p *SQLitePersistence) SavePushNotificationOptions(publicKey *ecdsa.PublicKey, options *protobuf.PushNotificationOptions) error {
+func (p *SQLitePersistence) SavePushNotificationRegistration(publicKey *ecdsa.PublicKey, registration *protobuf.PushNotificationRegistration) error {
 	compressedPublicKey := crypto.CompressPubkey(publicKey)
-	marshaledOptions, err := proto.Marshal(options)
+	marshaledRegistration, err := proto.Marshal(registration)
 	if err != nil {
 		return err
 	}
 
-	_, err = p.db.Exec(`INSERT INTO push_notification_server_registrations (public_key, installation_id, version, registration) VALUES (?, ?, ?, ?)`, compressedPublicKey, options.InstallationId, options.Version, marshaledOptions)
+	_, err = p.db.Exec(`INSERT INTO push_notification_server_registrations (public_key, installation_id, version, registration) VALUES (?, ?, ?, ?)`, compressedPublicKey, registration.InstallationId, registration.Version, marshaledRegistration)
 	return err
 }
 
-func (p *SQLitePersistence) DeletePushNotificationOptions(publicKey *ecdsa.PublicKey, installationID string) error {
+func (p *SQLitePersistence) DeletePushNotificationRegistration(publicKey *ecdsa.PublicKey, installationID string) error {
 	_, err := p.db.Exec(`DELETE FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, crypto.CompressPubkey(publicKey), installationID)
 	return err
 }

@@ -44,15 +44,15 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieve() {
 	s.Require().NoError(err)
 	installationID := "54242d02-bb92-11ea-b3de-0242ac130004"
 
-	options := &protobuf.PushNotificationOptions{
+	registration := &protobuf.PushNotificationRegistration{
 		InstallationId: installationID,
 		Version:        5,
 	}
 
-	s.Require().NoError(s.persistence.SavePushNotificationOptions(&key.PublicKey, options))
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(&key.PublicKey, registration))
 
-	retrievedOptions, err := s.persistence.GetPushNotificationOptions(&key.PublicKey, installationID)
+	retrievedRegistration, err := s.persistence.GetPushNotificationRegistration(&key.PublicKey, installationID)
 	s.Require().NoError(err)
 
-	s.Require().True(proto.Equal(options, retrievedOptions))
+	s.Require().True(proto.Equal(registration, retrievedRegistration))
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
@@ -17,15 +18,6 @@ import (
 
 const encryptedPayloadKeyLength = 16
 const nonceLength = 12
-
-var ErrInvalidPushNotificationOptionsVersion = errors.New("invalid version")
-var ErrEmptyPushNotificationOptionsPayload = errors.New("empty payload")
-var ErrMalformedPushNotificationOptionsInstallationID = errors.New("invalid installationID")
-var ErrEmptyPushNotificationOptionsPublicKey = errors.New("no public key")
-var ErrCouldNotUnmarshalPushNotificationOptions = errors.New("could not unmarshal preferences")
-var ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
-var ErrMalformedPushNotificationOptionsAccessToken = errors.New("invalid access token")
-var ErrMalformedPushNotificationOptionsDeviceToken = errors.New("invalid device token")
 
 type Config struct {
 	// Identity is our identity key
@@ -70,13 +62,13 @@ func (p *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte)
 
 // ValidateRegistration validates a new message against the last one received for a given installationID and and public key
 // and return the decrypted message
-func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationOptions, error) {
+func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationRegistration, error) {
 	if payload == nil {
-		return nil, ErrEmptyPushNotificationOptionsPayload
+		return nil, ErrEmptyPushNotificationRegistrationPayload
 	}
 
 	if publicKey == nil {
-		return nil, ErrEmptyPushNotificationOptionsPublicKey
+		return nil, ErrEmptyPushNotificationRegistrationPublicKey
 	}
 
 	decryptedPayload, err := p.decryptRegistration(publicKey, payload)
@@ -84,52 +76,82 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, err
 	}
 
-	options := &protobuf.PushNotificationOptions{}
+	registration := &protobuf.PushNotificationRegistration{}
 
-	if err := proto.Unmarshal(decryptedPayload, options); err != nil {
-		return nil, ErrCouldNotUnmarshalPushNotificationOptions
+	if err := proto.Unmarshal(decryptedPayload, registration); err != nil {
+		return nil, ErrCouldNotUnmarshalPushNotificationRegistration
 	}
 
-	if options.Version < 1 {
-		return nil, ErrInvalidPushNotificationOptionsVersion
+	if registration.Version < 1 {
+		return nil, ErrInvalidPushNotificationRegistrationVersion
 	}
 
-	if err := p.validateUUID(options.InstallationId); err != nil {
-		return nil, ErrMalformedPushNotificationOptionsInstallationID
+	if err := p.validateUUID(registration.InstallationId); err != nil {
+		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousOptions, err := p.persistence.GetPushNotificationOptions(publicKey, options.InstallationId)
+	previousRegistration, err := p.persistence.GetPushNotificationRegistration(publicKey, registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
 
-	if previousOptions != nil && options.Version <= previousOptions.Version {
-		return nil, ErrInvalidPushNotificationOptionsVersion
+	if previousRegistration != nil && registration.Version <= previousRegistration.Version {
+		return nil, ErrInvalidPushNotificationRegistrationVersion
 	}
 
 	// Unregistering message
-	if options.Unregister {
-		return options, nil
+	if registration.Unregister {
+		return registration, nil
 	}
 
-	if err := p.validateUUID(options.AccessToken); err != nil {
-		return nil, ErrMalformedPushNotificationOptionsAccessToken
+	if err := p.validateUUID(registration.AccessToken); err != nil {
+		return nil, ErrMalformedPushNotificationRegistrationAccessToken
 	}
 
-	if len(options.Token) == 0 {
-		return nil, ErrMalformedPushNotificationOptionsDeviceToken
+	if len(registration.Token) == 0 {
+		return nil, ErrMalformedPushNotificationRegistrationDeviceToken
 	}
 
-	return options, nil
+	return registration, nil
 }
 
-func (p *Server) HandlePushNotificationOptions(publicKey *ecdsa.PublicKey, payload []byte) error {
-
-	_, err := p.ValidateRegistration(publicKey, payload)
-	if err != nil {
-		return err
+func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
+	response := &protobuf.PushNotificationRegistrationResponse{
+		RequestId: shake256(payload),
 	}
-	return nil
+
+	registration, err := p.ValidateRegistration(publicKey, payload)
+	if registration != nil {
+	}
+
+	if err != nil {
+		if err == ErrInvalidPushNotificationRegistrationVersion {
+			response.Error = protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH
+		} else {
+			response.Error = protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE
+		}
+		return response
+	}
+
+	if registration.Unregister {
+		// We save an empty registration, only keeping version and installation-id
+		emptyRegistration := &protobuf.PushNotificationRegistration{
+			Version:        registration.Version,
+			InstallationId: registration.InstallationId,
+		}
+		if err := p.persistence.SavePushNotificationRegistration(publicKey, emptyRegistration); err != nil {
+			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
+			return response
+		}
+
+	} else if err := p.persistence.SavePushNotificationRegistration(publicKey, registration); err != nil {
+		response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
+		return response
+	}
+
+	response.Success = true
+
+	return response
 }
 
 func decrypt(cyphertext []byte, key []byte) ([]byte, error) {
@@ -168,4 +190,10 @@ func encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
 	}
 
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
+}
+
+func shake256(buf []byte) []byte {
+	h := make([]byte, 64)
+	sha3.ShakeSum256(h, buf)
+	return h
 }

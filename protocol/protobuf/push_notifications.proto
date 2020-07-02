@@ -2,12 +2,7 @@ syntax = "proto3";
 
 package protobuf;
 
-message PushNotificationTokenPair {
-  bytes token = 1;
-  bytes public_key = 2;
-}
-
-message PushNotificationOptions {
+message PushNotificationRegistration {
   enum TokenType {
     UNKNOWN_TOKEN_TYPE = 0;
     APN_TOKEN = 1;

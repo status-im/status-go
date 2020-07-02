@@ -54,11 +54,11 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	// Empty payload
 	_, err = server.ValidateRegistration(&key.PublicKey, nil)
-	s.Require().Equal(ErrEmptyPushNotificationOptionsPayload, err)
+	s.Require().Equal(ErrEmptyPushNotificationRegistrationPayload, err)
 
 	// Empty key
 	_, err = server.ValidateRegistration(nil, []byte("payload"))
-	s.Require().Equal(ErrEmptyPushNotificationOptionsPublicKey, err)
+	s.Require().Equal(ErrEmptyPushNotificationRegistrationPublicKey, err)
 
 	// Invalid cyphertext length
 	_, err = server.ValidateRegistration(&key.PublicKey, []byte("too short"))
@@ -82,10 +82,10 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt([]byte("plaintext"), sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrCouldNotUnmarshalPushNotificationOptions, err)
+	s.Require().Equal(ErrCouldNotUnmarshalPushNotificationRegistration, err)
 
 	// Missing installationID
-	payload, err := proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err := proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken: accessToken,
 		Version:     1,
 	})
@@ -94,10 +94,10 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrMalformedPushNotificationOptionsInstallationID, err)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationInstallationID, err)
 
 	// Malformed installationID
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    accessToken,
 		InstallationId: "abc",
 		Version:        1,
@@ -105,10 +105,10 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrMalformedPushNotificationOptionsInstallationID, err)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationInstallationID, err)
 
 	// Version set to 0
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    accessToken,
 		InstallationId: installationID,
 	})
@@ -117,10 +117,10 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrInvalidPushNotificationOptionsVersion, err)
+	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
 
 	// Version lower than previous one
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    accessToken,
 		InstallationId: installationID,
 		Version:        1,
@@ -130,20 +130,20 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 
-	// Setup mock
-	s.Require().NoError(s.persistence.SavePushNotificationOptions(&key.PublicKey, &protobuf.PushNotificationOptions{
+	// Setup persistence
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(&key.PublicKey, &protobuf.PushNotificationRegistration{
 		AccessToken:    accessToken,
 		InstallationId: installationID,
 		Version:        2}))
 
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrInvalidPushNotificationOptionsVersion, err)
+	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
 
-	// Cleanup mock
-	s.Require().NoError(s.persistence.DeletePushNotificationOptions(&key.PublicKey, installationID))
+	// Cleanup persistence
+	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(&key.PublicKey, installationID))
 
 	// Unregistering message
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		InstallationId: installationID,
 		Unregister:     true,
 		Version:        1,
@@ -156,7 +156,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	s.Require().Nil(err)
 
 	// Missing access token
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		InstallationId: installationID,
 		Version:        1,
 	})
@@ -165,10 +165,10 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrMalformedPushNotificationOptionsAccessToken, err)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationAccessToken, err)
 
 	// Invalid access token
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    "bc",
 		InstallationId: installationID,
 		Version:        1,
@@ -178,10 +178,10 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrMalformedPushNotificationOptionsAccessToken, err)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationAccessToken, err)
 
 	// Missing device token
-	payload, err = proto.Marshal(&protobuf.PushNotificationOptions{
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    accessToken,
 		InstallationId: installationID,
 		Version:        1,
@@ -191,5 +191,241 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
-	s.Require().Equal(ErrMalformedPushNotificationOptionsDeviceToken, err)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationDeviceToken, err)
+
+	// Successful
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		Token:          "abc",
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	_, err = server.ValidateRegistration(&key.PublicKey, cyphertext)
+	s.Require().NoError(err)
+}
+
+func (s *ServerSuite) TestPushNotificationHandleRegistration() {
+	accessToken := "b6ae4fde-bb65-11ea-b3de-0242ac130004"
+	installationID := "c6ae4fde-bb65-11ea-b3de-0242ac130004"
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	config := &Config{
+		Identity: identity,
+	}
+
+	server := New(config, s.persistence)
+
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	sharedKey, err := server.generateSharedKey(&key.PublicKey)
+	s.Require().NoError(err)
+
+	// Empty payload
+	response := server.HandlePushNotificationRegistration(&key.PublicKey, nil)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Empty key
+	response = server.HandlePushNotificationRegistration(nil, []byte("payload"))
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Invalid cyphertext length
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, []byte("too short"))
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Invalid cyphertext length
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, []byte("too short"))
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Invalid ciphertext
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, []byte("not too short but invalid"))
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Different key ciphertext
+	cyphertext, err := encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Right cyphertext but non unmarshable payload
+	cyphertext, err = encrypt([]byte("plaintext"), sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Missing installationID
+	payload, err := proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken: accessToken,
+		Version:     1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Malformed installationID
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    accessToken,
+		InstallationId: "abc",
+		Version:        1,
+	})
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Version set to 0
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH)
+
+	// Version lower than previous one
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+
+	// Setup persistence
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(&key.PublicKey, &protobuf.PushNotificationRegistration{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        2}))
+
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH)
+
+	// Cleanup persistence
+	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(&key.PublicKey, installationID))
+
+	// Missing access token
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		InstallationId: installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Invalid access token
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    "bc",
+		InstallationId: installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Missing device token
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().False(response.Success)
+	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
+
+	// Successful
+	registration := &protobuf.PushNotificationRegistration{
+		Token:          "abc",
+		AccessToken:    accessToken,
+		InstallationId: installationID,
+		Version:        1,
+	}
+	payload, err = proto.Marshal(registration)
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().True(response.Success)
+
+	// Pull from the db
+	retrievedRegistration, err := s.persistence.GetPushNotificationRegistration(&key.PublicKey, installationID)
+	s.Require().NoError(err)
+	s.Require().NotNil(retrievedRegistration)
+	s.Require().True(proto.Equal(retrievedRegistration, registration))
+
+	// Unregistering message
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		Token:          "token",
+		InstallationId: installationID,
+		Unregister:     true,
+		Version:        2,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = encrypt(payload, sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response = server.HandlePushNotificationRegistration(&key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().True(response.Success)
+
+	// Check is gone from the db
+	retrievedRegistration, err = s.persistence.GetPushNotificationRegistration(&key.PublicKey, installationID)
+	s.Require().NoError(err)
+	s.Require().NotNil(retrievedRegistration)
+	s.Require().Empty(retrievedRegistration.AccessToken)
+	s.Require().Empty(retrievedRegistration.Token)
+	s.Require().Equal(uint64(2), retrievedRegistration.Version)
+	s.Require().Equal(installationID, retrievedRegistration.InstallationId)
+	s.Require().Equal(shake256(cyphertext), response.RequestId)
 }

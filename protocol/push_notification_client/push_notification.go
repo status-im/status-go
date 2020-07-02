@@ -126,14 +126,14 @@ func (p *Client) allowedUserList(token []byte) ([][]byte, error) {
 	return encryptedTokens, nil
 }
 
-func (p *Client) buildPushNotificationOptionsMessage() (*protobuf.PushNotificationOptions, error) {
+func (p *Client) buildPushNotificationRegistrationMessage() (*protobuf.PushNotificationRegistration, error) {
 	token := uuid.New().String()
 	allowedUserList, err := p.allowedUserList([]byte(token))
 	if err != nil {
 		return nil, err
 	}
 
-	options := &protobuf.PushNotificationOptions{
+	options := &protobuf.PushNotificationRegistration{
 		AccessToken:     token,
 		Version:         p.lastPushNotificationVersion + 1,
 		InstallationId:  p.config.InstallationID,

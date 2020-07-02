@@ -67,7 +67,7 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 	// Set reader
 	client.reader = bytes.NewReader([]byte(expectedUUID))
 
-	options := &protobuf.PushNotificationOptions{
+	options := &protobuf.PushNotificationRegistration{
 		Version:         1,
 		AccessToken:     expectedUUID,
 		Token:           myDeviceToken,
@@ -77,7 +77,7 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 		AllowedUserList: [][]byte{encryptedToken},
 	}
 
-	actualMessage, err := client.buildPushNotificationOptionsMessage()
+	actualMessage, err := client.buildPushNotificationRegistrationMessage()
 	require.NoError(t, err)
 
 	require.Equal(t, options, actualMessage)
