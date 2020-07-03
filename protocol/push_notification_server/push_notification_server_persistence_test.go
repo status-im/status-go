@@ -49,9 +49,9 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieve() {
 		Version:        5,
 	}
 
-	s.Require().NoError(s.persistence.SavePushNotificationRegistration(&key.PublicKey, registration))
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(hashPublicKey(&key.PublicKey), registration))
 
-	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(&key.PublicKey, installationID)
+	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(&key.PublicKey), installationID)
 	s.Require().NoError(err)
 
 	s.Require().True(proto.Equal(registration, retrievedRegistration))

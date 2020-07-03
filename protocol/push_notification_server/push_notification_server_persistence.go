@@ -1,26 +1,24 @@
 package push_notification_server
 
 import (
-	"crypto/ecdsa"
 	"database/sql"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type Persistence interface {
 	// GetPushNotificationRegistrationByPublicKeyAndInstallationID retrieve a push notification registration from storage given a public key and installation id
-	GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationRegistration, error)
+	GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey []byte, installationID string) (*protobuf.PushNotificationRegistration, error)
 	// GetPushNotificationRegistrationByPublicKey retrieve all the push notification registrations from storage given a public key
 	GetPushNotificationRegistrationByPublicKeys(publicKeys [][]byte) ([]*PushNotificationIDAndRegistration, error)
 
 	// DeletePushNotificationRegistration deletes a push notification registration from storage given a public key and installation id
-	DeletePushNotificationRegistration(publicKey *ecdsa.PublicKey, installationID string) error
+	DeletePushNotificationRegistration(publicKey []byte, installationID string) error
 	// SavePushNotificationRegistration saves a push notification option to the db
-	SavePushNotificationRegistration(publicKey *ecdsa.PublicKey, registration *protobuf.PushNotificationRegistration) error
+	SavePushNotificationRegistration(publicKey []byte, registration *protobuf.PushNotificationRegistration) error
 }
 
 type SQLitePersistence struct {
@@ -31,9 +29,9 @@ func NewSQLitePersistence(db *sql.DB) Persistence {
 	return &SQLitePersistence{db: db}
 }
 
-func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey *ecdsa.PublicKey, installationID string) (*protobuf.PushNotificationRegistration, error) {
+func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey []byte, installationID string) (*protobuf.PushNotificationRegistration, error) {
 	var marshaledRegistration []byte
-	err := p.db.QueryRow(`SELECT registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, hashPublicKey(publicKey), installationID).Scan(&marshaledRegistration)
+	err := p.db.QueryRow(`SELECT registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID).Scan(&marshaledRegistration)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -90,21 +88,17 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 	return registrations, nil
 }
 
-func (p *SQLitePersistence) SavePushNotificationRegistration(publicKey *ecdsa.PublicKey, registration *protobuf.PushNotificationRegistration) error {
+func (p *SQLitePersistence) SavePushNotificationRegistration(publicKey []byte, registration *protobuf.PushNotificationRegistration) error {
 	marshaledRegistration, err := proto.Marshal(registration)
 	if err != nil {
 		return err
 	}
 
-	_, err = p.db.Exec(`INSERT INTO push_notification_server_registrations (public_key, installation_id, version, registration) VALUES (?, ?, ?, ?)`, hashPublicKey(publicKey), registration.InstallationId, registration.Version, marshaledRegistration)
+	_, err = p.db.Exec(`INSERT INTO push_notification_server_registrations (public_key, installation_id, version, registration) VALUES (?, ?, ?, ?)`, publicKey, registration.InstallationId, registration.Version, marshaledRegistration)
 	return err
 }
 
-func (p *SQLitePersistence) DeletePushNotificationRegistration(publicKey *ecdsa.PublicKey, installationID string) error {
-	_, err := p.db.Exec(`DELETE FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, hashPublicKey(publicKey), installationID)
+func (p *SQLitePersistence) DeletePushNotificationRegistration(publicKey []byte, installationID string) error {
+	_, err := p.db.Exec(`DELETE FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID)
 	return err
-}
-
-func hashPublicKey(pk *ecdsa.PublicKey) []byte {
-	return shake256(crypto.CompressPubkey(pk))
 }

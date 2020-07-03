@@ -62,15 +62,31 @@ message PushNotificationQueryResponse {
 message PushNotification {
   string access_token = 1;
   string chat_id = 2;
+  bytes public_key = 3;
+  string installation_id = 4;
+  bytes message = 5;
 }
 
 message PushNotificationRequest {
   repeated PushNotification requests = 1;
-  bytes message = 2;
-  string message_id = 3;
-  string ack_required = 4;
+  string message_id = 2;
+  string ack_required = 3;
 }
 
-message PushNotificationAcknowledgement {
-  string id = 1;
+message PushNotificationReport {
+  bool success = 1;
+  ErrorType error = 2;
+  enum ErrorType {
+    UNKNOWN_ERROR_TYPE = 0;
+    WRONG_TOKEN = 1;
+    INTERNAL_ERROR = 2;
+    NOT_REGISTERED = 3;
+  }
+  bytes public_key = 3;
+  string installation_id = 4;
+}
+
+message PushNotificationResponse {
+  string message_id = 1;
+  repeated PushNotificationReport reports = 2;
 }

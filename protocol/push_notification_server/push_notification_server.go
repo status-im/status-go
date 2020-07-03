@@ -1,13 +1,8 @@
 package push_notification_server
 
 import (
-	"errors"
-	"io"
-
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ecdsa"
-	"golang.org/x/crypto/sha3"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
@@ -90,7 +85,7 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousRegistration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey, registration.InstallationId)
+	previousRegistration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(publicKey), registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
@@ -151,6 +146,58 @@ func (p *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 	return response
 }
 
+func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
+	response := &protobuf.PushNotificationResponse{}
+	// We don't even send a response in this case
+	if request == nil || len(request.MessageId) == 0 {
+		return nil
+	}
+
+	response.MessageId = request.MessageId
+
+	// Collect successful requests & registrations
+	var requestAndRegistrations []*RequestAndRegistration
+
+	for _, pn := range request.Requests {
+		registration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(pn.PublicKey, pn.InstallationId)
+		report := &protobuf.PushNotificationReport{
+			PublicKey:      pn.PublicKey,
+			InstallationId: pn.InstallationId,
+		}
+
+		if err != nil {
+			// TODO: log error
+			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
+		} else if registration == nil {
+			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
+		} else if registration.AccessToken != pn.AccessToken {
+			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
+		} else {
+			// For now we just assume that the notification will be successful
+			requestAndRegistrations = append(requestAndRegistrations, &RequestAndRegistration{
+				Request:      pn,
+				Registration: registration,
+			})
+			report.Success = true
+		}
+
+		response.Reports = append(response.Reports, report)
+	}
+
+	if len(requestAndRegistrations) == 0 {
+		return response
+	}
+
+	// This can be done asynchronously
+	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
+	err := sendGoRushNotification(goRushRequest, p.config.GorushURL)
+	if err != nil {
+		// TODO: handle this error?
+	}
+
+	return response
+}
+
 func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
 	response := &protobuf.PushNotificationRegistrationResponse{
 		RequestId: shake256(payload),
@@ -175,12 +222,12 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 			Version:        registration.Version,
 			InstallationId: registration.InstallationId,
 		}
-		if err := p.persistence.SavePushNotificationRegistration(publicKey, emptyRegistration); err != nil {
+		if err := p.persistence.SavePushNotificationRegistration(hashPublicKey(publicKey), emptyRegistration); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
 			return response
 		}
 
-	} else if err := p.persistence.SavePushNotificationRegistration(publicKey, registration); err != nil {
+	} else if err := p.persistence.SavePushNotificationRegistration(hashPublicKey(publicKey), registration); err != nil {
 		response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
 		return response
 	}
@@ -188,48 +235,4 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 	response.Success = true
 
 	return response
-}
-
-func decrypt(cyphertext []byte, key []byte) ([]byte, error) {
-	if len(cyphertext) < nonceLength {
-		return nil, ErrInvalidCiphertextLength
-	}
-
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
-	gcm, err := cipher.NewGCM(c)
-	if err != nil {
-		return nil, err
-	}
-
-	nonce := cyphertext[:nonceLength]
-	return gcm.Open(nil, nonce, cyphertext[nonceLength:], nil)
-}
-
-func encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
-	gcm, err := cipher.NewGCM(c)
-	if err != nil {
-		return nil, err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err = io.ReadFull(reader, nonce); err != nil {
-		return nil, err
-	}
-
-	return gcm.Seal(nonce, nonce, plaintext, nil), nil
-}
-
-func shake256(buf []byte) []byte {
-	h := make([]byte, 64)
-	sha3.ShakeSum256(h, buf)
-	return h
 }

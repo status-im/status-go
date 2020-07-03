@@ -149,7 +149,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	s.Require().NoError(err)
 
 	// Setup persistence
-	s.Require().NoError(s.persistence.SavePushNotificationRegistration(&s.key.PublicKey, &protobuf.PushNotificationRegistration{
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
@@ -159,7 +159,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
 
 	// Cleanup persistence
-	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(&s.key.PublicKey, s.installationID))
+	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), s.installationID))
 
 	// Unregistering message
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
@@ -346,7 +346,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().NoError(err)
 
 	// Setup persistence
-	s.Require().NoError(s.persistence.SavePushNotificationRegistration(&s.key.PublicKey, &protobuf.PushNotificationRegistration{
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		InstallationId: s.installationID,
 		Version:        2}))
@@ -357,7 +357,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH)
 
 	// Cleanup persistence
-	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(&s.key.PublicKey, s.installationID))
+	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), s.installationID))
 
 	// Missing access token
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
@@ -421,7 +421,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().True(response.Success)
 
 	// Pull from the db
-	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(&s.key.PublicKey, s.installationID)
+	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedRegistration)
 	s.Require().True(proto.Equal(retrievedRegistration, registration))
@@ -442,7 +442,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().True(response.Success)
 
 	// Check is gone from the db
-	retrievedRegistration, err = s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(&s.key.PublicKey, s.installationID)
+	retrievedRegistration, err = s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedRegistration)
 	s.Require().Empty(retrievedRegistration.AccessToken)
