@@ -164,8 +164,8 @@ func (p *Client) HandlePushNotificationQueryResponse(response *protobuf.PushNoti
 	return nil
 }
 
-// HandlePushNotificationAcknowledgement should set the request as processed
-func (p *Client) HandlePushNotificationAcknowledgement(ack *protobuf.PushNotificationAcknowledgement) error {
+// HandlePushNotificationResponse should set the request as processed
+func (p *Client) HandlePushNotificationResponse(ack *protobuf.PushNotificationResponse) error {
 	return nil
 }
 

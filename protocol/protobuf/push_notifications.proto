@@ -86,6 +86,7 @@ message PushNotificationReport {
   string installation_id = 4;
 }
 
+// TOP LEVEL
 message PushNotificationResponse {
   string message_id = 1;
   repeated PushNotificationReport reports = 2;

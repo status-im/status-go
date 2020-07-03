@@ -319,6 +319,82 @@ func (m *StatusMessage) HandleApplication() error {
 
 			return nil
 		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
+		// This message is a bit different as it's encrypted, so we pass it straight through
+
+		m.ParsedMessage = m.DecryptedPayload
+
+		return nil
+
+	case protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT:
+		var message protobuf.ContactCodeAdvertisement
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode ContactCodeAdvertisement: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST:
+		var message protobuf.PushNotificationRequest
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationRequest: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE:
+		var message protobuf.PushNotificationRegistrationResponse
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationRegistrationResponse: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY:
+		var message protobuf.PushNotificationQuery
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationQuery: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE:
+		var message protobuf.PushNotificationQueryResponse
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationQueryResponse: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE:
+		var message protobuf.PushNotificationResponse
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationResponse: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+
 	}
 	return nil
 }

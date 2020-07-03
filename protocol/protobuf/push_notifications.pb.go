@@ -703,6 +703,7 @@ func (m *PushNotificationReport) GetInstallationId() string {
 	return ""
 }
 
+// TOP LEVEL
 type PushNotificationResponse struct {
 	MessageId            string                    `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	Reports              []*PushNotificationReport `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
