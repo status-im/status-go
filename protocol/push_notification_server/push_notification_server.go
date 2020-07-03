@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"go.uber.org/zap"
 )
 
 const encryptedPayloadKeyLength = 16
@@ -19,6 +20,8 @@ type Config struct {
 	Identity *ecdsa.PrivateKey
 	// GorushUrl is the url for the gorush service
 	GorushURL string
+
+	Logger *zap.Logger
 }
 
 type Server struct {

@@ -33,6 +33,7 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/push_notification_server"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
@@ -144,7 +145,7 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
 		Logger:                logger,
 	}
-	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, logger)
+	options := buildMessengerOptions(s.config, identity, db, envelopesMonitorConfig, logger)
 
 	messenger, err := protocol.NewMessenger(
 		identity,
@@ -439,6 +440,7 @@ func onNegotiatedFilters(filters []*transport.Filter) {
 
 func buildMessengerOptions(
 	config params.ShhextConfig,
+	identity *ecdsa.PrivateKey,
 	db *sql.DB,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	logger *zap.Logger,
@@ -452,6 +454,16 @@ func buildMessengerOptions(
 
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
+	}
+
+	// For now build with default/hardcoded options.
+	if config.PushNotificationServerEnabled {
+		config := &push_notification_server.Config{
+			Identity:  identity,
+			Logger:    logger,
+			GorushURL: "https://gorush.status.im",
+		}
+		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}
 
 	if config.VerifyTransactionURL != "" {

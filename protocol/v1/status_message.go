@@ -37,6 +37,9 @@ type StatusMessage struct {
 	// Hash is the transport layer hash
 	Hash []byte `json:"-"`
 
+	// Dst is the targeted public key
+	Dst *ecdsa.PublicKey
+
 	// TransportLayerSigPubKey contains the public key provided by the transport layer
 	TransportLayerSigPubKey *ecdsa.PublicKey `json:"-"`
 	// ApplicationMetadataLayerPubKey contains the public key provided by the application metadata layer
@@ -86,6 +89,14 @@ func (m *StatusMessage) HandleTransport(shhMessage *types.Message) error {
 	m.Hash = shhMessage.Hash
 	m.TransportLayerSigPubKey = publicKey
 	m.TransportPayload = shhMessage.Payload
+
+	if shhMessage.Dst != nil {
+		publicKey, err := crypto.UnmarshalPubkey(shhMessage.Dst)
+		if err != nil {
+			return err
+		}
+		m.Dst = publicKey
+	}
 
 	return nil
 }
