@@ -56,7 +56,7 @@ func (s *ServerSuite) SetupTest() {
 		Identity: identity,
 	}
 
-	s.server = New(config, s.persistence)
+	s.server = New(config, s.persistence, nil)
 
 	sharedKey, err := s.server.generateSharedKey(&s.key.PublicKey)
 	s.Require().NoError(err)

@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"io"
 
 	"golang.org/x/crypto/sha3"
@@ -12,7 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
-	"github.com/status-im/status-go/protocol/encryption"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -46,6 +47,7 @@ type Config struct {
 
 type Client struct {
 	persistence *Persistence
+	quit        chan struct{}
 	config      *Config
 
 	// lastPushNotificationVersion is the latest known push notification version
@@ -58,10 +60,44 @@ type Client struct {
 
 	// randomReader only used for testing so we have deterministic encryption
 	reader io.Reader
+
+	//messageProcessor is a message processor used to send and being notified of messages
+
+	messageProcessor *common.MessageProcessor
 }
 
-func New(persistence *Persistence) *Client {
-	return &Client{persistence: persistence, reader: rand.Reader}
+func New(persistence *Persistence, processor *common.MessageProcessor) *Client {
+	return &Client{
+		quit:             make(chan struct{}),
+		messageProcessor: processor,
+		persistence:      persistence,
+		reader:           rand.Reader}
+}
+
+func (c *Client) Start() error {
+	if c.messageProcessor == nil {
+		return errors.New("can't start, missing message processor")
+	}
+
+	go func() {
+		subscription := c.messageProcessor.Subscribe()
+		for {
+			select {
+			case m := <-subscription:
+				if err := c.HandleMessageSent(m); err != nil {
+					// TODO: log
+				}
+			case <-c.quit:
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+func (c *Client) Stop() error {
+	close(c.quit)
+	return nil
 }
 
 // This likely will return a channel as it's an asynchrous operation
@@ -78,7 +114,7 @@ func sendPushNotificationTo(publicKey *ecdsa.PublicKey, chatID string) error {
 // 1) Check we have reasonably fresh push notifications info
 // 2) Otherwise it should fetch them
 // 3) Send a push notification to the devices in question
-func (p *Client) HandleMessageSent(publicKey *ecdsa.PublicKey, spec *encryption.ProtocolMessageSpec, messageIDs [][]byte) error {
+func (p *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 	return nil
 }
 

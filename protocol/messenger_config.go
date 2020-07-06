@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"database/sql"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/push_notification_server"
@@ -23,7 +24,7 @@ type config struct {
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 
 	messagesPersistenceEnabled bool
-	featureFlags               featureFlags
+	featureFlags               common.FeatureFlags
 
 	// A path to a database or a database instance is required.
 	// The database instance has a higher priority.
@@ -99,7 +100,7 @@ func WithPushNotificationServerConfig(pushNotificationServerConfig *push_notific
 
 func WithDatasync() func(c *config) error {
 	return func(c *config) error {
-		c.featureFlags.datasync = true
+		c.featureFlags.Datasync = true
 		return nil
 	}
 }

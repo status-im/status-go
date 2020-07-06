@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"github.com/status-im/status-go/protocol/common"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -56,13 +57,13 @@ type Messenger struct {
 	persistence                *sqlitePersistence
 	transport                  transport.Transport
 	encryptor                  *encryption.Protocol
-	processor                  *messageProcessor
+	processor                  *common.MessageProcessor
 	handler                    *MessageHandler
 	pushNotificationClient     *push_notification_client.Client
 	pushNotificationServer     *push_notification_server.Server
 	logger                     *zap.Logger
 	verifyTransactionClient    EthClient
-	featureFlags               featureFlags
+	featureFlags               common.FeatureFlags
 	messagesPersistenceEnabled bool
 	shutdownTasks              []func() error
 	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
@@ -89,13 +90,6 @@ type MessengerResponse struct {
 
 func (m *MessengerResponse) IsEmpty() bool {
 	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0
-}
-
-type featureFlags struct {
-	// datasync indicates whether direct messages should be sent exclusively
-	// using datasync, breaking change for non-v1 clients. Public messages
-	// are not impacted
-	datasync bool
 }
 
 type dbConfig struct {
@@ -155,7 +149,7 @@ func NewMessenger(
 			slogger := logger.With(zap.String("site", "onSendContactCodeHandler"))
 			slogger.Debug("received a SendContactCode request")
 
-			newMessage, err := messageSpecToWhisper(messageSpec)
+			newMessage, err := common.MessageSpecToWhisper(messageSpec)
 			if err != nil {
 				slogger.Warn("failed to convert spec to Whisper message", zap.Error(err))
 				return
@@ -238,27 +232,26 @@ func NewMessenger(
 		logger,
 	)
 
-	pushNotificationClientPersistence := push_notification_client.NewPersistence(database)
-	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence)
-
-	var pushNotificationServer *push_notification_server.Server
-	if c.pushNotificationServerConfig != nil {
-		pushNotificationServerPersistence := push_notification_server.NewSQLitePersistence(database)
-		pushNotificationServer = push_notification_server.New(c.pushNotificationServerConfig, pushNotificationServerPersistence)
-	}
-
-	processor, err := newMessageProcessor(
+	processor, err := common.NewMessageProcessor(
 		identity,
 		database,
 		encryptionProtocol,
 		transp,
 		logger,
 		c.featureFlags,
-		pushNotificationClient.HandleMessageSent,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create messageProcessor")
 	}
+
+	var pushNotificationServer *push_notification_server.Server
+	if c.pushNotificationServerConfig != nil {
+		pushNotificationServerPersistence := push_notification_server.NewSQLitePersistence(database)
+		pushNotificationServer = push_notification_server.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, processor)
+	}
+
+	pushNotificationClientPersistence := push_notification_client.NewPersistence(database)
+	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence, processor)
 
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})
 
@@ -596,7 +589,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	}
 	m.allChats[chat.ID] = &chat
 
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -662,7 +655,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -725,7 +718,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -790,7 +783,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -856,7 +849,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -924,7 +917,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -992,7 +985,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 	if err != nil {
 		return nil, err
 	}
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
@@ -1178,7 +1171,7 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 		return errors.New("chat not found")
 	}
 
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     message.Payload,
 		MessageType: message.MessageType,
@@ -1198,7 +1191,7 @@ func (m *Messenger) hasPairedDevices() bool {
 }
 
 // sendToPairedDevices will check if we have any paired devices and send to them if necessary
-func (m *Messenger) sendToPairedDevices(ctx context.Context, spec *RawMessage) error {
+func (m *Messenger) sendToPairedDevices(ctx context.Context, spec *common.RawMessage) error {
 	hasPairedDevices := m.hasPairedDevices()
 	// We send a message to any paired device
 	if hasPairedDevices {
@@ -1210,7 +1203,7 @@ func (m *Messenger) sendToPairedDevices(ctx context.Context, spec *RawMessage) e
 	return nil
 }
 
-func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec *RawMessage) ([]byte, error) {
+func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec *common.RawMessage) ([]byte, error) {
 	var err error
 	var id []byte
 
@@ -1229,7 +1222,7 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec *R
 	return id, nil
 }
 
-func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]byte, error) {
+func (m *Messenger) dispatchMessage(ctx context.Context, spec *common.RawMessage) ([]byte, error) {
 	var err error
 	var id []byte
 	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", spec.LocalChatID))
@@ -1244,7 +1237,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 		if err != nil {
 			return nil, err
 		}
-		if !isPubKeyEqual(publicKey, &m.identity.PublicKey) {
+		if !common.IsPubKeyEqual(publicKey, &m.identity.PublicKey) {
 			id, err = m.processor.SendPrivate(ctx, publicKey, spec)
 
 			if err != nil {
@@ -1279,7 +1272,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec *RawMessage) ([]by
 			// Filter out my key from the recipients
 			n := 0
 			for _, recipient := range spec.Recipients {
-				if !isPubKeyEqual(recipient, &m.identity.PublicKey) {
+				if !common.IsPubKeyEqual(recipient, &m.identity.PublicKey) {
 					spec.Recipients[n] = recipient
 					n++
 				}
@@ -1379,7 +1372,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, errors.New("chat type not supported")
 	}
 
-	id, err := m.dispatchMessage(ctx, &RawMessage{
+	id, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID: chat.ID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
@@ -1494,7 +1487,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
@@ -1588,7 +1581,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 		return nil, err
 	}
 
-	_, err = m.dispatchPairInstallationMessage(ctx, &RawMessage{
+	_, err = m.dispatchPairInstallationMessage(ctx, &common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION,
@@ -1635,7 +1628,7 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT,
@@ -1678,7 +1671,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 		return err
 	}
 
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT,
@@ -1758,7 +1751,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	for _, messages := range chatWithMessages {
 		for _, shhMessage := range messages {
 			// TODO: fix this to use an exported method.
-			statusMessages, err := m.processor.handleMessages(shhMessage, true)
+			statusMessages, err := m.processor.HandleMessages(shhMessage, true)
 			if err != nil {
 				logger.Info("failed to decode messages", zap.Error(err))
 				continue
@@ -1827,7 +1820,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.PairInstallation:
-						if !isPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
@@ -1840,7 +1833,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.SyncInstallationContact:
-						if !isPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
@@ -1853,7 +1846,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.SyncInstallationPublicChat:
-						if !isPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
+						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
@@ -1926,6 +1919,43 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
 							continue
 						}
+					case protobuf.PushNotificationRegistration:
+						logger.Debug("Received PushNotificationRegistration")
+						if m.pushNotificationServer == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationRegistration")
+						// TODO: Compare DST with Identity
+						if err := m.pushNotificationServer.HandlePushNotificationRegistration2(publicKey, msg.ParsedMessage.([]byte)); err != nil {
+							logger.Warn("failed to handle PushNotificationRegistration", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+					case protobuf.PushNotificationQuery:
+						logger.Debug("Received PushNotificationQuery")
+						if m.pushNotificationServer == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationQuery")
+						// TODO: Compare DST with Identity
+						if err := m.pushNotificationServer.HandlePushNotificationQuery2(publicKey, msg.ParsedMessage.(protobuf.PushNotificationQuery)); err != nil {
+							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+					case protobuf.PushNotificationRequest:
+						logger.Debug("Received PushNotificationRequest")
+						if m.pushNotificationServer == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationRequest")
+						// TODO: Compare DST with Identity
+						if err := m.pushNotificationServer.HandlePushNotificationRequest2(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRequest)); err != nil {
+							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+
 					default:
 						logger.Debug("message not handled")
 
@@ -2244,7 +2274,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	if err != nil {
 		return nil, err
 	}
-	id, err := m.dispatchMessage(ctx, &RawMessage{
+	id, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION,
@@ -2320,7 +2350,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	if err != nil {
 		return nil, err
 	}
-	id, err := m.dispatchMessage(ctx, &RawMessage{
+	id, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -2422,7 +2452,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, &RawMessage{
+	newMessageID, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -2505,7 +2535,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, &RawMessage{
+	newMessageID, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION,
@@ -2587,7 +2617,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, &RawMessage{
+	newMessageID, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -2684,7 +2714,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, &RawMessage{
+	newMessageID, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
@@ -2761,7 +2791,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, &RawMessage{
+	newMessageID, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,

@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 
 	"github.com/pkg/errors"
+	"github.com/status-im/status-go/protocol/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 )
@@ -377,7 +378,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SaveRawMessage(message *RawMessage) error {
+func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 	var pubKeys [][]byte
 	for _, pk := range message.Recipients {
 		pubKeys = append(pubKeys, crypto.CompressPubkey(pk))
@@ -417,10 +418,10 @@ func (db sqlitePersistence) SaveRawMessage(message *RawMessage) error {
 	return err
 }
 
-func (db sqlitePersistence) RawMessageByID(id string) (*RawMessage, error) {
+func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
-	message := &RawMessage{}
+	message := &common.RawMessage{}
 
 	err := db.db.QueryRow(`
 			SELECT

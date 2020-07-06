@@ -1,4 +1,4 @@
-package protocol
+package common
 
 import (
 	"context"
@@ -34,30 +34,33 @@ const (
 	whisperPoWTime   = 5
 )
 
-type messageProcessor struct {
+// SentMessage reprent a message that has been passed to the transport layer
+type SentMessage struct {
+	PublicKey  *ecdsa.PublicKey
+	Spec       *encryption.ProtocolMessageSpec
+	MessageIDs [][]byte
+}
+
+type MessageProcessor struct {
 	identity  *ecdsa.PrivateKey
 	datasync  *datasync.DataSync
 	protocol  *encryption.Protocol
 	transport transport.Transport
 	logger    *zap.Logger
 
-	featureFlags featureFlags
-	// onMessageSpecSent is a callback that is to be called when
-	// a message spec is sent.
-	// The reason is a callback is that datasync dispatches things asynchronously
-	// through a callback, and therefore return values can't be used
-	onMessageSpecSent func(*ecdsa.PublicKey, *encryption.ProtocolMessageSpec, [][]byte) error
+	subscriptions []chan<- *SentMessage
+
+	featureFlags FeatureFlags
 }
 
-func newMessageProcessor(
+func NewMessageProcessor(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
 	enc *encryption.Protocol,
 	transport transport.Transport,
 	logger *zap.Logger,
-	features featureFlags,
-	onMessageSpecSent func(*ecdsa.PublicKey, *encryption.ProtocolMessageSpec, [][]byte) error,
-) (*messageProcessor, error) {
+	features FeatureFlags,
+) (*MessageProcessor, error) {
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
 		database,
@@ -70,9 +73,9 @@ func newMessageProcessor(
 	if err != nil {
 		return nil, err
 	}
-	ds := datasync.New(dataSyncNode, dataSyncTransport, features.datasync, logger)
+	ds := datasync.New(dataSyncNode, dataSyncTransport, features.Datasync, logger)
 
-	p := &messageProcessor{
+	p := &MessageProcessor{
 		identity:     identity,
 		datasync:     ds,
 		protocol:     enc,
@@ -85,7 +88,7 @@ func newMessageProcessor(
 	// With DataSync enabled, messages are added to the DataSync
 	// but actual encrypt and send calls are postponed.
 	// sendDataSync is responsible for encrypting and sending postponed messages.
-	if features.datasync {
+	if features.Datasync {
 		ds.Init(p.sendDataSync)
 		ds.Start(300 * time.Millisecond)
 	}
@@ -93,12 +96,15 @@ func newMessageProcessor(
 	return p, nil
 }
 
-func (p *messageProcessor) Stop() {
+func (p *MessageProcessor) Stop() {
+	for _, c := range p.subscriptions {
+		close(c)
+	}
 	p.datasync.Stop() // idempotent op
 }
 
 // SendPrivate takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPrivate(
+func (p *MessageProcessor) SendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
@@ -113,7 +119,7 @@ func (p *messageProcessor) SendPrivate(
 
 // SendGroupRaw takes encoded data, encrypts it and sends through the wire,
 // always return the messageID
-func (p *messageProcessor) SendGroup(
+func (p *MessageProcessor) SendGroup(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
 	rawMessage *RawMessage,
@@ -140,7 +146,7 @@ func (p *messageProcessor) SendGroup(
 }
 
 // sendPrivate sends data to the recipient identifying with a given public key.
-func (p *messageProcessor) sendPrivate(
+func (p *MessageProcessor) sendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
@@ -154,7 +160,7 @@ func (p *messageProcessor) sendPrivate(
 
 	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
 
-	if p.featureFlags.datasync {
+	if p.featureFlags.Datasync {
 		if err := p.addToDataSync(recipient, wrappedMessage); err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
@@ -180,7 +186,7 @@ func (p *messageProcessor) sendPrivate(
 }
 
 // sendPairInstallation sends data to the recipients, using DH
-func (p *messageProcessor) SendPairInstallation(
+func (p *MessageProcessor) SendPairInstallation(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
@@ -212,7 +218,7 @@ func (p *messageProcessor) SendPairInstallation(
 
 // EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
 // All the events in a group are encoded and added to the payload
-func (p *messageProcessor) EncodeMembershipUpdate(
+func (p *MessageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatMessage *protobuf.ChatMessage,
 ) ([]byte, error) {
@@ -231,7 +237,7 @@ func (p *messageProcessor) EncodeMembershipUpdate(
 }
 
 // SendPublic takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPublic(
+func (p *MessageProcessor) SendPublic(
 	ctx context.Context,
 	chatName string,
 	rawMessage *RawMessage,
@@ -262,12 +268,12 @@ func (p *messageProcessor) SendPublic(
 	return messageID, nil
 }
 
-// handleMessages expects a whisper message as input, and it will go through
+// HandleMessages expects a whisper message as input, and it will go through
 // a series of transformations until the message is parsed into an application
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (p *messageProcessor) handleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
+func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
 	logger := p.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
@@ -305,7 +311,7 @@ func (p *messageProcessor) handleMessages(shhMessage *types.Message, application
 	return statusMessages, nil
 }
 
-func (p *messageProcessor) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
+func (p *MessageProcessor) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
 	logger := p.logger.With(zap.String("site", "handleEncryptionLayer"))
 	publicKey := message.SigPubKey()
 
@@ -322,7 +328,7 @@ func (p *messageProcessor) handleEncryptionLayer(ctx context.Context, message *v
 	return nil
 }
 
-func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+func (p *MessageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
 	now := time.Now().Unix()
 	advertise, err := p.protocol.ShouldAdvertiseBundle(publicKey, now)
 	if err != nil {
@@ -351,7 +357,7 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 	return nil
 }
 
-func (p *messageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
+func (p *MessageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
 	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, p.identity)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
@@ -359,7 +365,7 @@ func (p *messageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error)
 	return wrappedMessage, nil
 }
 
-func (p *messageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
+func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
 	groupID := datasync.ToOneToOneGroupID(&p.identity.PublicKey, publicKey)
 	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
 	exist, err := p.datasync.IsPeerInGroup(groupID, peerID)
@@ -381,7 +387,7 @@ func (p *messageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []b
 
 // sendDataSync sends a message scheduled by the data sync layer.
 // Data Sync layer calls this method "dispatch" function.
-func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte, payload *datasyncproto.Payload) error {
+func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte, payload *datasyncproto.Payload) error {
 	messageIDs := make([][]byte, 0, len(payload.Messages))
 	for _, payload := range payload.Messages {
 		messageIDs = append(messageIDs, v1protocol.MessageID(&p.identity.PublicKey, payload.Body))
@@ -403,8 +409,8 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
-	newMessage, err := messageSpecToWhisper(messageSpec)
+func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+	newMessage, err := MessageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -425,17 +431,31 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 		return nil, nil, err
 	}
 
-	if p.onMessageSpecSent != nil {
+	sentMessage := &SentMessage{
+		PublicKey:  publicKey,
+		Spec:       messageSpec,
+		MessageIDs: messageIDs,
+	}
 
-		if err := p.onMessageSpecSent(publicKey, messageSpec, messageIDs); err != nil {
-			return nil, nil, err
+	// Publish on channels, drop if buffer is full
+	for _, c := range p.subscriptions {
+		select {
+		case c <- sentMessage:
+		default:
+			logger.Warn("subscription channel full, dropping message")
 		}
 	}
 
 	return hash, newMessage, nil
 }
 
-func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
+func (p *MessageProcessor) Subscribe() <-chan *SentMessage {
+	c := make(chan *SentMessage, 100)
+	p.subscriptions = append(p.subscriptions, c)
+	return c
+}
+
+func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
 	var newMessage *types.NewMessage
 
 	payload, err := proto.Marshal(spec.Message)
@@ -463,8 +483,8 @@ func calculatePoW(payload []byte) float64 {
 	return whisperDefaultPoW
 }
 
-// isPubKeyEqual checks that two public keys are equal
-func isPubKeyEqual(a, b *ecdsa.PublicKey) bool {
+// IsPubKeyEqual checks that two public keys are equal
+func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
 	// the curve is always the same, just compare the points
 	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
 }

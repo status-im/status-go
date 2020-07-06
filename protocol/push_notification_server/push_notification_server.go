@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"go.uber.org/zap"
 )
@@ -25,12 +26,13 @@ type Config struct {
 }
 
 type Server struct {
-	persistence Persistence
-	config      *Config
+	persistence      Persistence
+	config           *Config
+	messageProcessor *common.MessageProcessor
 }
 
-func New(config *Config, persistence Persistence) *Server {
-	return &Server{persistence: persistence, config: config}
+func New(config *Config, persistence Persistence, messageProcessor *common.MessageProcessor) *Server {
+	return &Server{persistence: persistence, config: config, messageProcessor: messageProcessor}
 }
 
 func (p *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
@@ -238,4 +240,20 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 	response.Success = true
 
 	return response
+}
+
+func (p *Server) HandlePushNotificationRegistration2(publicKey *ecdsa.PublicKey, payload []byte) error {
+	return nil
+
+}
+
+func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, query protobuf.PushNotificationQuery) error {
+	return nil
+
+}
+
+func (p *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
+	request protobuf.PushNotificationRequest) error {
+	return nil
+
 }

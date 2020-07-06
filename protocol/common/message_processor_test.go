@@ -1,6 +1,7 @@
-package protocol
+package common
 
 import (
+	"github.com/status-im/status-go/protocol"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -35,12 +36,12 @@ type MessageProcessorSuite struct {
 
 	processor   *messageProcessor
 	tmpDir      string
-	testMessage Message
+	testMessage protocol.Message
 	logger      *zap.Logger
 }
 
 func (s *MessageProcessorSuite) SetupTest() {
-	s.testMessage = Message{
+	s.testMessage = protocol.Message{
 		ChatMessage: protobuf.ChatMessage{
 			Text:        "abc123",
 			ChatId:      "testing-adamb",
@@ -81,8 +82,8 @@ func (s *MessageProcessorSuite) SetupTest() {
 	whisperConfig.MinimumAcceptedPOW = 0
 	shh := whisper.New(&whisperConfig)
 	s.Require().NoError(shh.Start(nil))
-	config := &config{}
-	s.Require().NoError(WithDatasync()(config))
+	config := &protocol.config{}
+	s.Require().NoError(protocol.WithDatasync()(config))
 
 	whisperTransport, err := transport.NewTransport(
 		gethbridge.NewGethWhisperWrapper(shh),
@@ -100,7 +101,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 		encryptionProtocol,
 		whisperTransport,
 		s.logger,
-		featureFlags{},
+		protocol.featureFlags{},
 		nil,
 	)
 	s.Require().NoError(err)
