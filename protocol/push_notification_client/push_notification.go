@@ -1,22 +1,25 @@
 package push_notification_client
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"errors"
 	"io"
+	"time"
 
-	"golang.org/x/crypto/sha3"
-
+	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"go.uber.org/zap"
 )
 
+const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
 
 type PushNotificationServer struct {
@@ -46,6 +49,11 @@ type Config struct {
 	PushNotificationServers []*PushNotificationServer
 	// InstallationID is the installation-id for this device
 	InstallationID string
+
+	Logger *zap.Logger
+
+	// TokenType is the type of token
+	TokenType protobuf.PushNotificationRegistration_TokenType
 }
 
 type Client struct {
@@ -67,14 +75,19 @@ type Client struct {
 	//messageProcessor is a message processor used to send and being notified of messages
 
 	messageProcessor *common.MessageProcessor
+	//pushNotificationQueryResponses is a channel that listens to pushNotificationResponse
+
+	pushNotificationQueryResponses chan *protobuf.PushNotificationQueryResponse
 }
 
-func New(persistence *Persistence, processor *common.MessageProcessor) *Client {
+func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
 	return &Client{
-		quit:             make(chan struct{}),
-		messageProcessor: processor,
-		persistence:      persistence,
-		reader:           rand.Reader}
+		quit:                           make(chan struct{}),
+		config:                         config,
+		pushNotificationQueryResponses: make(chan *protobuf.PushNotificationQueryResponse),
+		messageProcessor:               processor,
+		persistence:                    persistence,
+		reader:                         rand.Reader}
 }
 
 func (c *Client) Start() error {
@@ -129,7 +142,7 @@ func (p *Client) mutedChatIDsHashes(chatIDs []string) [][]byte {
 	var mutedChatListHashes [][]byte
 
 	for _, chatID := range chatIDs {
-		mutedChatListHashes = append(mutedChatListHashes, shake256(chatID))
+		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
 	}
 
 	return mutedChatListHashes
@@ -174,6 +187,7 @@ func (p *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 
 	options := &protobuf.PushNotificationRegistration{
 		AccessToken:     token,
+		TokenType:       p.config.TokenType,
 		Version:         p.lastPushNotificationVersion + 1,
 		InstallationId:  p.config.InstallationID,
 		Token:           p.DeviceToken,
@@ -184,15 +198,53 @@ func (p *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 	return options, nil
 }
 
-func (p *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
-	servers, err := p.persistence.GetServers()
+func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.DeviceToken = deviceToken
+	servers, err := c.persistence.GetServers()
 	if err != nil {
 		return err
 	}
+
 	if len(servers) == 0 {
 		return errors.New("no servers to register with")
 	}
-	return nil
+
+	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
+	if err != nil {
+		return err
+	}
+
+	marshaledRegistration, err := proto.Marshal(registration)
+	if err != nil {
+		return err
+	}
+
+	for _, server := range servers {
+
+		encryptedRegistration, err := c.encryptRegistration(server.publicKey, marshaledRegistration)
+		if err != nil {
+			return err
+		}
+		rawMessage := &common.RawMessage{
+			Payload:     encryptedRegistration,
+			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
+		}
+
+		_, err = c.messageProcessor.SendPrivate(context.Background(), server.publicKey, rawMessage)
+
+		// Send message and wait for reply
+
+	}
+	for {
+		select {
+		case <-c.quit:
+			return nil
+		case <-time.After(5 * time.Second):
+			return errors.New("no query response received")
+		case <-c.pushNotificationQueryResponses:
+			return nil
+		}
+	}
 }
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
@@ -206,7 +258,14 @@ func (p *Client) HandlePushNotificationAdvertisement(info *protobuf.PushNotifica
 }
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
-func (p *Client) HandlePushNotificationQueryResponse(response *protobuf.PushNotificationQueryResponse) error {
+func (c *Client) HandlePushNotificationQueryResponse(response *protobuf.PushNotificationQueryResponse) error {
+
+	c.config.Logger.Debug("received push notification query response", zap.Any("response", response))
+	select {
+	case c.pushNotificationQueryResponses <- response:
+	default:
+		return errors.New("could not process push notification query response")
+	}
 	return nil
 }
 
@@ -216,6 +275,7 @@ func (p *Client) HandlePushNotificationResponse(ack *protobuf.PushNotificationRe
 }
 
 func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
+	c.config.Logger.Debug("adding push notification server", zap.Any("public-key", publicKey))
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
 		return err
@@ -270,9 +330,19 @@ func encryptAccessToken(plaintext []byte, key []byte, reader io.Reader) ([]byte,
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
-func shake256(input string) []byte {
-	buf := []byte(input)
-	h := make([]byte, 64)
-	sha3.ShakeSum256(h, buf)
-	return h
+func (c *Client) encryptRegistration(publicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+	sharedKey, err := c.generateSharedKey(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return common.Encrypt(payload, sharedKey, c.reader)
+}
+
+func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
+	return ecies.ImportECDSA(c.config.Identity).GenerateShared(
+		ecies.ImportECDSAPublic(publicKey),
+		encryptedPayloadKeyLength,
+		encryptedPayloadKeyLength,
+	)
 }

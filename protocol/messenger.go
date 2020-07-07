@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 
@@ -252,7 +253,16 @@ func NewMessenger(
 	}
 
 	pushNotificationClientPersistence := push_notification_client.NewPersistence(database)
-	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence, processor)
+	// Hardcoding for now
+	pushNotificationClientConfig := &push_notification_client.Config{
+		Identity:                   identity,
+		TokenType:                  protobuf.PushNotificationRegistration_APN_TOKEN,
+		SendEnabled:                true,
+		Logger:                     logger,
+		RemoteNotificationsEnabled: true,
+		InstallationID:             installationID,
+	}
+	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor)
 
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})
 
@@ -1689,6 +1699,7 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
+	m.logger.Info("RETRIEVING ALL", zap.String("installation-id", m.installationID))
 	chatWithMessages, err := m.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
@@ -1920,18 +1931,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
 							continue
 						}
-					case protobuf.PushNotificationRegistration:
-						logger.Debug("Received PushNotificationRegistration")
-						if m.pushNotificationServer == nil {
-							continue
-						}
-						logger.Debug("Handling PushNotificationRegistration")
-						// TODO: Compare DST with Identity
-						if err := m.pushNotificationServer.HandlePushNotificationRegistration2(publicKey, msg.ParsedMessage.([]byte)); err != nil {
-							logger.Warn("failed to handle PushNotificationRegistration", zap.Error(err))
-						}
-						// We continue in any case, no changes to messenger
-						continue
 					case protobuf.PushNotificationQuery:
 						logger.Debug("Received PushNotificationQuery")
 						if m.pushNotificationServer == nil {
@@ -1958,7 +1957,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 
 					default:
-						logger.Debug("message not handled")
+						// Check if is an encrypted PushNotificationRegistration
+						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {
+							logger.Debug("Received PushNotificationRegistration")
+							if m.pushNotificationServer == nil {
+								continue
+							}
+							logger.Debug("Handling PushNotificationRegistration")
+							// TODO: Compare DST with Identity
+							if err := m.pushNotificationServer.HandlePushNotificationRegistration2(publicKey, msg.ParsedMessage.([]byte)); err != nil {
+								logger.Warn("failed to handle PushNotificationRegistration", zap.Error(err))
+							}
+							// We continue in any case, no changes to messenger
+							continue
+						}
+
+						logger.Debug("message not handled", zap.Any("messageType", reflect.TypeOf(msg.ParsedMessage)))
 
 					}
 				}

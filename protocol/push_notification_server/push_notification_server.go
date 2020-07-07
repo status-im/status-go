@@ -203,14 +203,14 @@ func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 	return response
 }
 
-func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
+func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
+
+	s.config.Logger.Debug("handling push notification registration")
 	response := &protobuf.PushNotificationRegistrationResponse{
 		RequestId: common.Shake256(payload),
 	}
 
-	registration, err := p.ValidateRegistration(publicKey, payload)
-	if registration != nil {
-	}
+	registration, err := s.ValidateRegistration(publicKey, payload)
 
 	if err != nil {
 		if err == ErrInvalidPushNotificationRegistrationVersion {
@@ -218,6 +218,7 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		} else {
 			response.Error = protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE
 		}
+		s.config.Logger.Warn("registration did not validate", zap.Error(err))
 		return response
 	}
 
@@ -227,17 +228,21 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 			Version:        registration.Version,
 			InstallationId: registration.InstallationId,
 		}
-		if err := p.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), emptyRegistration); err != nil {
+		if err := s.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), emptyRegistration); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
+			s.config.Logger.Error("failed to unregister ", zap.Error(err))
 			return response
 		}
 
-	} else if err := p.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), registration); err != nil {
+	} else if err := s.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), registration); err != nil {
 		response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
+		s.config.Logger.Error("failed to save registration", zap.Error(err))
 		return response
 	}
 
 	response.Success = true
+
+	s.config.Logger.Debug("handled push notification registration successfully")
 
 	return response
 }

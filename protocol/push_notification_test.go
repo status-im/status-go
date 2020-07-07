@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
@@ -14,6 +15,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/push_notification_server"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/whisper/v6"
 )
@@ -46,16 +48,10 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecdsa.PrivateKey) *Messenger {
+func (s *MessengerPushNotificationSuite) newMessengerWithOptions(shh types.Whisper, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
 	s.Require().NoError(err)
 
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(tmpFile.Name(), "some-key"),
-		WithDatasync(),
-	}
 	m, err := NewMessenger(
 		privateKey,
 		&testNode{shh: shh},
@@ -72,6 +68,19 @@ func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Whisper, 
 	return m
 }
 
+func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecdsa.PrivateKey) *Messenger {
+	tmpFile, err := ioutil.TempFile("", "")
+	s.Require().NoError(err)
+
+	options := []Option{
+		WithCustomLogger(s.logger),
+		WithMessagesPersistenceEnabled(),
+		WithDatabaseConfig(tmpFile.Name(), "some-key"),
+		WithDatasync(),
+	}
+	return s.newMessengerWithOptions(shh, privateKey, options)
+}
+
 func (s *MessengerPushNotificationSuite) newMessenger(shh types.Whisper) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -79,16 +88,57 @@ func (s *MessengerPushNotificationSuite) newMessenger(shh types.Whisper) *Messen
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
+func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Whisper) *Messenger {
+	privateKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	tmpFile, err := ioutil.TempFile("", "")
+	s.Require().NoError(err)
+
+	serverConfig := &push_notification_server.Config{
+		Logger:   s.logger,
+		Identity: privateKey,
+	}
+
+	options := []Option{
+		WithCustomLogger(s.logger),
+		WithMessagesPersistenceEnabled(),
+		WithDatabaseConfig(tmpFile.Name(), "some-key"),
+		WithPushNotificationServerConfig(serverConfig),
+		WithDatasync(),
+	}
+	return s.newMessengerWithOptions(shh, privateKey, options)
+}
+
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
+	errChan := make(chan error)
+
 	deviceToken := "token"
 
-	server := s.newMessenger(s.shh)
+	server := s.newPushNotificationServer(s.shh)
 	client2 := s.newMessenger(s.shh)
 
 	err := s.m.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	err = s.m.RegisterForPushNotifications(context.Background(), deviceToken)
+	go func() {
+		err := s.m.RegisterForPushNotifications(context.Background(), deviceToken)
+		errChan <- err
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	err = <-errChan
 	s.Require().NoError(err)
 
 	info, err := client2.pushNotificationClient.RetrievePushNotificationInfo(&s.m.identity.PublicKey)
