@@ -11,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -76,24 +77,24 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	// Invalid cyphertext length
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, []byte("too short"))
-	s.Require().Equal(ErrInvalidCiphertextLength, err)
+	s.Require().Equal(common.ErrInvalidCiphertextLength, err)
 
 	// Invalid cyphertext length
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, []byte("too short"))
-	s.Require().Equal(ErrInvalidCiphertextLength, err)
+	s.Require().Equal(common.ErrInvalidCiphertextLength, err)
 
 	// Invalid ciphertext
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, []byte("not too short but invalid"))
-	s.Require().Error(ErrInvalidCiphertextLength, err)
+	s.Require().Error(common.ErrInvalidCiphertextLength, err)
 
 	// Different key ciphertext
-	cyphertext, err := encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
+	cyphertext, err := common.Encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Error(err)
 
 	// Right cyphertext but non unmarshable payload
-	cyphertext, err = encrypt([]byte("plaintext"), s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt([]byte("plaintext"), s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrCouldNotUnmarshalPushNotificationRegistration, err)
@@ -106,7 +107,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationInstallationID, err)
@@ -118,7 +119,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 		InstallationId: "abc",
 		Version:        1,
 	})
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationInstallationID, err)
@@ -131,7 +132,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
@@ -145,11 +146,11 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 
 	// Setup persistence
-	s.Require().NoError(s.persistence.SavePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(common.HashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
@@ -159,7 +160,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
 
 	// Cleanup persistence
-	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), s.installationID))
+	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(common.HashPublicKey(&s.key.PublicKey), s.installationID))
 
 	// Unregistering message
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
@@ -170,7 +171,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Nil(err)
@@ -183,7 +184,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationAccessToken, err)
@@ -197,7 +198,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationAccessToken, err)
@@ -211,7 +212,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationDeviceToken, err)
@@ -225,7 +226,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrUnknownPushNotificationRegistrationTokenType, err)
@@ -240,7 +241,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NoError(err)
@@ -278,7 +279,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Different key ciphertext
-	cyphertext, err := encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
+	cyphertext, err := common.Encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -286,7 +287,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Right cyphertext but non unmarshable payload
-	cyphertext, err = encrypt([]byte("plaintext"), s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt([]byte("plaintext"), s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -300,7 +301,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -313,7 +314,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 		InstallationId: "abc",
 		Version:        1,
 	})
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -327,7 +328,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -342,11 +343,11 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 
 	// Setup persistence
-	s.Require().NoError(s.persistence.SavePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(common.HashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		InstallationId: s.installationID,
 		Version:        2}))
@@ -357,7 +358,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH)
 
 	// Cleanup persistence
-	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(hashPublicKey(&s.key.PublicKey), s.installationID))
+	s.Require().NoError(s.persistence.DeletePushNotificationRegistration(common.HashPublicKey(&s.key.PublicKey), s.installationID))
 
 	// Missing access token
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
@@ -366,7 +367,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -381,7 +382,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -396,7 +397,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -414,14 +415,14 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	payload, err = proto.Marshal(registration)
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
 
 	// Pull from the db
-	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(&s.key.PublicKey), s.installationID)
+	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedRegistration)
 	s.Require().True(proto.Equal(retrievedRegistration, registration))
@@ -435,25 +436,25 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	})
 	s.Require().NoError(err)
 
-	cyphertext, err = encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
 
 	// Check is gone from the db
-	retrievedRegistration, err = s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(&s.key.PublicKey), s.installationID)
+	retrievedRegistration, err = s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedRegistration)
 	s.Require().Empty(retrievedRegistration.AccessToken)
 	s.Require().Empty(retrievedRegistration.Token)
 	s.Require().Equal(uint64(2), retrievedRegistration.Version)
 	s.Require().Equal(s.installationID, retrievedRegistration.InstallationId)
-	s.Require().Equal(shake256(cyphertext), response.RequestId)
+	s.Require().Equal(common.Shake256(cyphertext), response.RequestId)
 }
 
 func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
-	hashedPublicKey := hashPublicKey(&s.key.PublicKey)
+	hashedPublicKey := common.HashPublicKey(&s.key.PublicKey)
 	// Successful
 	registration := &protobuf.PushNotificationRegistration{
 		Token:          "abc",
@@ -465,7 +466,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
 	payload, err := proto.Marshal(registration)
 	s.Require().NoError(err)
 
-	cyphertext, err := encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err := common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response := s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
@@ -486,7 +487,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
 }
 
 func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
-	hashedPublicKey := hashPublicKey(&s.key.PublicKey)
+	hashedPublicKey := common.HashPublicKey(&s.key.PublicKey)
 	allowedUserList := [][]byte{[]byte("a")}
 	// Successful
 
@@ -501,7 +502,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
 	payload, err := proto.Marshal(registration)
 	s.Require().NoError(err)
 
-	cyphertext, err := encrypt(payload, s.sharedKey, rand.Reader)
+	cyphertext, err := common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
 	response := s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)

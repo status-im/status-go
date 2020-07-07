@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -49,9 +50,9 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieve() {
 		Version:        5,
 	}
 
-	s.Require().NoError(s.persistence.SavePushNotificationRegistration(hashPublicKey(&key.PublicKey), registration))
+	s.Require().NoError(s.persistence.SavePushNotificationRegistration(common.HashPublicKey(&key.PublicKey), registration))
 
-	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(&key.PublicKey), installationID)
+	retrievedRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(&key.PublicKey), installationID)
 	s.Require().NoError(err)
 
 	s.Require().True(proto.Equal(registration, retrievedRegistration))

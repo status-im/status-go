@@ -72,6 +72,7 @@ type Messenger struct {
 	allInstallations           map[string]*multidevice.Installation
 	modifiedInstallations      map[string]bool
 	installationID             string
+	mailserver                 []byte
 
 	mutex sync.Mutex
 }
@@ -2036,13 +2037,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	return messageState.Response, nil
 }
 
+func (m *Messenger) SetMailserver(peer []byte) {
+	m.mailserver = peer
+}
+
 func (m *Messenger) RequestHistoricMessages(
 	ctx context.Context,
-	peer []byte, // should be removed after mailserver logic is ported
 	from, to uint32,
 	cursor []byte,
 ) ([]byte, error) {
-	return m.transport.SendMessagesRequest(ctx, peer, from, to, cursor)
+	if m.mailserver == nil {
+		return nil, errors.New("no mailserver selected")
+	}
+	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor)
 }
 
 func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
@@ -2963,6 +2970,46 @@ func (m *Messenger) getTimesource() TimeSource {
 
 func (m *Messenger) Timesource() TimeSource {
 	return m.getTimesource()
+}
+
+// AddPushNotificationServer adds a push notification server
+func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+	if m.pushNotificationClient == nil {
+		return errors.New("push notification client not enabled")
+	}
+	return m.pushNotificationClient.AddPushNotificationServer(publicKey)
+}
+
+// RegisterForPushNotification register deviceToken with any push notification server enabled
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
+	if m.pushNotificationClient == nil {
+		return errors.New("push notification client not enabled")
+	}
+
+	var contactIDs []*ecdsa.PublicKey
+	var mutedChatIDs []string
+
+	m.mutex.Lock()
+	for _, contact := range m.allContacts {
+		if contact.IsAdded() {
+			pk, err := contact.PublicKey()
+			if err != nil {
+				m.logger.Warn("could not parse contact public key")
+				continue
+			}
+			contactIDs = append(contactIDs, pk)
+		} else if contact.IsBlocked() {
+			mutedChatIDs = append(mutedChatIDs, contact.ID)
+		}
+	}
+	for _, chat := range m.allChats {
+		if chat.Muted {
+			mutedChatIDs = append(mutedChatIDs, chat.ID)
+		}
+
+	}
+	m.mutex.Unlock()
+	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
 }
 
 func generateAliasAndIdenticon(pk string) (string, string, error) {

@@ -20,8 +20,15 @@ import (
 const accessTokenKeyLength = 16
 
 type PushNotificationServer struct {
-	key        *ecdsa.PublicKey
-	registered bool
+	publicKey    *ecdsa.PublicKey
+	registered   bool
+	registeredAt int64
+}
+
+type PushNotificationInfo struct {
+	AccessToken    string
+	InstallationID string
+	PublicKey      *ecdsa.PublicKey
 }
 
 type Config struct {
@@ -35,10 +42,6 @@ type Config struct {
 	// AllowOnlyFromContacts indicates whether we should be receiving push notifications
 	// only from contacts
 	AllowOnlyFromContacts bool
-	// ContactIDs is the public keys for each contact that we allow notifications from
-	ContactIDs []*ecdsa.PublicKey
-	// MutedChatIDs is the IDs of the chats we don't want to receive notifications from
-	MutedChatIDs []string
 	// PushNotificationServers is an array of push notification servers we want to register with
 	PushNotificationServers []*PushNotificationServer
 	// InstallationID is the installation-id for this device
@@ -122,10 +125,10 @@ func (p *Client) NotifyOnMessageID(messageID []byte) error {
 	return nil
 }
 
-func (p *Client) mutedChatIDsHashes() [][]byte {
+func (p *Client) mutedChatIDsHashes(chatIDs []string) [][]byte {
 	var mutedChatListHashes [][]byte
 
-	for _, chatID := range p.config.MutedChatIDs {
+	for _, chatID := range chatIDs {
 		mutedChatListHashes = append(mutedChatListHashes, shake256(chatID))
 	}
 
@@ -148,9 +151,9 @@ func (p *Client) encryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte,
 	return encryptedToken, nil
 }
 
-func (p *Client) allowedUserList(token []byte) ([][]byte, error) {
+func (p *Client) allowedUserList(token []byte, contactIDs []*ecdsa.PublicKey) ([][]byte, error) {
 	var encryptedTokens [][]byte
-	for _, publicKey := range p.config.ContactIDs {
+	for _, publicKey := range contactIDs {
 		encryptedToken, err := p.encryptToken(publicKey, token)
 		if err != nil {
 			return nil, err
@@ -162,9 +165,9 @@ func (p *Client) allowedUserList(token []byte) ([][]byte, error) {
 	return encryptedTokens, nil
 }
 
-func (p *Client) buildPushNotificationRegistrationMessage() (*protobuf.PushNotificationRegistration, error) {
+func (p *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) (*protobuf.PushNotificationRegistration, error) {
 	token := uuid.New().String()
-	allowedUserList, err := p.allowedUserList([]byte(token))
+	allowedUserList, err := p.allowedUserList([]byte(token), contactIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -175,13 +178,20 @@ func (p *Client) buildPushNotificationRegistrationMessage() (*protobuf.PushNotif
 		InstallationId:  p.config.InstallationID,
 		Token:           p.DeviceToken,
 		Enabled:         p.config.RemoteNotificationsEnabled,
-		BlockedChatList: p.mutedChatIDsHashes(),
+		BlockedChatList: p.mutedChatIDsHashes(mutedChatIDs),
 		AllowedUserList: allowedUserList,
 	}
 	return options, nil
 }
 
-func (p *Client) Register(deviceToken string) error {
+func (p *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	servers, err := p.persistence.GetServers()
+	if err != nil {
+		return err
+	}
+	if len(servers) == 0 {
+		return errors.New("no servers to register with")
+	}
 	return nil
 }
 
@@ -205,16 +215,40 @@ func (p *Client) HandlePushNotificationResponse(ack *protobuf.PushNotificationRe
 	return nil
 }
 
-func (p *Client) SetContactIDs(contactIDs []*ecdsa.PublicKey) error {
-	p.config.ContactIDs = contactIDs
-	// Update or schedule update
-	return nil
+func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
+	currentServers, err := c.persistence.GetServers()
+	if err != nil {
+		return err
+	}
+
+	for _, server := range currentServers {
+		if common.IsPubKeyEqual(server.publicKey, publicKey) {
+			return errors.New("push notification server already added")
+		}
+	}
+
+	return c.persistence.UpsertServer(&PushNotificationServer{
+		publicKey: publicKey,
+	})
 }
 
-func (p *Client) SetMutedChatIDs(chatIDs []string) error {
-	p.config.MutedChatIDs = chatIDs
-	// Update or schedule update
-	return nil
+func (c *Client) RetrievePushNotificationInfo(publicKey *ecdsa.PublicKey) ([]*PushNotificationInfo, error) {
+	return nil, nil
+	/*
+		currentServers, err := c.persistence.GetServers()
+		if err != nil {
+			return err
+		}
+
+		for _, server := range currentServers {
+			if common.IsPubKeyEqual(server.publicKey, publicKey) {
+				return errors.New("push notification server already added")
+			}
+		}
+
+		return c.persistence.UpsertServer(&PushNotificationServer{
+			publicKey: publicKey,
+		})*/
 }
 
 func encryptAccessToken(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {

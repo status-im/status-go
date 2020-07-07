@@ -2106,7 +2106,8 @@ func (s *MessengerSuite) TestRequestHistoricMessagesRequest() {
 	m := s.newMessenger(shh)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
-	cursor, err := m.RequestHistoricMessages(ctx, nil, 10, 20, []byte{0x01})
+	m.mailserver = []byte("mailserver-id")
+	cursor, err := m.RequestHistoricMessages(ctx, 10, 20, []byte{0x01})
 	s.EqualError(err, ctx.Err().Error())
 	s.Empty(cursor)
 	// verify request is correct

@@ -1,6 +1,7 @@
 package push_notification_server
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 
@@ -14,7 +15,6 @@ import (
 )
 
 const encryptedPayloadKeyLength = 16
-const nonceLength = 12
 
 type Config struct {
 	// Identity is our identity key
@@ -57,7 +57,7 @@ func (p *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte)
 		return nil, err
 	}
 
-	return decrypt(payload, sharedKey)
+	return common.Decrypt(payload, sharedKey)
 }
 
 // ValidateRegistration validates a new message against the last one received for a given installationID and and public key
@@ -90,7 +90,7 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousRegistration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(hashPublicKey(publicKey), registration.InstallationId)
+	previousRegistration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(publicKey), registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +205,7 @@ func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 
 func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
 	response := &protobuf.PushNotificationRegistrationResponse{
-		RequestId: shake256(payload),
+		RequestId: common.Shake256(payload),
 	}
 
 	registration, err := p.ValidateRegistration(publicKey, payload)
@@ -227,12 +227,12 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 			Version:        registration.Version,
 			InstallationId: registration.InstallationId,
 		}
-		if err := p.persistence.SavePushNotificationRegistration(hashPublicKey(publicKey), emptyRegistration); err != nil {
+		if err := p.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), emptyRegistration); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
 			return response
 		}
 
-	} else if err := p.persistence.SavePushNotificationRegistration(hashPublicKey(publicKey), registration); err != nil {
+	} else if err := p.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), registration); err != nil {
 		response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
 		return response
 	}
@@ -243,17 +243,60 @@ func (p *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 }
 
 func (p *Server) HandlePushNotificationRegistration2(publicKey *ecdsa.PublicKey, payload []byte) error {
-	return nil
+	response := p.HandlePushNotificationRegistration(publicKey, payload)
+	if response == nil {
+		return nil
+	}
+	encodedMessage, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
 
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE,
+	}
+
+	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	return err
 }
 
 func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, query protobuf.PushNotificationQuery) error {
-	return nil
+	response := p.HandlePushNotificationQuery(&query)
+	if response == nil {
+		return nil
+	}
+	encodedMessage, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
+	}
+
+	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	return err
 
 }
 
 func (p *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
 	request protobuf.PushNotificationRequest) error {
-	return nil
+	response := p.HandlePushNotificationRequest(&request)
+	if response == nil {
+		return nil
+	}
+	encodedMessage, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
 
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
+	}
+
+	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	return err
 }

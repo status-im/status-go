@@ -482,9 +482,3 @@ func calculatePoW(payload []byte) float64 {
 	}
 	return whisperDefaultPoW
 }
-
-// IsPubKeyEqual checks that two public keys are equal
-func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
-	// the curve is always the same, just compare the points
-	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
-}

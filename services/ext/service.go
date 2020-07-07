@@ -339,6 +339,9 @@ func (s *Service) DisableInstallation(installationID string) error {
 
 // UpdateMailservers updates information about selected mail servers.
 func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
+	if len(nodes) > 0 && s.messenger != nil {
+		s.messenger.SetMailserver(nodes[0].ID().Bytes())
+	}
 	if err := s.peerStore.Update(nodes); err != nil {
 		return err
 	}

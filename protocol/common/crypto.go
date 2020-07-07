@@ -1,19 +1,24 @@
-package push_notification_server
+package common
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
+	"errors"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"golang.org/x/crypto/sha3"
 	"io"
 )
 
-func hashPublicKey(pk *ecdsa.PublicKey) []byte {
-	return shake256(crypto.CompressPubkey(pk))
+const nonceLength = 12
+
+var ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
+
+func HashPublicKey(pk *ecdsa.PublicKey) []byte {
+	return Shake256(crypto.CompressPubkey(pk))
 }
 
-func decrypt(cyphertext []byte, key []byte) ([]byte, error) {
+func Decrypt(cyphertext []byte, key []byte) ([]byte, error) {
 	if len(cyphertext) < nonceLength {
 		return nil, ErrInvalidCiphertextLength
 	}
@@ -32,7 +37,7 @@ func decrypt(cyphertext []byte, key []byte) ([]byte, error) {
 	return gcm.Open(nil, nonce, cyphertext[nonceLength:], nil)
 }
 
-func encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
+func Encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
 	c, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -51,8 +56,14 @@ func encrypt(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
-func shake256(buf []byte) []byte {
+func Shake256(buf []byte) []byte {
 	h := make([]byte, 64)
 	sha3.ShakeSum256(h, buf)
 	return h
+}
+
+// IsPubKeyEqual checks that two public keys are equal
+func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
+	// the curve is always the same, just compare the points
+	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
 }

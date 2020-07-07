@@ -56,8 +56,6 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 	config := &Config{
 		Identity:                   identity,
 		RemoteNotificationsEnabled: true,
-		MutedChatIDs:               mutedChatList,
-		ContactIDs:                 contactIDs,
 		InstallationID:             myInstallationID,
 	}
 
@@ -77,7 +75,7 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 		AllowedUserList: [][]byte{encryptedToken},
 	}
 
-	actualMessage, err := client.buildPushNotificationRegistrationMessage()
+	actualMessage, err := client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
 	require.NoError(t, err)
 
 	require.Equal(t, options, actualMessage)
