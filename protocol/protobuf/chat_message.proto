@@ -31,7 +31,7 @@ message AudioMessage {
 }
 
 message EmojiReaction {
-  string messageID = 1;
+  string message_id = 1;
   Type type = 2;
 
   enum Type {
@@ -46,7 +46,7 @@ message EmojiReaction {
 }
 
 message EmojiReactionRetraction {
-  string emojiReactionID = 1;
+  string emoji_reaction_id = 1;
 }
 
 message ChatMessage {
