@@ -35,7 +35,7 @@ message EmojiReaction {
   Type type = 2;
 
   enum Type {
-    UNKNOWN_IMAGE_TYPE = 0;
+    UNKNOWN_EMOJI_REACTION_TYPE = 0;
     LOVE = 1;
     THUMBS_UP = 2;
     THUMBS_DOWN = 3;
