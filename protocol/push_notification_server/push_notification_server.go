@@ -3,6 +3,7 @@ package push_notification_server
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 
 	"github.com/golang/protobuf/proto"
@@ -120,6 +121,8 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 }
 
 func (p *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
+
+	p.config.Logger.Debug("handling push notification query")
 	response := &protobuf.PushNotificationQueryResponse{}
 	if query == nil || len(query.PublicKeys) == 0 {
 		return response
@@ -240,11 +243,22 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		return response
 	}
 
+	if err := s.listenToPublicKeyQueryTopic(common.HashPublicKey(publicKey)); err != nil {
+		response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
+		s.config.Logger.Error("failed to listen to topic", zap.Error(err))
+		return response
+
+	}
 	response.Success = true
 
 	s.config.Logger.Debug("handled push notification registration successfully")
 
 	return response
+}
+
+func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
+	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
+	return s.messageProcessor.JoinPublic(encodedPublicKey)
 }
 
 func (p *Server) HandlePushNotificationRegistration2(publicKey *ecdsa.PublicKey, payload []byte) error {
@@ -266,11 +280,12 @@ func (p *Server) HandlePushNotificationRegistration2(publicKey *ecdsa.PublicKey,
 	return err
 }
 
-func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, query protobuf.PushNotificationQuery) error {
+func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, messageID []byte, query protobuf.PushNotificationQuery) error {
 	response := p.HandlePushNotificationQuery(&query)
 	if response == nil {
 		return nil
 	}
+	response.MessageId = messageID
 	encodedMessage, err := proto.Marshal(response)
 	if err != nil {
 		return err

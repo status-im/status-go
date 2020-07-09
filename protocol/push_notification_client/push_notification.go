@@ -4,8 +4,11 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"io"
 	"time"
@@ -75,19 +78,21 @@ type Client struct {
 	//messageProcessor is a message processor used to send and being notified of messages
 
 	messageProcessor *common.MessageProcessor
+	//pushNotificationRegistrationResponses is a channel that listens to pushNotificationResponse
+	pushNotificationRegistrationResponses chan *protobuf.PushNotificationRegistrationResponse
 	//pushNotificationQueryResponses is a channel that listens to pushNotificationResponse
-
 	pushNotificationQueryResponses chan *protobuf.PushNotificationQueryResponse
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
 	return &Client{
-		quit:                           make(chan struct{}),
-		config:                         config,
-		pushNotificationQueryResponses: make(chan *protobuf.PushNotificationQueryResponse),
-		messageProcessor:               processor,
-		persistence:                    persistence,
-		reader:                         rand.Reader}
+		quit:                                  make(chan struct{}),
+		config:                                config,
+		pushNotificationRegistrationResponses: make(chan *protobuf.PushNotificationRegistrationResponse),
+		pushNotificationQueryResponses:        make(chan *protobuf.PushNotificationQueryResponse),
+		messageProcessor:                      processor,
+		persistence:                           persistence,
+		reader:                                rand.Reader}
 }
 
 func (c *Client) Start() error {
@@ -113,11 +118,6 @@ func (c *Client) Start() error {
 
 func (c *Client) Stop() error {
 	close(c.quit)
-	return nil
-}
-
-// This likely will return a channel as it's an asynchrous operation
-func fetchNotificationInfoFor(publicKey *ecdsa.PublicKey) error {
 	return nil
 }
 
@@ -198,32 +198,32 @@ func (p *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 	return options, nil
 }
 
-func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]string, error) {
 	c.DeviceToken = deviceToken
 	servers, err := c.persistence.GetServers()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if len(servers) == 0 {
-		return errors.New("no servers to register with")
+		return nil, errors.New("no servers to register with")
 	}
 
 	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	marshaledRegistration, err := proto.Marshal(registration)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, server := range servers {
 
 		encryptedRegistration, err := c.encryptRegistration(server.publicKey, marshaledRegistration)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		rawMessage := &common.RawMessage{
 			Payload:     encryptedRegistration,
@@ -235,20 +235,27 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 		// Send message and wait for reply
 
 	}
+	// TODO: this needs to wait for all the registrations, probably best to poll the database
 	for {
 		select {
 		case <-c.quit:
-			return nil
+			return nil, nil
 		case <-time.After(5 * time.Second):
-			return errors.New("no query response received")
-		case <-c.pushNotificationQueryResponses:
-			return nil
+			return nil, errors.New("no registration response received")
+		case <-c.pushNotificationRegistrationResponses:
+			return nil, nil
 		}
 	}
 }
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
-func (p *Client) HandlePushNotificationRegistrationResponse(response *protobuf.PushNotificationRegistrationResponse) error {
+func (c *Client) HandlePushNotificationRegistrationResponse(response protobuf.PushNotificationRegistrationResponse) error {
+	c.config.Logger.Debug("received push notification registration response", zap.Any("response", response))
+	select {
+	case c.pushNotificationRegistrationResponses <- &response:
+	default:
+		return errors.New("could not process push notification registration response")
+	}
 	return nil
 }
 
@@ -258,11 +265,11 @@ func (p *Client) HandlePushNotificationAdvertisement(info *protobuf.PushNotifica
 }
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
-func (c *Client) HandlePushNotificationQueryResponse(response *protobuf.PushNotificationQueryResponse) error {
+func (c *Client) HandlePushNotificationQueryResponse(response protobuf.PushNotificationQueryResponse) error {
 
 	c.config.Logger.Debug("received push notification query response", zap.Any("response", response))
 	select {
-	case c.pushNotificationQueryResponses <- response:
+	case c.pushNotificationQueryResponses <- &response:
 	default:
 		return errors.New("could not process push notification query response")
 	}
@@ -293,22 +300,65 @@ func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
 }
 
 func (c *Client) RetrievePushNotificationInfo(publicKey *ecdsa.PublicKey) ([]*PushNotificationInfo, error) {
-	return nil, nil
-	/*
-		currentServers, err := c.persistence.GetServers()
-		if err != nil {
-			return err
-		}
+	hashedPublicKey := common.HashPublicKey(publicKey)
+	query := &protobuf.PushNotificationQuery{
+		PublicKeys: [][]byte{hashedPublicKey},
+	}
+	encodedMessage, err := proto.Marshal(query)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, server := range currentServers {
-			if common.IsPubKeyEqual(server.publicKey, publicKey) {
-				return errors.New("push notification server already added")
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
+	}
+
+	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
+	c.config.Logger.Debug("sending query")
+	messageID, err := c.messageProcessor.SendPublic(context.Background(), encodedPublicKey, rawMessage)
+
+	// TODO: this is probably best done by polling the database instead
+	for {
+		select {
+		case <-c.quit:
+			return nil, nil
+		case <-time.After(5 * time.Second):
+			return nil, errors.New("no registration query response received")
+		case response := <-c.pushNotificationQueryResponses:
+			if bytes.Compare(response.MessageId, messageID) != 0 {
+				// Not for us, queue back
+				c.pushNotificationQueryResponses <- response
+				// This is not accurate, we should then shrink the timeout
+				// Also we should handle multiple responses
+				continue
 			}
-		}
 
-		return c.persistence.UpsertServer(&PushNotificationServer{
-			publicKey: publicKey,
-		})*/
+			if len(response.Info) == 0 {
+				return nil, errors.New("empty response from the server")
+			}
+
+			var pushNotificationInfo []*PushNotificationInfo
+			for _, info := range response.Info {
+				if bytes.Compare(info.PublicKey, hashedPublicKey) != 0 {
+					continue
+				}
+				pushNotificationInfo = append(pushNotificationInfo, &PushNotificationInfo{
+					PublicKey:      publicKey,
+					AccessToken:    info.AccessToken,
+					InstallationID: info.InstallationId,
+				})
+
+			}
+
+			return pushNotificationInfo, nil
+		}
+	}
+}
+
+func (s *Client) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
+	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
+	return s.messageProcessor.JoinPublic(encodedPublicKey)
 }
 
 func encryptAccessToken(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {

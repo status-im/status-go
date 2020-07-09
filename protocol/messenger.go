@@ -1938,11 +1938,37 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						logger.Debug("Handling PushNotificationQuery")
 						// TODO: Compare DST with Identity
-						if err := m.pushNotificationServer.HandlePushNotificationQuery2(publicKey, msg.ParsedMessage.(protobuf.PushNotificationQuery)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationQuery2(publicKey, msg.ID, msg.ParsedMessage.(protobuf.PushNotificationQuery)); err != nil {
 							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
 						continue
+					case protobuf.PushNotificationRegistrationResponse:
+						logger.Debug("Received PushNotificationRegistrationResponse")
+						if m.pushNotificationClient == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationRegistrationResponse")
+						// TODO: Compare DST with Identity
+						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(msg.ParsedMessage.(protobuf.PushNotificationRegistrationResponse)); err != nil {
+							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+
+					case protobuf.PushNotificationQueryResponse:
+						logger.Debug("Received PushNotificationQueryResponse")
+						if m.pushNotificationClient == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationQueryResponse")
+						// TODO: Compare DST with Identity
+						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(msg.ParsedMessage.(protobuf.PushNotificationQueryResponse)); err != nil {
+							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+
 					case protobuf.PushNotificationRequest:
 						logger.Debug("Received PushNotificationRequest")
 						if m.pushNotificationServer == nil {
@@ -2995,9 +3021,9 @@ func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ec
 }
 
 // RegisterForPushNotification register deviceToken with any push notification server enabled
-func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]string, error) {
 	if m.pushNotificationClient == nil {
-		return errors.New("push notification client not enabled")
+		return nil, errors.New("push notification client not enabled")
 	}
 
 	var contactIDs []*ecdsa.PublicKey

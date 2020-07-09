@@ -56,7 +56,8 @@ message PushNotificationQueryInfo {
 
 message PushNotificationQueryResponse {
   repeated PushNotificationQueryInfo info = 1;
-  bool success = 2;
+  bytes message_id = 2;
+  bool success = 3;
 }
 
 message PushNotification {

@@ -455,6 +455,10 @@ func (p *MessageProcessor) Subscribe() <-chan *SentMessage {
 	return c
 }
 
+func (p *MessageProcessor) JoinPublic(chatID string) error {
+	return p.transport.JoinPublic(chatID)
+}
+
 func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
 	var newMessage *types.NewMessage
 

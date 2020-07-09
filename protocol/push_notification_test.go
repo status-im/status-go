@@ -15,6 +15,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/push_notification_client"
 	"github.com/status-im/status-go/protocol/push_notification_server"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/whisper/v6"
@@ -23,6 +24,8 @@ import (
 func TestMessengerPushNotificationSuite(t *testing.T) {
 	suite.Run(t, new(MessengerPushNotificationSuite))
 }
+
+// TODO: to test. Register -> stop server -> re-start -> is it loading the topics?
 
 type MessengerPushNotificationSuite struct {
 	suite.Suite
@@ -113,19 +116,26 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Whi
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	errChan := make(chan error)
 
-	deviceToken := "token"
+	bob1DeviceToken := "token-1"
+	bob2DeviceToken := "token-2"
+	var bob1AccessTokens, bob2AccessTokens []string
 
+	bob1 := s.m
+	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
 	server := s.newPushNotificationServer(s.shh)
 	client2 := s.newMessenger(s.shh)
 
-	err := s.m.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
+	// Register bob1
+	err := bob1.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
 	go func() {
-		err := s.m.RegisterForPushNotifications(context.Background(), deviceToken)
+		bob1AccessTokens, err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
 		errChan <- err
 	}()
 
+	// Receive message, reply
+	// TODO: find a better way to handle this waiting
 	time.Sleep(500 * time.Millisecond)
 	_, err = server.RetrieveAll()
 	s.Require().NoError(err)
@@ -136,60 +146,131 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	time.Sleep(500 * time.Millisecond)
 	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	// Check reply
+	// TODO: find a better way to handle this waiting
+	time.Sleep(500 * time.Millisecond)
+	_, err = bob1.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = bob1.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = bob1.RetrieveAll()
+	s.Require().NoError(err)
+
+	// Make sure we receive it
+	err = <-errChan
+	s.Require().NoError(err)
+	s.Require().NotNil(bob1AccessTokens)
+
+	// Register bob2
+	err = bob2.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
+	s.Require().NoError(err)
+
+	go func() {
+		bob2AccessTokens, err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
+		errChan <- err
+	}()
+
+	// Receive message, reply
+	// TODO: find a better way to handle this waiting
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	// Check reply
+	// TODO: find a better way to handle this waiting
+	time.Sleep(500 * time.Millisecond)
+	_, err = bob2.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = bob2.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = bob2.RetrieveAll()
+	s.Require().NoError(err)
+
+	// Make sure we receive it
+	err = <-errChan
+	s.Require().NoError(err)
+	s.Require().NotNil(bob2AccessTokens)
+
+	var info []*push_notification_client.PushNotificationInfo
+	go func() {
+		info, err = client2.pushNotificationClient.RetrievePushNotificationInfo(&bob2.identity.PublicKey)
+		errChan <- err
+	}()
+
+	// Receive push notification query
+	// TODO: find a better way to handle this waiting
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = server.RetrieveAll()
+	s.Require().NoError(err)
+
+	// Receive push notification query response
+	// TODO: find a better way to handle this waiting
+	time.Sleep(500 * time.Millisecond)
+	_, err = client2.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = client2.RetrieveAll()
+	s.Require().NoError(err)
+
+	time.Sleep(500 * time.Millisecond)
+	_, err = client2.RetrieveAll()
 	s.Require().NoError(err)
 
 	err = <-errChan
 	s.Require().NoError(err)
-
-	info, err := client2.pushNotificationClient.RetrievePushNotificationInfo(&s.m.identity.PublicKey)
-	s.Require().NoError(err)
 	s.Require().NotNil(info)
+	// Check we have replies for both bob1 and bob2
+	s.Require().Len(info, 2)
 
-	/*
-		s.Require().Len(response.Contacts, 1)
-		contact := response.Contacts[0]
-		s.Require().True(contact.IsAdded())
+	var bob1Info, bob2Info *push_notification_client.PushNotificationInfo
 
-		s.Require().Len(response.Chats, 1)
-		chat := response.Chats[0]
-		s.Require().False(chat.Active, "It does not create an active chat")
+	if info[0].AccessToken == bob1AccessTokens[0] {
+		bob1Info = info[0]
+		bob2Info = info[1]
+	} else {
+		bob2Info = info[0]
+		bob1Info = info[1]
+	}
 
-		// Wait for the message to reach its destination
-		response, err = WaitOnMessengerResponse(
-			s.m,
-			func(r *MessengerResponse) bool { return len(r.Contacts) > 0 },
-			"contact request not received",
-		)
-		s.Require().NoError(err)
+	s.Require().NotNil(bob1Info)
+	s.Require().Equal(bob1Info, &push_notification_client.PushNotificationInfo{
+		InstallationID: bob1.installationID,
+		AccessToken:    bob1DeviceToken,
+		PublicKey:      &bob1.identity.PublicKey,
+	})
 
-		receivedContact := response.Contacts[0]
-		s.Require().Equal(theirName, receivedContact.Name)
-		s.Require().Equal(theirPicture, receivedContact.Photo)
-		s.Require().False(receivedContact.ENSVerified)
-		s.Require().True(receivedContact.HasBeenAdded())
-		s.Require().NotEmpty(receivedContact.LastUpdated)
+	s.Require().NotNil(bob2Info)
+	s.Require().Equal(bob2Info, &push_notification_client.PushNotificationInfo{
+		InstallationID: bob2.installationID,
+		AccessToken:    bob2DeviceToken,
+		PublicKey:      &bob1.identity.PublicKey,
+	})
 
-		newPicture := "new-picture"
-		err = theirMessenger.SendPushNotifications(context.Background(), newName, newPicture)
-		s.Require().NoError(err)
-
-		// Wait for the message to reach its destination
-		response, err = WaitOnMessengerResponse(
-			s.m,
-			func(r *MessengerResponse) bool {
-				return len(r.Contacts) > 0 && response.Contacts[0].ID == theirContactID
-			},
-			"contact request not received",
-		)
-
-		s.Require().NoError(err)
-
-		receivedContact = response.Contacts[0]
-		s.Require().Equal(theirContactID, receivedContact.ID)
-		s.Require().Equal(newName, receivedContact.Name)
-		s.Require().Equal(newPicture, receivedContact.Photo)
-		s.Require().False(receivedContact.ENSVerified)
-		s.Require().True(receivedContact.HasBeenAdded())
-		s.Require().NotEmpty(receivedContact.LastUpdated)
-	*/
 }
