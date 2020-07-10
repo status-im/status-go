@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +23,7 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 	// build chat lish hashes
 	var mutedChatListHashes [][]byte
 	for _, chatID := range mutedChatList {
-		mutedChatListHashes = append(mutedChatListHashes, shake256(chatID))
+		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
 	}
 
 	identity, err := crypto.GenerateKey()

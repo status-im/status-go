@@ -39,11 +39,13 @@ func (s *SQLitePersistenceSuite) TearDownTest() {
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
+	accessToken := "token"
 
 	server := &PushNotificationServer{
-		publicKey:    &key.PublicKey,
-		registered:   true,
-		registeredAt: 1,
+		PublicKey:    &key.PublicKey,
+		Registered:   true,
+		RegisteredAt: 1,
+		AccessToken:  accessToken,
 	}
 
 	s.Require().NoError(s.persistence.UpsertServer(server))
@@ -52,12 +54,13 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	s.Require().NoError(err)
 
 	s.Require().Len(retrievedServers, 1)
-	s.Require().True(retrievedServers[0].registered)
-	s.Require().Equal(int64(1), retrievedServers[0].registeredAt)
-	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].publicKey, &key.PublicKey))
+	s.Require().True(retrievedServers[0].Registered)
+	s.Require().Equal(int64(1), retrievedServers[0].RegisteredAt)
+	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
+	s.Require().Equal(accessToken, retrievedServers[0].AccessToken)
 
-	server.registered = false
-	server.registeredAt = 2
+	server.Registered = false
+	server.RegisteredAt = 2
 
 	s.Require().NoError(s.persistence.UpsertServer(server))
 
@@ -65,7 +68,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	s.Require().NoError(err)
 
 	s.Require().Len(retrievedServers, 1)
-	s.Require().False(retrievedServers[0].registered)
-	s.Require().Equal(int64(2), retrievedServers[0].registeredAt)
-	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].publicKey, &key.PublicKey))
+	s.Require().False(retrievedServers[0].Registered)
+	s.Require().Equal(int64(2), retrievedServers[0].RegisteredAt)
+	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
 }

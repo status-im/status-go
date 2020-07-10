@@ -26,9 +26,10 @@ const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
 
 type PushNotificationServer struct {
-	publicKey    *ecdsa.PublicKey
-	registered   bool
-	registeredAt int64
+	PublicKey    *ecdsa.PublicKey
+	Registered   bool
+	RegisteredAt int64
+	AccessToken  string
 }
 
 type PushNotificationInfo struct {
@@ -78,21 +79,18 @@ type Client struct {
 	//messageProcessor is a message processor used to send and being notified of messages
 
 	messageProcessor *common.MessageProcessor
-	//pushNotificationRegistrationResponses is a channel that listens to pushNotificationResponse
-	pushNotificationRegistrationResponses chan *protobuf.PushNotificationRegistrationResponse
 	//pushNotificationQueryResponses is a channel that listens to pushNotificationResponse
 	pushNotificationQueryResponses chan *protobuf.PushNotificationQueryResponse
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
 	return &Client{
-		quit:                                  make(chan struct{}),
-		config:                                config,
-		pushNotificationRegistrationResponses: make(chan *protobuf.PushNotificationRegistrationResponse),
-		pushNotificationQueryResponses:        make(chan *protobuf.PushNotificationQueryResponse),
-		messageProcessor:                      processor,
-		persistence:                           persistence,
-		reader:                                rand.Reader}
+		quit:                           make(chan struct{}),
+		config:                         config,
+		pushNotificationQueryResponses: make(chan *protobuf.PushNotificationQueryResponse),
+		messageProcessor:               processor,
+		persistence:                    persistence,
+		reader:                         rand.Reader}
 }
 
 func (c *Client) Start() error {
@@ -198,7 +196,7 @@ func (p *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 	return options, nil
 }
 
-func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]string, error) {
+func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]*PushNotificationServer, error) {
 	c.DeviceToken = deviceToken
 	servers, err := c.persistence.GetServers()
 	if err != nil {
@@ -219,9 +217,21 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 		return nil, err
 	}
 
+	var serverPublicKeys []*ecdsa.PublicKey
 	for _, server := range servers {
 
-		encryptedRegistration, err := c.encryptRegistration(server.publicKey, marshaledRegistration)
+		// Reset server registration data
+		server.Registered = false
+		server.RegisteredAt = 0
+		server.AccessToken = registration.AccessToken
+		serverPublicKeys = append(serverPublicKeys, server.PublicKey)
+
+		if err := c.persistence.UpsertServer(server); err != nil {
+			return nil, err
+		}
+
+		// Dispatch message
+		encryptedRegistration, err := c.encryptRegistration(server.PublicKey, marshaledRegistration)
 		if err != nil {
 			return nil, err
 		}
@@ -230,33 +240,71 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
 		}
 
-		_, err = c.messageProcessor.SendPrivate(context.Background(), server.publicKey, rawMessage)
+		_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, rawMessage)
 
-		// Send message and wait for reply
+		if err != nil {
+			return nil, err
+		}
 
 	}
-	// TODO: this needs to wait for all the registrations, probably best to poll the database
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	// This code polls the database for server registrations, giving up
+	// after 5 seconds
 	for {
 		select {
 		case <-c.quit:
-			return nil, nil
-		case <-time.After(5 * time.Second):
-			return nil, errors.New("no registration response received")
-		case <-c.pushNotificationRegistrationResponses:
-			return nil, nil
+			return servers, nil
+		case <-ctx.Done():
+			c.config.Logger.Debug("Context done")
+			return servers, nil
+		case <-time.After(200 * time.Millisecond):
+			servers, err = c.persistence.GetServersByPublicKey(serverPublicKeys)
+			if err != nil {
+				return nil, err
+			}
+
+			allRegistered := true
+			for _, server := range servers {
+				allRegistered = allRegistered && server.Registered
+			}
+
+			// If any of the servers we haven't registered yet, continue
+			if !allRegistered {
+				continue
+			}
+
+			// all have registered,cancel context and return
+			cancel()
+			return servers, nil
 		}
 	}
 }
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
-func (c *Client) HandlePushNotificationRegistrationResponse(response protobuf.PushNotificationRegistrationResponse) error {
+func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, response protobuf.PushNotificationRegistrationResponse) error {
 	c.config.Logger.Debug("received push notification registration response", zap.Any("response", response))
-	select {
-	case c.pushNotificationRegistrationResponses <- &response:
-	default:
-		return errors.New("could not process push notification registration response")
+	// TODO: handle non successful response and match request id
+	// Not successful ignore for now
+	if !response.Success {
+		return errors.New("response was not successful")
 	}
-	return nil
+
+	servers, err := c.persistence.GetServersByPublicKey([]*ecdsa.PublicKey{publicKey})
+	if err != nil {
+		return err
+	}
+	// We haven't registered with this server
+	if len(servers) != 1 {
+		return errors.New("not registered with this server, ignoring")
+	}
+
+	server := servers[0]
+	server.Registered = true
+	server.RegisteredAt = time.Now().Unix()
+
+	return c.persistence.UpsertServer(server)
 }
 
 // HandlePushNotificationAdvertisement should store any info related to push notifications
@@ -289,13 +337,13 @@ func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
 	}
 
 	for _, server := range currentServers {
-		if common.IsPubKeyEqual(server.publicKey, publicKey) {
+		if common.IsPubKeyEqual(server.PublicKey, publicKey) {
 			return errors.New("push notification server already added")
 		}
 	}
 
 	return c.persistence.UpsertServer(&PushNotificationServer{
-		publicKey: publicKey,
+		PublicKey: publicKey,
 	})
 }
 

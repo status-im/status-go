@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/tt"
 )
 
 func TestServerSuite(t *testing.T) {
@@ -55,6 +56,7 @@ func (s *ServerSuite) SetupTest() {
 
 	config := &Config{
 		Identity: identity,
+		Logger:   tt.MustCreateTestLogger(),
 	}
 
 	s.server = New(config, s.persistence, nil)

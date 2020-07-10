@@ -118,7 +118,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	bob1DeviceToken := "token-1"
 	bob2DeviceToken := "token-2"
-	var bob1AccessTokens, bob2AccessTokens []string
+	var bob1Servers, bob2Servers []*push_notification_client.PushNotificationServer
 
 	bob1 := s.m
 	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
@@ -130,7 +130,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().NoError(err)
 
 	go func() {
-		bob1AccessTokens, err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
+		bob1Servers, err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
 		errChan <- err
 	}()
 
@@ -165,14 +165,16 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	// Make sure we receive it
 	err = <-errChan
 	s.Require().NoError(err)
-	s.Require().NotNil(bob1AccessTokens)
+	s.Require().NotNil(bob1Servers)
+	s.Require().Len(bob1Servers, 1)
+	s.Require().True(bob1Servers[0].Registered)
 
 	// Register bob2
 	err = bob2.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
 	go func() {
-		bob2AccessTokens, err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
+		bob2Servers, err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
 		errChan <- err
 	}()
 
@@ -207,7 +209,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	// Make sure we receive it
 	err = <-errChan
 	s.Require().NoError(err)
-	s.Require().NotNil(bob2AccessTokens)
+	s.Require().NotNil(bob2Servers)
+	s.Require().Len(bob2Servers, 1)
+	s.Require().True(bob2Servers[0].Registered)
 
 	var info []*push_notification_client.PushNotificationInfo
 	go func() {
@@ -251,7 +255,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	var bob1Info, bob2Info *push_notification_client.PushNotificationInfo
 
-	if info[0].AccessToken == bob1AccessTokens[0] {
+	if info[0].AccessToken == bob1Servers[0].AccessToken {
 		bob1Info = info[0]
 		bob2Info = info[1]
 	} else {
@@ -262,14 +266,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().NotNil(bob1Info)
 	s.Require().Equal(bob1Info, &push_notification_client.PushNotificationInfo{
 		InstallationID: bob1.installationID,
-		AccessToken:    bob1DeviceToken,
+		AccessToken:    bob1Servers[0].AccessToken,
 		PublicKey:      &bob1.identity.PublicKey,
 	})
 
 	s.Require().NotNil(bob2Info)
 	s.Require().Equal(bob2Info, &push_notification_client.PushNotificationInfo{
 		InstallationID: bob2.installationID,
-		AccessToken:    bob2DeviceToken,
+		AccessToken:    bob2Servers[0].AccessToken,
 		PublicKey:      &bob1.identity.PublicKey,
 	})
 

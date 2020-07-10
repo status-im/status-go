@@ -1950,7 +1950,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						logger.Debug("Handling PushNotificationRegistrationResponse")
 						// TODO: Compare DST with Identity
-						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(msg.ParsedMessage.(protobuf.PushNotificationRegistrationResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRegistrationResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -3021,7 +3021,7 @@ func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ec
 }
 
 // RegisterForPushNotification register deviceToken with any push notification server enabled
-func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]string, error) {
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]*push_notification_client.PushNotificationServer, error) {
 	if m.pushNotificationClient == nil {
 		return nil, errors.New("push notification client not enabled")
 	}

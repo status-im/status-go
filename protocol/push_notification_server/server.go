@@ -257,6 +257,9 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 }
 
 func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
+	if s.messageProcessor == nil {
+		return nil
+	}
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
 	return s.messageProcessor.JoinPublic(encodedPublicKey)
 }
