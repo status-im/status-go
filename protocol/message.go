@@ -123,11 +123,11 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Pack int32  `json:"pack"`
 	}
 	type EmojiReactionAlias struct {
-		MessageId string `json:"message_id"`
+		MessageID string `json:"message_id"`
 		Type      int32  `json:"type"`
 	}
 	type EmojiReactionRetractionAlias struct {
-		EmojiReactionId string `json:"emoji_reaction_id"`
+		EmojiReactionID string `json:"emoji_reaction_id"`
 	}
 
 	item := struct {
