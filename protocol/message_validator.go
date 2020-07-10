@@ -213,6 +213,9 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if emojiR == nil {
 			return errors.New("no emoji reaction data")
 		}
+		if len(emojiR.MessageId) == 0 {
+			return errors.New("emoji reaction no target message id")
+		}
 		if emojiR.Type == protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE {
 			return errors.New("emoji reaction type unknown")
 		}
@@ -224,6 +227,9 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		emojiRR := message.GetEmojiReactionRetraction()
 		if emojiRR == nil {
 			return errors.New("no emoji reaction retraction data")
+		}
+		if len(emojiRR.EmojiReactionId) == 0 {
+			return errors.New("emoji reaction retraction no target emoji reaction id")
 		}
 	}
 
