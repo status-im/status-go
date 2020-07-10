@@ -14,6 +14,8 @@ type Persistence interface {
 	GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey []byte, installationID string) (*protobuf.PushNotificationRegistration, error)
 	// GetPushNotificationRegistrationByPublicKey retrieve all the push notification registrations from storage given a public key
 	GetPushNotificationRegistrationByPublicKeys(publicKeys [][]byte) ([]*PushNotificationIDAndRegistration, error)
+	//GetPushNotificationRegistrationPublicKeys return all the public keys stored
+	GetPushNotificationRegistrationPublicKeys() ([][]byte, error)
 
 	// DeletePushNotificationRegistration deletes a push notification registration from storage given a public key and installation id
 	DeletePushNotificationRegistration(publicKey []byte, installationID string) error
@@ -86,6 +88,26 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 		registrations = append(registrations, response)
 	}
 	return registrations, nil
+}
+
+func (p *SQLitePersistence) GetPushNotificationRegistrationPublicKeys() ([][]byte, error) {
+	rows, err := p.db.Query(`SELECT public_key FROM push_notification_server_registrations`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var publicKeys [][]byte
+	for rows.Next() {
+		var publicKey []byte
+		err := rows.Scan(&publicKey)
+		if err != nil {
+			return nil, err
+		}
+
+		publicKeys = append(publicKeys, publicKey)
+	}
+	return publicKeys, nil
 }
 
 func (p *SQLitePersistence) SavePushNotificationRegistration(publicKey []byte, registration *protobuf.PushNotificationRegistration) error {

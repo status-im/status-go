@@ -287,6 +287,7 @@ func NewMessenger(
 		verifyTransactionClient:    c.verifyTransactionClient,
 		shutdownTasks: []func() error{
 			database.Close,
+			pushNotificationClient.Stop,
 			transp.ResetFilters,
 			transp.Stop,
 			func() error { processor.Stop(); return nil },
@@ -303,6 +304,18 @@ func NewMessenger(
 }
 
 func (m *Messenger) Start() error {
+	// Start push notification server
+	if m.pushNotificationServer != nil {
+		if err := m.pushNotificationServer.Start(); err != nil {
+			return err
+		}
+	}
+	if m.pushNotificationClient != nil {
+		if err := m.pushNotificationClient.Start(); err != nil {
+			return err
+		}
+	}
+
 	return m.encryptor.Start(m.identity)
 }
 
@@ -1394,7 +1407,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 
 	// If the chat is not public, we instruct the pushNotificationService to send a notification
 	if !chat.Public() && m.pushNotificationClient != nil {
-		if err := m.pushNotificationClient.NotifyOnMessageID(id); err != nil {
+		if err := m.pushNotificationClient.NotifyOnMessageID(chat.ID, id); err != nil {
 			return nil, err
 		}
 
@@ -1963,7 +1976,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						logger.Debug("Handling PushNotificationQueryResponse")
 						// TODO: Compare DST with Identity
-						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(msg.ParsedMessage.(protobuf.PushNotificationQueryResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationQueryResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger

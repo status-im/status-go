@@ -388,6 +388,7 @@ func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []b
 // sendDataSync sends a message scheduled by the data sync layer.
 // Data Sync layer calls this method "dispatch" function.
 func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte, payload *datasyncproto.Payload) error {
+	// Calculate the messageIDs
 	messageIDs := make([][]byte, 0, len(payload.Messages))
 	for _, payload := range payload.Messages {
 		messageIDs = append(messageIDs, v1protocol.MessageID(&p.identity.PublicKey, payload.Body))

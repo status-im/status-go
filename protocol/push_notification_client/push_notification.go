@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"sort"
 
 	"bytes"
 	"crypto/ecdsa"
@@ -16,6 +17,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -24,6 +26,7 @@ import (
 
 const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
+const staleQueryTimeInSeconds = 86400
 
 type PushNotificationServer struct {
 	PublicKey    *ecdsa.PublicKey
@@ -33,9 +36,11 @@ type PushNotificationServer struct {
 }
 
 type PushNotificationInfo struct {
-	AccessToken    string
-	InstallationID string
-	PublicKey      *ecdsa.PublicKey
+	AccessToken     string
+	InstallationID  string
+	PublicKey       *ecdsa.PublicKey
+	ServerPublicKey *ecdsa.PublicKey
+	RetrievedAt     int64
 }
 
 type Config struct {
@@ -79,18 +84,15 @@ type Client struct {
 	//messageProcessor is a message processor used to send and being notified of messages
 
 	messageProcessor *common.MessageProcessor
-	//pushNotificationQueryResponses is a channel that listens to pushNotificationResponse
-	pushNotificationQueryResponses chan *protobuf.PushNotificationQueryResponse
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
 	return &Client{
-		quit:                           make(chan struct{}),
-		config:                         config,
-		pushNotificationQueryResponses: make(chan *protobuf.PushNotificationQueryResponse),
-		messageProcessor:               processor,
-		persistence:                    persistence,
-		reader:                         rand.Reader}
+		quit:             make(chan struct{}),
+		config:           config,
+		messageProcessor: processor,
+		persistence:      persistence,
+		reader:           rand.Reader}
 }
 
 func (c *Client) Start() error {
@@ -104,7 +106,7 @@ func (c *Client) Start() error {
 			select {
 			case m := <-subscription:
 				if err := c.HandleMessageSent(m); err != nil {
-					// TODO: log
+					c.config.Logger.Error("failed to handle message", zap.Error(err))
 				}
 			case <-c.quit:
 				return
@@ -119,23 +121,150 @@ func (c *Client) Stop() error {
 	return nil
 }
 
-// Sends an actual push notification, where do we get the chatID?
-func sendPushNotificationTo(publicKey *ecdsa.PublicKey, chatID string) error {
+type notificationSendingSpec struct {
+	serverPublicKey *ecdsa.PublicKey
+	installationID  string
+	messageID       []byte
+}
+
+// The message has been sent
+// We should:
+// 1) Check whether we should notify on anything
+// 2) Refresh info if necessaary
+// 3) Sent push notifications
+func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
+	if !c.config.SendEnabled {
+		return nil
+	}
+	publicKey := sentMessage.PublicKey
+	var installationIDs []string
+
+	var notificationSpecs []*notificationSendingSpec
+
+	//Find if there's any actionable message
+	for _, messageID := range sentMessage.MessageIDs {
+		for _, installation := range sentMessage.Spec.Installations {
+			installationID := installation.ID
+			shouldNotify, err := c.shouldNotifyOn(publicKey, installationID, messageID)
+			if err != nil {
+				return err
+			}
+			if shouldNotify {
+				notificationSpecs = append(notificationSpecs, &notificationSendingSpec{
+					installationID: installationID,
+					messageID:      messageID,
+				})
+				installationIDs = append(installationIDs, installation.ID)
+			}
+		}
+	}
+
+	// Is there anything we should be notifying on?
+	if len(installationIDs) == 0 {
+		return nil
+	}
+
+	// Check if we queried recently
+	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
+	if err != nil {
+		return err
+	}
+
+	// Naively query again if too much time has passed.
+	// Here it might not be necessary
+	if time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
+		err := c.QueryPushNotificationInfo(publicKey)
+		if err != nil {
+			return err
+		}
+		// This is just horrible, but for now will do,
+		// the issue is that we don't really know how long it will
+		// take to reply, as there might be multiple servers
+		// replying to us.
+		// The only time we are 100% certain that we can proceed is
+		// when we have non-stale info for each device, but
+		// most devices are not going to be registered, so we'd still
+		// have to wait teh maximum amount of time allowed.
+		time.Sleep(3 * time.Second)
+
+	}
+	// Retrieve infos
+	info, err := c.GetPushNotificationInfo(publicKey, installationIDs)
+	if err != nil {
+		return err
+	}
+
+	// Naively dispatch to the first server for now
+	// This wait for an acknowledgement and try a different server after a timeout
+	// Also we sent a single notification for multiple message ids, need to check with UI what's the desired behavior
+
+	// Sort by server so we tend to hit the same one
+	sort.Slice(info, func(i, j int) bool {
+		return info[i].ServerPublicKey.X.Cmp(info[j].ServerPublicKey.X) <= 0
+	})
+
+	installationIDsMap := make(map[string]bool)
+	// One info per installation id, grouped by server
+	actionableInfos := make(map[string][]*PushNotificationInfo)
+	for _, i := range info {
+		if !installationIDsMap[i.InstallationID] {
+			serverKey := hex.EncodeToString(crypto.CompressPubkey(i.ServerPublicKey))
+			actionableInfos[serverKey] = append(actionableInfos[serverKey], i)
+			installationIDsMap[i.InstallationID] = true
+		}
+
+	}
+
+	for _, infos := range actionableInfos {
+		var pushNotifications []*protobuf.PushNotification
+		for _, i := range infos {
+			// TODO: Add ChatID, message, public_key
+			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
+				AccessToken:    i.AccessToken,
+				PublicKey:      common.HashPublicKey(publicKey),
+				InstallationId: i.InstallationID,
+			})
+
+		}
+		request := &protobuf.PushNotificationRequest{
+			MessageId: sentMessage.MessageIDs[0],
+			Requests:  pushNotifications,
+		}
+		serverPublicKey := infos[0].ServerPublicKey
+
+		payload, err := proto.Marshal(request)
+		if err != nil {
+			return err
+		}
+
+		rawMessage := &common.RawMessage{
+			Payload:     payload,
+			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
+		}
+
+		// TODO: We should use the messageID for the response
+		_, err = c.messageProcessor.SendPrivate(context.Background(), serverPublicKey, rawMessage)
+
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-// This should schedule:
-// 1) Check we have reasonably fresh push notifications info
-// 2) Otherwise it should fetch them
-// 3) Send a push notification to the devices in question
-func (p *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
-	return nil
+// NotifyOnMessageID keeps track of the message to make sure we notify on it
+func (c *Client) NotifyOnMessageID(chatID string, messageID []byte) error {
+	return c.persistence.TrackPushNotification(chatID, messageID)
 }
 
-func (p *Client) NotifyOnMessageID(messageID []byte) error {
-	return nil
+func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
+	return c.persistence.ShouldSentNotificationFor(publicKey, installationID, messageID)
 }
 
+func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
+	return c.persistence.NotifiedOn(publicKey, installationID, messageID)
+}
 func (p *Client) mutedChatIDsHashes(chatIDs []string) [][]byte {
 	var mutedChatListHashes [][]byte
 
@@ -313,14 +442,42 @@ func (p *Client) HandlePushNotificationAdvertisement(info *protobuf.PushNotifica
 }
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
-func (c *Client) HandlePushNotificationQueryResponse(response protobuf.PushNotificationQueryResponse) error {
+func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response protobuf.PushNotificationQueryResponse) error {
 
 	c.config.Logger.Debug("received push notification query response", zap.Any("response", response))
-	select {
-	case c.pushNotificationQueryResponses <- &response:
-	default:
-		return errors.New("could not process push notification query response")
+	if len(response.Info) == 0 {
+		return errors.New("empty response from the server")
 	}
+
+	publicKey, err := c.persistence.GetQueryPublicKey(response.MessageId)
+	if err != nil {
+		return err
+	}
+	if publicKey == nil {
+		c.config.Logger.Debug("query not found")
+		return nil
+	}
+	var pushNotificationInfo []*PushNotificationInfo
+	for _, info := range response.Info {
+		if bytes.Compare(info.PublicKey, common.HashPublicKey(publicKey)) != 0 {
+			c.config.Logger.Warn("reply for different key, ignoring")
+			continue
+		}
+		pushNotificationInfo = append(pushNotificationInfo, &PushNotificationInfo{
+			PublicKey:       publicKey,
+			ServerPublicKey: serverPublicKey,
+			AccessToken:     info.AccessToken,
+			InstallationID:  info.InstallationId,
+			RetrievedAt:     time.Now().Unix(),
+		})
+
+	}
+	err = c.persistence.SavePushNotificationInfo(pushNotificationInfo)
+	if err != nil {
+		c.config.Logger.Error("failed to save push notifications", zap.Error(err))
+		return err
+	}
+
 	return nil
 }
 
@@ -347,14 +504,14 @@ func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
 	})
 }
 
-func (c *Client) RetrievePushNotificationInfo(publicKey *ecdsa.PublicKey) ([]*PushNotificationInfo, error) {
+func (c *Client) QueryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 	hashedPublicKey := common.HashPublicKey(publicKey)
 	query := &protobuf.PushNotificationQuery{
 		PublicKeys: [][]byte{hashedPublicKey},
 	}
 	encodedMessage, err := proto.Marshal(query)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	rawMessage := &common.RawMessage{
@@ -366,47 +523,20 @@ func (c *Client) RetrievePushNotificationInfo(publicKey *ecdsa.PublicKey) ([]*Pu
 	c.config.Logger.Debug("sending query")
 	messageID, err := c.messageProcessor.SendPublic(context.Background(), encodedPublicKey, rawMessage)
 
-	// TODO: this is probably best done by polling the database instead
-	for {
-		select {
-		case <-c.quit:
-			return nil, nil
-		case <-time.After(5 * time.Second):
-			return nil, errors.New("no registration query response received")
-		case response := <-c.pushNotificationQueryResponses:
-			if bytes.Compare(response.MessageId, messageID) != 0 {
-				// Not for us, queue back
-				c.pushNotificationQueryResponses <- response
-				// This is not accurate, we should then shrink the timeout
-				// Also we should handle multiple responses
-				continue
-			}
-
-			if len(response.Info) == 0 {
-				return nil, errors.New("empty response from the server")
-			}
-
-			var pushNotificationInfo []*PushNotificationInfo
-			for _, info := range response.Info {
-				if bytes.Compare(info.PublicKey, hashedPublicKey) != 0 {
-					continue
-				}
-				pushNotificationInfo = append(pushNotificationInfo, &PushNotificationInfo{
-					PublicKey:      publicKey,
-					AccessToken:    info.AccessToken,
-					InstallationID: info.InstallationId,
-				})
-
-			}
-
-			return pushNotificationInfo, nil
-		}
+	if err != nil {
+		return err
 	}
+
+	return c.persistence.SavePushNotificationQuery(publicKey, messageID)
 }
 
-func (s *Client) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
+func (c *Client) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, installationIDs []string) ([]*PushNotificationInfo, error) {
+	return c.persistence.GetPushNotificationInfo(publicKey, installationIDs)
+}
+
+func (c *Client) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	return s.messageProcessor.JoinPublic(encodedPublicKey)
+	return c.messageProcessor.JoinPublic(encodedPublicKey)
 }
 
 func encryptAccessToken(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {

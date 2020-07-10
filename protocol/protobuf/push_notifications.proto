@@ -70,8 +70,7 @@ message PushNotification {
 
 message PushNotificationRequest {
   repeated PushNotification requests = 1;
-  string message_id = 2;
-  string ack_required = 3;
+  bytes message_id = 2;
 }
 
 message PushNotificationReport {
@@ -87,8 +86,7 @@ message PushNotificationReport {
   string installation_id = 4;
 }
 
-// TOP LEVEL
 message PushNotificationResponse {
-  string message_id = 1;
+  bytes message_id = 1;
   repeated PushNotificationReport reports = 2;
 }

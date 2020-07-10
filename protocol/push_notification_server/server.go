@@ -163,6 +163,7 @@ func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 
 	response.MessageId = request.MessageId
 
+	// TODO: filter by chat id
 	// Collect successful requests & registrations
 	var requestAndRegistrations []*RequestAndRegistration
 
@@ -254,6 +255,20 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 	s.config.Logger.Debug("handled push notification registration successfully")
 
 	return response
+}
+
+func (s *Server) Start() error {
+	pks, err := s.persistence.GetPushNotificationRegistrationPublicKeys()
+	if err != nil {
+		return err
+	}
+	for _, pk := range pks {
+		if err := s.listenToPublicKeyQueryTopic(pk); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {

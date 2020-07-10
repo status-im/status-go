@@ -3,7 +3,9 @@ package push_notification_client
 import (
 	"bytes"
 	"crypto/ecdsa"
+	"io/ioutil"
 	"math/rand"
+	"os"
 
 	"testing"
 
@@ -12,12 +14,52 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/stretchr/testify/require"
+	"github.com/status-im/status-go/protocol/sqlite"
+	"github.com/status-im/status-go/protocol/tt"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestBuildPushNotificationRegisterMessage(t *testing.T) {
+type ClientSuite struct {
+	suite.Suite
+	tmpFile        *os.File
+	persistence    *Persistence
+	identity       *ecdsa.PrivateKey
+	installationID string
+	client         *Client
+}
+
+func TestClientSuite(t *testing.T) {
+	s := new(ClientSuite)
+	s.installationID = "c6ae4fde-bb65-11ea-b3de-0242ac130004"
+
+	suite.Run(t, s)
+}
+
+func (s *ClientSuite) SetupTest() {
+	tmpFile, err := ioutil.TempFile("", "")
+	s.Require().NoError(err)
+	s.tmpFile = tmpFile
+
+	database, err := sqlite.Open(s.tmpFile.Name(), "")
+	s.Require().NoError(err)
+	s.persistence = NewPersistence(database)
+
+	identity, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.identity = identity
+
+	config := &Config{
+		Identity:                   identity,
+		Logger:                     tt.MustCreateTestLogger(),
+		RemoteNotificationsEnabled: true,
+		InstallationID:             s.installationID,
+	}
+
+	s.client = New(s.persistence, config, nil)
+}
+
+func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	myDeviceToken := "device-token"
-	myInstallationID := "installationID"
 	mutedChatList := []string{"a", "b"}
 
 	// build chat lish hashes
@@ -26,9 +68,8 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
 	}
 
-	identity, err := crypto.GenerateKey()
 	contactKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	contactIDs := []*ecdsa.PublicKey{&contactKey.PublicKey}
 
 	// Set random generator for uuid
@@ -41,43 +82,77 @@ func TestBuildPushNotificationRegisterMessage(t *testing.T) {
 	// set up reader
 	reader := bytes.NewReader([]byte(expectedUUID))
 
-	sharedKey, err := ecies.ImportECDSA(identity).GenerateShared(
+	sharedKey, err := ecies.ImportECDSA(s.identity).GenerateShared(
 		ecies.ImportECDSAPublic(&contactKey.PublicKey),
 		accessTokenKeyLength,
 		accessTokenKeyLength,
 	)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	// build encrypted token
 	encryptedToken, err := encryptAccessToken([]byte(expectedUUID), sharedKey, reader)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Reset random generator
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
 
-	config := &Config{
-		Identity:                   identity,
-		RemoteNotificationsEnabled: true,
-		InstallationID:             myInstallationID,
-	}
-
-	client := &Client{}
-	client.config = config
-	client.DeviceToken = myDeviceToken
+	s.client.DeviceToken = myDeviceToken
 	// Set reader
-	client.reader = bytes.NewReader([]byte(expectedUUID))
+	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 
 	options := &protobuf.PushNotificationRegistration{
 		Version:         1,
 		AccessToken:     expectedUUID,
 		Token:           myDeviceToken,
-		InstallationId:  myInstallationID,
+		InstallationId:  s.installationID,
 		Enabled:         true,
 		BlockedChatList: mutedChatListHashes,
 		AllowedUserList: [][]byte{encryptedToken},
 	}
 
-	actualMessage, err := client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
-	require.NoError(t, err)
+	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
+	s.Require().NoError(err)
 
-	require.Equal(t, options, actualMessage)
+	s.Require().Equal(options, actualMessage)
+}
+
+func (s *ClientSuite) TestNotifyOnMessageID() {
+	messageID := []byte("message-id")
+	chatID := "chat-id"
+	installationID1 := "1"
+	installationID2 := "2"
+
+	s.Require().NoError(s.client.NotifyOnMessageID(chatID, messageID))
+
+	key1, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// First time, should notify
+	response, err := s.client.shouldNotifyOn(&key1.PublicKey, installationID1, messageID)
+	s.Require().NoError(err)
+	s.Require().True(response)
+
+	// Save notification
+	s.Require().NoError(s.client.notifiedOn(&key1.PublicKey, installationID1, messageID))
+
+	// Second time, should not notify
+	response, err = s.client.shouldNotifyOn(&key1.PublicKey, installationID1, messageID)
+	s.Require().NoError(err)
+	s.Require().False(response)
+
+	// Different installationID
+	response, err = s.client.shouldNotifyOn(&key1.PublicKey, installationID2, messageID)
+	s.Require().NoError(err)
+	s.Require().True(response)
+
+	key2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	// different key, should notify
+	response, err = s.client.shouldNotifyOn(&key2.PublicKey, installationID1, messageID)
+	s.Require().NoError(err)
+	s.Require().True(response)
+
+	// non tracked message id
+	response, err = s.client.shouldNotifyOn(&key1.PublicKey, installationID1, []byte("not-existing"))
+	s.Require().NoError(err)
+	s.Require().False(response)
 }

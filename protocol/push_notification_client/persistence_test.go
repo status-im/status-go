@@ -72,3 +72,69 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	s.Require().Equal(int64(2), retrievedServers[0].RegisteredAt)
 	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
 }
+
+func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
+	installationID1 := "installation-id-1"
+	installationID2 := "installation-id-2"
+	installationID3 := "installation-id-3"
+	key1, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	key2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	serverKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	accessToken := "token"
+
+	infos := []*PushNotificationInfo{
+		{
+			PublicKey:       &key1.PublicKey,
+			ServerPublicKey: &serverKey.PublicKey,
+			RetrievedAt:     1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID1,
+		},
+		{
+			PublicKey:       &key1.PublicKey,
+			ServerPublicKey: &serverKey.PublicKey,
+			RetrievedAt:     1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID2,
+		},
+		{
+			PublicKey:       &key1.PublicKey,
+			ServerPublicKey: &serverKey.PublicKey,
+			RetrievedAt:     1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID3,
+		},
+		{
+			PublicKey:       &key2.PublicKey,
+			ServerPublicKey: &serverKey.PublicKey,
+			RetrievedAt:     1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID1,
+		},
+		{
+			PublicKey:       &key2.PublicKey,
+			ServerPublicKey: &serverKey.PublicKey,
+			RetrievedAt:     1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID2,
+		},
+		{
+			PublicKey:       &key2.PublicKey,
+			ServerPublicKey: &serverKey.PublicKey,
+			RetrievedAt:     1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID3,
+		},
+	}
+
+	s.Require().NoError(s.persistence.SavePushNotificationInfo(infos))
+
+	retrievedInfos, err := s.persistence.GetPushNotificationInfo(&key1.PublicKey, []string{installationID1, installationID2})
+	s.Require().NoError(err)
+
+	s.Require().Len(retrievedInfos, 2)
+}
