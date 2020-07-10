@@ -2087,7 +2087,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 		From: "from-field",
 	}
 
-	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","seen":false,"quotedMessage":null,"rtl":false,"parsedText":null,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"replace":"","responseTo":"","ensName":"","sticker":null,"commandParameters":null,"timestamp":0,"contentType":0,"messageType":0}`
+	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","seen":false,"quotedMessage":null,"rtl":false,"parsedText":null,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"replace":"","responseTo":"","ensName":"","sticker":null,"emojiReaction":null,"emojiReactionRetraction":null,"commandParameters":null,"timestamp":0,"contentType":0,"messageType":0}`
 
 	messageJSON, err := json.Marshal(message)
 	s.Require().NoError(err)
