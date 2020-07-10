@@ -173,17 +173,15 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	message.Alias = alias.String
 	message.Identicon = identicon.String
 
-	// TODO switch
-
-	if message.ContentType == protobuf.ChatMessage_STICKER {
+	switch message.ContentType {
+	case protobuf.ChatMessage_STICKER:
 		message.Payload = &protobuf.ChatMessage_Sticker{Sticker: sticker}
-	}
 
-	if message.ContentType == protobuf.ChatMessage_AUDIO {
-		message.Payload = &protobuf.ChatMessage_Audio{Audio: audio}
-	}
+		if message.ContentType == protobuf.ChatMessage_AUDIO {
+			message.Payload = &protobuf.ChatMessage_Audio{Audio: audio}
+		}
 
-	if message.ContentType == protobuf.ChatMessage_TRANSACTION_COMMAND {
+	case protobuf.ChatMessage_TRANSACTION_COMMAND:
 		message.CommandParameters = command
 	}
 
