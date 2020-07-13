@@ -30,25 +30,6 @@ message AudioMessage {
   }
 }
 
-message EmojiReaction {
-  string message_id = 1;
-  Type type = 2;
-
-  enum Type {
-    UNKNOWN_EMOJI_REACTION_TYPE = 0;
-    LOVE = 1;
-    THUMBS_UP = 2;
-    THUMBS_DOWN = 3;
-    LAUGH = 4;
-    SAD = 5;
-    ANGRY = 6;
-  }
-}
-
-message EmojiReactionRetraction {
-  string emoji_reaction_id = 1;
-}
-
 message ChatMessage {
   // Lamport timestamp of the chat message
   uint64 clock = 1;
