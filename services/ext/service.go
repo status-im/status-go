@@ -459,12 +459,9 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithDatasync())
 	}
 
-	// For now build with default/hardcoded options.
 	if config.PushNotificationServerEnabled {
 		config := &push_notification_server.Config{
-			Identity:  identity,
-			Logger:    logger,
-			GorushURL: "https://gorush.status.im",
+			Logger: logger,
 		}
 		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}

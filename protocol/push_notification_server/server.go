@@ -17,6 +17,7 @@ import (
 )
 
 const encryptedPayloadKeyLength = 16
+const defaultGorushURL = "https://gorush.status.im"
 
 type Config struct {
 	// Identity is our identity key
@@ -34,6 +35,10 @@ type Server struct {
 }
 
 func New(config *Config, persistence Persistence, messageProcessor *common.MessageProcessor) *Server {
+	if len(config.GorushURL) == 0 {
+		config.GorushURL = defaultGorushURL
+
+	}
 	return &Server{persistence: persistence, config: config, messageProcessor: messageProcessor}
 }
 
@@ -270,6 +275,24 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 }
 
 func (s *Server) Start() error {
+	if s.config.Identity == nil {
+		// Pull identity from database
+		identity, err := s.persistence.GetIdentity()
+		if err != nil {
+			return err
+		}
+		if identity == nil {
+			identity, err = crypto.GenerateKey()
+			if err != nil {
+				return err
+			}
+			if err := s.persistence.SaveIdentity(identity); err != nil {
+				return err
+			}
+		}
+		s.config.Identity = identity
+	}
+
 	pks, err := s.persistence.GetPushNotificationRegistrationPublicKeys()
 	if err != nil {
 		return err

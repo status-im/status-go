@@ -57,3 +57,29 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieve() {
 
 	s.Require().True(proto.Equal(registration, retrievedRegistration))
 }
+
+func (s *SQLitePersistenceSuite) TestSaveAndRetrieveIdentity() {
+	retrievedKey, err := s.persistence.GetIdentity()
+	s.Require().NoError(err)
+	s.Require().Nil(retrievedKey)
+
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	s.Require().NoError(s.persistence.SaveIdentity(key))
+
+	retrievedKey, err = s.persistence.GetIdentity()
+	s.Require().NoError(err)
+
+	s.Require().Equal(key, retrievedKey)
+}
+
+func (s *SQLitePersistenceSuite) TestSaveDifferentIdenities() {
+	key1, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	key2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// First one should be successul, second should fail
+	s.Require().NoError(s.persistence.SaveIdentity(key1))
+	s.Require().Error(s.persistence.SaveIdentity(key2))
+}

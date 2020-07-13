@@ -1,11 +1,13 @@
 package push_notification_server
 
 import (
+	"crypto/ecdsa"
 	"database/sql"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -21,6 +23,10 @@ type Persistence interface {
 	DeletePushNotificationRegistration(publicKey []byte, installationID string) error
 	// SavePushNotificationRegistration saves a push notification option to the db
 	SavePushNotificationRegistration(publicKey []byte, registration *protobuf.PushNotificationRegistration) error
+	// GetIdentity returns the server identity key
+	GetIdentity() (*ecdsa.PrivateKey, error)
+	// SaveIdentity saves the server identity key
+	SaveIdentity(*ecdsa.PrivateKey) error
 }
 
 type SQLitePersistence struct {
@@ -123,4 +129,26 @@ func (p *SQLitePersistence) SavePushNotificationRegistration(publicKey []byte, r
 func (p *SQLitePersistence) DeletePushNotificationRegistration(publicKey []byte, installationID string) error {
 	_, err := p.db.Exec(`DELETE FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID)
 	return err
+}
+
+func (p *SQLitePersistence) SaveIdentity(privateKey *ecdsa.PrivateKey) error {
+	_, err := p.db.Exec(`INSERT INTO push_notification_server_identity (private_key) VALUES (?)`, crypto.FromECDSA(privateKey))
+	return err
+}
+
+func (p *SQLitePersistence) GetIdentity() (*ecdsa.PrivateKey, error) {
+	var pkBytes []byte
+	err := p.db.QueryRow(`SELECT private_key FROM push_notification_server_identity LIMIT 1`).Scan(&pkBytes)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := crypto.ToECDSA(pkBytes)
+	if err != nil {
+		return nil, err
+	}
+	return pk, nil
 }
