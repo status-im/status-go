@@ -8,5 +8,6 @@ var ErrMalformedPushNotificationRegistrationInstallationID = errors.New("invalid
 var ErrEmptyPushNotificationRegistrationPublicKey = errors.New("no public key")
 var ErrCouldNotUnmarshalPushNotificationRegistration = errors.New("could not unmarshal preferences")
 var ErrMalformedPushNotificationRegistrationDeviceToken = errors.New("invalid device token")
+var ErrMalformedPushNotificationRegistrationGrant = errors.New("invalid grant")
 var ErrMalformedPushNotificationRegistrationAccessToken = errors.New("invalid access token")
 var ErrUnknownPushNotificationRegistrationTokenType = errors.New("invalid token type")

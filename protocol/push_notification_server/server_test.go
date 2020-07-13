@@ -34,6 +34,7 @@ type ServerSuite struct {
 	identity       *ecdsa.PrivateKey
 	key            *ecdsa.PrivateKey
 	sharedKey      []byte
+	grant          []byte
 	server         *Server
 }
 
@@ -64,6 +65,11 @@ func (s *ServerSuite) SetupTest() {
 	sharedKey, err := s.server.generateSharedKey(&s.key.PublicKey)
 	s.Require().NoError(err)
 	s.sharedKey = sharedKey
+	signatureMaterial := s.server.buildGrantSignatureMaterial(&s.key.PublicKey, &identity.PublicKey, s.accessToken)
+	grant, err := crypto.Sign(signatureMaterial, s.key)
+	s.Require().NoError(err)
+
+	s.grant = grant
 
 }
 
@@ -104,6 +110,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	// Missing installationID
 	payload, err := proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken: s.accessToken,
+		Grant:       s.grant,
 		TokenType:   protobuf.PushNotificationRegistration_APN_TOKEN,
 		Version:     1,
 	})
@@ -118,6 +125,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
+		Grant:          s.grant,
 		InstallationId: "abc",
 		Version:        1,
 	})
@@ -130,6 +138,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 	})
 	s.Require().NoError(err)
@@ -142,6 +151,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	// Version lower than previous one
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
 		Version:        1,
@@ -154,6 +164,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	// Setup persistence
 	s.Require().NoError(s.persistence.SavePushNotificationRegistration(common.HashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
 		Version:        2}))
@@ -168,6 +179,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
+		Grant:          s.grant,
 		Unregister:     true,
 		Version:        1,
 	})
@@ -181,6 +193,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	// Missing access token
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		InstallationId: s.installationID,
+		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		Version:        1,
 	})
@@ -195,6 +208,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    "bc",
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -209,6 +223,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -219,10 +234,41 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationDeviceToken, err)
 
+	// Missing  grant
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    s.accessToken,
+		Token:          "device-token",
+		InstallationId: s.installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationGrant, err)
+
+	// Invalid  grant
+	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
+		AccessToken:    s.accessToken,
+		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
+		Token:          "device-token",
+		Grant:          crypto.Keccak256([]byte("invalid")),
+		InstallationId: s.installationID,
+		Version:        1,
+	})
+	s.Require().NoError(err)
+
+	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	s.Require().Equal(ErrMalformedPushNotificationRegistrationGrant, err)
+
 	// Missing  token type
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		Token:          "device-token",
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -237,6 +283,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		Token:          "abc",
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
 		Version:        1,
@@ -299,6 +346,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Missing installationID
 	payload, err := proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken: s.accessToken,
+		Grant:       s.grant,
 		Version:     1,
 	})
 	s.Require().NoError(err)
@@ -314,6 +362,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		InstallationId: "abc",
+		Grant:          s.grant,
 		Version:        1,
 	})
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
@@ -326,6 +375,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Version set to 0
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 	})
 	s.Require().NoError(err)
@@ -340,6 +390,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Version lower than previous one
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -351,6 +402,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Setup persistence
 	s.Require().NoError(s.persistence.SavePushNotificationRegistration(common.HashPublicKey(&s.key.PublicKey), &protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        2}))
 
@@ -365,6 +417,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Missing access token
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		InstallationId: s.installationID,
+		Grant:          s.grant,
 		Version:        1,
 	})
 	s.Require().NoError(err)
@@ -379,6 +432,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Invalid access token
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    "bc",
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -394,6 +448,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Missing device token
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -410,6 +465,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	registration := &protobuf.PushNotificationRegistration{
 		Token:          "abc",
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
 		Version:        1,
@@ -461,6 +517,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
 	registration := &protobuf.PushNotificationRegistration{
 		Token:          "abc",
 		AccessToken:    s.accessToken,
+		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
 		Version:        1,
@@ -496,6 +553,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
 	registration := &protobuf.PushNotificationRegistration{
 		Token:           "abc",
 		AccessToken:     s.accessToken,
+		Grant:           s.grant,
 		TokenType:       protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId:  s.installationID,
 		AllowedUserList: allowedUserList,

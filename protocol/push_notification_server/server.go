@@ -9,6 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -63,7 +64,7 @@ func (p *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte)
 
 // ValidateRegistration validates a new message against the last one received for a given installationID and and public key
 // and return the decrypted message
-func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationRegistration, error) {
+func (s *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationRegistration, error) {
 	if payload == nil {
 		return nil, ErrEmptyPushNotificationRegistrationPayload
 	}
@@ -72,7 +73,7 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrEmptyPushNotificationRegistrationPublicKey
 	}
 
-	decryptedPayload, err := p.decryptRegistration(publicKey, payload)
+	decryptedPayload, err := s.decryptRegistration(publicKey, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -87,11 +88,11 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrInvalidPushNotificationRegistrationVersion
 	}
 
-	if err := p.validateUUID(registration.InstallationId); err != nil {
+	if err := s.validateUUID(registration.InstallationId); err != nil {
 		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousRegistration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(publicKey), registration.InstallationId)
+	previousRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(publicKey), registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
@@ -105,8 +106,18 @@ func (p *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return registration, nil
 	}
 
-	if err := p.validateUUID(registration.AccessToken); err != nil {
+	if err := s.validateUUID(registration.AccessToken); err != nil {
 		return nil, ErrMalformedPushNotificationRegistrationAccessToken
+	}
+
+	if len(registration.Grant) == 0 {
+		return nil, ErrMalformedPushNotificationRegistrationGrant
+	}
+
+	if err := s.verifyGrantSignature(publicKey, registration.AccessToken, registration.Grant); err != nil {
+
+		s.config.Logger.Error("failed to verify grant", zap.Error(err))
+		return nil, ErrMalformedPushNotificationRegistrationGrant
 	}
 
 	if len(registration.Token) == 0 {
@@ -139,6 +150,7 @@ func (p *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 		registration := idAndResponse.Registration
 		info := &protobuf.PushNotificationQueryInfo{
 			PublicKey:      idAndResponse.ID,
+			Grant:          registration.Grant,
 			InstallationId: registration.InstallationId,
 		}
 
@@ -337,4 +349,34 @@ func (p *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
 
 	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
 	return err
+}
+
+// buildGrantSignatureMaterial builds a grant for a specific server.
+// We use 3 components:
+// 1) The client public key. Not sure this applies to our signature scheme, but best to be conservative. https://crypto.stackexchange.com/questions/15538/given-a-message-and-signature-find-a-public-key-that-makes-the-signature-valid
+// 2) The server public key
+// 3) The access token
+// By verifying this signature, a client can trust the server was instructed to store this access token.
+
+func (s *Server) buildGrantSignatureMaterial(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, accessToken string) []byte {
+	var signatureMaterial []byte
+	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(clientPublicKey)...)
+	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(serverPublicKey)...)
+	signatureMaterial = append(signatureMaterial, []byte(accessToken)...)
+	a := crypto.Keccak256(signatureMaterial)
+	return a
+}
+
+func (s *Server) verifyGrantSignature(clientPublicKey *ecdsa.PublicKey, accessToken string, grant []byte) error {
+	signatureMaterial := s.buildGrantSignatureMaterial(clientPublicKey, &s.config.Identity.PublicKey, accessToken)
+	recoveredPublicKey, err := crypto.SigToPub(signatureMaterial, grant)
+	if err != nil {
+		return err
+	}
+
+	if !common.IsPubKeyEqual(recoveredPublicKey, clientPublicKey) {
+		return errors.New("pubkey mismatch")
+	}
+	return nil
+
 }

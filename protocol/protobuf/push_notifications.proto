@@ -17,6 +17,7 @@ message PushNotificationRegistration {
   repeated bytes allowed_user_list = 7;
   repeated bytes blocked_chat_list = 8;
   bool unregister = 9;
+  bytes grant = 10;
 }
 
 message PushNotificationRegistrationResponse {
@@ -52,6 +53,7 @@ message PushNotificationQueryInfo {
   string installation_id = 2;
   bytes public_key = 3;
   repeated bytes allowed_user_list = 4;
+  bytes grant = 5;
 }
 
 message PushNotificationQueryResponse {

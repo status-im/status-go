@@ -341,11 +341,6 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 		return nil, err
 	}
 
-	marshaledRegistration, err := proto.Marshal(registration)
-	if err != nil {
-		return nil, err
-	}
-
 	var serverPublicKeys []*ecdsa.PublicKey
 	for _, server := range servers {
 
@@ -356,6 +351,20 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 		serverPublicKeys = append(serverPublicKeys, server.PublicKey)
 
 		if err := c.persistence.UpsertServer(server); err != nil {
+			return nil, err
+		}
+
+		grant, err := c.buildGrantSignature(server.PublicKey, registration.AccessToken)
+		if err != nil {
+			c.config.Logger.Error("failed to build grant", zap.Error(err))
+			return nil, err
+		}
+
+		c.config.Logger.Info("GRANT2", zap.Binary("GRANT", grant))
+		registration.Grant = grant
+
+		marshaledRegistration, err := proto.Marshal(registration)
+		if err != nil {
 			return nil, err
 		}
 
@@ -441,6 +450,40 @@ func (p *Client) HandlePushNotificationAdvertisement(info *protobuf.PushNotifica
 	return nil
 }
 
+// buildGrantSignatureMaterial builds a grant for a specific server.
+// We use 3 components:
+// 1) The client public key. Not sure this applies to our signature scheme, but best to be conservative. https://crypto.stackexchange.com/questions/15538/given-a-message-and-signature-find-a-public-key-that-makes-the-signature-valid
+// 2) The server public key
+// 3) The access token
+// By verifying this signature, a client can trust the server was instructed to store this access token.
+
+func (c *Client) buildGrantSignatureMaterial(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, accessToken string) []byte {
+	var signatureMaterial []byte
+	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(clientPublicKey)...)
+	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(serverPublicKey)...)
+	signatureMaterial = append(signatureMaterial, []byte(accessToken)...)
+	return crypto.Keccak256(signatureMaterial)
+}
+
+func (c *Client) buildGrantSignature(serverPublicKey *ecdsa.PublicKey, accessToken string) ([]byte, error) {
+	signatureMaterial := c.buildGrantSignatureMaterial(&c.config.Identity.PublicKey, serverPublicKey, accessToken)
+	return crypto.Sign(signatureMaterial, c.config.Identity)
+}
+
+func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, grant []byte, accessToken string) error {
+	signatureMaterial := c.buildGrantSignatureMaterial(clientPublicKey, serverPublicKey, accessToken)
+	c.config.Logger.Info("GRANT", zap.Binary("GRANT", grant))
+	extractedPublicKey, err := crypto.SigToPub(signatureMaterial, grant)
+	if err != nil {
+		return err
+	}
+
+	if !common.IsPubKeyEqual(clientPublicKey, extractedPublicKey) {
+		return errors.New("invalid grant")
+	}
+	return nil
+}
+
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
 func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response protobuf.PushNotificationQueryResponse) error {
 
@@ -461,6 +504,14 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 	for _, info := range response.Info {
 		if bytes.Compare(info.PublicKey, common.HashPublicKey(publicKey)) != 0 {
 			c.config.Logger.Warn("reply for different key, ignoring")
+			continue
+		}
+
+		// We check the user has allowed this server to store this particular
+		// access token, otherwise anyone could reply with a fake token
+		// and receive notifications for a user
+		if err := c.handleGrant(publicKey, serverPublicKey, info.Grant, info.AccessToken); err != nil {
+			c.config.Logger.Warn("grant verification failed, ignoring", zap.Error(err))
 			continue
 		}
 		pushNotificationInfo = append(pushNotificationInfo, &PushNotificationInfo{
