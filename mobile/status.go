@@ -344,6 +344,16 @@ func SaveAccountAndLogin(accountData, password, settingsJSON, configJSON, subacc
 	return makeJSONResponse(nil)
 }
 
+// DeleteMultiaccount
+func DeleteMultiaccount(keyUID, keyStoreDir string) string {
+	err := statusBackend.DeleteMulticcount(keyUID, keyStoreDir)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return makeJSONResponse(nil)
+}
+
 // InitKeystore initialize keystore before doing any operations with keys.
 func InitKeystore(keydir string) string {
 	err := statusBackend.AccountManager().InitKeystore(keydir)

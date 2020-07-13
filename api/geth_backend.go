@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -176,6 +177,35 @@ func (b *GethStatusBackend) SaveAccount(account multiaccounts.Account) error {
 		return errors.New("accounts db wasn't initialized")
 	}
 	return b.multiaccountsDB.SaveAccount(account)
+}
+
+func (b *GethStatusBackend) DeleteMulticcount(keyUID string, keyStoreDir string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.multiaccountsDB == nil {
+		return errors.New("accounts db wasn't initialized")
+	}
+
+	err := b.multiaccountsDB.DeleteAccount(keyUID)
+	if err != nil {
+		return err
+	}
+
+	dbFiles := []string{
+		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-shm", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-wal", keyUID)),
+	}
+	for _, path := range dbFiles {
+		if _, err := os.Stat(path); err == nil {
+			err = os.Remove(path)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return os.RemoveAll(keyStoreDir)
 }
 
 func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, password string) (err error) {

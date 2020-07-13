@@ -614,3 +614,80 @@ func TestLoginWithKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, crypto.PubkeyToAddress(chatKey.PublicKey), extkey.Address)
 }
+
+func TestDeleteMulticcount(t *testing.T) {
+	backend := NewGethStatusBackend()
+
+	rootDataDir, err := ioutil.TempDir("", "test-keystore-dir")
+	require.NoError(t, err)
+	defer os.Remove(rootDataDir)
+
+	keyStoreDir := filepath.Join(rootDataDir, "keystore")
+
+	backend.rootDataDir = rootDataDir
+
+	err = backend.AccountManager().InitKeystore(keyStoreDir)
+	require.NoError(t, err)
+
+	backend.AccountManager()
+	accs, err := backend.AccountManager().
+		AccountsGenerator().
+		GenerateAndDeriveAddresses(12, 1, "", []string{"m/44'/60'/0'/0"})
+	require.NoError(t, err)
+
+	generateAccount := accs[0]
+	accountInfo, err := backend.AccountManager().
+		AccountsGenerator().
+		StoreAccount(generateAccount.ID, "123123")
+	require.NoError(t, err)
+
+	account := multiaccounts.Account{
+		Name:           "foo",
+		Timestamp:      1,
+		PhotoPath:      "path",
+		KeycardPairing: "pairing",
+		KeyUID:         generateAccount.KeyUID,
+	}
+
+	err = backend.ensureAppDBOpened(account, "123123")
+	require.NoError(t, err)
+
+	settings := accounts.Settings{
+		Address:           types.HexToAddress(accountInfo.Address),
+		CurrentNetwork:    "mainnet_rpc",
+		DappsAddress:      types.HexToAddress(accountInfo.Address),
+		EIP1581Address:    types.HexToAddress(accountInfo.Address),
+		InstallationID:    "d3efcff6-cffa-560e-a547-21d3858cbc51",
+		KeyUID:            account.KeyUID,
+		LatestDerivedPath: 0,
+		Name:              "Jittery Cornflowerblue Kingbird",
+		Networks:          &networks,
+		PhotoPath:         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAjklEQVR4nOzXwQmFMBAAUZXUYh32ZB32ZB02sxYQQSZGsod55/91WFgSS0RM+SyjA56ZRZhFmEWYRRT6h+M6G16zrxv6fdJpmUWYRbxsYr13dKfanpN0WmYRZhGzXz6AWYRZRIfbaX26fT9Jk07LLMIsosPt9I/dTDotswizCG+nhFmEWYRZhFnEHQAA///z1CFkYamgfQAAAABJRU5ErkJggg==",
+		PreviewPrivacy:    false,
+		PublicKey:         accountInfo.PublicKey,
+		SigningPhrase:     "yurt joey vibe",
+		WalletRootAddress: types.HexToAddress(accountInfo.Address)}
+
+	err = backend.saveAccountsAndSettings(
+		settings,
+		&params.NodeConfig{},
+		nil)
+	require.NoError(t, err)
+
+	err = backend.OpenAccounts()
+	require.NoError(t, err)
+
+	err = backend.SaveAccount(account)
+	require.NoError(t, err)
+
+	files, err := ioutil.ReadDir(rootDataDir)
+	require.NoError(t, err)
+	require.NotEqual(t, 3, len(files))
+
+	err = backend.DeleteMulticcount(account.KeyUID, keyStoreDir)
+	require.NoError(t, err)
+
+	files, err = ioutil.ReadDir(rootDataDir)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(files))
+}
