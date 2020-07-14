@@ -24,6 +24,20 @@ func (p *Persistence) TrackPushNotification(chatID string, messageID []byte) err
 	return err
 }
 
+func (p *Persistence) TrackedMessage(messageID []byte) (bool, error) {
+	var count uint64
+	err := p.db.QueryRow(`SELECT COUNT(1) FROM push_notification_client_tracked_messages WHERE message_id = ?`, messageID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	if count == 0 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (p *Persistence) SavePushNotificationQuery(publicKey *ecdsa.PublicKey, queryID []byte) error {
 	queriedAt := time.Now().Unix()
 	_, err := p.db.Exec(`INSERT INTO push_notification_client_queries (public_key, query_id, queried_at) VALUES (?,?,?)`, crypto.CompressPubkey(publicKey), queryID, queriedAt)
@@ -114,7 +128,33 @@ func (p *Persistence) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, instal
 	return infos, nil
 }
 
-func (p *Persistence) ShouldSentNotificationFor(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
+func (p *Persistence) GetPushNotificationInfoByPublicKey(publicKey *ecdsa.PublicKey) ([]*PushNotificationInfo, error) {
+	rows, err := p.db.Query(`SELECT server_public_key, installation_id, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ?`, crypto.CompressPubkey(publicKey))
+	if err != nil {
+		return nil, err
+	}
+	var infos []*PushNotificationInfo
+	for rows.Next() {
+		var serverPublicKeyBytes []byte
+		info := &PushNotificationInfo{PublicKey: publicKey}
+		err := rows.Scan(&serverPublicKeyBytes, &info.InstallationID, &info.AccessToken, &info.RetrievedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		serverPublicKey, err := crypto.DecompressPubkey(serverPublicKeyBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		info.ServerPublicKey = serverPublicKey
+		infos = append(infos, info)
+	}
+
+	return infos, nil
+}
+
+func (p *Persistence) ShouldSendNotificationFor(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
 	// First we check that we are tracking this message, next we check that we haven't already sent this
 	var count uint64
 	err := p.db.QueryRow(`SELECT COUNT(1) FROM push_notification_client_tracked_messages WHERE message_id = ?`, messageID).Scan(&count)
@@ -127,6 +167,26 @@ func (p *Persistence) ShouldSentNotificationFor(publicKey *ecdsa.PublicKey, inst
 	}
 
 	err = p.db.QueryRow(`SELECT COUNT(1) FROM push_notification_client_sent_notifications WHERE message_id = ? AND public_key = ? AND installation_id = ? `, messageID, crypto.CompressPubkey(publicKey), installationID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count == 0, nil
+}
+
+func (p *Persistence) ShouldSendNotificationToAllInstallationIDs(publicKey *ecdsa.PublicKey, messageID []byte) (bool, error) {
+	// First we check that we are tracking this message, next we check that we haven't already sent this
+	var count uint64
+	err := p.db.QueryRow(`SELECT COUNT(1) FROM push_notification_client_tracked_messages WHERE message_id = ?`, messageID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	if count == 0 {
+		return false, nil
+	}
+
+	err = p.db.QueryRow(`SELECT COUNT(1) FROM push_notification_client_sent_notifications WHERE message_id = ? AND public_key = ? `, messageID, crypto.CompressPubkey(publicKey)).Scan(&count)
 	if err != nil {
 		return false, err
 	}

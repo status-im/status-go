@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"database/sql"
 	"github.com/status-im/status-go/protocol/common"
 	"io/ioutil"
 	"math/rand"
@@ -74,6 +75,7 @@ type Messenger struct {
 	modifiedInstallations      map[string]bool
 	installationID             string
 	mailserver                 []byte
+	database                   *sql.DB
 
 	mutex sync.Mutex
 }
@@ -248,6 +250,7 @@ func NewMessenger(
 
 	var pushNotificationServer *push_notification_server.Server
 	if c.pushNotificationServerConfig != nil {
+		c.pushNotificationServerConfig.Identity = identity
 		pushNotificationServerPersistence := push_notification_server.NewSQLitePersistence(database)
 		pushNotificationServer = push_notification_server.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, processor)
 	}
@@ -285,6 +288,7 @@ func NewMessenger(
 		modifiedInstallations:      make(map[string]bool),
 		messagesPersistenceEnabled: c.messagesPersistenceEnabled,
 		verifyTransactionClient:    c.verifyTransactionClient,
+		database:                   database,
 		shutdownTasks: []func() error{
 			database.Close,
 			pushNotificationClient.Stop,
@@ -304,6 +308,7 @@ func NewMessenger(
 }
 
 func (m *Messenger) Start() error {
+	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server
 	if m.pushNotificationServer != nil {
 		if err := m.pushNotificationServer.Start(); err != nil {
@@ -3063,6 +3068,24 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	}
 	m.mutex.Unlock()
 	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
+}
+
+func (m *Messenger) StartPushNotificationServer() error {
+	if m.pushNotificationServer == nil {
+		pushNotificationServerPersistence := push_notification_server.NewSQLitePersistence(m.database)
+		config := &push_notification_server.Config{
+			Logger:   m.logger,
+			Identity: m.identity,
+		}
+		m.pushNotificationServer = push_notification_server.New(config, pushNotificationServerPersistence, m.processor)
+	}
+
+	return m.pushNotificationServer.Start()
+}
+
+func (m *Messenger) StopPushNotificationServer() error {
+	m.pushNotificationServer = nil
+	return nil
 }
 
 func generateAliasAndIdenticon(pk string) (string, string, error) {

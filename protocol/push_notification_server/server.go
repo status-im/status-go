@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"go.uber.org/zap"
@@ -136,17 +137,17 @@ func (s *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 	return registration, nil
 }
 
-func (p *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
+func (s *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
 
-	p.config.Logger.Debug("handling push notification query")
+	s.config.Logger.Info("handling push notification query")
 	response := &protobuf.PushNotificationQueryResponse{}
 	if query == nil || len(query.PublicKeys) == 0 {
 		return response
 	}
 
-	registrations, err := p.persistence.GetPushNotificationRegistrationByPublicKeys(query.PublicKeys)
+	registrations, err := s.persistence.GetPushNotificationRegistrationByPublicKeys(query.PublicKeys)
 	if err != nil {
-		// TODO: log errors
+		s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
 		return response
 	}
 
@@ -171,10 +172,12 @@ func (p *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 	return response
 }
 
-func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
+func (s *Server) HandlePushNotificationRequest(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
+	s.config.Logger.Info("handling pn request")
 	response := &protobuf.PushNotificationResponse{}
 	// We don't even send a response in this case
 	if request == nil || len(request.MessageId) == 0 {
+		s.config.Logger.Warn("empty message id")
 		return nil
 	}
 
@@ -185,18 +188,20 @@ func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 	var requestAndRegistrations []*RequestAndRegistration
 
 	for _, pn := range request.Requests {
-		registration, err := p.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(pn.PublicKey, pn.InstallationId)
+		registration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(pn.PublicKey, pn.InstallationId)
 		report := &protobuf.PushNotificationReport{
 			PublicKey:      pn.PublicKey,
 			InstallationId: pn.InstallationId,
 		}
 
 		if err != nil {
-			// TODO: log error
+			s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
 			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
 		} else if registration == nil {
+			s.config.Logger.Warn("empty registration")
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
+			s.config.Logger.Warn("invalid access token")
 			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
 		} else {
 			// For now we just assume that the notification will be successful
@@ -210,14 +215,19 @@ func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 		response.Reports = append(response.Reports, report)
 	}
 
+	s.config.Logger.Info("built pn request")
 	if len(requestAndRegistrations) == 0 {
+		s.config.Logger.Warn("no request and registration")
 		return response
 	}
 
 	// This can be done asynchronously
 	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
-	err := sendGoRushNotification(goRushRequest, p.config.GorushURL)
+	//TODO: REMOVE ME
+	s.config.Logger.Info("REQUEST", zap.Any("REQUEST", goRushRequest))
+	err := sendGoRushNotification(goRushRequest, s.config.GorushURL)
 	if err != nil {
+		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
 		// TODO: handle this error?
 	}
 
@@ -226,7 +236,7 @@ func (p *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 
 func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
 
-	s.config.Logger.Debug("handling push notification registration")
+	s.config.Logger.Info("handling push notification registration")
 	response := &protobuf.PushNotificationRegistrationResponse{
 		RequestId: common.Shake256(payload),
 	}
@@ -269,13 +279,15 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 	}
 	response.Success = true
 
-	s.config.Logger.Debug("handled push notification registration successfully")
+	s.config.Logger.Info("handled push notification registration successfully")
 
 	return response
 }
 
 func (s *Server) Start() error {
+	s.config.Logger.Info("starting push notification server")
 	if s.config.Identity == nil {
+		s.config.Logger.Info("Identity nil")
 		// Pull identity from database
 		identity, err := s.persistence.GetIdentity()
 		if err != nil {
@@ -302,6 +314,8 @@ func (s *Server) Start() error {
 			return err
 		}
 	}
+
+	s.config.Logger.Info("started push notification server", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&s.config.Identity.PublicKey))))
 
 	return nil
 }
@@ -354,9 +368,10 @@ func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, messag
 
 }
 
-func (p *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
+func (s *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
 	request protobuf.PushNotificationRequest) error {
-	response := p.HandlePushNotificationRequest(&request)
+	s.config.Logger.Info("handling pn request")
+	response := s.HandlePushNotificationRequest(&request)
 	if response == nil {
 		return nil
 	}
@@ -370,7 +385,7 @@ func (p *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
 	}
 
-	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
 	return err
 }
 

@@ -1,17 +1,17 @@
 package push_notification_client
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"sort"
-
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
+	"sort"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -19,6 +19,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"go.uber.org/zap"
@@ -29,10 +30,23 @@ const accessTokenKeyLength = 16
 const staleQueryTimeInSeconds = 86400
 
 type PushNotificationServer struct {
-	PublicKey    *ecdsa.PublicKey
-	Registered   bool
-	RegisteredAt int64
-	AccessToken  string
+	PublicKey    *ecdsa.PublicKey `json:"-"`
+	Registered   bool             `json:"registered,omitempty"`
+	RegisteredAt int64            `json:"registeredAt,omitempty"`
+	AccessToken  string           `json:"accessToken,omitempty"`
+}
+
+func (s *PushNotificationServer) MarshalJSON() ([]byte, error) {
+	type ServerAlias PushNotificationServer
+	item := struct {
+		*ServerAlias
+		PublicKeyString string `json:"publicKey"`
+	}{
+		ServerAlias:     (*ServerAlias)(s),
+		PublicKeyString: types.EncodeHex(crypto.FromECDSAPub(s.PublicKey)),
+	}
+
+	return json.Marshal(item)
 }
 
 type PushNotificationInfo struct {
@@ -104,7 +118,12 @@ func (c *Client) Start() error {
 		subscription := c.messageProcessor.Subscribe()
 		for {
 			select {
-			case m := <-subscription:
+			case m, more := <-subscription:
+				if !more {
+					c.config.Logger.Info("no more")
+					return
+				}
+				c.config.Logger.Info("handling message sent")
 				if err := c.HandleMessageSent(m); err != nil {
 					c.config.Logger.Error("failed to handle message", zap.Error(err))
 				}
@@ -121,28 +140,46 @@ func (c *Client) Stop() error {
 	return nil
 }
 
-type notificationSendingSpec struct {
-	serverPublicKey *ecdsa.PublicKey
-	installationID  string
-	messageID       []byte
-}
-
 // The message has been sent
 // We should:
 // 1) Check whether we should notify on anything
 // 2) Refresh info if necessaary
 // 3) Sent push notifications
+// TODO: handle DH messages
 func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
+	c.config.Logger.Info("sent message", zap.Any("sent message", sentMessage))
 	if !c.config.SendEnabled {
+		c.config.Logger.Info("send not enabled, ignoring")
 		return nil
 	}
 	publicKey := sentMessage.PublicKey
+	// Check we track this messages fist
+	var trackedMessageIDs [][]byte
+
+	for _, messageID := range sentMessage.MessageIDs {
+		tracked, err := c.persistence.TrackedMessage(messageID)
+		if err != nil {
+			return err
+		}
+		if tracked {
+			trackedMessageIDs = append(trackedMessageIDs, messageID)
+		}
+	}
+
+	// Nothing to do
+	if len(trackedMessageIDs) == 0 {
+		return nil
+	}
+
+	sendToAllDevices := len(sentMessage.Spec.Installations) == 0
+
 	var installationIDs []string
 
-	var notificationSpecs []*notificationSendingSpec
+	anyActionableMessage := sendToAllDevices
+	c.config.Logger.Info("send to all devices", zap.Bool("send to all", sendToAllDevices))
 
-	//Find if there's any actionable message
-	for _, messageID := range sentMessage.MessageIDs {
+	// Collect installationIDs
+	for _, messageID := range trackedMessageIDs {
 		for _, installation := range sentMessage.Spec.Installations {
 			installationID := installation.ID
 			shouldNotify, err := c.shouldNotifyOn(publicKey, installationID, messageID)
@@ -150,19 +187,19 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 				return err
 			}
 			if shouldNotify {
-				notificationSpecs = append(notificationSpecs, &notificationSendingSpec{
-					installationID: installationID,
-					messageID:      messageID,
-				})
+				anyActionableMessage = true
 				installationIDs = append(installationIDs, installation.ID)
 			}
 		}
 	}
 
 	// Is there anything we should be notifying on?
-	if len(installationIDs) == 0 {
+	if !anyActionableMessage {
+		c.config.Logger.Info("no actionable installation IDs")
 		return nil
 	}
+
+	c.config.Logger.Info("actionable messages", zap.Any("message-ids", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
 
 	// Check if we queried recently
 	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
@@ -173,8 +210,10 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 	// Naively query again if too much time has passed.
 	// Here it might not be necessary
 	if time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
+		c.config.Logger.Info("querying info")
 		err := c.QueryPushNotificationInfo(publicKey)
 		if err != nil {
+			c.config.Logger.Error("could not query pn info", zap.Error(err))
 			return err
 		}
 		// This is just horrible, but for now will do,
@@ -188,9 +227,12 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 		time.Sleep(3 * time.Second)
 
 	}
+
+	c.config.Logger.Info("queried info")
 	// Retrieve infos
 	info, err := c.GetPushNotificationInfo(publicKey, installationIDs)
 	if err != nil {
+		c.config.Logger.Error("could not get pn info", zap.Error(err))
 		return err
 	}
 
@@ -203,10 +245,14 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 		return info[i].ServerPublicKey.X.Cmp(info[j].ServerPublicKey.X) <= 0
 	})
 
+	c.config.Logger.Info("retrieved info")
+
 	installationIDsMap := make(map[string]bool)
 	// One info per installation id, grouped by server
 	actionableInfos := make(map[string][]*PushNotificationInfo)
 	for _, i := range info {
+
+		c.config.Logger.Info("queried info", zap.String("id", i.InstallationID))
 		if !installationIDsMap[i.InstallationID] {
 			serverKey := hex.EncodeToString(crypto.CompressPubkey(i.ServerPublicKey))
 			actionableInfos[serverKey] = append(actionableInfos[serverKey], i)
@@ -214,6 +260,8 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 		}
 
 	}
+
+	c.config.Logger.Info("actionable info", zap.Int("count", len(actionableInfos)))
 
 	for _, infos := range actionableInfos {
 		var pushNotifications []*protobuf.PushNotification
@@ -227,7 +275,7 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 
 		}
 		request := &protobuf.PushNotificationRequest{
-			MessageId: sentMessage.MessageIDs[0],
+			MessageId: trackedMessageIDs[0],
 			Requests:  pushNotifications,
 		}
 		serverPublicKey := infos[0].ServerPublicKey
@@ -248,6 +296,20 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 		if err != nil {
 			return err
 		}
+
+		// Mark message as sent, this is at-most-once semantic
+		// for all messageIDs
+		for _, i := range infos {
+			for _, messageID := range trackedMessageIDs {
+
+				c.config.Logger.Info("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
+				if err := c.notifiedOn(publicKey, i.InstallationID, messageID); err != nil {
+					return err
+				}
+
+			}
+		}
+
 	}
 
 	return nil
@@ -259,7 +321,11 @@ func (c *Client) NotifyOnMessageID(chatID string, messageID []byte) error {
 }
 
 func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
-	return c.persistence.ShouldSentNotificationFor(publicKey, installationID, messageID)
+	if len(installationID) == 0 {
+		return c.persistence.ShouldSendNotificationToAllInstallationIDs(publicKey, messageID)
+	} else {
+		return c.persistence.ShouldSendNotificationFor(publicKey, installationID, messageID)
+	}
 }
 
 func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
@@ -395,7 +461,7 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 		case <-c.quit:
 			return servers, nil
 		case <-ctx.Done():
-			c.config.Logger.Debug("Context done")
+			c.config.Logger.Info("Context done")
 			return servers, nil
 		case <-time.After(200 * time.Millisecond):
 			servers, err = c.persistence.GetServersByPublicKey(serverPublicKeys)
@@ -422,7 +488,7 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
 func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, response protobuf.PushNotificationRegistrationResponse) error {
-	c.config.Logger.Debug("received push notification registration response", zap.Any("response", response))
+	c.config.Logger.Info("received push notification registration response", zap.Any("response", response))
 	// TODO: handle non successful response and match request id
 	// Not successful ignore for now
 	if !response.Success {
@@ -487,7 +553,7 @@ func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
 func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response protobuf.PushNotificationQueryResponse) error {
 
-	c.config.Logger.Debug("received push notification query response", zap.Any("response", response))
+	c.config.Logger.Info("received push notification query response", zap.Any("response", response))
 	if len(response.Info) == 0 {
 		return errors.New("empty response from the server")
 	}
@@ -497,7 +563,7 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 		return err
 	}
 	if publicKey == nil {
-		c.config.Logger.Debug("query not found")
+		c.config.Logger.Info("query not found")
 		return nil
 	}
 	var pushNotificationInfo []*PushNotificationInfo
@@ -538,7 +604,7 @@ func (p *Client) HandlePushNotificationResponse(ack *protobuf.PushNotificationRe
 }
 
 func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
-	c.config.Logger.Debug("adding push notification server", zap.Any("public-key", publicKey))
+	c.config.Logger.Info("adding push notification server", zap.Any("public-key", publicKey))
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
 		return err
@@ -571,7 +637,7 @@ func (c *Client) QueryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 	}
 
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	c.config.Logger.Debug("sending query")
+	c.config.Logger.Info("sending query")
 	messageID, err := c.messageProcessor.SendPublic(context.Background(), encodedPublicKey, rawMessage)
 
 	if err != nil {
@@ -582,7 +648,11 @@ func (c *Client) QueryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 }
 
 func (c *Client) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, installationIDs []string) ([]*PushNotificationInfo, error) {
-	return c.persistence.GetPushNotificationInfo(publicKey, installationIDs)
+	if len(installationIDs) == 0 {
+		return c.persistence.GetPushNotificationInfoByPublicKey(publicKey)
+	} else {
+		return c.persistence.GetPushNotificationInfo(publicKey, installationIDs)
+	}
 }
 
 func (c *Client) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {

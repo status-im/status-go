@@ -12,10 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/push_notification_client"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
@@ -399,6 +401,31 @@ func (api *PublicAPI) UpdateMailservers(enodes []string) error {
 		nodes[i] = node
 	}
 	return api.service.UpdateMailservers(nodes)
+}
+
+// PushNotifications server
+
+func (api *PublicAPI) StartPushNotificationServer() error {
+	return api.service.messenger.StartPushNotificationServer()
+}
+
+func (api *PublicAPI) StopPushNotificationServer() error {
+	return api.service.messenger.StopPushNotificationServer()
+}
+
+// PushNotification client
+
+func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]*push_notification_client.PushNotificationServer, error) {
+	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken)
+}
+
+func (api *PublicAPI) AddPushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
+	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.AddPushNotificationServer(ctx, publicKey)
 }
 
 // Echo is a method for testing purposes.

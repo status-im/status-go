@@ -75,5 +75,4 @@ func sendGoRushNotification(request *GoRushRequest, url string) error {
 		return err
 	}
 	return nil
-
 }
