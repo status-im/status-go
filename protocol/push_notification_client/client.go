@@ -84,8 +84,8 @@ type Client struct {
 	quit        chan struct{}
 	config      *Config
 
-	// lastPushNotificationVersion is the latest known push notification version
-	lastPushNotificationVersion uint64
+	// lastPushNotificationRegistration is the latest known push notification version
+	lastPushNotificationRegistration *protobuf.PushNotificationRegistration
 
 	// AccessToken is the access token that is currently being used
 	AccessToken string
@@ -109,11 +109,7 @@ func New(persistence *Persistence, config *Config, processor *common.MessageProc
 		reader:           rand.Reader}
 }
 
-func (c *Client) Start() error {
-	if c.messageProcessor == nil {
-		return errors.New("can't start, missing message processor")
-	}
-
+func (c *Client) subscribeForSentMessages() {
 	go func() {
 		subscription := c.messageProcessor.Subscribe()
 		for {
@@ -132,6 +128,33 @@ func (c *Client) Start() error {
 			}
 		}
 	}()
+
+}
+
+func (c *Client) loadLastPushNotificationRegistration() error {
+	lastRegistration, err := c.persistence.GetLastPushNotificationRegistration()
+	if err != nil {
+		return err
+	}
+	if lastRegistration == nil {
+		lastRegistration = &protobuf.PushNotificationRegistration{}
+	}
+	c.lastPushNotificationRegistration = lastRegistration
+	return nil
+
+}
+
+func (c *Client) Start() error {
+	if c.messageProcessor == nil {
+		return errors.New("can't start, missing message processor")
+	}
+
+	err := c.loadLastPushNotificationRegistration()
+	if err != nil {
+		return err
+	}
+	c.subscribeForSentMessages()
+
 	return nil
 }
 
@@ -371,24 +394,93 @@ func (p *Client) allowedUserList(token []byte, contactIDs []*ecdsa.PublicKey) ([
 	return encryptedTokens, nil
 }
 
-func (p *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) (*protobuf.PushNotificationRegistration, error) {
-	token := uuid.New().String()
-	allowedUserList, err := p.allowedUserList([]byte(token), contactIDs)
+func (p *Client) getToken() string {
+	return uuid.New().String()
+
+}
+func (c *Client) getVersion() uint64 {
+	if c.lastPushNotificationRegistration == nil {
+		return 1
+	}
+	return c.lastPushNotificationRegistration.Version + 1
+}
+
+func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) (*protobuf.PushNotificationRegistration, error) {
+	token := c.getToken()
+	allowedUserList, err := c.allowedUserList([]byte(token), contactIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	options := &protobuf.PushNotificationRegistration{
 		AccessToken:     token,
-		TokenType:       p.config.TokenType,
-		Version:         p.lastPushNotificationVersion + 1,
-		InstallationId:  p.config.InstallationID,
-		Token:           p.DeviceToken,
-		Enabled:         p.config.RemoteNotificationsEnabled,
-		BlockedChatList: p.mutedChatIDsHashes(mutedChatIDs),
+		TokenType:       c.config.TokenType,
+		Version:         c.getVersion(),
+		InstallationId:  c.config.InstallationID,
+		Token:           c.DeviceToken,
+		Enabled:         c.config.RemoteNotificationsEnabled,
+		BlockedChatList: c.mutedChatIDsHashes(mutedChatIDs),
 		AllowedUserList: allowedUserList,
 	}
 	return options, nil
+}
+
+// shouldRefreshToken tells us whether we should pull a new token, that's only necessary when a contact is removed
+func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.PublicKey) bool {
+	newContactIDsMap := make(map[string]bool)
+	for _, pk := range newContactIDs {
+		newContactIDsMap[types.EncodeHex(crypto.FromECDSAPub(pk))] = true
+	}
+
+	for _, pk := range oldContactIDs {
+		if ok := newContactIDsMap[types.EncodeHex(crypto.FromECDSAPub(pk))]; !ok {
+			return true
+		}
+
+	}
+	return false
+}
+
+func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegistration, server *PushNotificationServer) error {
+	// Reset server registration data
+	server.Registered = false
+	server.RegisteredAt = 0
+	server.AccessToken = registration.AccessToken
+
+	if err := c.persistence.UpsertServer(server); err != nil {
+		return err
+	}
+
+	grant, err := c.buildGrantSignature(server.PublicKey, registration.AccessToken)
+	if err != nil {
+		c.config.Logger.Error("failed to build grant", zap.Error(err))
+		return err
+	}
+
+	registration.Grant = grant
+
+	marshaledRegistration, err := proto.Marshal(registration)
+	if err != nil {
+		return err
+	}
+
+	// Dispatch message
+	encryptedRegistration, err := c.encryptRegistration(server.PublicKey, marshaledRegistration)
+	if err != nil {
+		return err
+	}
+	rawMessage := &common.RawMessage{
+		Payload:     encryptedRegistration,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
+	}
+
+	_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, rawMessage)
+
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]*PushNotificationServer, error) {
@@ -409,47 +501,11 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 
 	var serverPublicKeys []*ecdsa.PublicKey
 	for _, server := range servers {
-
-		// Reset server registration data
-		server.Registered = false
-		server.RegisteredAt = 0
-		server.AccessToken = registration.AccessToken
+		err := c.registerWithServer(registration, server)
+		if err != nil {
+			return nil, err
+		}
 		serverPublicKeys = append(serverPublicKeys, server.PublicKey)
-
-		if err := c.persistence.UpsertServer(server); err != nil {
-			return nil, err
-		}
-
-		grant, err := c.buildGrantSignature(server.PublicKey, registration.AccessToken)
-		if err != nil {
-			c.config.Logger.Error("failed to build grant", zap.Error(err))
-			return nil, err
-		}
-
-		c.config.Logger.Info("GRANT2", zap.Binary("GRANT", grant))
-		registration.Grant = grant
-
-		marshaledRegistration, err := proto.Marshal(registration)
-		if err != nil {
-			return nil, err
-		}
-
-		// Dispatch message
-		encryptedRegistration, err := c.encryptRegistration(server.PublicKey, marshaledRegistration)
-		if err != nil {
-			return nil, err
-		}
-		rawMessage := &common.RawMessage{
-			Payload:     encryptedRegistration,
-			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
-		}
-
-		_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, rawMessage)
-
-		if err != nil {
-			return nil, err
-		}
-
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -538,7 +594,6 @@ func (c *Client) buildGrantSignature(serverPublicKey *ecdsa.PublicKey, accessTok
 
 func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, grant []byte, accessToken string) error {
 	signatureMaterial := c.buildGrantSignatureMaterial(clientPublicKey, serverPublicKey, accessToken)
-	c.config.Logger.Info("GRANT", zap.Binary("GRANT", grant))
 	extractedPublicKey, err := crypto.SigToPub(signatureMaterial, grant)
 	if err != nil {
 		return err

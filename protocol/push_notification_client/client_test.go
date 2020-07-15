@@ -156,3 +156,24 @@ func (s *ClientSuite) TestNotifyOnMessageID() {
 	s.Require().NoError(err)
 	s.Require().False(response)
 }
+
+func (s *ClientSuite) TestShouldRefreshToken() {
+	key1, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	key2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	key3, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	key4, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	// Contacts are added
+	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey, &key3.PublicKey, &key4.PublicKey}))
+
+	// everything the same
+	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey, &key1.PublicKey}))
+
+	// A contact is removed
+	s.Require().True(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey}))
+
+}

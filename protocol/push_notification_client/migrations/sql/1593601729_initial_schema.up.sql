@@ -37,4 +37,10 @@ CREATE TABLE IF NOT EXISTS push_notification_client_sent_notifications (
   UNIQUE(message_id, public_key, installation_id)
   );
 
+CREATE TABLE IF NOT EXISTS push_notification_client_registrations (
+    registration BLOB NOT NULL,
+    synthetic_id INT NOT NULL DEFAULT 0,
+    UNIQUE(synthetic_id) ON CONFLICT REPLACE
+);
+
 CREATE INDEX idx_push_notification_client_info_public_key ON push_notification_client_info(public_key, installation_id);

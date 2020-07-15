@@ -5,10 +5,12 @@ import (
 	"os"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
 
@@ -137,4 +139,30 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 	s.Require().NoError(err)
 
 	s.Require().Len(retrievedInfos, 2)
+}
+
+func (s *SQLitePersistenceSuite) TestSaveAndRetrieveRegistration() {
+	// Try with nil first
+	retrievedRegistration, err := s.persistence.GetLastPushNotificationRegistration()
+	s.Require().NoError(err)
+	s.Require().Nil(retrievedRegistration)
+
+	// Save & retrieve registration
+	registration := &protobuf.PushNotificationRegistration{
+		AccessToken: "test",
+		Version:     3,
+	}
+
+	s.Require().NoError(s.persistence.SaveLastPushNotificationRegistration(registration))
+	retrievedRegistration, err = s.persistence.GetLastPushNotificationRegistration()
+	s.Require().NoError(err)
+	s.Require().True(proto.Equal(registration, retrievedRegistration))
+
+	// Override and retrieve
+
+	registration.Version = 5
+	s.Require().NoError(s.persistence.SaveLastPushNotificationRegistration(registration))
+	retrievedRegistration, err = s.persistence.GetLastPushNotificationRegistration()
+	s.Require().NoError(err)
+	s.Require().True(proto.Equal(registration, retrievedRegistration))
 }

@@ -7,7 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 type Persistence struct {
@@ -16,6 +19,35 @@ type Persistence struct {
 
 func NewPersistence(db *sql.DB) *Persistence {
 	return &Persistence{db: db}
+}
+
+func (p *Persistence) GetLastPushNotificationRegistration() (*protobuf.PushNotificationRegistration, error) {
+	var registrationBytes []byte
+	err := p.db.QueryRow(`SELECT registration FROM push_notification_client_registrations LIMIT 1`).Scan(&registrationBytes)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	registration := &protobuf.PushNotificationRegistration{}
+
+	err = proto.Unmarshal(registrationBytes, registration)
+	if err != nil {
+		return nil, err
+	}
+
+	return registration, nil
+}
+
+func (p *Persistence) SaveLastPushNotificationRegistration(registration *protobuf.PushNotificationRegistration) error {
+	marshaledRegistration, err := proto.Marshal(registration)
+	if err != nil {
+		return err
+	}
+	_, err = p.db.Exec(`INSERT INTO push_notification_client_registrations (registration) VALUES (?)`, marshaledRegistration)
+	return err
+
 }
 
 func (p *Persistence) TrackPushNotification(chatID string, messageID []byte) error {
