@@ -195,12 +195,6 @@ func (c *Client) Stop() error {
 	return nil
 }
 
-// The message has been sent
-// We should:
-// 1) Check whether we should notify on anything
-// 2) Refresh info if necessaary
-// 3) Sent push notifications
-// TODO: handle DH messages
 func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 	c.config.Logger.Info("sent message", zap.Any("sent message", sentMessage))
 	if !c.config.SendEnabled {
@@ -775,9 +769,17 @@ func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
 		}
 	}
 
-	return c.persistence.UpsertServer(&PushNotificationServer{
+	err = c.persistence.UpsertServer(&PushNotificationServer{
 		PublicKey: publicKey,
 	})
+	if err != nil {
+		return err
+	}
+
+	if c.config.RemoteNotificationsEnabled {
+		c.startRegistrationLoop()
+	}
+	return nil
 }
 
 func (c *Client) QueryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
@@ -812,6 +814,14 @@ func (c *Client) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, installatio
 	} else {
 		return c.persistence.GetPushNotificationInfo(publicKey, installationIDs)
 	}
+}
+
+func (c *Client) EnableSending() {
+	c.config.SendEnabled = true
+}
+
+func (c *Client) DisableSending() {
+	c.config.SendEnabled = false
 }
 
 func (c *Client) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {

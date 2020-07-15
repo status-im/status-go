@@ -3043,6 +3043,26 @@ func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ec
 	return m.pushNotificationClient.AddPushNotificationServer(publicKey)
 }
 
+func (m *Messenger) UnregisterFromPushNotifications(ctx context.Context) error {
+	return nil
+}
+
+func (m *Messenger) DisableSendingPushNotifications() error {
+	if m.pushNotificationClient == nil {
+		return errors.New("push notification client not enabled")
+	}
+	m.pushNotificationClient.DisableSending()
+	return nil
+}
+
+func (m *Messenger) EnableSendingPushNotifications() error {
+	if m.pushNotificationClient == nil {
+		return errors.New("push notification client not enabled")
+	}
+	m.pushNotificationClient.EnableSending()
+	return nil
+}
+
 // RegisterForPushNotification register deviceToken with any push notification server enabled
 func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]*push_notification_client.PushNotificationServer, error) {
 	if m.pushNotificationClient == nil {

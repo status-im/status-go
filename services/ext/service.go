@@ -469,7 +469,7 @@ func buildMessengerOptions(
 		return nil, err
 	}
 
-	if config.PushNotificationServerEnabled || settings.PushNotificationServerEnabled {
+	if settings.PushNotificationServerEnabled {
 		config := &push_notification_server.Config{
 			Logger: logger,
 		}

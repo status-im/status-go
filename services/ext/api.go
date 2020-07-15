@@ -406,17 +406,48 @@ func (api *PublicAPI) UpdateMailservers(enodes []string) error {
 // PushNotifications server
 
 func (api *PublicAPI) StartPushNotificationServer() error {
+	// update settings
 	return api.service.messenger.StartPushNotificationServer()
 }
 
 func (api *PublicAPI) StopPushNotificationServer() error {
+	// update settings
 	return api.service.messenger.StopPushNotificationServer()
 }
 
 // PushNotification client
 
 func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]*push_notification_client.PushNotificationServer, error) {
+	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled", true)
+	if err != nil {
+		return nil, err
+	}
 	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken)
+}
+
+func (api *PublicAPI) UnregisterForPushNotifications(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled", false)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.UnregisterFromPushNotifications(ctx)
+}
+
+func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("send-push-notifications", false)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.DisableSendingPushNotifications()
+}
+
+func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("send-push-notifications", true)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.EnableSendingPushNotifications()
 }
 
 func (api *PublicAPI) AddPushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {

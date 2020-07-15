@@ -523,9 +523,6 @@ type ShhextConfig struct {
 	VerifyENSContractAddress string
 
 	VerifyTransactionChainID int64
-
-	// PushNotificationServerEnabled indicates whether a push notification server should be started
-	PushNotificationServerEnabled bool
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
