@@ -256,15 +256,18 @@ func NewMessenger(
 	}
 
 	pushNotificationClientPersistence := push_notification_client.NewPersistence(database)
-	// Hardcoding for now
-	pushNotificationClientConfig := &push_notification_client.Config{
-		Identity:                   identity,
-		TokenType:                  protobuf.PushNotificationRegistration_APN_TOKEN,
-		SendEnabled:                true,
-		Logger:                     logger,
-		RemoteNotificationsEnabled: true,
-		InstallationID:             installationID,
+	pushNotificationClientConfig := c.pushNotificationClientConfig
+	if pushNotificationClientConfig == nil {
+		pushNotificationClientConfig = &push_notification_client.Config{}
 	}
+
+	// Overriding until we handle sending/receiving from multiple identities
+	pushNotificationClientConfig.Identity = identity
+	// Hardcoding this for now, as it's the only one we support
+	pushNotificationClientConfig.TokenType = protobuf.PushNotificationRegistration_APN_TOKEN
+	pushNotificationClientConfig.Logger = logger
+	pushNotificationClientConfig.InstallationID = installationID
+
 	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor)
 
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})

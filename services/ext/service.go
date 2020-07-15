@@ -33,6 +33,7 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/push_notification_client"
 	"github.com/status-im/status-go/protocol/push_notification_server"
 	"github.com/status-im/status-go/protocol/transport"
 )
@@ -145,7 +146,12 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
 		Logger:                logger,
 	}
-	options := buildMessengerOptions(s.config, identity, db, envelopesMonitorConfig, logger)
+	s.accountsDB = accounts.NewDB(db)
+
+	options, err := buildMessengerOptions(s.config, identity, db, envelopesMonitorConfig, s.accountsDB, logger)
+	if err != nil {
+		return err
+	}
 
 	messenger, err := protocol.NewMessenger(
 		identity,
@@ -156,7 +162,6 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 	if err != nil {
 		return err
 	}
-	s.accountsDB = accounts.NewDB(db)
 	s.messenger = messenger
 	return messenger.Init()
 }
@@ -446,8 +451,9 @@ func buildMessengerOptions(
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
+	accountsDB *accounts.Database,
 	logger *zap.Logger,
-) []protocol.Option {
+) ([]protocol.Option, error) {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithDatabase(db),
@@ -458,13 +464,22 @@ func buildMessengerOptions(
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
+	settings, err := accountsDB.GetSettings()
+	if err != nil {
+		return nil, err
+	}
 
-	if config.PushNotificationServerEnabled {
+	if config.PushNotificationServerEnabled || settings.PushNotificationServerEnabled {
 		config := &push_notification_server.Config{
 			Logger: logger,
 		}
 		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}
+
+	options = append(options, protocol.WithPushNotificationClientConfig(&push_notification_client.Config{
+		SendEnabled:                settings.SendPushNotifications,
+		RemoteNotificationsEnabled: settings.RemotePushNotificationsEnabled,
+	}))
 
 	if config.VerifyTransactionURL != "" {
 		client := &verifyTransactionClient{
@@ -474,5 +489,5 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithVerifyTransactionClient(client))
 	}
 
-	return options
+	return options, nil
 }

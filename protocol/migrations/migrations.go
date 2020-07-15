@@ -338,7 +338,7 @@ func _1593087212_add_mute_chatDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593087212_add_mute_chat.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1593087310, 0)}
+	info := bindataFileInfo{name: "1593087212_add_mute_chat.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1594393604, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -358,7 +358,7 @@ func _1593087212_add_mute_chatUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593087212_add_mute_chat.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1593091669, 0)}
+	info := bindataFileInfo{name: "1593087212_add_mute_chat.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1594393604, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe, 0x9, 0xa0, 0x4a, 0x8e, 0x23, 0xe4, 0xce, 0xbc, 0xd4, 0x9, 0xeb, 0xf9, 0x67, 0x90, 0xc0, 0x4b, 0x67, 0x84, 0xe4, 0x42, 0x8d, 0x0, 0x17, 0x29, 0x7f, 0x12, 0xbf, 0x7d, 0x4e, 0x78, 0xec}}
 	return a, nil
 }
