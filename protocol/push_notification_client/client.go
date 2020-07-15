@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"sort"
 	"time"
 
@@ -29,11 +30,19 @@ const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
 const staleQueryTimeInSeconds = 86400
 
+// maxRetries is the maximum number of attempts we do before giving up registering with a server
+const maxRetries int64 = 12
+
+// RegistrationBackoffTime is the step of the exponential backoff
+const RegistrationBackoffTime int64 = 15
+
 type PushNotificationServer struct {
-	PublicKey    *ecdsa.PublicKey `json:"-"`
-	Registered   bool             `json:"registered,omitempty"`
-	RegisteredAt int64            `json:"registeredAt,omitempty"`
-	AccessToken  string           `json:"accessToken,omitempty"`
+	PublicKey     *ecdsa.PublicKey `json:"-"`
+	Registered    bool             `json:"registered,omitempty"`
+	RegisteredAt  int64            `json:"registeredAt,omitempty"`
+	LastRetriedAt int64            `json:"lastRetriedAt,omitempty"`
+	RetryCount    int64            `json:"retryCount,omitempty"`
+	AccessToken   string           `json:"accessToken,omitempty"`
 }
 
 func (s *PushNotificationServer) MarshalJSON() ([]byte, error) {
@@ -68,8 +77,7 @@ type Config struct {
 	// AllowOnlyFromContacts indicates whether we should be receiving push notifications
 	// only from contacts
 	AllowOnlyFromContacts bool
-	// PushNotificationServers is an array of push notification servers we want to register with
-	PushNotificationServers []*PushNotificationServer
+
 	// InstallationID is the installation-id for this device
 	InstallationID string
 
@@ -99,8 +107,10 @@ type Client struct {
 	reader io.Reader
 
 	//messageProcessor is a message processor used to send and being notified of messages
-
 	messageProcessor *common.MessageProcessor
+
+	// registrationLoopQuitChan is a channel to indicate to the registration loop that should be terminating
+	registrationLoopQuitChan chan struct{}
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
@@ -109,7 +119,8 @@ func New(persistence *Persistence, config *Config, processor *common.MessageProc
 		config:           config,
 		messageProcessor: processor,
 		persistence:      persistence,
-		reader:           rand.Reader}
+		reader:           rand.Reader,
+	}
 }
 
 func (c *Client) subscribeForSentMessages() {
@@ -147,6 +158,19 @@ func (c *Client) loadLastPushNotificationRegistration() error {
 	return nil
 
 }
+func (c *Client) stopRegistrationLoop() {
+	// stop old registration loop
+	if c.registrationLoopQuitChan != nil {
+		close(c.registrationLoopQuitChan)
+		c.registrationLoopQuitChan = nil
+	}
+}
+
+func (c *Client) startRegistrationLoop() {
+	c.stopRegistrationLoop()
+	c.registrationLoopQuitChan = make(chan struct{})
+	go c.registrationLoop()
+}
 
 func (c *Client) Start() error {
 	if c.messageProcessor == nil {
@@ -158,12 +182,16 @@ func (c *Client) Start() error {
 		return err
 	}
 	c.subscribeForSentMessages()
+	c.startRegistrationLoop()
 
 	return nil
 }
 
 func (c *Client) Stop() error {
 	close(c.quit)
+	if c.registrationLoopQuitChan != nil {
+		close(c.registrationLoopQuitChan)
+	}
 	return nil
 }
 
@@ -450,10 +478,21 @@ func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.Public
 	return false
 }
 
+func nextServerRetry(server *PushNotificationServer) int64 {
+	return server.LastRetriedAt + RegistrationBackoffTime*server.RetryCount*int64(math.Exp2(float64(server.RetryCount)))
+}
+
+// We calculate if it's too early to retry, by exponentially backing off
+func shouldRetryRegisteringWithServer(server *PushNotificationServer) bool {
+	return time.Now().Unix() < nextServerRetry(server)
+}
+
 func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegistration, server *PushNotificationServer) error {
 	// Reset server registration data
 	server.Registered = false
 	server.RegisteredAt = 0
+	server.RetryCount += 1
+	server.LastRetriedAt = time.Now().Unix()
 	server.AccessToken = registration.AccessToken
 
 	if err := c.persistence.UpsertServer(server); err != nil {
@@ -489,10 +528,64 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 		return err
 	}
 	return nil
+}
 
+func (c *Client) registrationLoop() error {
+	for {
+		c.config.Logger.Info("runing registration loop")
+		servers, err := c.persistence.GetServers()
+		if err != nil {
+			c.config.Logger.Error("failed retrieving servers, quitting registration loop", zap.Error(err))
+			return err
+		}
+		if len(servers) == 0 {
+			c.config.Logger.Debug("nothing to do, quitting registration loop")
+			return nil
+		}
+
+		var nonRegisteredServers []*PushNotificationServer
+		for _, server := range servers {
+			if server.Registered {
+				nonRegisteredServers = append(nonRegisteredServers, server)
+			}
+			if len(nonRegisteredServers) == 0 {
+				c.config.Logger.Debug("registered with all servers, quitting registration loop")
+				return nil
+			}
+
+			var lowestNextRetry int64
+
+			for _, server := range nonRegisteredServers {
+				if shouldRetryRegisteringWithServer(server) {
+					err := c.registerWithServer(c.lastPushNotificationRegistration, server)
+					if err != nil {
+						return err
+					}
+				}
+				nextRetry := nextServerRetry(server)
+				if lowestNextRetry == 0 || nextRetry < lowestNextRetry {
+					lowestNextRetry = nextRetry
+				}
+
+			}
+
+			nextRetry := lowestNextRetry - time.Now().Unix()
+			waitFor := time.Duration(nextRetry)
+			select {
+
+			case <-time.After(waitFor * time.Second):
+			case <-c.registrationLoopQuitChan:
+				return nil
+
+			}
+		}
+	}
 }
 
 func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]*PushNotificationServer, error) {
+	// stop registration loop
+	c.stopRegistrationLoop()
+
 	c.DeviceToken = deviceToken
 	servers, err := c.persistence.GetServers()
 	if err != nil {
@@ -526,7 +619,9 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 		case <-c.quit:
 			return servers, nil
 		case <-ctx.Done():
-			c.config.Logger.Info("Context done")
+			c.config.Logger.Info("could not register all servers")
+			// start registration loop
+			c.startRegistrationLoop()
 			return servers, nil
 		case <-time.After(200 * time.Millisecond):
 			servers, err = c.persistence.GetServersByPublicKey(serverPublicKeys)
