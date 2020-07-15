@@ -1,9 +1,11 @@
 package push_notification_client
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/gob"
 	"strings"
 	"time"
 
@@ -21,33 +23,59 @@ func NewPersistence(db *sql.DB) *Persistence {
 	return &Persistence{db: db}
 }
 
-func (p *Persistence) GetLastPushNotificationRegistration() (*protobuf.PushNotificationRegistration, error) {
+func (p *Persistence) GetLastPushNotificationRegistration() (*protobuf.PushNotificationRegistration, []*ecdsa.PublicKey, error) {
 	var registrationBytes []byte
-	err := p.db.QueryRow(`SELECT registration FROM push_notification_client_registrations LIMIT 1`).Scan(&registrationBytes)
+	var contactIDsBytes []byte
+	err := p.db.QueryRow(`SELECT registration,contact_ids FROM push_notification_client_registrations LIMIT 1`).Scan(&registrationBytes, &contactIDsBytes)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, nil, nil
 	} else if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	var publicKeyBytes [][]byte
+	var contactIDs []*ecdsa.PublicKey
+	// Restore contactIDs
+	contactIDsDecoder := gob.NewDecoder(bytes.NewBuffer(contactIDsBytes))
+	err = contactIDsDecoder.Decode(&publicKeyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, pkBytes := range publicKeyBytes {
+		pk, err := crypto.UnmarshalPubkey(pkBytes)
+		if err != nil {
+			return nil, nil, err
+		}
+		contactIDs = append(contactIDs, pk)
 	}
 
 	registration := &protobuf.PushNotificationRegistration{}
 
 	err = proto.Unmarshal(registrationBytes, registration)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return registration, nil
+	return registration, contactIDs, nil
 }
 
-func (p *Persistence) SaveLastPushNotificationRegistration(registration *protobuf.PushNotificationRegistration) error {
+func (p *Persistence) SaveLastPushNotificationRegistration(registration *protobuf.PushNotificationRegistration, contactIDs []*ecdsa.PublicKey) error {
+	var encodedContactIDs bytes.Buffer
+	var contactIDsBytes [][]byte
+	for _, pk := range contactIDs {
+		contactIDsBytes = append(contactIDsBytes, crypto.FromECDSAPub(pk))
+	}
+	pkEncoder := gob.NewEncoder(&encodedContactIDs)
+	if err := pkEncoder.Encode(contactIDsBytes); err != nil {
+		return err
+	}
+
 	marshaledRegistration, err := proto.Marshal(registration)
 	if err != nil {
 		return err
 	}
-	_, err = p.db.Exec(`INSERT INTO push_notification_client_registrations (registration) VALUES (?)`, marshaledRegistration)
+	_, err = p.db.Exec(`INSERT INTO push_notification_client_registrations (registration,contact_ids) VALUES (?, ?)`, marshaledRegistration, encodedContactIDs.Bytes())
 	return err
-
 }
 
 func (p *Persistence) TrackPushNotification(chatID string, messageID []byte) error {

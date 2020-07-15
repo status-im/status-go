@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS push_notification_client_sent_notifications (
 
 CREATE TABLE IF NOT EXISTS push_notification_client_registrations (
     registration BLOB NOT NULL,
+    contact_ids BLOB,
     synthetic_id INT NOT NULL DEFAULT 0,
     UNIQUE(synthetic_id) ON CONFLICT REPLACE
 );

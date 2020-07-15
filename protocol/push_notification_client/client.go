@@ -87,6 +87,9 @@ type Client struct {
 	// lastPushNotificationRegistration is the latest known push notification version
 	lastPushNotificationRegistration *protobuf.PushNotificationRegistration
 
+	// lastContactIDs is the latest contact ids array
+	lastContactIDs []*ecdsa.PublicKey
+
 	// AccessToken is the access token that is currently being used
 	AccessToken string
 	// DeviceToken is the device token for this device
@@ -132,13 +135,14 @@ func (c *Client) subscribeForSentMessages() {
 }
 
 func (c *Client) loadLastPushNotificationRegistration() error {
-	lastRegistration, err := c.persistence.GetLastPushNotificationRegistration()
+	lastRegistration, lastContactIDs, err := c.persistence.GetLastPushNotificationRegistration()
 	if err != nil {
 		return err
 	}
 	if lastRegistration == nil {
 		lastRegistration = &protobuf.PushNotificationRegistration{}
 	}
+	c.lastContactIDs = lastContactIDs
 	c.lastPushNotificationRegistration = lastRegistration
 	return nil
 
@@ -394,8 +398,13 @@ func (p *Client) allowedUserList(token []byte, contactIDs []*ecdsa.PublicKey) ([
 	return encryptedTokens, nil
 }
 
-func (p *Client) getToken() string {
-	return uuid.New().String()
+// getToken checks if we need to refresh the token
+// and return a new one in that case
+func (c *Client) getToken(contactIDs []*ecdsa.PublicKey) string {
+	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs) {
+		return uuid.New().String()
+	}
+	return c.lastPushNotificationRegistration.AccessToken
 
 }
 func (c *Client) getVersion() uint64 {
@@ -406,7 +415,7 @@ func (c *Client) getVersion() uint64 {
 }
 
 func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) (*protobuf.PushNotificationRegistration, error) {
-	token := c.getToken()
+	token := c.getToken(contactIDs)
 	allowedUserList, err := c.allowedUserList([]byte(token), contactIDs)
 	if err != nil {
 		return nil, err

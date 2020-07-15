@@ -1,6 +1,7 @@
 package push_notification_client
 
 import (
+	"crypto/ecdsa"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -143,9 +144,10 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveRegistration() {
 	// Try with nil first
-	retrievedRegistration, err := s.persistence.GetLastPushNotificationRegistration()
+	retrievedRegistration, retrievedContactIDs, err := s.persistence.GetLastPushNotificationRegistration()
 	s.Require().NoError(err)
 	s.Require().Nil(retrievedRegistration)
+	s.Require().Nil(retrievedContactIDs)
 
 	// Save & retrieve registration
 	registration := &protobuf.PushNotificationRegistration{
@@ -153,16 +155,30 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveRegistration() {
 		Version:     3,
 	}
 
-	s.Require().NoError(s.persistence.SaveLastPushNotificationRegistration(registration))
-	retrievedRegistration, err = s.persistence.GetLastPushNotificationRegistration()
+	key1, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	key2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	key3, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	publicKeys := []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}
+
+	s.Require().NoError(s.persistence.SaveLastPushNotificationRegistration(registration, publicKeys))
+	retrievedRegistration, retrievedContactIDs, err = s.persistence.GetLastPushNotificationRegistration()
 	s.Require().NoError(err)
 	s.Require().True(proto.Equal(registration, retrievedRegistration))
+	s.Require().Equal(publicKeys, retrievedContactIDs)
 
 	// Override and retrieve
 
 	registration.Version = 5
-	s.Require().NoError(s.persistence.SaveLastPushNotificationRegistration(registration))
-	retrievedRegistration, err = s.persistence.GetLastPushNotificationRegistration()
+	publicKeys = append(publicKeys, &key3.PublicKey)
+	s.Require().NoError(s.persistence.SaveLastPushNotificationRegistration(registration, publicKeys))
+	retrievedRegistration, retrievedContactIDs, err = s.persistence.GetLastPushNotificationRegistration()
 	s.Require().NoError(err)
 	s.Require().True(proto.Equal(registration, retrievedRegistration))
+	s.Require().Equal(publicKeys, retrievedContactIDs)
 }
