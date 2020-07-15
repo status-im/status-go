@@ -160,7 +160,7 @@ func (p *MessageProcessor) sendPrivate(
 
 	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
 
-	if p.featureFlags.Datasync {
+	if p.featureFlags.Datasync && rawMessage.ResendAutomatically {
 		if err := p.addToDataSync(recipient, wrappedMessage); err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}

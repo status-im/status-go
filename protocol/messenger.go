@@ -1201,10 +1201,11 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 	}
 
 	_, err = m.dispatchMessage(ctx, &common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     message.Payload,
-		MessageType: message.MessageType,
-		Recipients:  message.Recipients,
+		LocalChatID:         chat.ID,
+		Payload:             message.Payload,
+		MessageType:         message.MessageType,
+		Recipients:          message.Recipients,
+		ResendAutomatically: message.ResendAutomatically,
 	})
 	return err
 }
@@ -1402,9 +1403,10 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 	}
 
 	id, err := m.dispatchMessage(ctx, &common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		LocalChatID:         chat.ID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		ResendAutomatically: true,
 	})
 	if err != nil {
 		return nil, err
