@@ -262,7 +262,7 @@ func (m *Message) parseImage() error {
 }
 
 // parseAudio check the message contains an audio, and if so
-// it creates the a base64 encoded version of it.
+// it creates a base64 encoded version of it.
 func (m *Message) parseAudio() error {
 	if m.ContentType != protobuf.ChatMessage_AUDIO {
 		return nil
