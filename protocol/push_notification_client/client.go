@@ -456,6 +456,15 @@ func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 	return options, nil
 }
 
+func (c *Client) buildPushNotificationUnregisterMessage() *protobuf.PushNotificationRegistration {
+	options := &protobuf.PushNotificationRegistration{
+		Version:        c.getVersion(),
+		InstallationId: c.config.InstallationID,
+		Unregister:     true,
+	}
+	return options
+}
+
 // shouldRefreshToken tells us whether we should pull a new token, that's only necessary when a contact is removed
 func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.PublicKey) bool {
 	newContactIDsMap := make(map[string]bool)
@@ -479,6 +488,29 @@ func nextServerRetry(server *PushNotificationServer) int64 {
 // We calculate if it's too early to retry, by exponentially backing off
 func shouldRetryRegisteringWithServer(server *PushNotificationServer) bool {
 	return time.Now().Unix() < nextServerRetry(server)
+}
+
+func (c *Client) resetServers() error {
+	servers, err := c.persistence.GetServers()
+	if err != nil {
+		return err
+	}
+	for _, server := range servers {
+
+		// Reset server registration data
+		server.Registered = false
+		server.RegisteredAt = 0
+		server.RetryCount += 1
+		server.LastRetriedAt = time.Now().Unix()
+		server.AccessToken = ""
+
+		if err := c.persistence.UpsertServer(server); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
 }
 
 func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegistration, server *PushNotificationServer) error {
@@ -576,6 +608,41 @@ func (c *Client) registrationLoop() error {
 	}
 }
 
+func (c *Client) Unregister() error {
+	// stop registration loop
+	c.stopRegistrationLoop()
+
+	registration := c.buildPushNotificationUnregisterMessage()
+	err := c.SaveLastPushNotificationRegistration(registration, nil)
+	if err != nil {
+		return err
+	}
+	// Reset servers
+	err = c.resetServers()
+	if err != nil {
+		return err
+	}
+
+	// and asynchronously register
+	c.startRegistrationLoop()
+	return nil
+}
+
+func (c *Client) SaveLastPushNotificationRegistration(registration *protobuf.PushNotificationRegistration, contactIDs []*ecdsa.PublicKey) error {
+	// stop registration loop
+	c.stopRegistrationLoop()
+
+	err := c.persistence.SaveLastPushNotificationRegistration(registration, contactIDs)
+	if err != nil {
+		return err
+	}
+	c.lastPushNotificationRegistration = registration
+	c.lastContactIDs = contactIDs
+
+	c.startRegistrationLoop()
+	return nil
+}
+
 func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]*PushNotificationServer, error) {
 	// stop registration loop
 	c.stopRegistrationLoop()
@@ -591,6 +658,11 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 	}
 
 	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.SaveLastPushNotificationRegistration(registration, contactIDs)
 	if err != nil {
 		return nil, err
 	}

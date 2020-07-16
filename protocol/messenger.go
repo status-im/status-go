@@ -3044,7 +3044,7 @@ func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ec
 }
 
 func (m *Messenger) UnregisterFromPushNotifications(ctx context.Context) error {
-	return nil
+	return m.pushNotificationClient.Unregister()
 }
 
 func (m *Messenger) DisableSendingPushNotifications() error {

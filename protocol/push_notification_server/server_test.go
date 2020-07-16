@@ -177,9 +177,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	// Unregistering message
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
-		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId: s.installationID,
-		Grant:          s.grant,
 		Unregister:     true,
 		Version:        1,
 	})
