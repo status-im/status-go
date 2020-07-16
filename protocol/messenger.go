@@ -3064,9 +3064,9 @@ func (m *Messenger) EnableSendingPushNotifications() error {
 }
 
 // RegisterForPushNotification register deviceToken with any push notification server enabled
-func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]*push_notification_client.PushNotificationServer, error) {
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
 	if m.pushNotificationClient == nil {
-		return nil, errors.New("push notification client not enabled")
+		return errors.New("push notification client not enabled")
 	}
 
 	var contactIDs []*ecdsa.PublicKey
@@ -3093,6 +3093,20 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	}
 	m.mutex.Unlock()
 	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
+}
+
+func (m *Messenger) RegisteredForPushNotifications() (bool, error) {
+	if m.pushNotificationClient == nil {
+		return false, errors.New("no push notification client")
+	}
+	return m.pushNotificationClient.Registered()
+}
+
+func (m *Messenger) GetPushNotificationServers() ([]*push_notification_client.PushNotificationServer, error) {
+	if m.pushNotificationClient == nil {
+		return nil, errors.New("no push notification client")
+	}
+	return m.pushNotificationClient.GetServers()
 }
 
 func (m *Messenger) StartPushNotificationServer() error {

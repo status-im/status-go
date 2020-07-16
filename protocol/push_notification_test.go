@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -114,11 +115,9 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Whi
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
-	errChan := make(chan error)
 
 	bob1DeviceToken := "token-1"
 	bob2DeviceToken := "token-2"
-	var bob1Servers, bob2Servers []*push_notification_client.PushNotificationServer
 
 	bob1 := s.m
 	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
@@ -130,10 +129,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err := bob1.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	go func() {
-		bob1Servers, err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
-		errChan <- err
-	}()
+	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
 
 	// Receive message, reply
 	// TODO: find a better way to handle this waiting
@@ -163,21 +159,28 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	_, err = bob1.RetrieveAll()
 	s.Require().NoError(err)
 
+	// Pull servers  and check we registered
+	err = tt.RetryWithBackOff(func() error {
+		registered, err := bob1.RegisteredForPushNotifications()
+		if err != nil {
+			return err
+		}
+		if !registered {
+			return errors.New("not registered")
+		}
+		return nil
+	})
 	// Make sure we receive it
-	err = <-errChan
 	s.Require().NoError(err)
-	s.Require().NotNil(bob1Servers)
-	s.Require().Len(bob1Servers, 1)
-	s.Require().True(bob1Servers[0].Registered)
+	bob1Servers, err := bob1.GetPushNotificationServers()
+	s.Require().NoError(err)
 
 	// Register bob2
 	err = bob2.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	go func() {
-		bob2Servers, err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
-		errChan <- err
-	}()
+	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
+	s.Require().NoError(err)
 
 	// Receive message, reply
 	// TODO: find a better way to handle this waiting
@@ -207,12 +210,20 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	_, err = bob2.RetrieveAll()
 	s.Require().NoError(err)
 
+	err = tt.RetryWithBackOff(func() error {
+		registered, err := bob2.RegisteredForPushNotifications()
+		if err != nil {
+			return err
+		}
+		if !registered {
+			return errors.New("not registered")
+		}
+		return nil
+	})
 	// Make sure we receive it
-	err = <-errChan
 	s.Require().NoError(err)
-	s.Require().NotNil(bob2Servers)
-	s.Require().Len(bob2Servers, 1)
-	s.Require().True(bob2Servers[0].Registered)
+	bob2Servers, err := bob2.GetPushNotificationServers()
+	s.Require().NoError(err)
 
 	err = alice.pushNotificationClient.QueryPushNotificationInfo(&bob2.identity.PublicKey)
 	s.Require().NoError(err)

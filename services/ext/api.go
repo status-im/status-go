@@ -417,10 +417,10 @@ func (api *PublicAPI) StopPushNotificationServer() error {
 
 // PushNotification client
 
-func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string) ([]*push_notification_client.PushNotificationServer, error) {
+func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
 	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled", true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken)
 }
@@ -457,6 +457,14 @@ func (api *PublicAPI) AddPushNotificationServer(ctx context.Context, publicKeyBy
 	}
 
 	return api.service.messenger.AddPushNotificationServer(ctx, publicKey)
+}
+
+func (api *PublicAPI) GetPushNotificationServers() ([]*push_notification_client.PushNotificationServer, error) {
+	return api.service.messenger.GetPushNotificationServers()
+}
+
+func (api *PublicAPI) RegisteredForPushNotifications() (bool, error) {
+	return api.service.messenger.RegisteredForPushNotifications()
 }
 
 // Echo is a method for testing purposes.

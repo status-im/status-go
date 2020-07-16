@@ -487,7 +487,7 @@ func nextServerRetry(server *PushNotificationServer) int64 {
 
 // We calculate if it's too early to retry, by exponentially backing off
 func shouldRetryRegisteringWithServer(server *PushNotificationServer) bool {
-	return time.Now().Unix() < nextServerRetry(server)
+	return time.Now().Unix() > nextServerRetry(server)
 }
 
 func (c *Client) resetServers() error {
@@ -558,7 +558,7 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 
 func (c *Client) registrationLoop() error {
 	for {
-		c.config.Logger.Info("runing registration loop")
+		c.config.Logger.Info("running registration loop")
 		servers, err := c.persistence.GetServers()
 		if err != nil {
 			c.config.Logger.Error("failed retrieving servers, quitting registration loop", zap.Error(err))
@@ -571,39 +571,44 @@ func (c *Client) registrationLoop() error {
 
 		var nonRegisteredServers []*PushNotificationServer
 		for _, server := range servers {
-			if server.Registered {
+			if !server.Registered {
 				nonRegisteredServers = append(nonRegisteredServers, server)
 			}
-			if len(nonRegisteredServers) == 0 {
-				c.config.Logger.Debug("registered with all servers, quitting registration loop")
-				return nil
-			}
+		}
+		if len(nonRegisteredServers) == 0 {
+			c.config.Logger.Debug("registered with all servers, quitting registration loop")
+			return nil
+		}
 
-			var lowestNextRetry int64
+		c.config.Logger.Info("Trying to register with", zap.Int("servers", len(nonRegisteredServers)))
 
-			for _, server := range nonRegisteredServers {
-				if shouldRetryRegisteringWithServer(server) {
-					err := c.registerWithServer(c.lastPushNotificationRegistration, server)
-					if err != nil {
-						return err
-					}
+		var lowestNextRetry int64
+
+		for _, server := range nonRegisteredServers {
+			nR := nextServerRetry(server)
+			c.config.Logger.Info("Next retry", zap.Int64("now", time.Now().Unix()), zap.Int64("next", nR))
+			if shouldRetryRegisteringWithServer(server) {
+				c.config.Logger.Info("registering with server", zap.Any("server", server))
+				err := c.registerWithServer(c.lastPushNotificationRegistration, server)
+				if err != nil {
+					return err
 				}
-				nextRetry := nextServerRetry(server)
-				if lowestNextRetry == 0 || nextRetry < lowestNextRetry {
-					lowestNextRetry = nextRetry
-				}
-
+			}
+			nextRetry := nextServerRetry(server)
+			if lowestNextRetry == 0 || nextRetry < lowestNextRetry {
+				lowestNextRetry = nextRetry
 			}
 
-			nextRetry := lowestNextRetry - time.Now().Unix()
-			waitFor := time.Duration(nextRetry)
-			select {
+		}
 
-			case <-time.After(waitFor * time.Second):
-			case <-c.registrationLoopQuitChan:
-				return nil
+		nextRetry := lowestNextRetry - time.Now().Unix()
+		waitFor := time.Duration(nextRetry)
+		select {
 
-			}
+		case <-time.After(waitFor * time.Second):
+		case <-c.registrationLoopQuitChan:
+			return nil
+
 		}
 	}
 }
@@ -643,73 +648,44 @@ func (c *Client) SaveLastPushNotificationRegistration(registration *protobuf.Pus
 	return nil
 }
 
-func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) ([]*PushNotificationServer, error) {
+func (c *Client) Registered() (bool, error) {
+	servers, err := c.persistence.GetServers()
+	if err != nil {
+		return false, err
+	}
+
+	for _, s := range servers {
+		if !s.Registered {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (c *Client) GetServers() ([]*PushNotificationServer, error) {
+	return c.persistence.GetServers()
+}
+
+func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
 	c.stopRegistrationLoop()
 
 	c.DeviceToken = deviceToken
-	servers, err := c.persistence.GetServers()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(servers) == 0 {
-		return nil, errors.New("no servers to register with")
-	}
 
 	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = c.SaveLastPushNotificationRegistration(registration, contactIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var serverPublicKeys []*ecdsa.PublicKey
-	for _, server := range servers {
-		err := c.registerWithServer(registration, server)
-		if err != nil {
-			return nil, err
-		}
-		serverPublicKeys = append(serverPublicKeys, server.PublicKey)
-	}
+	c.startRegistrationLoop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-
-	// This code polls the database for server registrations, giving up
-	// after 5 seconds
-	for {
-		select {
-		case <-c.quit:
-			return servers, nil
-		case <-ctx.Done():
-			c.config.Logger.Info("could not register all servers")
-			// start registration loop
-			c.startRegistrationLoop()
-			return servers, nil
-		case <-time.After(200 * time.Millisecond):
-			servers, err = c.persistence.GetServersByPublicKey(serverPublicKeys)
-			if err != nil {
-				return nil, err
-			}
-
-			allRegistered := true
-			for _, server := range servers {
-				allRegistered = allRegistered && server.Registered
-			}
-
-			// If any of the servers we haven't registered yet, continue
-			if !allRegistered {
-				continue
-			}
-
-			// all have registered,cancel context and return
-			cancel()
-			return servers, nil
-		}
-	}
+	return nil
 }
 
 // HandlePushNotificationRegistrationResponse should check whether the response was successful or not, retry if necessary otherwise store the result in the database
