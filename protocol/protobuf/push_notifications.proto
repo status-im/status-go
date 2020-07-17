@@ -54,6 +54,7 @@ message PushNotificationQueryInfo {
   bytes public_key = 3;
   repeated bytes allowed_user_list = 4;
   bytes grant = 5;
+  uint64 version = 6;
 }
 
 message PushNotificationQueryResponse {

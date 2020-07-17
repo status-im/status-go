@@ -157,6 +157,7 @@ func (s *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 		info := &protobuf.PushNotificationQueryInfo{
 			PublicKey:      idAndResponse.ID,
 			Grant:          registration.Grant,
+			Version:        registration.Version,
 			InstallationId: registration.InstallationId,
 		}
 

@@ -38,49 +38,50 @@ type Account struct {
 
 type Settings struct {
 	// required
-	Address                        types.Address    `json:"address"`
-	ChaosMode                      bool             `json:"chaos-mode?,omitempty"`
-	Currency                       string           `json:"currency,omitempty"`
-	CurrentNetwork                 string           `json:"networks/current-network"`
-	CustomBootnodes                *json.RawMessage `json:"custom-bootnodes,omitempty"`
-	CustomBootnodesEnabled         *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
-	DappsAddress                   types.Address    `json:"dapps-address"`
-	EIP1581Address                 types.Address    `json:"eip1581-address"`
-	Fleet                          *string          `json:"fleet,omitempty"`
-	HideHomeTooltip                bool             `json:"hide-home-tooltip?,omitempty"`
-	InstallationID                 string           `json:"installation-id"`
-	KeyUID                         string           `json:"key-uid"`
-	KeycardInstanceUID             string           `json:"keycard-instance-uid,omitempty"`
-	KeycardPAiredOn                int64            `json:"keycard-paired-on,omitempty"`
-	KeycardPairing                 string           `json:"keycard-pairing,omitempty"`
-	LastUpdated                    *int64           `json:"last-updated,omitempty"`
-	LatestDerivedPath              uint             `json:"latest-derived-path"`
-	LogLevel                       *string          `json:"log-level,omitempty"`
-	Mnemonic                       *string          `json:"mnemonic,omitempty"`
-	Name                           string           `json:"name,omitempty"`
-	Networks                       *json.RawMessage `json:"networks/networks"`
-	NotificationsEnabled           bool             `json:"notifications-enabled?,omitempty"`
-	PhotoPath                      string           `json:"photo-path"`
-	PinnedMailserver               *json.RawMessage `json:"pinned-mailservers,omitempty"`
-	PreferredName                  *string          `json:"preferred-name,omitempty"`
-	PreviewPrivacy                 bool             `json:"preview-privacy?"`
-	PublicKey                      string           `json:"public-key"`
-	PushNotificationServerEnabled  bool             `json:"push-notification-server-enabled,omitempty"`
-	RememberSyncingChoice          bool             `json:"remember-syncing-choice?,omitempty"`
-	RemotePushNotificationsEnabled bool             `json:"remote-push-notifications-enabled,omitempty"`
-	SigningPhrase                  string           `json:"signing-phrase"`
-	StickerPacksInstalled          *json.RawMessage `json:"stickers/packs-installed,omitempty"`
-	StickerPacksPending            *json.RawMessage `json:"stickers/packs-pending,omitempty"`
-	StickersRecentStickers         *json.RawMessage `json:"stickers/recent-stickers,omitempty"`
-	SyncingOnMobileNetwork         bool             `json:"syncing-on-mobile-network?,omitempty"`
-	SendPushNotifications          bool             `json:"send-push-notifications,omitempty"`
-	Appearance                     uint             `json:"appearance"`
-	Usernames                      *json.RawMessage `json:"usernames,omitempty"`
-	WalletRootAddress              types.Address    `json:"wallet-root-address,omitempty"`
-	WalletSetUpPassed              bool             `json:"wallet-set-up-passed?,omitempty"`
-	WalletVisibleTokens            *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
-	WakuEnabled                    bool             `json:"waku-enabled,omitempty"`
-	WakuBloomFilterMode            bool             `json:"waku-bloom-filter-mode,omitempty"`
+	Address                           types.Address    `json:"address"`
+	ChaosMode                         bool             `json:"chaos-mode?,omitempty"`
+	Currency                          string           `json:"currency,omitempty"`
+	CurrentNetwork                    string           `json:"networks/current-network"`
+	CustomBootnodes                   *json.RawMessage `json:"custom-bootnodes,omitempty"`
+	CustomBootnodesEnabled            *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
+	DappsAddress                      types.Address    `json:"dapps-address"`
+	EIP1581Address                    types.Address    `json:"eip1581-address"`
+	Fleet                             *string          `json:"fleet,omitempty"`
+	HideHomeTooltip                   bool             `json:"hide-home-tooltip?,omitempty"`
+	InstallationID                    string           `json:"installation-id"`
+	KeyUID                            string           `json:"key-uid"`
+	KeycardInstanceUID                string           `json:"keycard-instance-uid,omitempty"`
+	KeycardPAiredOn                   int64            `json:"keycard-paired-on,omitempty"`
+	KeycardPairing                    string           `json:"keycard-pairing,omitempty"`
+	LastUpdated                       *int64           `json:"last-updated,omitempty"`
+	LatestDerivedPath                 uint             `json:"latest-derived-path"`
+	LogLevel                          *string          `json:"log-level,omitempty"`
+	Mnemonic                          *string          `json:"mnemonic,omitempty"`
+	Name                              string           `json:"name,omitempty"`
+	Networks                          *json.RawMessage `json:"networks/networks"`
+	NotificationsEnabled              bool             `json:"notifications-enabled?,omitempty"`
+	PhotoPath                         string           `json:"photo-path"`
+	PinnedMailserver                  *json.RawMessage `json:"pinned-mailservers,omitempty"`
+	PreferredName                     *string          `json:"preferred-name,omitempty"`
+	PreviewPrivacy                    bool             `json:"preview-privacy?"`
+	PublicKey                         string           `json:"public-key"`
+	PushNotificationsServerEnabled    bool             `json:"push-notifications-server-enabled,omitempty"`
+	PushNotificationsFromContactsOnly bool             `json:"push-notifications-from-contacts-only,omitempty"`
+	RememberSyncingChoice             bool             `json:"remember-syncing-choice?,omitempty"`
+	RemotePushNotificationsEnabled    bool             `json:"remote-push-notifications-enabled,omitempty"`
+	SigningPhrase                     string           `json:"signing-phrase"`
+	StickerPacksInstalled             *json.RawMessage `json:"stickers/packs-installed,omitempty"`
+	StickerPacksPending               *json.RawMessage `json:"stickers/packs-pending,omitempty"`
+	StickersRecentStickers            *json.RawMessage `json:"stickers/recent-stickers,omitempty"`
+	SyncingOnMobileNetwork            bool             `json:"syncing-on-mobile-network?,omitempty"`
+	SendPushNotifications             bool             `json:"send-push-notifications,omitempty"`
+	Appearance                        uint             `json:"appearance"`
+	Usernames                         *json.RawMessage `json:"usernames,omitempty"`
+	WalletRootAddress                 types.Address    `json:"wallet-root-address,omitempty"`
+	WalletSetUpPassed                 bool             `json:"wallet-set-up-passed?,omitempty"`
+	WalletVisibleTokens               *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
+	WakuEnabled                       bool             `json:"waku-enabled,omitempty"`
+	WakuBloomFilterMode               bool             `json:"waku-bloom-filter-mode,omitempty"`
 }
 
 func NewDB(db *sql.DB) *Database {
@@ -260,8 +261,13 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		if !ok {
 			return ErrInvalidConfig
 		}
-		update, err = db.db.Prepare("UPDATE settings SET push_notification_server_enabled = ? WHERE synthetic_id = 'id'")
-
+		update, err = db.db.Prepare("UPDATE settings SET push_notifications_server_enabled = ? WHERE synthetic_id = 'id'")
+	case "push-notifications-from-contacts-only":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET push_notifications_from_contacts_only = ? WHERE synthetic_id = 'id'")
 	case "send-push-notifications":
 		_, ok := value.(bool)
 		if !ok {

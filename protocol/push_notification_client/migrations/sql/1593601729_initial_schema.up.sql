@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS push_notification_client_info (
   installation_id TEXT NOT NULL,
   access_token TEXT NOT NULL,
   retrieved_at INT NOT NULL,
+  version INT NOT NULL,
   UNIQUE(public_key, installation_id, server_public_key) ON CONFLICT REPLACE
 );
 

@@ -64,6 +64,7 @@ type PushNotificationInfo struct {
 	PublicKey       *ecdsa.PublicKey
 	ServerPublicKey *ecdsa.PublicKey
 	RetrievedAt     int64
+	Version         uint64
 }
 
 type Config struct {
@@ -74,9 +75,9 @@ type Config struct {
 	// RemoteNotificationsEnabled is whether we should register with a remote server for push notifications
 	RemoteNotificationsEnabled bool
 
-	// AllowOnlyFromContacts indicates whether we should be receiving push notifications
+	// AllowyFromContactsOnly indicates whether we should be receiving push notifications
 	// only from contacts
-	AllowOnlyFromContacts bool
+	AllowFromContactsOnly bool
 
 	// InstallationID is the installation-id for this device
 	InstallationID string
@@ -786,6 +787,7 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 			ServerPublicKey: serverPublicKey,
 			AccessToken:     info.AccessToken,
 			InstallationID:  info.InstallationId,
+			Version:         info.Version,
 			RetrievedAt:     time.Now().Unix(),
 		})
 
@@ -802,6 +804,13 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 // HandlePushNotificationResponse should set the request as processed
 func (p *Client) HandlePushNotificationResponse(ack *protobuf.PushNotificationResponse) error {
 	return nil
+}
+
+func (c *Client) RemovePushNotificationServer(publicKey *ecdsa.PublicKey) error {
+	c.config.Logger.Info("removing push notification server", zap.Any("public-key", publicKey))
+	//TODO: this needs implementing. It requires unregistering from the server and
+	// likely invalidate the device token of the user
+	return errors.New("not implemented")
 }
 
 func (c *Client) AddPushNotificationServer(publicKey *ecdsa.PublicKey) error {
@@ -870,6 +879,16 @@ func (c *Client) EnableSending() {
 
 func (c *Client) DisableSending() {
 	c.config.SendEnabled = false
+}
+
+func (c *Client) EnablePushNotificationsFromContactsOnly() error {
+	c.config.AllowFromContactsOnly = true
+	return nil
+}
+
+func (c *Client) DisablePushNotificationsFromContactsOnly() error {
+	c.config.AllowFromContactsOnly = false
+	return nil
 }
 
 func (c *Client) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {

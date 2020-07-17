@@ -3043,6 +3043,14 @@ func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ec
 	return m.pushNotificationClient.AddPushNotificationServer(publicKey)
 }
 
+// RemovePushNotificationServer removes a push notification server
+func (m *Messenger) RemovePushNotificationServer(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+	if m.pushNotificationClient == nil {
+		return errors.New("push notification client not enabled")
+	}
+	return m.pushNotificationClient.RemovePushNotificationServer(publicKey)
+}
+
 func (m *Messenger) UnregisterFromPushNotifications(ctx context.Context) error {
 	return m.pushNotificationClient.Unregister()
 }
@@ -3100,6 +3108,22 @@ func (m *Messenger) RegisteredForPushNotifications() (bool, error) {
 		return false, errors.New("no push notification client")
 	}
 	return m.pushNotificationClient.Registered()
+}
+
+func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
+	if m.pushNotificationClient == nil {
+		return errors.New("no push notification client")
+	}
+
+	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly()
+}
+
+func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
+	if m.pushNotificationClient == nil {
+		return errors.New("no push notification client")
+	}
+
+	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly()
 }
 
 func (m *Messenger) GetPushNotificationServers() ([]*push_notification_client.PushNotificationServer, error) {

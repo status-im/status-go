@@ -406,12 +406,20 @@ func (api *PublicAPI) UpdateMailservers(enodes []string) error {
 // PushNotifications server
 
 func (api *PublicAPI) StartPushNotificationServer() error {
-	// update settings
+	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled", true)
+	if err != nil {
+		return err
+	}
+
 	return api.service.messenger.StartPushNotificationServer()
 }
 
 func (api *PublicAPI) StopPushNotificationServer() error {
-	// update settings
+	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled", false)
+	if err != nil {
+		return err
+	}
+
 	return api.service.messenger.StopPushNotificationServer()
 }
 
@@ -422,6 +430,11 @@ func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceTo
 	if err != nil {
 		return err
 	}
+	err = api.service.accountsDB.SaveSetting("notifications-enabled?", true)
+	if err != nil {
+		return err
+	}
+
 	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken)
 }
 
@@ -430,6 +443,11 @@ func (api *PublicAPI) UnregisterForPushNotifications(ctx context.Context) error 
 	if err != nil {
 		return err
 	}
+	err = api.service.accountsDB.SaveSetting("notifications-enabled?", false)
+	if err != nil {
+		return err
+	}
+
 	return api.service.messenger.UnregisterFromPushNotifications(ctx)
 }
 
@@ -450,6 +468,22 @@ func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
 	return api.service.messenger.EnableSendingPushNotifications()
 }
 
+func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only", true)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.EnablePushNotificationsFromContactsOnly()
+}
+
+func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only", false)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DisablePushNotificationsFromContactsOnly()
+}
+
 func (api *PublicAPI) AddPushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
 	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {
@@ -457,6 +491,15 @@ func (api *PublicAPI) AddPushNotificationServer(ctx context.Context, publicKeyBy
 	}
 
 	return api.service.messenger.AddPushNotificationServer(ctx, publicKey)
+}
+
+func (api *PublicAPI) RemovePushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
+	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.RemovePushNotificationServer(ctx, publicKey)
 }
 
 func (api *PublicAPI) GetPushNotificationServers() ([]*push_notification_client.PushNotificationServer, error) {

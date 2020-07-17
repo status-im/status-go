@@ -145,7 +145,24 @@ func (p *Persistence) SavePushNotificationInfo(infos []*PushNotificationInfo) er
 		_ = tx.Rollback()
 	}()
 	for _, info := range infos {
-		_, err := tx.Exec(`INSERT INTO push_notification_client_info (public_key, server_public_key, installation_id, access_token, retrieved_at) VALUES (?, ?, ?, ?, ?)`, crypto.CompressPubkey(info.PublicKey), crypto.CompressPubkey(info.ServerPublicKey), info.InstallationID, info.AccessToken, info.RetrievedAt)
+		var latestVersion uint64
+		clientCompressedKey := crypto.CompressPubkey(info.PublicKey)
+		err := tx.QueryRow(`SELECT IFNULL(MAX(version),0) FROM push_notification_client_info WHERE public_key = ? AND installation_id = ? LIMIT 1`, clientCompressedKey, info.InstallationID).Scan(&latestVersion)
+		if err != sql.ErrNoRows && err != nil {
+			return err
+		}
+		if latestVersion > info.Version {
+			// Nothing to do
+			continue
+		}
+
+		// Remove anything that as a lower version
+		_, err = tx.Exec(`DELETE FROM push_notification_client_info WHERE public_key = ? AND installation_id = ? AND version < ?`, clientCompressedKey, info.InstallationID, info.Version)
+		if err != nil {
+			return err
+		}
+		// Insert
+		_, err = tx.Exec(`INSERT INTO push_notification_client_info (public_key, server_public_key, installation_id, access_token, retrieved_at, version) VALUES (?, ?, ?, ?, ?,?)`, clientCompressedKey, crypto.CompressPubkey(info.ServerPublicKey), info.InstallationID, info.AccessToken, info.RetrievedAt, info.Version)
 		if err != nil {
 			return err
 		}
@@ -163,7 +180,7 @@ func (p *Persistence) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, instal
 
 	inVector := strings.Repeat("?, ", len(installationIDs)-1) + "?"
 
-	rows, err := p.db.Query(`SELECT server_public_key, installation_id, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ? AND installation_id IN (`+inVector+`)`, queryArgs...)
+	rows, err := p.db.Query(`SELECT server_public_key, installation_id, version, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ? AND installation_id IN (`+inVector+`)`, queryArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +188,7 @@ func (p *Persistence) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, instal
 	for rows.Next() {
 		var serverPublicKeyBytes []byte
 		info := &PushNotificationInfo{PublicKey: publicKey}
-		err := rows.Scan(&serverPublicKeyBytes, &info.InstallationID, &info.AccessToken, &info.RetrievedAt)
+		err := rows.Scan(&serverPublicKeyBytes, &info.InstallationID, &info.Version, &info.AccessToken, &info.RetrievedAt)
 		if err != nil {
 			return nil, err
 		}

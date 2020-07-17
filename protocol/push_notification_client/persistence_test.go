@@ -94,6 +94,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			PublicKey:       &key1.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
+			Version:         1,
 			AccessToken:     accessToken,
 			InstallationID:  installationID1,
 		},
@@ -101,6 +102,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			PublicKey:       &key1.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
+			Version:         1,
 			AccessToken:     accessToken,
 			InstallationID:  installationID2,
 		},
@@ -108,6 +110,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			PublicKey:       &key1.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
+			Version:         1,
 			AccessToken:     accessToken,
 			InstallationID:  installationID3,
 		},
@@ -115,6 +118,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			PublicKey:       &key2.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
+			Version:         1,
 			AccessToken:     accessToken,
 			InstallationID:  installationID1,
 		},
@@ -122,6 +126,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			PublicKey:       &key2.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
+			Version:         1,
 			AccessToken:     accessToken,
 			InstallationID:  installationID2,
 		},
@@ -129,6 +134,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			PublicKey:       &key2.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
+			Version:         1,
 			AccessToken:     accessToken,
 			InstallationID:  installationID3,
 		},
@@ -140,6 +146,69 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 	s.Require().NoError(err)
 
 	s.Require().Len(retrievedInfos, 2)
+}
+
+func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfoWithVersion() {
+	installationID := "installation-id-1"
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	serverKey1, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	serverKey2, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+
+	accessToken := "token"
+
+	infos := []*PushNotificationInfo{
+		{
+			PublicKey:       &key.PublicKey,
+			ServerPublicKey: &serverKey1.PublicKey,
+			RetrievedAt:     1,
+			Version:         1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID,
+		},
+		{
+			PublicKey:       &key.PublicKey,
+			ServerPublicKey: &serverKey2.PublicKey,
+			RetrievedAt:     1,
+			Version:         1,
+			AccessToken:     accessToken,
+			InstallationID:  installationID,
+		},
+	}
+
+	s.Require().NoError(s.persistence.SavePushNotificationInfo(infos))
+
+	retrievedInfos, err := s.persistence.GetPushNotificationInfo(&key.PublicKey, []string{installationID})
+	s.Require().NoError(err)
+
+	// We should retrieve both
+	s.Require().Len(retrievedInfos, 2)
+	s.Require().Equal(uint64(1), retrievedInfos[0].Version)
+
+	// Bump version
+	infos[0].Version = 2
+
+	s.Require().NoError(s.persistence.SavePushNotificationInfo(infos))
+
+	retrievedInfos, err = s.persistence.GetPushNotificationInfo(&key.PublicKey, []string{installationID})
+	s.Require().NoError(err)
+
+	// Only one should be retrieved now
+	s.Require().Len(retrievedInfos, 1)
+	s.Require().Equal(uint64(2), retrievedInfos[0].Version)
+
+	// Lower version
+	infos[0].Version = 1
+
+	s.Require().NoError(s.persistence.SavePushNotificationInfo(infos))
+
+	retrievedInfos, err = s.persistence.GetPushNotificationInfo(&key.PublicKey, []string{installationID})
+	s.Require().NoError(err)
+
+	s.Require().Len(retrievedInfos, 1)
+	s.Require().Equal(uint64(2), retrievedInfos[0].Version)
 }
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveRegistration() {
