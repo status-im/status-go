@@ -79,6 +79,49 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	// Get token
 	expectedUUID := uuid.New().String()
 
+	// Reset random generator
+	uuid.SetRand(rand.New(rand.NewSource(seed)))
+
+	s.client.deviceToken = myDeviceToken
+	// Set reader
+	s.client.reader = bytes.NewReader([]byte(expectedUUID))
+
+	options := &protobuf.PushNotificationRegistration{
+		Version:         1,
+		AccessToken:     expectedUUID,
+		Token:           myDeviceToken,
+		InstallationId:  s.installationID,
+		Enabled:         true,
+		BlockedChatList: mutedChatListHashes,
+	}
+
+	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
+	s.Require().NoError(err)
+
+	s.Require().Equal(options, actualMessage)
+}
+
+func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsOnly() {
+	myDeviceToken := "device-token"
+	mutedChatList := []string{"a", "b"}
+
+	// build chat lish hashes
+	var mutedChatListHashes [][]byte
+	for _, chatID := range mutedChatList {
+		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
+	}
+
+	contactKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	contactIDs := []*ecdsa.PublicKey{&contactKey.PublicKey}
+
+	// Set random generator for uuid
+	var seed int64 = 1
+	uuid.SetRand(rand.New(rand.NewSource(seed)))
+
+	// Get token
+	expectedUUID := uuid.New().String()
+
 	// set up reader
 	reader := bytes.NewReader([]byte(expectedUUID))
 
@@ -95,7 +138,8 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	// Reset random generator
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
 
-	s.client.DeviceToken = myDeviceToken
+	s.client.config.allowFromContactsOnly = true
+	s.client.deviceToken = myDeviceToken
 	// Set reader
 	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 

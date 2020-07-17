@@ -75,9 +75,9 @@ type Config struct {
 	// RemoteNotificationsEnabled is whether we should register with a remote server for push notifications
 	RemoteNotificationsEnabled bool
 
-	// AllowyFromContactsOnly indicates whether we should be receiving push notifications
+	// allowyFromContactsOnly indicates whether we should be receiving push notifications
 	// only from contacts
-	AllowFromContactsOnly bool
+	allowFromContactsOnly bool
 
 	// InstallationID is the installation-id for this device
 	InstallationID string
@@ -101,8 +101,8 @@ type Client struct {
 
 	// AccessToken is the access token that is currently being used
 	AccessToken string
-	// DeviceToken is the device token for this device
-	DeviceToken string
+	// deviceToken is the device token for this device
+	deviceToken string
 
 	// randomReader only used for testing so we have deterministic encryption
 	reader io.Reader
@@ -156,6 +156,7 @@ func (c *Client) loadLastPushNotificationRegistration() error {
 	}
 	c.lastContactIDs = lastContactIDs
 	c.lastPushNotificationRegistration = lastRegistration
+	c.deviceToken = lastRegistration.Token
 	return nil
 
 }
@@ -407,10 +408,30 @@ func (p *Client) encryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte,
 	return encryptedToken, nil
 }
 
-func (p *Client) allowedUserList(token []byte, contactIDs []*ecdsa.PublicKey) ([][]byte, error) {
+func (p *Client) decryptToken(publicKey *ecdsa.PublicKey, token []byte) ([]byte, error) {
+	sharedKey, err := ecies.ImportECDSA(p.config.Identity).GenerateShared(
+		ecies.ImportECDSAPublic(publicKey),
+		accessTokenKeyLength,
+		accessTokenKeyLength,
+	)
+	if err != nil {
+		return nil, err
+	}
+	decryptedToken, err := common.Decrypt(token, sharedKey)
+	if err != nil {
+		return nil, err
+	}
+	return decryptedToken, nil
+}
+
+func (c *Client) allowedUserList(token []byte, contactIDs []*ecdsa.PublicKey) ([][]byte, error) {
+	// If we allow everyone, don't set the list
+	if !c.config.allowFromContactsOnly {
+		return nil, nil
+	}
 	var encryptedTokens [][]byte
 	for _, publicKey := range contactIDs {
-		encryptedToken, err := p.encryptToken(publicKey, token)
+		encryptedToken, err := c.encryptToken(publicKey, token)
 		if err != nil {
 			return nil, err
 		}
@@ -449,7 +470,7 @@ func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 		TokenType:       c.config.TokenType,
 		Version:         c.getVersion(),
 		InstallationId:  c.config.InstallationID,
-		Token:           c.DeviceToken,
+		Token:           c.deviceToken,
 		Enabled:         c.config.RemoteNotificationsEnabled,
 		BlockedChatList: c.mutedChatIDsHashes(mutedChatIDs),
 		AllowedUserList: allowedUserList,
@@ -672,7 +693,7 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 	// stop registration loop
 	c.stopRegistrationLoop()
 
-	c.DeviceToken = deviceToken
+	c.deviceToken = deviceToken
 
 	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
 	if err != nil {
@@ -752,6 +773,18 @@ func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *
 	return nil
 }
 
+func (c *Client) handleAllowedUserList(publicKey *ecdsa.PublicKey, allowedUserList [][]byte) string {
+	for _, encryptedToken := range allowedUserList {
+		token, err := c.decryptToken(publicKey, encryptedToken)
+		if err != nil {
+			c.config.Logger.Warn("could not decrypt token", zap.Error(err))
+			continue
+		}
+		return string(token)
+	}
+	return ""
+}
+
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
 func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.PublicKey, response protobuf.PushNotificationQueryResponse) error {
 
@@ -772,6 +805,18 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 	for _, info := range response.Info {
 		if bytes.Compare(info.PublicKey, common.HashPublicKey(publicKey)) != 0 {
 			c.config.Logger.Warn("reply for different key, ignoring")
+			continue
+		}
+
+		accessToken := info.AccessToken
+
+		if len(info.AllowedUserList) != 0 {
+			accessToken = c.handleAllowedUserList(publicKey, info.AllowedUserList)
+
+		}
+
+		if len(accessToken) == 0 {
+			c.config.Logger.Info("not in the allowed users list")
 			continue
 		}
 
@@ -881,13 +926,19 @@ func (c *Client) DisableSending() {
 	c.config.SendEnabled = false
 }
 
-func (c *Client) EnablePushNotificationsFromContactsOnly() error {
-	c.config.AllowFromContactsOnly = true
+func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.allowFromContactsOnly = true
+	if c.lastPushNotificationRegistration != nil {
+		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+	}
 	return nil
 }
 
-func (c *Client) DisablePushNotificationsFromContactsOnly() error {
-	c.config.AllowFromContactsOnly = false
+func (c *Client) DisablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.allowFromContactsOnly = false
+	if c.lastPushNotificationRegistration != nil {
+		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+	}
 	return nil
 }
 

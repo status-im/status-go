@@ -3071,16 +3071,12 @@ func (m *Messenger) EnableSendingPushNotifications() error {
 	return nil
 }
 
-// RegisterForPushNotification register deviceToken with any push notification server enabled
-func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
-	if m.pushNotificationClient == nil {
-		return errors.New("push notification client not enabled")
-	}
-
+func (m *Messenger) addedContactsAndMutedChatIDs() ([]*ecdsa.PublicKey, []string) {
 	var contactIDs []*ecdsa.PublicKey
 	var mutedChatIDs []string
 
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	for _, contact := range m.allContacts {
 		if contact.IsAdded() {
 			pk, err := contact.PublicKey()
@@ -3099,7 +3095,16 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 		}
 
 	}
-	m.mutex.Unlock()
+	return contactIDs, mutedChatIDs
+}
+
+// RegisterForPushNotification register deviceToken with any push notification server enabled
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
+	if m.pushNotificationClient == nil {
+		return errors.New("push notification client not enabled")
+	}
+
+	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
 	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
 }
 
@@ -3115,7 +3120,8 @@ func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 		return errors.New("no push notification client")
 	}
 
-	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly()
+	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
+	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
 }
 
 func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
@@ -3123,7 +3129,8 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 		return errors.New("no push notification client")
 	}
 
-	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly()
+	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
+	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
 }
 
 func (m *Messenger) GetPushNotificationServers() ([]*push_notification_client.PushNotificationServer, error) {
