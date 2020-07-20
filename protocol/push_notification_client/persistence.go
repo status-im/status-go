@@ -271,8 +271,8 @@ func (p *Persistence) ShouldSendNotificationToAllInstallationIDs(publicKey *ecds
 	return count == 0, nil
 }
 
-func (p *Persistence) NotifiedOn(n *SentNotification) error {
-	_, err := p.db.Exec(`INSERT INTO push_notification_client_sent_notifications (public_key, installation_id, message_id, sent_at, hashed_public_key) VALUES (?, ?, ?, ?, ?)`, crypto.CompressPubkey(n.PublicKey), n.InstallationID, n.MessageID, n.SentAt, n.HashedPublicKey())
+func (p *Persistence) UpsertSentNotification(n *SentNotification) error {
+	_, err := p.db.Exec(`INSERT INTO push_notification_client_sent_notifications (public_key, installation_id, message_id, last_tried_at, retry_count, success, error, hashed_public_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, crypto.CompressPubkey(n.PublicKey), n.InstallationID, n.MessageID, n.LastTriedAt, n.RetryCount, n.Success, n.Error, n.HashedPublicKey())
 	return err
 }
 
@@ -282,7 +282,7 @@ func (p *Persistence) GetSentNotification(hashedPublicKey []byte, installationID
 		InstallationID: installationID,
 		MessageID:      messageID,
 	}
-	err := p.db.QueryRow(`SELECT sent_at, error, success, public_key FROM push_notification_client_sent_notifications WHERE hashed_public_key = ?`, hashedPublicKey).Scan(&sentNotification.SentAt, &sentNotification.Error, &sentNotification.Success, &publicKeyBytes)
+	err := p.db.QueryRow(`SELECT retry_count, last_tried_at, error, success, public_key FROM push_notification_client_sent_notifications WHERE hashed_public_key = ?`, hashedPublicKey).Scan(&sentNotification.RetryCount, &sentNotification.LastTriedAt, &sentNotification.Error, &sentNotification.Success, &publicKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -300,6 +300,30 @@ func (p *Persistence) GetSentNotification(hashedPublicKey []byte, installationID
 func (p *Persistence) UpdateNotificationResponse(messageID []byte, response *protobuf.PushNotificationReport) error {
 	_, err := p.db.Exec(`UPDATE push_notification_client_sent_notifications SET success = ?, error = ? WHERE hashed_public_key = ? AND installation_id = ? AND message_id = ? AND NOT success`, response.Success, response.Error, response.PublicKey, response.InstallationId, messageID)
 	return err
+}
+
+func (p *Persistence) GetRetriablePushNotifications() ([]*SentNotification, error) {
+	var notifications []*SentNotification
+	rows, err := p.db.Query(`SELECT retry_count, last_tried_at, error, success, public_key, installation_id, message_id FROM push_notification_client_sent_notifications WHERE NOT success AND error = ?`, protobuf.PushNotificationReport_WRONG_TOKEN)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var publicKeyBytes []byte
+		notification := &SentNotification{}
+		err = rows.Scan(&notification.RetryCount, &notification.LastTriedAt, &notification.Error, &notification.Success, &publicKeyBytes, &notification.InstallationID, &notification.MessageID)
+		if err != nil {
+			return nil, err
+		}
+		publicKey, err := crypto.DecompressPubkey(publicKeyBytes)
+		if err != nil {
+			return nil, err
+		}
+		notification.PublicKey = publicKey
+		notifications = append(notifications, notification)
+	}
+	return notifications, err
 }
 
 func (p *Persistence) UpsertServer(server *PushNotificationServer) error {

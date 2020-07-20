@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -120,6 +121,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
 	server := s.newPushNotificationServer(s.shh)
 	alice := s.newMessenger(s.shh)
+	// start alice and enable sending push notifications
+	s.Require().NoError(alice.Start())
+	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
 	// Register bob1
@@ -183,7 +187,12 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bob2Servers, err := bob2.GetPushNotificationServers()
 	s.Require().NoError(err)
 
-	err = alice.pushNotificationClient.QueryPushNotificationInfo(&bob2.identity.PublicKey)
+	// Create one to one chat & send message
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
+	s.Require().NoError(alice.SaveChat(&chat))
+	inputMessage := buildTestMessage(chat)
+	_, err = alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
 	var info []*push_notification_client.PushNotificationInfo
@@ -247,6 +256,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
 	server := s.newPushNotificationServer(s.shh)
 	alice := s.newMessenger(s.shh)
+	// start alice and enable push notifications
+	s.Require().NoError(alice.Start())
+	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID, bob2.installationID}
 
 	// Register bob
@@ -294,7 +306,12 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	bobServers, err := bob.GetPushNotificationServers()
 	s.Require().NoError(err)
 
-	err = alice.pushNotificationClient.QueryPushNotificationInfo(&bob2.identity.PublicKey)
+	// Create one to one chat & send message
+	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
+	s.Require().NoError(alice.SaveChat(&chat))
+	inputMessage := buildTestMessage(chat)
+	_, err = alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
 	var info []*push_notification_client.PushNotificationInfo

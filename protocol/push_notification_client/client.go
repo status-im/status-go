@@ -30,8 +30,14 @@ const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
 const staleQueryTimeInSeconds = 86400
 
-// maxRetries is the maximum number of attempts we do before giving up registering with a server
-const maxRetries int64 = 12
+// maxRegistrationRetries is the maximum number of attempts we do before giving up registering with a server
+const maxRegistrationRetries int64 = 12
+
+// maxPushNotificationRetries is the maximum number of attempts before we give up sending a push notification
+const maxPushNotificationRetries int64 = 4
+
+// pushNotificationBackoffTime is the step of the exponential backoff
+const pushNotificationBackoffTime int64 = 2
 
 // RegistrationBackoffTime is the step of the exponential backoff
 const RegistrationBackoffTime int64 = 15
@@ -70,7 +76,8 @@ type PushNotificationInfo struct {
 type SentNotification struct {
 	PublicKey      *ecdsa.PublicKey
 	InstallationID string
-	SentAt         int64
+	LastTriedAt    int64
+	RetryCount     int64
 	MessageID      []byte
 	Success        bool
 	Error          protobuf.PushNotificationReport_ErrorType
@@ -125,6 +132,9 @@ type Client struct {
 
 	// registrationLoopQuitChan is a channel to indicate to the registration loop that should be terminating
 	registrationLoopQuitChan chan struct{}
+
+	// resendingLoopQuitChan is a channel to indicate to the send loop that shoudl be terminating
+	resendingLoopQuitChan chan struct{}
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
@@ -139,6 +149,7 @@ func New(persistence *Persistence, config *Config, processor *common.MessageProc
 
 func (c *Client) subscribeForSentMessages() {
 	go func() {
+		c.config.Logger.Info("subscribing for messages")
 		subscription := c.messageProcessor.Subscribe()
 		for {
 			select {
@@ -181,10 +192,24 @@ func (c *Client) stopRegistrationLoop() {
 	}
 }
 
+func (c *Client) stopResendingLoop() {
+	// stop old registration loop
+	if c.resendingLoopQuitChan != nil {
+		close(c.resendingLoopQuitChan)
+		c.resendingLoopQuitChan = nil
+	}
+}
+
 func (c *Client) startRegistrationLoop() {
 	c.stopRegistrationLoop()
 	c.registrationLoopQuitChan = make(chan struct{})
 	go c.registrationLoop()
+}
+
+func (c *Client) startResendingLoop() {
+	c.stopResendingLoop()
+	c.resendingLoopQuitChan = make(chan struct{})
+	go c.resendingLoop()
 }
 
 func (c *Client) Start() error {
@@ -198,19 +223,19 @@ func (c *Client) Start() error {
 	}
 	c.subscribeForSentMessages()
 	c.startRegistrationLoop()
+	c.startResendingLoop()
 
 	return nil
 }
 
 func (c *Client) Stop() error {
 	close(c.quit)
-	if c.registrationLoopQuitChan != nil {
-		close(c.registrationLoopQuitChan)
-	}
+	c.stopRegistrationLoop()
+	c.stopResendingLoop()
 	return nil
 }
 
-func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey) error {
+func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) error {
 	// Check if we queried recently
 	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
 	if err != nil {
@@ -218,7 +243,7 @@ func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey) error {
 	}
 	// Naively query again if too much time has passed.
 	// Here it might not be necessary
-	if time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
+	if force || time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
 		c.config.Logger.Info("querying info")
 		err := c.QueryPushNotificationInfo(publicKey)
 		if err != nil {
@@ -294,92 +319,21 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 
 	c.config.Logger.Info("actionable messages", zap.Any("message-ids", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
 
-	err := c.queryNotificationInfo(publicKey)
+	infos, err := c.sendNotification(publicKey, installationIDs, trackedMessageIDs[0])
 	if err != nil {
 		return err
 	}
-	c.config.Logger.Info("queried info")
-	// Retrieve infos
-	info, err := c.GetPushNotificationInfo(publicKey, installationIDs)
-	if err != nil {
-		c.config.Logger.Error("could not get pn info", zap.Error(err))
-		return err
-	}
+	// Mark message as sent, this is at-most-once semantic
+	// for all messageIDs
+	for _, i := range infos {
+		for _, messageID := range trackedMessageIDs {
 
-	// Naively dispatch to the first server for now
-	// This wait for an acknowledgement and try a different server after a timeout
-	// Also we sent a single notification for multiple message ids, need to check with UI what's the desired behavior
-
-	// Sort by server so we tend to hit the same one
-	sort.Slice(info, func(i, j int) bool {
-		return info[i].ServerPublicKey.X.Cmp(info[j].ServerPublicKey.X) <= 0
-	})
-
-	c.config.Logger.Info("retrieved info")
-
-	installationIDsMap := make(map[string]bool)
-	// One info per installation id, grouped by server
-	actionableInfos := make(map[string][]*PushNotificationInfo)
-	for _, i := range info {
-
-		c.config.Logger.Info("queried info", zap.String("id", i.InstallationID))
-		if !installationIDsMap[i.InstallationID] {
-			serverKey := hex.EncodeToString(crypto.CompressPubkey(i.ServerPublicKey))
-			actionableInfos[serverKey] = append(actionableInfos[serverKey], i)
-			installationIDsMap[i.InstallationID] = true
-		}
-
-	}
-
-	c.config.Logger.Info("actionable info", zap.Int("count", len(actionableInfos)))
-
-	for _, infos := range actionableInfos {
-		var pushNotifications []*protobuf.PushNotification
-		for _, i := range infos {
-			// TODO: Add ChatID, message, public_key
-			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
-				AccessToken:    i.AccessToken,
-				PublicKey:      common.HashPublicKey(publicKey),
-				InstallationId: i.InstallationID,
-			})
-
-		}
-		request := &protobuf.PushNotificationRequest{
-			MessageId: trackedMessageIDs[0],
-			Requests:  pushNotifications,
-		}
-		serverPublicKey := infos[0].ServerPublicKey
-
-		payload, err := proto.Marshal(request)
-		if err != nil {
-			return err
-		}
-
-		rawMessage := &common.RawMessage{
-			Payload:     payload,
-			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
-		}
-
-		// TODO: We should use the messageID for the response
-		_, err = c.messageProcessor.SendPrivate(context.Background(), serverPublicKey, rawMessage)
-
-		if err != nil {
-			return err
-		}
-
-		// Mark message as sent, this is at-most-once semantic
-		// for all messageIDs
-		for _, i := range infos {
-			for _, messageID := range trackedMessageIDs {
-
-				c.config.Logger.Info("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
-				if err := c.notifiedOn(publicKey, i.InstallationID, messageID); err != nil {
-					return err
-				}
-
+			c.config.Logger.Info("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
+			if err := c.notifiedOn(publicKey, i.InstallationID, messageID); err != nil {
+				return err
 			}
-		}
 
+		}
 	}
 
 	return nil
@@ -399,9 +353,9 @@ func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID strin
 }
 
 func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
-	return c.persistence.NotifiedOn(&SentNotification{
+	return c.persistence.UpsertSentNotification(&SentNotification{
 		PublicKey:      publicKey,
-		SentAt:         time.Now().Unix(),
+		LastTriedAt:    time.Now().Unix(),
 		InstallationID: installationID,
 		MessageID:      messageID,
 	})
@@ -532,9 +486,24 @@ func nextServerRetry(server *PushNotificationServer) int64 {
 	return server.LastRetriedAt + RegistrationBackoffTime*server.RetryCount*int64(math.Exp2(float64(server.RetryCount)))
 }
 
+func nextPushNotificationRetry(pn *SentNotification) int64 {
+	return pn.LastTriedAt + pushNotificationBackoffTime*pn.RetryCount*int64(math.Exp2(float64(pn.RetryCount)))
+}
+
 // We calculate if it's too early to retry, by exponentially backing off
 func shouldRetryRegisteringWithServer(server *PushNotificationServer) bool {
+	if server.RetryCount > maxRegistrationRetries {
+		return false
+	}
 	return time.Now().Unix() > nextServerRetry(server)
+}
+
+// We calculate if it's too early to retry, by exponentially backing off
+func shouldRetryPushNotification(pn *SentNotification) bool {
+	if pn.RetryCount > maxPushNotificationRetries {
+		return false
+	}
+	return time.Now().Unix() > nextPushNotificationRetry(pn)
 }
 
 func (c *Client) resetServers() error {
@@ -601,6 +570,153 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 		return err
 	}
 	return nil
+}
+
+func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte) ([]*PushNotificationInfo, error) {
+	err := c.queryNotificationInfo(publicKey, false)
+	if err != nil {
+		return nil, err
+	}
+	c.config.Logger.Info("queried info")
+	// Retrieve infos
+	info, err := c.GetPushNotificationInfo(publicKey, installationIDs)
+	if err != nil {
+		c.config.Logger.Error("could not get pn info", zap.Error(err))
+		return nil, err
+	}
+
+	// Naively dispatch to the first server for now
+	// This wait for an acknowledgement and try a different server after a timeout
+	// Also we sent a single notification for multiple message ids, need to check with UI what's the desired behavior
+
+	// Sort by server so we tend to hit the same one
+	sort.Slice(info, func(i, j int) bool {
+		return info[i].ServerPublicKey.X.Cmp(info[j].ServerPublicKey.X) <= 0
+	})
+
+	c.config.Logger.Info("retrieved info")
+
+	installationIDsMap := make(map[string]bool)
+	// One info per installation id, grouped by server
+	actionableInfos := make(map[string][]*PushNotificationInfo)
+	for _, i := range info {
+
+		c.config.Logger.Info("queried info", zap.String("id", i.InstallationID))
+		if !installationIDsMap[i.InstallationID] {
+			serverKey := hex.EncodeToString(crypto.CompressPubkey(i.ServerPublicKey))
+			actionableInfos[serverKey] = append(actionableInfos[serverKey], i)
+			installationIDsMap[i.InstallationID] = true
+		}
+
+	}
+
+	c.config.Logger.Info("actionable info", zap.Int("count", len(actionableInfos)))
+
+	var actionedInfo []*PushNotificationInfo
+	for _, infos := range actionableInfos {
+		var pushNotifications []*protobuf.PushNotification
+		for _, i := range infos {
+			// TODO: Add ChatID, message, public_key
+			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
+				AccessToken:    i.AccessToken,
+				PublicKey:      common.HashPublicKey(publicKey),
+				InstallationId: i.InstallationID,
+			})
+
+		}
+		request := &protobuf.PushNotificationRequest{
+			MessageId: messageID,
+			Requests:  pushNotifications,
+		}
+		serverPublicKey := infos[0].ServerPublicKey
+
+		payload, err := proto.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+
+		rawMessage := &common.RawMessage{
+			Payload:     payload,
+			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
+		}
+
+		// TODO: We should use the messageID for the response
+		_, err = c.messageProcessor.SendPrivate(context.Background(), serverPublicKey, rawMessage)
+
+		if err != nil {
+			return nil, err
+		}
+		actionedInfo = append(actionedInfo, infos...)
+	}
+	return actionedInfo, nil
+}
+
+func (c *Client) resendNotification(pn *SentNotification) error {
+	c.config.Logger.Info("resending notification", zap.Any("notification", pn))
+	pn.RetryCount += 1
+	pn.LastTriedAt = time.Now().Unix()
+	err := c.persistence.UpsertSentNotification(pn)
+	if err != nil {
+		return err
+	}
+
+	// Re-fetch push notification info
+	err = c.queryNotificationInfo(pn.PublicKey, true)
+	if err != nil {
+		return err
+	}
+
+	if err != nil {
+		c.config.Logger.Error("could not get pn info", zap.Error(err))
+		return err
+	}
+
+	_, err = c.sendNotification(pn.PublicKey, []string{pn.InstallationID}, pn.MessageID)
+	return err
+}
+
+func (c *Client) resendingLoop() error {
+	for {
+		c.config.Logger.Info("running resending loop")
+		var lowestNextRetry int64
+
+		retriableNotifications, err := c.persistence.GetRetriablePushNotifications()
+		if err != nil {
+			c.config.Logger.Error("failed retrieving notifications, quitting resending loop", zap.Error(err))
+			return err
+		}
+
+		if len(retriableNotifications) == 0 {
+			c.config.Logger.Debug("no retriable notifications, quitting")
+			return nil
+		}
+
+		for _, pn := range retriableNotifications {
+			nextRetry := nextPushNotificationRetry(pn)
+			c.config.Logger.Info("Next retry", zap.Int64("now", time.Now().Unix()), zap.Int64("next", nextRetry))
+			if shouldRetryPushNotification(pn) {
+				c.config.Logger.Info("retrying pn", zap.Any("pn", pn))
+				err := c.resendNotification(pn)
+				if err != nil {
+					return err
+				}
+			}
+			if lowestNextRetry == 0 || nextRetry < lowestNextRetry {
+				lowestNextRetry = nextRetry
+			}
+		}
+
+		nextRetry := lowestNextRetry - time.Now().Unix()
+		waitFor := time.Duration(nextRetry)
+		select {
+
+		case <-time.After(waitFor * time.Second):
+		case <-c.resendingLoopQuitChan:
+			return nil
+
+		}
+
+	}
 }
 
 func (c *Client) registrationLoop() error {
@@ -882,6 +998,9 @@ func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, resp
 			return err
 		}
 	}
+	// Restart resending loop
+	c.stopResendingLoop()
+	c.startResendingLoop()
 	return nil
 }
 

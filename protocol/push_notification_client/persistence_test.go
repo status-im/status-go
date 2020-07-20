@@ -222,14 +222,18 @@ func (s *SQLitePersistenceSuite) TestNotifiedOnAndUpdateNotificationResponse() {
 		PublicKey:      &key.PublicKey,
 		InstallationID: installationID,
 		MessageID:      messageID,
-		SentAt:         time.Now().Unix(),
+		LastTriedAt:    time.Now().Unix(),
 	}
 
-	s.Require().NoError(s.persistence.NotifiedOn(sentNotification))
+	s.Require().NoError(s.persistence.UpsertSentNotification(sentNotification))
 
 	retrievedNotification, err := s.persistence.GetSentNotification(sentNotification.HashedPublicKey(), installationID, messageID)
 	s.Require().NoError(err)
 	s.Require().Equal(sentNotification, retrievedNotification)
+
+	retriableNotifications, err := s.persistence.GetRetriablePushNotifications()
+	s.Require().NoError(err)
+	s.Require().Len(retriableNotifications, 0)
 
 	response := &protobuf.PushNotificationReport{
 		Success:        false,
@@ -239,6 +243,10 @@ func (s *SQLitePersistenceSuite) TestNotifiedOnAndUpdateNotificationResponse() {
 	}
 
 	s.Require().NoError(s.persistence.UpdateNotificationResponse(messageID, response))
+	// This notification should be retriable
+	retriableNotifications, err = s.persistence.GetRetriablePushNotifications()
+	s.Require().NoError(err)
+	s.Require().Len(retriableNotifications, 1)
 
 	sentNotification.Error = protobuf.PushNotificationReport_WRONG_TOKEN
 
@@ -261,6 +269,11 @@ func (s *SQLitePersistenceSuite) TestNotifiedOnAndUpdateNotificationResponse() {
 	retrievedNotification, err = s.persistence.GetSentNotification(sentNotification.HashedPublicKey(), installationID, messageID)
 	s.Require().NoError(err)
 	s.Require().Equal(sentNotification, retrievedNotification)
+
+	// This notification should not be retriable
+	retriableNotifications, err = s.persistence.GetRetriablePushNotifications()
+	s.Require().NoError(err)
+	s.Require().Len(retriableNotifications, 0)
 
 	// Update with a unsuccessful notification, it should be ignored
 	response = &protobuf.PushNotificationReport{

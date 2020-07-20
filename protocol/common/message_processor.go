@@ -438,8 +438,10 @@ func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 		MessageIDs: messageIDs,
 	}
 
+	logger.Debug("subscriptions", zap.Int("count", len(p.subscriptions)))
 	// Publish on channels, drop if buffer is full
 	for _, c := range p.subscriptions {
+		logger.Debug("sending on subscription")
 		select {
 		case c <- sentMessage:
 		default:
