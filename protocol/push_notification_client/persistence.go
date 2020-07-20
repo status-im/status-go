@@ -42,7 +42,7 @@ func (p *Persistence) GetLastPushNotificationRegistration() (*protobuf.PushNotif
 		return nil, nil, err
 	}
 	for _, pkBytes := range publicKeyBytes {
-		pk, err := crypto.UnmarshalPubkey(pkBytes)
+		pk, err := crypto.DecompressPubkey(pkBytes)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -63,7 +63,7 @@ func (p *Persistence) SaveLastPushNotificationRegistration(registration *protobu
 	var encodedContactIDs bytes.Buffer
 	var contactIDsBytes [][]byte
 	for _, pk := range contactIDs {
-		contactIDsBytes = append(contactIDsBytes, crypto.FromECDSAPub(pk))
+		contactIDsBytes = append(contactIDsBytes, crypto.CompressPubkey(pk))
 	}
 	pkEncoder := gob.NewEncoder(&encodedContactIDs)
 	if err := pkEncoder.Encode(contactIDsBytes); err != nil {
@@ -271,9 +271,34 @@ func (p *Persistence) ShouldSendNotificationToAllInstallationIDs(publicKey *ecds
 	return count == 0, nil
 }
 
-func (p *Persistence) NotifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
-	sentAt := time.Now().Unix()
-	_, err := p.db.Exec(`INSERT INTO push_notification_client_sent_notifications (public_key, installation_id, message_id, sent_at) VALUES (?, ?, ?, ?)`, crypto.CompressPubkey(publicKey), installationID, messageID, sentAt)
+func (p *Persistence) NotifiedOn(n *SentNotification) error {
+	_, err := p.db.Exec(`INSERT INTO push_notification_client_sent_notifications (public_key, installation_id, message_id, sent_at, hashed_public_key) VALUES (?, ?, ?, ?, ?)`, crypto.CompressPubkey(n.PublicKey), n.InstallationID, n.MessageID, n.SentAt, n.HashedPublicKey())
+	return err
+}
+
+func (p *Persistence) GetSentNotification(hashedPublicKey []byte, installationID string, messageID []byte) (*SentNotification, error) {
+	var publicKeyBytes []byte
+	sentNotification := &SentNotification{
+		InstallationID: installationID,
+		MessageID:      messageID,
+	}
+	err := p.db.QueryRow(`SELECT sent_at, error, success, public_key FROM push_notification_client_sent_notifications WHERE hashed_public_key = ?`, hashedPublicKey).Scan(&sentNotification.SentAt, &sentNotification.Error, &sentNotification.Success, &publicKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	publicKey, err := crypto.DecompressPubkey(publicKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	sentNotification.PublicKey = publicKey
+
+	return sentNotification, nil
+}
+
+func (p *Persistence) UpdateNotificationResponse(messageID []byte, response *protobuf.PushNotificationReport) error {
+	_, err := p.db.Exec(`UPDATE push_notification_client_sent_notifications SET success = ?, error = ? WHERE hashed_public_key = ? AND installation_id = ? AND message_id = ? AND NOT success`, response.Success, response.Error, response.PublicKey, response.InstallationId, messageID)
 	return err
 }
 

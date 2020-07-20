@@ -144,13 +144,14 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 
 	options := &protobuf.PushNotificationRegistration{
-		Version:         1,
-		AccessToken:     expectedUUID,
-		Token:           myDeviceToken,
-		InstallationId:  s.installationID,
-		Enabled:         true,
-		BlockedChatList: mutedChatListHashes,
-		AllowedUserList: [][]byte{encryptedToken},
+		Version:               1,
+		AccessToken:           expectedUUID,
+		Token:                 myDeviceToken,
+		InstallationId:        s.installationID,
+		AllowFromContactsOnly: true,
+		Enabled:               true,
+		BlockedChatList:       mutedChatListHashes,
+		AllowedUserList:       [][]byte{encryptedToken},
 	}
 
 	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)

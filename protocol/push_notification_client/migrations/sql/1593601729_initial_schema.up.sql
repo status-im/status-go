@@ -35,8 +35,11 @@ CREATE TABLE IF NOT EXISTS push_notification_client_tracked_messages (
 CREATE TABLE IF NOT EXISTS push_notification_client_sent_notifications (
   message_id BLOB NOT NULL,
   public_key BLOB NOT NULL,
+  hashed_public_key BLOB NOT NULL,
   installation_id TEXT NOT NULL,
   sent_at INT NOT NULL,
+  success BOOLEAN NOT NULL DEFAULT FALSE,
+  error INT NOT NULL DEFAULT 0,
   UNIQUE(message_id, public_key, installation_id)
   );
 

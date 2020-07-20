@@ -67,6 +67,19 @@ type PushNotificationInfo struct {
 	Version         uint64
 }
 
+type SentNotification struct {
+	PublicKey      *ecdsa.PublicKey
+	InstallationID string
+	SentAt         int64
+	MessageID      []byte
+	Success        bool
+	Error          protobuf.PushNotificationReport_ErrorType
+}
+
+func (s *SentNotification) HashedPublicKey() []byte {
+	return common.HashPublicKey(s.PublicKey)
+}
+
 type Config struct {
 	// Identity is our identity key
 	Identity *ecdsa.PrivateKey
@@ -197,6 +210,35 @@ func (c *Client) Stop() error {
 	return nil
 }
 
+func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey) error {
+	// Check if we queried recently
+	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
+	if err != nil {
+		return err
+	}
+	// Naively query again if too much time has passed.
+	// Here it might not be necessary
+	if time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
+		c.config.Logger.Info("querying info")
+		err := c.QueryPushNotificationInfo(publicKey)
+		if err != nil {
+			c.config.Logger.Error("could not query pn info", zap.Error(err))
+			return err
+		}
+		// This is just horrible, but for now will do,
+		// the issue is that we don't really know how long it will
+		// take to reply, as there might be multiple servers
+		// replying to us.
+		// The only time we are 100% certain that we can proceed is
+		// when we have non-stale info for each device, but
+		// most devices are not going to be registered, so we'd still
+		// have to wait teh maximum amount of time allowed.
+		time.Sleep(3 * time.Second)
+
+	}
+	return nil
+}
+
 func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 	c.config.Logger.Info("sent message", zap.Any("sent message", sentMessage))
 	if !c.config.SendEnabled {
@@ -252,33 +294,10 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 
 	c.config.Logger.Info("actionable messages", zap.Any("message-ids", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
 
-	// Check if we queried recently
-	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
+	err := c.queryNotificationInfo(publicKey)
 	if err != nil {
 		return err
 	}
-
-	// Naively query again if too much time has passed.
-	// Here it might not be necessary
-	if time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
-		c.config.Logger.Info("querying info")
-		err := c.QueryPushNotificationInfo(publicKey)
-		if err != nil {
-			c.config.Logger.Error("could not query pn info", zap.Error(err))
-			return err
-		}
-		// This is just horrible, but for now will do,
-		// the issue is that we don't really know how long it will
-		// take to reply, as there might be multiple servers
-		// replying to us.
-		// The only time we are 100% certain that we can proceed is
-		// when we have non-stale info for each device, but
-		// most devices are not going to be registered, so we'd still
-		// have to wait teh maximum amount of time allowed.
-		time.Sleep(3 * time.Second)
-
-	}
-
 	c.config.Logger.Info("queried info")
 	// Retrieve infos
 	info, err := c.GetPushNotificationInfo(publicKey, installationIDs)
@@ -380,7 +399,12 @@ func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID strin
 }
 
 func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
-	return c.persistence.NotifiedOn(publicKey, installationID, messageID)
+	return c.persistence.NotifiedOn(&SentNotification{
+		PublicKey:      publicKey,
+		SentAt:         time.Now().Unix(),
+		InstallationID: installationID,
+		MessageID:      messageID,
+	})
 }
 func (p *Client) mutedChatIDsHashes(chatIDs []string) [][]byte {
 	var mutedChatListHashes [][]byte
@@ -850,7 +874,14 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 }
 
 // HandlePushNotificationResponse should set the request as processed
-func (p *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response protobuf.PushNotificationResponse) error {
+func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response protobuf.PushNotificationResponse) error {
+	messageID := response.MessageId
+	for _, report := range response.Reports {
+		err := c.persistence.UpdateNotificationResponse(messageID, report)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

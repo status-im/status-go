@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
@@ -209,6 +210,74 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfoWithVersion() {
 
 	s.Require().Len(retrievedInfos, 1)
 	s.Require().Equal(uint64(2), retrievedInfos[0].Version)
+}
+
+func (s *SQLitePersistenceSuite) TestNotifiedOnAndUpdateNotificationResponse() {
+	key, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	installationID := "installation-id"
+	messageID := []byte("message-id")
+
+	sentNotification := &SentNotification{
+		PublicKey:      &key.PublicKey,
+		InstallationID: installationID,
+		MessageID:      messageID,
+		SentAt:         time.Now().Unix(),
+	}
+
+	s.Require().NoError(s.persistence.NotifiedOn(sentNotification))
+
+	retrievedNotification, err := s.persistence.GetSentNotification(sentNotification.HashedPublicKey(), installationID, messageID)
+	s.Require().NoError(err)
+	s.Require().Equal(sentNotification, retrievedNotification)
+
+	response := &protobuf.PushNotificationReport{
+		Success:        false,
+		Error:          protobuf.PushNotificationReport_WRONG_TOKEN,
+		PublicKey:      sentNotification.HashedPublicKey(),
+		InstallationId: installationID,
+	}
+
+	s.Require().NoError(s.persistence.UpdateNotificationResponse(messageID, response))
+
+	sentNotification.Error = protobuf.PushNotificationReport_WRONG_TOKEN
+
+	retrievedNotification, err = s.persistence.GetSentNotification(sentNotification.HashedPublicKey(), installationID, messageID)
+	s.Require().NoError(err)
+	s.Require().Equal(sentNotification, retrievedNotification)
+
+	// Update with a successful notification
+	response = &protobuf.PushNotificationReport{
+		Success:        true,
+		PublicKey:      sentNotification.HashedPublicKey(),
+		InstallationId: installationID,
+	}
+
+	s.Require().NoError(s.persistence.UpdateNotificationResponse(messageID, response))
+
+	sentNotification.Success = true
+	sentNotification.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
+
+	retrievedNotification, err = s.persistence.GetSentNotification(sentNotification.HashedPublicKey(), installationID, messageID)
+	s.Require().NoError(err)
+	s.Require().Equal(sentNotification, retrievedNotification)
+
+	// Update with a unsuccessful notification, it should be ignored
+	response = &protobuf.PushNotificationReport{
+		Success:        false,
+		Error:          protobuf.PushNotificationReport_WRONG_TOKEN,
+		PublicKey:      sentNotification.HashedPublicKey(),
+		InstallationId: installationID,
+	}
+
+	s.Require().NoError(s.persistence.UpdateNotificationResponse(messageID, response))
+
+	sentNotification.Success = true
+	sentNotification.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
+
+	retrievedNotification, err = s.persistence.GetSentNotification(sentNotification.HashedPublicKey(), installationID, messageID)
+	s.Require().NoError(err)
+	s.Require().Equal(sentNotification, retrievedNotification)
 }
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveRegistration() {
