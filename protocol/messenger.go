@@ -3237,7 +3237,7 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 
 }
 
-func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiId int) (*MessengerResponse, error) {
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID int) (*MessengerResponse, error) {
 	var response MessengerResponse
 
 	chat, ok := m.allChats[chatID]
@@ -3250,7 +3250,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	emojiReaction := &protobuf.EmojiReaction{
 		Clock:     clock,
 		MessageId: messageID,
-		Type:      protobuf.EmojiReaction_Type(emojiId),
+		Type:      protobuf.EmojiReaction_Type(emojiID),
 	}
 	encodedMessage, err := proto.Marshal(emojiReaction)
 	if err != nil {
@@ -3271,7 +3271,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		ID:        types.EncodeHex(id),
 		MessageID: messageID,
 		ChatID:    chatID,
-		EmojiID:   protobuf.EmojiReaction_Type(emojiId),
+		EmojiID:   protobuf.EmojiReaction_Type(emojiID),
 		From:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 		Retracted: false,
 	}
