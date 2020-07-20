@@ -87,11 +87,11 @@ type RawResponse struct {
 }
 
 type MessengerResponse struct {
-	Chats         []*Chat                     `json:"chats,omitempty"`
-	Messages      []*Message                  `json:"messages,omitempty"`
-	Contacts      []*Contact                  `json:"contacts,omitempty"`
-	Installations []*multidevice.Installation `json:"installations,omitempty"`
-	EmojiReactions []*EmojiReaction `json:"emoji_reactions"`
+	Chats          []*Chat                     `json:"chats,omitempty"`
+	Messages       []*Message                  `json:"messages,omitempty"`
+	Contacts       []*Contact                  `json:"contacts,omitempty"`
+	Installations  []*multidevice.Installation `json:"installations,omitempty"`
+	EmojiReactions []*EmojiReaction            `json:"emoji_reactions,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {

@@ -122,13 +122,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Hash string `json:"hash"`
 		Pack int32  `json:"pack"`
 	}
-	type EmojiReactionAlias struct {
-		MessageID string `json:"message_id"`
-		Type      int32  `json:"type"`
-	}
-	type EmojiReactionRetractionAlias struct {
-		EmojiReactionID string `json:"emoji_reaction_id"`
-	}
 
 	item := struct {
 		ID                string                           `json:"id"`
@@ -215,13 +208,8 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	switch aux.ContentType {
-	case protobuf.ChatMessage_STICKER:
+	if aux.ContentType == protobuf.ChatMessage_STICKER {
 		m.Payload = &protobuf.ChatMessage_Sticker{Sticker: aux.Sticker}
-	case protobuf.ChatMessage_EMOJI_REACTION:
-		m.Payload = &protobuf.ChatMessage_EmojiReaction{EmojiReaction: aux.EmojiReaction}
-	case protobuf.ChatMessage_EMOJI_REACTION_RETRACTION:
-		m.Payload = &protobuf.ChatMessage_EmojiReactionRetraction{EmojiReactionRetraction: aux.EmojiReactionRetraction}
 	}
 	if aux.ContentType == protobuf.ChatMessage_AUDIO {
 		m.Payload = &protobuf.ChatMessage_Audio{

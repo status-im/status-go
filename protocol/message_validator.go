@@ -204,33 +204,6 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if image.Type == protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE {
 			return errors.New("image type unknown")
 		}
-
-	case protobuf.ChatMessage_EMOJI_REACTION:
-		if message.Payload == nil {
-			return errors.New("no emoji reaction data")
-		}
-		emojiR := message.GetEmojiReaction()
-		if emojiR == nil {
-			return errors.New("no emoji reaction data")
-		}
-		if len(emojiR.MessageId) == 0 {
-			return errors.New("emoji reaction no target message id")
-		}
-		if emojiR.Type == protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE {
-			return errors.New("emoji reaction type unknown")
-		}
-
-	case protobuf.ChatMessage_EMOJI_REACTION_RETRACTION:
-		if message.Payload == nil {
-			return errors.New("no emoji reaction retraction data")
-		}
-		emojiRR := message.GetEmojiReactionRetraction()
-		if emojiRR == nil {
-			return errors.New("no emoji reaction retraction data")
-		}
-		if len(emojiRR.EmojiReactionId) == 0 {
-			return errors.New("emoji reaction retraction no target emoji reaction id")
-		}
 	}
 
 	if message.ContentType == protobuf.ChatMessage_AUDIO {
