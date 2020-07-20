@@ -3286,4 +3286,5 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, EmojiReactionID string) (*MessengerResponse, error) {
 	// TODO
+	return nil, nil
 }
