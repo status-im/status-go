@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS push_notification_client_sent_notifications (
   retry_count INT NOT NULL DEFAULT 0,
   success BOOLEAN NOT NULL DEFAULT FALSE,
   error INT NOT NULL DEFAULT 0,
-  UNIQUE(message_id, public_key, installation_id)
+  UNIQUE(message_id, public_key, installation_id) ON CONFLICT REPLACE
   );
 
 CREATE TABLE IF NOT EXISTS push_notification_client_registrations (

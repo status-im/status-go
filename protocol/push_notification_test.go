@@ -273,6 +273,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		}
 		return nil
 	})
+	s.Require().NoError(err)
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactOnly() {
@@ -400,6 +401,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 		return nil
 	})
 
+	s.Require().NoError(err)
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
@@ -476,12 +478,38 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
 	s.Require().NoError(alice.SaveChat(&chat))
 	inputMessage := buildTestMessage(chat)
-	response, err := alice.SendChatMessage(context.Background(), inputMessage)
+	_, err = alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
-	messageIDString := response.Messages[0].ID
-	messageID, err := hex.DecodeString(messageIDString[2:])
+	// We check that alice retrieves the info from the server
+	var info []*push_notification_client.PushNotificationInfo
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob.identity.PublicKey, bobInstallationIDs)
+		if err != nil {
+			return err
+		}
+		// Check we have replies for bob
+		if len(info) != 1 {
+			return errors.New("info not fetched")
+		}
+		return nil
+
+	})
 	s.Require().NoError(err)
+
+	s.Require().NotNil(info)
+	s.Require().Equal(bob.installationID, info[0].InstallationID)
+	s.Require().Equal(bobServers[0].AccessToken, info[0].AccessToken)
+	s.Require().Equal(&bob.identity.PublicKey, info[0].PublicKey)
 
 	// The message has been sent, but not received, now we remove a contact so that the token is invalidated
 	frankContact = &Contact{
@@ -518,7 +546,14 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	// Make sure access token is not the same
 	s.Require().NotEqual(newBobServers[0].AccessToken, bobServers[0].AccessToken)
 
-	var info []*push_notification_client.PushNotificationInfo
+	// Send another message, here the token will not be valid
+	inputMessage = buildTestMessage(chat)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+	messageIDString := response.Messages[0].ID
+	messageID, err := hex.DecodeString(messageIDString[2:])
+	s.Require().NoError(err)
+
 	err = tt.RetryWithBackOff(func() error {
 		_, err = server.RetrieveAll()
 		if err != nil {
@@ -536,6 +571,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		// Check we have replies for bob
 		if len(info) != 1 {
 			return errors.New("info not fetched")
+		}
+		if newBobServers[0].AccessToken != info[0].AccessToken {
+			return errors.New("still using the old access token")
 		}
 		return nil
 
@@ -574,4 +612,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		}
 		return nil
 	})
+
+	s.Require().NoError(err)
 }

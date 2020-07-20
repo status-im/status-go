@@ -236,11 +236,13 @@ func (c *Client) Stop() error {
 }
 
 func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) error {
+	c.config.Logger.Info("Getting queried at")
 	// Check if we queried recently
 	queriedAt, err := c.persistence.GetQueriedAt(publicKey)
 	if err != nil {
 		return err
 	}
+	c.config.Logger.Info("checking if querying necessary")
 	// Naively query again if too much time has passed.
 	// Here it might not be necessary
 	if force || time.Now().Unix()-queriedAt > staleQueryTimeInSeconds {
@@ -353,6 +355,7 @@ func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID strin
 }
 
 func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
+	c.config.Logger.Info("notified on")
 	return c.persistence.UpsertSentNotification(&SentNotification{
 		PublicKey:      publicKey,
 		LastTriedAt:    time.Now().Unix(),
@@ -501,7 +504,7 @@ func shouldRetryPushNotification(pn *SentNotification) bool {
 	if pn.RetryCount > maxPushNotificationRetries {
 		return false
 	}
-	return time.Now().Unix() > nextPushNotificationRetry(pn)
+	return time.Now().Unix() >= nextPushNotificationRetry(pn)
 }
 
 func (c *Client) resetServers() error {
@@ -652,14 +655,18 @@ func (c *Client) resendNotification(pn *SentNotification) error {
 	c.config.Logger.Info("resending notification", zap.Any("notification", pn))
 	pn.RetryCount += 1
 	pn.LastTriedAt = time.Now().Unix()
+	c.config.Logger.Info("PN", zap.Any("pn", pn))
 	err := c.persistence.UpsertSentNotification(pn)
 	if err != nil {
+		c.config.Logger.Error("failed to upsert notification", zap.Error(err))
 		return err
 	}
 
+	c.config.Logger.Info("GOING INTO querying")
 	// Re-fetch push notification info
 	err = c.queryNotificationInfo(pn.PublicKey, true)
 	if err != nil {
+		c.config.Logger.Error("failed to query notification info", zap.Error(err))
 		return err
 	}
 
@@ -699,6 +706,7 @@ func (c *Client) resendingLoop() error {
 				}
 			}
 			nextRetry := nextPushNotificationRetry(pn)
+			c.config.Logger.Info("Next next retry", zap.Int64("now", time.Now().Unix()), zap.Int64("next", nextRetry), zap.Any("pn", pn))
 			if lowestNextRetry == 0 || nextRetry < lowestNextRetry {
 				lowestNextRetry = nextRetry
 			}
@@ -1011,7 +1019,9 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 // HandlePushNotificationResponse should set the request as processed
 func (c *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response protobuf.PushNotificationResponse) error {
 	messageID := response.MessageId
+	c.config.Logger.Info("received response for", zap.Binary("message-id", messageID))
 	for _, report := range response.Reports {
+		c.config.Logger.Info("received response", zap.Any("report", report))
 		err := c.persistence.UpdateNotificationResponse(messageID, report)
 		if err != nil {
 			return err
