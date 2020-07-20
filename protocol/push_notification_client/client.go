@@ -424,6 +424,7 @@ func (c *Client) allowedUserList(token []byte, contactIDs []*ecdsa.PublicKey) ([
 // and return a new one in that case
 func (c *Client) getToken(contactIDs []*ecdsa.PublicKey) string {
 	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs) {
+		c.config.Logger.Info("refreshing access token")
 		return uuid.New().String()
 	}
 	return c.lastPushNotificationRegistration.AccessToken
@@ -492,10 +493,7 @@ func nextPushNotificationRetry(pn *SentNotification) int64 {
 
 // We calculate if it's too early to retry, by exponentially backing off
 func shouldRetryRegisteringWithServer(server *PushNotificationServer) bool {
-	if server.RetryCount > maxRegistrationRetries {
-		return false
-	}
-	return time.Now().Unix() > nextServerRetry(server)
+	return time.Now().Unix() >= nextServerRetry(server)
 }
 
 // We calculate if it's too early to retry, by exponentially backing off
@@ -516,14 +514,13 @@ func (c *Client) resetServers() error {
 		// Reset server registration data
 		server.Registered = false
 		server.RegisteredAt = 0
-		server.RetryCount += 1
+		server.RetryCount = 0
 		server.LastRetriedAt = time.Now().Unix()
 		server.AccessToken = ""
 
 		if err := c.persistence.UpsertServer(server); err != nil {
 			return err
 		}
-
 	}
 
 	return nil
@@ -692,8 +689,8 @@ func (c *Client) resendingLoop() error {
 		}
 
 		for _, pn := range retriableNotifications {
-			nextRetry := nextPushNotificationRetry(pn)
-			c.config.Logger.Info("Next retry", zap.Int64("now", time.Now().Unix()), zap.Int64("next", nextRetry))
+			nR := nextPushNotificationRetry(pn)
+			c.config.Logger.Info("Next retry", zap.Int64("now", time.Now().Unix()), zap.Int64("next", nR))
 			if shouldRetryPushNotification(pn) {
 				c.config.Logger.Info("retrying pn", zap.Any("pn", pn))
 				err := c.resendNotification(pn)
@@ -701,6 +698,7 @@ func (c *Client) resendingLoop() error {
 					return err
 				}
 			}
+			nextRetry := nextPushNotificationRetry(pn)
 			if lowestNextRetry == 0 || nextRetry < lowestNextRetry {
 				lowestNextRetry = nextRetry
 			}
@@ -734,7 +732,7 @@ func (c *Client) registrationLoop() error {
 
 		var nonRegisteredServers []*PushNotificationServer
 		for _, server := range servers {
-			if !server.Registered {
+			if !server.Registered && server.RetryCount < maxRegistrationRetries {
 				nonRegisteredServers = append(nonRegisteredServers, server)
 			}
 		}
@@ -766,6 +764,7 @@ func (c *Client) registrationLoop() error {
 
 		nextRetry := lowestNextRetry - time.Now().Unix()
 		waitFor := time.Duration(nextRetry)
+		c.config.Logger.Info("Waiting for", zap.Any("wait for", waitFor))
 		select {
 
 		case <-time.After(waitFor * time.Second):
@@ -830,9 +829,25 @@ func (c *Client) GetServers() ([]*PushNotificationServer, error) {
 	return c.persistence.GetServers()
 }
 
+func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.Logger.Info("re-registering")
+	if len(c.deviceToken) == 0 {
+		c.config.Logger.Info("no device token, not registering")
+		return nil
+	}
+
+	return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+}
+
 func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
 	c.stopRegistrationLoop()
+
+	// Reset servers
+	err := c.resetServers()
+	if err != nil {
+		return err
+	}
 
 	c.deviceToken = deviceToken
 

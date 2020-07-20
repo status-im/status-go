@@ -1121,6 +1121,14 @@ func (m *Messenger) isNewContact(contact *Contact) bool {
 	return contact.IsAdded() && (!ok || !previousContact.IsAdded())
 }
 
+func (m *Messenger) removedContact(contact *Contact) bool {
+	previousContact, ok := m.allContacts[contact.ID]
+	if !ok {
+		return false
+	}
+	return previousContact.IsAdded() && !contact.IsAdded()
+}
+
 func (m *Messenger) saveContact(contact *Contact) error {
 	name, identicon, err := generateAliasAndIdenticon(contact.ID)
 	if err != nil {
@@ -1137,12 +1145,25 @@ func (m *Messenger) saveContact(contact *Contact) error {
 		}
 	}
 
+	// We check if it should re-register
+	shouldReregisterForPushNotifications := m.pushNotificationClient != nil && (m.isNewContact(contact) || m.removedContact(contact))
+
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
 		return err
 	}
 
 	m.allContacts[contact.ID] = contact
+
+	// Reregister only when data has changed
+	if shouldReregisterForPushNotifications {
+		m.logger.Info("contact state changed, re-registering for push notification")
+		contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
+		err := m.pushNotificationClient.Reregister(contactIDs, mutedChatIDs)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -3087,8 +3108,6 @@ func (m *Messenger) addedContactsAndMutedChatIDs() ([]*ecdsa.PublicKey, []string
 	var contactIDs []*ecdsa.PublicKey
 	var mutedChatIDs []string
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	for _, contact := range m.allContacts {
 		if contact.IsAdded() {
 			pk, err := contact.PublicKey()
@@ -3115,6 +3134,8 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
 	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
@@ -3131,6 +3152,8 @@ func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
 	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
@@ -3140,6 +3163,8 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
