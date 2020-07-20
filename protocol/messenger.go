@@ -91,6 +91,7 @@ type MessengerResponse struct {
 	Messages      []*Message                  `json:"messages,omitempty"`
 	Contacts      []*Contact                  `json:"contacts,omitempty"`
 	Installations []*multidevice.Installation `json:"installations,omitempty"`
+	EmojiReactions []*EmojiReaction `json:"emoji_reactions"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
@@ -3234,4 +3235,55 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 	}
 	return name, identicon, nil
 
+}
+
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiId int) (*MessengerResponse, error) {
+	var response MessengerResponse
+
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	emojiReaction := &protobuf.EmojiReaction{
+		Clock:     clock,
+		MessageId: messageID,
+		Type:      protobuf.EmojiReaction_Type(emojiId),
+	}
+	encodedMessage, err := proto.Marshal(emojiReaction)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := m.dispatchMessage(ctx, &RawMessage{
+		LocalChatID:         chatID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	emojiR := &EmojiReaction{
+		ID:        types.EncodeHex(id),
+		MessageID: messageID,
+		ChatID:    chatID,
+		EmojiID:   protobuf.EmojiReaction_Type(emojiId),
+		From:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+		Retracted: false,
+	}
+
+	response.EmojiReactions = []*EmojiReaction{emojiR}
+	response.Chats = []*Chat{chat}
+
+	// TODO emoji reaction persistence
+
+	return &response, nil
+}
+
+func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, EmojiReactionID string) (*MessengerResponse, error) {
+	// TODO
 }
