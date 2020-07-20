@@ -775,12 +775,14 @@ func (c *Client) handleGrant(clientPublicKey *ecdsa.PublicKey, serverPublicKey *
 }
 
 func (c *Client) handleAllowedUserList(publicKey *ecdsa.PublicKey, allowedUserList [][]byte) string {
+	c.config.Logger.Info("handling allowed user list")
 	for _, encryptedToken := range allowedUserList {
 		token, err := c.decryptToken(publicKey, encryptedToken)
 		if err != nil {
 			c.config.Logger.Warn("could not decrypt token", zap.Error(err))
 			continue
 		}
+		c.config.Logger.Info("decrypted token")
 		return string(token)
 	}
 	return ""
@@ -811,7 +813,7 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 
 		accessToken := info.AccessToken
 
-		if len(info.AllowedUserList) != 0 {
+		if len(accessToken) == 0 && len(info.AllowedUserList) != 0 {
 			accessToken = c.handleAllowedUserList(publicKey, info.AllowedUserList)
 
 		}
@@ -824,14 +826,14 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 		// We check the user has allowed this server to store this particular
 		// access token, otherwise anyone could reply with a fake token
 		// and receive notifications for a user
-		if err := c.handleGrant(publicKey, serverPublicKey, info.Grant, info.AccessToken); err != nil {
+		if err := c.handleGrant(publicKey, serverPublicKey, info.Grant, accessToken); err != nil {
 			c.config.Logger.Warn("grant verification failed, ignoring", zap.Error(err))
 			continue
 		}
 		pushNotificationInfo = append(pushNotificationInfo, &PushNotificationInfo{
 			PublicKey:       publicKey,
 			ServerPublicKey: serverPublicKey,
-			AccessToken:     info.AccessToken,
+			AccessToken:     accessToken,
 			InstallationID:  info.InstallationId,
 			Version:         info.Version,
 			RetrievedAt:     time.Now().Unix(),

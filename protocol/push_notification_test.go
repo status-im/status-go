@@ -224,7 +224,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	s.Require().NotNil(bob1Info)
 	s.Require().Equal(bob1.installationID, bob1Info.InstallationID)
-	s.Require().Equal(bob1Info.AccessToken, bob1Servers[0].AccessToken, bob1Info.AccessToken)
+	s.Require().Equal(bob1Servers[0].AccessToken, bob1Info.AccessToken)
 	s.Require().Equal(&bob1.identity.PublicKey, bob1Info.PublicKey)
 
 	s.Require().NotNil(bob2Info)
@@ -233,7 +233,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().Equal(&bob2.identity.PublicKey, bob2Info.PublicKey)
 
 	retrievedNotificationInfo, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
-	alice.logger.Info("BOB KEY", zap.Any("key", bob1.identity.PublicKey))
+
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedNotificationInfo)
 	s.Require().Len(retrievedNotificationInfo, 2)
@@ -241,20 +241,33 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactOnly() {
 
-	bob1DeviceToken := "token-1"
-	bob2DeviceToken := "token-2"
+	bobDeviceToken := "token-1"
 
-	bob1 := s.m
+	bob := s.m
 	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
 	server := s.newPushNotificationServer(s.shh)
 	alice := s.newMessenger(s.shh)
-	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
+	bobInstallationIDs := []string{bob.installationID, bob2.installationID}
 
-	// Register bob1
-	err := bob1.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
+	// Register bob
+	err := bob.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
+	// Add alice has a contact
+	aliceContact := &Contact{
+		ID:         types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
+		Name:       "Some Contact",
+		SystemTags: []string{contactAdded},
+	}
+
+	err = bob.SaveContact(aliceContact)
+	s.Require().NoError(err)
+
+	// Enable from contacts only
+	err = bob.EnablePushNotificationsFromContactsOnly()
+	s.Require().NoError(err)
+
+	err = bob.RegisterForPushNotifications(context.Background(), bobDeviceToken)
 	s.Require().NoError(err)
 
 	// Pull servers  and check we registered
@@ -263,43 +276,11 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 		if err != nil {
 			return err
 		}
-		_, err = bob1.RetrieveAll()
+		_, err = bob.RetrieveAll()
 		if err != nil {
 			return err
 		}
-		registered, err := bob1.RegisteredForPushNotifications()
-		if err != nil {
-			return err
-		}
-		if !registered {
-			return errors.New("not registered")
-		}
-		return nil
-	})
-	// Make sure we receive it
-	s.Require().NoError(err)
-	bob1Servers, err := bob1.GetPushNotificationServers()
-	s.Require().NoError(err)
-
-	// Register bob2
-	err = bob2.AddPushNotificationServer(context.Background(), &server.identity.PublicKey)
-	s.Require().NoError(err)
-
-	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
-	s.Require().NoError(err)
-
-	err = tt.RetryWithBackOff(func() error {
-		// Fetch server messages, for the registration
-		_, err = server.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		// Fetch bob messages, for the response
-		_, err = bob2.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		registered, err := bob2.RegisteredForPushNotifications()
+		registered, err := bob.RegisteredForPushNotifications()
 		if err != nil {
 			return err
 		}
@@ -310,7 +291,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bob2Servers, err := bob2.GetPushNotificationServers()
+	bobServers, err := bob.GetPushNotificationServers()
 	s.Require().NoError(err)
 
 	err = alice.pushNotificationClient.QueryPushNotificationInfo(&bob2.identity.PublicKey)
@@ -327,12 +308,12 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 			return err
 		}
 
-		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
+		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob.identity.PublicKey, bobInstallationIDs)
 		if err != nil {
 			return err
 		}
-		// Check we have replies for both bob1 and bob2
-		if len(info) != 2 {
+		// Check we have replies for bob
+		if len(info) != 1 {
 			return errors.New("info not fetched")
 		}
 		return nil
@@ -340,29 +321,13 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	})
 	s.Require().NoError(err)
 
-	var bob1Info, bob2Info *push_notification_client.PushNotificationInfo
+	s.Require().NotNil(info)
+	s.Require().Equal(bob.installationID, info[0].InstallationID)
+	s.Require().Equal(bobServers[0].AccessToken, info[0].AccessToken)
+	s.Require().Equal(&bob.identity.PublicKey, info[0].PublicKey)
 
-	if info[0].AccessToken == bob1Servers[0].AccessToken {
-		bob1Info = info[0]
-		bob2Info = info[1]
-	} else {
-		bob2Info = info[0]
-		bob1Info = info[1]
-	}
-
-	s.Require().NotNil(bob1Info)
-	s.Require().Equal(bob1.installationID, bob1Info.InstallationID)
-	s.Require().Equal(bob1Info.AccessToken, bob1Servers[0].AccessToken, bob1Info.AccessToken)
-	s.Require().Equal(&bob1.identity.PublicKey, bob1Info.PublicKey)
-
-	s.Require().NotNil(bob2Info)
-	s.Require().Equal(bob2.installationID, bob2Info.InstallationID)
-	s.Require().Equal(bob2Servers[0].AccessToken, bob2Info.AccessToken)
-	s.Require().Equal(&bob2.identity.PublicKey, bob2Info.PublicKey)
-
-	retrievedNotificationInfo, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
-	alice.logger.Info("BOB KEY", zap.Any("key", bob1.identity.PublicKey))
+	retrievedNotificationInfo, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob.identity.PublicKey, bobInstallationIDs)
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedNotificationInfo)
-	s.Require().Len(retrievedNotificationInfo, 2)
+	s.Require().Len(retrievedNotificationInfo, 1)
 }
