@@ -122,7 +122,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Hash string `json:"hash"`
 		Pack int32  `json:"pack"`
 	}
-
 	item := struct {
 		ID                string                           `json:"id"`
 		WhisperTimestamp  uint64                           `json:"whisperTimestamp"`
@@ -176,7 +175,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		MessageType:       m.MessageType,
 		CommandParameters: m.CommandParameters,
 	}
-
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{
 			Pack: sticker.Pack,
@@ -207,7 +205,6 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-
 	if aux.ContentType == protobuf.ChatMessage_STICKER {
 		m.Payload = &protobuf.ChatMessage_Sticker{Sticker: aux.Sticker}
 	}
