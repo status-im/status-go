@@ -466,14 +466,15 @@ func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 	}
 
 	options := &protobuf.PushNotificationRegistration{
-		AccessToken:     token,
-		TokenType:       c.config.TokenType,
-		Version:         c.getVersion(),
-		InstallationId:  c.config.InstallationID,
-		Token:           c.deviceToken,
-		Enabled:         c.config.RemoteNotificationsEnabled,
-		BlockedChatList: c.mutedChatIDsHashes(mutedChatIDs),
-		AllowedUserList: allowedUserList,
+		AccessToken:           token,
+		TokenType:             c.config.TokenType,
+		Version:               c.getVersion(),
+		InstallationId:        c.config.InstallationID,
+		Token:                 c.deviceToken,
+		AllowFromContactsOnly: c.config.allowFromContactsOnly,
+		Enabled:               c.config.RemoteNotificationsEnabled,
+		BlockedChatList:       c.mutedChatIDsHashes(mutedChatIDs),
+		AllowedUserList:       allowedUserList,
 	}
 	return options, nil
 }
@@ -847,7 +848,7 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 }
 
 // HandlePushNotificationResponse should set the request as processed
-func (p *Client) HandlePushNotificationResponse(ack *protobuf.PushNotificationResponse) error {
+func (p *Client) HandlePushNotificationResponse(serverKey *ecdsa.PublicKey, response protobuf.PushNotificationResponse) error {
 	return nil
 }
 

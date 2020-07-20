@@ -1978,6 +1978,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						// We continue in any case, no changes to messenger
 						continue
+					case protobuf.PushNotificationResponse:
+						logger.Debug("Received PushNotificationResponse")
+						if m.pushNotificationClient == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationResponse")
+						// TODO: Compare DST with Identity
+						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationResponse)); err != nil {
+							logger.Warn("failed to handle PushNotificationResponse", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
 
 					case protobuf.PushNotificationQueryResponse:
 						logger.Debug("Received PushNotificationQueryResponse")

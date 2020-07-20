@@ -549,13 +549,14 @@ func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
 	// Successful
 
 	registration := &protobuf.PushNotificationRegistration{
-		Token:           "abc",
-		AccessToken:     s.accessToken,
-		Grant:           s.grant,
-		TokenType:       protobuf.PushNotificationRegistration_APN_TOKEN,
-		InstallationId:  s.installationID,
-		AllowedUserList: allowedUserList,
-		Version:         1,
+		Token:                 "abc",
+		AccessToken:           s.accessToken,
+		Grant:                 s.grant,
+		TokenType:             protobuf.PushNotificationRegistration_APN_TOKEN,
+		InstallationId:        s.installationID,
+		AllowFromContactsOnly: true,
+		AllowedUserList:       allowedUserList,
+		Version:               1,
 	}
 	payload, err := proto.Marshal(registration)
 	s.Require().NoError(err)

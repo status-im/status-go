@@ -161,7 +161,7 @@ func (s *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 			InstallationId: registration.InstallationId,
 		}
 
-		if len(registration.AllowedUserList) > 0 {
+		if len(registration.AllowedUserList) > 0 && registration.AllowFromContactsOnly {
 			info.AllowedUserList = registration.AllowedUserList
 		} else {
 			info.AccessToken = registration.AccessToken

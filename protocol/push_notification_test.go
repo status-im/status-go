@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
@@ -129,36 +128,16 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
 
-	// Receive message, reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Check reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob1.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob1.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob1.RetrieveAll()
-	s.Require().NoError(err)
-
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = bob1.RetrieveAll()
+		if err != nil {
+			return err
+		}
 		registered, err := bob1.RegisteredForPushNotifications()
 		if err != nil {
 			return err
@@ -180,35 +159,16 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
 	s.Require().NoError(err)
 
-	// Receive message, reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Check reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob2.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob2.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob2.RetrieveAll()
-	s.Require().NoError(err)
-
 	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = bob2.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
 		registered, err := bob2.RegisteredForPushNotifications()
 		if err != nil {
 			return err
@@ -226,42 +186,32 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err = alice.pushNotificationClient.QueryPushNotificationInfo(&bob2.identity.PublicKey)
 	s.Require().NoError(err)
 
-	// Receive push notification query
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
+	var info []*push_notification_client.PushNotificationInfo
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
+		if err != nil {
+			return err
+		}
+		// Check we have replies for both bob1 and bob2
+		if len(info) != 2 {
+			return errors.New("info not fetched")
+		}
+		return nil
+
+	})
+
 	s.Require().NoError(err)
 
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Receive push notification query response
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = alice.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = alice.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = alice.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Here we should poll, as we don't know whether they are already there
-
-	info, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
-	s.Require().NoError(err)
 	// Check we have replies for both bob1 and bob2
-	s.Require().NotNil(info)
-	s.Require().Len(info, 2)
-
 	var bob1Info, bob2Info *push_notification_client.PushNotificationInfo
 
 	if info[0].AccessToken == bob1Servers[0].AccessToken {
@@ -305,37 +255,18 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
-
-	// Receive message, reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Check reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob1.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob1.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob1.RetrieveAll()
 	s.Require().NoError(err)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = bob1.RetrieveAll()
+		if err != nil {
+			return err
+		}
 		registered, err := bob1.RegisteredForPushNotifications()
 		if err != nil {
 			return err
@@ -357,35 +288,17 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
 	s.Require().NoError(err)
 
-	// Receive message, reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Check reply
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob2.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob2.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = bob2.RetrieveAll()
-	s.Require().NoError(err)
-
 	err = tt.RetryWithBackOff(func() error {
+		// Fetch server messages, for the registration
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		// Fetch bob messages, for the response
+		_, err = bob2.RetrieveAll()
+		if err != nil {
+			return err
+		}
 		registered, err := bob2.RegisteredForPushNotifications()
 		if err != nil {
 			return err
@@ -403,41 +316,29 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	err = alice.pushNotificationClient.QueryPushNotificationInfo(&bob2.identity.PublicKey)
 	s.Require().NoError(err)
 
-	// Receive push notification query
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
+	var info []*push_notification_client.PushNotificationInfo
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
 
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
-	s.Require().NoError(err)
+		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
+		if err != nil {
+			return err
+		}
+		// Check we have replies for both bob1 and bob2
+		if len(info) != 2 {
+			return errors.New("info not fetched")
+		}
+		return nil
 
-	time.Sleep(500 * time.Millisecond)
-	_, err = server.RetrieveAll()
+	})
 	s.Require().NoError(err)
-
-	// Receive push notification query response
-	// TODO: find a better way to handle this waiting
-	time.Sleep(500 * time.Millisecond)
-	_, err = alice.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = alice.RetrieveAll()
-	s.Require().NoError(err)
-
-	time.Sleep(500 * time.Millisecond)
-	_, err = alice.RetrieveAll()
-	s.Require().NoError(err)
-
-	// Here we should poll, as we don't know whether they are already there
-
-	info, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
-	s.Require().NoError(err)
-	// Check we have replies for both bob1 and bob2
-	s.Require().NotNil(info)
-	s.Require().Len(info, 2)
 
 	var bob1Info, bob2Info *push_notification_client.PushNotificationInfo
 

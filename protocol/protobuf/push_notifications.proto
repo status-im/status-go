@@ -18,6 +18,7 @@ message PushNotificationRegistration {
   repeated bytes blocked_chat_list = 8;
   bool unregister = 9;
   bytes grant = 10;
+  bool allow_from_contacts_only = 11;
 }
 
 message PushNotificationRegistrationResponse {
