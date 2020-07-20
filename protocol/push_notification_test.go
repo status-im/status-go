@@ -16,6 +16,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/push_notification_client"
 	"github.com/status-im/status-go/protocol/push_notification_server"
 	"github.com/status-im/status-go/protocol/tt"
@@ -192,7 +193,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
 	s.Require().NoError(alice.SaveChat(&chat))
 	inputMessage := buildTestMessage(chat)
-	_, err = alice.SendChatMessage(context.Background(), inputMessage)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+	messageIDString := response.Messages[0].ID
+	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
 	var info []*push_notification_client.PushNotificationInfo
@@ -246,6 +250,29 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedNotificationInfo)
 	s.Require().Len(retrievedNotificationInfo, 2)
+
+	var sentNotification *push_notification_client.SentNotification
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		sentNotification, err = alice.pushNotificationClient.GetSentNotification(common.HashPublicKey(&bob1.identity.PublicKey), bob1.installationID, messageID)
+		if err != nil {
+			return err
+		}
+		if sentNotification == nil {
+			return errors.New("sent notification not found")
+		}
+		if !sentNotification.Success {
+			return errors.New("sent notification not successul")
+		}
+		return nil
+	})
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactOnly() {
@@ -310,7 +337,10 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
 	s.Require().NoError(alice.SaveChat(&chat))
 	inputMessage := buildTestMessage(chat)
-	_, err = alice.SendChatMessage(context.Background(), inputMessage)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+	messageIDString := response.Messages[0].ID
+	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
 	var info []*push_notification_client.PushNotificationInfo
@@ -346,6 +376,30 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedNotificationInfo)
 	s.Require().Len(retrievedNotificationInfo, 1)
+
+	var sentNotification *push_notification_client.SentNotification
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		sentNotification, err = alice.pushNotificationClient.GetSentNotification(common.HashPublicKey(&bob.identity.PublicKey), bob.installationID, messageID)
+		if err != nil {
+			return err
+		}
+		if sentNotification == nil {
+			return errors.New("sent notification not found")
+		}
+		if !sentNotification.Success {
+			return errors.New("sent notification not successul")
+		}
+		return nil
+	})
+
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
@@ -422,7 +476,11 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
 	s.Require().NoError(alice.SaveChat(&chat))
 	inputMessage := buildTestMessage(chat)
-	_, err = alice.SendChatMessage(context.Background(), inputMessage)
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	messageIDString := response.Messages[0].ID
+	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
 	// The message has been sent, but not received, now we remove a contact so that the token is invalidated
@@ -493,4 +551,27 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedNotificationInfo)
 	s.Require().Len(retrievedNotificationInfo, 1)
+
+	var sentNotification *push_notification_client.SentNotification
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		sentNotification, err = alice.pushNotificationClient.GetSentNotification(common.HashPublicKey(&bob.identity.PublicKey), bob.installationID, messageID)
+		if err != nil {
+			return err
+		}
+		if sentNotification == nil {
+			return errors.New("sent notification not found")
+		}
+		if !sentNotification.Success {
+			return errors.New("sent notification not successul")
+		}
+		return nil
+	})
 }

@@ -825,6 +825,10 @@ func (c *Client) Registered() (bool, error) {
 	return true, nil
 }
 
+func (c *Client) GetSentNotification(hashedPublicKey []byte, installationID string, messageID []byte) (*SentNotification, error) {
+	return c.persistence.GetSentNotification(hashedPublicKey, installationID, messageID)
+}
+
 func (c *Client) GetServers() ([]*PushNotificationServer, error) {
 	return c.persistence.GetServers()
 }
