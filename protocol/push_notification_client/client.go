@@ -288,6 +288,7 @@ func (c *Client) HandleMessageSent(sentMessage *common.SentMessage) error {
 
 	// Nothing to do
 	if len(trackedMessageIDs) == 0 {
+		c.config.Logger.Info("nothing to do")
 		return nil
 	}
 
@@ -611,6 +612,14 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	}
 
 	c.config.Logger.Info("actionable info", zap.Int("count", len(actionableInfos)))
+	ephemeralKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	_, err = c.messageProcessor.LoadKeyFilters(ephemeralKey)
+	if err != nil {
+		return nil, err
+	}
 
 	var actionedInfo []*PushNotificationInfo
 	for _, infos := range actionableInfos {
@@ -636,8 +645,10 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 		}
 
 		rawMessage := &common.RawMessage{
-			Payload:     payload,
-			MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
+			Payload:         payload,
+			Sender:          ephemeralKey,
+			SkipNegotiation: true,
+			MessageType:     protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
 		}
 
 		// TODO: We should use the messageID for the response
@@ -1076,10 +1087,23 @@ func (c *Client) QueryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		return err
 	}
 
-	rawMessage := &common.RawMessage{
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
+	ephemeralKey, err := crypto.GenerateKey()
+	if err != nil {
+		return err
 	}
+
+	rawMessage := &common.RawMessage{
+		Payload:         encodedMessage,
+		Sender:          ephemeralKey,
+		SkipNegotiation: true,
+		MessageType:     protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY,
+	}
+
+	filter, err := c.messageProcessor.LoadKeyFilters(ephemeralKey)
+	if err != nil {
+		return err
+	}
+	c.config.Logger.Debug("Filter", zap.String("filter-id", filter.FilterID))
 
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
 	c.config.Logger.Info("sending query")

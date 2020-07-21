@@ -35,6 +35,7 @@ type Transport interface {
 	RemoveFilters(filters []*Filter) error
 	ResetFilters() error
 	Filters() []*Filter
+	LoadKeyFilters(*ecdsa.PrivateKey) (*Filter, error)
 	ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error)
 	RetrieveRawAll() (map[Filter][]*types.Message, error)
 }

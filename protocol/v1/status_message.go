@@ -101,10 +101,14 @@ func (m *StatusMessage) HandleTransport(shhMessage *types.Message) error {
 	return nil
 }
 
-func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol) error {
+func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
 	// As we handle non-encrypted messages, we make sure that DecryptPayload
 	// is set regardless of whether this step is successful
 	m.DecryptedPayload = m.TransportPayload
+	// Nothing to do
+	if skipNegotiation {
+		return nil
+	}
 
 	var protocolMessage encryption.ProtocolMessage
 	err := proto.Unmarshal(m.TransportPayload, &protocolMessage)

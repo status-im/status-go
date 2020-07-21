@@ -20,7 +20,7 @@ import (
 	"github.com/status-im/status-go/protocol/push_notification_client"
 	"github.com/status-im/status-go/protocol/push_notification_server"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerPushNotificationSuite(t *testing.T) {
@@ -32,8 +32,8 @@ type MessengerPushNotificationSuite struct {
 	m          *Messenger        // main instance of Messenger
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	// If one wants to send messages between different instances of Messenger,
-	// a single Whisper service should be shared.
-	shh      types.Whisper
+	// a single Waku service should be shared.
+	shh      types.Waku
 	tmpFiles []*os.File // files to clean up
 	logger   *zap.Logger
 }
@@ -41,17 +41,25 @@ type MessengerPushNotificationSuite struct {
 func (s *MessengerPushNotificationSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := whisper.DefaultConfig
-	config.MinimumAcceptedPOW = 0
-	shh := whisper.New(&config)
-	s.shh = gethbridge.NewGethWhisperWrapper(shh)
+	config := waku.DefaultConfig
+	config.MinimumAcceptedPoW = 0
+	shh := waku.New(&config, s.logger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start(nil))
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerPushNotificationSuite) newMessengerWithOptions(shh types.Whisper, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
+func (s *MessengerPushNotificationSuite) TearDownTest() {
+	s.Require().NoError(s.m.Shutdown())
+	for _, f := range s.tmpFiles {
+		_ = os.Remove(f.Name())
+	}
+	_ = s.logger.Sync()
+}
+
+func (s *MessengerPushNotificationSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
 	s.Require().NoError(err)
 
@@ -71,7 +79,7 @@ func (s *MessengerPushNotificationSuite) newMessengerWithOptions(shh types.Whisp
 	return m
 }
 
-func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecdsa.PrivateKey) *Messenger {
+func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
 	s.Require().NoError(err)
 
@@ -84,14 +92,14 @@ func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Whisper, 
 	return s.newMessengerWithOptions(shh, privateKey, options)
 }
 
-func (s *MessengerPushNotificationSuite) newMessenger(shh types.Whisper) *Messenger {
+func (s *MessengerPushNotificationSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
-func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Whisper) *Messenger {
+func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -274,6 +282,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		return nil
 	})
 	s.Require().NoError(err)
+	s.Require().NoError(bob2.Shutdown())
+	s.Require().NoError(alice.Shutdown())
+	s.Require().NoError(server.Shutdown())
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactOnly() {
@@ -402,6 +413,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	})
 
 	s.Require().NoError(err)
+	s.Require().NoError(alice.Shutdown())
+	s.Require().NoError(server.Shutdown())
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
@@ -614,4 +627,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	})
 
 	s.Require().NoError(err)
+	s.Require().NoError(alice.Shutdown())
+	s.Require().NoError(server.Shutdown())
 }

@@ -318,7 +318,7 @@ func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	filter, err := a.filters.LoadPartitioned(publicKey)
+	filter, err := a.filters.LoadPartitioned(publicKey, a.keysManager.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -404,6 +404,10 @@ func (a *Transport) SendMessagesRequest(
 		cursor = resp.Cursor
 	}
 	return
+}
+
+func (a *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*transport.Filter, error) {
+	return a.filters.LoadPartitioned(&key.PublicKey, key, true)
 }
 
 func (a *Transport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan types.EnvelopeEvent) (*types.MailServerResponse, error) {

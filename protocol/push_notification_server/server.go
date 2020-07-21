@@ -360,8 +360,9 @@ func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, messag
 	}
 
 	rawMessage := &common.RawMessage{
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
+		Payload:         encodedMessage,
+		MessageType:     protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
+		SkipNegotiation: true,
 	}
 
 	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
@@ -382,8 +383,9 @@ func (s *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
 	}
 
 	rawMessage := &common.RawMessage{
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
+		Payload:         encodedMessage,
+		MessageType:     protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
+		SkipNegotiation: true,
 	}
 
 	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)

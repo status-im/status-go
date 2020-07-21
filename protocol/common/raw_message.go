@@ -15,7 +15,9 @@ type RawMessage struct {
 	SendCount           int
 	Sent                bool
 	ResendAutomatically bool
+	SkipNegotiation     bool
 	MessageType         protobuf.ApplicationMetadataMessage_Type
 	Payload             []byte
+	Sender              *ecdsa.PrivateKey
 	Recipients          []*ecdsa.PublicKey
 }

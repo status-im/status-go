@@ -218,15 +218,15 @@ func (s *FiltersManager) Remove(filters ...*Filter) error {
 }
 
 // LoadPartitioned creates a filter for a partitioned topic.
-func (s *FiltersManager) LoadPartitioned(publicKey *ecdsa.PublicKey) (*Filter, error) {
-	return s.loadPartitioned(publicKey, false)
+func (s *FiltersManager) LoadPartitioned(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen bool) (*Filter, error) {
+	return s.loadPartitioned(publicKey, identity, listen)
 }
 
 func (s *FiltersManager) loadMyPartitioned() (*Filter, error) {
-	return s.loadPartitioned(&s.privateKey.PublicKey, true)
+	return s.loadPartitioned(&s.privateKey.PublicKey, s.privateKey, true)
 }
 
-func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool) (*Filter, error) {
+func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen bool) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -237,7 +237,7 @@ func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, listen bool
 
 	// We set up a filter so we can publish,
 	// but we discard envelopes if listen is false.
-	filter, err := s.addAsymmetric(chatID, listen)
+	filter, err := s.addAsymmetric(chatID, identity, listen)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +321,7 @@ func (s *FiltersManager) LoadDiscovery() ([]*Filter, error) {
 		OneToOne:  true,
 	}
 
-	discoveryResponse, err := s.addAsymmetric(personalDiscoveryChat.ChatID, true)
+	discoveryResponse, err := s.addAsymmetric(personalDiscoveryChat.ChatID, s.privateKey, true)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +439,7 @@ func (s *FiltersManager) addSymmetric(chatID string) (*RawFilter, error) {
 
 // addAsymmetricFilter adds a filter with our private key
 // and set minPow according to the listen parameter.
-func (s *FiltersManager) addAsymmetric(chatID string, listen bool) (*RawFilter, error) {
+func (s *FiltersManager) addAsymmetric(chatID string, identity *ecdsa.PrivateKey, listen bool) (*RawFilter, error) {
 	var (
 		err error
 		pow = 1.0 // use PoW high enough to discard all messages for the filter
@@ -452,7 +452,7 @@ func (s *FiltersManager) addAsymmetric(chatID string, listen bool) (*RawFilter, 
 	topic := ToTopic(chatID)
 	topics := [][]byte{topic}
 
-	privateKeyID, err := s.service.AddKeyPair(s.privateKey)
+	privateKeyID, err := s.service.AddKeyPair(identity)
 	if err != nil {
 		return nil, err
 	}

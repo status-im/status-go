@@ -1379,6 +1379,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 
 	}
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
+	logger.Info("SENDING CHAT MESSAGE")
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -1426,6 +1427,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, errors.New("chat type not supported")
 	}
 
+	// THERE'S A RACE CONDITION, WE SHOULD CALCULATE AND TRACK THE ID FIRST
 	id, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
@@ -1743,7 +1745,6 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 // RetrieveAll retrieves messages from all filters, processes them and returns a
 // MessengerResponse to the client
 func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
-	m.logger.Info("RETRIEVING ALL", zap.String("installation-id", m.installationID))
 	chatWithMessages, err := m.transport.RetrieveRawAll()
 	if err != nil {
 		return nil, err
