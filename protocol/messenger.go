@@ -3269,6 +3269,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 
 	emojiR := &EmojiReaction{
 		ID:        types.EncodeHex(id),
+		Clock:     clock,
 		MessageID: messageID,
 		ChatID:    chatID,
 		EmojiID:   protobuf.EmojiReaction_Type(emojiID),
@@ -3279,12 +3280,18 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	response.EmojiReactions = []*EmojiReaction{emojiR}
 	response.Chats = []*Chat{chat}
 
-	// TODO emoji reaction persistence
+	err = m.persistence.SaveEmojiReaction(emojiR)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, nil
 }
 
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, EmojiReactionID string) (*MessengerResponse, error) {
 	// TODO
+
+	// TODO check that the sender is the key owner
+
 	return nil, nil
 }

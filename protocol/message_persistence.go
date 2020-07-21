@@ -705,3 +705,54 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 
 	return chats, err
 }
+
+func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	allFields := db.tableEmojiReactionsAllFields()
+	valuesVector := strings.Repeat("?, ", db.tableEmojiReactionsAllFieldsCount()-1) + "?"
+	query := "INSERT INTO emoji_reactions(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+
+	allValues := []interface{}{
+		emojiReaction.ID,
+		emojiReaction.Clock,
+		emojiReaction.From,
+		emojiReaction.EmojiID,
+		emojiReaction.MessageID,
+		emojiReaction.ChatID,
+		emojiReaction.Retracted,
+	}
+
+	_, err = stmt.Exec(allValues...)
+
+	return
+}
+
+func (db sqlitePersistence) tableEmojiReactionsAllFields() string {
+	return `id,
+		clock_value,
+		source,
+		emoji_id,
+		message_id,
+		chat_id,
+		retracted`
+}
+
+func (db sqlitePersistence) tableEmojiReactionsAllFieldsCount() int {
+	return strings.Count(db.tableEmojiReactionsAllFields(), ",") + 1
+}
