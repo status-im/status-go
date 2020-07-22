@@ -8,6 +8,7 @@ type EmojiReaction struct {
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
 	ID string
 
+	// Clock Lamport timestamp of the chat message
 	Clock uint64
 
 	// MessageID the ID of the target message that the user wishes to react to

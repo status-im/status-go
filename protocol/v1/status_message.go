@@ -410,6 +410,26 @@ func (m *StatusMessage) HandleApplication() error {
 			return nil
 		}
 
+	case protobuf.ApplicationMetadataMessage_EMOJI_REACTION:
+		var message protobuf.EmojiReaction
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode EmojiReaction: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_EMOJI_REACTION_RETRACTION:
+		var message protobuf.EmojiReactionRetraction
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode EmojiReactionRetraction: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+			return nil
+		}
 	}
 	return nil
 }
