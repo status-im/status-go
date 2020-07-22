@@ -3331,8 +3331,12 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	response := MessengerResponse{}
 	emojiReaction.Retracted = true
 	response.EmojiReactions = []*EmojiReaction{emojiReaction}
+	response.Chats = []*Chat{chat}
 
-	// TODO update the retraction in the db
+	err = m.persistence.RetractEmojiReaction(emojiReactionID)
+	if err != nil {
+		return nil, err
+	}
 
 	return &response, nil
 }

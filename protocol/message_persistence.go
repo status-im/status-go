@@ -804,3 +804,8 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 		return nil, err
 	}
 }
+
+func (db sqlitePersistence) RetractEmojiReaction(id string) error {
+	_, err := db.db.Exec(`UPDATE emoji_reactions SET retracted = 1 WHERE id = ?`, id)
+	return err
+}
