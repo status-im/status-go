@@ -3238,13 +3238,15 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 }
 
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID int) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	var response MessengerResponse
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
 		return nil, ErrChatNotFound
 	}
-
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	emojiReaction := &protobuf.EmojiReaction{
@@ -3288,10 +3290,49 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	return &response, nil
 }
 
-func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, EmojiReactionID string) (*MessengerResponse, error) {
-	// TODO
-
+func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
 	// TODO check that the sender is the key owner
 
-	return nil, nil
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	emojiReaction, err := m.persistence.EmojiReactionByID(emojiReactionID)
+	if err != nil {
+		return nil, err
+	}
+
+	chat, ok := m.allChats[emojiReaction.ChatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	// Build the EmojiReactionRetraction protobuf struct
+	emojiRR := &protobuf.EmojiReactionRetraction{
+		Clock:           clock,
+		EmojiReactionId: emojiReactionID,
+	}
+	encodedMessage, err := proto.Marshal(emojiRR)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send the marshalled EmojiReactionRetraction protobuf
+	_, err = m.dispatchMessage(ctx, &RawMessage{
+		LocalChatID:         emojiReaction.ChatID,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_EMOJI_REACTION_RETRACTION,
+		ResendAutomatically: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	response := MessengerResponse{}
+	emojiReaction.Retracted = true
+	response.EmojiReactions = []*EmojiReaction{emojiReaction}
+
+	// TODO update the retraction in the db
+
+	return &response, nil
 }

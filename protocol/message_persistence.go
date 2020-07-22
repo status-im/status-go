@@ -757,7 +757,6 @@ func (db sqlitePersistence) tableEmojiReactionsAllFieldsCount() int {
 	return strings.Count(db.tableEmojiReactionsAllFields(), ",") + 1
 }
 
-
 func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
