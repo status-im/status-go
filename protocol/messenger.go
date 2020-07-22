@@ -3291,7 +3291,6 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 }
 
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
-	// TODO check that the sender is the key owner
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3301,6 +3300,17 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 		return nil, err
 	}
 
+	// Check that the sender is the key owner
+	pk := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+	if emojiReaction.From != pk {
+		return nil, errors.Errorf("identity mismatch, " +
+			"emoji reactions can only be retracted by the reaction sender, " +
+			"emoji reaction sent by '%s', current identity '%s'",
+			emojiReaction.From, pk,
+		)
+	}
+
+	// Get chat and clock
 	chat, ok := m.allChats[emojiReaction.ChatID]
 	if !ok {
 		return nil, ErrChatNotFound
@@ -3328,11 +3338,13 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 		return nil, err
 	}
 
+	// Update MessengerResponse
 	response := MessengerResponse{}
 	emojiReaction.Retracted = true
 	response.EmojiReactions = []*EmojiReaction{emojiReaction}
 	response.Chats = []*Chat{chat}
 
+	// Persist retraction state for emoji reaction
 	err = m.persistence.RetractEmojiReaction(emojiReactionID)
 	if err != nil {
 		return nil, err
