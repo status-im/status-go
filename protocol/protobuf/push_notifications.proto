@@ -9,12 +9,12 @@ message PushNotificationRegistration {
     FIREBASE_TOKEN = 2;
   }
   TokenType token_type = 1;
-  string token = 2;
+  string device_token = 2;
   string installation_id = 3;
   string access_token = 4;
   bool enabled = 5;
   uint64 version = 6;
-  repeated bytes allowed_user_list = 7;
+  repeated bytes allowed_key_list = 7;
   repeated bytes blocked_chat_list = 8;
   bool unregister = 9;
   bytes grant = 10;
@@ -35,14 +35,8 @@ message PushNotificationRegistrationResponse {
   }
 }
 
-message PushNotificationAdvertisementInfo {
-  bytes public_key = 1;
-  string access_token = 2;
-  string installation_id = 3;
-}
-
 message ContactCodeAdvertisement {
-  repeated PushNotificationAdvertisementInfo push_notification_info = 1;
+  repeated PushNotificationQueryInfo push_notification_info = 1;
 }
 
 message PushNotificationQuery {
@@ -53,9 +47,10 @@ message PushNotificationQueryInfo {
   string access_token = 1;
   string installation_id = 2;
   bytes public_key = 3;
-  repeated bytes allowed_user_list = 4;
+  repeated bytes allowed_key_list = 4;
   bytes grant = 5;
   uint64 version = 6;
+  bytes server_public_key = 7;
 }
 
 message PushNotificationQueryResponse {

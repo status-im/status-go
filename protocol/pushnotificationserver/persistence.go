@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import (
 	"crypto/ecdsa"
@@ -70,7 +70,7 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 
 	inVector := strings.Repeat("?, ", len(publicKeys)-1) + "?"
 
-	rows, err := p.db.Query(`SELECT public_key,registration FROM push_notification_server_registrations WHERE public_key IN (`+inVector+`)`, publicKeyArgs...)
+	rows, err := p.db.Query(`SELECT public_key,registration FROM push_notification_server_registrations WHERE public_key IN (`+inVector+`)`, publicKeyArgs...) // nolint: gosec
 	if err != nil {
 		return nil, err
 	}

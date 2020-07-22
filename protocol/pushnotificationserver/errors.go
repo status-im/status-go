@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import "errors"
 

@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import (
 	"io/ioutil"
@@ -13,8 +13,6 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
-
-//tmpFile, err := ioutil.TempFile("", "")
 
 func TestSQLitePersistenceSuite(t *testing.T) {
 	suite.Run(t, new(SQLitePersistenceSuite))

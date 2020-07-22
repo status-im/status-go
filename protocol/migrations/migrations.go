@@ -12,8 +12,8 @@
 // 1589365189_add_pow_target.up.sql (66B)
 // 1591277220_add_index_messages.down.sql (237B)
 // 1591277220_add_index_messages.up.sql (240B)
-// 1593087212_add_mute_chat.down.sql (0)
-// 1593087212_add_mute_chat.up.sql (58B)
+// 1593087212_add_mute_chat_and_raw_message_fields.down.sql (0)
+// 1593087212_add_mute_chat_and_raw_message_fields.up.sql (215B)
 // doc.go (850B)
 
 package migrations
@@ -138,7 +138,7 @@ func _000002_add_last_ens_clock_valueDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
+	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -158,7 +158,7 @@ func _000002_add_last_ens_clock_valueUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
+	info := bindataFileInfo{name: "000002_add_last_ens_clock_value.up.sql", size: 77, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4d, 0x3, 0x8f, 0xd5, 0x85, 0x83, 0x47, 0xbe, 0xf9, 0x82, 0x7e, 0x81, 0xa4, 0xbd, 0xaa, 0xd5, 0x98, 0x18, 0x5, 0x2d, 0x82, 0x42, 0x3b, 0x3, 0x50, 0xc3, 0x1e, 0x84, 0x35, 0xf, 0xb6, 0x2b}}
 	return a, nil
 }
@@ -178,7 +178,7 @@ func _1586358095_add_replaceDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1586358095_add_replace.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1589265610, 0)}
+	info := bindataFileInfo{name: "1586358095_add_replace.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -198,7 +198,7 @@ func _1586358095_add_replaceUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1586358095_add_replace.up.sql", size: 224, mode: os.FileMode(0644), modTime: time.Unix(1589265610, 0)}
+	info := bindataFileInfo{name: "1586358095_add_replace.up.sql", size: 224, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd2, 0xb3, 0xa9, 0xc7, 0x7f, 0x9d, 0x8f, 0x43, 0x8c, 0x9e, 0x58, 0x8d, 0x44, 0xbc, 0xfa, 0x6b, 0x5f, 0x3f, 0x5a, 0xbe, 0xe8, 0xb1, 0x16, 0xf, 0x91, 0x2a, 0xa0, 0x71, 0xbb, 0x8d, 0x6b, 0xcb}}
 	return a, nil
 }
@@ -218,7 +218,7 @@ func _1588665364_add_image_dataDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1588665364_add_image_data.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1591690523, 0)}
+	info := bindataFileInfo{name: "1588665364_add_image_data.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -238,7 +238,7 @@ func _1588665364_add_image_dataUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1588665364_add_image_data.up.sql", size: 186, mode: os.FileMode(0644), modTime: time.Unix(1591690523, 0)}
+	info := bindataFileInfo{name: "1588665364_add_image_data.up.sql", size: 186, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd6, 0xc6, 0x35, 0xb4, 0x4c, 0x39, 0x96, 0x29, 0x30, 0xda, 0xf4, 0x8f, 0xcb, 0xf1, 0x9f, 0x84, 0xdc, 0x88, 0xd4, 0xd5, 0xbc, 0xb6, 0x5b, 0x46, 0x78, 0x67, 0x76, 0x1a, 0x5, 0x36, 0xdc, 0xe5}}
 	return a, nil
 }
@@ -258,7 +258,7 @@ func _1589365189_add_pow_targetDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1589365189_add_pow_target.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1591690523, 0)}
+	info := bindataFileInfo{name: "1589365189_add_pow_target.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -278,7 +278,7 @@ func _1589365189_add_pow_targetUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1589365189_add_pow_target.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1591690523, 0)}
+	info := bindataFileInfo{name: "1589365189_add_pow_target.up.sql", size: 66, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4e, 0x3a, 0xe2, 0x2e, 0x7d, 0xaf, 0xbb, 0xcc, 0x21, 0xa1, 0x7a, 0x41, 0x9a, 0xd0, 0xbb, 0xa9, 0xc8, 0x35, 0xf9, 0x32, 0x34, 0x46, 0x44, 0x9a, 0x86, 0x40, 0x7c, 0xb9, 0x23, 0xc7, 0x3, 0x3f}}
 	return a, nil
 }
@@ -298,7 +298,7 @@ func _1591277220_add_index_messagesDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1591277220_add_index_messages.down.sql", size: 237, mode: os.FileMode(0644), modTime: time.Unix(1591690523, 0)}
+	info := bindataFileInfo{name: "1591277220_add_index_messages.down.sql", size: 237, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x79, 0xe5, 0x42, 0x56, 0x64, 0x1d, 0xb7, 0x8a, 0x1b, 0x0, 0x99, 0xf0, 0x18, 0x8c, 0x69, 0xe3, 0x14, 0x3a, 0x7f, 0x78, 0xfe, 0xe3, 0x2e, 0xcb, 0x6e, 0x5c, 0x8c, 0x1f, 0x7b, 0xfc, 0x21, 0xc7}}
 	return a, nil
 }
@@ -318,48 +318,48 @@ func _1591277220_add_index_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1591277220_add_index_messages.up.sql", size: 240, mode: os.FileMode(0644), modTime: time.Unix(1591690523, 0)}
+	info := bindataFileInfo{name: "1591277220_add_index_messages.up.sql", size: 240, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9c, 0xfe, 0xbe, 0xd5, 0xb8, 0x8f, 0xdd, 0xef, 0xbb, 0xa8, 0xad, 0x7f, 0xed, 0x5b, 0x5b, 0x2f, 0xe6, 0x82, 0x27, 0x78, 0x1f, 0xb9, 0x57, 0xdc, 0x8, 0xc2, 0xb2, 0xa9, 0x9a, 0x4, 0xe1, 0x7a}}
 	return a, nil
 }
 
-var __1593087212_add_mute_chatDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+var __1593087212_add_mute_chat_and_raw_message_fieldsDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
 
-func _1593087212_add_mute_chatDownSqlBytes() ([]byte, error) {
+func _1593087212_add_mute_chat_and_raw_message_fieldsDownSqlBytes() ([]byte, error) {
 	return bindataRead(
-		__1593087212_add_mute_chatDownSql,
-		"1593087212_add_mute_chat.down.sql",
+		__1593087212_add_mute_chat_and_raw_message_fieldsDownSql,
+		"1593087212_add_mute_chat_and_raw_message_fields.down.sql",
 	)
 }
 
-func _1593087212_add_mute_chatDownSql() (*asset, error) {
-	bytes, err := _1593087212_add_mute_chatDownSqlBytes()
+func _1593087212_add_mute_chat_and_raw_message_fieldsDownSql() (*asset, error) {
+	bytes, err := _1593087212_add_mute_chat_and_raw_message_fieldsDownSqlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593087212_add_mute_chat.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1594896559, 0)}
+	info := bindataFileInfo{name: "1593087212_add_mute_chat_and_raw_message_fields.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595832279, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
 
-var __1593087212_add_mute_chatUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\x48\x2c\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\x2d\x2d\x49\x4d\x51\x70\xf2\xf7\xf7\x71\x75\xf4\x53\x70\x71\x75\x73\x0c\xf5\x09\x51\x70\x73\xf4\x09\x76\xb5\xe6\x02\x04\x00\x00\xff\xff\x59\x4c\x4b\xec\x3a\x00\x00\x00")
+var __1593087212_add_mute_chat_and_raw_message_fieldsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\xcc\x31\x0e\xc2\x30\x0c\x00\xc0\x9d\x57\xf8\x1f\x4c\x2e\x71\x27\xd3\x48\x90\xce\x51\x94\x1a\x1a\xa1\xa6\x51\xed\x0a\xf1\x7b\x56\x58\x58\x78\xc0\x1d\x72\xa0\x0b\x04\xec\x98\x20\xcf\xc9\x14\xd0\x39\x38\x79\x1e\xcf\x03\x2c\xbb\xc9\x04\x9d\xf7\x4c\x38\x80\xa3\x1e\x47\x0e\xd0\x23\x5f\xe9\x78\xf8\x94\x5b\x7a\xc6\x45\x54\xd3\x5d\xbe\x02\x7d\x94\x16\xa5\xe6\xed\xd5\xac\xac\xf5\xaf\x4a\xea\x14\xdb\xae\x73\xac\xab\x95\x5b\xc9\xe9\xd7\xf8\x0e\x00\x00\xff\xff\xd9\x47\x38\x58\xd7\x00\x00\x00")
 
-func _1593087212_add_mute_chatUpSqlBytes() ([]byte, error) {
+func _1593087212_add_mute_chat_and_raw_message_fieldsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
-		__1593087212_add_mute_chatUpSql,
-		"1593087212_add_mute_chat.up.sql",
+		__1593087212_add_mute_chat_and_raw_message_fieldsUpSql,
+		"1593087212_add_mute_chat_and_raw_message_fields.up.sql",
 	)
 }
 
-func _1593087212_add_mute_chatUpSql() (*asset, error) {
-	bytes, err := _1593087212_add_mute_chatUpSqlBytes()
+func _1593087212_add_mute_chat_and_raw_message_fieldsUpSql() (*asset, error) {
+	bytes, err := _1593087212_add_mute_chat_and_raw_message_fieldsUpSqlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593087212_add_mute_chat.up.sql", size: 58, mode: os.FileMode(0644), modTime: time.Unix(1594896559, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe, 0x9, 0xa0, 0x4a, 0x8e, 0x23, 0xe4, 0xce, 0xbc, 0xd4, 0x9, 0xeb, 0xf9, 0x67, 0x90, 0xc0, 0x4b, 0x67, 0x84, 0xe4, 0x42, 0x8d, 0x0, 0x17, 0x29, 0x7f, 0x12, 0xbf, 0x7d, 0x4e, 0x78, 0xec}}
+	info := bindataFileInfo{name: "1593087212_add_mute_chat_and_raw_message_fields.up.sql", size: 215, mode: os.FileMode(0644), modTime: time.Unix(1595832279, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x73, 0x99, 0x61, 0xd1, 0xaa, 0xb4, 0xbf, 0xaf, 0xd7, 0x20, 0x17, 0x40, 0xf9, 0x2, 0xfb, 0xcc, 0x40, 0x2a, 0xd, 0x86, 0x36, 0x30, 0x88, 0x89, 0x25, 0x80, 0x42, 0xb0, 0x5b, 0xe9, 0x73, 0x78}}
 	return a, nil
 }
 
@@ -378,7 +378,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 850, mode: os.FileMode(0644), modTime: time.Unix(1589265610, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 850, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa0, 0xcc, 0x41, 0xe1, 0x61, 0x12, 0x97, 0xe, 0x36, 0x8c, 0xa7, 0x9e, 0xe0, 0x6e, 0x59, 0x9e, 0xee, 0xd5, 0x4a, 0xcf, 0x1e, 0x60, 0xd6, 0xc3, 0x3a, 0xc9, 0x6c, 0xf2, 0x86, 0x5a, 0xb4, 0x1e}}
 	return a, nil
 }
@@ -498,9 +498,9 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1591277220_add_index_messages.up.sql": _1591277220_add_index_messagesUpSql,
 
-	"1593087212_add_mute_chat.down.sql": _1593087212_add_mute_chatDownSql,
+	"1593087212_add_mute_chat_and_raw_message_fields.down.sql": _1593087212_add_mute_chat_and_raw_message_fieldsDownSql,
 
-	"1593087212_add_mute_chat.up.sql": _1593087212_add_mute_chatUpSql,
+	"1593087212_add_mute_chat_and_raw_message_fields.up.sql": _1593087212_add_mute_chat_and_raw_message_fieldsUpSql,
 
 	"doc.go": docGo,
 }
@@ -546,21 +546,21 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"000001_init.down.db.sql":                  &bintree{_000001_initDownDbSql, map[string]*bintree{}},
-	"000001_init.up.db.sql":                    &bintree{_000001_initUpDbSql, map[string]*bintree{}},
-	"000002_add_last_ens_clock_value.down.sql": &bintree{_000002_add_last_ens_clock_valueDownSql, map[string]*bintree{}},
-	"000002_add_last_ens_clock_value.up.sql":   &bintree{_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
-	"1586358095_add_replace.down.sql":          &bintree{_1586358095_add_replaceDownSql, map[string]*bintree{}},
-	"1586358095_add_replace.up.sql":            &bintree{_1586358095_add_replaceUpSql, map[string]*bintree{}},
-	"1588665364_add_image_data.down.sql":       &bintree{_1588665364_add_image_dataDownSql, map[string]*bintree{}},
-	"1588665364_add_image_data.up.sql":         &bintree{_1588665364_add_image_dataUpSql, map[string]*bintree{}},
-	"1589365189_add_pow_target.down.sql":       &bintree{_1589365189_add_pow_targetDownSql, map[string]*bintree{}},
-	"1589365189_add_pow_target.up.sql":         &bintree{_1589365189_add_pow_targetUpSql, map[string]*bintree{}},
-	"1591277220_add_index_messages.down.sql":   &bintree{_1591277220_add_index_messagesDownSql, map[string]*bintree{}},
-	"1591277220_add_index_messages.up.sql":     &bintree{_1591277220_add_index_messagesUpSql, map[string]*bintree{}},
-	"1593087212_add_mute_chat.down.sql":        &bintree{_1593087212_add_mute_chatDownSql, map[string]*bintree{}},
-	"1593087212_add_mute_chat.up.sql":          &bintree{_1593087212_add_mute_chatUpSql, map[string]*bintree{}},
-	"doc.go":                                   &bintree{docGo, map[string]*bintree{}},
+	"000001_init.down.db.sql":                                  &bintree{_000001_initDownDbSql, map[string]*bintree{}},
+	"000001_init.up.db.sql":                                    &bintree{_000001_initUpDbSql, map[string]*bintree{}},
+	"000002_add_last_ens_clock_value.down.sql":                 &bintree{_000002_add_last_ens_clock_valueDownSql, map[string]*bintree{}},
+	"000002_add_last_ens_clock_value.up.sql":                   &bintree{_000002_add_last_ens_clock_valueUpSql, map[string]*bintree{}},
+	"1586358095_add_replace.down.sql":                          &bintree{_1586358095_add_replaceDownSql, map[string]*bintree{}},
+	"1586358095_add_replace.up.sql":                            &bintree{_1586358095_add_replaceUpSql, map[string]*bintree{}},
+	"1588665364_add_image_data.down.sql":                       &bintree{_1588665364_add_image_dataDownSql, map[string]*bintree{}},
+	"1588665364_add_image_data.up.sql":                         &bintree{_1588665364_add_image_dataUpSql, map[string]*bintree{}},
+	"1589365189_add_pow_target.down.sql":                       &bintree{_1589365189_add_pow_targetDownSql, map[string]*bintree{}},
+	"1589365189_add_pow_target.up.sql":                         &bintree{_1589365189_add_pow_targetUpSql, map[string]*bintree{}},
+	"1591277220_add_index_messages.down.sql":                   &bintree{_1591277220_add_index_messagesDownSql, map[string]*bintree{}},
+	"1591277220_add_index_messages.up.sql":                     &bintree{_1591277220_add_index_messagesUpSql, map[string]*bintree{}},
+	"1593087212_add_mute_chat_and_raw_message_fields.down.sql": &bintree{_1593087212_add_mute_chat_and_raw_message_fieldsDownSql, map[string]*bintree{}},
+	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":   &bintree{_1593087212_add_mute_chat_and_raw_message_fieldsUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

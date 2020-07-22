@@ -2,13 +2,15 @@ package protocol
 
 import (
 	"database/sql"
+
+	"go.uber.org/zap"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/push_notification_client"
-	"github.com/status-im/status-go/protocol/push_notification_server"
+	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
-	"go.uber.org/zap"
 )
 
 type config struct {
@@ -34,8 +36,8 @@ type config struct {
 
 	verifyTransactionClient EthClient
 
-	pushNotificationServerConfig *push_notification_server.Config
-	pushNotificationClientConfig *push_notification_client.Config
+	pushNotificationServerConfig *pushnotificationserver.Config
+	pushNotificationClientConfig *pushnotificationclient.Config
 
 	logger *zap.Logger
 }
@@ -93,14 +95,14 @@ func WithDatabase(db *sql.DB) Option {
 	}
 }
 
-func WithPushNotificationServerConfig(pushNotificationServerConfig *push_notification_server.Config) Option {
+func WithPushNotificationServerConfig(pushNotificationServerConfig *pushnotificationserver.Config) Option {
 	return func(c *config) error {
 		c.pushNotificationServerConfig = pushNotificationServerConfig
 		return nil
 	}
 }
 
-func WithPushNotificationClientConfig(pushNotificationClientConfig *push_notification_client.Config) Option {
+func WithPushNotificationClientConfig(pushNotificationClientConfig *pushnotificationclient.Config) Option {
 	return func(c *config) error {
 		c.pushNotificationClientConfig = pushNotificationClientConfig
 		return nil

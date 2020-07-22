@@ -4,12 +4,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
-	"github.com/status-im/status-go/protocol/common"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"

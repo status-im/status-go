@@ -7,8 +7,8 @@ import (
 
 	encryptmigrations "github.com/status-im/status-go/protocol/encryption/migrations"
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
-	push_notification_client_migrations "github.com/status-im/status-go/protocol/push_notification_client/migrations"
-	push_notification_server_migrations "github.com/status-im/status-go/protocol/push_notification_server/migrations"
+	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
+	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
 	wakumigrations "github.com/status-im/status-go/protocol/transport/waku/migrations"
 	whispermigrations "github.com/status-im/status-go/protocol/transport/whisper/migrations"
 )

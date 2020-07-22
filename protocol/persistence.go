@@ -7,9 +7,9 @@ import (
 	"encoding/gob"
 
 	"github.com/pkg/errors"
-	"github.com/status-im/status-go/protocol/common"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/common"
 )
 
 var (
@@ -403,9 +403,11 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		   message_type,
 		   resend_automatically,
 		   recipients,
+		   skip_encryption,
+		   send_push_notification,
 		   payload
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		message.ID,
 		message.LocalChatID,
 		message.LastSent,
@@ -414,6 +416,8 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		message.MessageType,
 		message.ResendAutomatically,
 		encodedRecipients.Bytes(),
+		message.SkipEncryption,
+		message.SendPushNotification,
 		message.Payload)
 	return err
 }
@@ -433,6 +437,8 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 			  message_type,
 			  resend_automatically,
 			  recipients,
+			  skip_encryption,
+			  send_push_notification,
 			  payload
 			FROM
 				raw_messages
@@ -448,6 +454,8 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 		&message.MessageType,
 		&message.ResendAutomatically,
 		&encodedRecipients,
+		&message.SkipEncryption,
+		&message.SendPushNotification,
 		&message.Payload,
 	)
 	if err != nil {

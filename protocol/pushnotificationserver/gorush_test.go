@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import (
 	"encoding/hex"
@@ -38,8 +38,8 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				Message:        message1,
 			},
 			Registration: &protobuf.PushNotificationRegistration{
-				Token:     token1,
-				TokenType: protobuf.PushNotificationRegistration_APN_TOKEN,
+				DeviceToken: token1,
+				TokenType:   protobuf.PushNotificationRegistration_APN_TOKEN,
 			},
 		},
 		{
@@ -50,8 +50,8 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				Message:        message2,
 			},
 			Registration: &protobuf.PushNotificationRegistration{
-				Token:     token2,
-				TokenType: protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
+				DeviceToken: token2,
+				TokenType:   protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
 			},
 		},
 		{
@@ -62,8 +62,8 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				Message:        message3,
 			},
 			Registration: &protobuf.PushNotificationRegistration{
-				Token:     token3,
-				TokenType: protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
+				DeviceToken: token3,
+				TokenType:   protobuf.PushNotificationRegistration_FIREBASE_TOKEN,
 			},
 		},
 	}

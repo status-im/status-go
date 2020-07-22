@@ -5,9 +5,11 @@ import (
 	"crypto/cipher"
 	"crypto/ecdsa"
 	"errors"
-	"github.com/status-im/status-go/eth-node/crypto"
-	"golang.org/x/crypto/sha3"
 	"io"
+
+	"golang.org/x/crypto/sha3"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 const nonceLength = 12

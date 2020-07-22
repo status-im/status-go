@@ -43,15 +43,21 @@ type SentMessage struct {
 }
 
 type MessageProcessor struct {
-	identity      *ecdsa.PrivateKey
-	datasync      *datasync.DataSync
-	protocol      *encryption.Protocol
-	transport     transport.Transport
-	logger        *zap.Logger
-	ephemeralKeys map[string]*ecdsa.PrivateKey
-	mutex         sync.Mutex
+	identity  *ecdsa.PrivateKey
+	datasync  *datasync.DataSync
+	protocol  *encryption.Protocol
+	transport transport.Transport
+	logger    *zap.Logger
 
-	subscriptions []chan<- *SentMessage
+	// ephemeralKeys is a map that contains the ephemeral keys of the client, used
+	// to decrypt messages
+	ephemeralKeys      map[string]*ecdsa.PrivateKey
+	ephemeralKeysMutex sync.Mutex
+
+	// sentMessagesSubscriptions contains all the subscriptions for sent messages
+	sentMessagesSubscriptions []chan<- *SentMessage
+	// sentMessagesSubscriptions contains all the subscriptions for scheduled messages
+	scheduledMessagesSubscriptions []chan<- *RawMessage
 
 	featureFlags FeatureFlags
 }
@@ -101,7 +107,7 @@ func NewMessageProcessor(
 }
 
 func (p *MessageProcessor) Stop() {
-	for _, c := range p.subscriptions {
+	for _, c := range p.sentMessagesSubscriptions {
 		close(c)
 	}
 	p.datasync.Stop() // idempotent op
@@ -118,10 +124,22 @@ func (p *MessageProcessor) SendPrivate(
 		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
 		zap.String("site", "SendPrivate"),
 	)
+	// Currently we don't support sending through datasync and setting custom waku fields,
+	// as the datasync interface is not rich enough to propagate that information, so we
+	// would have to add some complexity to handle this.
+	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryption) {
+		return nil, errors.New("setting identity, skip-encryption and datasync not supported")
+	}
+
+	// Set sender identity if not specified
+	if rawMessage.Sender == nil {
+		rawMessage.Sender = p.identity
+	}
+
 	return p.sendPrivate(ctx, recipient, rawMessage)
 }
 
-// SendGroupRaw takes encoded data, encrypts it and sends through the wire,
+// SendGroup takes encoded data, encrypts it and sends through the wire,
 // always return the messageID
 func (p *MessageProcessor) SendGroup(
 	ctx context.Context,
@@ -132,15 +150,18 @@ func (p *MessageProcessor) SendGroup(
 		"sending a private group message",
 		zap.String("site", "SendGroup"),
 	)
+	// Set sender if not specified
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = p.identity
 	}
-	// Calculate messageID first
+
+	// Calculate messageID first and set on raw message
 	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
 
 	// Send to each recipients
 	for _, recipient := range recipients {
@@ -160,21 +181,17 @@ func (p *MessageProcessor) sendPrivate(
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
-	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipNegotiation) {
-		return nil, errors.New("setting identity, skip-negotiation and datasync not supported")
-	}
-
-	// If we use our own key we don't skip negotiation
-	if rawMessage.Sender == nil {
-		rawMessage.Sender = p.identity
-	}
-
 	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
+
+	// Notify before dispatching, otherwise the dispatch subscription might happen
+	// earlier than the scheduled
+	p.notifyOnScheduledMessage(rawMessage)
 
 	if p.featureFlags.Datasync && rawMessage.ResendAutomatically {
 		// No need to call transport tracking.
@@ -183,7 +200,8 @@ func (p *MessageProcessor) sendPrivate(
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
 
-	} else if rawMessage.SkipNegotiation {
+	} else if rawMessage.SkipEncryption {
+		// When SkipEncryption is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
 		hash, newMessage, err := p.sendRawMessage(ctx, recipient, wrappedMessage, messageIDs)
 		if err != nil {
@@ -267,7 +285,7 @@ func (p *MessageProcessor) SendPublic(
 	chatName string,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	var newMessage *types.NewMessage
+	// Set sender
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = p.identity
 	}
@@ -277,19 +295,23 @@ func (p *MessageProcessor) SendPublic(
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	newMessage = &types.NewMessage{
+	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   wrappedMessage,
 		PowTarget: calculatePoW(wrappedMessage),
 		PowTime:   whisperPoWTime,
 	}
 
+	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
+
+	// notify before dispatching
+	p.notifyOnScheduledMessage(rawMessage)
+
 	hash, err := p.transport.SendPublic(ctx, newMessage, chatName)
 	if err != nil {
 		return nil, err
 	}
-
-	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
 
 	p.transport.Track([][]byte{messageID}, hash, newMessage)
 
@@ -339,24 +361,32 @@ func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, application
 	return statusMessages, nil
 }
 
+// fetchDecryptionKey returns the private key associated with this public key, and returns true if it's an ephemeral key
+func (p *MessageProcessor) fetchDecryptionKey(destination *ecdsa.PublicKey) (*ecdsa.PrivateKey, bool) {
+	destinationID := types.EncodeHex(crypto.FromECDSAPub(destination))
+
+	p.ephemeralKeysMutex.Lock()
+	decryptionKey, ok := p.ephemeralKeys[destinationID]
+	p.ephemeralKeysMutex.Unlock()
+
+	// the key is not there, fallback on identity
+	if !ok {
+		return p.identity, false
+	}
+	return decryptionKey, true
+}
+
 func (p *MessageProcessor) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
 	logger := p.logger.With(zap.String("site", "handleEncryptionLayer"))
 	publicKey := message.SigPubKey()
-	destination := message.Dst
 
-	destinationID := types.EncodeHex(crypto.FromECDSAPub(destination))
-	p.mutex.Lock()
-	decryptionKey, ok := p.ephemeralKeys[destinationID]
-	p.mutex.Unlock()
-	logger.Info("destination id", zap.String("desti", destinationID))
-	skipNegotiation := true
-	if !ok {
-		skipNegotiation = false
-		decryptionKey = p.identity
-	}
+	// if it's an ephemeral key, we don't negotiate a topic
+	decryptionKey, skipNegotiation := p.fetchDecryptionKey(message.Dst)
 
 	err := message.HandleEncryption(decryptionKey, publicKey, p.protocol, skipNegotiation)
-	if err == encryption.ErrDeviceNotFound {
+
+	// if it's an ephemeral key, we don't have to handle a device not found error
+	if err == encryption.ErrDeviceNotFound && !skipNegotiation {
 		if err := p.handleErrDeviceNotFound(ctx, publicKey); err != nil {
 			logger.Error("failed to handle ErrDeviceNotFound", zap.Error(err))
 		}
@@ -464,7 +494,6 @@ func (p *MessageProcessor) sendRawMessage(ctx context.Context, publicKey *ecdsa.
 	}
 
 	return hash, newMessage, nil
-
 }
 
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
@@ -496,34 +525,60 @@ func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 		MessageIDs: messageIDs,
 	}
 
-	logger.Debug("subscriptions", zap.Int("count", len(p.subscriptions)))
-	// Publish on channels, drop if buffer is full
-	for _, c := range p.subscriptions {
-		logger.Debug("sending on subscription")
-		select {
-		case c <- sentMessage:
-		default:
-			logger.Warn("subscription channel full, dropping message")
-		}
-	}
+	p.notifyOnSentMessage(sentMessage)
 
 	return hash, newMessage, nil
 }
 
-func (p *MessageProcessor) Subscribe() <-chan *SentMessage {
+// SubscribeToSentMessages returns a channel where we publish every time a message is sent
+func (p *MessageProcessor) SubscribeToSentMessages() <-chan *SentMessage {
 	c := make(chan *SentMessage, 100)
-	p.subscriptions = append(p.subscriptions, c)
+	p.sentMessagesSubscriptions = append(p.sentMessagesSubscriptions, c)
 	return c
+}
+
+func (p *MessageProcessor) notifyOnSentMessage(sentMessage *SentMessage) {
+	// Publish on channels, drop if buffer is full
+	for _, c := range p.sentMessagesSubscriptions {
+		select {
+		case c <- sentMessage:
+		default:
+			p.logger.Warn("sent messages subscription channel full, dropping message")
+		}
+	}
+
+}
+
+// SubscribeToScheduledMessages returns a channel where we publish every time a message is scheduled for sending
+func (p *MessageProcessor) SubscribeToScheduledMessages() <-chan *RawMessage {
+	c := make(chan *RawMessage, 100)
+	p.scheduledMessagesSubscriptions = append(p.scheduledMessagesSubscriptions, c)
+	return c
+}
+
+func (p *MessageProcessor) notifyOnScheduledMessage(message *RawMessage) {
+	// Publish on channels, drop if buffer is full
+	for _, c := range p.scheduledMessagesSubscriptions {
+		select {
+		case c <- message:
+		default:
+			p.logger.Warn("scheduled messages subscription channel full, dropping message")
+		}
+	}
 }
 
 func (p *MessageProcessor) JoinPublic(chatID string) error {
 	return p.transport.JoinPublic(chatID)
 }
 
-func (p *MessageProcessor) LoadKeyFilters(privateKey *ecdsa.PrivateKey) (*transport.Filter, error) {
-	p.mutex.Lock()
+// AddEphemeralKey adds an ephemeral key that we will be listening to
+// note that we never removed them from now, as waku/whisper does not
+// recalculate topics on removal, so effectively there's no benefit.
+// On restart they will be gone.
+func (p *MessageProcessor) AddEphemeralKey(privateKey *ecdsa.PrivateKey) (*transport.Filter, error) {
+	p.ephemeralKeysMutex.Lock()
 	p.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
-	p.mutex.Unlock()
+	p.ephemeralKeysMutex.Unlock()
 	return p.transport.LoadKeyFilters(privateKey)
 }
 

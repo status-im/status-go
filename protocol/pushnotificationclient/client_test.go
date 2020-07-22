@@ -1,4 +1,4 @@
-package push_notification_client
+package pushnotificationclient
 
 import (
 	"bytes"
@@ -6,18 +6,21 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/stretchr/testify/suite"
 )
+
+const testDeviceToken = "test-token"
 
 type ClientSuite struct {
 	suite.Suite
@@ -59,7 +62,6 @@ func (s *ClientSuite) SetupTest() {
 }
 
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
-	myDeviceToken := "device-token"
 	mutedChatList := []string{"a", "b"}
 
 	// build chat lish hashes
@@ -82,14 +84,14 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	// Reset random generator
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
 
-	s.client.deviceToken = myDeviceToken
+	s.client.deviceToken = testDeviceToken
 	// Set reader
 	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 
 	options := &protobuf.PushNotificationRegistration{
 		Version:         1,
 		AccessToken:     expectedUUID,
-		Token:           myDeviceToken,
+		DeviceToken:     testDeviceToken,
 		InstallationId:  s.installationID,
 		Enabled:         true,
 		BlockedChatList: mutedChatListHashes,
@@ -102,7 +104,6 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 }
 
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsOnly() {
-	myDeviceToken := "device-token"
 	mutedChatList := []string{"a", "b"}
 
 	// build chat lish hashes
@@ -138,20 +139,20 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	// Reset random generator
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
 
-	s.client.config.allowFromContactsOnly = true
-	s.client.deviceToken = myDeviceToken
+	s.client.config.AllowFromContactsOnly = true
+	s.client.deviceToken = testDeviceToken
 	// Set reader
 	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 
 	options := &protobuf.PushNotificationRegistration{
 		Version:               1,
 		AccessToken:           expectedUUID,
-		Token:                 myDeviceToken,
+		DeviceToken:           testDeviceToken,
 		InstallationId:        s.installationID,
 		AllowFromContactsOnly: true,
 		Enabled:               true,
 		BlockedChatList:       mutedChatListHashes,
-		AllowedUserList:       [][]byte{encryptedToken},
+		AllowedKeyList:        [][]byte{encryptedToken},
 	}
 
 	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
@@ -160,13 +161,18 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	s.Require().Equal(options, actualMessage)
 }
 
-func (s *ClientSuite) TestNotifyOnMessageID() {
+func (s *ClientSuite) TestHandleMessageScheduled() {
 	messageID := []byte("message-id")
 	chatID := "chat-id"
 	installationID1 := "1"
 	installationID2 := "2"
+	rawMessage := &common.RawMessage{
+		ID:                   types.EncodeHex(messageID),
+		SendPushNotification: true,
+		LocalChatID:          chatID,
+	}
 
-	s.Require().NoError(s.client.NotifyOnMessageID(chatID, messageID))
+	s.Require().NoError(s.client.handleMessageScheduled(rawMessage))
 
 	key1, err := crypto.GenerateKey()
 	s.Require().NoError(err)

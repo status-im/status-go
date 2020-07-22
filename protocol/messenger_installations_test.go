@@ -20,6 +20,8 @@ import (
 	"github.com/status-im/status-go/waku"
 )
 
+const statusChatID = "status"
+
 func TestMessengerInstallationSuite(t *testing.T) {
 	suite.Run(t, new(MessengerInstallationSuite))
 }
@@ -136,7 +138,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().Equal(contact.ID, actualContact.ID)
 	s.Require().True(actualContact.IsAdded())
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
@@ -149,7 +151,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().NoError(err)
 
 	actualChat := response.Chats[0]
-	s.Require().Equal("status", actualChat.ID)
+	s.Require().Equal(statusChatID, actualChat.ID)
 	s.Require().True(actualChat.Active)
 }
 
@@ -166,7 +168,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// add chat
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
@@ -230,7 +232,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	var statusChat *Chat
 	for _, c := range allChats {
-		if c.ID == "status" {
+		if c.ID == statusChatID {
 			statusChat = c
 		}
 	}

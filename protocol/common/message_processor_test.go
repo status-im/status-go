@@ -1,7 +1,6 @@
 package common
 
 import (
-	"github.com/status-im/status-go/protocol"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -34,22 +33,20 @@ func TestMessageProcessorSuite(t *testing.T) {
 type MessageProcessorSuite struct {
 	suite.Suite
 
-	processor   *messageProcessor
+	processor   *MessageProcessor
 	tmpDir      string
-	testMessage protocol.Message
+	testMessage protobuf.ChatMessage
 	logger      *zap.Logger
 }
 
 func (s *MessageProcessorSuite) SetupTest() {
-	s.testMessage = protocol.Message{
-		ChatMessage: protobuf.ChatMessage{
-			Text:        "abc123",
-			ChatId:      "testing-adamb",
-			ContentType: protobuf.ChatMessage_TEXT_PLAIN,
-			MessageType: protobuf.ChatMessage_PUBLIC_GROUP,
-			Clock:       154593077368201,
-			Timestamp:   1545930773682,
-		},
+	s.testMessage = protobuf.ChatMessage{
+		Text:        "abc123",
+		ChatId:      "testing-adamb",
+		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
+		MessageType: protobuf.ChatMessage_PUBLIC_GROUP,
+		Clock:       154593077368201,
+		Timestamp:   1545930773682,
 	}
 
 	var err error
@@ -82,8 +79,6 @@ func (s *MessageProcessorSuite) SetupTest() {
 	whisperConfig.MinimumAcceptedPOW = 0
 	shh := whisper.New(&whisperConfig)
 	s.Require().NoError(shh.Start(nil))
-	config := &protocol.config{}
-	s.Require().NoError(protocol.WithDatasync()(config))
 
 	whisperTransport, err := transport.NewTransport(
 		gethbridge.NewGethWhisperWrapper(shh),
@@ -95,14 +90,13 @@ func (s *MessageProcessorSuite) SetupTest() {
 	)
 	s.Require().NoError(err)
 
-	s.processor, err = newMessageProcessor(
+	s.processor, err = NewMessageProcessor(
 		identity,
 		database,
 		encryptionProtocol,
 		whisperTransport,
 		s.logger,
-		protocol.featureFlags{},
-		nil,
+		FeatureFlags{},
 	)
 	s.Require().NoError(err)
 }
@@ -129,7 +123,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = wrappedPayload
 
-	decodedMessages, err := s.processor.handleMessages(message, true)
+	decodedMessages, err := s.processor.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	s.Require().Equal(1, len(decodedMessages))
@@ -137,7 +131,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
-	s.Require().True(proto.Equal(&s.testMessage.ChatMessage, &parsedMessage))
+	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -165,7 +159,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
-	decodedMessages, err := s.processor.handleMessages(message, true)
+	decodedMessages, err := s.processor.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	// We send two messages, the unwrapped one will be attributed to the relayer, while the wrapped one will be attributed to the author
@@ -174,7 +168,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
 	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage.ChatMessage, &parsedMessage))
+	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
 
@@ -232,7 +226,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	decodedMessages, err := s.processor.handleMessages(message, true)
+	decodedMessages, err := s.processor.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	// We send two messages, the unwrapped one will be attributed to the relayer,
@@ -242,6 +236,6 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
 	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
-	s.Require().True(proto.Equal(&s.testMessage.ChatMessage, &parsedMessage))
+	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }

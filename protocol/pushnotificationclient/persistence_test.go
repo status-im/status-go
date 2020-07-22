@@ -1,4 +1,4 @@
-package push_notification_client
+package pushnotificationclient
 
 import (
 	"crypto/ecdsa"
@@ -14,6 +14,13 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
+)
+
+const (
+	testAccessToken = "token"
+	installationID1 = "installation-id-1"
+	installationID2 = "installation-id-2"
+	installationID3 = "installation-id-3"
 )
 
 func TestSQLitePersistenceSuite(t *testing.T) {
@@ -43,13 +50,12 @@ func (s *SQLitePersistenceSuite) TearDownTest() {
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	accessToken := "token"
 
 	server := &PushNotificationServer{
 		PublicKey:    &key.PublicKey,
 		Registered:   true,
 		RegisteredAt: 1,
-		AccessToken:  accessToken,
+		AccessToken:  testAccessToken,
 	}
 
 	s.Require().NoError(s.persistence.UpsertServer(server))
@@ -61,7 +67,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 	s.Require().True(retrievedServers[0].Registered)
 	s.Require().Equal(int64(1), retrievedServers[0].RegisteredAt)
 	s.Require().True(common.IsPubKeyEqual(retrievedServers[0].PublicKey, &key.PublicKey))
-	s.Require().Equal(accessToken, retrievedServers[0].AccessToken)
+	s.Require().Equal(testAccessToken, retrievedServers[0].AccessToken)
 
 	server.Registered = false
 	server.RegisteredAt = 2
@@ -78,9 +84,6 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveServer() {
 }
 
 func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
-	installationID1 := "installation-id-1"
-	installationID2 := "installation-id-2"
-	installationID3 := "installation-id-3"
 	key1, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	key2, err := crypto.GenerateKey()
@@ -88,15 +91,13 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	accessToken := "token"
-
 	infos := []*PushNotificationInfo{
 		{
 			PublicKey:       &key1.PublicKey,
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID1,
 		},
 		{
@@ -104,7 +105,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID2,
 		},
 		{
@@ -112,7 +113,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID3,
 		},
 		{
@@ -120,7 +121,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID1,
 		},
 		{
@@ -128,7 +129,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID2,
 		},
 		{
@@ -136,7 +137,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfo() {
 			ServerPublicKey: &serverKey.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID3,
 		},
 	}
@@ -158,15 +159,13 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfoWithVersion() {
 	serverKey2, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	accessToken := "token"
-
 	infos := []*PushNotificationInfo{
 		{
 			PublicKey:       &key.PublicKey,
 			ServerPublicKey: &serverKey1.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID,
 		},
 		{
@@ -174,7 +173,7 @@ func (s *SQLitePersistenceSuite) TestSaveAndRetrieveInfoWithVersion() {
 			ServerPublicKey: &serverKey2.PublicKey,
 			RetrievedAt:     1,
 			Version:         1,
-			AccessToken:     accessToken,
+			AccessToken:     testAccessToken,
 			InstallationID:  installationID,
 		},
 	}

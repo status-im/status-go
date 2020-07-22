@@ -1,4 +1,4 @@
-package push_notification_client
+package pushnotificationclient
 
 import (
 	"bytes"
@@ -180,10 +180,13 @@ func (p *Persistence) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, instal
 
 	inVector := strings.Repeat("?, ", len(installationIDs)-1) + "?"
 
-	rows, err := p.db.Query(`SELECT server_public_key, installation_id, version, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ? AND installation_id IN (`+inVector+`)`, queryArgs...)
+	rows, err := p.db.Query(`SELECT server_public_key, installation_id, version, access_token, retrieved_at FROM push_notification_client_info WHERE public_key = ? AND installation_id IN (`+inVector+`)`, queryArgs...) //nolint: gosec
+
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	var infos []*PushNotificationInfo
 	for rows.Next() {
 		var serverPublicKeyBytes []byte
@@ -210,6 +213,8 @@ func (p *Persistence) GetPushNotificationInfoByPublicKey(publicKey *ecdsa.Public
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	var infos []*PushNotificationInfo
 	for rows.Next() {
 		var serverPublicKeyBytes []byte
@@ -308,6 +313,7 @@ func (p *Persistence) GetRetriablePushNotifications() ([]*SentNotification, erro
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var publicKeyBytes []byte
@@ -337,6 +343,8 @@ func (p *Persistence) GetServers() ([]*PushNotificationServer, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	var servers []*PushNotificationServer
 	for rows.Next() {
 		server := &PushNotificationServer{}
@@ -367,6 +375,8 @@ func (p *Persistence) GetServersByPublicKey(keys []*ecdsa.PublicKey) ([]*PushNot
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	var servers []*PushNotificationServer
 	for rows.Next() {
 		server := &PushNotificationServer{}

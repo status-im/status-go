@@ -33,8 +33,8 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
-	"github.com/status-im/status-go/protocol/push_notification_client"
-	"github.com/status-im/status-go/protocol/push_notification_server"
+	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
@@ -465,19 +465,20 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithDatasync())
 	}
 	settings, err := accountsDB.GetSettings()
-	if err != nil {
+	if err != sql.ErrNoRows && err != nil {
 		return nil, err
 	}
 
 	if settings.PushNotificationsServerEnabled {
-		config := &push_notification_server.Config{
+		config := &pushnotificationserver.Config{
 			Logger: logger,
 		}
 		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}
 
-	options = append(options, protocol.WithPushNotificationClientConfig(&push_notification_client.Config{
+	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
 		SendEnabled:                settings.SendPushNotifications,
+		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
 		RemoteNotificationsEnabled: settings.RemotePushNotificationsEnabled,
 	}))
 

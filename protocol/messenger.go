@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"github.com/status-im/status-go/protocol/common"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
@@ -27,8 +27,8 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 	"github.com/status-im/status-go/protocol/images"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/push_notification_client"
-	"github.com/status-im/status-go/protocol/push_notification_server"
+	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
 	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
@@ -61,8 +61,8 @@ type Messenger struct {
 	encryptor                  *encryption.Protocol
 	processor                  *common.MessageProcessor
 	handler                    *MessageHandler
-	pushNotificationClient     *push_notification_client.Client
-	pushNotificationServer     *push_notification_server.Server
+	pushNotificationClient     *pushnotificationclient.Client
+	pushNotificationServer     *pushnotificationserver.Server
 	logger                     *zap.Logger
 	verifyTransactionClient    EthClient
 	featureFlags               common.FeatureFlags
@@ -248,27 +248,29 @@ func NewMessenger(
 		return nil, errors.Wrap(err, "failed to create messageProcessor")
 	}
 
-	var pushNotificationServer *push_notification_server.Server
+	// Initialize push notification server
+	var pushNotificationServer *pushnotificationserver.Server
 	if c.pushNotificationServerConfig != nil {
 		c.pushNotificationServerConfig.Identity = identity
-		pushNotificationServerPersistence := push_notification_server.NewSQLitePersistence(database)
-		pushNotificationServer = push_notification_server.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, processor)
+		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(database)
+		pushNotificationServer = pushnotificationserver.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, processor)
 	}
 
-	pushNotificationClientPersistence := push_notification_client.NewPersistence(database)
+	// Initialize push notification client
+	pushNotificationClientPersistence := pushnotificationclient.NewPersistence(database)
 	pushNotificationClientConfig := c.pushNotificationClientConfig
 	if pushNotificationClientConfig == nil {
-		pushNotificationClientConfig = &push_notification_client.Config{}
+		pushNotificationClientConfig = &pushnotificationclient.Config{}
 	}
 
-	// Overriding until we handle sending/receiving from multiple identities
+	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
 	// Hardcoding this for now, as it's the only one we support
 	pushNotificationClientConfig.TokenType = protobuf.PushNotificationRegistration_APN_TOKEN
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
-	pushNotificationClient := push_notification_client.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor)
+	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor)
 
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})
 
@@ -318,6 +320,8 @@ func (m *Messenger) Start() error {
 			return err
 		}
 	}
+
+	// Start push notification client
 	if m.pushNotificationClient != nil {
 		if err := m.pushNotificationClient.Start(); err != nil {
 			return err
@@ -1145,7 +1149,7 @@ func (m *Messenger) saveContact(contact *Contact) error {
 		}
 	}
 
-	// We check if it should re-register
+	// We check if it should re-register with the push notification server
 	shouldReregisterForPushNotifications := m.pushNotificationClient != nil && (m.isNewContact(contact) || m.removedContact(contact))
 
 	err = m.persistence.SaveContact(contact, nil)
@@ -1379,7 +1383,6 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 
 	}
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
-	logger.Info("SENDING CHAT MESSAGE")
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -1427,23 +1430,15 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, errors.New("chat type not supported")
 	}
 
-	// THERE'S A RACE CONDITION, WE SHOULD CALCULATE AND TRACK THE ID FIRST
 	id, err := m.dispatchMessage(ctx, &common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
-		ResendAutomatically: true,
+		LocalChatID:          chat.ID,
+		SendPushNotification: !chat.Public(),
+		Payload:              encodedMessage,
+		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
+		ResendAutomatically:  true,
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	// If the chat is not public, we instruct the pushNotificationService to send a notification
-	if !chat.Public() && m.pushNotificationClient != nil {
-		if err := m.pushNotificationClient.NotifyOnMessageID(chat.ID, id); err != nil {
-			return nil, err
-		}
-
 	}
 
 	message.ID = types.EncodeHex(id)
@@ -1982,8 +1977,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQuery")
-						// TODO: Compare DST with Identity
-						if err := m.pushNotificationServer.HandlePushNotificationQuery2(publicKey, msg.ID, msg.ParsedMessage.(protobuf.PushNotificationQuery)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, msg.ParsedMessage.(protobuf.PushNotificationQuery)); err != nil {
 							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -1994,7 +1988,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRegistrationResponse")
-						// TODO: Compare DST with Identity
 						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRegistrationResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
 						}
@@ -2006,7 +1999,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationResponse")
-						// TODO: Compare DST with Identity
 						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationResponse", zap.Error(err))
 						}
@@ -2019,7 +2011,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQueryResponse")
-						// TODO: Compare DST with Identity
 						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationQueryResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
 						}
@@ -2032,8 +2023,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRequest")
-						// TODO: Compare DST with Identity
-						if err := m.pushNotificationServer.HandlePushNotificationRequest2(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRequest)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRequest)); err != nil {
 							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -2047,8 +2037,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 								continue
 							}
 							logger.Debug("Handling PushNotificationRegistration")
-							// TODO: Compare DST with Identity
-							if err := m.pushNotificationServer.HandlePushNotificationRegistration2(publicKey, msg.ParsedMessage.([]byte)); err != nil {
+							if err := m.pushNotificationServer.HandlePushNotificationRegistration(publicKey, msg.ParsedMessage.([]byte)); err != nil {
 								logger.Warn("failed to handle PushNotificationRegistration", zap.Error(err))
 							}
 							// We continue in any case, no changes to messenger
@@ -2134,6 +2123,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	return messageState.Response, nil
 }
 
+// SetMailserver sets the currently used mailserver
 func (m *Messenger) SetMailserver(peer []byte) {
 	m.mailserver = peer
 }
@@ -3069,12 +3059,12 @@ func (m *Messenger) Timesource() TimeSource {
 	return m.getTimesource()
 }
 
-// AddPushNotificationServer adds a push notification server
-func (m *Messenger) AddPushNotificationServer(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+// AddPushNotificationsServer adds a push notification server
+func (m *Messenger) AddPushNotificationsServer(ctx context.Context, publicKey *ecdsa.PublicKey) error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
-	return m.pushNotificationClient.AddPushNotificationServer(publicKey)
+	return m.pushNotificationClient.AddPushNotificationsServer(publicKey)
 }
 
 // RemovePushNotificationServer removes a push notification server
@@ -3085,10 +3075,12 @@ func (m *Messenger) RemovePushNotificationServer(ctx context.Context, publicKey 
 	return m.pushNotificationClient.RemovePushNotificationServer(publicKey)
 }
 
+// UnregisterFromPushNotifications unregister from any server
 func (m *Messenger) UnregisterFromPushNotifications(ctx context.Context) error {
 	return m.pushNotificationClient.Unregister()
 }
 
+// DisableSendingPushNotifications signals the client not to send any push notification
 func (m *Messenger) DisableSendingPushNotifications() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
@@ -3097,6 +3089,7 @@ func (m *Messenger) DisableSendingPushNotifications() error {
 	return nil
 }
 
+// EnableSendingPushNotifications signals the client to send push notifications
 func (m *Messenger) EnableSendingPushNotifications() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
@@ -3142,6 +3135,7 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
 }
 
+// RegisteredForPushNotifications returns whether we successfully registered with all the servers
 func (m *Messenger) RegisteredForPushNotifications() (bool, error) {
 	if m.pushNotificationClient == nil {
 		return false, errors.New("no push notification client")
@@ -3149,6 +3143,7 @@ func (m *Messenger) RegisteredForPushNotifications() (bool, error) {
 	return m.pushNotificationClient.Registered()
 }
 
+// EnablePushNotificationsFromContactsOnly is used to indicate that we want to received push notifications only from contacts
 func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
@@ -3160,6 +3155,7 @@ func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
 }
 
+// DisablePushNotificationsFromContactsOnly is used to indicate that we want to received push notifications from anyone
 func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
@@ -3171,27 +3167,30 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
 }
 
-func (m *Messenger) GetPushNotificationServers() ([]*push_notification_client.PushNotificationServer, error) {
+// GetPushNotificationServers returns the servers used for push notifications
+func (m *Messenger) GetPushNotificationServers() ([]*pushnotificationclient.PushNotificationServer, error) {
 	if m.pushNotificationClient == nil {
 		return nil, errors.New("no push notification client")
 	}
 	return m.pushNotificationClient.GetServers()
 }
 
-func (m *Messenger) StartPushNotificationServer() error {
+// StartPushNotificationsServer initialize and start a push notification server, using the current messenger identity key
+func (m *Messenger) StartPushNotificationsServer() error {
 	if m.pushNotificationServer == nil {
-		pushNotificationServerPersistence := push_notification_server.NewSQLitePersistence(m.database)
-		config := &push_notification_server.Config{
+		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(m.database)
+		config := &pushnotificationserver.Config{
 			Logger:   m.logger,
 			Identity: m.identity,
 		}
-		m.pushNotificationServer = push_notification_server.New(config, pushNotificationServerPersistence, m.processor)
+		m.pushNotificationServer = pushnotificationserver.New(config, pushNotificationServerPersistence, m.processor)
 	}
 
 	return m.pushNotificationServer.Start()
 }
 
-func (m *Messenger) StopPushNotificationServer() error {
+// StopPushNotificationServer stops the push notification server if running
+func (m *Messenger) StopPushNotificationsServer() error {
 	m.pushNotificationServer = nil
 	return nil
 }

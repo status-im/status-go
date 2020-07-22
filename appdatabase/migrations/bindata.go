@@ -12,7 +12,7 @@
 // 0005_waku_mode.up.sql (146B)
 // 0006_appearance.up.sql (67B)
 // 0007_enable_waku_default.up.sql (38B)
-// 0008_add_push_notifications.up.sql (294B)
+// 0008_add_push_notifications.up.sql (349B)
 // doc.go (74B)
 
 package migrations
@@ -217,7 +217,7 @@ func _0004_pending_stickersDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
+	info := bindataFileInfo{name: "0004_pending_stickers.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -237,7 +237,7 @@ func _0004_pending_stickersUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
+	info := bindataFileInfo{name: "0004_pending_stickers.up.sql", size: 61, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3c, 0xed, 0x25, 0xdf, 0x75, 0x2, 0x6c, 0xf0, 0xa2, 0xa8, 0x37, 0x62, 0x65, 0xad, 0xfd, 0x98, 0xa0, 0x9d, 0x63, 0x94, 0xdf, 0x6b, 0x46, 0xe0, 0x68, 0xec, 0x9c, 0x7f, 0x77, 0xdd, 0xb3, 0x6}}
 	return a, nil
 }
@@ -257,7 +257,7 @@ func _0005_waku_modeDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0005_waku_mode.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
+	info := bindataFileInfo{name: "0005_waku_mode.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -277,7 +277,7 @@ func _0005_waku_modeUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0005_waku_mode.up.sql", size: 146, mode: os.FileMode(0644), modTime: time.Unix(1584434371, 0)}
+	info := bindataFileInfo{name: "0005_waku_mode.up.sql", size: 146, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa6, 0x91, 0xc, 0xd7, 0x89, 0x61, 0x2e, 0x4c, 0x5a, 0xb6, 0x67, 0xd1, 0xc1, 0x42, 0x24, 0x38, 0xd6, 0x1b, 0x75, 0x41, 0x9c, 0x23, 0xb0, 0xca, 0x5c, 0xf1, 0x5c, 0xd0, 0x13, 0x92, 0x3e, 0xe1}}
 	return a, nil
 }
@@ -297,7 +297,7 @@ func _0006_appearanceUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1585895847, 0)}
+	info := bindataFileInfo{name: "0006_appearance.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xae, 0x6, 0x25, 0x6c, 0xe4, 0x9d, 0xa7, 0x72, 0xe8, 0xbc, 0xe4, 0x1f, 0x1e, 0x2d, 0x7c, 0xb7, 0xf6, 0xa3, 0xec, 0x3b, 0x4e, 0x93, 0x2e, 0xa4, 0xec, 0x6f, 0xe5, 0x95, 0x94, 0xe8, 0x4, 0xfb}}
 	return a, nil
 }
@@ -317,12 +317,12 @@ func _0007_enable_waku_defaultUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0007_enable_waku_default.up.sql", size: 38, mode: os.FileMode(0644), modTime: time.Unix(1585895900, 0)}
+	info := bindataFileInfo{name: "0007_enable_waku_default.up.sql", size: 38, mode: os.FileMode(0644), modTime: time.Unix(1595493797, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xd4, 0x42, 0xb6, 0xe5, 0x48, 0x41, 0xeb, 0xc0, 0x7e, 0x3b, 0xe6, 0x8e, 0x96, 0x33, 0x20, 0x92, 0x24, 0x5a, 0x60, 0xfa, 0xa0, 0x3, 0x5e, 0x76, 0x4b, 0x89, 0xaa, 0x37, 0x66, 0xbc, 0x26, 0x11}}
 	return a, nil
 }
 
-var __0008_add_push_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x94\xce\xc1\x0a\xc2\x30\x0c\x00\xd0\xbb\x5f\x91\xff\xf0\xd4\xb9\xde\xea\x0a\x32\xcf\xa1\x76\x99\x16\xd6\x44\x9a\x28\xf8\xf7\x1e\xbd\x14\xd4\x1f\x78\x3c\x17\x66\x7f\x82\xd9\x0d\xc1\x83\x92\x59\xe1\xab\x82\x1b\x47\x38\xc4\x70\x3e\x4e\xd0\xa8\x8a\x11\xde\x1f\x7a\x43\x16\x2b\x6b\xc9\xc9\x8a\xb0\x22\x71\xba\x6c\xb4\xc0\x10\x63\xf0\x6e\xda\xef\xbe\x51\x4a\xbc\x74\xa0\xdf\x81\x4e\x42\xa9\x3d\xa9\xfd\x7f\xe9\x50\x6b\x93\x8a\x59\xd8\x52\x36\x45\xe1\xed\xf5\xe1\xde\x01\x00\x00\xff\xff\x16\x96\xb2\xb5\x26\x01\x00\x00")
+var __0008_add_push_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\xce\x51\x0e\x82\x30\x0c\x00\xd0\x7f\x4f\xd1\x7b\xf8\x35\x64\x7c\x55\x48\x70\x7c\x2f\x08\x45\x97\x40\x6b\xd6\x6a\xe2\xed\x3d\x80\x33\x9a\x78\x81\x97\xe7\x30\xf8\x1e\x82\xab\xd0\x83\x92\x59\xe2\x8b\x82\xab\x6b\x38\x74\x38\x1c\x5b\xc8\xb4\x89\x51\xbc\xdd\xf5\x1a\x59\x2c\x2d\x69\x1a\x2d\x09\x6b\x24\x1e\xcf\x2b\xcd\x50\x75\x1d\x7a\xd7\x42\xed\x1b\x37\x60\x80\xc6\xe1\xc9\xef\x77\xdf\x60\x25\x9e\x0b\xec\x1b\x17\xfa\xe1\x07\xad\xf0\x53\xca\x0f\xca\xff\x36\x0b\xf0\x92\x65\x8b\x93\xb0\x8d\x93\x69\x14\x5e\x9f\x9f\xf0\x57\x00\x00\x00\xff\xff\x30\xc0\x56\xbd\x5d\x01\x00\x00")
 
 func _0008_add_push_notificationsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -337,8 +337,8 @@ func _0008_add_push_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 294, mode: os.FileMode(0644), modTime: time.Unix(1594974529, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xde, 0x81, 0x4a, 0x9, 0x4d, 0xd9, 0xa1, 0x3d, 0xc5, 0xc3, 0xd7, 0x62, 0x8f, 0xc5, 0xfd, 0xb8, 0xa2, 0x71, 0x1d, 0xbc, 0xa6, 0x0, 0x3, 0x83, 0x7a, 0x12, 0x7b, 0x1f, 0xa9, 0x2, 0x29, 0x1a}}
+	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1595832401, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5a, 0x0, 0xbf, 0xd0, 0xdd, 0xcd, 0x73, 0xe0, 0x7c, 0x56, 0xef, 0xdc, 0x57, 0x61, 0x94, 0x64, 0x70, 0xb9, 0xfa, 0xa1, 0x2a, 0x36, 0xc, 0x2f, 0xf8, 0x95, 0xa, 0x57, 0x3e, 0x7a, 0xd7, 0x12}}
 	return a, nil
 }
 

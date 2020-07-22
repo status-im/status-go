@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import (
 	"context"
@@ -8,13 +8,13 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"go.uber.org/zap"
 )
 
 const encryptedPayloadKeyLength = 16
@@ -43,15 +43,150 @@ func New(config *Config, persistence Persistence, messageProcessor *common.Messa
 	return &Server{persistence: persistence, config: config, messageProcessor: messageProcessor}
 }
 
-func (p *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
-	return ecies.ImportECDSA(p.config.Identity).GenerateShared(
+func (s *Server) Start() error {
+	s.config.Logger.Info("starting push notification server")
+	if s.config.Identity == nil {
+		s.config.Logger.Info("Identity nil")
+		// Pull identity from database
+		identity, err := s.persistence.GetIdentity()
+		if err != nil {
+			return err
+		}
+		if identity == nil {
+			identity, err = crypto.GenerateKey()
+			if err != nil {
+				return err
+			}
+			if err := s.persistence.SaveIdentity(identity); err != nil {
+				return err
+			}
+		}
+		s.config.Identity = identity
+	}
+
+	pks, err := s.persistence.GetPushNotificationRegistrationPublicKeys()
+	if err != nil {
+		return err
+	}
+	// listen to all topics for users registered
+	for _, pk := range pks {
+		if err := s.listenToPublicKeyQueryTopic(pk); err != nil {
+			return err
+		}
+	}
+
+	s.config.Logger.Info("started push notification server", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&s.config.Identity.PublicKey))))
+
+	return nil
+}
+
+// HandlePushNotificationRegistration builds a response for the registration and sends it back to the user
+func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) error {
+	response := s.buildPushNotificationRegistrationResponse(publicKey, payload)
+	if response == nil {
+		return nil
+	}
+	encodedMessage, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE,
+		// we skip encryption as might be sent from an ephemeral key
+		SkipEncryption: true,
+	}
+
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	return err
+}
+
+// HandlePushNotificationQuery builds a response for the query and sends it back to the user
+func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, messageID []byte, query protobuf.PushNotificationQuery) error {
+	response := s.buildPushNotificationQueryResponse(&query)
+	if response == nil {
+		return nil
+	}
+	response.MessageId = messageID
+	encodedMessage, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
+		// we skip encryption as sent from an ephemeral key
+		SkipEncryption: true,
+	}
+
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	return err
+}
+
+// HandlePushNotificationRequest will send a gorush notification and send a response back to the user
+func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
+	request protobuf.PushNotificationRequest) error {
+	s.config.Logger.Debug("handling pn request")
+	response := s.buildPushNotificationRequestResponseAndSendNotification(&request)
+	if response == nil {
+		return nil
+	}
+	encodedMessage, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+
+	rawMessage := &common.RawMessage{
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
+		// We skip encryption here as the message has been sent from an ephemeral key
+		SkipEncryption: true,
+	}
+
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	return err
+}
+
+// buildGrantSignatureMaterial builds a grant for a specific server.
+// We use 3 components:
+// 1) The client public key. Not sure this applies to our signature scheme, but best to be conservative. https://crypto.stackexchange.com/questions/15538/given-a-message-and-signature-find-a-public-key-that-makes-the-signature-valid
+// 2) The server public key
+// 3) The access token
+// By verifying this signature, a client can trust the server was instructed to store this access token.
+func (s *Server) buildGrantSignatureMaterial(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, accessToken string) []byte {
+	var signatureMaterial []byte
+	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(clientPublicKey)...)
+	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(serverPublicKey)...)
+	signatureMaterial = append(signatureMaterial, []byte(accessToken)...)
+	a := crypto.Keccak256(signatureMaterial)
+	return a
+}
+
+func (s *Server) verifyGrantSignature(clientPublicKey *ecdsa.PublicKey, accessToken string, grant []byte) error {
+	signatureMaterial := s.buildGrantSignatureMaterial(clientPublicKey, &s.config.Identity.PublicKey, accessToken)
+	recoveredPublicKey, err := crypto.SigToPub(signatureMaterial, grant)
+	if err != nil {
+		return err
+	}
+
+	if !common.IsPubKeyEqual(recoveredPublicKey, clientPublicKey) {
+		return errors.New("pubkey mismatch")
+	}
+	return nil
+
+}
+
+func (s *Server) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
+	return ecies.ImportECDSA(s.config.Identity).GenerateShared(
 		ecies.ImportECDSAPublic(publicKey),
 		encryptedPayloadKeyLength,
 		encryptedPayloadKeyLength,
 	)
 }
 
-func (p *Server) validateUUID(u string) error {
+func (s *Server) validateUUID(u string) error {
 	if len(u) == 0 {
 		return errors.New("empty uuid")
 	}
@@ -59,8 +194,8 @@ func (p *Server) validateUUID(u string) error {
 	return err
 }
 
-func (p *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
-	sharedKey, err := p.generateSharedKey(publicKey)
+func (s *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte) ([]byte, error) {
+	sharedKey, err := s.generateSharedKey(publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -68,9 +203,9 @@ func (p *Server) decryptRegistration(publicKey *ecdsa.PublicKey, payload []byte)
 	return common.Decrypt(payload, sharedKey)
 }
 
-// ValidateRegistration validates a new message against the last one received for a given installationID and and public key
+// validateRegistration validates a new message against the last one received for a given installationID and and public key
 // and return the decrypted message
-func (s *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationRegistration, error) {
+func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte) (*protobuf.PushNotificationRegistration, error) {
 	if payload == nil {
 		return nil, ErrEmptyPushNotificationRegistrationPayload
 	}
@@ -107,7 +242,7 @@ func (s *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrInvalidPushNotificationRegistrationVersion
 	}
 
-	// Unregistering message
+	// unregistering message
 	if registration.Unregister {
 		return registration, nil
 	}
@@ -126,7 +261,7 @@ func (s *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationGrant
 	}
 
-	if len(registration.Token) == 0 {
+	if len(registration.DeviceToken) == 0 {
 		return nil, ErrMalformedPushNotificationRegistrationDeviceToken
 	}
 
@@ -137,9 +272,10 @@ func (s *Server) ValidateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 	return registration, nil
 }
 
-func (s *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
+// buildPushNotificationQueryResponse check if we have the client information and send them back
+func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
 
-	s.config.Logger.Info("handling push notification query")
+	s.config.Logger.Debug("handling push notification query")
 	response := &protobuf.PushNotificationQueryResponse{}
 	if query == nil || len(query.PublicKeys) == 0 {
 		return response
@@ -161,8 +297,9 @@ func (s *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 			InstallationId: registration.InstallationId,
 		}
 
+		// if instructed to only allow from contacts, send back a list
 		if registration.AllowFromContactsOnly {
-			info.AllowedUserList = registration.AllowedUserList
+			info.AllowedKeyList = registration.AllowedKeyList
 		} else {
 			info.AccessToken = registration.AccessToken
 		}
@@ -173,8 +310,9 @@ func (s *Server) HandlePushNotificationQuery(query *protobuf.PushNotificationQue
 	return response
 }
 
-func (s *Server) HandlePushNotificationRequest(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
-	s.config.Logger.Info("handling pn request")
+// buildPushNotificationRequestResponseAndSendNotification will build a response
+// and fire-and-forget send a query to the gorush instance
+func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
 	response := &protobuf.PushNotificationResponse{}
 	// We don't even send a response in this case
 	if request == nil || len(request.MessageId) == 0 {
@@ -185,7 +323,7 @@ func (s *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 	response.MessageId = request.MessageId
 
 	// TODO: filter by chat id
-	// Collect successful requests & registrations
+	// collect successful requests & registrations
 	var requestAndRegistrations []*RequestAndRegistration
 
 	for _, pn := range request.Requests {
@@ -216,7 +354,7 @@ func (s *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 		response.Reports = append(response.Reports, report)
 	}
 
-	s.config.Logger.Info("built pn request")
+	s.config.Logger.Debug("built pn request")
 	if len(requestAndRegistrations) == 0 {
 		s.config.Logger.Warn("no request and registration")
 		return response
@@ -224,25 +362,35 @@ func (s *Server) HandlePushNotificationRequest(request *protobuf.PushNotificatio
 
 	// This can be done asynchronously
 	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
-	//TODO: REMOVE ME
-	s.config.Logger.Info("REQUEST", zap.Any("REQUEST", goRushRequest))
 	err := sendGoRushNotification(goRushRequest, s.config.GorushURL)
 	if err != nil {
 		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
 		// TODO: handle this error?
+		// GoRush will not let us know that the sending of the push notification has failed,
+		// so this likely mean that the actual HTTP request has failed, or there was some unexpected error
 	}
 
 	return response
 }
 
-func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
+// listenToPublicKeyQueryTopic listen to a topic derived from the hashed public key
+func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
+	if s.messageProcessor == nil {
+		return nil
+	}
+	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
+	return s.messageProcessor.JoinPublic(encodedPublicKey)
+}
+
+// buildPushNotificationRegistrationResponse will check the registration is valid, save it, and listen to the topic for the queries
+func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
 
 	s.config.Logger.Info("handling push notification registration")
 	response := &protobuf.PushNotificationRegistrationResponse{
 		RequestId: common.Shake256(payload),
 	}
 
-	registration, err := s.ValidateRegistration(publicKey, payload)
+	registration, err := s.validateRegistration(publicKey, payload)
 
 	if err != nil {
 		if err == ErrInvalidPushNotificationRegistrationVersion {
@@ -283,141 +431,4 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 	s.config.Logger.Info("handled push notification registration successfully")
 
 	return response
-}
-
-func (s *Server) Start() error {
-	s.config.Logger.Info("starting push notification server")
-	if s.config.Identity == nil {
-		s.config.Logger.Info("Identity nil")
-		// Pull identity from database
-		identity, err := s.persistence.GetIdentity()
-		if err != nil {
-			return err
-		}
-		if identity == nil {
-			identity, err = crypto.GenerateKey()
-			if err != nil {
-				return err
-			}
-			if err := s.persistence.SaveIdentity(identity); err != nil {
-				return err
-			}
-		}
-		s.config.Identity = identity
-	}
-
-	pks, err := s.persistence.GetPushNotificationRegistrationPublicKeys()
-	if err != nil {
-		return err
-	}
-	for _, pk := range pks {
-		if err := s.listenToPublicKeyQueryTopic(pk); err != nil {
-			return err
-		}
-	}
-
-	s.config.Logger.Info("started push notification server", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&s.config.Identity.PublicKey))))
-
-	return nil
-}
-
-func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
-	if s.messageProcessor == nil {
-		return nil
-	}
-	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	return s.messageProcessor.JoinPublic(encodedPublicKey)
-}
-
-func (p *Server) HandlePushNotificationRegistration2(publicKey *ecdsa.PublicKey, payload []byte) error {
-	response := p.HandlePushNotificationRegistration(publicKey, payload)
-	if response == nil {
-		return nil
-	}
-	encodedMessage, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := &common.RawMessage{
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE,
-	}
-
-	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
-	return err
-}
-
-func (p *Server) HandlePushNotificationQuery2(publicKey *ecdsa.PublicKey, messageID []byte, query protobuf.PushNotificationQuery) error {
-	response := p.HandlePushNotificationQuery(&query)
-	if response == nil {
-		return nil
-	}
-	response.MessageId = messageID
-	encodedMessage, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := &common.RawMessage{
-		Payload:         encodedMessage,
-		MessageType:     protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE,
-		SkipNegotiation: true,
-	}
-
-	_, err = p.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
-	return err
-
-}
-
-func (s *Server) HandlePushNotificationRequest2(publicKey *ecdsa.PublicKey,
-	request protobuf.PushNotificationRequest) error {
-	s.config.Logger.Info("handling pn request")
-	response := s.HandlePushNotificationRequest(&request)
-	if response == nil {
-		return nil
-	}
-	encodedMessage, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-
-	rawMessage := &common.RawMessage{
-		Payload:         encodedMessage,
-		MessageType:     protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE,
-		SkipNegotiation: true,
-	}
-
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
-	return err
-}
-
-// buildGrantSignatureMaterial builds a grant for a specific server.
-// We use 3 components:
-// 1) The client public key. Not sure this applies to our signature scheme, but best to be conservative. https://crypto.stackexchange.com/questions/15538/given-a-message-and-signature-find-a-public-key-that-makes-the-signature-valid
-// 2) The server public key
-// 3) The access token
-// By verifying this signature, a client can trust the server was instructed to store this access token.
-
-func (s *Server) buildGrantSignatureMaterial(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, accessToken string) []byte {
-	var signatureMaterial []byte
-	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(clientPublicKey)...)
-	signatureMaterial = append(signatureMaterial, crypto.CompressPubkey(serverPublicKey)...)
-	signatureMaterial = append(signatureMaterial, []byte(accessToken)...)
-	a := crypto.Keccak256(signatureMaterial)
-	return a
-}
-
-func (s *Server) verifyGrantSignature(clientPublicKey *ecdsa.PublicKey, accessToken string, grant []byte) error {
-	signatureMaterial := s.buildGrantSignatureMaterial(clientPublicKey, &s.config.Identity.PublicKey, accessToken)
-	recoveredPublicKey, err := crypto.SigToPub(signatureMaterial, grant)
-	if err != nil {
-		return err
-	}
-
-	if !common.IsPubKeyEqual(recoveredPublicKey, clientPublicKey) {
-		return errors.New("pubkey mismatch")
-	}
-	return nil
-
 }

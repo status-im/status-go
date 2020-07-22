@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import (
 	"crypto/ecdsa"
@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -76,35 +76,35 @@ func (s *ServerSuite) SetupTest() {
 func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	// Empty payload
-	_, err := s.server.ValidateRegistration(&s.key.PublicKey, nil)
+	_, err := s.server.validateRegistration(&s.key.PublicKey, nil)
 	s.Require().Equal(ErrEmptyPushNotificationRegistrationPayload, err)
 
 	// Empty key
-	_, err = s.server.ValidateRegistration(nil, []byte("payload"))
+	_, err = s.server.validateRegistration(nil, []byte("payload"))
 	s.Require().Equal(ErrEmptyPushNotificationRegistrationPublicKey, err)
 
 	// Invalid cyphertext length
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, []byte("too short"))
+	_, err = s.server.validateRegistration(&s.key.PublicKey, []byte("too short"))
 	s.Require().Equal(common.ErrInvalidCiphertextLength, err)
 
 	// Invalid cyphertext length
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, []byte("too short"))
+	_, err = s.server.validateRegistration(&s.key.PublicKey, []byte("too short"))
 	s.Require().Equal(common.ErrInvalidCiphertextLength, err)
 
 	// Invalid ciphertext
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, []byte("not too short but invalid"))
+	_, err = s.server.validateRegistration(&s.key.PublicKey, []byte("not too short but invalid"))
 	s.Require().Error(common.ErrInvalidCiphertextLength, err)
 
 	// Different key ciphertext
 	cyphertext, err := common.Encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Error(err)
 
 	// Right cyphertext but non unmarshable payload
 	cyphertext, err = common.Encrypt([]byte("plaintext"), s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrCouldNotUnmarshalPushNotificationRegistration, err)
 
 	// Missing installationID
@@ -118,7 +118,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationInstallationID, err)
 
 	// Malformed installationID
@@ -129,9 +129,11 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 		InstallationId: "abc",
 		Version:        1,
 	})
+	s.Require().NoError(err)
+
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationInstallationID, err)
 
 	// Version set to 0
@@ -145,7 +147,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
 
 	// Version lower than previous one
@@ -169,7 +171,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 		InstallationId: s.installationID,
 		Version:        2}))
 
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrInvalidPushNotificationRegistrationVersion, err)
 
 	// Cleanup persistence
@@ -185,7 +187,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Nil(err)
 
 	// Missing access token
@@ -199,7 +201,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationAccessToken, err)
 
 	// Invalid access token
@@ -214,7 +216,7 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationAccessToken, err)
 
 	// Missing device token
@@ -229,13 +231,13 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationDeviceToken, err)
 
 	// Missing  grant
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
-		Token:          "device-token",
+		DeviceToken:    "device-token",
 		InstallationId: s.installationID,
 		Version:        1,
 	})
@@ -243,14 +245,14 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationGrant, err)
 
 	// Invalid  grant
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
-		Token:          "device-token",
+		DeviceToken:    "device-token",
 		Grant:          crypto.Keccak256([]byte("invalid")),
 		InstallationId: s.installationID,
 		Version:        1,
@@ -259,13 +261,13 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrMalformedPushNotificationRegistrationGrant, err)
 
 	// Missing  token type
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
 		AccessToken:    s.accessToken,
-		Token:          "device-token",
+		DeviceToken:    "device-token",
 		Grant:          s.grant,
 		InstallationId: s.installationID,
 		Version:        1,
@@ -274,12 +276,12 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().Equal(ErrUnknownPushNotificationRegistrationTokenType, err)
 
 	// Successful
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
-		Token:          "abc",
+		DeviceToken:    "abc",
 		AccessToken:    s.accessToken,
 		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
@@ -290,37 +292,37 @@ func (s *ServerSuite) TestPushNotificationServerValidateRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	_, err = s.server.ValidateRegistration(&s.key.PublicKey, cyphertext)
+	_, err = s.server.validateRegistration(&s.key.PublicKey, cyphertext)
 	s.Require().NoError(err)
 }
 
 func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Empty payload
-	response := s.server.HandlePushNotificationRegistration(&s.key.PublicKey, nil)
+	response := s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, nil)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Empty key
-	response = s.server.HandlePushNotificationRegistration(nil, []byte("payload"))
+	response = s.server.buildPushNotificationRegistrationResponse(nil, []byte("payload"))
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Invalid cyphertext length
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, []byte("too short"))
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, []byte("too short"))
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Invalid cyphertext length
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, []byte("too short"))
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, []byte("too short"))
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Invalid ciphertext
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, []byte("not too short but invalid"))
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, []byte("not too short but invalid"))
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -328,7 +330,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Different key ciphertext
 	cyphertext, err := common.Encrypt([]byte("plaintext"), make([]byte, 32), rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -336,7 +338,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	// Right cyphertext but non unmarshable payload
 	cyphertext, err = common.Encrypt([]byte("plaintext"), s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -351,7 +353,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -363,9 +365,10 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 		Grant:          s.grant,
 		Version:        1,
 	})
+	s.Require().NoError(err)
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -380,7 +383,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH)
@@ -404,7 +407,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 		InstallationId: s.installationID,
 		Version:        2}))
 
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_VERSION_MISMATCH)
@@ -422,7 +425,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -438,7 +441,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
@@ -454,14 +457,14 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().False(response.Success)
 	s.Require().Equal(response.Error, protobuf.PushNotificationRegistrationResponse_MALFORMED_MESSAGE)
 
 	// Successful
 	registration := &protobuf.PushNotificationRegistration{
-		Token:          "abc",
+		DeviceToken:    "abc",
 		AccessToken:    s.accessToken,
 		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
@@ -473,7 +476,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
 
@@ -485,7 +488,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	// Unregistering message
 	payload, err = proto.Marshal(&protobuf.PushNotificationRegistration{
-		Token:          "token",
+		DeviceToken:    "token",
 		InstallationId: s.installationID,
 		Unregister:     true,
 		Version:        2,
@@ -494,7 +497,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 
 	cyphertext, err = common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response = s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
 
@@ -503,17 +506,17 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	s.Require().NoError(err)
 	s.Require().NotNil(retrievedRegistration)
 	s.Require().Empty(retrievedRegistration.AccessToken)
-	s.Require().Empty(retrievedRegistration.Token)
+	s.Require().Empty(retrievedRegistration.DeviceToken)
 	s.Require().Equal(uint64(2), retrievedRegistration.Version)
 	s.Require().Equal(s.installationID, retrievedRegistration.InstallationId)
 	s.Require().Equal(common.Shake256(cyphertext), response.RequestId)
 }
 
-func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
+func (s *ServerSuite) TestbuildPushNotificationQueryResponseNoFiltering() {
 	hashedPublicKey := common.HashPublicKey(&s.key.PublicKey)
 	// Successful
 	registration := &protobuf.PushNotificationRegistration{
-		Token:          "abc",
+		DeviceToken:    "abc",
 		AccessToken:    s.accessToken,
 		Grant:          s.grant,
 		TokenType:      protobuf.PushNotificationRegistration_APN_TOKEN,
@@ -525,7 +528,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
 
 	cyphertext, err := common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response := s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response := s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
 
@@ -533,29 +536,29 @@ func (s *ServerSuite) TestHandlePushNotificationQueryNoFiltering() {
 		PublicKeys: [][]byte{[]byte("non-existing"), hashedPublicKey},
 	}
 
-	queryResponse := s.server.HandlePushNotificationQuery(query)
+	queryResponse := s.server.buildPushNotificationQueryResponse(query)
 	s.Require().NotNil(queryResponse)
 	s.Require().True(queryResponse.Success)
 	s.Require().Len(queryResponse.Info, 1)
 	s.Require().Equal(s.accessToken, queryResponse.Info[0].AccessToken)
 	s.Require().Equal(hashedPublicKey, queryResponse.Info[0].PublicKey)
 	s.Require().Equal(s.installationID, queryResponse.Info[0].InstallationId)
-	s.Require().Nil(queryResponse.Info[0].AllowedUserList)
+	s.Require().Nil(queryResponse.Info[0].AllowedKeyList)
 }
 
-func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
+func (s *ServerSuite) TestbuildPushNotificationQueryResponseWithFiltering() {
 	hashedPublicKey := common.HashPublicKey(&s.key.PublicKey)
-	allowedUserList := [][]byte{[]byte("a")}
+	allowedKeyList := [][]byte{[]byte("a")}
 	// Successful
 
 	registration := &protobuf.PushNotificationRegistration{
-		Token:                 "abc",
+		DeviceToken:           "abc",
 		AccessToken:           s.accessToken,
 		Grant:                 s.grant,
 		TokenType:             protobuf.PushNotificationRegistration_APN_TOKEN,
 		InstallationId:        s.installationID,
 		AllowFromContactsOnly: true,
-		AllowedUserList:       allowedUserList,
+		AllowedKeyList:        allowedKeyList,
 		Version:               1,
 	}
 	payload, err := proto.Marshal(registration)
@@ -563,7 +566,7 @@ func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
 
 	cyphertext, err := common.Encrypt(payload, s.sharedKey, rand.Reader)
 	s.Require().NoError(err)
-	response := s.server.HandlePushNotificationRegistration(&s.key.PublicKey, cyphertext)
+	response := s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
 
@@ -571,11 +574,11 @@ func (s *ServerSuite) TestHandlePushNotificationQueryWithFiltering() {
 		PublicKeys: [][]byte{[]byte("non-existing"), hashedPublicKey},
 	}
 
-	queryResponse := s.server.HandlePushNotificationQuery(query)
+	queryResponse := s.server.buildPushNotificationQueryResponse(query)
 	s.Require().NotNil(queryResponse)
 	s.Require().True(queryResponse.Success)
 	s.Require().Len(queryResponse.Info, 1)
 	s.Require().Equal(hashedPublicKey, queryResponse.Info[0].PublicKey)
 	s.Require().Equal(s.installationID, queryResponse.Info[0].InstallationId)
-	s.Require().Equal(allowedUserList, queryResponse.Info[0].AllowedUserList)
+	s.Require().Equal(allowedKeyList, queryResponse.Info[0].AllowedKeyList)
 }

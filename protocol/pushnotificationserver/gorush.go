@@ -1,4 +1,4 @@
-package push_notification_server
+package pushnotificationserver
 
 import (
 	"bytes"
@@ -46,12 +46,11 @@ func tokenTypeToGoRushPlatform(tokenType protobuf.PushNotificationRegistration_T
 func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*RequestAndRegistration) *GoRushRequest {
 	goRushRequests := &GoRushRequest{}
 	for _, requestAndRegistration := range requestAndRegistrations {
-
 		request := requestAndRegistration.Request
 		registration := requestAndRegistration.Registration
 		goRushRequests.Notifications = append(goRushRequests.Notifications,
 			&GoRushRequestNotification{
-				Tokens:   []string{registration.Token},
+				Tokens:   []string{registration.DeviceToken},
 				Platform: tokenTypeToGoRushPlatform(registration.TokenType),
 				Message:  defaultNotificationMessage,
 				Data: &GoRushRequestData{
