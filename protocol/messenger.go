@@ -3259,7 +3259,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		return nil, err
 	}
 
-	id, err := m.dispatchMessage(ctx, &RawMessage{
+	id, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         chatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
@@ -3303,8 +3303,8 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	// Check that the sender is the key owner
 	pk := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
 	if emojiReaction.From != pk {
-		return nil, errors.Errorf("identity mismatch, " +
-			"emoji reactions can only be retracted by the reaction sender, " +
+		return nil, errors.Errorf("identity mismatch, "+
+			"emoji reactions can only be retracted by the reaction sender, "+
 			"emoji reaction sent by '%s', current identity '%s'",
 			emojiReaction.From, pk,
 		)
@@ -3328,7 +3328,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	}
 
 	// Send the marshalled EmojiReactionRetraction protobuf
-	_, err = m.dispatchMessage(ctx, &RawMessage{
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:         emojiReaction.ChatID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_EMOJI_REACTION_RETRACTION,

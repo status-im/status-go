@@ -407,6 +407,7 @@ func _1594390919_create_emoji_reactions_tableUpSql() (*asset, error) {
 	}
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	info := bindataFileInfo{name: "1594390919_create_emoji_reactions_table.up.sql", size: 234, mode: os.FileMode(0644), modTime: time.Unix(1595864971, 0)}
 =======
 <<<<<<< HEAD
@@ -415,8 +416,10 @@ func _1594390919_create_emoji_reactions_tableUpSql() (*asset, error) {
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5f, 0xcb, 0xf0, 0xaf, 0xa8, 0x82, 0xec, 0x10, 0xd0, 0xae, 0x83, 0x78, 0xa7, 0x90, 0x84, 0x3d, 0xc0, 0xfe, 0x6, 0xe6, 0xc8, 0x8b, 0xda, 0xe0, 0x1a, 0x81, 0x86, 0x61, 0xe9, 0xb0, 0xa2, 0x31}}
 =======
 	info := bindataFileInfo{name: "1594390919_create_emoji_reactions_table.up.sql", size: 263, mode: os.FileMode(0644), modTime: time.Unix(1595339114, 0)}
+=======
+	info := bindataFileInfo{name: "1594390919_create_emoji_reactions_table.up.sql", size: 263, mode: os.FileMode(0644), modTime: time.Unix(1595840951, 0)}
+>>>>>>> 546b68df9... Added general protobuf umarshaller function
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x60, 0xab, 0x81, 0xa6, 0x1a, 0x5a, 0x9, 0xee, 0x72, 0x18, 0x5d, 0xe7, 0xf1, 0x94, 0x66, 0x2d, 0x38, 0x29, 0x57, 0xf8, 0xec, 0x1c, 0x1b, 0x1f, 0xc6, 0x1d, 0xb5, 0x2e, 0xe8, 0x15, 0x8, 0x74}}
->>>>>>> c546f6146... make generate
 	return a, nil
 }
 
