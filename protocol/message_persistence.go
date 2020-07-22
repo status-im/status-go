@@ -756,3 +756,52 @@ func (db sqlitePersistence) tableEmojiReactionsAllFields() string {
 func (db sqlitePersistence) tableEmojiReactionsAllFieldsCount() int {
 	return strings.Count(db.tableEmojiReactionsAllFields(), ",") + 1
 }
+
+
+func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	row := tx.QueryRow(
+		fmt.Sprintf(`
+			SELECT
+				%s
+			FROM
+				emoji_reactions
+			WHERE
+				emoji_reactions.id = ?
+		`, db.tableEmojiReactionsAllFields()),
+		id,
+	)
+
+	emojiReaction := new(EmojiReaction)
+	args := []interface{}{
+		&emojiReaction.ID,
+		&emojiReaction.Clock,
+		&emojiReaction.From,
+		&emojiReaction.EmojiID,
+		&emojiReaction.MessageID,
+		&emojiReaction.ChatID,
+		&emojiReaction.Retracted,
+	}
+	err = row.Scan(args...)
+
+	switch err {
+	case sql.ErrNoRows:
+		return nil, errRecordNotFound
+	case nil:
+		return emojiReaction, nil
+	default:
+		return nil, err
+	}
+}
