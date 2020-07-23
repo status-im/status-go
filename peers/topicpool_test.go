@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discv5"
@@ -238,7 +237,7 @@ func (s *TopicPoolSuite) TestTheMostRecentPeerIsSelected() {
 	// peer1 has dropped
 	s.topicPool.ConfirmDropped(s.peer, nodeID1)
 	// and peer3 is take from the pool as the most recent
-	s.True(s.topicPool.pendingPeers[nodeID2].discoveredTime < s.topicPool.pendingPeers[nodeID3].discoveredTime)
+	s.True(s.topicPool.pendingPeers[nodeID2].discoveredTime.Before(s.topicPool.pendingPeers[nodeID3].discoveredTime))
 	s.Equal(peer3.ID, s.topicPool.AddPeerFromTable(s.peer).ID)
 }
 
@@ -353,9 +352,9 @@ func (s *TopicPoolSuite) TestMaxPendingPeers() {
 	pk2, _ := peer2.ID.Pubkey()
 	pk3, _ := peer3.ID.Pubkey()
 
-	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1})
-	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer2, publicKey: pk2})
-	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer3, publicKey: pk3})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: time.Now(), node: peer1, publicKey: pk1})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: time.Now(), node: peer2, publicKey: pk2})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: time.Now(), node: peer3, publicKey: pk3})
 
 	s.Equal(2, len(s.topicPool.pendingPeers))
 	s.Require().NotContains(s.topicPool.pendingPeers, nodeID1)
@@ -364,7 +363,7 @@ func (s *TopicPoolSuite) TestMaxPendingPeers() {
 
 	// maxPendingPeers = 0 means no limits.
 	s.topicPool.maxPendingPeers = 0
-	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: time.Now(), node: peer1, publicKey: pk1})
 
 	s.Equal(3, len(s.topicPool.pendingPeers))
 	s.Require().Contains(s.topicPool.pendingPeers, nodeID1)
@@ -377,11 +376,11 @@ func (s *TopicPoolSuite) TestQueueDuplicatePeers() {
 	_, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
 	pk1, _ := peer1.ID.Pubkey()
 	pk2, _ := peer2.ID.Pubkey()
-	peerInfo1 := &peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1}
-	peerInfo2 := &peerInfo{discoveredTime: mclock.Now(), node: peer2, publicKey: pk2}
+	peerInfo1 := &peerInfo{discoveredTime: time.Now(), node: peer1, publicKey: pk1}
+	peerInfo2 := &peerInfo{discoveredTime: time.Now(), node: peer2, publicKey: pk2}
 
-	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer1, publicKey: pk1})
-	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: mclock.Now(), node: peer2, publicKey: pk2})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: time.Now(), node: peer1, publicKey: pk1})
+	s.topicPool.addToPendingPeers(&peerInfo{discoveredTime: time.Now(), node: peer2, publicKey: pk2})
 	s.topicPool.addToQueue(peerInfo1)
 	s.topicPool.addToQueue(peerInfo2)
 

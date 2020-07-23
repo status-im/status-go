@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -77,7 +76,7 @@ func NewDefaultOptions() *Options {
 
 type peerInfo struct {
 	// discoveredTime last time when node was found by v5
-	discoveredTime mclock.AbsTime
+	discoveredTime time.Time
 	// dismissed is true when our node requested a disconnect
 	dismissed bool
 	// added is true when the node tries to add this peer to a server
