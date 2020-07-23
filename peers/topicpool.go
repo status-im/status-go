@@ -45,6 +45,14 @@ type TopicPoolInterface interface {
 	readyToStopSearch() bool
 }
 
+type Clock interface {
+	Now() time.Time
+}
+
+type realClock struct{}
+
+func (realClock) Now() time.Time { return time.Now() }
+
 // newTopicPool returns instance of TopicPool.
 func newTopicPool(discovery discovery.Discovery, topic discv5.Topic, limits params.Limits, slowMode, fastMode time.Duration, cache *Cache) *TopicPool {
 	pool := TopicPool{
@@ -61,6 +69,7 @@ func newTopicPool(discovery discovery.Discovery, topic discv5.Topic, limits para
 		cache:                cache,
 		maxCachedPeers:       limits.Max * maxCachedPeersMultiplier,
 		maxPendingPeers:      limits.Max * maxPendingPeersMultiplier,
+		clock:                realClock{},
 	}
 	heap.Init(&pool.discoveredPeersQueue)
 
@@ -99,6 +108,8 @@ type TopicPool struct {
 	maxPendingPeers int
 	maxCachedPeers  int
 	cache           *Cache
+
+	clock Clock
 }
 
 func (t *TopicPool) addToPendingPeers(peer *peerInfo) {
@@ -166,7 +177,7 @@ func (t *TopicPool) updatePendingPeer(nodeID enode.ID) {
 	if !ok {
 		return
 	}
-	peer.discoveredTime = time.Now()
+	peer.discoveredTime = t.clock.Now()
 	if peer.index != notQueuedIndex {
 		heap.Fix(&t.discoveredPeersQueue, peer.index)
 	}
@@ -216,7 +227,7 @@ func (t *TopicPool) setStopSearchTimeout(delay time.Duration) {
 	if t.stopSearchTimeout != nil {
 		return
 	}
-	now := time.Now().Add(delay)
+	now := t.clock.Now().Add(delay)
 	t.stopSearchTimeout = &now
 }
 
@@ -226,7 +237,7 @@ func (t *TopicPool) isStopSearchDelayExpired() bool {
 	if t.stopSearchTimeout == nil {
 		return false
 	}
-	return t.stopSearchTimeout.Before(time.Now())
+	return t.stopSearchTimeout.Before(t.clock.Now())
 }
 
 // readyToStopSearch return true if all conditions to stop search are ok.
@@ -390,7 +401,7 @@ func (t *TopicPool) AddPeerFromTable(server *p2p.Server) *discv5.Node {
 	// TODO(adam): investigate if it's worth to keep the peer in the queue
 	// until the server confirms it is added and in the meanwhile only adjust its priority.
 	peer := t.popFromQueue()
-	if peer != nil && time.Now().Before(peer.discoveredTime.Add(expirationPeriod)) {
+	if peer != nil && t.clock.Now().Before(peer.discoveredTime.Add(expirationPeriod)) {
 		t.addServerPeer(server, peer)
 		return peer.node
 	}
@@ -482,7 +493,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 
 	// peer is already connected so update only discoveredTime
 	if peer, ok := t.connectedPeers[nodeID]; ok {
-		peer.discoveredTime = time.Now()
+		peer.discoveredTime = t.clock.Now()
 		return nil
 	}
 
@@ -490,7 +501,7 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 		t.updatePendingPeer(nodeID)
 	} else {
 		t.addToPendingPeers(&peerInfo{
-			discoveredTime: time.Now(),
+			discoveredTime: t.clock.Now(),
 			node:           node,
 			publicKey:      pk,
 		})
@@ -498,6 +509,22 @@ func (t *TopicPool) processFoundNode(server *p2p.Server, node *discv5.Node) erro
 	log.Debug(
 		"adding peer to a server", "peer", node.ID.String(),
 		"connected", len(t.connectedPeers), "max", t.maxCachedPeers)
+
+	// This can happen when the monotonic clock is not precise enough and
+	// multiple peers gets added at the same clock time, resulting in all
+	// of them having the same discoveredTime.
+	// At which point a random peer will be removed, sometimes being the
+	// peer we just added.
+	// We could make sure that the latest added peer is not removed,
+	// but this is simpler, and peers will be fresh enough as resolution
+	// should be quite high (ms at least).
+	// This has been reported on windows builds
+	// only https://github.com/status-im/nim-status-client/issues/522
+	if t.pendingPeers[nodeID] == nil {
+		log.Debug("peer added has just been removed", "peer", nodeID)
+		return nil
+	}
+
 	// the upper limit is not reached, so let's add this peer
 	if len(t.connectedPeers) < t.maxCachedPeers {
 		t.addServerPeer(server, t.pendingPeers[nodeID].peerInfo)

@@ -192,6 +192,25 @@ func (s *TopicPoolSuite) TestNewPeerSelectedOnDrop() {
 	s.Len(s.topicPool.discoveredPeersQueue, 0)
 }
 
+type mockConstantClock struct{}
+
+func (mockConstantClock) Now() time.Time { return time.Unix(0, 0) }
+
+// Regression test for https://github.com/status-im/nim-status-client/issues/522
+func (s *TopicPoolSuite) TestNewPeerLackOfClockPrecision() {
+	_, peer1 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	_, peer2 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+	_, peer3 := s.createDiscV5Node(s.peer.Self().IP(), 32311)
+
+	s.topicPool.maxPendingPeers = 2
+
+	s.topicPool.clock = mockConstantClock{}
+
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer1))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer2))
+	s.Require().NoError(s.topicPool.processFoundNode(s.peer, peer3))
+}
+
 func (s *TopicPoolSuite) TestRequestedDoesntRemove() {
 	// max limit is 1 because we test that 2nd peer will stay in local table
 	// when we request to drop it
