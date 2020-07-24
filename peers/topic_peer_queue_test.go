@@ -4,19 +4,18 @@ import (
 	"container/heap"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ethereum/go-ethereum/common/mclock"
 )
 
 func TestPeerPriorityQueueSorting(t *testing.T) {
 	count := 5
-	discTimes := make([]mclock.AbsTime, count)
+	discTimes := make([]time.Time, count)
 
 	// generate a slice of monotonic times
 	for i := 0; i < count; i++ {
-		discTimes[i] = mclock.Now()
+		discTimes[i] = time.Now()
 	}
 
 	// shuffle discTimes
@@ -41,7 +40,7 @@ func TestPeerPriorityQueueSorting(t *testing.T) {
 	for q.Len() > 0 {
 		newItem := heap.Pop(&q).(*peerInfoItem)
 		if item != nil {
-			require.True(t, item.discoveredTime > newItem.discoveredTime)
+			require.True(t, item.discoveredTime.After(newItem.discoveredTime))
 		}
 		item = newItem
 	}
@@ -54,13 +53,13 @@ func TestPeerPriorityQueueIndexUpdating(t *testing.T) {
 	item1 := &peerInfoItem{
 		index: -1,
 		peerInfo: &peerInfo{
-			discoveredTime: mclock.Now(),
+			discoveredTime: time.Now(),
 		},
 	}
 	item2 := &peerInfoItem{
 		index: -1,
 		peerInfo: &peerInfo{
-			discoveredTime: mclock.Now(),
+			discoveredTime: time.Now(),
 		},
 	}
 
