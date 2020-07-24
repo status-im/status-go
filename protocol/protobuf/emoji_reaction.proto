@@ -4,8 +4,9 @@ package protobuf;
 
 message EmojiReaction {
   uint64 clock = 1;
-  string message_id = 2;
-  Type type = 3;
+  string chat_id = 2;
+  string message_id = 3;
+  Type type = 4;
 
   enum Type {
     UNKNOWN_EMOJI_REACTION_TYPE = 0;
