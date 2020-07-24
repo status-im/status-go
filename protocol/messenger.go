@@ -2056,7 +2056,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						// We continue in any case, no changes to messenger
 						continue
+					case protobuf.EmojiReaction:
+						err = m.handler.HandleEmojiReaction(messageState, msg.ParsedMessage.(protobuf.EmojiReaction))
+						if err != nil {
+							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
+							continue
+						}
 
+					case protobuf.EmojiReactionRetraction:
+						err = m.handler.HandleEmojiReactionRetraction(messageState, msg.ParsedMessage.(protobuf.EmojiReactionRetraction))
+						if err != nil {
+							logger.Warn("failed to handle EmojiReactionRetraction", zap.Error(err))
+							continue
+						}
 					default:
 						// Check if is an encrypted PushNotificationRegistration
 						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {
@@ -3291,7 +3303,6 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 }
 
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
-
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

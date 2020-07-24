@@ -669,3 +669,26 @@ func (m *MessageHandler) messageExists(messageID string, existingMessagesMap map
 	}
 	return false, nil
 }
+
+func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, message protobuf.EmojiReaction) error {
+	logger := m.logger.With(zap.String("site", "HandleEmojiReaction"))
+	// TODO change this to chat id directly from the protobuf once it is updated
+	contact := state.CurrentMessageState.Contact
+	chat, ok := state.AllChats[contact.ID]
+	if !ok {
+		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	logger.Info("Handling emoji reaction")
+
+	if chat.LastClockValue < message.Clock {
+		chat.LastClockValue = message.Clock
+	}
+
+	state.ModifiedChats[chat.ID] = true
+	state.AllChats[chat.ID] = chat
+
+	return nil
+}
