@@ -18,7 +18,6 @@ import (
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
@@ -263,13 +262,13 @@ func (p *MessageProcessor) SendPairInstallation(
 // All the events in a group are encoded and added to the payload
 func (p *MessageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
-	chatMessage *protobuf.ChatMessage,
+	chatEntity proto.Message,
 ) ([]byte, error) {
 
 	message := v1protocol.MembershipUpdateMessage{
 		ChatID:  group.ChatID(),
 		Events:  group.Events(),
-		Message: chatMessage,
+		Message: chatEntity,
 	}
 	encodedMessage, err := v1protocol.EncodeMembershipUpdateMessage(message)
 	if err != nil {

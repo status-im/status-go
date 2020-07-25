@@ -3,6 +3,8 @@ package protocol
 import (
 	"crypto/ecdsa"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -25,7 +27,19 @@ type EmojiReaction struct {
 }
 
 // GetSigPubKey returns an ecdsa encoded public key
-// this function is also required to implement the ChatEntity interface
+// this function is required to implement the ChatEntity interface
 func (e EmojiReaction) GetSigPubKey() *ecdsa.PublicKey {
 	return e.SigPubKey
+}
+
+// GetProtoBuf returns the struct's embedded protobuf struct
+// this function is required to implement the ChatEntity interface
+func (e EmojiReaction) GetProtobuf() proto.Message {
+	return &e.EmojiReaction
+}
+
+// SetMessageType a setter for the MessageType field
+// this function is required to implement the ChatEntity interface
+func (e *EmojiReaction) SetMessageType(messageType protobuf.MessageType) {
+	e.MessageType = messageType
 }

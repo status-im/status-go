@@ -10,8 +10,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/status-im/markdown"
+	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/markdown"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -334,7 +335,19 @@ func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {
 }
 
 // GetSigPubKey returns an ecdsa encoded public key
-// this function is also required to implement the ChatEntity interface
+// this function is required to implement the ChatEntity interface
 func (m Message) GetSigPubKey() *ecdsa.PublicKey {
 	return m.SigPubKey
+}
+
+// GetProtoBuf returns the struct's embedded protobuf struct
+// this function is required to implement the ChatEntity interface
+func (m *Message) GetProtobuf() proto.Message {
+	return &m.ChatMessage
+}
+
+// SetMessageType a setter for the MessageType field
+// this function is required to implement the ChatEntity interface
+func (m *Message) SetMessageType(messageType protobuf.MessageType) {
+	m.MessageType = messageType
 }

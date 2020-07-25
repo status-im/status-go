@@ -732,9 +732,9 @@ func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err
 		emojiReaction.ID,
 		emojiReaction.Clock,
 		emojiReaction.From,
-		emojiReaction.EmojiID,
-		emojiReaction.MessageID,
-		emojiReaction.ChatID,
+		emojiReaction.Type,
+		emojiReaction.MessageId,
+		emojiReaction.ChatId,
 		emojiReaction.Retracted,
 	}
 
@@ -788,9 +788,9 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 		&emojiReaction.ID,
 		&emojiReaction.Clock,
 		&emojiReaction.From,
-		&emojiReaction.EmojiID,
-		&emojiReaction.MessageID,
-		&emojiReaction.ChatID,
+		&emojiReaction.Type,
+		&emojiReaction.MessageId,
+		&emojiReaction.ChatId,
 		&emojiReaction.Retracted,
 	}
 	err = row.Scan(args...)

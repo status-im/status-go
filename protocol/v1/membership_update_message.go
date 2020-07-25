@@ -22,7 +22,7 @@ import (
 type MembershipUpdateMessage struct {
 	ChatID  string                  `json:"chatId"` // UUID concatenated with hex-encoded public key of the creator for the chat
 	Events  []MembershipUpdateEvent `json:"events"`
-	Message *protobuf.ChatMessage   `json:"-"`
+	Message proto.Message   `json:"-"`
 }
 
 const signatureLength = 65
@@ -70,6 +70,8 @@ func (m *MembershipUpdateMessage) ToProtobuf() *protobuf.MembershipUpdateMessage
 	return &protobuf.MembershipUpdateMessage{
 		ChatId:  m.ChatID,
 		Events:  rawEvents,
+
+		// TODO handle this
 		Message: m.Message,
 	}
 }

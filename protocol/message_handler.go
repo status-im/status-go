@@ -107,8 +107,9 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	// Set in the map
 	messageState.ModifiedChats[chat.ID] = true
 
-	if message.Message != nil {
-		messageState.CurrentMessageState.Message = *message.Message
+	msg, ok := message.Message.(*protobuf.ChatMessage)
+	if msg != nil && ok {
+		messageState.CurrentMessageState.Message = *msg
 		return m.HandleChatMessage(messageState)
 	}
 
