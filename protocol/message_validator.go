@@ -167,7 +167,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("chatId can't be empty")
 	}
 
-	if message.MessageType == protobuf.ChatMessage_UNKNOWN_MESSAGE_TYPE || message.MessageType == protobuf.ChatMessage_SYSTEM_MESSAGE_PRIVATE_GROUP {
+	if message.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE || message.MessageType == protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP {
 		return errors.New("unknown message type")
 	}
 

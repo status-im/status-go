@@ -377,7 +377,7 @@ func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *Receiv
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 			Text:        "Request address for transaction",
 			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
-			MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
 		CommandParameters: &CommandParameters{
@@ -401,7 +401,7 @@ func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageS
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 			Text:        "Request transaction",
 			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
-			MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
 		CommandParameters: &CommandParameters{
@@ -574,7 +574,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 	}
 
 	switch {
-	case message.MessageType == protobuf.ChatMessage_PUBLIC_GROUP:
+	case message.MessageType == protobuf.MessageType_PUBLIC_GROUP:
 		// For public messages, all outgoing and incoming messages have the same chatID
 		// equal to a public chat name.
 		chatID := message.ChatId
@@ -583,7 +583,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 			return nil, errors.New("received a public message from non-existing chat")
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
+	case message.MessageType == protobuf.MessageType_ONE_TO_ONE && common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := message.ChatId
@@ -606,7 +606,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 			chat = &newChat
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE:
+	case message.MessageType == protobuf.MessageType_ONE_TO_ONE:
 		// It's an incoming private message. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
 		chatID := contactIDFromPublicKey(message.SigPubKey)
@@ -617,7 +617,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 			chat = &newChat
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_PRIVATE_GROUP:
+	case message.MessageType == protobuf.MessageType_PRIVATE_GROUP:
 		// In the case of a group message, ChatID is the same for all messages belonging to a group.
 		// It needs to be verified if the signature public key belongs to the chat.
 		chatID := message.ChatId

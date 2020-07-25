@@ -1428,20 +1428,20 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
 		logger.Debug("sending private message")
-		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
 		encodedMessage, err = proto.Marshal(message)
 		if err != nil {
 			return nil, err
 		}
 	case ChatTypePublic:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		message.MessageType = protobuf.ChatMessage_PUBLIC_GROUP
+		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
 		encodedMessage, err = proto.Marshal(message)
 		if err != nil {
 			return nil, err
 		}
 	case ChatTypePrivateGroupChat:
-		message.MessageType = protobuf.ChatMessage_PRIVATE_GROUP
+		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))
 
 		group, err := newProtocolGroupFromChat(chat)
@@ -1899,6 +1899,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							continue
 						}
+
 					case protobuf.PairInstallation:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -1925,6 +1926,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
 							continue
 						}
+
 					case protobuf.SyncInstallationPublicChat:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -1938,6 +1940,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle SyncInstallationPublicChat", zap.Error(err))
 							continue
 						}
+
 					case protobuf.RequestAddressForTransaction:
 						command := msg.ParsedMessage.(protobuf.RequestAddressForTransaction)
 						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))
@@ -1946,6 +1949,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle RequestAddressForTransaction", zap.Error(err))
 							continue
 						}
+
 					case protobuf.SendTransaction:
 						command := msg.ParsedMessage.(protobuf.SendTransaction)
 						logger.Debug("Handling SendTransaction", zap.Any("message", command))
@@ -1954,6 +1958,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle SendTransaction", zap.Error(err))
 							continue
 						}
+
 					case protobuf.AcceptRequestAddressForTransaction:
 						command := msg.ParsedMessage.(protobuf.AcceptRequestAddressForTransaction)
 						logger.Debug("Handling AcceptRequestAddressForTransaction")
@@ -1989,11 +1994,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle RequestTransaction", zap.Error(err))
 							continue
 						}
+
 					case protobuf.ContactUpdate:
 						logger.Debug("Handling ContactUpdate")
-
 						contactUpdate := msg.ParsedMessage.(protobuf.ContactUpdate)
-
 						err = m.handler.HandleContactUpdate(messageState, contactUpdate)
 						if err != nil {
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
@@ -2057,6 +2061,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						// We continue in any case, no changes to messenger
 						continue
 					case protobuf.EmojiReaction:
+						logger.Debug("Handling EmojiReaction")
 						err = m.handler.HandleEmojiReaction(messageState, msg.ParsedMessage.(protobuf.EmojiReaction))
 						if err != nil {
 							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
@@ -2064,6 +2069,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.EmojiReactionRetraction:
+						logger.Debug("Handling EmojiReactionRetraction")
 						err = m.handler.HandleEmojiReactionRetraction(messageState, msg.ParsedMessage.(protobuf.EmojiReactionRetraction))
 						if err != nil {
 							logger.Warn("failed to handle EmojiReactionRetraction", zap.Error(err))
@@ -2394,7 +2400,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, err
 	}
 
-	message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.Text = "Request transaction"
 
@@ -2471,7 +2477,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, err
 	}
 
-	message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.Text = "Request address for transaction"
 
@@ -2905,7 +2911,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.LocalChatID = chatID
 
@@ -3006,7 +3012,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			}
 		}
 
-		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
 		message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 		message.LocalChatID = chatID
 		message.OutgoingStatus = ""

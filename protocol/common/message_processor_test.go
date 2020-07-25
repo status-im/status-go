@@ -44,7 +44,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 		Text:        "abc123",
 		ChatId:      "testing-adamb",
 		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
-		MessageType: protobuf.ChatMessage_PUBLIC_GROUP,
+		MessageType: protobuf.MessageType_PUBLIC_GROUP,
 		Clock:       154593077368201,
 		Timestamp:   1545930773682,
 	}

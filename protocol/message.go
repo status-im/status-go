@@ -148,7 +148,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		CommandParameters *CommandParameters               `json:"commandParameters"`
 		Timestamp         uint64                           `json:"timestamp"`
 		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
-		MessageType       protobuf.ChatMessage_MessageType `json:"messageType"`
+		MessageType       protobuf.MessageType             `json:"messageType"`
 	}{
 		ID:                m.ID,
 		WhisperTimestamp:  m.WhisperTimestamp,
