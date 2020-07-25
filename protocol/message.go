@@ -332,3 +332,9 @@ func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {
 
 	return "", errors.New("audio format not supported")
 }
+
+// GetSigPubKey returns an ecdsa encoded public key
+// this function is also required to implement the ChatEntity interface
+func (m Message) GetSigPubKey() *ecdsa.PublicKey {
+	return m.SigPubKey
+}

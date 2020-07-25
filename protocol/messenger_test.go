@@ -2254,7 +2254,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			s.Empty(message.LocalChatID)
 
 			message.ID = strconv.Itoa(idx) // manually set the ID because messages does not go through messageProcessor
-			chat, err := s.messageHandler.matchMessage(&message, chatsMap, &testTimeSource{})
+			chat, err := s.messageHandler.matchChatEntity(&message, chatsMap, &testTimeSource{})
 			if tc.Error {
 				s.Require().Error(err)
 			} else {
