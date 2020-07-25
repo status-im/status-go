@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package protobuf;
+
+enum MessageType {
+  UNKNOWN_MESSAGE_TYPE = 0;
+  ONE_TO_ONE = 1;
+  PUBLIC_GROUP = 2;
+  PRIVATE_GROUP = 3;
+  // Only local
+  SYSTEM_MESSAGE_PRIVATE_GROUP = 4;
+}
