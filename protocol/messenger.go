@@ -1450,7 +1450,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 			return nil, err
 		}
 
-		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, &message.ChatMessage)
+		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
 		if err != nil {
 			return nil, err
 		}
