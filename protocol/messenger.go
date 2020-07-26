@@ -1412,6 +1412,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 	}
 
 	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
+
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -3342,17 +3343,18 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, error) {
 	var encodedMessage []byte
 	var err error
+	l := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chat.ID))
 
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
-		logger.Debug("sending private message")
+		l.Debug("sending private message")
 		message.SetMessageType(protobuf.MessageType_ONE_TO_ONE)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
 			return nil, err
 		}
 	case ChatTypePublic:
-		logger.Debug("sending public message", zap.String("chatName", chat.Name))
+		l.Debug("sending public message", zap.String("chatName", chat.Name))
 		message.SetMessageType(protobuf.MessageType_PUBLIC_GROUP)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
@@ -3360,7 +3362,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, er
 		}
 	case ChatTypePrivateGroupChat:
 		message.SetMessageType(protobuf.MessageType_PRIVATE_GROUP)
-		logger.Debug("sending group message", zap.String("chatName", chat.Name))
+		l.Debug("sending group message", zap.String("chatName", chat.Name))
 
 		group, err := newProtocolGroupFromChat(chat)
 		if err != nil {
