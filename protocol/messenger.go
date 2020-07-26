@@ -1425,38 +1425,9 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
-	var encodedMessage []byte
-	switch chat.ChatType {
-	case ChatTypeOneToOne:
-		logger.Debug("sending private message")
-		message.MessageType = protobuf.MessageType_ONE_TO_ONE
-		encodedMessage, err = proto.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-	case ChatTypePublic:
-		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
-		encodedMessage, err = proto.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-	case ChatTypePrivateGroupChat:
-		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
-		logger.Debug("sending group message", zap.String("chatName", chat.Name))
-
-		group, err := newProtocolGroupFromChat(chat)
-		if err != nil {
-			return nil, err
-		}
-
-		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, errors.New("chat type not supported")
+	encodedMessage, err := m.encodeChatEntity(chat, message)
+	if err != nil {
+		return nil, err
 	}
 
 	id, err := m.dispatchMessage(ctx, common.RawMessage{
@@ -3268,12 +3239,17 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	}
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	emojiReaction := &protobuf.EmojiReaction{
-		Clock:     clock,
-		MessageId: messageID,
-		Type:      protobuf.EmojiReaction_Type(emojiID),
+	emojiR := &EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     clock,
+			MessageId: messageID,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_Type(emojiID),
+		},
+		From:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+		Retracted: false,
 	}
-	encodedMessage, err := proto.Marshal(emojiReaction)
+	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
 	if err != nil {
 		return nil, err
 	}
@@ -3288,17 +3264,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		return nil, err
 	}
 
-	emojiR := &EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
-			Clock:     clock,
-			MessageId: messageID,
-			ChatId:    chatID,
-			Type:      protobuf.EmojiReaction_Type(emojiID),
-		},
-		ID:        types.EncodeHex(id),
-		From:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
-		Retracted: false,
-	}
+	emojiR.ID = types.EncodeHex(id)
 
 	response.EmojiReactions = []*EmojiReaction{emojiR}
 	response.Chats = []*Chat{chat}
@@ -3381,14 +3347,14 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message ChatEntity) ([]byte, er
 	case ChatTypeOneToOne:
 		logger.Debug("sending private message")
 		message.SetMessageType(protobuf.MessageType_ONE_TO_ONE)
-		encodedMessage, err = proto.Marshal(message)
+		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
 			return nil, err
 		}
 	case ChatTypePublic:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
 		message.SetMessageType(protobuf.MessageType_PUBLIC_GROUP)
-		encodedMessage, err = proto.Marshal(message)
+		encodedMessage, err = proto.Marshal(message.GetProtobuf())
 		if err != nil {
 			return nil, err
 		}
