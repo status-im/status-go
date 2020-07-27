@@ -204,61 +204,6 @@ func (a *Transport) LeaveGroup(publicKeys []*ecdsa.PublicKey) error {
 	return nil
 }
 
-type Message struct {
-	Message *types.Message
-	Public  bool
-}
-
-func (a *Transport) RetrieveAllMessages() ([]Message, error) {
-	var messages []Message
-
-	for _, filter := range a.filters.Filters() {
-		filterMsgs, err := a.api.GetFilterMessages(filter.FilterID)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, m := range filterMsgs {
-			messages = append(messages, Message{
-				Message: m,
-				Public:  filter.IsPublic(),
-			})
-		}
-	}
-
-	return messages, nil
-}
-
-func (a *Transport) RetrievePublicMessages(chatID string) ([]*types.Message, error) {
-	filter, err := a.filters.LoadPublic(chatID)
-	if err != nil {
-		return nil, err
-	}
-
-	return a.api.GetFilterMessages(filter.FilterID)
-}
-
-func (a *Transport) RetrievePrivateMessages(publicKey *ecdsa.PublicKey) ([]*types.Message, error) {
-	chats := a.filters.FiltersByPublicKey(publicKey)
-	discoveryChats, err := a.filters.Init(nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []*types.Message
-
-	for _, chat := range append(chats, discoveryChats...) {
-		filterMsgs, err := a.api.GetFilterMessages(chat.FilterID)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, filterMsgs...)
-	}
-
-	return result, nil
-}
-
 func (a *Transport) RetrieveRawAll() (map[transport.Filter][]*types.Message, error) {
 	result := make(map[transport.Filter][]*types.Message)
 
@@ -318,7 +263,7 @@ func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 		return nil, err
 	}
 
-	filter, err := a.filters.LoadPartitioned(publicKey)
+	filter, err := a.filters.LoadPartitioned(publicKey, a.keysManager.privateKey, false)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +272,10 @@ func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
 
 	return a.api.Post(ctx, *newMessage)
+}
+
+func (a *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*transport.Filter, error) {
+	return a.filters.LoadPartitioned(&key.PublicKey, key, true)
 }
 
 func (a *Transport) SendPrivateOnDiscovery(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {

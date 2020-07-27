@@ -37,6 +37,9 @@ type StatusMessage struct {
 	// Hash is the transport layer hash
 	Hash []byte `json:"-"`
 
+	// Dst is the targeted public key
+	Dst *ecdsa.PublicKey
+
 	// TransportLayerSigPubKey contains the public key provided by the transport layer
 	TransportLayerSigPubKey *ecdsa.PublicKey `json:"-"`
 	// ApplicationMetadataLayerPubKey contains the public key provided by the application metadata layer
@@ -87,13 +90,25 @@ func (m *StatusMessage) HandleTransport(shhMessage *types.Message) error {
 	m.TransportLayerSigPubKey = publicKey
 	m.TransportPayload = shhMessage.Payload
 
+	if shhMessage.Dst != nil {
+		publicKey, err := crypto.UnmarshalPubkey(shhMessage.Dst)
+		if err != nil {
+			return err
+		}
+		m.Dst = publicKey
+	}
+
 	return nil
 }
 
-func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol) error {
+func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecdsa.PublicKey, enc *encryption.Protocol, skipNegotiation bool) error {
 	// As we handle non-encrypted messages, we make sure that DecryptPayload
 	// is set regardless of whether this step is successful
 	m.DecryptedPayload = m.TransportPayload
+	// Nothing to do
+	if skipNegotiation {
+		return nil
+	}
 
 	var protocolMessage encryption.ProtocolMessage
 	err := proto.Unmarshal(m.TransportPayload, &protocolMessage)
@@ -319,6 +334,82 @@ func (m *StatusMessage) HandleApplication() error {
 
 			return nil
 		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
+		// This message is a bit different as it's encrypted, so we pass it straight through
+
+		m.ParsedMessage = m.DecryptedPayload
+
+		return nil
+
+	case protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT:
+		var message protobuf.ContactCodeAdvertisement
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode ContactCodeAdvertisement: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST:
+		var message protobuf.PushNotificationRequest
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationRequest: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE:
+		var message protobuf.PushNotificationRegistrationResponse
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationRegistrationResponse: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY:
+		var message protobuf.PushNotificationQuery
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationQuery: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE:
+		var message protobuf.PushNotificationQueryResponse
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationQueryResponse: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE:
+		var message protobuf.PushNotificationResponse
+		err := proto.Unmarshal(m.DecryptedPayload, &message)
+		if err != nil {
+			m.ParsedMessage = nil
+			log.Printf("[message::DecodeMessage] could not decode PushNotificationResponse: %#x, err: %v", m.Hash, err.Error())
+		} else {
+			m.ParsedMessage = message
+
+			return nil
+		}
+
 	}
 	return nil
 }

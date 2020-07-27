@@ -33,6 +33,8 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
 )
 
@@ -144,7 +146,12 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 		EnvelopeEventsHandler: EnvelopeSignalHandler{},
 		Logger:                logger,
 	}
-	options := buildMessengerOptions(s.config, db, envelopesMonitorConfig, logger)
+	s.accountsDB = accounts.NewDB(db)
+
+	options, err := buildMessengerOptions(s.config, identity, db, envelopesMonitorConfig, s.accountsDB, logger)
+	if err != nil {
+		return err
+	}
 
 	messenger, err := protocol.NewMessenger(
 		identity,
@@ -155,7 +162,6 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 	if err != nil {
 		return err
 	}
-	s.accountsDB = accounts.NewDB(db)
 	s.messenger = messenger
 	return messenger.Init()
 }
@@ -338,6 +344,9 @@ func (s *Service) DisableInstallation(installationID string) error {
 
 // UpdateMailservers updates information about selected mail servers.
 func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
+	if len(nodes) > 0 && s.messenger != nil {
+		s.messenger.SetMailserver(nodes[0].ID().Bytes())
+	}
 	if err := s.peerStore.Update(nodes); err != nil {
 		return err
 	}
@@ -439,10 +448,12 @@ func onNegotiatedFilters(filters []*transport.Filter) {
 
 func buildMessengerOptions(
 	config params.ShhextConfig,
+	identity *ecdsa.PrivateKey,
 	db *sql.DB,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
+	accountsDB *accounts.Database,
 	logger *zap.Logger,
-) []protocol.Option {
+) ([]protocol.Option, error) {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
 		protocol.WithDatabase(db),
@@ -453,6 +464,23 @@ func buildMessengerOptions(
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
+	settings, err := accountsDB.GetSettings()
+	if err != sql.ErrNoRows && err != nil {
+		return nil, err
+	}
+
+	if settings.PushNotificationsServerEnabled {
+		config := &pushnotificationserver.Config{
+			Logger: logger,
+		}
+		options = append(options, protocol.WithPushNotificationServerConfig(config))
+	}
+
+	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
+		SendEnabled:                settings.SendPushNotifications,
+		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
+		RemoteNotificationsEnabled: settings.RemotePushNotificationsEnabled,
+	}))
 
 	if config.VerifyTransactionURL != "" {
 		client := &verifyTransactionClient{
@@ -462,5 +490,5 @@ func buildMessengerOptions(
 		options = append(options, protocol.WithVerifyTransactionClient(client))
 	}
 
-	return options
+	return options, nil
 }

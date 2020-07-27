@@ -1,9 +1,10 @@
-package protocol
+package common
 
 import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -34,24 +35,41 @@ const (
 	whisperPoWTime   = 5
 )
 
-type messageProcessor struct {
+// SentMessage reprent a message that has been passed to the transport layer
+type SentMessage struct {
+	PublicKey  *ecdsa.PublicKey
+	Spec       *encryption.ProtocolMessageSpec
+	MessageIDs [][]byte
+}
+
+type MessageProcessor struct {
 	identity  *ecdsa.PrivateKey
 	datasync  *datasync.DataSync
 	protocol  *encryption.Protocol
 	transport transport.Transport
 	logger    *zap.Logger
 
-	featureFlags featureFlags
+	// ephemeralKeys is a map that contains the ephemeral keys of the client, used
+	// to decrypt messages
+	ephemeralKeys      map[string]*ecdsa.PrivateKey
+	ephemeralKeysMutex sync.Mutex
+
+	// sentMessagesSubscriptions contains all the subscriptions for sent messages
+	sentMessagesSubscriptions []chan<- *SentMessage
+	// sentMessagesSubscriptions contains all the subscriptions for scheduled messages
+	scheduledMessagesSubscriptions []chan<- *RawMessage
+
+	featureFlags FeatureFlags
 }
 
-func newMessageProcessor(
+func NewMessageProcessor(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
 	enc *encryption.Protocol,
 	transport transport.Transport,
 	logger *zap.Logger,
-	features featureFlags,
-) (*messageProcessor, error) {
+	features FeatureFlags,
+) (*MessageProcessor, error) {
 	dataSyncTransport := datasync.NewNodeTransport()
 	dataSyncNode, err := datasyncnode.NewPersistentNode(
 		database,
@@ -64,22 +82,23 @@ func newMessageProcessor(
 	if err != nil {
 		return nil, err
 	}
-	ds := datasync.New(dataSyncNode, dataSyncTransport, features.datasync, logger)
+	ds := datasync.New(dataSyncNode, dataSyncTransport, features.Datasync, logger)
 
-	p := &messageProcessor{
-		identity:     identity,
-		datasync:     ds,
-		protocol:     enc,
-		transport:    transport,
-		logger:       logger,
-		featureFlags: features,
+	p := &MessageProcessor{
+		identity:      identity,
+		datasync:      ds,
+		protocol:      enc,
+		transport:     transport,
+		logger:        logger,
+		ephemeralKeys: make(map[string]*ecdsa.PrivateKey),
+		featureFlags:  features,
 	}
 
 	// Initializing DataSync is required to encrypt and send messages.
 	// With DataSync enabled, messages are added to the DataSync
 	// but actual encrypt and send calls are postponed.
 	// sendDataSync is responsible for encrypting and sending postponed messages.
-	if features.datasync {
+	if features.Datasync {
 		ds.Init(p.sendDataSync)
 		ds.Start(300 * time.Millisecond)
 	}
@@ -87,27 +106,42 @@ func newMessageProcessor(
 	return p, nil
 }
 
-func (p *messageProcessor) Stop() {
+func (p *MessageProcessor) Stop() {
+	for _, c := range p.sentMessagesSubscriptions {
+		close(c)
+	}
 	p.datasync.Stop() // idempotent op
 }
 
 // SendPrivate takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPrivate(
+func (p *MessageProcessor) SendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private message",
-		zap.Binary("public-key", crypto.FromECDSAPub(recipient)),
+		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
 		zap.String("site", "SendPrivate"),
 	)
+	// Currently we don't support sending through datasync and setting custom waku fields,
+	// as the datasync interface is not rich enough to propagate that information, so we
+	// would have to add some complexity to handle this.
+	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryption) {
+		return nil, errors.New("setting identity, skip-encryption and datasync not supported")
+	}
+
+	// Set sender identity if not specified
+	if rawMessage.Sender == nil {
+		rawMessage.Sender = p.identity
+	}
+
 	return p.sendPrivate(ctx, recipient, rawMessage)
 }
 
-// SendGroupRaw takes encoded data, encrypts it and sends through the wire,
+// SendGroup takes encoded data, encrypts it and sends through the wire,
 // always return the messageID
-func (p *messageProcessor) SendGroup(
+func (p *MessageProcessor) SendGroup(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
 	rawMessage *RawMessage,
@@ -116,12 +150,18 @@ func (p *messageProcessor) SendGroup(
 		"sending a private group message",
 		zap.String("site", "SendGroup"),
 	)
-	// Calculate messageID first
+	// Set sender if not specified
+	if rawMessage.Sender == nil {
+		rawMessage.Sender = p.identity
+	}
+
+	// Calculate messageID first and set on raw message
 	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
 
 	// Send to each recipients
 	for _, recipient := range recipients {
@@ -134,51 +174,67 @@ func (p *messageProcessor) SendGroup(
 }
 
 // sendPrivate sends data to the recipient identifying with a given public key.
-func (p *messageProcessor) sendPrivate(
+func (p *MessageProcessor) sendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
+	p.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
 
-	if p.featureFlags.datasync {
+	// Notify before dispatching, otherwise the dispatch subscription might happen
+	// earlier than the scheduled
+	p.notifyOnScheduledMessage(rawMessage)
+
+	if p.featureFlags.Datasync && rawMessage.ResendAutomatically {
+		// No need to call transport tracking.
+		// It is done in a data sync dispatch step.
 		if err := p.addToDataSync(recipient, wrappedMessage); err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
 
-		// No need to call transport tracking.
-		// It is done in a data sync dispatch step.
-	} else {
-		messageSpec, err := p.protocol.BuildDirectMessage(p.identity, recipient, wrappedMessage)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to encrypt message")
-		}
-
-		hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec)
+	} else if rawMessage.SkipEncryption {
+		// When SkipEncryption is set we don't pass the message to the encryption layer
+		messageIDs := [][]byte{messageID}
+		hash, newMessage, err := p.sendRawMessage(ctx, recipient, wrappedMessage, messageIDs)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
 
-		p.transport.Track([][]byte{messageID}, hash, newMessage)
+		p.transport.Track(messageIDs, hash, newMessage)
+
+	} else {
+		messageSpec, err := p.protocol.BuildDirectMessage(rawMessage.Sender, recipient, wrappedMessage)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to encrypt message")
+		}
+
+		messageIDs := [][]byte{messageID}
+		hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to send a message spec")
+		}
+
+		p.transport.Track(messageIDs, hash, newMessage)
 	}
 
 	return messageID, nil
 }
 
 // sendPairInstallation sends data to the recipients, using DH
-func (p *messageProcessor) SendPairInstallation(
+func (p *MessageProcessor) SendPairInstallation(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	p.logger.Debug("sending private message", zap.Binary("recipient", crypto.FromECDSAPub(recipient)))
+	p.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
 	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
@@ -190,20 +246,22 @@ func (p *messageProcessor) SendPairInstallation(
 		return nil, errors.Wrap(err, "failed to encrypt message")
 	}
 
-	hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec)
+	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
+	messageIDs := [][]byte{messageID}
+
+	hash, newMessage, err := p.sendMessageSpec(ctx, recipient, messageSpec, messageIDs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send a message spec")
 	}
 
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
-	p.transport.Track([][]byte{messageID}, hash, newMessage)
+	p.transport.Track(messageIDs, hash, newMessage)
 
 	return messageID, nil
 }
 
 // EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
 // All the events in a group are encoded and added to the payload
-func (p *messageProcessor) EncodeMembershipUpdate(
+func (p *MessageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatMessage *protobuf.ChatMessage,
 ) ([]byte, error) {
@@ -222,43 +280,50 @@ func (p *messageProcessor) EncodeMembershipUpdate(
 }
 
 // SendPublic takes encoded data, encrypts it and sends through the wire.
-func (p *messageProcessor) SendPublic(
+func (p *MessageProcessor) SendPublic(
 	ctx context.Context,
 	chatName string,
 	rawMessage *RawMessage,
 ) ([]byte, error) {
-	var newMessage *types.NewMessage
+	// Set sender
+	if rawMessage.Sender == nil {
+		rawMessage.Sender = p.identity
+	}
 
 	wrappedMessage, err := p.wrapMessageV1(rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	newMessage = &types.NewMessage{
+	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   wrappedMessage,
 		PowTarget: calculatePoW(wrappedMessage),
 		PowTime:   whisperPoWTime,
 	}
 
+	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
+
+	// notify before dispatching
+	p.notifyOnScheduledMessage(rawMessage)
+
 	hash, err := p.transport.SendPublic(ctx, newMessage, chatName)
 	if err != nil {
 		return nil, err
 	}
-
-	messageID := v1protocol.MessageID(&p.identity.PublicKey, wrappedMessage)
 
 	p.transport.Track([][]byte{messageID}, hash, newMessage)
 
 	return messageID, nil
 }
 
-// handleMessages expects a whisper message as input, and it will go through
+// HandleMessages expects a whisper message as input, and it will go through
 // a series of transformations until the message is parsed into an application
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (p *messageProcessor) handleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
+func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
 	logger := p.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
@@ -296,12 +361,32 @@ func (p *messageProcessor) handleMessages(shhMessage *types.Message, application
 	return statusMessages, nil
 }
 
-func (p *messageProcessor) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
+// fetchDecryptionKey returns the private key associated with this public key, and returns true if it's an ephemeral key
+func (p *MessageProcessor) fetchDecryptionKey(destination *ecdsa.PublicKey) (*ecdsa.PrivateKey, bool) {
+	destinationID := types.EncodeHex(crypto.FromECDSAPub(destination))
+
+	p.ephemeralKeysMutex.Lock()
+	decryptionKey, ok := p.ephemeralKeys[destinationID]
+	p.ephemeralKeysMutex.Unlock()
+
+	// the key is not there, fallback on identity
+	if !ok {
+		return p.identity, false
+	}
+	return decryptionKey, true
+}
+
+func (p *MessageProcessor) handleEncryptionLayer(ctx context.Context, message *v1protocol.StatusMessage) error {
 	logger := p.logger.With(zap.String("site", "handleEncryptionLayer"))
 	publicKey := message.SigPubKey()
 
-	err := message.HandleEncryption(p.identity, publicKey, p.protocol)
-	if err == encryption.ErrDeviceNotFound {
+	// if it's an ephemeral key, we don't negotiate a topic
+	decryptionKey, skipNegotiation := p.fetchDecryptionKey(message.Dst)
+
+	err := message.HandleEncryption(decryptionKey, publicKey, p.protocol, skipNegotiation)
+
+	// if it's an ephemeral key, we don't have to handle a device not found error
+	if err == encryption.ErrDeviceNotFound && !skipNegotiation {
 		if err := p.handleErrDeviceNotFound(ctx, publicKey); err != nil {
 			logger.Error("failed to handle ErrDeviceNotFound", zap.Error(err))
 		}
@@ -313,7 +398,7 @@ func (p *messageProcessor) handleEncryptionLayer(ctx context.Context, message *v
 	return nil
 }
 
-func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+func (p *MessageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKey *ecdsa.PublicKey) error {
 	now := time.Now().Unix()
 	advertise, err := p.protocol.ShouldAdvertiseBundle(publicKey, now)
 	if err != nil {
@@ -330,7 +415,9 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	_, _, err = p.sendMessageSpec(ctx, publicKey, messageSpec)
+	// We don't pass an array of messageIDs as no action needs to be taken
+	// when sending a bundle
+	_, _, err = p.sendMessageSpec(ctx, publicKey, messageSpec, nil)
 	if err != nil {
 		return err
 	}
@@ -340,15 +427,15 @@ func (p *messageProcessor) handleErrDeviceNotFound(ctx context.Context, publicKe
 	return nil
 }
 
-func (p *messageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
-	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, p.identity)
+func (p *MessageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error) {
+	wrappedMessage, err := v1protocol.WrapMessageV1(rawMessage.Payload, rawMessage.MessageType, rawMessage.Sender)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 	return wrappedMessage, nil
 }
 
-func (p *messageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
+func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
 	groupID := datasync.ToOneToOneGroupID(&p.identity.PublicKey, publicKey)
 	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
 	exist, err := p.datasync.IsPeerInGroup(groupID, peerID)
@@ -370,7 +457,8 @@ func (p *messageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []b
 
 // sendDataSync sends a message scheduled by the data sync layer.
 // Data Sync layer calls this method "dispatch" function.
-func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte, payload *datasyncproto.Payload) error {
+func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.PublicKey, encodedMessage []byte, payload *datasyncproto.Payload) error {
+	// Calculate the messageIDs
 	messageIDs := make([][]byte, 0, len(payload.Messages))
 	for _, payload := range payload.Messages {
 		messageIDs = append(messageIDs, v1protocol.MessageID(&p.identity.PublicKey, payload.Body))
@@ -381,7 +469,7 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 		return errors.Wrap(err, "failed to encrypt message")
 	}
 
-	hash, newMessage, err := p.sendMessageSpec(ctx, publicKey, messageSpec)
+	hash, newMessage, err := p.sendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
 	if err != nil {
 		return err
 	}
@@ -391,9 +479,26 @@ func (p *messageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 	return nil
 }
 
+// sendRawMessage sends a message not wrapped in an encryption layer
+func (p *MessageProcessor) sendRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+	newMessage := &types.NewMessage{
+		TTL:       whisperTTL,
+		Payload:   payload,
+		PowTarget: calculatePoW(payload),
+		PowTime:   whisperPoWTime,
+	}
+
+	hash, err := p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return hash, newMessage, nil
+}
+
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
-func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec) ([]byte, *types.NewMessage, error) {
-	newMessage, err := messageSpecToWhisper(messageSpec)
+func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+	newMessage, err := MessageSpecToWhisper(messageSpec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -414,10 +519,70 @@ func (p *messageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 		return nil, nil, err
 	}
 
+	sentMessage := &SentMessage{
+		PublicKey:  publicKey,
+		Spec:       messageSpec,
+		MessageIDs: messageIDs,
+	}
+
+	p.notifyOnSentMessage(sentMessage)
+
 	return hash, newMessage, nil
 }
 
-func messageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
+// SubscribeToSentMessages returns a channel where we publish every time a message is sent
+func (p *MessageProcessor) SubscribeToSentMessages() <-chan *SentMessage {
+	c := make(chan *SentMessage, 100)
+	p.sentMessagesSubscriptions = append(p.sentMessagesSubscriptions, c)
+	return c
+}
+
+func (p *MessageProcessor) notifyOnSentMessage(sentMessage *SentMessage) {
+	// Publish on channels, drop if buffer is full
+	for _, c := range p.sentMessagesSubscriptions {
+		select {
+		case c <- sentMessage:
+		default:
+			p.logger.Warn("sent messages subscription channel full, dropping message")
+		}
+	}
+
+}
+
+// SubscribeToScheduledMessages returns a channel where we publish every time a message is scheduled for sending
+func (p *MessageProcessor) SubscribeToScheduledMessages() <-chan *RawMessage {
+	c := make(chan *RawMessage, 100)
+	p.scheduledMessagesSubscriptions = append(p.scheduledMessagesSubscriptions, c)
+	return c
+}
+
+func (p *MessageProcessor) notifyOnScheduledMessage(message *RawMessage) {
+	// Publish on channels, drop if buffer is full
+	for _, c := range p.scheduledMessagesSubscriptions {
+		select {
+		case c <- message:
+		default:
+			p.logger.Warn("scheduled messages subscription channel full, dropping message")
+		}
+	}
+}
+
+func (p *MessageProcessor) JoinPublic(chatID string) error {
+	return p.transport.JoinPublic(chatID)
+}
+
+// AddEphemeralKey adds an ephemeral key that we will be listening to
+// note that we never removed them from now, as waku/whisper does not
+// recalculate topics on removal, so effectively there's no benefit.
+// On restart they will be gone.
+func (p *MessageProcessor) AddEphemeralKey(privateKey *ecdsa.PrivateKey) (*transport.Filter, error) {
+	p.ephemeralKeysMutex.Lock()
+	p.ephemeralKeys[types.EncodeHex(crypto.FromECDSAPub(&privateKey.PublicKey))] = privateKey
+	p.ephemeralKeysMutex.Unlock()
+	return p.transport.LoadKeyFilters(privateKey)
+}
+
+func MessageSpecToWhisper(spec *encryption.ProtocolMessageSpec) (*types.NewMessage, error) {
 	var newMessage *types.NewMessage
 
 	payload, err := proto.Marshal(spec.Message)
@@ -443,10 +608,4 @@ func calculatePoW(payload []byte) float64 {
 		return whisperLargeSizePoW
 	}
 	return whisperDefaultPoW
-}
-
-// isPubKeyEqual checks that two public keys are equal
-func isPubKeyEqual(a, b *ecdsa.PublicKey) bool {
-	// the curve is always the same, just compare the points
-	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
 }

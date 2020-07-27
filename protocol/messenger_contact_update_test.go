@@ -15,7 +15,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/waku"
 )
 
 func TestMessengerContactUpdateSuite(t *testing.T) {
@@ -27,8 +27,8 @@ type MessengerContactUpdateSuite struct {
 	m          *Messenger        // main instance of Messenger
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	// If one wants to send messages between different instances of Messenger,
-	// a single Whisper service should be shared.
-	shh      types.Whisper
+	// a single waku service should be shared.
+	shh      types.Waku
 	tmpFiles []*os.File // files to clean up
 	logger   *zap.Logger
 }
@@ -36,17 +36,17 @@ type MessengerContactUpdateSuite struct {
 func (s *MessengerContactUpdateSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := whisper.DefaultConfig
-	config.MinimumAcceptedPOW = 0
-	shh := whisper.New(&config)
-	s.shh = gethbridge.NewGethWhisperWrapper(shh)
+	config := waku.DefaultConfig
+	config.MinimumAcceptedPoW = 0
+	shh := waku.New(&config, s.logger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start(nil))
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerContactUpdateSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecdsa.PrivateKey) *Messenger {
+func (s *MessengerContactUpdateSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
 	s.Require().NoError(err)
 
@@ -72,7 +72,7 @@ func (s *MessengerContactUpdateSuite) newMessengerWithKey(shh types.Whisper, pri
 	return m
 }
 
-func (s *MessengerContactUpdateSuite) newMessenger(shh types.Whisper) *Messenger {
+func (s *MessengerContactUpdateSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 

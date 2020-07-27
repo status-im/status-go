@@ -1,0 +1,4 @@
+DROP TABLE push_notification_server_registrations;
+DROP INDEX idx_push_notification_server_registrations_public_key;
+DROP INDEX idx_push_notification_server_registrations_public_key_installation_id;
+

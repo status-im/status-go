@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -146,7 +147,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	message.LocalChatID = chat.ID
 
 	// Increase unviewed count
-	if !isPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
+	if !common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey) {
 		chat.UnviewedMessagesCount++
 		message.OutgoingStatus = ""
 	} else {
@@ -332,7 +333,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	receivedMessage.LocalChatID = chat.ID
 
 	// Increase unviewed count
-	if !isPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
+	if !common.IsPubKeyEqual(receivedMessage.SigPubKey, &m.identity.PublicKey) {
 		chat.UnviewedMessagesCount++
 	} else {
 		// Our own message, mark as sent
@@ -582,7 +583,7 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 			return nil, errors.New("received a public message from non-existing chat")
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && isPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
+	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := message.ChatId

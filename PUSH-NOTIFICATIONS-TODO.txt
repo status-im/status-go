@@ -1,0 +1,6 @@
+Specs changes:
+- Use application metadata wrapper
+- Encrypt of payload instead of signature + public key of server
+- Removed preferencs + each device registers individually
+- Add grant
+- Add version in PushNotificationInfo

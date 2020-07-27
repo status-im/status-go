@@ -23,12 +23,12 @@ import (
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/status-im/status-go/appdatabase"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/sqlite"
 	"github.com/status-im/status-go/t/helpers"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -126,7 +126,7 @@ func TestInitProtocol(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "test-shhext-service-init-protocol")
 	require.NoError(t, err)
 
-	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
+	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	require.NoError(t, err)
 
 	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
@@ -179,7 +179,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	s.Require().NoError(err)
 	nodeWrapper := ext.NewTestNodeWrapper(nil, gethbridge.NewGethWakuWrapper(w))
 	service := New(config, nodeWrapper, nil, nil, db)
-	sqlDB, err := sqlite.OpenDB(fmt.Sprintf("%s/%d", s.dir, idx), "password")
+	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password")
 	s.Require().NoError(err)
 	privateKey, err := crypto.GenerateKey()
 	s.NoError(err)

@@ -12,10 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
@@ -247,6 +249,14 @@ func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.DeleteChat(chatID)
 }
 
+func (api *PublicAPI) MuteChat(parent context.Context, chatID string) error {
+	return api.service.messenger.MuteChat(chatID)
+}
+
+func (api *PublicAPI) UnmuteChat(parent context.Context, chatID string) error {
+	return api.service.messenger.UnmuteChat(chatID)
+}
+
 func (api *PublicAPI) SaveContact(parent context.Context, contact *protocol.Contact) error {
 	return api.service.messenger.SaveContact(contact)
 }
@@ -391,6 +401,114 @@ func (api *PublicAPI) UpdateMailservers(enodes []string) error {
 		nodes[i] = node
 	}
 	return api.service.UpdateMailservers(nodes)
+}
+
+// PushNotifications server endpoints
+
+func (api *PublicAPI) StartPushNotificationsServer() error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled?", true)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.StartPushNotificationsServer()
+}
+
+func (api *PublicAPI) StopPushNotificationsServer() error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-server-enabled?", false)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.StopPushNotificationsServer()
+}
+
+// PushNotification client endpoints
+
+func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
+	// We set both for now as they are equivalent
+	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled?", true)
+	if err != nil {
+		return err
+	}
+	err = api.service.accountsDB.SaveSetting("notifications-enabled?", true)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken)
+}
+
+func (api *PublicAPI) UnregisterForPushNotifications(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled?", false)
+	if err != nil {
+		return err
+	}
+	err = api.service.accountsDB.SaveSetting("notifications-enabled?", false)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.UnregisterFromPushNotifications(ctx)
+}
+
+func (api *PublicAPI) DisableSendingNotifications(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("send-push-notifications?", false)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.DisableSendingPushNotifications()
+}
+
+func (api *PublicAPI) EnableSendingNotifications(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("send-push-notifications?", true)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.EnableSendingPushNotifications()
+}
+
+func (api *PublicAPI) EnablePushNotificationsFromContactsOnly(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only?", true)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.EnablePushNotificationsFromContactsOnly()
+}
+
+func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-from-contacts-only?", false)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DisablePushNotificationsFromContactsOnly()
+}
+
+func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
+	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.AddPushNotificationsServer(ctx, publicKey)
+}
+
+func (api *PublicAPI) RemovePushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
+	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	return api.service.messenger.RemovePushNotificationServer(ctx, publicKey)
+}
+
+func (api *PublicAPI) GetPushNotificationServers() ([]*pushnotificationclient.PushNotificationServer, error) {
+	return api.service.messenger.GetPushNotificationServers()
+}
+
+func (api *PublicAPI) RegisteredForPushNotifications() (bool, error) {
+	return api.service.messenger.RegisteredForPushNotifications()
 }
 
 // Echo is a method for testing purposes.

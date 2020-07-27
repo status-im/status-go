@@ -17,8 +17,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/tt"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/waku"
 )
+
+const statusChatID = "status"
 
 func TestMessengerInstallationSuite(t *testing.T) {
 	suite.Run(t, new(MessengerInstallationSuite))
@@ -30,8 +32,8 @@ type MessengerInstallationSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 
 	// If one wants to send messages between different instances of Messenger,
-	// a single Whisper service should be shared.
-	shh types.Whisper
+	// a single Waku service should be shared.
+	shh types.Waku
 
 	tmpFiles []*os.File // files to clean up
 	logger   *zap.Logger
@@ -40,17 +42,17 @@ type MessengerInstallationSuite struct {
 func (s *MessengerInstallationSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 
-	config := whisper.DefaultConfig
-	config.MinimumAcceptedPOW = 0
-	shh := whisper.New(&config)
-	s.shh = gethbridge.NewGethWhisperWrapper(shh)
+	config := waku.DefaultConfig
+	config.MinimumAcceptedPoW = 0
+	shh := waku.New(&config, s.logger)
+	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start(nil))
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
 }
 
-func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Whisper, privateKey *ecdsa.PrivateKey) *Messenger {
+func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
 	tmpFile, err := ioutil.TempFile("", "")
 	s.Require().NoError(err)
 
@@ -77,7 +79,7 @@ func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Whisper, priv
 	return m
 }
 
-func (s *MessengerInstallationSuite) newMessenger(shh types.Whisper) *Messenger {
+func (s *MessengerInstallationSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -136,7 +138,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().Equal(contact.ID, actualContact.ID)
 	s.Require().True(actualContact.IsAdded())
 
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
@@ -149,7 +151,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().NoError(err)
 
 	actualChat := response.Chats[0]
-	s.Require().Equal("status", actualChat.ID)
+	s.Require().Equal(statusChatID, actualChat.ID)
 	s.Require().True(actualChat.Active)
 }
 
@@ -166,7 +168,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// add chat
-	chat := CreatePublicChat("status", s.m.transport)
+	chat := CreatePublicChat(statusChatID, s.m.transport)
 	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
@@ -230,7 +232,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	var statusChat *Chat
 	for _, c := range allChats {
-		if c.ID == "status" {
+		if c.ID == statusChatID {
 			statusChat = c
 		}
 	}

@@ -7,6 +7,8 @@ import (
 
 	encryptmigrations "github.com/status-im/status-go/protocol/encryption/migrations"
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
+	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
+	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
 	wakumigrations "github.com/status-im/status-go/protocol/transport/waku/migrations"
 	whispermigrations "github.com/status-im/status-go/protocol/transport/whisper/migrations"
 )
@@ -34,6 +36,14 @@ var defaultMigrations = []migrationsWithGetter{
 	{
 		Names:  appmigrations.AssetNames(),
 		Getter: appmigrations.Asset,
+	},
+	{
+		Names:  push_notification_server_migrations.AssetNames(),
+		Getter: push_notification_server_migrations.Asset,
+	},
+	{
+		Names:  push_notification_client_migrations.AssetNames(),
+		Getter: push_notification_client_migrations.Asset,
 	},
 }
 

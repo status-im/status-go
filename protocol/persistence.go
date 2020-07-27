@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/protocol/common"
 )
 
 var (
@@ -103,8 +104,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`)
 	if err != nil {
 		return err
 	}
@@ -123,6 +124,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.LastMessage,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
+		chat.Muted,
 	)
 	if err != nil {
 		return err
@@ -133,6 +135,16 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 
 func (db sqlitePersistence) DeleteChat(chatID string) error {
 	_, err := db.db.Exec("DELETE FROM chats WHERE id = ?", chatID)
+	return err
+}
+
+func (db sqlitePersistence) MuteChat(chatID string) error {
+	_, err := db.db.Exec("UPDATE chats SET muted = 1 WHERE id = ?", chatID)
+	return err
+}
+
+func (db sqlitePersistence) UnmuteChat(chatID string) error {
+	_, err := db.db.Exec("UPDATE chats SET muted = 0 WHERE id = ?", chatID)
 	return err
 }
 
@@ -170,6 +182,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.last_message,
 			chats.members,
 			chats.membership_updates,
+			chats.muted,
 			contacts.identicon,
 			contacts.alias
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
@@ -201,6 +214,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.LastMessage,
 			&encodedMembers,
 			&encodedMembershipUpdates,
+			&chat.Muted,
 			&identicon,
 			&alias,
 		)
@@ -251,7 +265,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			last_clock_value,
 			last_message,
 			members,
-			membership_updates
+			membership_updates,
+			muted
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -266,6 +281,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.LastMessage,
 		&encodedMembers,
 		&encodedMembershipUpdates,
+		&chat.Muted,
 	)
 	switch err {
 	case sql.ErrNoRows:
@@ -362,7 +378,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	return response, nil
 }
 
-func (db sqlitePersistence) SaveRawMessage(message *RawMessage) error {
+func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 	var pubKeys [][]byte
 	for _, pk := range message.Recipients {
 		pubKeys = append(pubKeys, crypto.CompressPubkey(pk))
@@ -387,9 +403,11 @@ func (db sqlitePersistence) SaveRawMessage(message *RawMessage) error {
 		   message_type,
 		   resend_automatically,
 		   recipients,
+		   skip_encryption,
+		   send_push_notification,
 		   payload
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		message.ID,
 		message.LocalChatID,
 		message.LastSent,
@@ -398,14 +416,16 @@ func (db sqlitePersistence) SaveRawMessage(message *RawMessage) error {
 		message.MessageType,
 		message.ResendAutomatically,
 		encodedRecipients.Bytes(),
+		message.SkipEncryption,
+		message.SendPushNotification,
 		message.Payload)
 	return err
 }
 
-func (db sqlitePersistence) RawMessageByID(id string) (*RawMessage, error) {
+func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
-	message := &RawMessage{}
+	message := &common.RawMessage{}
 
 	err := db.db.QueryRow(`
 			SELECT
@@ -417,6 +437,8 @@ func (db sqlitePersistence) RawMessageByID(id string) (*RawMessage, error) {
 			  message_type,
 			  resend_automatically,
 			  recipients,
+			  skip_encryption,
+			  send_push_notification,
 			  payload
 			FROM
 				raw_messages
@@ -432,6 +454,8 @@ func (db sqlitePersistence) RawMessageByID(id string) (*RawMessage, error) {
 		&message.MessageType,
 		&message.ResendAutomatically,
 		&encodedRecipients,
+		&message.SkipEncryption,
+		&message.SendPushNotification,
 		&message.Payload,
 	)
 	if err != nil {
