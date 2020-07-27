@@ -30,9 +30,7 @@ message EmojiReaction {
     SAD = 5;
     ANGRY = 6;
   }
-}
 
-message EmojiReactionRetraction {
-  uint64 clock = 1;
-  string emoji_reaction_id = 2;
+ // whether this is a rectraction of a previously sent emoji
+  bool retracted = 6;
 }

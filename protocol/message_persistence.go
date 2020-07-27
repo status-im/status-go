@@ -707,54 +707,23 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 }
 
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	allFields := db.tableEmojiReactionsAllFields()
-	valuesVector := strings.Repeat("?, ", db.tableEmojiReactionsAllFieldsCount()-1) + "?"
-	query := "INSERT INTO emoji_reactions(" + allFields + ") VALUES (" + valuesVector + ")" // nolint: gosec
-	stmt, err := tx.Prepare(query)
+	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,retracted) VALUES (?,?,?,?,?,?,?)"
+	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
 	}
 
-	allValues := []interface{}{
-		emojiReaction.ID,
+	_, err = stmt.Exec(
+		emojiReaction.ID(),
 		emojiReaction.Clock,
 		emojiReaction.From,
 		emojiReaction.Type,
 		emojiReaction.MessageId,
 		emojiReaction.ChatId,
 		emojiReaction.Retracted,
-	}
-
-	_, err = stmt.Exec(allValues...)
+	)
 
 	return
-}
-
-func (db sqlitePersistence) tableEmojiReactionsAllFields() string {
-	return `id,
-		clock_value,
-		source,
-		emoji_id,
-		message_id,
-		chat_id,
-		retracted`
-}
-
-func (db sqlitePersistence) tableEmojiReactionsAllFieldsCount() int {
-	return strings.Count(db.tableEmojiReactionsAllFields(), ",") + 1
 }
 
 func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error) {
@@ -772,20 +741,21 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 	}()
 
 	row := tx.QueryRow(
-		fmt.Sprintf(`
-			SELECT
-				%s
+		`SELECT
+			    clock_value,
+			    source,
+			    emoji_id,
+			    message_id,
+			    chat_id,
+			    retracted
 			FROM
 				emoji_reactions
 			WHERE
 				emoji_reactions.id = ?
-		`, db.tableEmojiReactionsAllFields()),
-		id,
-	)
+		`, id)
 
 	emojiReaction := new(EmojiReaction)
 	args := []interface{}{
-		&emojiReaction.ID,
 		&emojiReaction.Clock,
 		&emojiReaction.From,
 		&emojiReaction.Type,
@@ -794,6 +764,61 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 		&emojiReaction.Retracted,
 	}
 	err = row.Scan(args...)
+
+	switch err {
+	case sql.ErrNoRows:
+		return nil, errRecordNotFound
+	case nil:
+		return emojiReaction, nil
+	default:
+		return nil, err
+	}
+}
+
+func (db sqlitePersistence) EmojiReactionByFromMessageIDAndType(from string, messageID string, emojiType protobuf.EmojiReaction_Type) (*EmojiReaction, error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	row := tx.QueryRow(
+		`SELECT
+			    clock_value,
+			    source,
+			    emoji_id,
+			    message_id,
+			    chat_id,
+			    retracted
+
+			FROM
+				emoji_reactions
+			WHERE
+				emoji_reactions.source = ?
+				AND
+				emoji_reactions.message_id = ?
+				AND
+				emoji_reactions.emoji_id = ?
+		`,
+		from,
+		messageID,
+		emojiType,
+	)
+
+	emojiReaction := new(EmojiReaction)
+	err = row.Scan(&emojiReaction.Clock,
+		&emojiReaction.From,
+		&emojiReaction.Type,
+		&emojiReaction.MessageId,
+		&emojiReaction.ChatId,
+		&emojiReaction.Retracted)
 
 	switch err {
 	case sql.ErrNoRows:

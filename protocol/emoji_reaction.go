@@ -2,9 +2,13 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"encoding/json"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -13,17 +17,16 @@ import (
 type EmojiReaction struct {
 	protobuf.EmojiReaction
 
-	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
-	ID string
-
 	// From is a public key of the author of the emoji reaction.
-	From string
-
-	// Retracted represents whether the user has chosen to remove a previously given reaction
-	Retracted bool
+	From string `json:"from,omitempty"`
 
 	// SigPubKey is the ecdsa encoded public key of the emoji reaction author
 	SigPubKey *ecdsa.PublicKey `json:"-"`
+}
+
+// ID is the Keccak256() contatenation of From-ChatID-MessageID-EmojiType
+func (e EmojiReaction) ID() string {
+	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%s%d", e.From, e.ChatId, e.MessageId, e.Type))))
 }
 
 // GetSigPubKey returns an ecdsa encoded public key
@@ -42,4 +45,17 @@ func (e EmojiReaction) GetProtobuf() proto.Message {
 // this function is required to implement the ChatEntity interface
 func (e *EmojiReaction) SetMessageType(messageType protobuf.MessageType) {
 	e.MessageType = messageType
+}
+
+func (e *EmojiReaction) MarshalJSON() ([]byte, error) {
+	type EmojiAlias EmojiReaction
+	item := struct {
+		*EmojiAlias
+		ID string `json:"id"`
+	}{
+		EmojiAlias: (*EmojiAlias)(e),
+		ID:         e.ID(),
+	}
+
+	return json.Marshal(item)
 }

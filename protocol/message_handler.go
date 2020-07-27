@@ -670,10 +670,22 @@ func (m *MessageHandler) messageExists(messageID string, existingMessagesMap map
 
 func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR protobuf.EmojiReaction) error {
 	logger := m.logger.With(zap.String("site", "HandleEmojiReaction"))
+	from := state.CurrentMessageState.Contact.ID
+
+	// check that the user can actually send an emoji for this message
+	existingEmoji, err := m.persistence.EmojiReactionByFromMessageIDAndType(from, pbEmojiR.MessageId, pbEmojiR.Type)
+	if err != errRecordNotFound && err != nil {
+		return err
+	}
+
+	if existingEmoji != nil && existingEmoji.Clock >= pbEmojiR.Clock {
+		// this is not a valid emoji, ignoring
+		return nil
+	}
+
 	emojiReaction := &EmojiReaction{
 		EmojiReaction: pbEmojiR,
-		ID:            state.CurrentMessageState.MessageID,
-		From:          state.CurrentMessageState.Contact.ID,
+		From:          from,
 		SigPubKey:     state.CurrentMessageState.PublicKey,
 	}
 	chat, err := m.matchChatEntity(emojiReaction, state.AllChats, state.Timesource)
@@ -681,6 +693,7 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 		return err // matchChatEntity returns a descriptive error message
 	}
 
+	// TODO: make sure the user can actualy send an emoji for this chat.
 	logger.Info("Handling emoji reaction")
 
 	if chat.LastClockValue < pbEmojiR.Clock {
@@ -690,9 +703,13 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 	state.ModifiedChats[chat.ID] = true
 	state.AllChats[chat.ID] = chat
 
-	return nil
-}
+	// save emoji reaction
+	err = m.persistence.SaveEmojiReaction(emojiReaction)
+	if err != nil {
+		return err
+	}
 
-func (m *MessageHandler) HandleEmojiReactionRetraction(state *ReceivedMessageState, pbEmojiR protobuf.EmojiReactionRetraction) error {
+	state.EmojiReactions[emojiReaction.ID()] = emojiReaction
+
 	return nil
 }

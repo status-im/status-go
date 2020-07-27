@@ -1778,6 +1778,9 @@ type ReceivedMessageState struct {
 	ModifiedInstallations map[string]bool
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
+	// EmojiReactions is a list of emoji reactions for the current batch
+	// indexed by from-message-id-emoji-type
+	EmojiReactions map[string]*EmojiReaction
 	// Response to the client
 	Response *MessengerResponse
 	// Timesource is a time source for clock values/timestamps.
@@ -1795,6 +1798,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
+		EmojiReactions:        make(map[string]*EmojiReaction),
 		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
 	}
@@ -2040,13 +2044,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-					case protobuf.EmojiReactionRetraction:
-						logger.Debug("Handling EmojiReactionRetraction")
-						err = m.handler.HandleEmojiReactionRetraction(messageState, msg.ParsedMessage.Interface().(protobuf.EmojiReactionRetraction))
-						if err != nil {
-							logger.Warn("failed to handle EmojiReactionRetraction", zap.Error(err))
-							continue
-						}
 					default:
 						// Check if is an encrypted PushNotificationRegistration
 						if msg.Type == protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION {
@@ -2120,6 +2117,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for _, emojiReaction := range messageState.EmojiReactions {
+		messageState.Response.EmojiReactions = append(messageState.Response.EmojiReactions, emojiReaction)
 	}
 
 	if len(contactsToSave) > 0 {
@@ -3227,7 +3228,7 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 
 }
 
-func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID int) (*MessengerResponse, error) {
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -3246,25 +3247,24 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_Type(emojiID),
 		},
-		From:      types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
-		Retracted: false,
+		From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 	}
 	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := m.dispatchMessage(ctx, &common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
-		ResendAutomatically: true,
+	_, err = m.dispatchMessage(ctx, &common.RawMessage{
+		LocalChatID: chatID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		// Don't resend using datasync, that would create quite a lot
+		// of traffic if clicking too eagelry
+		ResendAutomatically: false,
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	emojiR.ID = types.EncodeHex(id)
 
 	response.EmojiReactions = []*EmojiReaction{emojiR}
 	response.Chats = []*Chat{chat}
@@ -3281,44 +3281,45 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	emojiReaction, err := m.persistence.EmojiReactionByID(emojiReactionID)
+	emojiR, err := m.persistence.EmojiReactionByID(emojiReactionID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check that the sender is the key owner
 	pk := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
-	if emojiReaction.From != pk {
+	if emojiR.From != pk {
 		return nil, errors.Errorf("identity mismatch, "+
 			"emoji reactions can only be retracted by the reaction sender, "+
 			"emoji reaction sent by '%s', current identity '%s'",
-			emojiReaction.From, pk,
+			emojiR.From, pk,
 		)
 	}
 
 	// Get chat and clock
-	chat, ok := m.allChats[emojiReaction.GetChatId()]
+	chat, ok := m.allChats[emojiR.GetChatId()]
 	if !ok {
 		return nil, ErrChatNotFound
 	}
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-	// Build the EmojiReactionRetraction protobuf struct
-	emojiRR := &protobuf.EmojiReactionRetraction{
-		Clock:           clock,
-		EmojiReactionId: emojiReactionID,
-	}
-	encodedMessage, err := proto.Marshal(emojiRR)
+	// Update the relevant fields
+	emojiR.Clock = clock
+	emojiR.Retracted = true
+
+	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
 	if err != nil {
 		return nil, err
 	}
 
 	// Send the marshalled EmojiReactionRetraction protobuf
 	_, err = m.dispatchMessage(ctx, &common.RawMessage{
-		LocalChatID:         emojiReaction.GetChatId(),
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_EMOJI_REACTION_RETRACTION,
-		ResendAutomatically: true,
+		LocalChatID: emojiR.GetChatId(),
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		// Don't resend using datasync, that would create quite a lot
+		// of traffic if clicking too eagelry
+		ResendAutomatically: false,
 	})
 	if err != nil {
 		return nil, err
@@ -3326,8 +3327,8 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 
 	// Update MessengerResponse
 	response := MessengerResponse{}
-	emojiReaction.Retracted = true
-	response.EmojiReactions = []*EmojiReaction{emojiReaction}
+	emojiR.Retracted = true
+	response.EmojiReactions = []*EmojiReaction{emojiR}
 	response.Chats = []*Chat{chat}
 
 	// Persist retraction state for emoji reaction
