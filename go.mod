@@ -13,14 +13,15 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/deckarep/golang-set v1.7.1
-	github.com/duo-labs/webauthn.io v0.0.0-20200717012147-67203c5c36a7
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/golang-migrate/migrate/v4 v4.8.0 // indirect
+	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
 	github.com/golang/mock v1.4.1
 	github.com/golang/protobuf v1.3.4
 	github.com/google/uuid v1.1.1
+	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
@@ -29,12 +30,19 @@ require (
 	github.com/libp2p/go-libp2p v0.4.2 // indirect
 	github.com/libp2p/go-libp2p-core v0.2.4
 	github.com/lucasb-eyer/go-colorful v1.0.3
+	github.com/mattn/go-colorable v0.1.4 // indirect
+	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
+	github.com/mattn/go-runewidth v0.0.6 // indirect
+	github.com/mattn/go-sqlite3 v1.12.0 // indirect
 	github.com/multiformats/go-multiaddr v0.1.1
 	github.com/multiformats/go-multibase v0.0.1
 	github.com/multiformats/go-varint v0.0.5
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
+	github.com/olekukonko/tablewriter v0.0.2 // indirect
+	github.com/onsi/ginkgo v1.10.3 // indirect
+	github.com/onsi/gomega v1.7.1 // indirect
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.0
@@ -54,10 +62,16 @@ require (
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.23
 	github.com/wealdtech/go-ens/v3 v3.3.0
+	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
+	golang.org/x/net v0.0.0-20191119073136-fc4aabc6c914 // indirect
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	golang.org/x/tools v0.0.0-20200211045251-2de505fc5306 // indirect
+	google.golang.org/genproto v0.0.0-20191115221424-83cc0476cb11 // indirect
+	google.golang.org/grpc v1.25.1 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	gopkg.in/yaml.v2 v2.2.6 // indirect
 )

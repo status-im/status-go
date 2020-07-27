@@ -282,13 +282,13 @@ github.com/libp2p/go-ws-transport
 github.com/libp2p/go-yamux
 # github.com/lucasb-eyer/go-colorful v1.0.3
 github.com/lucasb-eyer/go-colorful
-# github.com/mattn/go-colorable v0.1.1
+# github.com/mattn/go-colorable v0.1.4
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.7
+# github.com/mattn/go-isatty v0.0.10
 github.com/mattn/go-isatty
 # github.com/mattn/go-pointer v0.0.0-20190911064623-a0a44394634f
 github.com/mattn/go-pointer
-# github.com/mattn/go-runewidth v0.0.4
+# github.com/mattn/go-runewidth v0.0.6
 github.com/mattn/go-runewidth
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
@@ -320,7 +320,7 @@ github.com/multiformats/go-varint
 github.com/mutecomm/go-sqlcipher
 # github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 github.com/okzk/sdnotify
-# github.com/olekukonko/tablewriter v0.0.1
+# github.com/olekukonko/tablewriter v0.0.2
 github.com/olekukonko/tablewriter
 # github.com/opentracing/opentracing-go v1.1.0
 github.com/opentracing/opentracing-go
@@ -459,7 +459,7 @@ go.opencensus.io/stats/view
 go.opencensus.io/tag
 # go.uber.org/atomic v1.5.0
 go.uber.org/atomic
-# go.uber.org/multierr v1.3.0
+# go.uber.org/multierr v1.4.0
 go.uber.org/multierr
 # go.uber.org/tools v0.0.0-20190618225709-2cfd321de3ee
 go.uber.org/tools/update-license
@@ -484,7 +484,7 @@ golang.org/x/crypto/ssh/terminal
 # golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+# golang.org/x/net v0.0.0-20191119073136-fc4aabc6c914
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
@@ -544,7 +544,7 @@ gopkg.in/natefinch/npipe.v2
 gopkg.in/olebedev/go-duktape.v3
 # gopkg.in/urfave/cli.v1 v1.20.0
 gopkg.in/urfave/cli.v1
-# gopkg.in/yaml.v2 v2.2.5
+# gopkg.in/yaml.v2 v2.2.6
 gopkg.in/yaml.v2
 # honnef.co/go/tools v0.0.1-2019.2.3
 honnef.co/go/tools/arg
