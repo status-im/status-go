@@ -489,6 +489,64 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+// EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
+// NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
+func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
+	cursorWhere := ""
+	if currCursor != "" {
+		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) <= ?"
+	}
+	args := []interface{}{chatID}
+	if currCursor != "" {
+		args = append(args, currCursor)
+	}
+	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
+	// concatenated with message ID. Results are sorted using this new column.
+	// This new column values can also be returned as a cursor for subsequent requests.
+	rows, err := db.db.Query(
+		fmt.Sprintf(`
+			SELECT
+			    e.clock_value,
+			    e.source,
+			    e.emoji_id,
+			    e.message_id,
+			    e.chat_id,
+			    e.retracted
+			FROM
+				emoji_reactions e
+			WHERE NOT(e.retracted)
+			AND
+			e.message_id IN
+			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id = ? %s
+			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
+			LIMIT 100
+		`, cursorWhere),
+		append(args, limit)...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*EmojiReaction
+	for rows.Next() {
+		var emojiReaction EmojiReaction
+		err := rows.Scan(&emojiReaction.Clock,
+			&emojiReaction.From,
+			&emojiReaction.Type,
+			&emojiReaction.MessageId,
+			&emojiReaction.ChatId,
+			&emojiReaction.Retracted)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, &emojiReaction)
+	}
+
+	return result, nil
+}
+
 func (db sqlitePersistence) SaveMessages(messages []*Message) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {

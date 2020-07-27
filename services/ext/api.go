@@ -522,6 +522,10 @@ func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReac
 	return api.service.messenger.SendEmojiReactionRetraction(ctx, emojiReactionID)
 }
 
+func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatID(chatID, cursor, limit)
+}
+
 // Echo is a method for testing purposes.
 func (api *PublicAPI) Echo(ctx context.Context, message string) (string, error) {
 	return message, nil

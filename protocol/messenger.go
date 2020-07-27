@@ -1410,8 +1410,6 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		}
 	}
 
-	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -3275,6 +3273,10 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	}
 
 	return &response, nil
+}
+
+func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*EmojiReaction, error) {
+	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
 }
 
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
