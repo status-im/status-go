@@ -36,6 +36,10 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		image_payload,
 		image_type,
 		image_base64,
+		audio_payload,
+		audio_type,
+		audio_duration_ms,
+		audio_base64,
 		command_id,
 		command_value,
 		command_from,
@@ -68,6 +72,8 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.sticker_pack,
 		m1.sticker_hash,
 		m1.image_base64,
+		m1.audio_duration_ms,
+		m1.audio_base64,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -83,6 +89,8 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.source,
 		m2.text,
 		m2.image_base64,
+		m2.audio_duration_ms,
+		m2.audio_base64,
 		c.alias,
 		c.identicon`
 }
@@ -99,11 +107,14 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedText sql.NullString
 	var quotedFrom sql.NullString
 	var quotedImage sql.NullString
+	var quotedAudio sql.NullString
+	var quotedAudioDuration sql.NullInt64
 	var alias sql.NullString
 	var identicon sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
 	command := &CommandParameters{}
+	audio := &protobuf.AudioMessage{}
 
 	args := []interface{}{
 		&message.ID,
@@ -123,6 +134,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&sticker.Pack,
 		&sticker.Hash,
 		&message.Base64Image,
+		&audio.DurationMs,
+		&message.Base64Audio,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -138,6 +151,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedFrom,
 		&quotedText,
 		&quotedImage,
+		&quotedAudioDuration,
+		&quotedAudio,
 		&alias,
 		&identicon,
 	}
@@ -148,15 +163,21 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if quotedText.Valid {
 		message.QuotedMessage = &QuotedMessage{
-			From:        quotedFrom.String,
-			Text:        quotedText.String,
-			Base64Image: quotedImage.String,
+			From:            quotedFrom.String,
+			Text:            quotedText.String,
+			Base64Image:     quotedImage.String,
+			AudioDurationMs: uint64(quotedAudioDuration.Int64),
+			Base64Audio:     quotedAudio.String,
 		}
 	}
 	message.Alias = alias.String
 	message.Identicon = identicon.String
 	if message.ContentType == protobuf.ChatMessage_STICKER {
 		message.Payload = &protobuf.ChatMessage_Sticker{Sticker: sticker}
+	}
+
+	if message.ContentType == protobuf.ChatMessage_AUDIO {
+		message.Payload = &protobuf.ChatMessage_Audio{Audio: audio}
 	}
 
 	if message.ContentType == protobuf.ChatMessage_TRANSACTION_COMMAND {
@@ -175,6 +196,11 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 	image := message.GetImage()
 	if image == nil {
 		image = &protobuf.ImageMessage{}
+	}
+
+	audio := message.GetAudio()
+	if audio == nil {
+		audio = &protobuf.AudioMessage{}
 	}
 
 	command := message.CommandParameters
@@ -201,6 +227,10 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 		image.Payload,
 		image.Type,
 		message.Base64Image,
+		audio.Payload,
+		audio.Type,
+		audio.DurationMs,
+		message.Base64Audio,
 		command.ID,
 		command.Value,
 		command.From,

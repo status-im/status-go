@@ -116,6 +116,13 @@ func WithDatasync() func(c *config) error {
 	}
 }
 
+func WithPushNotifications() func(c *config) error {
+	return func(c *config) error {
+		c.featureFlags.PushNotifications = true
+		return nil
+	}
+}
+
 func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 	return func(c *config) error {
 		c.envelopesMonitorConfig = emc
