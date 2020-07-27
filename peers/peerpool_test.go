@@ -30,6 +30,21 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
+// GetFreePort asks the kernel for a free open port that is ready to use.
+func getFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
 type PeerPoolSimulationSuite struct {
 	suite.Suite
 
@@ -41,14 +56,20 @@ type PeerPoolSimulationSuite struct {
 }
 
 func TestPeerPoolSimulationSuite(t *testing.T) {
-	s := new(PeerPoolSimulationSuite)
-	s.port = 33731
+	s := &PeerPoolSimulationSuite{}
+	port, err := getFreePort()
+	if err != nil {
+		panic(err)
+	}
+	s.port = uint16(port)
+
 	suite.Run(t, s)
 }
 
 func (s *PeerPoolSimulationSuite) nextPort() uint16 {
-	s.port++
-	return s.port
+	port, err := getFreePort()
+	s.Require().NoError(err)
+	return uint16(port)
 }
 
 func (s *PeerPoolSimulationSuite) SetupTest() {
