@@ -88,6 +88,7 @@ func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Waku, pri
 		WithMessagesPersistenceEnabled(),
 		WithDatabaseConfig(tmpFile.Name(), ""),
 		WithDatasync(),
+		WithPushNotifications(),
 	}
 	return s.newMessengerWithOptions(shh, privateKey, options)
 }

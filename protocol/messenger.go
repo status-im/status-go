@@ -1459,7 +1459,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 
 	id, err := m.dispatchMessage(ctx, &common.RawMessage{
 		LocalChatID:          chat.ID,
-		SendPushNotification: !chat.Public(),
+		SendPushNotification: m.featureFlags.PushNotifications && !chat.Public(),
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		ResendAutomatically:  true,
