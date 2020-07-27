@@ -565,7 +565,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchChatEntity(chatEntity ChatEntity, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
+func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
@@ -581,7 +581,7 @@ func (m *MessageHandler) matchChatEntity(chatEntity ChatEntity, chats map[string
 			return nil, errors.New("received a public chatEntity from non-existing chat")
 		}
 		return chat, nil
-	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE && common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
+	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE && common.IsPubKeyEqual(chatEntity.GetSigPubKey(), &m.identity.PublicKey):
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := chatEntity.GetChatId()
@@ -690,5 +690,9 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 	state.ModifiedChats[chat.ID] = true
 	state.AllChats[chat.ID] = chat
 
+	return nil
+}
+
+func (m *MessageHandler) HandleEmojiReactionRetraction(state *ReceivedMessageState, pbEmojiR protobuf.EmojiReactionRetraction) error {
 	return nil
 }

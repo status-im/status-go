@@ -265,19 +265,22 @@ func (p *MessageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
 	chatEntity ChatEntity,
 ) ([]byte, error) {
-	m := chatEntity.GetProtobuf().(*protobuf.ChatMessage)
-	e := chatEntity.GetProtobuf().(*protobuf.EmojiReaction)
-
-	if m == nil && e == nil {
-		return nil, errors.New("chat entity must be of type protobuf.ChatMessage or protobuf.EmojiReaction")
-	}
-
 	message := v1protocol.MembershipUpdateMessage{
-		ChatID:  group.ChatID(),
-		Events:  group.Events(),
-		Message: m,
-		EmojiReaction: e,
+		ChatID: group.ChatID(),
+		Events: group.Events(),
 	}
+
+	if chatEntity != nil {
+		chatEntityProtobuf := chatEntity.GetProtobuf()
+		switch chatEntityProtobuf.(type) {
+		case *protobuf.ChatMessage:
+			message.Message = chatEntityProtobuf.(*protobuf.ChatMessage)
+		case *protobuf.EmojiReaction:
+			message.EmojiReaction = chatEntityProtobuf.(*protobuf.EmojiReaction)
+
+		}
+	}
+
 	encodedMessage, err := v1protocol.EncodeMembershipUpdateMessage(message)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to encode membership update message")

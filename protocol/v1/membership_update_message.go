@@ -74,13 +74,12 @@ func (m *MembershipUpdateMessage) ToProtobuf() (*protobuf.MembershipUpdateMessag
 		Events: rawEvents,
 	}
 
+	// If message is not piggybacking anything, that's a valid case and we just return
 	switch {
 	case m.Message != nil:
 		mUM.ChatEntity = &protobuf.MembershipUpdateMessage_Message{Message: m.Message}
 	case m.EmojiReaction != nil:
 		mUM.ChatEntity = &protobuf.MembershipUpdateMessage_EmojiReaction{EmojiReaction: m.EmojiReaction}
-	default:
-		return nil, errors.New("neither Message or EmojiReaction is set")
 	}
 
 	return mUM, nil

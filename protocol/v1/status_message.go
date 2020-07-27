@@ -26,7 +26,7 @@ type StatusMessage struct {
 	// Type is the type of application message contained
 	Type protobuf.ApplicationMetadataMessage_Type `json:"-"`
 	// ParsedMessage is the parsed message by the application layer, i.e the output
-	ParsedMessage interface{} `json:"-"`
+	ParsedMessage *reflect.Value `json:"-"`
 
 	// TransportPayload is the payload as received from the transport layer
 	TransportPayload []byte `json:"-"`
@@ -236,7 +236,8 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.EmojiReactionRetraction))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
 		// This message is a bit different as it's encrypted, so we pass it straight through
-		m.ParsedMessage = m.DecryptedPayload
+		v := reflect.ValueOf(m.DecryptedPayload)
+		m.ParsedMessage = &v
 		return nil
 	}
 	return nil
@@ -257,7 +258,8 @@ func (m *StatusMessage) unmarshalProtobufData(pb proto.Message) error {
 		log.Printf("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())
 	} else {
 		rv = reflect.ValueOf(ptr)
-		m.ParsedMessage = rv.Elem()
+		elem := rv.Elem()
+		m.ParsedMessage = &elem
 		return nil
 	}
 
