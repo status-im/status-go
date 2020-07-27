@@ -91,7 +91,7 @@ type MessengerResponse struct {
 	Messages       []*Message                  `json:"messages,omitempty"`
 	Contacts       []*Contact                  `json:"contacts,omitempty"`
 	Installations  []*multidevice.Installation `json:"installations,omitempty"`
-	EmojiReactions []*EmojiReaction            `json:"emoji_reactions,omitempty"`
+	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
