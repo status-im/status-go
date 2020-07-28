@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"database/sql"
-	"fmt"
 	"io/ioutil"
 	"math"
 	"sort"
@@ -453,7 +452,6 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	// Try with a cursor
 	_, cursor, err := p.MessageByChatID(chatID, "", 1)
 	require.NoError(t, err)
-	fmt.Println("CURSOR", cursor)
 
 	reactions, err = p.EmojiReactionsByChatID(chatID, cursor, 2)
 	require.NoError(t, err)

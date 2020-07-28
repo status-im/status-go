@@ -494,17 +494,17 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
 	cursorWhere := ""
 	if currCursor != "" {
-		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) <= ?"
+		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?"
 	}
 	args := []interface{}{chatID}
 	if currCursor != "" {
 		args = append(args, currCursor)
 	}
+	args = append(args, limit)
 	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
 	// concatenated with message ID. Results are sorted using this new column.
 	// This new column values can also be returned as a cursor for subsequent requests.
-	rows, err := db.db.Query(
-		fmt.Sprintf(`
+	query := fmt.Sprintf(`
 			SELECT
 			    e.clock_value,
 			    e.source,
@@ -520,8 +520,11 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id = ? %s
 			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
 			LIMIT 100
-		`, cursorWhere),
-		append(args, limit)...,
+		`, cursorWhere)
+
+	rows, err := db.db.Query(
+		query,
+		args...,
 	)
 	if err != nil {
 		return nil, err
