@@ -11,8 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
-
 	"github.com/status-im/markdown"
+
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 

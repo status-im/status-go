@@ -272,11 +272,11 @@ func (p *MessageProcessor) EncodeMembershipUpdate(
 
 	if chatEntity != nil {
 		chatEntityProtobuf := chatEntity.GetProtobuf()
-		switch chatEntityProtobuf.(type) {
+		switch chatEntityProtobuf := chatEntityProtobuf.(type) {
 		case *protobuf.ChatMessage:
-			message.Message = chatEntityProtobuf.(*protobuf.ChatMessage)
+			message.Message = chatEntityProtobuf
 		case *protobuf.EmojiReaction:
-			message.EmojiReaction = chatEntityProtobuf.(*protobuf.EmojiReaction)
+			message.EmojiReaction = chatEntityProtobuf
 
 		}
 	}

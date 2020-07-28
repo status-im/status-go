@@ -90,7 +90,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	bob := s.newMessengerWithKey(s.shh, key)
 
-	chatID := "status"
+	chatID := statusChatID
 
 	chat := CreatePublicChat(chatID, alice.transport)
 

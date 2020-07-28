@@ -505,6 +505,7 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 	// NOTE: We match against local_chat_id for security reasons.
 	// As a user could potentially send an emoji reaction for a one to
 	// one/group chat that has no access to.
+	// nolint: gosec
 	query := fmt.Sprintf(`
 			SELECT
 			    e.clock_value,

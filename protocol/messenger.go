@@ -3243,7 +3243,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 			Clock:     clock,
 			MessageId: messageID,
 			ChatId:    chatID,
-			Type:      protobuf.EmojiReaction_Type(emojiID),
+			Type:      emojiID,
 		},
 		LocalChatID: chatID,
 		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
