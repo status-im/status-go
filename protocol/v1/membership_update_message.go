@@ -95,9 +95,10 @@ func MembershipUpdateMessageFromProtobuf(raw *protobuf.MembershipUpdateMessage) 
 		events = append(events, *verifiedEvent)
 	}
 	return &MembershipUpdateMessage{
-		ChatID:  raw.ChatId,
-		Events:  events,
-		Message: raw.GetMessage(),
+		ChatID:        raw.ChatId,
+		Events:        events,
+		Message:       raw.GetMessage(),
+		EmojiReaction: raw.GetEmojiReaction(),
 	}, nil
 }
 
