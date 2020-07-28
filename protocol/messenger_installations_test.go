@@ -241,3 +241,54 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	s.Require().True(actualContact.IsAdded())
 }
+
+func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
+
+	bob1 := s.m
+	// pair
+	bob2 := s.newMessengerWithKey(s.shh, s.privateKey)
+	alice := s.newMessenger(s.shh)
+
+	err := bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
+		Name:       "their-name",
+		DeviceType: "their-device-type",
+	})
+	s.Require().NoError(err)
+	response, err := bob2.SendPairInstallation(context.Background())
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Chats, 1)
+	s.Require().False(response.Chats[0].Active)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		bob1,
+		func(r *MessengerResponse) bool { return len(r.Installations) > 0 },
+		"installation not received",
+	)
+
+	s.Require().NoError(err)
+	actualInstallation := response.Installations[0]
+	s.Require().Equal(bob2.installationID, actualInstallation.ID)
+	err = bob1.EnableInstallation(bob2.installationID)
+	s.Require().NoError(err)
+
+	// send a message from bob1 to alice, it should be received on both bob1 and bob2
+
+	alicePkString := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
+	chat := CreateOneToOneChat(alicePkString, &alice.identity.PublicKey, bob1.transport)
+	s.Require().NoError(bob1.SaveChat(&chat))
+
+	inputMessage := buildTestMessage(chat)
+	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob2,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"message not received",
+	)
+
+	s.Require().NoError(err)
+}
