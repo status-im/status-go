@@ -945,7 +945,7 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 	if err != nil {
 		return err
 	}
-	rawMessage := &common.RawMessage{
+	rawMessage := common.RawMessage{
 		Payload:     encryptedRegistration,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
 	}
@@ -1034,7 +1034,7 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 			return nil, err
 		}
 
-		rawMessage := &common.RawMessage{
+		rawMessage := common.RawMessage{
 			Payload: payload,
 			Sender:  ephemeralKey,
 			// we skip encryption as we don't want to save any key material
@@ -1262,7 +1262,7 @@ func (c *Client) queryPushNotificationInfo(publicKey *ecdsa.PublicKey) error {
 		return err
 	}
 
-	rawMessage := &common.RawMessage{
+	rawMessage := common.RawMessage{
 		Payload: encodedMessage,
 		Sender:  ephemeralKey,
 		// we don't want to wrap in an encryption layer message

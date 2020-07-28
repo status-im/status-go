@@ -117,7 +117,7 @@ func (p *MessageProcessor) Stop() {
 func (p *MessageProcessor) SendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
-	rawMessage *RawMessage,
+	rawMessage RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private message",
@@ -136,7 +136,7 @@ func (p *MessageProcessor) SendPrivate(
 		rawMessage.Sender = p.identity
 	}
 
-	return p.sendPrivate(ctx, recipient, rawMessage)
+	return p.sendPrivate(ctx, recipient, &rawMessage)
 }
 
 // SendGroup takes encoded data, encrypts it and sends through the wire,
@@ -144,7 +144,7 @@ func (p *MessageProcessor) SendPrivate(
 func (p *MessageProcessor) SendGroup(
 	ctx context.Context,
 	recipients []*ecdsa.PublicKey,
-	rawMessage *RawMessage,
+	rawMessage RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private group message",
@@ -156,7 +156,7 @@ func (p *MessageProcessor) SendGroup(
 	}
 
 	// Calculate messageID first and set on raw message
-	wrappedMessage, err := p.wrapMessageV1(rawMessage)
+	wrappedMessage, err := p.wrapMessageV1(&rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -165,7 +165,7 @@ func (p *MessageProcessor) SendGroup(
 
 	// Send to each recipients
 	for _, recipient := range recipients {
-		_, err = p.sendPrivate(ctx, recipient, rawMessage)
+		_, err = p.sendPrivate(ctx, recipient, &rawMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message")
 		}
@@ -232,11 +232,11 @@ func (p *MessageProcessor) sendPrivate(
 func (p *MessageProcessor) SendPairInstallation(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
-	rawMessage *RawMessage,
+	rawMessage RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug("sending private message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
 
-	wrappedMessage, err := p.wrapMessageV1(rawMessage)
+	wrappedMessage, err := p.wrapMessageV1(&rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -283,14 +283,14 @@ func (p *MessageProcessor) EncodeMembershipUpdate(
 func (p *MessageProcessor) SendPublic(
 	ctx context.Context,
 	chatName string,
-	rawMessage *RawMessage,
+	rawMessage RawMessage,
 ) ([]byte, error) {
 	// Set sender
 	if rawMessage.Sender == nil {
 		rawMessage.Sender = p.identity
 	}
 
-	wrappedMessage, err := p.wrapMessageV1(rawMessage)
+	wrappedMessage, err := p.wrapMessageV1(&rawMessage)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
@@ -306,7 +306,7 @@ func (p *MessageProcessor) SendPublic(
 	rawMessage.ID = types.EncodeHex(messageID)
 
 	// notify before dispatching
-	p.notifyOnScheduledMessage(rawMessage)
+	p.notifyOnScheduledMessage(&rawMessage)
 
 	hash, err := p.transport.SendPublic(ctx, newMessage, chatName)
 	if err != nil {
