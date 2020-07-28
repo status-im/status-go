@@ -51,7 +51,6 @@ func (e *EmojiReaction) SetMessageType(messageType protobuf.MessageType) {
 }
 
 func (e EmojiReaction) MarshalJSON() ([]byte, error) {
-	type EmojiAlias EmojiReaction
 	item := struct {
 		ID          string                      `json:"id"`
 		Clock       uint64                      `json:"clock,omitempty"`
