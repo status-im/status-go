@@ -54,7 +54,8 @@ func TestSignMembershipUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Encode message
-	encodedMessage := testMembershipUpdateMessageStruct.ToProtobuf()
+	encodedMessage, err := testMembershipUpdateMessageStruct.ToProtobuf()
+	require.NoError(t, err)
 	// Verify it
 	verifiedMessage, err := MembershipUpdateMessageFromProtobuf(encodedMessage)
 	require.NoError(t, err)

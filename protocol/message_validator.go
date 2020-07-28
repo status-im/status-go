@@ -225,3 +225,27 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 
 	return nil
 }
+
+func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(emoji.Clock, whisperTimestamp); err != nil {
+		return err
+	}
+
+	if len(emoji.MessageId) == 0 {
+		return errors.New("message-id can't be empty")
+	}
+
+	if len(emoji.ChatId) == 0 {
+		return errors.New("chat-id can't be empty")
+	}
+
+	if emoji.Type == protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE {
+		return errors.New("unknown emoji reaction type")
+	}
+
+	if emoji.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE {
+		return errors.New("unknown message type")
+	}
+
+	return nil
+}

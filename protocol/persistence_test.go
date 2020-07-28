@@ -407,7 +407,8 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_SAD,
 		},
-		From: from1,
+		LocalChatID: chatID,
+		From:        from1,
 	}))
 
 	// Insert retracted emoji reaction
@@ -419,7 +420,8 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 			Type:      protobuf.EmojiReaction_SAD,
 			Retracted: true,
 		},
-		From: from2,
+		LocalChatID: chatID,
+		From:        from2,
 	}))
 
 	// Insert retracted emoji reaction out of pagination
@@ -430,7 +432,8 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_SAD,
 		},
-		From: from2,
+		LocalChatID: chatID,
+		From:        from2,
 	}))
 
 	// Insert retracted emoji reaction out of pagination
@@ -441,7 +444,20 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_SAD,
 		},
-		From: from3,
+		LocalChatID: chatID,
+		From:        from3,
+	}))
+
+	// Wrong local chat id
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: id1,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_LOVE,
+		},
+		LocalChatID: "wrong-chat-id",
+		From:        from3,
 	}))
 
 	reactions, err := p.EmojiReactionsByChatID(chatID, "", 1)

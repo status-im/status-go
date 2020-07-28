@@ -408,6 +408,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
 		return nil, err
 	}
 	defer rows.Close()
+
 	var result []*Message
 	for rows.Next() {
 		var message Message
@@ -496,14 +497,14 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 	if currCursor != "" {
 		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?"
 	}
-	args := []interface{}{chatID}
+	args := []interface{}{chatID, chatID}
 	if currCursor != "" {
 		args = append(args, currCursor)
 	}
 	args = append(args, limit)
-	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
-	// concatenated with message ID. Results are sorted using this new column.
-	// This new column values can also be returned as a cursor for subsequent requests.
+	// NOTE: We match against local_chat_id for security reasons.
+	// As a user could potentially send an emoji reaction for a one to
+	// one/group chat that has no access to.
 	query := fmt.Sprintf(`
 			SELECT
 			    e.clock_value,
@@ -511,10 +512,13 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			    e.emoji_id,
 			    e.message_id,
 			    e.chat_id,
+			    e.local_chat_id,
 			    e.retracted
 			FROM
 				emoji_reactions e
 			WHERE NOT(e.retracted)
+			AND
+			e.local_chat_id = ?
 			AND
 			e.message_id IN
 			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id = ? %s
@@ -539,6 +543,7 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			&emojiReaction.Type,
 			&emojiReaction.MessageId,
 			&emojiReaction.ChatId,
+			&emojiReaction.LocalChatID,
 			&emojiReaction.Retracted)
 		if err != nil {
 			return nil, err
@@ -768,7 +773,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 }
 
 func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err error) {
-	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,retracted) VALUES (?,?,?,?,?,?,?)"
+	query := "INSERT INTO emoji_reactions(id,clock_value,source,emoji_id,message_id,chat_id,local_chat_id,retracted) VALUES (?,?,?,?,?,?,?,?)"
 	stmt, err := db.db.Prepare(query)
 	if err != nil {
 		return
@@ -781,6 +786,7 @@ func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err
 		emojiReaction.Type,
 		emojiReaction.MessageId,
 		emojiReaction.ChatId,
+		emojiReaction.LocalChatID,
 		emojiReaction.Retracted,
 	)
 
@@ -788,26 +794,14 @@ func (db sqlitePersistence) SaveEmojiReaction(emojiReaction *EmojiReaction) (err
 }
 
 func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	row := tx.QueryRow(
+	row := db.db.QueryRow(
 		`SELECT
 			    clock_value,
 			    source,
 			    emoji_id,
 			    message_id,
 			    chat_id,
+			    local_chat_id,
 			    retracted
 			FROM
 				emoji_reactions
@@ -816,71 +810,15 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 		`, id)
 
 	emojiReaction := new(EmojiReaction)
-	args := []interface{}{
-		&emojiReaction.Clock,
+	err := row.Scan(&emojiReaction.Clock,
 		&emojiReaction.From,
 		&emojiReaction.Type,
 		&emojiReaction.MessageId,
 		&emojiReaction.ChatId,
+		&emojiReaction.LocalChatID,
 		&emojiReaction.Retracted,
-	}
-	err = row.Scan(args...)
-
-	switch err {
-	case sql.ErrNoRows:
-		return nil, errRecordNotFound
-	case nil:
-		return emojiReaction, nil
-	default:
-		return nil, err
-	}
-}
-
-func (db sqlitePersistence) EmojiReactionByFromMessageIDAndType(from string, messageID string, emojiType protobuf.EmojiReaction_Type) (*EmojiReaction, error) {
-	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	row := tx.QueryRow(
-		`SELECT
-			    clock_value,
-			    source,
-			    emoji_id,
-			    message_id,
-			    chat_id,
-			    retracted
-
-			FROM
-				emoji_reactions
-			WHERE
-				emoji_reactions.source = ?
-				AND
-				emoji_reactions.message_id = ?
-				AND
-				emoji_reactions.emoji_id = ?
-		`,
-		from,
-		messageID,
-		emojiType,
 	)
 
-	emojiReaction := new(EmojiReaction)
-	err = row.Scan(&emojiReaction.Clock,
-		&emojiReaction.From,
-		&emojiReaction.Type,
-		&emojiReaction.MessageId,
-		&emojiReaction.ChatId,
-		&emojiReaction.Retracted)
-
 	switch err {
 	case sql.ErrNoRows:
 		return nil, errRecordNotFound
@@ -889,9 +827,4 @@ func (db sqlitePersistence) EmojiReactionByFromMessageIDAndType(from string, mes
 	default:
 		return nil, err
 	}
-}
-
-func (db sqlitePersistence) RetractEmojiReaction(id string) error {
-	_, err := db.db.Exec(`UPDATE emoji_reactions SET retracted = 1 WHERE id = ?`, id)
-	return err
 }

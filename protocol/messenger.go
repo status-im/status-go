@@ -3245,7 +3245,8 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 			ChatId:    chatID,
 			Type:      protobuf.EmojiReaction_Type(emojiID),
 		},
-		From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+		LocalChatID: chatID,
+		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 	}
 	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
 	if err != nil {
@@ -3334,7 +3335,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	response.Chats = []*Chat{chat}
 
 	// Persist retraction state for emoji reaction
-	err = m.persistence.RetractEmojiReaction(emojiReactionID)
+	err = m.persistence.SaveEmojiReaction(emojiR)
 	if err != nil {
 		return nil, err
 	}

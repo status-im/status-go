@@ -22,11 +22,14 @@ type EmojiReaction struct {
 
 	// SigPubKey is the ecdsa encoded public key of the emoji reaction author
 	SigPubKey *ecdsa.PublicKey `json:"-"`
+
+	// LocalChatID is the chatID of the local chat (one-to-one are not symmetric)
+	LocalChatID string `json:"localChatId"`
 }
 
-// ID is the Keccak256() contatenation of From-ChatID-MessageID-EmojiType
+// ID is the Keccak256() contatenation of From-MessageID-EmojiType
 func (e EmojiReaction) ID() string {
-	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%s%d", e.From, e.ChatId, e.MessageId, e.Type))))
+	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf("%s%s%d", e.From, e.MessageId, e.Type))))
 }
 
 // GetSigPubKey returns an ecdsa encoded public key

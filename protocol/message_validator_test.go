@@ -477,3 +477,105 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 		})
 	}
 }
+
+func (s *MessageValidatorSuite) TestValidateEmojiReaction() {
+	testCases := []struct {
+		Name             string
+		Valid            bool
+		WhisperTimestamp uint64
+		Message          protobuf.EmojiReaction
+	}{
+		{
+			Name:             "valid emoji reaction",
+			Valid:            true,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:       30,
+				ChatId:      "chat-id",
+				MessageId:   "message-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Type:        protobuf.EmojiReaction_LOVE,
+			},
+		},
+		{
+			Name:             "valid emoji retraction",
+			Valid:            true,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:       30,
+				ChatId:      "0.34",
+				MessageId:   "message-id",
+				Type:        protobuf.EmojiReaction_LOVE,
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Retracted:   true,
+			},
+		},
+		{
+			Name:             "missing chatID",
+			Valid:            false,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:       30,
+				MessageId:   "message-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Type:        protobuf.EmojiReaction_LOVE,
+			},
+		},
+		{
+			Name:             "missing messageID",
+			Valid:            false,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:       30,
+				ChatId:      "chat-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Type:        protobuf.EmojiReaction_LOVE,
+			},
+		},
+		{
+			Name:             "missing type",
+			Valid:            false,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:       30,
+				ChatId:      "chat-id",
+				MessageId:   "message-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+			},
+		},
+		{
+			Name:             "missing message type",
+			Valid:            false,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:     30,
+				ChatId:    "chat-id",
+				MessageId: "message-id",
+				Type:      protobuf.EmojiReaction_LOVE,
+			},
+		},
+		{
+			Name:             "clock value too high",
+			Valid:            false,
+			WhisperTimestamp: 30,
+			Message: protobuf.EmojiReaction{
+				Clock:       900000,
+				ChatId:      "chat-id",
+				MessageId:   "message-id",
+				MessageType: protobuf.MessageType_ONE_TO_ONE,
+				Type:        protobuf.EmojiReaction_LOVE,
+			},
+		},
+	}
+	for _, tc := range testCases {
+		s.Run(tc.Name, func() {
+			err := ValidateReceivedEmojiReaction(&tc.Message, tc.WhisperTimestamp)
+			if tc.Valid {
+				s.Nil(err)
+			} else {
+				s.NotNil(err)
+			}
+		})
+	}
+
+}

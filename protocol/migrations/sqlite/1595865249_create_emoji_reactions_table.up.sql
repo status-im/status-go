@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS emoji_reactions (
   emoji_id INT NOT NULL,
   message_id VARCHAR NOT NULL,
   chat_id VARCHAR NOT NULL,
+  local_chat_id VARCHAR NOT NULL,
   retracted INT DEFAULT 0
 );
