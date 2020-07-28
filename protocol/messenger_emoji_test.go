@@ -83,7 +83,7 @@ func (s *MessengerEmojiSuite) newMessenger(shh types.Waku) *Messenger {
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
-func (s *MessengerEmojiSuite) TestSendEmoji() {
+func (s *MessengerEmojiSuite) testSendEmoji() {
 	alice := s.m
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -162,4 +162,59 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	s.Require().Equal(response.EmojiReactions[0].ID(), emojiID)
 	s.Require().Equal(response.EmojiReactions[0].Type, protobuf.EmojiReaction_SAD)
 	s.Require().True(response.EmojiReactions[0].Retracted)
+}
+
+func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
+	bob := s.m
+	alice := s.newMessenger(s.shh)
+	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
+	s.NoError(err)
+
+	chat := response.Chats[0]
+	members := []string{types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))}
+	_, err = bob.AddMembersToGroupChat(context.Background(), chat.ID, members)
+	s.NoError(err)
+
+	// Retrieve their messages so that the chat is created
+	_, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"chat invitation not received",
+	)
+	s.Require().NoError(err)
+
+	_, err = alice.ConfirmJoiningGroup(context.Background(), chat.ID)
+	s.NoError(err)
+
+	// Wait for the message to reach its destination
+	_, err = WaitOnMessengerResponse(
+		bob,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		"no joining group event received",
+	)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(*chat)
+	_, err = bob.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
+		"no message received",
+	)
+	s.Require().NoError(err)
+	messageID := response.Messages[0].ID
+
+	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		alice,
+		func(r *MessengerResponse) bool { return len(r.EmojiReactions) > 0 },
+		"no emoji reaction received",
+	)
+	s.Require().NoError(err)
 }

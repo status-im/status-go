@@ -110,6 +110,8 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	if message.Message != nil {
 		messageState.CurrentMessageState.Message = *message.Message
 		return m.HandleChatMessage(messageState)
+	} else if message.EmojiReaction != nil {
+		return m.HandleEmojiReaction(messageState, *message.EmojiReaction)
 	}
 
 	return nil
