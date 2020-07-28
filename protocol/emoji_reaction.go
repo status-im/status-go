@@ -53,17 +53,25 @@ func (e *EmojiReaction) SetMessageType(messageType protobuf.MessageType) {
 func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 	type EmojiAlias EmojiReaction
 	item := struct {
-		EmojiAlias
-		ID      string                      `json:"id"`
-		EmojiID protobuf.EmojiReaction_Type `json:"emojiId"`
+		ID          string                      `json:"id"`
+		Clock       uint64                      `json:"clock,omitempty"`
+		ChatID      string                      `json:"chatId,omitempty"`
+		LocalChatID string                      `json:"localChatId,omitempty"`
+		From        string                      `json:"from"`
+		MessageID   string                      `json:"messageId,omitempty"`
+		MessageType protobuf.MessageType        `json:"messageType,omitempty"`
+		EmojiID     protobuf.EmojiReaction_Type `json:"emojiId,omitempty"`
 	}{
-		EmojiAlias: (EmojiAlias)(e),
-		ID:         e.ID(),
-		EmojiID:    e.Type,
-	}
 
-	// cleanup type
-	item.Type = 0
+		ID:          e.ID(),
+		Clock:       e.Clock,
+		ChatID:      e.ChatId,
+		LocalChatID: e.LocalChatID,
+		From:        e.From,
+		MessageID:   e.MessageId,
+		MessageType: e.MessageType,
+		EmojiID:     e.Type,
+	}
 
 	return json.Marshal(item)
 }
