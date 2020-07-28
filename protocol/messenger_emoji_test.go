@@ -83,7 +83,7 @@ func (s *MessengerEmojiSuite) newMessenger(shh types.Waku) *Messenger {
 	return s.newMessengerWithKey(s.shh, privateKey)
 }
 
-func (s *MessengerEmojiSuite) testSendEmoji() {
+func (s *MessengerEmojiSuite) TestSendEmoji() {
 	alice := s.m
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -207,11 +207,11 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	s.Require().NoError(err)
 	messageID := response.Messages[0].ID
 
-	response, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
+	_, err = bob.SendEmojiReaction(context.Background(), chat.ID, messageID, protobuf.EmojiReaction_SAD)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
-	response, err = WaitOnMessengerResponse(
+	_, err = WaitOnMessengerResponse(
 		alice,
 		func(r *MessengerResponse) bool { return len(r.EmojiReactions) > 0 },
 		"no emoji reaction received",
