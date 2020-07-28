@@ -3253,7 +3253,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		return nil, err
 	}
 
-	_, err = m.dispatchMessage(ctx, &common.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chatID,
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
@@ -3316,7 +3316,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	}
 
 	// Send the marshalled EmojiReactionRetraction protobuf
-	_, err = m.dispatchMessage(ctx, &common.RawMessage{
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: emojiR.GetChatId(),
 		Payload:     encodedMessage,
 		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
