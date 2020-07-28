@@ -59,6 +59,7 @@ func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 		From        string                      `json:"from"`
 		MessageID   string                      `json:"messageId,omitempty"`
 		MessageType protobuf.MessageType        `json:"messageType,omitempty"`
+		Retracted   bool                        `json:"retracted,omitempty"`
 		EmojiID     protobuf.EmojiReaction_Type `json:"emojiId,omitempty"`
 	}{
 
@@ -69,6 +70,7 @@ func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 		From:        e.From,
 		MessageID:   e.MessageId,
 		MessageType: e.MessageType,
+		Retracted:   e.Retracted,
 		EmojiID:     e.Type,
 	}
 
