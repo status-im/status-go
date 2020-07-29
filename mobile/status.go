@@ -624,6 +624,18 @@ func AppStateChange(state string) {
 	statusBackend.AppStateChange(state)
 }
 
+// StopWallet
+func StopWallet() string {
+	err := statusBackend.StopWallet()
+	return makeJSONResponse(err)
+}
+
+// StartWallet
+func StartWallet() string {
+	err := statusBackend.StartWallet()
+	return makeJSONResponse(err)
+}
+
 // SetMobileSignalHandler setup geth callback to notify about new signal
 // used for gomobile builds
 func SetMobileSignalHandler(handler SignalHandler) {

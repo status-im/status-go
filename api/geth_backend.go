@@ -84,6 +84,7 @@ type GethStatusBackend struct {
 	selectedAccountKeyID string
 	log                  log.Logger
 	allowAllRPC          bool // used only for tests, disables api method restrictions
+	forceStopWallet      bool
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -267,9 +268,6 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
 	err = b.injectAccountIntoServices()
 	if err != nil {
-		return err
-	}
-	if err := b.startWallet(); err != nil {
 		return err
 	}
 	err = b.multiaccountsDB.UpdateAccountTimestamp(acc.KeyUID, time.Now().Unix())
@@ -856,7 +854,7 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
-	if s == appStateForeground {
+	if s == appStateForeground && !b.forceStopWallet {
 		wallet, err := b.statusNode.WalletService()
 		if err != nil {
 			b.log.Error("Retrieving of wallet service failed on app state change to active", "error", err)
@@ -875,7 +873,7 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 				return
 			}
 		}
-	} else if s == appStateBackground {
+	} else if s == appStateBackground && !b.forceStopWallet {
 		wallet, err := b.statusNode.WalletService()
 		if err != nil {
 			b.log.Error("Retrieving of wallet service failed on app state change to background", "error", err)
@@ -889,6 +887,50 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	}
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
+}
+
+func (b *GethStatusBackend) StopWallet() error {
+	wallet, err := b.statusNode.WalletService()
+	if err != nil {
+		b.log.Error("Retrieving of wallet service failed on StopWallet", "error", err)
+		return nil
+	}
+	if wallet.IsStarted() {
+		err = wallet.Stop()
+		if err != nil {
+			b.log.Error("Wallet service stop failed on StopWallet", "error", err)
+			return nil
+		}
+	}
+
+	b.forceStopWallet = true
+
+	return nil
+}
+
+func (b *GethStatusBackend) StartWallet() error {
+	wallet, err := b.statusNode.WalletService()
+	if err != nil {
+		b.log.Error("Retrieving of wallet service failed on StartWallet", "error", err)
+		return nil
+	}
+	if !wallet.IsStarted() {
+		err = wallet.Start(b.statusNode.Server())
+		if err != nil {
+			b.log.Error("Wallet service start failed on StartWallet", "error", err)
+			return nil
+		}
+
+		err = b.startWallet()
+		if err != nil {
+			b.log.Error("Wallet reactor start failed on StartWallet", "error", err)
+			return nil
+		}
+	}
+
+	b.forceStopWallet = false
+
+	return nil
 }
 
 // Logout clears whisper identities.
@@ -940,9 +982,11 @@ func (b *GethStatusBackend) cleanupServices() error {
 		switch err {
 		case node.ErrServiceUnknown:
 		case nil:
-			err = wallet.StopReactor()
-			if err != nil {
-				return err
+			if wallet.IsStarted() {
+				err = wallet.Stop()
+				if err != nil {
+					return err
+				}
 			}
 		default:
 			return err
@@ -978,10 +1022,6 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 	}
 
 	if err := b.injectAccountIntoServices(); err != nil {
-		return err
-	}
-
-	if err := b.startWallet(); err != nil {
 		return err
 	}
 
