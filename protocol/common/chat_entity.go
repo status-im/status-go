@@ -8,6 +8,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
+// ChatEntity is anything that is sendable in a chat.
+// Currently it encompass a Message and EmojiReaction.
 type ChatEntity interface {
 	proto.Message
 
