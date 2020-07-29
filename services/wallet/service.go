@@ -64,8 +64,10 @@ func (s *Service) StopReactor() error {
 		return nil
 	}
 	s.reactor.Stop()
-	s.group.Stop()
-	s.group.Wait()
+	if s.group != nil {
+		s.group.Stop()
+		s.group.Wait()
+	}
 	return nil
 }
 
