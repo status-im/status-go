@@ -456,6 +456,7 @@ func buildMessengerOptions(
 ) ([]protocol.Option, error) {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
+		protocol.WithPushNotifications(),
 		protocol.WithDatabase(db),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
