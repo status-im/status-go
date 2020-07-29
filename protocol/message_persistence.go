@@ -505,6 +505,13 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 	// NOTE: We match against local_chat_id for security reasons.
 	// As a user could potentially send an emoji reaction for a one to
 	// one/group chat that has no access to.
+	// We also limit the number of emoji to a reasonable number (1000)
+	// for now, as we don't want the client to choke on this.
+	// The issue is that your own emoji might not be returned in such cases,
+	// allowing the user to react to a post multiple times.
+	// Jakubgs: Returning the whole list seems like a real overkill.
+	// This will get very heavy in threads that have loads of reactions on loads of messages.
+	// A more sensible response would just include a count and a bool telling you if you are in the list.
 	// nolint: gosec
 	query := fmt.Sprintf(`
 			SELECT
@@ -524,7 +531,7 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			e.message_id IN
 			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id = ? %s
 			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
-			LIMIT 100
+			LIMIT 1000
 		`, cursorWhere)
 
 	rows, err := db.db.Query(
