@@ -60,7 +60,7 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[p
 		ChatMessage: protobuf.ChatMessage{
 			ChatId:      e.ChatID,
 			Text:        text,
-			MessageType: protobuf.ChatMessage_SYSTEM_MESSAGE_PRIVATE_GROUP,
+			MessageType: protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP,
 			ContentType: protobuf.ChatMessage_SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP,
 			Clock:       e.ClockValue,
 			Timestamp:   timestamp,

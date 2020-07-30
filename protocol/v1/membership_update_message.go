@@ -20,9 +20,10 @@ import (
 // about group membership changes.
 // For more information, see https://github.com/status-im/specs/blob/master/status-group-chats-spec.md.
 type MembershipUpdateMessage struct {
-	ChatID  string                  `json:"chatId"` // UUID concatenated with hex-encoded public key of the creator for the chat
-	Events  []MembershipUpdateEvent `json:"events"`
-	Message *protobuf.ChatMessage   `json:"-"`
+	ChatID        string                  `json:"chatId"` // UUID concatenated with hex-encoded public key of the creator for the chat
+	Events        []MembershipUpdateEvent `json:"events"`
+	Message       *protobuf.ChatMessage   `json:"-"`
+	EmojiReaction *protobuf.EmojiReaction `json:"-"`
 }
 
 const signatureLength = 65
@@ -59,7 +60,7 @@ func MembershipUpdateEventFromProtobuf(chatID string, raw []byte) (*MembershipUp
 	}, nil
 }
 
-func (m *MembershipUpdateMessage) ToProtobuf() *protobuf.MembershipUpdateMessage {
+func (m *MembershipUpdateMessage) ToProtobuf() (*protobuf.MembershipUpdateMessage, error) {
 	var rawEvents [][]byte
 	for _, e := range m.Events {
 		var encodedEvent []byte
@@ -67,11 +68,21 @@ func (m *MembershipUpdateMessage) ToProtobuf() *protobuf.MembershipUpdateMessage
 		encodedEvent = append(encodedEvent, e.RawPayload...)
 		rawEvents = append(rawEvents, encodedEvent)
 	}
-	return &protobuf.MembershipUpdateMessage{
-		ChatId:  m.ChatID,
-		Events:  rawEvents,
-		Message: m.Message,
+
+	mUM := &protobuf.MembershipUpdateMessage{
+		ChatId: m.ChatID,
+		Events: rawEvents,
 	}
+
+	// If message is not piggybacking anything, that's a valid case and we just return
+	switch {
+	case m.Message != nil:
+		mUM.ChatEntity = &protobuf.MembershipUpdateMessage_Message{Message: m.Message}
+	case m.EmojiReaction != nil:
+		mUM.ChatEntity = &protobuf.MembershipUpdateMessage_EmojiReaction{EmojiReaction: m.EmojiReaction}
+	}
+
+	return mUM, nil
 }
 
 func MembershipUpdateMessageFromProtobuf(raw *protobuf.MembershipUpdateMessage) (*MembershipUpdateMessage, error) {
@@ -84,15 +95,21 @@ func MembershipUpdateMessageFromProtobuf(raw *protobuf.MembershipUpdateMessage) 
 		events = append(events, *verifiedEvent)
 	}
 	return &MembershipUpdateMessage{
-		ChatID:  raw.ChatId,
-		Events:  events,
-		Message: raw.Message,
+		ChatID:        raw.ChatId,
+		Events:        events,
+		Message:       raw.GetMessage(),
+		EmojiReaction: raw.GetEmojiReaction(),
 	}, nil
 }
 
 // EncodeMembershipUpdateMessage encodes a MembershipUpdateMessage using protobuf serialization.
 func EncodeMembershipUpdateMessage(value MembershipUpdateMessage) ([]byte, error) {
-	return proto.Marshal(value.ToProtobuf())
+	pb, err := value.ToProtobuf()
+	if err != nil {
+		return nil, err
+	}
+
+	return proto.Marshal(pb)
 }
 
 // MembershipUpdateEvent contains an event information.

@@ -70,3 +70,34 @@ func (s *ChatTestSuite) TestValidateChat() {
 	}
 
 }
+
+func (s *ChatTestSuite) TestUpdateFromMessage() {
+
+	// Base case, clock is higher
+	message := &Message{}
+	chat := &Chat{}
+
+	message.Clock = 1
+	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
+	s.Require().NotNil(chat.LastMessage)
+	s.Require().Equal(uint64(1), chat.LastClockValue)
+
+	// Clock is lower and lastMessage is not nil
+	message = &Message{}
+	lastMessage := []byte("test")
+	chat = &Chat{LastClockValue: 2, LastMessage: lastMessage}
+
+	message.Clock = 1
+	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
+	s.Require().Equal(lastMessage, chat.LastMessage)
+	s.Require().Equal(uint64(2), chat.LastClockValue)
+
+	// Clock is lower and lastMessage is nil
+	message = &Message{}
+	chat = &Chat{LastClockValue: 2}
+
+	message.Clock = 1
+	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
+	s.Require().NotNil(chat.LastMessage)
+	s.Require().Equal(uint64(2), chat.LastClockValue)
+}

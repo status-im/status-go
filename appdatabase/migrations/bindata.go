@@ -337,7 +337,7 @@ func _0008_add_push_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1595832401, 0)}
+	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1595840384, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5a, 0x0, 0xbf, 0xd0, 0xdd, 0xcd, 0x73, 0xe0, 0x7c, 0x56, 0xef, 0xdc, 0x57, 0x61, 0x94, 0x64, 0x70, 0xb9, 0xfa, 0xa1, 0x2a, 0x36, 0xc, 0x2f, 0xf8, 0x95, 0xa, 0x57, 0x3e, 0x7a, 0xd7, 0x12}}
 	return a, nil
 }

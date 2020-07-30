@@ -289,6 +289,5 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 		func(r *MessengerResponse) bool { return len(r.Messages) > 0 },
 		"message not received",
 	)
-
 	s.Require().NoError(err)
 }

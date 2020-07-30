@@ -375,6 +375,107 @@ func TestUpdateMessageOutgoingStatus(t *testing.T) {
 	require.Equal(t, "new-status", m.OutgoingStatus)
 }
 
+func TestPersistenceEmojiReactions(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	// reverse order as we use DESC
+	id1 := "1"
+	id2 := "2"
+	id3 := "3"
+
+	from1 := "from-1"
+	from2 := "from-2"
+	from3 := "from-3"
+
+	chatID := "chat-id"
+
+	err = insertMinimalMessage(p, id1)
+	require.NoError(t, err)
+
+	err = insertMinimalMessage(p, id2)
+	require.NoError(t, err)
+
+	err = insertMinimalMessage(p, id3)
+	require.NoError(t, err)
+
+	// Insert normal emoji reaction
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: id3,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_SAD,
+		},
+		LocalChatID: chatID,
+		From:        from1,
+	}))
+
+	// Insert retracted emoji reaction
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: id3,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_SAD,
+			Retracted: true,
+		},
+		LocalChatID: chatID,
+		From:        from2,
+	}))
+
+	// Insert retracted emoji reaction out of pagination
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: id1,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_SAD,
+		},
+		LocalChatID: chatID,
+		From:        from2,
+	}))
+
+	// Insert retracted emoji reaction out of pagination
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: id1,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_SAD,
+		},
+		LocalChatID: chatID,
+		From:        from3,
+	}))
+
+	// Wrong local chat id
+	require.NoError(t, p.SaveEmojiReaction(&EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     1,
+			MessageId: id1,
+			ChatId:    chatID,
+			Type:      protobuf.EmojiReaction_LOVE,
+		},
+		LocalChatID: "wrong-chat-id",
+		From:        from3,
+	}))
+
+	reactions, err := p.EmojiReactionsByChatID(chatID, "", 1)
+	require.NoError(t, err)
+	require.Len(t, reactions, 1)
+	require.Equal(t, id3, reactions[0].MessageId)
+
+	// Try with a cursor
+	_, cursor, err := p.MessageByChatID(chatID, "", 1)
+	require.NoError(t, err)
+
+	reactions, err = p.EmojiReactionsByChatID(chatID, cursor, 2)
+	require.NoError(t, err)
+	require.Len(t, reactions, 2)
+	require.Equal(t, id1, reactions[0].MessageId)
+	require.Equal(t, id1, reactions[1].MessageId)
+}
+
 func openTestDB() (*sql.DB, error) {
 	dbPath, err := ioutil.TempFile("", "")
 	if err != nil {

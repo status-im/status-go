@@ -263,14 +263,24 @@ func (p *MessageProcessor) SendPairInstallation(
 // All the events in a group are encoded and added to the payload
 func (p *MessageProcessor) EncodeMembershipUpdate(
 	group *v1protocol.Group,
-	chatMessage *protobuf.ChatMessage,
+	chatEntity ChatEntity,
 ) ([]byte, error) {
-
 	message := v1protocol.MembershipUpdateMessage{
-		ChatID:  group.ChatID(),
-		Events:  group.Events(),
-		Message: chatMessage,
+		ChatID: group.ChatID(),
+		Events: group.Events(),
 	}
+
+	if chatEntity != nil {
+		chatEntityProtobuf := chatEntity.GetProtobuf()
+		switch chatEntityProtobuf := chatEntityProtobuf.(type) {
+		case *protobuf.ChatMessage:
+			message.Message = chatEntityProtobuf
+		case *protobuf.EmojiReaction:
+			message.EmojiReaction = chatEntityProtobuf
+
+		}
+	}
+
 	encodedMessage, err := v1protocol.EncodeMembershipUpdateMessage(message)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to encode membership update message")

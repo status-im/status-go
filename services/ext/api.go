@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/ext/mailservers"
@@ -509,6 +510,20 @@ func (api *PublicAPI) GetPushNotificationServers() ([]*pushnotificationclient.Pu
 
 func (api *PublicAPI) RegisteredForPushNotifications() (bool, error) {
 	return api.service.messenger.RegisteredForPushNotifications()
+}
+
+// Emoji
+
+func (api *PublicAPI) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendEmojiReaction(ctx, chatID, messageID, emojiID)
+}
+
+func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendEmojiReactionRetraction(ctx, emojiReactionID)
+}
+
+func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
+	return api.service.messenger.EmojiReactionsByChatID(chatID, cursor, limit)
 }
 
 // Echo is a method for testing purposes.

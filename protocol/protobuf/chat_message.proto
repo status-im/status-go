@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+import "enums.proto";
+
 message StickerMessage {
   string hash = 1;
   int32 pack = 2;
@@ -59,13 +61,6 @@ message ChatMessage {
     AudioMessage audio = 11;
   }
 
-  enum MessageType {
-    UNKNOWN_MESSAGE_TYPE = 0;
-    ONE_TO_ONE = 1;
-    PUBLIC_GROUP = 2;
-    PRIVATE_GROUP = 3;
-    // Only local
-    SYSTEM_MESSAGE_PRIVATE_GROUP = 4;}
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
     TEXT_PLAIN = 1;

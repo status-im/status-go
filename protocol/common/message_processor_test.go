@@ -44,7 +44,7 @@ func (s *MessageProcessorSuite) SetupTest() {
 		Text:        "abc123",
 		ChatId:      "testing-adamb",
 		ContentType: protobuf.ChatMessage_TEXT_PLAIN,
-		MessageType: protobuf.ChatMessage_PUBLIC_GROUP,
+		MessageType: protobuf.MessageType_PUBLIC_GROUP,
 		Clock:       154593077368201,
 		Timestamp:   1545930773682,
 	}
@@ -129,7 +129,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	s.Require().Equal(1, len(decodedMessages))
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
-	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
 	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
@@ -167,7 +167,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
-	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
 	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }
@@ -235,7 +235,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	s.Require().Equal(&authorKey.PublicKey, decodedMessages[0].SigPubKey())
 	s.Require().Equal(v1protocol.MessageID(&authorKey.PublicKey, wrappedPayload), decodedMessages[0].ID)
 	s.Require().Equal(encodedPayload, decodedMessages[0].DecryptedPayload)
-	parsedMessage := decodedMessages[0].ParsedMessage.(protobuf.ChatMessage)
+	parsedMessage := decodedMessages[0].ParsedMessage.Interface().(protobuf.ChatMessage)
 	s.Require().True(proto.Equal(&s.testMessage, &parsedMessage))
 	s.Require().Equal(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE, decodedMessages[0].Type)
 }

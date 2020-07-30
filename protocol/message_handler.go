@@ -110,6 +110,8 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	if message.Message != nil {
 		messageState.CurrentMessageState.Message = *message.Message
 		return m.HandleChatMessage(messageState)
+	} else if message.EmojiReaction != nil {
+		return m.HandleEmojiReaction(messageState, *message.EmojiReaction)
 	}
 
 	return nil
@@ -126,7 +128,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	if err := message.PrepareContent(); err != nil {
 		return fmt.Errorf("failed to prepare content: %v", err)
 	}
-	chat, err := m.matchMessage(message, state.AllChats, state.Timesource)
+	chat, err := m.matchChatEntity(message, state.AllChats, state.Timesource)
 	if err != nil {
 		return err
 	}
@@ -312,9 +314,9 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
-	chat, err := m.matchMessage(receivedMessage, state.AllChats, state.Timesource)
+	chat, err := m.matchChatEntity(receivedMessage, state.AllChats, state.Timesource)
 	if err != nil {
-		return err // matchMessage returns a descriptive error message
+		return err // matchChatEntity returns a descriptive error message
 	}
 
 	// If deleted-at is greater, ignore message
@@ -359,9 +361,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	// Add to response
-	if receivedMessage != nil {
-		state.Response.Messages = append(state.Response.Messages, receivedMessage)
-	}
+	state.Response.Messages = append(state.Response.Messages, receivedMessage)
 
 	return nil
 }
@@ -377,7 +377,7 @@ func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *Receiv
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 			Text:        "Request address for transaction",
 			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
-			MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
 		CommandParameters: &CommandParameters{
@@ -401,7 +401,7 @@ func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageS
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
 			Text:        "Request transaction",
 			ChatId:      contactIDFromPublicKey(&m.identity.PublicKey),
-			MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
 		CommandParameters: &CommandParameters{
@@ -567,26 +567,26 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
-	if message.SigPubKey == nil {
+func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
+	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
-		return nil, errors.New("received a message with empty public key")
+		return nil, errors.New("received a chatEntity with empty public key")
 	}
 
 	switch {
-	case message.MessageType == protobuf.ChatMessage_PUBLIC_GROUP:
+	case chatEntity.GetMessageType() == protobuf.MessageType_PUBLIC_GROUP:
 		// For public messages, all outgoing and incoming messages have the same chatID
 		// equal to a public chat name.
-		chatID := message.ChatId
+		chatID := chatEntity.GetChatId()
 		chat := chats[chatID]
 		if chat == nil {
-			return nil, errors.New("received a public message from non-existing chat")
+			return nil, errors.New("received a public chatEntity from non-existing chat")
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE && common.IsPubKeyEqual(message.SigPubKey, &m.identity.PublicKey):
+	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE && common.IsPubKeyEqual(chatEntity.GetSigPubKey(), &m.identity.PublicKey):
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
-		chatID := message.ChatId
+		chatID := chatEntity.GetChatId()
 		chat := chats[chatID]
 		if chat == nil {
 			if len(chatID) != PubKeyStringLength {
@@ -606,27 +606,27 @@ func (m *MessageHandler) matchMessage(message *Message, chats map[string]*Chat, 
 			chat = &newChat
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_ONE_TO_ONE:
-		// It's an incoming private message. ChatID is calculated from the signature.
+	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE:
+		// It's an incoming private chatEntity. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
-		chatID := contactIDFromPublicKey(message.SigPubKey)
+		chatID := contactIDFromPublicKey(chatEntity.GetSigPubKey())
 		chat := chats[chatID]
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
-			newChat := CreateOneToOneChat(chatID[:8], message.SigPubKey, timesource)
+			newChat := CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
 			chat = &newChat
 		}
 		return chat, nil
-	case message.MessageType == protobuf.ChatMessage_PRIVATE_GROUP:
-		// In the case of a group message, ChatID is the same for all messages belonging to a group.
+	case chatEntity.GetMessageType() == protobuf.MessageType_PRIVATE_GROUP:
+		// In the case of a group chatEntity, ChatID is the same for all messages belonging to a group.
 		// It needs to be verified if the signature public key belongs to the chat.
-		chatID := message.ChatId
+		chatID := chatEntity.GetChatId()
 		chat := chats[chatID]
 		if chat == nil {
-			return nil, errors.New("received group chat message for non-existing chat")
+			return nil, errors.New("received group chat chatEntity for non-existing chat")
 		}
 
-		theirKeyHex := contactIDFromPublicKey(message.SigPubKey)
+		theirKeyHex := contactIDFromPublicKey(chatEntity.GetSigPubKey())
 		myKeyHex := contactIDFromPublicKey(&m.identity.PublicKey)
 		var theyJoined bool
 		var iJoined bool
@@ -668,4 +668,57 @@ func (m *MessageHandler) messageExists(messageID string, existingMessagesMap map
 		return true, nil
 	}
 	return false, nil
+}
+
+func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmojiR protobuf.EmojiReaction) error {
+	logger := m.logger.With(zap.String("site", "HandleEmojiReaction"))
+	if err := ValidateReceivedEmojiReaction(&pbEmojiR, state.Timesource.GetCurrentTime()); err != nil {
+		logger.Error("invalid emoji reaction", zap.Error(err))
+		return err
+	}
+
+	from := state.CurrentMessageState.Contact.ID
+
+	emojiReaction := &EmojiReaction{
+		EmojiReaction: pbEmojiR,
+		From:          from,
+		SigPubKey:     state.CurrentMessageState.PublicKey,
+	}
+
+	existingEmoji, err := m.persistence.EmojiReactionByID(emojiReaction.ID())
+	if err != errRecordNotFound && err != nil {
+		return err
+	}
+
+	if existingEmoji != nil && existingEmoji.Clock >= pbEmojiR.Clock {
+		// this is not a valid emoji, ignoring
+		return nil
+	}
+
+	chat, err := m.matchChatEntity(emojiReaction, state.AllChats, state.Timesource)
+	if err != nil {
+		return err // matchChatEntity returns a descriptive error message
+	}
+
+	// Set local chat id
+	emojiReaction.LocalChatID = chat.ID
+
+	logger.Debug("Handling emoji reaction")
+
+	if chat.LastClockValue < pbEmojiR.Clock {
+		chat.LastClockValue = pbEmojiR.Clock
+	}
+
+	state.ModifiedChats[chat.ID] = true
+	state.AllChats[chat.ID] = chat
+
+	// save emoji reaction
+	err = m.persistence.SaveEmojiReaction(emojiReaction)
+	if err != nil {
+		return err
+	}
+
+	state.EmojiReactions[emojiReaction.ID()] = emojiReaction
+
+	return nil
 }

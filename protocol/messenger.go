@@ -87,10 +87,11 @@ type RawResponse struct {
 }
 
 type MessengerResponse struct {
-	Chats         []*Chat                     `json:"chats,omitempty"`
-	Messages      []*Message                  `json:"messages,omitempty"`
-	Contacts      []*Contact                  `json:"contacts,omitempty"`
-	Installations []*multidevice.Installation `json:"installations,omitempty"`
+	Chats          []*Chat                     `json:"chats,omitempty"`
+	Messages       []*Message                  `json:"messages,omitempty"`
+	Contacts       []*Contact                  `json:"contacts,omitempty"`
+	Installations  []*multidevice.Installation `json:"installations,omitempty"`
+	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
@@ -1409,7 +1410,6 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		}
 	}
 
-	logger := m.logger.With(zap.String("site", "Send"), zap.String("chatID", message.ChatId))
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -1423,38 +1423,9 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
-	var encodedMessage []byte
-	switch chat.ChatType {
-	case ChatTypeOneToOne:
-		logger.Debug("sending private message")
-		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
-		encodedMessage, err = proto.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-	case ChatTypePublic:
-		logger.Debug("sending public message", zap.String("chatName", chat.Name))
-		message.MessageType = protobuf.ChatMessage_PUBLIC_GROUP
-		encodedMessage, err = proto.Marshal(message)
-		if err != nil {
-			return nil, err
-		}
-	case ChatTypePrivateGroupChat:
-		message.MessageType = protobuf.ChatMessage_PRIVATE_GROUP
-		logger.Debug("sending group message", zap.String("chatName", chat.Name))
-
-		group, err := newProtocolGroupFromChat(chat)
-		if err != nil {
-			return nil, err
-		}
-
-		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, &message.ChatMessage)
-		if err != nil {
-			return nil, err
-		}
-
-	default:
-		return nil, errors.New("chat type not supported")
+	encodedMessage, err := m.encodeChatEntity(chat, message)
+	if err != nil {
+		return nil, err
 	}
 
 	id, err := m.dispatchMessage(ctx, common.RawMessage{
@@ -1805,6 +1776,9 @@ type ReceivedMessageState struct {
 	ModifiedInstallations map[string]bool
 	// Map of existing messages
 	ExistingMessagesMap map[string]bool
+	// EmojiReactions is a list of emoji reactions for the current batch
+	// indexed by from-message-id-emoji-type
+	EmojiReactions map[string]*EmojiReaction
 	// Response to the client
 	Response *MessengerResponse
 	// Timesource is a time source for clock values/timestamps.
@@ -1822,6 +1796,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
+		EmojiReactions:        make(map[string]*EmojiReaction),
 		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
 	}
@@ -1878,11 +1853,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				if msg.ParsedMessage != nil {
 					logger.Debug("Handling parsed message")
-					switch msg.ParsedMessage.(type) {
+					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
 						logger.Debug("Handling MembershipUpdateMessage")
 
-						rawMembershipUpdate := msg.ParsedMessage.(protobuf.MembershipUpdateMessage)
+						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
 
 						err = m.handler.HandleMembershipUpdate(messageState, messageState.AllChats[rawMembershipUpdate.ChatId], rawMembershipUpdate, m.systemMessagesTranslations)
 						if err != nil {
@@ -1892,18 +1867,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.ChatMessage:
 						logger.Debug("Handling ChatMessage")
-						messageState.CurrentMessageState.Message = msg.ParsedMessage.(protobuf.ChatMessage)
+						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
 						err = m.handler.HandleChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
 							continue
 						}
+
 					case protobuf.PairInstallation:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
-						p := msg.ParsedMessage.(protobuf.PairInstallation)
+						p := msg.ParsedMessage.Interface().(protobuf.PairInstallation)
 						logger.Debug("Handling PairInstallation", zap.Any("message", p))
 						err = m.handler.HandlePairInstallation(messageState, p)
 						if err != nil {
@@ -1917,44 +1893,48 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						p := msg.ParsedMessage.(protobuf.SyncInstallationContact)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationContact)
 						logger.Debug("Handling SyncInstallationContact", zap.Any("message", p))
 						err = m.handler.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationContact", zap.Error(err))
 							continue
 						}
+
 					case protobuf.SyncInstallationPublicChat:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
 
-						p := msg.ParsedMessage.(protobuf.SyncInstallationPublicChat)
+						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
 						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
 						err = m.handler.HandleSyncInstallationPublicChat(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationPublicChat", zap.Error(err))
 							continue
 						}
+
 					case protobuf.RequestAddressForTransaction:
-						command := msg.ParsedMessage.(protobuf.RequestAddressForTransaction)
+						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)
 						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))
 						err = m.handler.HandleRequestAddressForTransaction(messageState, command)
 						if err != nil {
 							logger.Warn("failed to handle RequestAddressForTransaction", zap.Error(err))
 							continue
 						}
+
 					case protobuf.SendTransaction:
-						command := msg.ParsedMessage.(protobuf.SendTransaction)
+						command := msg.ParsedMessage.Interface().(protobuf.SendTransaction)
 						logger.Debug("Handling SendTransaction", zap.Any("message", command))
 						err = m.handler.HandleSendTransaction(messageState, command)
 						if err != nil {
 							logger.Warn("failed to handle SendTransaction", zap.Error(err))
 							continue
 						}
+
 					case protobuf.AcceptRequestAddressForTransaction:
-						command := msg.ParsedMessage.(protobuf.AcceptRequestAddressForTransaction)
+						command := msg.ParsedMessage.Interface().(protobuf.AcceptRequestAddressForTransaction)
 						logger.Debug("Handling AcceptRequestAddressForTransaction")
 						err = m.handler.HandleAcceptRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -1963,7 +1943,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeclineRequestAddressForTransaction:
-						command := msg.ParsedMessage.(protobuf.DeclineRequestAddressForTransaction)
+						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestAddressForTransaction)
 						logger.Debug("Handling DeclineRequestAddressForTransaction")
 						err = m.handler.HandleDeclineRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -1972,7 +1952,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeclineRequestTransaction:
-						command := msg.ParsedMessage.(protobuf.DeclineRequestTransaction)
+						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestTransaction)
 						logger.Debug("Handling DeclineRequestTransaction")
 						err = m.handler.HandleDeclineRequestTransaction(messageState, command)
 						if err != nil {
@@ -1981,18 +1961,17 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.RequestTransaction:
-						command := msg.ParsedMessage.(protobuf.RequestTransaction)
+						command := msg.ParsedMessage.Interface().(protobuf.RequestTransaction)
 						logger.Debug("Handling RequestTransaction")
 						err = m.handler.HandleRequestTransaction(messageState, command)
 						if err != nil {
 							logger.Warn("failed to handle RequestTransaction", zap.Error(err))
 							continue
 						}
+
 					case protobuf.ContactUpdate:
 						logger.Debug("Handling ContactUpdate")
-
-						contactUpdate := msg.ParsedMessage.(protobuf.ContactUpdate)
-
+						contactUpdate := msg.ParsedMessage.Interface().(protobuf.ContactUpdate)
 						err = m.handler.HandleContactUpdate(messageState, contactUpdate)
 						if err != nil {
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
@@ -2004,7 +1983,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQuery")
-						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, msg.ParsedMessage.(protobuf.PushNotificationQuery)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationQuery)); err != nil {
 							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -2015,7 +1994,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRegistrationResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRegistrationResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationRegistrationResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -2026,7 +2005,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationResponse", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -2038,7 +2017,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQueryResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.(protobuf.PushNotificationQueryResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationQueryResponse)); err != nil {
 							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -2050,11 +2029,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRequest")
-						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ParsedMessage.(protobuf.PushNotificationRequest)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
 							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
 						continue
+					case protobuf.EmojiReaction:
+						logger.Debug("Handling EmojiReaction")
+						err = m.handler.HandleEmojiReaction(messageState, msg.ParsedMessage.Interface().(protobuf.EmojiReaction))
+						if err != nil {
+							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
+							continue
+						}
 
 					default:
 						// Check if is an encrypted PushNotificationRegistration
@@ -2064,14 +2050,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 								continue
 							}
 							logger.Debug("Handling PushNotificationRegistration")
-							if err := m.pushNotificationServer.HandlePushNotificationRegistration(publicKey, msg.ParsedMessage.([]byte)); err != nil {
+							if err := m.pushNotificationServer.HandlePushNotificationRegistration(publicKey, msg.ParsedMessage.Interface().([]byte)); err != nil {
 								logger.Warn("failed to handle PushNotificationRegistration", zap.Error(err))
 							}
 							// We continue in any case, no changes to messenger
 							continue
 						}
 
-						logger.Debug("message not handled", zap.Any("messageType", reflect.TypeOf(msg.ParsedMessage)))
+						logger.Debug("message not handled", zap.Any("messageType", reflect.TypeOf(msg.ParsedMessage.Interface())))
 
 					}
 				}
@@ -2129,6 +2115,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for _, emojiReaction := range messageState.EmojiReactions {
+		messageState.Response.EmojiReactions = append(messageState.Response.EmojiReactions, emojiReaction)
 	}
 
 	if len(contactsToSave) > 0 {
@@ -2381,7 +2371,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, err
 	}
 
-	message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.Text = "Request transaction"
 
@@ -2458,7 +2448,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, err
 	}
 
-	message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.Text = "Request address for transaction"
 
@@ -2892,7 +2882,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 	message.LocalChatID = chatID
 
@@ -2993,7 +2983,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			}
 		}
 
-		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
 		message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
 		message.LocalChatID = chatID
 		message.OutgoingStatus = ""
@@ -3234,4 +3224,162 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 	}
 	return name, identicon, nil
 
+}
+
+func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	var response MessengerResponse
+
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	emojiR := &EmojiReaction{
+		EmojiReaction: protobuf.EmojiReaction{
+			Clock:     clock,
+			MessageId: messageID,
+			ChatId:    chatID,
+			Type:      emojiID,
+		},
+		LocalChatID: chatID,
+		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+	}
+	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID: chatID,
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		// Don't resend using datasync, that would create quite a lot
+		// of traffic if clicking too eagelry
+		ResendAutomatically: false,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	response.EmojiReactions = []*EmojiReaction{emojiR}
+	response.Chats = []*Chat{chat}
+
+	err = m.persistence.SaveEmojiReaction(emojiR)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*EmojiReaction, error) {
+	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
+}
+
+func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	emojiR, err := m.persistence.EmojiReactionByID(emojiReactionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check that the sender is the key owner
+	pk := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+	if emojiR.From != pk {
+		return nil, errors.Errorf("identity mismatch, "+
+			"emoji reactions can only be retracted by the reaction sender, "+
+			"emoji reaction sent by '%s', current identity '%s'",
+			emojiR.From, pk,
+		)
+	}
+
+	// Get chat and clock
+	chat, ok := m.allChats[emojiR.GetChatId()]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	// Update the relevant fields
+	emojiR.Clock = clock
+	emojiR.Retracted = true
+
+	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
+	if err != nil {
+		return nil, err
+	}
+
+	// Send the marshalled EmojiReactionRetraction protobuf
+	_, err = m.dispatchMessage(ctx, common.RawMessage{
+		LocalChatID: emojiR.GetChatId(),
+		Payload:     encodedMessage,
+		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		// Don't resend using datasync, that would create quite a lot
+		// of traffic if clicking too eagelry
+		ResendAutomatically: false,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Update MessengerResponse
+	response := MessengerResponse{}
+	emojiR.Retracted = true
+	response.EmojiReactions = []*EmojiReaction{emojiR}
+	response.Chats = []*Chat{chat}
+
+	// Persist retraction state for emoji reaction
+	err = m.persistence.SaveEmojiReaction(emojiR)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]byte, error) {
+	var encodedMessage []byte
+	var err error
+	l := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chat.ID))
+
+	switch chat.ChatType {
+	case ChatTypeOneToOne:
+		l.Debug("sending private message")
+		message.SetMessageType(protobuf.MessageType_ONE_TO_ONE)
+		encodedMessage, err = proto.Marshal(message.GetProtobuf())
+		if err != nil {
+			return nil, err
+		}
+	case ChatTypePublic:
+		l.Debug("sending public message", zap.String("chatName", chat.Name))
+		message.SetMessageType(protobuf.MessageType_PUBLIC_GROUP)
+		encodedMessage, err = proto.Marshal(message.GetProtobuf())
+		if err != nil {
+			return nil, err
+		}
+	case ChatTypePrivateGroupChat:
+		message.SetMessageType(protobuf.MessageType_PRIVATE_GROUP)
+		l.Debug("sending group message", zap.String("chatName", chat.Name))
+
+		group, err := newProtocolGroupFromChat(chat)
+		if err != nil {
+			return nil, err
+		}
+
+		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, errors.New("chat type not supported")
+	}
+
+	return encodedMessage, nil
 }

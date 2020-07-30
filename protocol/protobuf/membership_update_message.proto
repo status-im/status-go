@@ -3,6 +3,7 @@ syntax = "proto3";
 package protobuf;
 
 import "chat_message.proto";
+import "emoji_reaction.proto";
 
 message MembershipUpdateEvent {
   // Lamport timestamp of the event
@@ -35,6 +36,10 @@ message MembershipUpdateMessage {
   // A list of events for this group chat, first x bytes are the signature, then is a 
   // protobuf encoded MembershipUpdateEvent
   repeated bytes events = 2;
+
   // An optional chat message
-  ChatMessage message = 3;
+  oneof chat_entity {
+    ChatMessage message = 3;
+    EmojiReaction emoji_reaction = 4;
+  }
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"log"
+	"reflect"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/copier"
@@ -25,7 +26,7 @@ type StatusMessage struct {
 	// Type is the type of application message contained
 	Type protobuf.ApplicationMetadataMessage_Type `json:"-"`
 	// ParsedMessage is the parsed message by the application layer, i.e the output
-	ParsedMessage interface{} `json:"-"`
+	ParsedMessage *reflect.Value `json:"-"`
 
 	// TransportPayload is the payload as received from the transport layer
 	TransportPayload []byte `json:"-"`
@@ -175,241 +176,90 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 func (m *StatusMessage) HandleApplication() error {
 	switch m.Type {
 	case protobuf.ApplicationMetadataMessage_CHAT_MESSAGE:
-		var message protobuf.ChatMessage
+		return m.unmarshalProtobufData(new(protobuf.ChatMessage))
 
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode ChatMessage: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE:
-		var message protobuf.MembershipUpdateMessage
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode MembershipUpdateMessage: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.MembershipUpdateMessage))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION:
-		var message protobuf.AcceptRequestAddressForTransaction
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode AcceptRequestAddressForTransaction: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.AcceptRequestAddressForTransaction))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_SEND_TRANSACTION:
-		var message protobuf.SendTransaction
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode SendTransaction: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.SendTransaction))
 
 	case protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION:
-		var message protobuf.RequestTransaction
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode RequestTransaction: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.RequestTransaction))
 
 	case protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION:
-		var message protobuf.DeclineRequestAddressForTransaction
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode DeclineRequestAddressForTransaction: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.DeclineRequestAddressForTransaction))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION:
-		var message protobuf.DeclineRequestTransaction
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode DeclineRequestTransaction: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.DeclineRequestTransaction))
 
 	case protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION:
-		var message protobuf.RequestAddressForTransaction
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode RequestAddressForTransaction: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.RequestAddressForTransaction))
 
 	case protobuf.ApplicationMetadataMessage_CONTACT_UPDATE:
-		var message protobuf.ContactUpdate
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode ContactUpdate: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.ContactUpdate))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION:
-		var message protobuf.SyncInstallation
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode SyncInstallation: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.SyncInstallation))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_CONTACT:
-		var message protobuf.SyncInstallationContact
 		log.Printf("Sync installation contact")
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode SyncInstallationContact: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.SyncInstallationContact))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_PUBLIC_CHAT:
-		var message protobuf.SyncInstallationPublicChat
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode SyncInstallationPublicChat: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.SyncInstallationPublicChat))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_SYNC_INSTALLATION_ACCOUNT:
-		var message protobuf.SyncInstallationAccount
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode SyncInstallationAccount: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
+		return m.unmarshalProtobufData(new(protobuf.SyncInstallationAccount))
 
-			return nil
-		}
 	case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
-		var message protobuf.PairInstallation
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode PairInstallation: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
-	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
-		// This message is a bit different as it's encrypted, so we pass it straight through
-
-		m.ParsedMessage = m.DecryptedPayload
-
-		return nil
+		return m.unmarshalProtobufData(new(protobuf.PairInstallation))
 
 	case protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT:
-		var message protobuf.ContactCodeAdvertisement
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode ContactCodeAdvertisement: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
-
+		return m.unmarshalProtobufData(new(protobuf.ContactCodeAdvertisement))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST:
-		var message protobuf.PushNotificationRequest
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode PushNotificationRequest: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
-
+		return m.unmarshalProtobufData(new(protobuf.PushNotificationRequest))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION_RESPONSE:
-		var message protobuf.PushNotificationRegistrationResponse
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode PushNotificationRegistrationResponse: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.PushNotificationRegistrationResponse))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY:
-		var message protobuf.PushNotificationQuery
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode PushNotificationQuery: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.PushNotificationQuery))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_QUERY_RESPONSE:
-		var message protobuf.PushNotificationQueryResponse
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode PushNotificationQueryResponse: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
+		return m.unmarshalProtobufData(new(protobuf.PushNotificationQueryResponse))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_RESPONSE:
-		var message protobuf.PushNotificationResponse
-		err := proto.Unmarshal(m.DecryptedPayload, &message)
-		if err != nil {
-			m.ParsedMessage = nil
-			log.Printf("[message::DecodeMessage] could not decode PushNotificationResponse: %#x, err: %v", m.Hash, err.Error())
-		} else {
-			m.ParsedMessage = message
-
-			return nil
-		}
-
+		return m.unmarshalProtobufData(new(protobuf.PushNotificationResponse))
+	case protobuf.ApplicationMetadataMessage_EMOJI_REACTION:
+		return m.unmarshalProtobufData(new(protobuf.EmojiReaction))
+	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
+		// This message is a bit different as it's encrypted, so we pass it straight through
+		v := reflect.ValueOf(m.DecryptedPayload)
+		m.ParsedMessage = &v
+		return nil
 	}
+	return nil
+}
+
+func (m *StatusMessage) unmarshalProtobufData(pb proto.Message) error {
+	var ptr proto.Message
+	rv := reflect.ValueOf(pb)
+	if rv.Kind() == reflect.Ptr {
+		ptr = pb
+	} else {
+		ptr = rv.Addr().Interface().(proto.Message)
+	}
+
+	err := proto.Unmarshal(m.DecryptedPayload, ptr)
+	if err != nil {
+		m.ParsedMessage = nil
+		log.Printf("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())
+	} else {
+		rv = reflect.ValueOf(ptr)
+		elem := rv.Elem()
+		m.ParsedMessage = &elem
+		return nil
+	}
+
 	return nil
 }

@@ -16,6 +16,8 @@
 // 1593087212_add_mute_chat_and_raw_message_fields.up.sql (215B)
 // 1595862781_add_audio_data.down.sql (0)
 // 1595862781_add_audio_data.up.sql (246B)
+// 1595865249_create_emoji_reactions_table.down.sql (27B)
+// 1595865249_create_emoji_reactions_table.up.sql (300B)
 // doc.go (850B)
 
 package migrations
@@ -380,7 +382,7 @@ func _1595862781_add_audio_dataDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1595862781_add_audio_data.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595862768, 0)}
+	info := bindataFileInfo{name: "1595862781_add_audio_data.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1595864522, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
 	return a, nil
 }
@@ -400,8 +402,48 @@ func _1595862781_add_audio_dataUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1595862781_add_audio_data.up.sql", size: 246, mode: os.FileMode(0644), modTime: time.Unix(1595862893, 0)}
+	info := bindataFileInfo{name: "1595862781_add_audio_data.up.sql", size: 246, mode: os.FileMode(0644), modTime: time.Unix(1595864522, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xae, 0xd2, 0xee, 0x55, 0xfb, 0x36, 0xa4, 0x92, 0x66, 0xe, 0x81, 0x62, 0x1e, 0x7a, 0x69, 0xa, 0xd5, 0x4b, 0xa5, 0x6a, 0x8d, 0x1d, 0xce, 0xf3, 0x3e, 0xc0, 0x5f, 0x9c, 0x66, 0x1b, 0xb4, 0xed}}
+	return a, nil
+}
+
+var __1595865249_create_emoji_reactions_tableDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\x48\xcd\xcd\xcf\xca\x8c\x2f\x4a\x4d\x4c\x2e\xc9\xcc\xcf\x2b\xb6\x06\x04\x00\x00\xff\xff\x54\xc5\xdd\x49\x1b\x00\x00\x00")
+
+func _1595865249_create_emoji_reactions_tableDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1595865249_create_emoji_reactions_tableDownSql,
+		"1595865249_create_emoji_reactions_table.down.sql",
+	)
+}
+
+func _1595865249_create_emoji_reactions_tableDownSql() (*asset, error) {
+	bytes, err := _1595865249_create_emoji_reactions_tableDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1595865249_create_emoji_reactions_table.down.sql", size: 27, mode: os.FileMode(0644), modTime: time.Unix(1595865239, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6f, 0xbb, 0xdb, 0x8c, 0xd1, 0x17, 0x1b, 0x19, 0x2a, 0x80, 0xc6, 0xb1, 0xc5, 0x47, 0x74, 0x97, 0x32, 0x30, 0x5, 0xa9, 0x9c, 0xa7, 0x60, 0xa, 0xfe, 0xfb, 0x41, 0x6b, 0x25, 0xad, 0x84, 0x20}}
+	return a, nil
+}
+
+var __1595865249_create_emoji_reactions_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\xce\xbd\x4e\x03\x31\x10\x04\xe0\xfe\xa4\x7b\x87\x29\x41\xa2\xa0\xa7\x32\x66\x4f\x58\x18\x5f\xe4\x6c\x50\x52\x9d\x2c\x67\x05\x07\x0e\x96\x6c\x87\xe7\x47\xe4\x1a\x7e\x44\xea\x6f\x76\x67\xb4\x27\xc5\x04\x56\xb7\x96\x60\x06\xb8\x91\x41\x5b\xb3\xe6\x35\xe4\x90\x5f\xe7\xa9\x48\x88\x6d\xce\xef\x15\x17\x7d\x07\xcc\x7b\x3c\x29\xaf\xef\x95\xc7\xca\x9b\x47\xe5\x77\x78\xa0\x1d\x46\x07\x3d\xba\xc1\x1a\xcd\xf0\xb4\xb2\x4a\xd3\xd5\x57\x3c\xa6\x1c\xdf\xa6\x8f\x90\x8e\x02\xe3\xf8\xf4\xde\x6d\xac\x3d\x61\xcd\xc7\x12\x05\x4c\xdb\x5f\xb0\x34\xcf\xfb\xbf\x27\x07\xa9\x35\x3c\xcb\xf4\x6d\xc6\x0f\x8f\x2f\xa1\xfd\x8b\x29\xc7\x90\xa6\xb3\x91\x22\xad\x84\xd8\x64\xa9\xbe\xa3\x41\x6d\x2c\xe3\xba\xef\x2e\x6f\xfa\xee\x33\x00\x00\xff\xff\xe4\x28\x05\xe0\x2c\x01\x00\x00")
+
+func _1595865249_create_emoji_reactions_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1595865249_create_emoji_reactions_tableUpSql,
+		"1595865249_create_emoji_reactions_table.up.sql",
+	)
+}
+
+func _1595865249_create_emoji_reactions_tableUpSql() (*asset, error) {
+	bytes, err := _1595865249_create_emoji_reactions_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1595865249_create_emoji_reactions_table.up.sql", size: 300, mode: os.FileMode(0644), modTime: time.Unix(1595921491, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x3e, 0xc5, 0x43, 0x5c, 0x3d, 0x53, 0x43, 0x2c, 0x1a, 0xa5, 0xb6, 0xbf, 0x7, 0x4, 0x5a, 0x3e, 0x40, 0x8b, 0xa4, 0x57, 0x12, 0x58, 0xbc, 0x42, 0xe2, 0xc3, 0xde, 0x76, 0x98, 0x80, 0xe2, 0xbe}}
 	return a, nil
 }
 
@@ -548,6 +590,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1595862781_add_audio_data.up.sql": _1595862781_add_audio_dataUpSql,
 
+	"1595865249_create_emoji_reactions_table.down.sql": _1595865249_create_emoji_reactions_tableDownSql,
+
+	"1595865249_create_emoji_reactions_table.up.sql": _1595865249_create_emoji_reactions_tableUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -608,7 +654,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1593087212_add_mute_chat_and_raw_message_fields.up.sql":   &bintree{_1593087212_add_mute_chat_and_raw_message_fieldsUpSql, map[string]*bintree{}},
 	"1595862781_add_audio_data.down.sql":                       &bintree{_1595862781_add_audio_dataDownSql, map[string]*bintree{}},
 	"1595862781_add_audio_data.up.sql":                         &bintree{_1595862781_add_audio_dataUpSql, map[string]*bintree{}},
-	"doc.go":                                                   &bintree{docGo, map[string]*bintree{}},
+	"1595865249_create_emoji_reactions_table.down.sql":         &bintree{_1595865249_create_emoji_reactions_tableDownSql, map[string]*bintree{}},
+	"1595865249_create_emoji_reactions_table.up.sql":           &bintree{_1595865249_create_emoji_reactions_tableUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

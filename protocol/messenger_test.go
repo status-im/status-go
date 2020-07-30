@@ -295,11 +295,11 @@ func buildTestMessage(chat Chat) *Message {
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	switch chat.ChatType {
 	case ChatTypePublic:
-		message.MessageType = protobuf.ChatMessage_PUBLIC_GROUP
+		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
 	case ChatTypeOneToOne:
-		message.MessageType = protobuf.ChatMessage_ONE_TO_ONE
+		message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	case ChatTypePrivateGroupChat:
-		message.MessageType = protobuf.ChatMessage_PRIVATE_GROUP
+		message.MessageType = protobuf.MessageType_PRIVATE_GROUP
 	}
 
 	return message
@@ -371,7 +371,7 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
 	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
-	s.Require().Equal(protobuf.ChatMessage_PUBLIC_GROUP, outputMessage.MessageType)
+	s.Require().Equal(protobuf.MessageType_PUBLIC_GROUP, outputMessage.MessageType)
 
 	savedMessages, _, err := s.m.MessageByChatID(chat.ID, "", 10)
 	s.Require().NoError(err)
@@ -402,7 +402,7 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
 	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
-	s.Require().Equal(protobuf.ChatMessage_ONE_TO_ONE, outputMessage.MessageType)
+	s.Require().Equal(protobuf.MessageType_ONE_TO_ONE, outputMessage.MessageType)
 }
 
 func (s *MessengerSuite) TestSendPrivateGroup() {
@@ -435,7 +435,7 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
 	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
-	s.Require().Equal(protobuf.ChatMessage_PRIVATE_GROUP, outputMessage.MessageType)
+	s.Require().Equal(protobuf.MessageType_PRIVATE_GROUP, outputMessage.MessageType)
 }
 
 func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
@@ -463,7 +463,7 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
 	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
-	s.Require().Equal(protobuf.ChatMessage_PRIVATE_GROUP, outputMessage.MessageType)
+	s.Require().Equal(protobuf.MessageType_PRIVATE_GROUP, outputMessage.MessageType)
 }
 
 // Make sure public messages sent by us are not
@@ -2168,7 +2168,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			Message: Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
-					MessageType: protobuf.ChatMessage_PUBLIC_GROUP,
+					MessageType: protobuf.MessageType_PUBLIC_GROUP,
 					Text:        "test-text"},
 			},
 			SigPubKey:      &key1.PublicKey,
@@ -2180,7 +2180,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			Message: Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
-					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					MessageType: protobuf.MessageType_ONE_TO_ONE,
 					Text:        "test-text"},
 			},
 			SigPubKey:      &key1.PublicKey,
@@ -2192,7 +2192,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			Message: Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
-					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					MessageType: protobuf.MessageType_ONE_TO_ONE,
 					Text:        "test-text"},
 			},
 
@@ -2204,7 +2204,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			Message: Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
-					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					MessageType: protobuf.MessageType_ONE_TO_ONE,
 					Text:        "test-text"},
 			},
 
@@ -2216,7 +2216,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			Message: Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
-					MessageType: protobuf.ChatMessage_ONE_TO_ONE,
+					MessageType: protobuf.MessageType_ONE_TO_ONE,
 					Text:        "test-text"},
 			},
 
@@ -2233,7 +2233,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			Message: Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "non-existing-chat",
-					MessageType: protobuf.ChatMessage_PRIVATE_GROUP,
+					MessageType: protobuf.MessageType_PRIVATE_GROUP,
 					Text:        "test-text"},
 			},
 			Error:     true,
@@ -2254,7 +2254,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			s.Empty(message.LocalChatID)
 
 			message.ID = strconv.Itoa(idx) // manually set the ID because messages does not go through messageProcessor
-			chat, err := s.messageHandler.matchMessage(&message, chatsMap, &testTimeSource{})
+			chat, err := s.messageHandler.matchChatEntity(&message, chatsMap, &testTimeSource{})
 			if tc.Error {
 				s.Require().Error(err)
 			} else {

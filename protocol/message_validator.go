@@ -167,19 +167,18 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("chatId can't be empty")
 	}
 
-	if message.ContentType == protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE {
-		return errors.New("unknown content type")
-	}
-
-	if message.ContentType == protobuf.ChatMessage_TRANSACTION_COMMAND {
-		return errors.New("can't receive request address for transaction from others")
-	}
-
-	if message.MessageType == protobuf.ChatMessage_UNKNOWN_MESSAGE_TYPE || message.MessageType == protobuf.ChatMessage_SYSTEM_MESSAGE_PRIVATE_GROUP {
+	if message.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE || message.MessageType == protobuf.MessageType_SYSTEM_MESSAGE_PRIVATE_GROUP {
 		return errors.New("unknown message type")
 	}
 
-	if message.ContentType == protobuf.ChatMessage_STICKER {
+	switch message.ContentType {
+	case protobuf.ChatMessage_UNKNOWN_CONTENT_TYPE:
+		return errors.New("unknown content type")
+
+	case protobuf.ChatMessage_TRANSACTION_COMMAND:
+		return errors.New("can't receive request address for transaction from others")
+
+	case protobuf.ChatMessage_STICKER:
 		if message.Payload == nil {
 			return errors.New("no sticker content")
 		}
@@ -190,9 +189,8 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if len(sticker.Hash) == 0 {
 			return errors.New("sticker hash not set")
 		}
-	}
 
-	if message.ContentType == protobuf.ChatMessage_IMAGE {
+	case protobuf.ChatMessage_IMAGE:
 		if message.Payload == nil {
 			return errors.New("no image content")
 		}
@@ -203,7 +201,6 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if len(image.Payload) == 0 {
 			return errors.New("image payload empty")
 		}
-
 		if image.Type == protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE {
 			return errors.New("image type unknown")
 		}
@@ -224,6 +221,30 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if audio.Type == protobuf.AudioMessage_UNKNOWN_AUDIO_TYPE {
 			return errors.New("audio type unknown")
 		}
+	}
+
+	return nil
+}
+
+func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimestamp uint64) error {
+	if err := validateClockValue(emoji.Clock, whisperTimestamp); err != nil {
+		return err
+	}
+
+	if len(emoji.MessageId) == 0 {
+		return errors.New("message-id can't be empty")
+	}
+
+	if len(emoji.ChatId) == 0 {
+		return errors.New("chat-id can't be empty")
+	}
+
+	if emoji.Type == protobuf.EmojiReaction_UNKNOWN_EMOJI_REACTION_TYPE {
+		return errors.New("unknown emoji reaction type")
+	}
+
+	if emoji.MessageType == protobuf.MessageType_UNKNOWN_MESSAGE_TYPE {
+		return errors.New("unknown message type")
 	}
 
 	return nil

@@ -10,6 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/status-im/markdown"
 
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -148,7 +149,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		CommandParameters *CommandParameters               `json:"commandParameters"`
 		Timestamp         uint64                           `json:"timestamp"`
 		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
-		MessageType       protobuf.ChatMessage_MessageType `json:"messageType"`
+		MessageType       protobuf.MessageType             `json:"messageType"`
 	}{
 		ID:                m.ID,
 		WhisperTimestamp:  m.WhisperTimestamp,
@@ -175,7 +176,6 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		MessageType:       m.MessageType,
 		CommandParameters: m.CommandParameters,
 	}
-
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{
 			Pack: sticker.Pack,
@@ -332,4 +332,22 @@ func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {
 	}
 
 	return "", errors.New("audio format not supported")
+}
+
+// GetSigPubKey returns an ecdsa encoded public key
+// this function is required to implement the ChatEntity interface
+func (m Message) GetSigPubKey() *ecdsa.PublicKey {
+	return m.SigPubKey
+}
+
+// GetProtoBuf returns the struct's embedded protobuf struct
+// this function is required to implement the ChatEntity interface
+func (m *Message) GetProtobuf() proto.Message {
+	return &m.ChatMessage
+}
+
+// SetMessageType a setter for the MessageType field
+// this function is required to implement the ChatEntity interface
+func (m *Message) SetMessageType(messageType protobuf.MessageType) {
+	m.MessageType = messageType
 }
