@@ -391,3 +391,25 @@ func insertMinimalMessage(p sqlitePersistence, id string) error {
 		From:        "me",
 	}})
 }
+
+// Regression test making sure that if audio_duration_ms is null, no error is thrown
+func TestMessagesAudioDurationMsNull(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	id := "message-id-1"
+
+	err = insertMinimalMessage(p, id)
+	require.NoError(t, err)
+
+	_, err = p.db.Exec("UPDATE user_messages SET audio_duration_ms = NULL")
+	require.NoError(t, err)
+
+	m, err := p.MessagesByIDs([]string{id})
+	require.NoError(t, err)
+	require.Len(t, m, 1)
+
+	m, _, err = p.MessageByChatID("chat-id", "", 10)
+	require.NoError(t, err)
+	require.Len(t, m, 1)
+}
