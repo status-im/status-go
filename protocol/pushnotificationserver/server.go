@@ -362,7 +362,7 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 
 	// This can be done asynchronously
 	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
-	err := sendGoRushNotification(goRushRequest, s.config.GorushURL)
+	err := sendGoRushNotification(goRushRequest, s.config.GorushURL, s.config.Logger)
 	if err != nil {
 		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
 		// TODO: handle this error?
