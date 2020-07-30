@@ -3,7 +3,6 @@ package protocol
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"math/rand"
 
@@ -51,8 +50,8 @@ type Chat struct {
 	DeletedAtClockValue uint64 `json:"deletedAtClockValue"`
 
 	// Denormalized fields
-	UnviewedMessagesCount uint   `json:"unviewedMessagesCount"`
-	LastMessage           []byte `json:"lastMessage"`
+	UnviewedMessagesCount uint     `json:"unviewedMessagesCount"`
+	LastMessage           *Message `json:"lastMessage"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat
@@ -100,53 +99,6 @@ func (c *Chat) Validate() error {
 	if c.OneToOne() {
 		_, err := c.PublicKey()
 		return err
-	}
-	return nil
-}
-
-func (c *Chat) MarshalJSON() ([]byte, error) {
-	type ChatAlias Chat
-	item := struct {
-		*ChatAlias
-		LastMessage json.RawMessage `json:"lastMessage"`
-	}{
-		ChatAlias:   (*ChatAlias)(c),
-		LastMessage: c.LastMessage,
-	}
-
-	return json.Marshal(item)
-}
-
-func (c *Chat) UnmarshalJSON(data []byte) error {
-	type ChatAlias Chat
-	aux := struct {
-		*ChatAlias
-		LastMessage *Message `json:"lastMessage"`
-	}{
-		ChatAlias: (*ChatAlias)(c),
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	c.ID = aux.ID
-	c.Name = aux.Name
-	c.Color = aux.Color
-	c.Active = aux.Active
-	c.ChatType = aux.ChatType
-	c.Timestamp = aux.Timestamp
-	c.LastClockValue = aux.LastClockValue
-	c.DeletedAtClockValue = aux.DeletedAtClockValue
-	c.UnviewedMessagesCount = aux.UnviewedMessagesCount
-	c.Members = aux.Members
-	c.MembershipUpdates = aux.MembershipUpdates
-
-	if aux.LastMessage != nil {
-		data, err := json.Marshal(aux.LastMessage)
-		if err != nil {
-			return err
-		}
-		c.LastMessage = data
 	}
 	return nil
 }
@@ -219,17 +171,13 @@ func (c *Chat) NextClockAndTimestamp(timesource TimeSource) (uint64, uint64) {
 
 func (c *Chat) UpdateFromMessage(message *Message, timesource TimeSource) error {
 	c.Timestamp = int64(timesource.GetCurrentTime())
-	higherClock := c.LastClockValue <= message.Clock
-	// If the clock is higher, or last message is nil, we set the message
-	if higherClock || c.LastMessage == nil {
-		jsonMessage, err := json.Marshal(message)
-		if err != nil {
-			return err
-		}
-		c.LastMessage = jsonMessage
+
+	// If the clock of the last message is lower, we set the message
+	if c.LastMessage == nil || c.LastMessage.Clock <= message.Clock {
+		c.LastMessage = message
 	}
 	// If the clock is higher we set the clock
-	if higherClock {
+	if c.LastClockValue < message.Clock {
 		c.LastClockValue = message.Clock
 	}
 	return nil

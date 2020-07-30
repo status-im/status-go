@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/gob"
+	"encoding/json"
 
 	"github.com/pkg/errors"
 
@@ -111,6 +112,15 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		return err
 	}
 
+	// encode last message
+	var encodedLastMessage []byte
+	if chat.LastMessage != nil {
+		encodedLastMessage, err = json.Marshal(chat.LastMessage)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Insert record
 	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted)
 	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`)
@@ -129,7 +139,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.DeletedAtClockValue,
 		chat.UnviewedMessagesCount,
 		chat.LastClockValue,
-		chat.LastMessage,
+		encodedLastMessage,
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 		chat.Muted,
@@ -208,6 +218,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
+			lastMessageBytes         []byte
 		)
 		err = rows.Scan(
 			&chat.ID,
@@ -219,7 +230,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.DeletedAtClockValue,
 			&chat.UnviewedMessagesCount,
 			&chat.LastClockValue,
-			&chat.LastMessage,
+			&lastMessageBytes,
 			&encodedMembers,
 			&encodedMembershipUpdates,
 			&chat.Muted,
@@ -244,6 +255,14 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			return
 		}
 
+		// Restore last message
+		if lastMessageBytes != nil {
+			message := &Message{}
+			if err = json.Unmarshal(lastMessageBytes, message); err != nil {
+				return
+			}
+			chat.LastMessage = message
+		}
 		chat.Alias = alias.String
 		chat.Identicon = identicon.String
 
