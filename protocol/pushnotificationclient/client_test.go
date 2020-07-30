@@ -219,12 +219,17 @@ func (s *ClientSuite) TestShouldRefreshToken() {
 	s.Require().NoError(err)
 
 	// Contacts are added
-	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey, &key3.PublicKey, &key4.PublicKey}))
+	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey, &key3.PublicKey, &key4.PublicKey}, true, true))
 
 	// everything the same
-	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey, &key1.PublicKey}))
+	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey, &key1.PublicKey}, true, true))
 
 	// A contact is removed
-	s.Require().True(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey}))
+	s.Require().True(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey}, true, true))
 
+	// allow from contacts only is disabled
+	s.Require().False(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey, &key1.PublicKey}, true, false))
+
+	// allow from contacts only is enabled
+	s.Require().True(s.client.shouldRefreshToken([]*ecdsa.PublicKey{&key1.PublicKey, &key2.PublicKey}, []*ecdsa.PublicKey{&key2.PublicKey, &key1.PublicKey}, false, true))
 }

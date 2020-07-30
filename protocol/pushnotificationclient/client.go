@@ -436,16 +436,20 @@ func (c *Client) DisableSending() {
 }
 
 func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.Logger.Debug("enabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = true
 	if c.lastPushNotificationRegistration != nil {
+		c.config.Logger.Debug("re-registering after enabling push notifications from contacts only")
 		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
 	}
 	return nil
 }
 
 func (c *Client) DisablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.Logger.Debug("disabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = false
 	if c.lastPushNotificationRegistration != nil {
+		c.config.Logger.Debug("re-registering after disabling push notifications from contacts only")
 		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
 	}
 	return nil
@@ -807,7 +811,7 @@ func (c *Client) allowedKeyList(token []byte, contactIDs []*ecdsa.PublicKey) ([]
 // and return a new one in that case. A token is refreshed only if it's not set
 // or if a contact has been removed
 func (c *Client) getToken(contactIDs []*ecdsa.PublicKey) string {
-	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs) {
+	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs, c.lastPushNotificationRegistration.AllowFromContactsOnly, c.config.AllowFromContactsOnly) {
 		c.config.Logger.Info("refreshing access token")
 		return uuid.New().String()
 	}
@@ -851,8 +855,17 @@ func (c *Client) buildPushNotificationUnregisterMessage() *protobuf.PushNotifica
 	return options
 }
 
-// shouldRefreshToken tells us whether we should pull a new token, that's only necessary when a contact is removed
-func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.PublicKey) bool {
+// shouldRefreshToken tells us whether we should create a new token,
+// that's only necessary when a contact is removed
+// or allowFromContactsOnly is enabled.
+// In both cases we want to invalidate any existing token
+func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.PublicKey, oldAllowFromContactsOnly, newAllowFromContactsOnly bool) bool {
+
+	// Check if allowFromContactsOnly has just been enabled
+	if !oldAllowFromContactsOnly && newAllowFromContactsOnly {
+		return true
+	}
+
 	newContactIDsMap := make(map[string]bool)
 	for _, pk := range newContactIDs {
 		newContactIDsMap[types.EncodeHex(crypto.FromECDSAPub(pk))] = true
