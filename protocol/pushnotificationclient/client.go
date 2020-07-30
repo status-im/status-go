@@ -180,7 +180,11 @@ func (c *Client) Start() error {
 
 	c.subscribeForSentMessages()
 	c.subscribeForScheduledMessages()
+
+	// We start even if push notifications are disabled, as we might
+	// actually be sending an unregister message
 	c.startRegistrationLoop()
+
 	c.startResendingLoop()
 
 	return nil
@@ -197,6 +201,8 @@ func (c *Client) Stop() error {
 func (c *Client) Unregister() error {
 	// stop registration loop
 	c.stopRegistrationLoop()
+
+	c.config.RemoteNotificationsEnabled = false
 
 	registration := c.buildPushNotificationUnregisterMessage()
 	err := c.saveLastPushNotificationRegistration(registration, nil)
@@ -246,6 +252,11 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 		return nil
 	}
 
+	if !c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Info("remote notifications not enabled, not registering")
+		return nil
+	}
+
 	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 }
 
@@ -253,6 +264,8 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
 	c.stopRegistrationLoop()
+
+	c.config.RemoteNotificationsEnabled = true
 
 	// reset servers
 	err := c.resetServers()
@@ -441,7 +454,7 @@ func (c *Client) DisableSending() {
 func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	c.config.Logger.Debug("enabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = true
-	if c.lastPushNotificationRegistration != nil {
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
 		c.config.Logger.Debug("re-registering after enabling push notifications from contacts only")
 		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 	}
@@ -451,7 +464,7 @@ func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.Pub
 func (c *Client) DisablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	c.config.Logger.Debug("disabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = false
-	if c.lastPushNotificationRegistration != nil {
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
 		c.config.Logger.Debug("re-registering after disabling push notifications from contacts only")
 		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 	}
@@ -1211,7 +1224,6 @@ func (c *Client) saveLastPushNotificationRegistration(registration *protobuf.Pus
 	c.lastPushNotificationRegistration = registration
 	c.lastContactIDs = contactIDs
 
-	c.startRegistrationLoop()
 	return nil
 }
 
