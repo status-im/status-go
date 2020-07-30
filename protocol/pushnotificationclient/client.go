@@ -121,9 +121,6 @@ type Config struct {
 	InstallationID string
 
 	Logger *zap.Logger
-
-	// TokenType is the type of token
-	TokenType protobuf.PushNotificationRegistration_TokenType
 }
 
 type Client struct {
@@ -141,6 +138,10 @@ type Client struct {
 	AccessToken string
 	// deviceToken is the device token for this device
 	deviceToken string
+	// TokenType is the type of token
+	tokenType protobuf.PushNotificationRegistration_TokenType
+	// APNTopic is the topic of the apn topic for push notification
+	apnTopic string
 
 	// randomReader only used for testing so we have deterministic encryption
 	reader io.Reader
@@ -245,11 +246,11 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 		return nil
 	}
 
-	return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 }
 
 // Register registers with all the servers
-func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
 	c.stopRegistrationLoop()
 
@@ -260,6 +261,8 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 	}
 
 	c.deviceToken = deviceToken
+	c.apnTopic = apnTopic
+	c.tokenType = tokenType
 
 	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
 	if err != nil {
@@ -440,7 +443,7 @@ func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.Pub
 	c.config.AllowFromContactsOnly = true
 	if c.lastPushNotificationRegistration != nil {
 		c.config.Logger.Debug("re-registering after enabling push notifications from contacts only")
-		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 	}
 	return nil
 }
@@ -450,7 +453,7 @@ func (c *Client) DisablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.Pu
 	c.config.AllowFromContactsOnly = false
 	if c.lastPushNotificationRegistration != nil {
 		c.config.Logger.Debug("re-registering after disabling push notifications from contacts only")
-		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 	}
 	return nil
 }
@@ -549,8 +552,9 @@ func (c *Client) loadLastPushNotificationRegistration() error {
 	c.lastContactIDs = lastContactIDs
 	c.lastPushNotificationRegistration = lastRegistration
 	c.deviceToken = lastRegistration.DeviceToken
+	c.apnTopic = lastRegistration.ApnTopic
+	c.tokenType = lastRegistration.TokenType
 	return nil
-
 }
 
 func (c *Client) stopRegistrationLoop() {
@@ -834,7 +838,8 @@ func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 
 	options := &protobuf.PushNotificationRegistration{
 		AccessToken:           token,
-		TokenType:             c.config.TokenType,
+		TokenType:             c.tokenType,
+		ApnTopic:              c.apnTopic,
 		Version:               c.getVersion(),
 		InstallationId:        c.config.InstallationID,
 		DeviceToken:           c.deviceToken,

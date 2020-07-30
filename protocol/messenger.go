@@ -267,8 +267,6 @@ func NewMessenger(
 
 	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
-	// Hardcoding this for now, as it's the only one we support
-	pushNotificationClientConfig.TokenType = protobuf.PushNotificationRegistration_APN_TOKEN
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
@@ -3146,7 +3144,7 @@ func (m *Messenger) addedContactsAndMutedChatIDs() ([]*ecdsa.PublicKey, []string
 }
 
 // RegisterForPushNotification register deviceToken with any push notification server enabled
-func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType) error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
@@ -3154,7 +3152,7 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	defer m.mutex.Unlock()
 
 	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
+	return m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, contactIDs, mutedChatIDs)
 }
 
 // RegisteredForPushNotifications returns whether we successfully registered with all the servers

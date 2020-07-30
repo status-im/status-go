@@ -57,7 +57,7 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 				Tokens:   []string{registration.DeviceToken},
 				Platform: tokenTypeToGoRushPlatform(registration.TokenType),
 				Message:  defaultNotificationMessage,
-				Topic:    "im.status.ethereum.pr",
+				Topic:    registration.ApnTopic,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hex.EncodeToString(request.Message),
 					ChatID:           request.ChatId,

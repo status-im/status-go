@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/tt"
@@ -26,6 +27,7 @@ import (
 const (
 	bob1DeviceToken = "token-1"
 	bob2DeviceToken = "token-2"
+	testAPNTopic    = "topic"
 )
 
 func TestMessengerPushNotificationSuite(t *testing.T) {
@@ -139,7 +141,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
+	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
@@ -169,7 +171,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
+	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {
@@ -319,7 +321,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	err = bob.EnablePushNotificationsFromContactsOnly()
 	s.Require().NoError(err)
 
-	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
+	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
 	// Pull servers  and check we registered
@@ -463,7 +465,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	err = bob.EnablePushNotificationsFromContactsOnly()
 	s.Require().NoError(err)
 
-	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
+	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
 	// Pull servers  and check we registered
@@ -650,7 +652,7 @@ func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer(
 	err := bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken)
+	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 
 	// Pull servers  and check we registered
 	err = tt.RetryWithBackOff(func() error {
@@ -680,7 +682,7 @@ func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer(
 	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
 	s.Require().NoError(err)
 
-	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken)
+	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
 	s.Require().NoError(err)
 
 	err = tt.RetryWithBackOff(func() error {

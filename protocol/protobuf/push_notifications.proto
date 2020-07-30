@@ -19,6 +19,7 @@ message PushNotificationRegistration {
   bool unregister = 9;
   bytes grant = 10;
   bool allow_from_contacts_only = 11;
+  string apn_topic = 12;
 }
 
 message PushNotificationRegistrationResponse {
