@@ -219,14 +219,18 @@ func (c *Chat) NextClockAndTimestamp(timesource TimeSource) (uint64, uint64) {
 
 func (c *Chat) UpdateFromMessage(message *Message, timesource TimeSource) error {
 	c.Timestamp = int64(timesource.GetCurrentTime())
-	if c.LastClockValue <= message.Clock {
+	higherClock := c.LastClockValue <= message.Clock
+	// If the clock is higher, or last message is nil, we set the message
+	if higherClock || c.LastMessage == nil {
 		jsonMessage, err := json.Marshal(message)
 		if err != nil {
 			return err
 		}
-
-		c.LastClockValue = message.Clock
 		c.LastMessage = jsonMessage
+	}
+	// If the clock is higher we set the clock
+	if higherClock {
+		c.LastClockValue = message.Clock
 	}
 	return nil
 }
