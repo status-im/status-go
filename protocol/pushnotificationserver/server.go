@@ -233,12 +233,12 @@ func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(publicKey), registration.InstallationId)
+	previousVersion, err := s.persistence.GetPushNotificationRegistrationVersion(common.HashPublicKey(publicKey), registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
 
-	if previousRegistration != nil && registration.Version <= previousRegistration.Version {
+	if registration.Version <= previousVersion {
 		return nil, ErrInvalidPushNotificationRegistrationVersion
 	}
 
@@ -290,6 +290,7 @@ func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotifica
 	for _, idAndResponse := range registrations {
 
 		registration := idAndResponse.Registration
+
 		info := &protobuf.PushNotificationQueryInfo{
 			PublicKey:      idAndResponse.ID,
 			Grant:          registration.Grant,
@@ -336,7 +337,7 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 		if err != nil {
 			s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
 			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
-		} else if registration == nil || registration.AccessToken == "" {
+		} else if registration == nil {
 			s.config.Logger.Warn("empty registration")
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
@@ -404,11 +405,7 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	if registration.Unregister {
 		s.config.Logger.Info("unregistering client")
 		// We save an empty registration, only keeping version and installation-id
-		emptyRegistration := &protobuf.PushNotificationRegistration{
-			Version:        registration.Version,
-			InstallationId: registration.InstallationId,
-		}
-		if err := s.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), emptyRegistration); err != nil {
+		if err := s.persistence.UnregisterPushNotificationRegistration(common.HashPublicKey(publicKey), registration.InstallationId, registration.Version); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
 			s.config.Logger.Error("failed to unregister ", zap.Error(err))
 			return response

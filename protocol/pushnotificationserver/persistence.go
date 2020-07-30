@@ -16,8 +16,13 @@ type Persistence interface {
 	GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey []byte, installationID string) (*protobuf.PushNotificationRegistration, error)
 	// GetPushNotificationRegistrationByPublicKey retrieve all the push notification registrations from storage given a public key
 	GetPushNotificationRegistrationByPublicKeys(publicKeys [][]byte) ([]*PushNotificationIDAndRegistration, error)
-	//GetPushNotificationRegistrationPublicKeys return all the public keys stored
+	// GetPushNotificationRegistrationPublicKeys return all the public keys stored
 	GetPushNotificationRegistrationPublicKeys() ([][]byte, error)
+
+	//GetPushNotificationRegistrationVersion returns the latest version or 0 for a given pk and installationID
+	GetPushNotificationRegistrationVersion(publicKey []byte, installationID string) (uint64, error)
+	// UnregisterPushNotificationRegistration unregister a given pk/installationID
+	UnregisterPushNotificationRegistration(publicKey []byte, installationID string, version uint64) error
 
 	// DeletePushNotificationRegistration deletes a push notification registration from storage given a public key and installation id
 	DeletePushNotificationRegistration(publicKey []byte, installationID string) error
@@ -39,8 +44,7 @@ func NewSQLitePersistence(db *sql.DB) Persistence {
 
 func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey []byte, installationID string) (*protobuf.PushNotificationRegistration, error) {
 	var marshaledRegistration []byte
-	var version uint64
-	err := p.db.QueryRow(`SELECT version,registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID).Scan(&version, &marshaledRegistration)
+	err := p.db.QueryRow(`SELECT registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ? AND registration IS NOT NULL`, publicKey, installationID).Scan(&marshaledRegistration)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -48,19 +52,23 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstall
 		return nil, err
 	}
 
-	registration := &protobuf.PushNotificationRegistration{
-		InstallationId: installationID,
-		Version:        version,
-	}
-
-	if marshaledRegistration == nil {
-		return registration, nil
-	}
-
+	registration := &protobuf.PushNotificationRegistration{}
 	if err := proto.Unmarshal(marshaledRegistration, registration); err != nil {
 		return nil, err
 	}
 	return registration, nil
+}
+
+func (p *SQLitePersistence) GetPushNotificationRegistrationVersion(publicKey []byte, installationID string) (uint64, error) {
+	registration, err := p.GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey, installationID)
+	if err != nil {
+		return 0, err
+	}
+
+	if registration == nil {
+		return 0, nil
+	}
+	return registration.Version, nil
 }
 
 type PushNotificationIDAndRegistration struct {
@@ -78,7 +86,7 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 
 	inVector := strings.Repeat("?, ", len(publicKeys)-1) + "?"
 
-	rows, err := p.db.Query(`SELECT public_key,registration FROM push_notification_server_registrations WHERE public_key IN (`+inVector+`)`, publicKeyArgs...) // nolint: gosec
+	rows, err := p.db.Query(`SELECT public_key,registration FROM push_notification_server_registrations WHERE registration IS NOT NULL AND public_key IN (`+inVector+`)`, publicKeyArgs...) // nolint: gosec
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +143,11 @@ func (p *SQLitePersistence) SavePushNotificationRegistration(publicKey []byte, r
 	}
 
 	_, err = p.db.Exec(`INSERT INTO push_notification_server_registrations (public_key, installation_id, version, registration) VALUES (?, ?, ?, ?)`, publicKey, registration.InstallationId, registration.Version, marshaledRegistration)
+	return err
+}
+
+func (p *SQLitePersistence) UnregisterPushNotificationRegistration(publicKey []byte, installationID string, version uint64) error {
+	_, err := p.db.Exec(`UPDATE push_notification_server_registrations SET registration = NULL, version = ? WHERE public_key = ? AND installation_id = ?`, version, publicKey, installationID)
 	return err
 }
 
