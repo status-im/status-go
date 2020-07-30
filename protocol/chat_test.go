@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -84,7 +85,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 
 	// Clock is lower and lastMessage is not nil
 	message = &Message{}
-	lastMessage := []byte("test")
+	lastMessage := message
 	chat = &Chat{LastClockValue: 2, LastMessage: lastMessage}
 
 	message.Clock = 1
@@ -100,4 +101,40 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
 	s.Require().NotNil(chat.LastMessage)
 	s.Require().Equal(uint64(2), chat.LastClockValue)
+
+	// Clock is higher but lastMessage has lower clock message then the receiving one
+	message = &Message{}
+	chat = &Chat{LastClockValue: 2}
+
+	message.Clock = 1
+	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
+	s.Require().NotNil(chat.LastMessage)
+	s.Require().Equal(uint64(2), chat.LastClockValue)
+
+	chat.LastClockValue = 4
+	message = &Message{}
+	message.Clock = 3
+	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
+	s.Require().Equal(chat.LastMessage, message)
+	s.Require().Equal(uint64(4), chat.LastClockValue)
+
+}
+
+func (s *ChatTestSuite) TestSerializeJSON() {
+
+	message := &Message{}
+	chat := &Chat{}
+
+	message.Clock = 1
+	message.Text = "`some markdown text`"
+	s.Require().NoError(message.PrepareContent())
+	chat.LastMessage = message
+
+	encodedJSON, err := json.Marshal(chat)
+	s.Require().NoError(err)
+
+	decodedChat := &Chat{}
+
+	s.Require().NoError(json.Unmarshal(encodedJSON, decodedChat))
+	s.Require().Equal(chat, decodedChat)
 }

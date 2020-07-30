@@ -761,7 +761,7 @@ func (db sqlitePersistence) BlockContact(contact *Contact) ([]*Chat, error) {
 				if err != nil {
 					return nil, err
 				}
-				c.LastMessage = encodedMessage
+				c.LastMessage = message
 
 			}
 

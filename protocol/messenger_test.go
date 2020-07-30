@@ -941,7 +941,7 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           []byte("test"),
+		LastMessage:           &Message{},
 	}
 
 	s.Require().NoError(s.m.SaveChat(&chat))
@@ -966,7 +966,7 @@ func (s *MessengerSuite) TestDeleteChat() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           []byte("test"),
+		LastMessage:           &Message{},
 	}
 
 	s.Require().NoError(s.m.SaveChat(&chat))
@@ -989,7 +989,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           []byte("test"),
+		LastMessage:           &Message{},
 	}
 
 	s.Require().NoError(s.m.SaveChat(&chat))
@@ -1023,7 +1023,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           []byte("test"),
+		LastMessage:           &Message{},
 	}
 	contact := Contact{
 		ID: testPK,
@@ -1112,7 +1112,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           []byte("test"),
+		LastMessage:           &Message{},
 	}
 	s.Require().NoError(s.m.SaveChat(&chat))
 	savedChats := s.m.Chats()
@@ -1279,17 +1279,12 @@ func (s *MessengerSuite) TestBlockContact() {
 	s.Require().Equal(uint(2), response[1].UnviewedMessagesCount)
 
 	// The new message content is updated
-	decodedMessage := &Message{}
 	s.Require().NotNil(response[0].LastMessage)
 
-	s.Require().NoError(json.Unmarshal(response[0].LastMessage, decodedMessage))
-	s.Require().Equal("test-7", decodedMessage.ID)
+	s.Require().Equal("test-7", response[0].LastMessage.ID)
 
-	decodedMessage = &Message{}
 	s.Require().NotNil(response[1].LastMessage)
-
-	s.Require().NoError(json.Unmarshal(response[1].LastMessage, decodedMessage))
-	s.Require().Equal("test-5", decodedMessage.ID)
+	s.Require().Equal("test-5", response[1].LastMessage.ID)
 
 	// The contact is updated
 	savedContacts := s.m.Contacts()
@@ -2087,7 +2082,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 		From: "from-field",
 	}
 
-	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","seen":false,"quotedMessage":null,"rtl":false,"parsedText":null,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"replace":"","responseTo":"","ensName":"","sticker":null,"commandParameters":null,"timestamp":0,"contentType":0,"messageType":0}`
+	expectedJSON := `{"id":"test-1","whisperTimestamp":0,"from":"from-field","alias":"alias","identicon":"","seen":false,"quotedMessage":null,"rtl":false,"lineCount":0,"text":"test-1","chatId":"remote-chat-id","localChatId":"local-chat-id","clock":1,"replace":"","responseTo":"","ensName":"","sticker":null,"commandParameters":null,"timestamp":0,"contentType":0,"messageType":0}`
 
 	messageJSON, err := json.Marshal(message)
 	s.Require().NoError(err)

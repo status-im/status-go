@@ -100,7 +100,7 @@ type Message struct {
 	// RTL is whether this is a right-to-left message (arabic/hebrew script etc)
 	RTL bool `json:"rtl"`
 	// ParsedText is the parsed markdown for displaying
-	ParsedText []byte `json:"parsedText"`
+	ParsedText []byte `json:"parsedText,omitempty"`
 	// LineCount is the count of newlines in the message
 	LineCount int `json:"lineCount"`
 	// Base64Image is the converted base64 image
@@ -133,7 +133,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		OutgoingStatus    string                           `json:"outgoingStatus,omitempty"`
 		QuotedMessage     *QuotedMessage                   `json:"quotedMessage"`
 		RTL               bool                             `json:"rtl"`
-		ParsedText        json.RawMessage                  `json:"parsedText"`
+		ParsedText        json.RawMessage                  `json:"parsedText,omitempty"`
 		LineCount         int                              `json:"lineCount"`
 		Text              string                           `json:"text"`
 		ChatID            string                           `json:"chatId"`
@@ -199,6 +199,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 		ChatID          string                           `json:"chatId"`
 		Sticker         *protobuf.StickerMessage         `json:"sticker"`
 		AudioDurationMs uint64                           `json:"audioDurationMs"`
+		ParsedText      json.RawMessage                  `json:"parsedText"`
 		ContentType     protobuf.ChatMessage_ContentType `json:"contentType"`
 	}{
 		Alias: (*Alias)(m),
@@ -218,6 +219,7 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	m.EnsName = aux.EnsName
 	m.ChatId = aux.ChatID
 	m.ContentType = aux.ContentType
+	m.ParsedText = aux.ParsedText
 	return nil
 }
 
