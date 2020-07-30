@@ -39,7 +39,8 @@ func NewSQLitePersistence(db *sql.DB) Persistence {
 
 func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey []byte, installationID string) (*protobuf.PushNotificationRegistration, error) {
 	var marshaledRegistration []byte
-	err := p.db.QueryRow(`SELECT registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID).Scan(&marshaledRegistration)
+	var version uint64
+	err := p.db.QueryRow(`SELECT version,registration FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID).Scan(&version, &marshaledRegistration)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -47,7 +48,14 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstall
 		return nil, err
 	}
 
-	registration := &protobuf.PushNotificationRegistration{}
+	registration := &protobuf.PushNotificationRegistration{
+		InstallationId: installationID,
+		Version:        version,
+	}
+
+	if marshaledRegistration == nil {
+		return registration, nil
+	}
 
 	if err := proto.Unmarshal(marshaledRegistration, registration); err != nil {
 		return nil, err
@@ -86,6 +94,10 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 		}
 
 		registration := &protobuf.PushNotificationRegistration{}
+		// Skip if there's no registration
+		if marshaledRegistration == nil {
+			continue
+		}
 
 		if err := proto.Unmarshal(marshaledRegistration, registration); err != nil {
 			return nil, err
@@ -97,7 +109,7 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeys(publicKe
 }
 
 func (p *SQLitePersistence) GetPushNotificationRegistrationPublicKeys() ([][]byte, error) {
-	rows, err := p.db.Query(`SELECT public_key FROM push_notification_server_registrations`)
+	rows, err := p.db.Query(`SELECT public_key FROM push_notification_server_registrations WHERE registration IS NOT NULL`)
 	if err != nil {
 		return nil, err
 	}

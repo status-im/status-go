@@ -444,7 +444,7 @@ func (api *PublicAPI) RegisterForPushNotifications(ctx context.Context, deviceTo
 	return api.service.messenger.RegisterForPushNotifications(ctx, deviceToken, apnTopic, tokenType)
 }
 
-func (api *PublicAPI) UnregisterForPushNotifications(ctx context.Context) error {
+func (api *PublicAPI) UnregisterFromPushNotifications(ctx context.Context) error {
 	err := api.service.accountsDB.SaveSetting("remote-push-notifications-enabled?", false)
 	if err != nil {
 		return err

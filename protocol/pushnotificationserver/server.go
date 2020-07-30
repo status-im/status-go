@@ -336,11 +336,10 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 		if err != nil {
 			s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
 			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
-		} else if registration == nil {
+		} else if registration == nil || registration.AccessToken == "" {
 			s.config.Logger.Warn("empty registration")
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
-			s.config.Logger.Warn("invalid access token")
 			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
 		} else {
 			// For now we just assume that the notification will be successful
@@ -403,6 +402,7 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	}
 
 	if registration.Unregister {
+		s.config.Logger.Info("unregistering client")
 		// We save an empty registration, only keeping version and installation-id
 		emptyRegistration := &protobuf.PushNotificationRegistration{
 			Version:        registration.Version,
