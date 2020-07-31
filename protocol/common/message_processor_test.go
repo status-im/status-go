@@ -61,11 +61,9 @@ func (s *MessageProcessorSuite) SetupTest() {
 	database, err := sqlite.Open(filepath.Join(s.tmpDir, "processor-test.sql"), "some-key")
 	s.Require().NoError(err)
 
-	onSendContactCode := func(*encryption.ProtocolMessageSpec) {}
 	encryptionProtocol := encryption.New(
 		database,
 		"installation-1",
-		onSendContactCode,
 		s.logger,
 	)
 
@@ -200,7 +198,6 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	senderEncryptionProtocol := encryption.New(
 		senderDatabase,
 		"installation-2",
-		func(*encryption.ProtocolMessageSpec) {},
 		s.logger,
 	)
 

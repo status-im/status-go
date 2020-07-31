@@ -6,7 +6,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
-	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -18,8 +17,6 @@ type config struct {
 	// as otherwise the client is not notified of a new filter and
 	// won't be pulling messages from mailservers until it reloads the chats/filters
 	onNegotiatedFilters func([]*transport.Filter)
-	// DEPRECATED: no need to expose it
-	onSendContactCodeHandler func(*encryption.ProtocolMessageSpec)
 
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string

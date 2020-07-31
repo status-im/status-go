@@ -24,7 +24,6 @@ const (
 	sharedSecretNegotiationVersion = 1
 	partitionedTopicMinVersion     = 1
 	defaultMinVersion              = 0
-	subscriptionsChannelSize       = 100
 )
 
 type PartitionTopicMode int
@@ -39,7 +38,9 @@ type ProtocolMessageSpec struct {
 	// Installations is the targeted devices
 	Installations []*multidevice.Installation
 	// SharedSecret is a shared secret established among the installations
-	SharedSecret []byte
+	SharedSecret *sharedsecret.Secret
+	// AgreedSecret indicates whether the shared secret has been agreed
+	AgreedSecret bool
 	// Public means that the spec contains a public wrapped message
 	Public bool
 }
@@ -73,8 +74,6 @@ type Protocol struct {
 	publisher     *publisher.Publisher
 	subscriptions *Subscriptions
 
-	onSendContactCodeHandler func(*ProtocolMessageSpec)
-
 	logger *zap.Logger
 }
 
@@ -87,14 +86,12 @@ var (
 func New(
 	db *sql.DB,
 	installationID string,
-	onSendContactCodeHandler func(*ProtocolMessageSpec),
 	logger *zap.Logger,
 ) *Protocol {
 	return NewWithEncryptorConfig(
 		db,
 		installationID,
 		defaultEncryptorConfig(installationID, logger),
-		onSendContactCodeHandler,
 		logger,
 	)
 }
@@ -105,7 +102,6 @@ func NewWithEncryptorConfig(
 	db *sql.DB,
 	installationID string,
 	encryptorConfig encryptorConfig,
-	onSendContactCodeHandler func(*ProtocolMessageSpec),
 	logger *zap.Logger,
 ) *Protocol {
 	return &Protocol{
@@ -116,17 +112,15 @@ func NewWithEncryptorConfig(
 			ProtocolVersion:  protocolVersion,
 			InstallationID:   installationID,
 		}),
-		publisher:                publisher.New(logger),
-		onSendContactCodeHandler: onSendContactCodeHandler,
-		logger:                   logger.With(zap.Namespace("Protocol")),
+		publisher: publisher.New(logger),
+		logger:    logger.With(zap.Namespace("Protocol")),
 	}
 }
 
 type Subscriptions struct {
-	NewInstallations chan []*multidevice.Installation
-	NewSharedSecrets chan []*sharedsecret.Secret
-	SendContactCode  <-chan struct{}
-	Quit             chan struct{}
+	SharedSecrets   []*sharedsecret.Secret
+	SendContactCode <-chan struct{}
+	Quit            chan struct{}
 }
 
 func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
@@ -136,32 +130,10 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
 		return nil, errors.Wrap(err, "failed to get all secrets")
 	}
 	p.subscriptions = &Subscriptions{
-		NewInstallations: make(chan []*multidevice.Installation, subscriptionsChannelSize),
-		NewSharedSecrets: make(chan []*sharedsecret.Secret, subscriptionsChannelSize),
-		SendContactCode:  p.publisher.Start(),
-		Quit:             make(chan struct{}),
+		SharedSecrets:   secrets,
+		SendContactCode: p.publisher.Start(),
+		Quit:            make(chan struct{}),
 	}
-	if len(secrets) > 0 {
-		p.publishNewSharedSecrets(secrets)
-	}
-
-	// Handle Publisher system messages.
-	publisherCh := p.publisher.Start()
-
-	go func() {
-		for range publisherCh {
-			messageSpec, err := p.buildContactCodeMessage(myIdentity)
-			if err != nil {
-				p.logger.Error("failed to build contact code message",
-					zap.String("site", "Start"),
-					zap.Error(err))
-				continue
-			}
-
-			p.onSendContactCodeHandler(messageSpec)
-		}
-	}()
-
 	return p.subscriptions, nil
 }
 
@@ -210,12 +182,6 @@ func (p *Protocol) BuildPublicMessage(myIdentityKey *ecdsa.PrivateKey, payload [
 	}
 
 	return &ProtocolMessageSpec{Message: message, Public: true}, nil
-}
-
-// buildContactCodeMessage creates a contact code message. It's a public message
-// without any data but it carries bundle information.
-func (p *Protocol) buildContactCodeMessage(myIdentityKey *ecdsa.PrivateKey) (*ProtocolMessageSpec, error) {
-	return p.BuildPublicMessage(myIdentityKey, nil)
 }
 
 // BuildDirectMessage returns a 1:1 chat message and optionally a negotiated topic given the user identity private key, the recipient's public key, and a payload
@@ -268,17 +234,11 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 		zap.Bool("has-shared-secret", sharedSecret != nil),
 		zap.Bool("agreed", agreed))
 
-	// Publish shared secrets
-	if sharedSecret != nil {
-		p.publishNewSharedSecrets([]*sharedsecret.Secret{sharedSecret})
-	}
-
 	spec := &ProtocolMessageSpec{
+		SharedSecret:  sharedSecret,
+		AgreedSecret:  agreed,
 		Message:       message,
 		Installations: installations,
-	}
-	if agreed {
-		spec.SharedSecret = sharedSecret.Key
 	}
 	return spec, nil
 }
@@ -425,24 +385,10 @@ func (p *Protocol) ConfirmMessageProcessed(messageID []byte) error {
 	return p.encryptor.ConfirmMessageProcessed(messageID)
 }
 
-func (p *Protocol) publishNewInstallations(installations []*multidevice.Installation) {
-	if p.subscriptions != nil {
-		select {
-		case p.subscriptions.NewInstallations <- installations:
-		default:
-			p.logger.Warn("new installations channel full, dropping message")
-		}
-	}
-}
-
-func (p *Protocol) publishNewSharedSecrets(secrets []*sharedsecret.Secret) {
-	if p.subscriptions != nil {
-		select {
-		case p.subscriptions.NewSharedSecrets <- secrets:
-		default:
-			p.logger.Warn("new sharedsecrets channel full, dropping message")
-		}
-	}
+type DecryptMessageResponse struct {
+	DecryptedMessage []byte
+	Installations    []*multidevice.Installation
+	SharedSecrets    []*sharedsecret.Secret
 }
 
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
@@ -451,8 +397,9 @@ func (p *Protocol) HandleMessage(
 	theirPublicKey *ecdsa.PublicKey,
 	protocolMessage *ProtocolMessage,
 	messageID []byte,
-) ([]byte, error) {
+) (*DecryptMessageResponse, error) {
 	logger := p.logger.With(zap.String("site", "HandleMessage"))
+	response := &DecryptMessageResponse{}
 
 	logger.Debug("received a protocol message", zap.Binary("sender-public-key", crypto.FromECDSAPub(theirPublicKey)), zap.Binary("message-id", messageID))
 
@@ -463,20 +410,19 @@ func (p *Protocol) HandleMessage(
 	// Process bundles
 	for _, bundle := range protocolMessage.GetBundles() {
 		// Should we stop processing if the bundle cannot be verified?
-		addedBundles, err := p.ProcessPublicBundle(myIdentityKey, bundle)
+		newInstallations, err := p.ProcessPublicBundle(myIdentityKey, bundle)
 		if err != nil {
 			return nil, err
 		}
-
-		// Publish without blocking if channel is full
-		p.publishNewInstallations(addedBundles)
+		response.Installations = newInstallations
 	}
 
 	// Check if it's a public message
 	if publicMessage := protocolMessage.GetPublicMessage(); publicMessage != nil {
 		logger.Debug("received a public message in direct message")
 		// Nothing to do, as already in cleartext
-		return publicMessage, nil
+		response.DecryptedMessage = publicMessage
+		return response, nil
 	}
 
 	// Decrypt message
@@ -504,9 +450,10 @@ func (p *Protocol) HandleMessage(
 				return nil, err
 			}
 
-			p.publishNewSharedSecrets([]*sharedsecret.Secret{sharedSecret})
+			response.SharedSecrets = []*sharedsecret.Secret{sharedSecret}
 		}
-		return message, nil
+		response.DecryptedMessage = message
+		return response, nil
 	}
 
 	// Return error

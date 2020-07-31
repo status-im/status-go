@@ -128,27 +128,6 @@ func NewMessenger(
 		}
 	}
 
-	if c.onSendContactCodeHandler == nil {
-		c.onSendContactCodeHandler = func(messageSpec *encryption.ProtocolMessageSpec) {
-			slogger := logger.With(zap.String("site", "onSendContactCodeHandler"))
-			slogger.Debug("received a SendContactCode request")
-
-			newMessage, err := common.MessageSpecToWhisper(messageSpec)
-			if err != nil {
-				slogger.Warn("failed to convert spec to Whisper message", zap.Error(err))
-				return
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			chatName := transport.ContactCodeTopic(&messenger.identity.PublicKey)
-			_, err = messenger.transport.SendPublic(ctx, newMessage, chatName)
-			if err != nil {
-				slogger.Warn("failed to send a contact code", zap.Error(err))
-			}
-		}
-	}
-
 	if c.systemMessagesTranslations == nil {
 		c.systemMessagesTranslations = defaultSystemMessagesTranslations
 	}
@@ -210,7 +189,6 @@ func NewMessenger(
 	encryptionProtocol := encryption.New(
 		database,
 		installationID,
-		c.onSendContactCodeHandler,
 		logger,
 	)
 
@@ -306,15 +284,43 @@ func (m *Messenger) Start() error {
 		}
 	}
 
+	// set shared secret handles
+	m.processor.SetHandleSharedSecrets(m.handleSharedSecrets)
+
 	subscriptions, err := m.encryptor.Start(m.identity)
 	if err != nil {
 		return err
 	}
+
+	// handle stored shared secrets
+	err = m.handleSharedSecrets(subscriptions.SharedSecrets)
+	if err != nil {
+		return err
+	}
+
 	m.handleEncryptionLayerSubscriptions(subscriptions)
 	return nil
 }
 
-func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*transport.Filter, error) {
+// handleSendContactCode sends a public message wrapped in the encryption
+// layer, which will propagate our bundle
+func (m *Messenger) handleSendContactCode() error {
+	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	rawMessage := common.RawMessage{
+		LocalChatID: contactCodeTopic,
+		Payload:     nil,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := m.processor.SendPublic(ctx, contactCodeTopic, rawMessage)
+	if err != nil {
+		m.logger.Warn("failed to send a contact code", zap.Error(err))
+	}
+	return err
+}
+
+// handleSharedSecrets process the negotiated secrets received from the encryption layer
+func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
 	logger := m.logger.With(zap.String("site", "handleSharedSecrets"))
 	var result []*transport.Filter
 	for _, secret := range secrets {
@@ -325,14 +331,19 @@ func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*tran
 		}
 		filter, err := m.transport.ProcessNegotiatedSecret(fSecret)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		result = append(result, filter)
 	}
-	return result, nil
+	if m.config.onNegotiatedFilters != nil {
+		m.config.onNegotiatedFilters(result)
+	}
+
+	return nil
 }
 
-func (m *Messenger) handleNewInstallations(installations []*multidevice.Installation) {
+// handleInstallations adds the installations in the installations map
+func (m *Messenger) handleInstallations(installations []*multidevice.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
 			if _, ok := m.allInstallations[installation.ID]; !ok {
@@ -348,20 +359,11 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 	go func() {
 		for {
 			select {
-			case secrets := <-subscriptions.NewSharedSecrets:
-				m.logger.Debug("handling new shared secrets")
-				filters, err := m.handleSharedSecrets(secrets)
-				if err != nil {
-					m.logger.Warn("failed to process secrets", zap.Error(err))
-					continue
+			case <-subscriptions.SendContactCode:
+				if err := m.handleSendContactCode(); err != nil {
+					m.logger.Error("failed to publish contact code", zap.Error(err))
 				}
 
-				if m.config.onNegotiatedFilters != nil {
-					m.config.onNegotiatedFilters(filters)
-				}
-			case newInstallations := <-subscriptions.NewInstallations:
-				m.logger.Debug("handling new installations")
-				m.handleNewInstallations(newInstallations)
 			case <-subscriptions.Quit:
 				m.logger.Debug("quitting encryption subscription loop")
 				return
@@ -1834,6 +1836,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 			for _, msg := range statusMessages {
 				publicKey := msg.SigPubKey()
+
+				m.handleInstallations(msg.Installations)
+				err := m.handleSharedSecrets(msg.SharedSecrets)
+				if err != nil {
+					// log and continue, non-critical error
+					logger.Warn("failed to handle shared secrets")
+				}
 
 				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)

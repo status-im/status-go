@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/status-im/status-go/protocol/tt"
 
@@ -14,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
 func TestProtocolServiceTestSuite(t *testing.T) {
@@ -48,7 +46,6 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.alice = New(
 		db,
 		"1",
-		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "alice")),
 	)
 
@@ -57,7 +54,6 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.bob = New(
 		db,
 		"2",
-		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "bob")),
 	)
 }
@@ -134,7 +130,6 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 }
 
 func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
-	var secretResponse []*sharedsecret.Secret
 	bobKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	aliceKey, err := crypto.GenerateKey()
@@ -142,12 +137,13 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 
 	payload := []byte("test")
 
-	subscriptions, err := s.bob.Start(bobKey)
+	_, err = s.bob.Start(bobKey)
 	s.Require().NoError(err)
 
 	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
 	s.NotNil(msgSpec, "It creates a message spec")
+	s.Require().NotNil(msgSpec.SharedSecret)
 
 	bundle := msgSpec.Message.GetBundles()[0]
 	s.Require().NotNil(bundle)
@@ -163,19 +159,10 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msgSpec.Message, []byte("message-id"))
 	s.NoError(err)
 
-	select {
-	case <-time.After(2 * time.Second):
-	case secretResponse = <-subscriptions.NewSharedSecrets:
-
-	}
-
-	s.Require().NotNil(secretResponse)
 	s.Require().NoError(s.bob.Stop())
 }
 
 func (s *ProtocolServiceTestSuite) TestPropagatingSavedSharedSecretsOnStart() {
-	var secretResponse []*sharedsecret.Secret
-
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	bobKey, err := crypto.GenerateKey()
@@ -188,10 +175,7 @@ func (s *ProtocolServiceTestSuite) TestPropagatingSavedSharedSecretsOnStart() {
 	subscriptions, err := s.alice.Start(aliceKey)
 	s.Require().NoError(err)
 
-	select {
-	case <-time.After(2 * time.Second):
-	case secretResponse = <-subscriptions.NewSharedSecrets:
-	}
+	secretResponse := subscriptions.SharedSecrets
 
 	s.Require().NotNil(secretResponse)
 	s.Require().Len(secretResponse, 1)

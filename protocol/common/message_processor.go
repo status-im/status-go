@@ -18,6 +18,7 @@ import (
 	"github.com/status-im/status-go/protocol/datasync"
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 	"github.com/status-im/status-go/protocol/encryption"
+	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -60,6 +61,9 @@ type MessageProcessor struct {
 	scheduledMessagesSubscriptions []chan<- *RawMessage
 
 	featureFlags FeatureFlags
+
+	// handleSharedSecrets is a callback that is called every time a new shared secret is negotiated
+	handleSharedSecrets func([]*sharedsecret.Secret) error
 }
 
 func NewMessageProcessor(
@@ -110,7 +114,12 @@ func (p *MessageProcessor) Stop() {
 	for _, c := range p.sentMessagesSubscriptions {
 		close(c)
 	}
+	p.sentMessagesSubscriptions = nil
 	p.datasync.Stop() // idempotent op
+}
+
+func (p *MessageProcessor) SetHandleSharedSecrets(handler func([]*sharedsecret.Secret) error) {
+	p.handleSharedSecrets = handler
 }
 
 // SendPrivate takes encoded data, encrypts it and sends through the wire.
@@ -203,7 +212,7 @@ func (p *MessageProcessor) sendPrivate(
 	} else if rawMessage.SkipEncryption {
 		// When SkipEncryption is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
-		hash, newMessage, err := p.sendRawMessage(ctx, recipient, wrappedMessage, messageIDs)
+		hash, newMessage, err := p.sendPrivateRawMessage(ctx, recipient, wrappedMessage, messageIDs)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send a message spec")
 		}
@@ -214,6 +223,16 @@ func (p *MessageProcessor) sendPrivate(
 		messageSpec, err := p.protocol.BuildDirectMessage(rawMessage.Sender, recipient, wrappedMessage)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to encrypt message")
+		}
+
+		// The shared secret needs to be handle before we send a message
+		// otherwise the topic might not be set up before we receive a message
+		if p.handleSharedSecrets != nil {
+			err := p.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
+			if err != nil {
+				return nil, err
+			}
+
 		}
 
 		messageIDs := [][]byte{messageID}
@@ -305,11 +324,23 @@ func (p *MessageProcessor) SendPublic(
 		return nil, errors.Wrap(err, "failed to wrap message")
 	}
 
-	newMessage := &types.NewMessage{
-		TTL:       whisperTTL,
-		Payload:   wrappedMessage,
-		PowTarget: calculatePoW(wrappedMessage),
-		PowTime:   whisperPoWTime,
+	var newMessage *types.NewMessage
+	if !rawMessage.SkipEncryption {
+		messageSpec, err := p.protocol.BuildPublicMessage(p.identity, wrappedMessage)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
+		}
+		newMessage, err = MessageSpecToWhisper(messageSpec)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		newMessage = &types.NewMessage{
+			TTL:       whisperTTL,
+			Payload:   wrappedMessage,
+			PowTarget: calculatePoW(wrappedMessage),
+			PowTime:   whisperPoWTime,
+		}
 	}
 
 	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
@@ -479,6 +510,16 @@ func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 		return errors.Wrap(err, "failed to encrypt message")
 	}
 
+	// The shared secret needs to be handle before we send a message
+	// otherwise the topic might not be set up before we receive a message
+	if p.handleSharedSecrets != nil {
+		err := p.handleSharedSecrets([]*sharedsecret.Secret{messageSpec.SharedSecret})
+		if err != nil {
+			return err
+		}
+
+	}
+
 	hash, newMessage, err := p.sendMessageSpec(ctx, publicKey, messageSpec, messageIDs)
 	if err != nil {
 		return err
@@ -489,8 +530,8 @@ func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 	return nil
 }
 
-// sendRawMessage sends a message not wrapped in an encryption layer
-func (p *MessageProcessor) sendRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+// sendPrivateRawMessage sends a message not wrapped in an encryption layer
+func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
@@ -517,11 +558,11 @@ func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa
 
 	var hash []byte
 
-	switch {
-	case messageSpec.SharedSecret != nil:
+	// process shared secret
+	if messageSpec.AgreedSecret {
 		logger.Debug("sending using shared secret")
-		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret)
-	default:
+		hash, err = p.transport.SendPrivateWithSharedSecret(ctx, newMessage, publicKey, messageSpec.SharedSecret.Key)
+	} else {
 		logger.Debug("sending partitioned topic")
 		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
 	}

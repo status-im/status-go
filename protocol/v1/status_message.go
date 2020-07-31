@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/datasync"
 	"github.com/status-im/status-go/protocol/encryption"
+	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -45,6 +47,11 @@ type StatusMessage struct {
 	TransportLayerSigPubKey *ecdsa.PublicKey `json:"-"`
 	// ApplicationMetadataLayerPubKey contains the public key provided by the application metadata layer
 	ApplicationMetadataLayerSigPubKey *ecdsa.PublicKey `json:"-"`
+
+	// Installations is the new installations returned by the encryption layer
+	Installations []*multidevice.Installation
+	// SharedSecret is the shared secret returned by the encryption layer
+	SharedSecrets []*sharedsecret.Secret
 }
 
 // Temporary JSON marshaling for those messages that are not yet processed
@@ -117,7 +124,7 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 		return errors.Wrap(err, "failed to unmarshal ProtocolMessage")
 	}
 
-	payload, err := enc.HandleMessage(
+	response, err := enc.HandleMessage(
 		myKey,
 		senderKey,
 		&protocolMessage,
@@ -128,7 +135,9 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 		return errors.Wrap(err, "failed to handle Encryption message")
 	}
 
-	m.DecryptedPayload = payload
+	m.DecryptedPayload = response.DecryptedMessage
+	m.Installations = response.Installations
+	m.SharedSecrets = response.SharedSecrets
 	return nil
 }
 

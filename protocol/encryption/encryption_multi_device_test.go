@@ -64,7 +64,6 @@ func setupUser(user string, s *EncryptionServiceMultiDeviceSuite, n int) error {
 		protocol := New(
 			db,
 			installationID,
-			func(*ProtocolMessageSpec) {},
 			s.logger.With(zap.String("user", user)),
 		)
 		s.services[user].services[i] = protocol

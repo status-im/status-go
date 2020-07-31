@@ -506,7 +506,7 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	retrievedRegistration, err = s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
 	s.Require().Nil(retrievedRegistration)
-	// Check version is mantained
+	// Check version is maintained
 	version, err := s.persistence.GetPushNotificationRegistrationVersion(common.HashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
 	s.Require().Equal(uint64(2), version)

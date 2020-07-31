@@ -1405,7 +1405,7 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 }
 
 func (s *MessengerSuite) TestSharedSecretHandler() {
-	_, err := s.m.handleSharedSecrets(nil)
+	err := s.m.handleSharedSecrets(nil)
 	s.NoError(err)
 }
 
