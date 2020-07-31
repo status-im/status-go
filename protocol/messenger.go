@@ -305,10 +305,29 @@ func (m *Messenger) Start() error {
 // handleSendContactCode sends a public message wrapped in the encryption
 // layer, which will propagate our bundle
 func (m *Messenger) handleSendContactCode() error {
+	var payload []byte
+	if m.pushNotificationClient != nil && m.pushNotificationClient.Enabled() {
+		info, err := m.pushNotificationClient.MyPushNotificationQueryInfo()
+		if err != nil {
+			return err
+		}
+		if len(info) != 0 {
+			contactCode := &protobuf.ContactCodeAdvertisement{
+				PushNotificationInfo: info,
+			}
+
+			payload, err = proto.Marshal(contactCode)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
 	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,
-		Payload:     nil,
+		Payload:     payload,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -2027,6 +2046,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						// We continue in any case, no changes to messenger
 						continue
+					case protobuf.ContactCodeAdvertisement:
+						logger.Debug("Received ContactCodeAdvertisement")
+						if m.pushNotificationClient == nil {
+							continue
+						}
+						logger.Debug("Handling PushNotificationRegistrationResponse")
+						if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)); err != nil {
+							logger.Warn("failed to handle ContactCodeAdvertisement", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+
 					case protobuf.PushNotificationResponse:
 						logger.Debug("Received PushNotificationResponse")
 						if m.pushNotificationClient == nil {

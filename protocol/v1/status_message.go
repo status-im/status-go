@@ -226,7 +226,6 @@ func (m *StatusMessage) HandleApplication() error {
 
 	case protobuf.ApplicationMetadataMessage_PAIR_INSTALLATION:
 		return m.unmarshalProtobufData(new(protobuf.PairInstallation))
-
 	case protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT:
 		return m.unmarshalProtobufData(new(protobuf.ContactCodeAdvertisement))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST:
