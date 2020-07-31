@@ -18,8 +18,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
 var cleartext = []byte("hello")
@@ -56,7 +54,6 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		db,
 		aliceInstallationID,
 		config,
-		func(s []*sharedsecret.Secret) {},
 		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "alice")),
 	)
@@ -68,7 +65,6 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		db,
 		bobInstallationID,
 		config,
-		func(s []*sharedsecret.Secret) {},
 		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "bob")),
 	)

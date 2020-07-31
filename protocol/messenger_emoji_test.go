@@ -47,6 +47,11 @@ func (s *MessengerEmojiSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
+	s.Require().NoError(s.m.Start())
+}
+
+func (s *MessengerEmojiSuite) TearDownTest() {
+	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerEmojiSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
@@ -89,6 +94,7 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	s.Require().NoError(err)
 
 	bob := s.newMessengerWithKey(s.shh, key)
+	s.Require().NoError(bob.Start())
 
 	chatID := statusChatID
 
@@ -162,11 +168,13 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	s.Require().Equal(response.EmojiReactions[0].ID(), emojiID)
 	s.Require().Equal(response.EmojiReactions[0].Type, protobuf.EmojiReaction_SAD)
 	s.Require().True(response.EmojiReactions[0].Retracted)
+	s.Require().NoError(bob.Shutdown())
 }
 
 func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	bob := s.m
 	alice := s.newMessenger(s.shh)
+	s.Require().NoError(alice.Start())
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 
@@ -217,4 +225,5 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 		"no emoji reaction received",
 	)
 	s.Require().NoError(err)
+	s.Require().NoError(alice.Shutdown())
 }

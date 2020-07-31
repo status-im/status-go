@@ -56,6 +56,7 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
+	s.Require().NoError(s.m.Start())
 }
 
 func (s *MessengerPushNotificationSuite) TearDownTest() {
@@ -126,6 +127,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	bob1 := s.m
 	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
+	s.Require().NoError(bob2.Start())
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -432,6 +434,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	alice := s.newMessenger(s.shh)
 	// another contact to invalidate the token
 	frank := s.newMessenger(s.shh)
+	s.Require().NoError(frank.Start())
 	// start alice and enable push notifications
 	s.Require().NoError(alice.Start())
 	s.Require().NoError(alice.EnableSendingPushNotifications())

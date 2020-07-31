@@ -56,6 +56,7 @@ var (
 // mailservers because they can also be managed by the user.
 type Messenger struct {
 	node                       types.Node
+	config                     *config
 	identity                   *ecdsa.PrivateKey
 	persistence                *sqlitePersistence
 	transport                  transport.Transport
@@ -127,18 +128,6 @@ func NewMessenger(
 		}
 	}
 
-	// Set default config fields.
-	onNewSharedSecretHandler := func(secrets []*sharedsecret.Secret) {
-		filters, err := messenger.handleSharedSecrets(secrets)
-		if err != nil {
-			slogger := logger.With(zap.String("site", "onNewSharedSecretHandler"))
-			slogger.Warn("failed to process secrets", zap.Error(err))
-		}
-
-		if c.onNegotiatedFilters != nil {
-			c.onNegotiatedFilters(filters)
-		}
-	}
 	if c.onSendContactCodeHandler == nil {
 		c.onSendContactCodeHandler = func(messageSpec *encryption.ProtocolMessageSpec) {
 			slogger := logger.With(zap.String("site", "onSendContactCodeHandler"))
@@ -221,7 +210,6 @@ func NewMessenger(
 	encryptionProtocol := encryption.New(
 		database,
 		installationID,
-		onNewSharedSecretHandler,
 		c.onSendContactCodeHandler,
 		logger,
 	)
@@ -263,6 +251,7 @@ func NewMessenger(
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})
 
 	messenger = &Messenger{
+		config:                     &c,
 		node:                       node,
 		identity:                   identity,
 		persistence:                &sqlitePersistence{db: database},
@@ -325,6 +314,24 @@ func (m *Messenger) Start() error {
 	return nil
 }
 
+func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*transport.Filter, error) {
+	logger := m.logger.With(zap.String("site", "handleSharedSecrets"))
+	var result []*transport.Filter
+	for _, secret := range secrets {
+		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
+		fSecret := types.NegotiatedSecret{
+			PublicKey: secret.Identity,
+			Key:       secret.Key,
+		}
+		filter, err := m.transport.ProcessNegotiatedSecret(fSecret)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, filter)
+	}
+	return result, nil
+}
+
 func (m *Messenger) handleNewInstallations(installations []*multidevice.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
@@ -336,17 +343,28 @@ func (m *Messenger) handleNewInstallations(installations []*multidevice.Installa
 	}
 }
 
+// handleEncryptionLayerSubscriptions handles events from the encryption layer
 func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
 	go func() {
 		for {
 			select {
+			case secrets := <-subscriptions.NewSharedSecrets:
+				m.logger.Debug("handling new shared secrets")
+				filters, err := m.handleSharedSecrets(secrets)
+				if err != nil {
+					m.logger.Warn("failed to process secrets", zap.Error(err))
+					continue
+				}
+
+				if m.config.onNegotiatedFilters != nil {
+					m.config.onNegotiatedFilters(filters)
+				}
 			case newInstallations := <-subscriptions.NewInstallations:
 				m.logger.Debug("handling new installations")
 				m.handleNewInstallations(newInstallations)
 			case <-subscriptions.Quit:
 				m.logger.Debug("quitting encryption subscription loop")
 				return
-
 			}
 		}
 	}()
@@ -453,24 +471,6 @@ func (m *Messenger) Shutdown() (err error) {
 		}
 	}
 	return
-}
-
-func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*transport.Filter, error) {
-	logger := m.logger.With(zap.String("site", "handleSharedSecrets"))
-	var result []*transport.Filter
-	for _, secret := range secrets {
-		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
-		fSecret := types.NegotiatedSecret{
-			PublicKey: secret.Identity,
-			Key:       secret.Key,
-		}
-		filter, err := m.transport.ProcessNegotiatedSecret(fSecret)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, filter)
-	}
-	return result, nil
 }
 
 func (m *Messenger) EnableInstallation(id string) error {

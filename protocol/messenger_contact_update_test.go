@@ -44,6 +44,11 @@ func (s *MessengerContactUpdateSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
+	s.Require().NoError(s.m.Start())
+}
+
+func (s *MessengerContactUpdateSuite) TearDownTest() {
+	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerContactUpdateSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
@@ -85,6 +90,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 
 	theirMessenger := s.newMessenger(s.shh)
+	s.Require().NoError(theirMessenger.Start())
 	theirContactID := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	response, err := theirMessenger.SendContactUpdate(context.Background(), contactID, theirName, theirPicture)
@@ -136,4 +142,5 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
+	s.Require().NoError(theirMessenger.Shutdown())
 }

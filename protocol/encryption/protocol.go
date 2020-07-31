@@ -73,7 +73,6 @@ type Protocol struct {
 	publisher     *publisher.Publisher
 	subscriptions *Subscriptions
 
-	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	onSendContactCodeHandler func(*ProtocolMessageSpec)
 
 	logger *zap.Logger
@@ -88,7 +87,6 @@ var (
 func New(
 	db *sql.DB,
 	installationID string,
-	onNewSharedSecretHandler func([]*sharedsecret.Secret),
 	onSendContactCodeHandler func(*ProtocolMessageSpec),
 	logger *zap.Logger,
 ) *Protocol {
@@ -96,7 +94,6 @@ func New(
 		db,
 		installationID,
 		defaultEncryptorConfig(installationID, logger),
-		onNewSharedSecretHandler,
 		onSendContactCodeHandler,
 		logger,
 	)
@@ -108,7 +105,6 @@ func NewWithEncryptorConfig(
 	db *sql.DB,
 	installationID string,
 	encryptorConfig encryptorConfig,
-	onNewSharedSecretHandler func([]*sharedsecret.Secret),
 	onSendContactCodeHandler func(*ProtocolMessageSpec),
 	logger *zap.Logger,
 ) *Protocol {
@@ -121,7 +117,6 @@ func NewWithEncryptorConfig(
 			InstallationID:   installationID,
 		}),
 		publisher:                publisher.New(logger),
-		onNewSharedSecretHandler: onNewSharedSecretHandler,
 		onSendContactCodeHandler: onSendContactCodeHandler,
 		logger:                   logger.With(zap.Namespace("Protocol")),
 	}
@@ -129,7 +124,7 @@ func NewWithEncryptorConfig(
 
 type Subscriptions struct {
 	NewInstallations chan []*multidevice.Installation
-	NewSharedSecret  chan []*sharedsecret.Secret
+	NewSharedSecrets chan []*sharedsecret.Secret
 	SendContactCode  <-chan struct{}
 	Quit             chan struct{}
 }
@@ -142,11 +137,13 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
 	}
 	p.subscriptions = &Subscriptions{
 		NewInstallations: make(chan []*multidevice.Installation, subscriptionsChannelSize),
-		NewSharedSecret:  make(chan []*sharedsecret.Secret, subscriptionsChannelSize),
+		NewSharedSecrets: make(chan []*sharedsecret.Secret, subscriptionsChannelSize),
 		SendContactCode:  p.publisher.Start(),
 		Quit:             make(chan struct{}),
 	}
-	p.onNewSharedSecretHandler(secrets)
+	if len(secrets) > 0 {
+		p.publishNewSharedSecrets(secrets)
+	}
 
 	// Handle Publisher system messages.
 	publisherCh := p.publisher.Start()
@@ -271,9 +268,9 @@ func (p *Protocol) BuildDirectMessage(myIdentityKey *ecdsa.PrivateKey, publicKey
 		zap.Bool("has-shared-secret", sharedSecret != nil),
 		zap.Bool("agreed", agreed))
 
-	// Call handler
+	// Publish shared secrets
 	if sharedSecret != nil {
-		p.onNewSharedSecretHandler([]*sharedsecret.Secret{sharedSecret})
+		p.publishNewSharedSecrets([]*sharedsecret.Secret{sharedSecret})
 	}
 
 	spec := &ProtocolMessageSpec{
@@ -428,6 +425,26 @@ func (p *Protocol) ConfirmMessageProcessed(messageID []byte) error {
 	return p.encryptor.ConfirmMessageProcessed(messageID)
 }
 
+func (p *Protocol) publishNewInstallations(installations []*multidevice.Installation) {
+	if p.subscriptions != nil {
+		select {
+		case p.subscriptions.NewInstallations <- installations:
+		default:
+			p.logger.Warn("new installations channel full, dropping message")
+		}
+	}
+}
+
+func (p *Protocol) publishNewSharedSecrets(secrets []*sharedsecret.Secret) {
+	if p.subscriptions != nil {
+		select {
+		case p.subscriptions.NewSharedSecrets <- secrets:
+		default:
+			p.logger.Warn("new sharedsecrets channel full, dropping message")
+		}
+	}
+}
+
 // HandleMessage unmarshals a message and processes it, decrypting it if it is a 1:1 message.
 func (p *Protocol) HandleMessage(
 	myIdentityKey *ecdsa.PrivateKey,
@@ -452,13 +469,7 @@ func (p *Protocol) HandleMessage(
 		}
 
 		// Publish without blocking if channel is full
-		if p.subscriptions != nil {
-			select {
-			case p.subscriptions.NewInstallations <- addedBundles:
-			default:
-				p.logger.Warn("new installations channel full, dropping message")
-			}
-		}
+		p.publishNewInstallations(addedBundles)
 	}
 
 	// Check if it's a public message
@@ -493,7 +504,7 @@ func (p *Protocol) HandleMessage(
 				return nil, err
 			}
 
-			p.onNewSharedSecretHandler([]*sharedsecret.Secret{sharedSecret})
+			p.publishNewSharedSecrets([]*sharedsecret.Secret{sharedSecret})
 		}
 		return message, nil
 	}
