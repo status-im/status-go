@@ -19,7 +19,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
@@ -57,7 +56,6 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		db,
 		aliceInstallationID,
 		config,
-		func(s []*multidevice.Installation) {},
 		func(s []*sharedsecret.Secret) {},
 		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "alice")),
@@ -70,7 +68,6 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		db,
 		bobInstallationID,
 		config,
-		func(s []*multidevice.Installation) {},
 		func(s []*sharedsecret.Secret) {},
 		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "bob")),

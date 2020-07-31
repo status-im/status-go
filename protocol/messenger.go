@@ -127,17 +127,6 @@ func NewMessenger(
 		}
 	}
 
-	onNewInstallationsHandler := func(installations []*multidevice.Installation) {
-
-		for _, installation := range installations {
-			if installation.Identity == contactIDFromPublicKey(&messenger.identity.PublicKey) {
-				if _, ok := messenger.allInstallations[installation.ID]; !ok {
-					messenger.allInstallations[installation.ID] = installation
-					messenger.modifiedInstallations[installation.ID] = true
-				}
-			}
-		}
-	}
 	// Set default config fields.
 	onNewSharedSecretHandler := func(secrets []*sharedsecret.Secret) {
 		filters, err := messenger.handleSharedSecrets(secrets)
@@ -232,7 +221,6 @@ func NewMessenger(
 	encryptionProtocol := encryption.New(
 		database,
 		installationID,
-		onNewInstallationsHandler,
 		onNewSharedSecretHandler,
 		c.onSendContactCodeHandler,
 		logger,
@@ -297,6 +285,7 @@ func NewMessenger(
 		shutdownTasks: []func() error{
 			database.Close,
 			pushNotificationClient.Stop,
+			encryptionProtocol.Stop,
 			transp.ResetFilters,
 			transp.Stop,
 			func() error { processor.Stop(); return nil },
@@ -328,7 +317,39 @@ func (m *Messenger) Start() error {
 		}
 	}
 
-	return m.encryptor.Start(m.identity)
+	subscriptions, err := m.encryptor.Start(m.identity)
+	if err != nil {
+		return err
+	}
+	m.handleEncryptionLayerSubscriptions(subscriptions)
+	return nil
+}
+
+func (m *Messenger) handleNewInstallations(installations []*multidevice.Installation) {
+	for _, installation := range installations {
+		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
+			if _, ok := m.allInstallations[installation.ID]; !ok {
+				m.allInstallations[installation.ID] = installation
+				m.modifiedInstallations[installation.ID] = true
+			}
+		}
+	}
+}
+
+func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
+	go func() {
+		for {
+			select {
+			case newInstallations := <-subscriptions.NewInstallations:
+				m.logger.Debug("handling new installations")
+				m.handleNewInstallations(newInstallations)
+			case <-subscriptions.Quit:
+				m.logger.Debug("quitting encryption subscription loop")
+				return
+
+			}
+		}
+	}()
 }
 
 // Init analyzes chats and contacts in order to setup filters

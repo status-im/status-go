@@ -14,7 +14,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
@@ -44,7 +43,6 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	bobDBKey := "bob"
 
-	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {}
 	onNewSharedSecretHandler := func(secret []*sharedsecret.Secret) {}
 
 	db, err := sqlite.Open(s.aliceDBPath.Name(), aliceDBKey)
@@ -52,7 +50,6 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.alice = New(
 		db,
 		"1",
-		addedBundlesHandler,
 		onNewSharedSecretHandler,
 		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "alice")),
@@ -63,7 +60,6 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.bob = New(
 		db,
 		"2",
-		addedBundlesHandler,
 		onNewSharedSecretHandler,
 		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "bob")),
@@ -190,7 +186,7 @@ func (s *ProtocolServiceTestSuite) TestPropagatingSavedSharedSecretsOnStart() {
 		secretResponse = secret
 	}
 
-	err = s.alice.Start(aliceKey)
+	_, err = s.alice.Start(aliceKey)
 	s.NoError(err)
 
 	s.Require().NotNil(secretResponse)

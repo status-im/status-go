@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption"
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
@@ -63,13 +62,11 @@ func (s *MessageProcessorSuite) SetupTest() {
 	database, err := sqlite.Open(filepath.Join(s.tmpDir, "processor-test.sql"), "some-key")
 	s.Require().NoError(err)
 
-	onNewInstallations := func([]*multidevice.Installation) {}
 	onNewSharedSecret := func([]*sharedsecret.Secret) {}
 	onSendContactCode := func(*encryption.ProtocolMessageSpec) {}
 	encryptionProtocol := encryption.New(
 		database,
 		"installation-1",
-		onNewInstallations,
 		onNewSharedSecret,
 		onSendContactCode,
 		s.logger,
@@ -206,7 +203,6 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	senderEncryptionProtocol := encryption.New(
 		senderDatabase,
 		"installation-2",
-		func([]*multidevice.Installation) {},
 		func([]*sharedsecret.Secret) {},
 		func(*encryption.ProtocolMessageSpec) {},
 		s.logger,

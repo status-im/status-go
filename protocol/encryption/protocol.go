@@ -24,6 +24,7 @@ const (
 	sharedSecretNegotiationVersion = 1
 	partitionedTopicMinVersion     = 1
 	defaultMinVersion              = 0
+	subscriptionsChannelSize       = 100
 )
 
 type PartitionTopicMode int
@@ -66,12 +67,12 @@ func (p *ProtocolMessageSpec) PartitionedTopicMode() PartitionTopicMode {
 }
 
 type Protocol struct {
-	encryptor   *encryptor
-	secret      *sharedsecret.SharedSecret
-	multidevice *multidevice.Multidevice
-	publisher   *publisher.Publisher
+	encryptor     *encryptor
+	secret        *sharedsecret.SharedSecret
+	multidevice   *multidevice.Multidevice
+	publisher     *publisher.Publisher
+	subscriptions *Subscriptions
 
-	onAddedBundlesHandler    func([]*multidevice.Installation)
 	onNewSharedSecretHandler func([]*sharedsecret.Secret)
 	onSendContactCodeHandler func(*ProtocolMessageSpec)
 
@@ -87,7 +88,6 @@ var (
 func New(
 	db *sql.DB,
 	installationID string,
-	addedBundlesHandler func([]*multidevice.Installation),
 	onNewSharedSecretHandler func([]*sharedsecret.Secret),
 	onSendContactCodeHandler func(*ProtocolMessageSpec),
 	logger *zap.Logger,
@@ -96,7 +96,6 @@ func New(
 		db,
 		installationID,
 		defaultEncryptorConfig(installationID, logger),
-		addedBundlesHandler,
 		onNewSharedSecretHandler,
 		onSendContactCodeHandler,
 		logger,
@@ -109,7 +108,6 @@ func NewWithEncryptorConfig(
 	db *sql.DB,
 	installationID string,
 	encryptorConfig encryptorConfig,
-	addedBundlesHandler func([]*multidevice.Installation),
 	onNewSharedSecretHandler func([]*sharedsecret.Secret),
 	onSendContactCodeHandler func(*ProtocolMessageSpec),
 	logger *zap.Logger,
@@ -123,18 +121,30 @@ func NewWithEncryptorConfig(
 			InstallationID:   installationID,
 		}),
 		publisher:                publisher.New(logger),
-		onAddedBundlesHandler:    addedBundlesHandler,
 		onNewSharedSecretHandler: onNewSharedSecretHandler,
 		onSendContactCodeHandler: onSendContactCodeHandler,
 		logger:                   logger.With(zap.Namespace("Protocol")),
 	}
 }
 
-func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) error {
+type Subscriptions struct {
+	NewInstallations chan []*multidevice.Installation
+	NewSharedSecret  chan []*sharedsecret.Secret
+	SendContactCode  <-chan struct{}
+	Quit             chan struct{}
+}
+
+func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) (*Subscriptions, error) {
 	// Propagate currently cached shared secrets.
 	secrets, err := p.secret.All()
 	if err != nil {
-		return errors.Wrap(err, "failed to get all secrets")
+		return nil, errors.Wrap(err, "failed to get all secrets")
+	}
+	p.subscriptions = &Subscriptions{
+		NewInstallations: make(chan []*multidevice.Installation, subscriptionsChannelSize),
+		NewSharedSecret:  make(chan []*sharedsecret.Secret, subscriptionsChannelSize),
+		SendContactCode:  p.publisher.Start(),
+		Quit:             make(chan struct{}),
 	}
 	p.onNewSharedSecretHandler(secrets)
 
@@ -155,6 +165,14 @@ func (p *Protocol) Start(myIdentity *ecdsa.PrivateKey) error {
 		}
 	}()
 
+	return p.subscriptions, nil
+}
+
+func (p *Protocol) Stop() error {
+	p.publisher.Stop()
+	if p.subscriptions != nil {
+		close(p.subscriptions.Quit)
+	}
 	return nil
 }
 
@@ -433,7 +451,14 @@ func (p *Protocol) HandleMessage(
 			return nil, err
 		}
 
-		p.onAddedBundlesHandler(addedBundles)
+		// Publish without blocking if channel is full
+		if p.subscriptions != nil {
+			select {
+			case p.subscriptions.NewInstallations <- addedBundles:
+			default:
+				p.logger.Warn("new installations channel full, dropping message")
+			}
+		}
 	}
 
 	// Check if it's a public message

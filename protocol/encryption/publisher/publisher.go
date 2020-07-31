@@ -55,6 +55,10 @@ func (p *Publisher) Start() <-chan struct{} {
 }
 
 func (p *Publisher) Stop() {
+	// If hasn't started, ignore
+	if p.quit == nil {
+		return
+	}
 	select {
 	case _, ok := <-p.quit:
 		if !ok {
