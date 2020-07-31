@@ -60,15 +60,16 @@ func (p *SQLitePersistence) GetPushNotificationRegistrationByPublicKeyAndInstall
 }
 
 func (p *SQLitePersistence) GetPushNotificationRegistrationVersion(publicKey []byte, installationID string) (uint64, error) {
-	registration, err := p.GetPushNotificationRegistrationByPublicKeyAndInstallationID(publicKey, installationID)
-	if err != nil {
+	var version uint64
+	err := p.db.QueryRow(`SELECT version FROM push_notification_server_registrations WHERE public_key = ? AND installation_id = ?`, publicKey, installationID).Scan(&version)
+
+	if err == sql.ErrNoRows {
+		return 0, nil
+	} else if err != nil {
 		return 0, err
 	}
 
-	if registration == nil {
-		return 0, nil
-	}
-	return registration.Version, nil
+	return version, nil
 }
 
 type PushNotificationIDAndRegistration struct {
