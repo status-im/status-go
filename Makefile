@@ -8,6 +8,22 @@ PRE_RELEASE := "1"
 RELEASE_TYPE := $(shell if [ $(PRE_RELEASE) = "0" ] ; then echo release; else echo pre-release ; fi)
 GOLANGCI_BINARY=golangci-lint
 
+ifeq ($(OS),Windows_NT)     # is Windows_NT on XP, 2000, 7, Vista, 10...
+ detected_OS := Windows
+else
+ detected_OS := $(strip $(shell uname))
+endif
+
+ifeq ($(detected_OS),Darwin)
+ GOBIN_SHARED_LIB_EXT := dylib
+else ifeq ($(detected_OS),Windows)
+ # on Windows need `--export-all-symbols` flag else expected symbols will not be found in libstatus.dll
+ GOBIN_SHARED_LIB_CGO_LDFLAGS := CGO_LDFLAGS="-Wl,--export-all-symbols"
+ GOBIN_SHARED_LIB_EXT := dll
+else
+ GOBIN_SHARED_LIB_EXT := so
+endif
+
 help: ##@other Show this help
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
@@ -117,6 +133,15 @@ statusgo-library: ##@cross-compile Build status-go as static library for current
 	@echo "Building static library..."
 	go build -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
 	@echo "Static library built:"
+	@ls -la $(GOBIN)/libstatus.*
+
+statusgo-shared-library: ##@cross-compile Build status-go as shared library for current platform
+	## cmd/library/README.md explains the magic incantation behind this
+	mkdir -p $(GOBIN)/statusgo-lib
+	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	@echo "Building shared library..."
+	$(GOBIN_SHARED_LIB_CGO_LDFLAGS) go build -buildmode=c-shared -o $(GOBIN)/libstatus.$(GOBIN_SHARED_LIB_EXT) $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	@echo "Shared library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
