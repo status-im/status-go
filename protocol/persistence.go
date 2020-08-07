@@ -122,8 +122,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -143,6 +143,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		encodedMembers.Bytes(),
 		encodedMembershipUpdates.Bytes(),
 		chat.Muted,
+		chat.InvitationAdmin,
 	)
 	if err != nil {
 		return err
@@ -201,6 +202,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.members,
 			chats.membership_updates,
 			chats.muted,
+			chats.invitation_admin,
 			contacts.identicon,
 			contacts.alias
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
@@ -215,6 +217,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 		var (
 			alias                    sql.NullString
 			identicon                sql.NullString
+			invitationAdmin          sql.NullString
 			chat                     Chat
 			encodedMembers           []byte
 			encodedMembershipUpdates []byte
@@ -234,11 +237,17 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&encodedMembers,
 			&encodedMembershipUpdates,
 			&chat.Muted,
+			&invitationAdmin,
 			&identicon,
 			&alias,
 		)
+
 		if err != nil {
 			return
+		}
+
+		if invitationAdmin.Valid {
+			chat.InvitationAdmin = invitationAdmin.String
 		}
 
 		// Restore members
@@ -278,6 +287,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		encodedMembers           []byte
 		encodedMembershipUpdates []byte
 		lastMessageBytes         []byte
+		invitationAdmin          sql.NullString
 	)
 
 	err := db.db.QueryRow(`
@@ -294,7 +304,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			last_message,
 			members,
 			membership_updates,
-			muted
+			muted,
+			invitation_admin
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -310,11 +321,15 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&encodedMembers,
 		&encodedMembershipUpdates,
 		&chat.Muted,
+		&invitationAdmin,
 	)
 	switch err {
 	case sql.ErrNoRows:
 		return nil, nil
 	case nil:
+		if invitationAdmin.Valid {
+			chat.InvitationAdmin = invitationAdmin.String
+		}
 		// Restore members
 		membersDecoder := gob.NewDecoder(bytes.NewBuffer(encodedMembers))
 		err = membersDecoder.Decode(&chat.Members)

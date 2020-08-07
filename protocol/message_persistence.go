@@ -835,3 +835,96 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 		return nil, err
 	}
 }
+
+func (db sqlitePersistence) SaveInvitation(invitation *GroupChatInvitation) (err error) {
+	query := "INSERT INTO group_chat_invitations(id,source,chat_id,message,state,clock) VALUES (?,?,?,?,?,?)"
+	stmt, err := db.db.Prepare(query)
+	if err != nil {
+		return
+	}
+	_, err = stmt.Exec(
+		invitation.ID(),
+		invitation.From,
+		invitation.ChatId,
+		invitation.IntroductionMessage,
+		invitation.State,
+		invitation.Clock,
+	)
+
+	return
+}
+
+func (db sqlitePersistence) GetGroupChatInvitations() (rst []*GroupChatInvitation, err error) {
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	bRows, err := tx.Query(`SELECT
+			    source,
+			    chat_id,
+			    message,
+			    state,
+			    clock
+			FROM
+				group_chat_invitations`)
+	if err != nil {
+		return
+	}
+	defer bRows.Close()
+	for bRows.Next() {
+		invitation := GroupChatInvitation{}
+		err = bRows.Scan(
+			&invitation.From,
+			&invitation.ChatId,
+			&invitation.IntroductionMessage,
+			&invitation.State,
+			&invitation.Clock)
+		if err != nil {
+			return nil, err
+		}
+		rst = append(rst, &invitation)
+	}
+
+	return rst, nil
+}
+
+func (db sqlitePersistence) InvitationByID(id string) (*GroupChatInvitation, error) {
+	row := db.db.QueryRow(
+		`SELECT
+			    source,
+			    chat_id,
+			    message,
+			    state,
+			    clock
+			FROM
+				group_chat_invitations
+			WHERE
+				group_chat_invitations.id = ?
+		`, id)
+
+	chatInvitations := new(GroupChatInvitation)
+	err := row.Scan(&chatInvitations.From,
+		&chatInvitations.ChatId,
+		&chatInvitations.IntroductionMessage,
+		&chatInvitations.State,
+		&chatInvitations.Clock,
+	)
+
+	switch err {
+	case sql.ErrNoRows:
+		return nil, errRecordNotFound
+	case nil:
+		return chatInvitations, nil
+	default:
+		return nil, err
+	}
+}

@@ -67,6 +67,9 @@ type Chat struct {
 	// Muted is used to check whether we want to receive
 	// push notifications for this chat
 	Muted bool `json:"muted,omitempty"`
+
+	// Public key of administrator who created invitation link
+	InvitationAdmin string `json:"invitationAdmin,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {

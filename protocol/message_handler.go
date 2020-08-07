@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
@@ -54,10 +55,38 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		return err
 	}
 
-	if chat == nil {
+	//if chat.InvitationAdmin exists means we are waiting for invitation request approvement, and in that case
+	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
+	if chat == nil || len(chat.InvitationAdmin) > 0 {
 		if len(message.Events) == 0 {
 			return errors.New("can't create new group chat without events")
 		}
+
+		//approve invitations
+		if chat != nil && len(chat.InvitationAdmin) > 0 {
+
+			groupChatInvitation := &GroupChatInvitation{
+				GroupChatInvitation: protobuf.GroupChatInvitation{
+					ChatId: message.ChatID,
+				},
+				From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+			}
+
+			groupChatInvitation, err = m.persistence.InvitationByID(groupChatInvitation.ID())
+			if err != nil && err != errRecordNotFound {
+				return err
+			}
+			if groupChatInvitation != nil {
+				groupChatInvitation.State = protobuf.GroupChatInvitation_APPROVED
+
+				err := m.persistence.SaveInvitation(groupChatInvitation)
+				if err != nil {
+					return err
+				}
+				messageState.GroupChatInvitations[groupChatInvitation.ID()] = groupChatInvitation
+			}
+		}
+
 		group, err = v1protocol.NewGroupWithEvents(message.ChatID, message.Events)
 		if err != nil {
 			return err
@@ -69,7 +98,6 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		}
 		newChat := CreateGroupChat(messageState.Timesource)
 		chat = &newChat
-
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
 		if err != nil {
@@ -721,6 +749,48 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 	}
 
 	state.EmojiReactions[emojiReaction.ID()] = emojiReaction
+
+	return nil
+}
+
+func (m *MessageHandler) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHInvitations protobuf.GroupChatInvitation) error {
+	logger := m.logger.With(zap.String("site", "HandleGroupChatInvitation"))
+	if err := ValidateReceivedGroupChatInvitation(&pbGHInvitations); err != nil {
+		logger.Error("invalid group chat invitation", zap.Error(err))
+		return err
+	}
+
+	groupChatInvitation := &GroupChatInvitation{
+		GroupChatInvitation: pbGHInvitations,
+		SigPubKey:           state.CurrentMessageState.PublicKey,
+	}
+
+	//From is the PK of author of invitation request
+	if groupChatInvitation.State == protobuf.GroupChatInvitation_REJECTED {
+		//rejected so From is the current user who received this rejection
+		groupChatInvitation.From = types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))
+	} else {
+		//invitation request, so From is the author of message
+		groupChatInvitation.From = state.CurrentMessageState.Contact.ID
+	}
+
+	existingInvitation, err := m.persistence.InvitationByID(groupChatInvitation.ID())
+	if err != errRecordNotFound && err != nil {
+		return err
+	}
+
+	if existingInvitation != nil && existingInvitation.Clock >= pbGHInvitations.Clock {
+		// this is not a valid invitation, ignoring
+		return nil
+	}
+
+	// save invitation
+	err = m.persistence.SaveInvitation(groupChatInvitation)
+	if err != nil {
+		return err
+	}
+
+	state.GroupChatInvitations[groupChatInvitation.ID()] = groupChatInvitation
 
 	return nil
 }
