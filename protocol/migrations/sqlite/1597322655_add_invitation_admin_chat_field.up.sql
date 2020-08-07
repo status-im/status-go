@@ -1,0 +1,1 @@
+ALTER TABLE chats ADD COLUMN invitation_admin VARCHAR;

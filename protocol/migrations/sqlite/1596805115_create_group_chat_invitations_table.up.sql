@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS group_chat_invitations (
+  id VARCHAR PRIMARY KEY ON CONFLICT REPLACE,
+  source TEXT NOT NULL,
+  chat_id VARCHAR NOT NULL,
+  message VARCHAR NOT NULL,
+  state INT DEFAULT 0,
+  clock INT NOT NULL
+);

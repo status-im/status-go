@@ -213,6 +213,10 @@ func (api *PublicAPI) CreateGroupChatWithMembers(ctx Context, name string, membe
 	return api.service.messenger.CreateGroupChatWithMembers(ctx, name, members)
 }
 
+func (api *PublicAPI) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateGroupChatFromInvitation(name, chatID, adminPK)
+}
+
 func (api *PublicAPI) AddMembersToGroupChat(ctx Context, chatID string, members []string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AddMembersToGroupChat(ctx, chatID, members)
 }
@@ -231,6 +235,18 @@ func (api *PublicAPI) ConfirmJoiningGroup(ctx context.Context, chatID string) (*
 
 func (api *PublicAPI) ChangeGroupChatName(ctx Context, chatID string, name string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.ChangeGroupChatName(ctx, chatID, name)
+}
+
+func (api *PublicAPI) SendGroupChatInvitationRequest(ctx Context, chatID string, adminPK string, message string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendGroupChatInvitationRequest(ctx, chatID, adminPK, message)
+}
+
+func (api *PublicAPI) GetGroupChatInvitations() ([]*protocol.GroupChatInvitation, error) {
+	return api.service.messenger.GetGroupChatInvitations()
+}
+
+func (api *PublicAPI) SendGroupChatInvitationRejection(ctx Context, invitationRequestID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendGroupChatInvitationRejection(ctx, invitationRequestID)
 }
 
 func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Filter) ([]*transport.Filter, error) {

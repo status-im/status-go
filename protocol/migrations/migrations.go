@@ -18,6 +18,9 @@
 // 1595862781_add_audio_data.up.sql (246B)
 // 1595865249_create_emoji_reactions_table.down.sql (27B)
 // 1595865249_create_emoji_reactions_table.up.sql (300B)
+// 1596805115_create_group_chat_invitations_table.down.sql (34B)
+// 1596805115_create_group_chat_invitations_table.up.sql (231B)
+// 1597322655_add_invitation_admin_chat_field.up.sql (54B)
 // 1597757544_add_nickname.up.sql (52B)
 // doc.go (850B)
 
@@ -448,6 +451,66 @@ func _1595865249_create_emoji_reactions_tableUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1596805115_create_group_chat_invitations_tableDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\x48\x2f\xca\x2f\x2d\x88\x4f\xce\x48\x2c\x89\xcf\xcc\x2b\xcb\x2c\x49\x2c\xc9\xcc\xcf\x2b\xb6\x06\x04\x00\x00\xff\xff\x82\x66\x9d\x1a\x22\x00\x00\x00")
+
+func _1596805115_create_group_chat_invitations_tableDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1596805115_create_group_chat_invitations_tableDownSql,
+		"1596805115_create_group_chat_invitations_table.down.sql",
+	)
+}
+
+func _1596805115_create_group_chat_invitations_tableDownSql() (*asset, error) {
+	bytes, err := _1596805115_create_group_chat_invitations_tableDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1596805115_create_group_chat_invitations_table.down.sql", size: 34, mode: os.FileMode(0644), modTime: time.Unix(1599471320, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6b, 0x5a, 0x17, 0xd8, 0x8d, 0xb3, 0xfe, 0xcb, 0xb6, 0xc0, 0xcb, 0x14, 0x68, 0x8c, 0x5b, 0x18, 0xf8, 0x7d, 0xc9, 0x2c, 0xa6, 0x41, 0xc9, 0x71, 0xeb, 0x3f, 0xc6, 0xa, 0x45, 0xee, 0x5d, 0x2a}}
+	return a, nil
+}
+
+var __1596805115_create_group_chat_invitations_tableUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x6c\x8d\xc1\x4a\xc4\x30\x14\x45\xf7\x85\xfe\xc3\x5d\x2a\xb8\x70\xef\x2a\xc6\x57\x0c\xc6\xb4\xa4\xaf\xd2\xae\x4a\xa8\xa1\x06\xb5\x91\x26\xf5\xfb\xc5\x96\x61\x18\x98\xed\x3d\x87\x73\xa5\x25\xc1\x04\x16\x8f\x9a\xa0\x2a\x98\x9a\x41\xbd\x6a\xb9\xc5\xbc\xc6\xed\x67\x9c\x3e\x5c\x1e\xc3\xf2\x1b\xb2\xcb\x21\x2e\x09\x37\x65\x01\x84\x77\xbc\x09\x2b\x9f\x85\x45\x63\xd5\xab\xb0\x03\x5e\x68\x40\x6d\x20\x6b\x53\x69\x25\x19\x96\x1a\x2d\x24\xdd\xfd\xeb\x29\x6e\xeb\xe4\xc1\xd4\xf3\xfe\x60\x3a\xad\x77\x70\xd4\xcf\xb1\x0b\xf8\xed\x53\x72\xb3\xbf\x0e\x53\x76\xd9\x43\x19\xc6\x13\x55\xa2\xd3\x8c\xfb\xa3\xf8\x15\xa7\xcf\x7d\x3f\xe9\x65\x71\xfb\xf0\x17\x00\x00\xff\xff\x34\x03\xb2\x2f\xe7\x00\x00\x00")
+
+func _1596805115_create_group_chat_invitations_tableUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1596805115_create_group_chat_invitations_tableUpSql,
+		"1596805115_create_group_chat_invitations_table.up.sql",
+	)
+}
+
+func _1596805115_create_group_chat_invitations_tableUpSql() (*asset, error) {
+	bytes, err := _1596805115_create_group_chat_invitations_tableUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1596805115_create_group_chat_invitations_table.up.sql", size: 231, mode: os.FileMode(0644), modTime: time.Unix(1599471320, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6d, 0xb1, 0x14, 0x6d, 0x54, 0x28, 0x67, 0xc3, 0x23, 0x6a, 0xfc, 0x80, 0xdf, 0x9e, 0x4c, 0x35, 0x36, 0xf, 0xf8, 0xf3, 0x5f, 0xae, 0xad, 0xb, 0xc1, 0x51, 0x8e, 0x17, 0x7, 0xe5, 0x7f, 0x91}}
+	return a, nil
+}
+
+var __1597322655_add_invitation_admin_chat_fieldUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\x48\x2c\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\xcc\x2b\xcb\x2c\x49\x2c\xc9\xcc\xcf\x8b\x4f\x4c\xc9\xcd\xcc\x53\x08\x73\x0c\x72\xf6\x70\x0c\xb2\x06\x04\x00\x00\xff\xff\x51\xe6\x0d\x74\x36\x00\x00\x00")
+
+func _1597322655_add_invitation_admin_chat_fieldUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1597322655_add_invitation_admin_chat_fieldUpSql,
+		"1597322655_add_invitation_admin_chat_field.up.sql",
+	)
+}
+
+func _1597322655_add_invitation_admin_chat_fieldUpSql() (*asset, error) {
+	bytes, err := _1597322655_add_invitation_admin_chat_fieldUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1597322655_add_invitation_admin_chat_field.up.sql", size: 54, mode: os.FileMode(0644), modTime: time.Unix(1599471320, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa9, 0x7a, 0xa0, 0xf2, 0xdb, 0x13, 0x91, 0x91, 0xa8, 0x34, 0x1a, 0xa1, 0x49, 0x68, 0xd5, 0xae, 0x2c, 0xd8, 0xd5, 0xea, 0x8f, 0x8c, 0xc7, 0x2, 0x4e, 0x58, 0x2c, 0x3a, 0x14, 0xd4, 0x4f, 0x2c}}
+	return a, nil
+}
+
 var __1597757544_add_nicknameUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\xce\xcf\x2b\x49\x4c\x2e\x29\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\xc8\xc9\x4f\x4e\xcc\x89\xcf\xcb\x4c\xce\xce\x4b\xcc\x4d\x55\x08\x71\x8d\x08\xb1\x06\x04\x00\x00\xff\xff\x54\xf7\xdc\x23\x34\x00\x00\x00")
 
 func _1597757544_add_nicknameUpSqlBytes() ([]byte, error) {
@@ -463,7 +526,7 @@ func _1597757544_add_nicknameUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1597757544_add_nickname.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1598445725, 0)}
+	info := bindataFileInfo{name: "1597757544_add_nickname.up.sql", size: 52, mode: os.FileMode(0644), modTime: time.Unix(1599471320, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf4, 0xa2, 0x64, 0x50, 0xc5, 0x4, 0xb9, 0x8b, 0xd1, 0x18, 0x9b, 0xc3, 0x91, 0x36, 0x2a, 0x1f, 0xc3, 0x6c, 0x2d, 0x92, 0xf8, 0x5e, 0xff, 0xb1, 0x59, 0x61, 0x2, 0x1c, 0xe1, 0x85, 0x90, 0xa4}}
 	return a, nil
 }
@@ -615,6 +678,12 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1595865249_create_emoji_reactions_table.up.sql": _1595865249_create_emoji_reactions_tableUpSql,
 
+	"1596805115_create_group_chat_invitations_table.down.sql": _1596805115_create_group_chat_invitations_tableDownSql,
+
+	"1596805115_create_group_chat_invitations_table.up.sql": _1596805115_create_group_chat_invitations_tableUpSql,
+
+	"1597322655_add_invitation_admin_chat_field.up.sql": _1597322655_add_invitation_admin_chat_fieldUpSql,
+
 	"1597757544_add_nickname.up.sql": _1597757544_add_nicknameUpSql,
 
 	"doc.go": docGo,
@@ -679,6 +748,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1595862781_add_audio_data.up.sql":                         &bintree{_1595862781_add_audio_dataUpSql, map[string]*bintree{}},
 	"1595865249_create_emoji_reactions_table.down.sql":         &bintree{_1595865249_create_emoji_reactions_tableDownSql, map[string]*bintree{}},
 	"1595865249_create_emoji_reactions_table.up.sql":           &bintree{_1595865249_create_emoji_reactions_tableUpSql, map[string]*bintree{}},
+	"1596805115_create_group_chat_invitations_table.down.sql":  &bintree{_1596805115_create_group_chat_invitations_tableDownSql, map[string]*bintree{}},
+	"1596805115_create_group_chat_invitations_table.up.sql":    &bintree{_1596805115_create_group_chat_invitations_tableUpSql, map[string]*bintree{}},
+	"1597322655_add_invitation_admin_chat_field.up.sql":        &bintree{_1597322655_add_invitation_admin_chat_fieldUpSql, map[string]*bintree{}},
 	"1597757544_add_nickname.up.sql":                           &bintree{_1597757544_add_nicknameUpSql, map[string]*bintree{}},
 	"doc.go":                                                   &bintree{docGo, map[string]*bintree{}},
 }}

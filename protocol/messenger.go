@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -94,10 +95,11 @@ type MessengerResponse struct {
 	Contacts       []*Contact                  `json:"contacts,omitempty"`
 	Installations  []*multidevice.Installation `json:"installations,omitempty"`
 	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
+	Invitations    []*GroupChatInvitation      `json:"invitations,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0
+	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0 && len(m.Invitations) == 0
 }
 
 type dbConfig struct {
@@ -768,6 +770,23 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	return &response, m.saveChat(&chat)
 }
 
+func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	var response MessengerResponse
+	logger := m.logger.With(zap.String("site", "CreateGroupChatFromInvitation"))
+	logger.Info("Creating group chat from invitation", zap.String("name", name))
+	chat := CreateGroupChat(m.getTimesource())
+	chat.ID = chatID
+	chat.Name = name
+	chat.InvitationAdmin = adminPK
+
+	response.Chats = []*Chat{&chat}
+
+	return &response, m.saveChat(&chat)
+}
+
 func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -857,6 +876,32 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	err = event.Sign(m.identity)
 	if err != nil {
 		return nil, err
+	}
+
+	//approve invitations
+	for _, member := range members {
+		logger.Info("ApproveInvitationByChatIdAndFrom", zap.String("chatID", chatID), zap.Any("member", member))
+
+		groupChatInvitation := &GroupChatInvitation{
+			GroupChatInvitation: protobuf.GroupChatInvitation{
+				ChatId: chat.ID,
+			},
+			From: member,
+		}
+
+		groupChatInvitation, err = m.persistence.InvitationByID(groupChatInvitation.ID())
+		if err != nil && err != errRecordNotFound {
+			return nil, err
+		}
+		if groupChatInvitation != nil {
+			groupChatInvitation.State = protobuf.GroupChatInvitation_APPROVED
+
+			err := m.persistence.SaveInvitation(groupChatInvitation)
+			if err != nil {
+				return nil, err
+			}
+			response.Invitations = append(response.Invitations, groupChatInvitation)
+		}
 	}
 
 	err = group.ProcessEvent(event)
@@ -961,6 +1006,151 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	}
 
 	return &response, m.saveChat(chat)
+}
+
+func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID string, adminPK string,
+	message string) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRequest"))
+	logger.Info("Sending group chat invitation request", zap.String("chatID", chatID),
+		zap.String("adminPK", adminPK), zap.String("message", message))
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	var response MessengerResponse
+
+	// Get chat and clock
+	chat, ok := m.allChats[chatID]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	invitationR := &GroupChatInvitation{
+		GroupChatInvitation: protobuf.GroupChatInvitation{
+			Clock:               clock,
+			ChatId:              chatID,
+			IntroductionMessage: message,
+			State:               protobuf.GroupChatInvitation_REQUEST,
+		},
+		From: types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
+	}
+
+	encodedMessage, err := proto.Marshal(invitationR.GetProtobuf())
+	if err != nil {
+		return nil, err
+	}
+
+	spec := common.RawMessage{
+		LocalChatID:         adminPK,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
+		ResendAutomatically: true,
+	}
+
+	pkey, err := hex.DecodeString(adminPK[2:])
+	if err != nil {
+		return nil, err
+	}
+	// Safety check, make sure is well formed
+	adminpk, err := crypto.UnmarshalPubkey(pkey)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := m.processor.SendPrivate(ctx, adminpk, spec)
+	if err != nil {
+		return nil, err
+	}
+
+	spec.ID = types.EncodeHex(id)
+	spec.SendCount++
+	err = m.persistence.SaveRawMessage(&spec)
+	if err != nil {
+		return nil, err
+	}
+
+	response.Invitations = []*GroupChatInvitation{invitationR}
+
+	err = m.persistence.SaveInvitation(invitationR)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (m *Messenger) GetGroupChatInvitations() ([]*GroupChatInvitation, error) {
+	return m.persistence.GetGroupChatInvitations()
+}
+
+func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invitationRequestID string) (*MessengerResponse, error) {
+	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRejection"))
+	logger.Info("Sending group chat invitation reject", zap.String("invitationRequestID", invitationRequestID))
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	invitationR, err := m.persistence.InvitationByID(invitationRequestID)
+	if err != nil {
+		return nil, err
+	}
+
+	invitationR.State = protobuf.GroupChatInvitation_REJECTED
+
+	// Get chat and clock
+	chat, ok := m.allChats[invitationR.ChatId]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+
+	invitationR.Clock = clock
+
+	encodedMessage, err := proto.Marshal(invitationR.GetProtobuf())
+	if err != nil {
+		return nil, err
+	}
+
+	spec := common.RawMessage{
+		LocalChatID:         invitationR.From,
+		Payload:             encodedMessage,
+		MessageType:         protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION,
+		ResendAutomatically: true,
+	}
+
+	pkey, err := hex.DecodeString(invitationR.From[2:])
+	if err != nil {
+		return nil, err
+	}
+	// Safety check, make sure is well formed
+	userpk, err := crypto.UnmarshalPubkey(pkey)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := m.processor.SendPrivate(ctx, userpk, spec)
+	if err != nil {
+		return nil, err
+	}
+
+	spec.ID = types.EncodeHex(id)
+	spec.SendCount++
+	err = m.persistence.SaveRawMessage(&spec)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MessengerResponse
+
+	response.Invitations = []*GroupChatInvitation{invitationR}
+
+	err = m.persistence.SaveInvitation(invitationR)
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
 }
 
 func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
@@ -1920,6 +2110,8 @@ type ReceivedMessageState struct {
 	// EmojiReactions is a list of emoji reactions for the current batch
 	// indexed by from-message-id-emoji-type
 	EmojiReactions map[string]*EmojiReaction
+	// GroupChatInvitations is a list of invitation requests or rejections
+	GroupChatInvitations map[string]*GroupChatInvitation
 	// Response to the client
 	Response *MessengerResponse
 	// Timesource is a time source for clock values/timestamps.
@@ -1938,6 +2130,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
 		EmojiReactions:        make(map[string]*EmojiReaction),
+		GroupChatInvitations:  make(map[string]*GroupChatInvitation),
 		Response:              &MessengerResponse{},
 		Timesource:            m.getTimesource(),
 	}
@@ -2202,6 +2395,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
 							continue
 						}
+					case protobuf.GroupChatInvitation:
+						logger.Debug("Handling GroupChatInvitation")
+						err = m.handler.HandleGroupChatInvitation(messageState, msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation))
+						if err != nil {
+							logger.Warn("failed to handle GroupChatInvitation", zap.Error(err))
+							continue
+						}
 
 					default:
 						// Check if is an encrypted PushNotificationRegistration
@@ -2282,6 +2482,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	for _, emojiReaction := range messageState.EmojiReactions {
 		messageState.Response.EmojiReactions = append(messageState.Response.EmojiReactions, emojiReaction)
+	}
+
+	for _, groupChatInvitation := range messageState.GroupChatInvitations {
+		messageState.Response.Invitations = append(messageState.Response.Invitations, groupChatInvitation)
 	}
 
 	if len(contactsToSave) > 0 {

@@ -256,3 +256,12 @@ func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimesta
 
 	return nil
 }
+
+func ValidateReceivedGroupChatInvitation(invitation *protobuf.GroupChatInvitation) error {
+
+	if len(invitation.ChatId) == 0 {
+		return errors.New("chat-id can't be empty")
+	}
+
+	return nil
+}
