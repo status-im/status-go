@@ -177,9 +177,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	case protobuf.ChatMessage_STICKER:
 		message.Payload = &protobuf.ChatMessage_Sticker{Sticker: sticker}
 
-		if message.ContentType == protobuf.ChatMessage_AUDIO {
-			message.Payload = &protobuf.ChatMessage_Audio{Audio: audio}
-		}
+	case protobuf.ChatMessage_AUDIO:
+		message.Payload = &protobuf.ChatMessage_Audio{Audio: audio}
 
 	case protobuf.ChatMessage_TRANSACTION_COMMAND:
 		message.CommandParameters = command
