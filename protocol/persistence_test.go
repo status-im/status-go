@@ -514,3 +514,18 @@ func TestMessagesAudioDurationMsNull(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 }
+
+func TestSaveChat(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	chat.LastMessage = &Message{}
+	err = p.SaveChat(chat)
+	require.NoError(t, err)
+
+	retrievedChat, err := p.Chat(chat.ID)
+	require.NoError(t, err)
+	require.Equal(t, &chat, retrievedChat)
+}
