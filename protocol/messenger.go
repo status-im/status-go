@@ -3158,7 +3158,6 @@ func (m *Messenger) RemovePushNotificationServer(ctx context.Context, publicKey 
 
 // UnregisterFromPushNotifications unregister from any server
 func (m *Messenger) UnregisterFromPushNotifications(ctx context.Context) error {
-
 	return m.pushNotificationClient.Unregister()
 }
 
