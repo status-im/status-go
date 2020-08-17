@@ -323,7 +323,7 @@ func (c *Client) processQueryInfo(clientPublicKey *ecdsa.PublicKey, serverPublic
 	// make sure the public key matches
 	if !bytes.Equal(info.PublicKey, common.HashPublicKey(clientPublicKey)) {
 		c.config.Logger.Warn("reply for different key, ignoring")
-		return errors.New("reply for a different key, ignoreing")
+		return errors.New("reply for a different key, ignoring")
 	}
 
 	accessToken := info.AccessToken
