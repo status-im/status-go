@@ -277,6 +277,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		chat                     Chat
 		encodedMembers           []byte
 		encodedMembershipUpdates []byte
+		lastMessageBytes         []byte
 	)
 
 	err := db.db.QueryRow(`
@@ -305,7 +306,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.DeletedAtClockValue,
 		&chat.UnviewedMessagesCount,
 		&chat.LastClockValue,
-		&chat.LastMessage,
+		&lastMessageBytes,
 		&encodedMembers,
 		&encodedMembershipUpdates,
 		&chat.Muted,
@@ -326,6 +327,15 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		err = membershipUpdatesDecoder.Decode(&chat.MembershipUpdates)
 		if err != nil {
 			return nil, err
+		}
+
+		// Restore last message
+		if lastMessageBytes != nil {
+			message := &Message{}
+			if err = json.Unmarshal(lastMessageBytes, message); err != nil {
+				return nil, err
+			}
+			chat.LastMessage = message
 		}
 
 		return &chat, nil
