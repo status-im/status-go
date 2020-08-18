@@ -144,6 +144,37 @@ statusgo-shared-library: ##@cross-compile Build status-go as shared library for 
 	@echo "Shared library built:"
 	@ls -la $(GOBIN)/libstatus.*
 
+statusgo-library-ios: ##@cross-compile Build status-go as static library for target platform
+	## cmd/library/README.md explains the magic incantation behind this
+	mkdir -p $(GOBIN)/statusgo-lib
+	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	@echo "Building static library..."
+	# iOS simulator version
+	GOOS=darwin GOARCH=amd64 CC=$(shell xcrun --sdk iphonesimulator --find clang) CXX=$(shell xcrun --sdk iphonesimulator --find clang++) CGO_CFLAGS="-isysroot $(shell xcrun --sdk iphonesimulator --show-sdk-path) -miphonesimulator-version-min=7.0 -fembed-bitcode -arch x86_64" CGO_CXXFLAGS="-isysroot $(shell xcrun --sdk iphonesimulator --show-sdk-path) -miphonesimulator-version-min=7.0 -fembed-bitcode -arch x86_64" CGO_LDFLAGS="-isysroot $(shell xcrun --sdk iphonesimulator --show-sdk-path) -miphonesimulator-version-min=7.0 -fembed-bitcode -arch x86_64" CGO_ENABLED=1 go build -tags ios -buildmode=c-archive -o $(GOBIN)/libstatus.a $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	@echo "Static library built:"
+	@ls -la $(GOBIN)/libstatus.*
+
+statusgo-library-android: ##@cross-compile Build status-go as a shared library for target platform
+	## cmd/library/README.md explains the magic incantation behind this
+	mkdir -p $(GOBIN)/statusgo-lib
+	go run cmd/library/*.go > $(GOBIN)/statusgo-lib/main.go
+	@echo "Building shared library..."
+	# Android emulator (x86) version
+	GOOS=android GOARCH=386 \
+	API=23 \
+	LIBRARY_PATH=$(ANDROID_HOME)/ndk/21.3.6528147/platforms/android-23/arch-x86/usr/lib \
+	AR=$(ANDROID_HOME)/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android-ar \
+	AS=$(ANDROID_HOME)/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android-as \
+	CC=$(ANDROID_HOME)/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang \
+	LD=$(ANDROID_HOME)/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android-ld \
+	RANLIB=$(ANDROID_HOME)/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android-ranlib \
+	STRIP=$(ANDROID_HOME)/ndk/21.3.6528147/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android-strip \
+	CGO_CFLAGS="-isysroot $(ANDROID_HOME)/ndk/21.3.6528147/sysroot -target i686-linux-android23" \
+  CGO_LDFLAGS="--sysroot $(ANDROID_HOME)/ndk/21.3.6528147/platforms/android-23/arch-x86 -target i686-linux-android -v -Wl,-soname,libstatus.so" \
+ 	CGO_ENABLED=1 go build -buildmode=c-shared -o $(GOBIN)/libstatus.so $(BUILD_FLAGS) $(GOBIN)/statusgo-lib
+	@echo "Shared library built:"
+	@ls -la $(GOBIN)/libstatus.*
+
 docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the image name)
 	@echo "Building docker image..."
 	docker build --file _assets/build/Dockerfile . \
