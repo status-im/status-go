@@ -1080,6 +1080,7 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 		for _, i := range infos {
 			// TODO: Add ChatID, message, public_key
 			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
+				Type:           protobuf.PushNotification_MESSAGE,
 				AccessToken:    i.AccessToken,
 				PublicKey:      common.HashPublicKey(publicKey),
 				InstallationId: i.InstallationID,

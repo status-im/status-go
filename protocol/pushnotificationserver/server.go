@@ -334,6 +334,11 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 			InstallationId: pn.InstallationId,
 		}
 
+		if pn.Type != protobuf.PushNotification_MESSAGE {
+			s.config.Logger.Warn("unhandled type")
+			continue
+		}
+
 		if err != nil {
 			s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
 			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
