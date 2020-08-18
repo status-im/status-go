@@ -24,7 +24,8 @@ type SignalsTransmitter struct {
 // Start runs loop in background.
 func (tmr *SignalsTransmitter) Start() error {
 	if tmr.quit != nil {
-		return errAlreadyRunning
+		// already running, nothing to do
+		return nil
 	}
 	tmr.quit = make(chan struct{})
 	events := make(chan Event, 10)

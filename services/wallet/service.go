@@ -32,6 +32,7 @@ type Service struct {
 	reactor *Reactor
 	signals *SignalsTransmitter
 	client  *ethclient.Client
+	started bool
 
 	group        *Group
 	accountsFeed *event.Feed
@@ -55,6 +56,7 @@ func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Addre
 	s.group.Add(func(ctx context.Context) error {
 		return WatchAccountsChanges(ctx, s.accountsFeed, accounts, reactor)
 	})
+	s.started = true
 	return nil
 }
 
@@ -68,6 +70,7 @@ func (s *Service) StopReactor() error {
 		s.group.Stop()
 		s.group.Wait()
 	}
+	s.started = false
 	return nil
 }
 
@@ -153,5 +156,5 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 }
 
 func (s *Service) IsStarted() bool {
-	return s.group != nil
+	return s.started
 }
