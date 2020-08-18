@@ -156,6 +156,9 @@ type Client struct {
 	resendingLoopQuitChan chan struct{}
 
 	quit chan struct{}
+
+	// registrationSubscriptions is a list of chan of client subscribed to the registration event
+	registrationSubscriptions []chan struct{}
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
@@ -190,10 +193,28 @@ func (c *Client) Start() error {
 	return nil
 }
 
+func (c *Client) publishOnRegistrationSubscriptions() {
+	// Publish on channels, drop if buffer is full
+	for _, s := range c.registrationSubscriptions {
+		select {
+		case s <- struct{}{}:
+		default:
+			c.config.Logger.Warn("subscription channel full, dropping message")
+		}
+	}
+}
+
+func (c *Client) quitRegistrationSubscriptions() {
+	for _, s := range c.registrationSubscriptions {
+		close(s)
+	}
+}
+
 func (c *Client) Stop() error {
 	close(c.quit)
 	c.stopRegistrationLoop()
 	c.stopResendingLoop()
+	c.quitRegistrationSubscriptions()
 	return nil
 }
 
@@ -235,6 +256,12 @@ func (c *Client) Registered() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (c *Client) SubscribeToRegistrations() chan struct{} {
+	s := make(chan struct{}, 100)
+	c.registrationSubscriptions = append(c.registrationSubscriptions, s)
+	return s
 }
 
 func (c *Client) GetSentNotification(hashedPublicKey []byte, installationID string, messageID []byte) (*SentNotification, error) {
@@ -315,7 +342,13 @@ func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.Pub
 	server.Registered = true
 	server.RegisteredAt = time.Now().Unix()
 
-	return c.persistence.UpsertServer(server)
+	err = c.persistence.UpsertServer(server)
+	if err != nil {
+		return err
+	}
+	c.publishOnRegistrationSubscriptions()
+
+	return nil
 }
 
 // processQueryInfo takes info about push notifications and validates them
@@ -397,11 +430,17 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 
 // HandleContactCodeAdvertisement checks if there are any info and process them
 func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey, message protobuf.ContactCodeAdvertisement) error {
+	// nothing to do for our own pubkey
+	if common.IsPubKeyEqual(clientPublicKey, &c.config.Identity.PublicKey) {
+		return nil
+	}
+
 	c.config.Logger.Debug("received contact code advertisement", zap.Any("advertisement", message))
 	for _, info := range message.PushNotificationInfo {
 		c.config.Logger.Debug("handling push notification query info")
-		serverPublicKey, err := crypto.UnmarshalPubkey(info.ServerPublicKey)
+		serverPublicKey, err := crypto.DecompressPubkey(info.ServerPublicKey)
 		if err != nil {
+			c.config.Logger.Error("could not unmarshal server pubkey", zap.Binary("server-key", info.ServerPublicKey))
 			return err
 		}
 		err = c.processQueryInfo(clientPublicKey, serverPublicKey, info)
@@ -410,7 +449,12 @@ func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey
 		}
 	}
 
-	return nil
+	// Save query so that we won't query again to early
+	// NOTE: this is not very accurate as we might fetch an historical message,
+	// prolonging the time that we fetch new info.
+	// Most of the times it should work fine, as if the info are stale they'd be
+	// fetched again because of an error response from the push notification server
+	return c.persistence.SavePushNotificationQuery(clientPublicKey, []byte(uuid.New().String()))
 }
 
 // HandlePushNotificationResponse should set the request as processed

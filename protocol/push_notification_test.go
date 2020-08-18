@@ -801,3 +801,54 @@ func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer(
 	s.Require().NoError(bob2.Shutdown())
 	s.Require().NoError(alice.Shutdown())
 }
+
+func (s *MessengerPushNotificationSuite) TestContactCode() {
+
+	bob1 := s.m
+
+	serverKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	server := s.newPushNotificationServer(s.shh, serverKey)
+
+	alice := s.newMessenger(s.shh)
+	// start alice and enable sending push notifications
+	s.Require().NoError(alice.Start())
+	s.Require().NoError(alice.EnableSendingPushNotifications())
+
+	// Register bob1
+	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	s.Require().NoError(err)
+
+	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
+
+	// Pull servers  and check we registered
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = bob1.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		registered, err := bob1.RegisteredForPushNotifications()
+		if err != nil {
+			return err
+		}
+		if !registered {
+			return errors.New("not registered")
+		}
+		return nil
+	})
+	// Make sure we receive it
+	s.Require().NoError(err)
+
+	contactCodeAdvertisement, err := bob1.buildContactCodeAdvertisement()
+	s.Require().NoError(err)
+	s.Require().NotNil(contactCodeAdvertisement)
+
+	s.Require().NoError(alice.pushNotificationClient.HandleContactCodeAdvertisement(&bob1.identity.PublicKey, *contactCodeAdvertisement))
+
+	s.Require().NoError(alice.Shutdown())
+	s.Require().NoError(server.Shutdown())
+}

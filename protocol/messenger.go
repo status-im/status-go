@@ -279,6 +279,8 @@ func (m *Messenger) Start() error {
 
 	// Start push notification client
 	if m.pushNotificationClient != nil {
+		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
+
 		if err := m.pushNotificationClient.Start(); err != nil {
 			return err
 		}
@@ -302,36 +304,49 @@ func (m *Messenger) Start() error {
 	return nil
 }
 
+func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
+	if m.pushNotificationClient == nil || !m.pushNotificationClient.Enabled() {
+		return nil, nil
+	}
+	m.logger.Debug("adding push notification info to contact code bundle")
+	info, err := m.pushNotificationClient.MyPushNotificationQueryInfo()
+	if err != nil {
+		return nil, err
+	}
+	if len(info) == 0 {
+		return nil, nil
+	}
+	return &protobuf.ContactCodeAdvertisement{
+		PushNotificationInfo: info,
+	}, nil
+}
+
 // handleSendContactCode sends a public message wrapped in the encryption
 // layer, which will propagate our bundle
 func (m *Messenger) handleSendContactCode() error {
 	var payload []byte
-	if m.pushNotificationClient != nil && m.pushNotificationClient.Enabled() {
-		info, err := m.pushNotificationClient.MyPushNotificationQueryInfo()
+	m.logger.Debug("sending contact code")
+	contactCodeAdvertisement, err := m.buildContactCodeAdvertisement()
+	if err != nil {
+		m.logger.Error("could not build contact code advertisement", zap.Error(err))
+	}
+
+	if contactCodeAdvertisement != nil {
+		payload, err = proto.Marshal(contactCodeAdvertisement)
 		if err != nil {
 			return err
-		}
-		if len(info) != 0 {
-			contactCode := &protobuf.ContactCodeAdvertisement{
-				PushNotificationInfo: info,
-			}
-
-			payload, err = proto.Marshal(contactCode)
-			if err != nil {
-				return err
-			}
-
 		}
 	}
 
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
 	rawMessage := common.RawMessage{
 		LocalChatID: contactCodeTopic,
+		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT,
 		Payload:     payload,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := m.processor.SendPublic(ctx, contactCodeTopic, rawMessage)
+	_, err = m.processor.SendPublic(ctx, contactCodeTopic, rawMessage)
 	if err != nil {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
@@ -387,6 +402,22 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 				m.logger.Debug("quitting encryption subscription loop")
 				return
 			}
+		}
+	}()
+}
+
+// handlePushNotificationClientRegistration handles registration events
+func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
+	go func() {
+		for {
+			_, more := <-c
+			if !more {
+				return
+			}
+			if err := m.handleSendContactCode(); err != nil {
+				m.logger.Error("failed to publish contact code", zap.Error(err))
+			}
+
 		}
 	}()
 }
@@ -1192,7 +1223,7 @@ func (m *Messenger) saveContact(contact *Contact) error {
 	}
 
 	// We check if it should re-register with the push notification server
-	shouldReregisterForPushNotifications := m.pushNotificationClient != nil && (m.isNewContact(contact) || m.removedContact(contact))
+	shouldReregisterForPushNotifications := (m.isNewContact(contact) || m.removedContact(contact))
 
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
@@ -1203,15 +1234,20 @@ func (m *Messenger) saveContact(contact *Contact) error {
 
 	// Reregister only when data has changed
 	if shouldReregisterForPushNotifications {
-		m.logger.Info("contact state changed, re-registering for push notification")
-		contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-		err := m.pushNotificationClient.Reregister(contactIDs, mutedChatIDs)
-		if err != nil {
-			return err
-		}
+		return m.reregisterForPushNotifications()
 	}
 
 	return nil
+}
+
+func (m *Messenger) reregisterForPushNotifications() error {
+	m.logger.Info("contact state changed, re-registering for push notification")
+	if m.pushNotificationClient == nil {
+		return nil
+	}
+
+	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
+	return m.pushNotificationClient.Reregister(contactIDs, mutedChatIDs)
 }
 
 func (m *Messenger) SaveContact(contact *Contact) error {
@@ -1875,6 +1911,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					logger.Warn("failed to check message exists", zap.Error(err))
 				}
 				if exists {
+					logger.Debug("messageExists", zap.String("messageID", messageID))
 					continue
 				}
 
@@ -2051,7 +2088,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						if m.pushNotificationClient == nil {
 							continue
 						}
-						logger.Debug("Handling PushNotificationRegistrationResponse")
+						logger.Debug("Handling ContactCodeAdvertisement")
 						if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)); err != nil {
 							logger.Warn("failed to handle ContactCodeAdvertisement", zap.Error(err))
 						}
@@ -2119,6 +2156,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("message not handled", zap.Any("messageType", reflect.TypeOf(msg.ParsedMessage.Interface())))
 
 					}
+				} else {
+					logger.Debug("parsed message is nil")
 				}
 			}
 		}
@@ -2310,7 +2349,8 @@ func (m *Messenger) MuteChat(chatID string) error {
 
 	chat.Muted = true
 	m.allChats[chat.ID] = chat
-	return nil
+
+	return m.reregisterForPushNotifications()
 }
 
 // UnmuteChat signals to the messenger that we want to be notified
@@ -2330,7 +2370,7 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 
 	chat.Muted = false
 	m.allChats[chat.ID] = chat
-	return nil
+	return m.reregisterForPushNotifications()
 }
 
 func (m *Messenger) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
@@ -3213,7 +3253,12 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	defer m.mutex.Unlock()
 
 	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	return m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, contactIDs, mutedChatIDs)
+	err := m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, contactIDs, mutedChatIDs)
+	if err != nil {
+		m.logger.Error("failed to register for push notifications", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 // RegisteredForPushNotifications returns whether we successfully registered with all the servers
