@@ -52,15 +52,15 @@ In order to adjust logging settings you'd need:
 ```
 Valid `LogLevel` settings are: `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`
 
-## `WhisperConfig` 
+## `WakuConfig` 
 
-If you want your node to relay Whisper(SHH) protocol messages you'll want to include this:
+If you want your node to relay Waku(modified Whisper) protocol messages you'll want to include this:
 ```json
 {
-    "WhisperConfig": {
+    "WakuConfig": {
         "Enabled": true,
         "EnableMailServer": true,
-        "LightClient": false,
+        "DataDir": "/tmp/status-go-data/waku",
         "MailServerPassword": "status-offline-inbox"
     }
 }
