@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/static"
+	wakucommon "github.com/status-im/status-go/waku/common"
 	"github.com/status-im/status-go/whisper/v6"
 )
 
@@ -584,7 +585,7 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	c.LogMaxBackups = 3
 	c.LogToStderr = true
 	c.EnableNTPSync = true
-	c.WhisperConfig.Enabled = true
+	c.WakuConfig.Enabled = true
 
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
@@ -666,13 +667,12 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, wnodeDir string
+	var keyStoreDir, wnodeDir, wakuDir string
 
 	if dataDir != "" {
 		keyStoreDir = filepath.Join(dataDir, "keystore")
-	}
-	if dataDir != "" {
 		wnodeDir = filepath.Join(dataDir, "wnode")
+		wakuDir = filepath.Join(dataDir, "waku")
 	}
 
 	config := &NodeConfig{
@@ -698,6 +698,12 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 		},
 		LightEthConfig: LightEthConfig{
 			DatabaseCache: 16,
+		},
+		WakuConfig: WakuConfig{
+			DataDir:        wakuDir,
+			MinimumPoW:     WakuMinimumPoW,
+			TTL:            WakuTTL,
+			MaxMessageSize: wakucommon.DefaultMaxMessageSize,
 		},
 		WhisperConfig: WhisperConfig{
 			DataDir:        wnodeDir,
@@ -801,6 +807,14 @@ func (c *NodeConfig) Validate() error {
 	if c.WhisperConfig.Enabled && c.WhisperConfig.EnableMailServer {
 		if !strings.HasPrefix(c.WhisperConfig.DataDir, c.DataDir) {
 			return fmt.Errorf("WhisperConfig.DataDir must start with DataDir fragment")
+		}
+	}
+
+	// Waku's data directory must be relative to the main data directory
+	// if EnableMailServer is true.
+	if c.WakuConfig.Enabled && c.WakuConfig.EnableMailServer {
+		if !strings.HasPrefix(c.WakuConfig.DataDir, c.DataDir) {
+			return fmt.Errorf("WakuConfig.DataDir must start with DataDir fragment")
 		}
 	}
 
