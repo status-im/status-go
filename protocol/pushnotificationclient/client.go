@@ -60,6 +60,13 @@ const pushNotificationBackoffTime int64 = 2
 // RegistrationBackoffTime is the step of the exponential backoff
 const RegistrationBackoffTime int64 = 15
 
+type ServerType int
+
+const (
+	ServerTypeDefault = iota + 1
+	ServerTypeCustom
+)
+
 type PushNotificationServer struct {
 	PublicKey     *ecdsa.PublicKey `json:"-"`
 	Registered    bool             `json:"registered,omitempty"`
@@ -67,6 +74,7 @@ type PushNotificationServer struct {
 	LastRetriedAt int64            `json:"lastRetriedAt,omitempty"`
 	RetryCount    int64            `json:"retryCount,omitempty"`
 	AccessToken   string           `json:"accessToken,omitempty"`
+	Type          ServerType       `json:"type,omitempty"`
 }
 
 func (s *PushNotificationServer) MarshalJSON() ([]byte, error) {
@@ -121,6 +129,10 @@ type Config struct {
 	InstallationID string
 
 	Logger *zap.Logger
+
+	// DefaultServers holds the push notification servers used by
+	// default if none is selected
+	DefaultServers []*ecdsa.PublicKey
 }
 
 type Client struct {
@@ -175,6 +187,8 @@ func (c *Client) Start() error {
 	if c.messageProcessor == nil {
 		return errors.New("can't start, missing message processor")
 	}
+
+	c.config.Logger.Debug("starting push notification client", zap.Any("config", c.config))
 
 	err := c.loadLastPushNotificationRegistration()
 	if err != nil {
@@ -294,8 +308,23 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 
 	c.config.RemoteNotificationsEnabled = true
 
+	// check if we need to fallback on default servers
+	currentServers, err := c.persistence.GetServers()
+	if err != nil {
+		return err
+	}
+	if len(currentServers) == 0 {
+		c.config.Logger.Debug("servers empty, checking default servers")
+		for _, s := range c.config.DefaultServers {
+			err = c.AddPushNotificationsServer(s, ServerTypeDefault)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// reset servers
-	err := c.resetServers()
+	err = c.resetServers()
 	if err != nil {
 		return err
 	}
@@ -482,7 +511,7 @@ func (c *Client) RemovePushNotificationServer(publicKey *ecdsa.PublicKey) error 
 	return errors.New("not implemented")
 }
 
-func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey) error {
+func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverType ServerType) error {
 	c.config.Logger.Debug("adding push notifications server", zap.Any("public-key", publicKey))
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
@@ -497,6 +526,7 @@ func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey) error {
 
 	err = c.persistence.UpsertServer(&PushNotificationServer{
 		PublicKey: publicKey,
+		Type:      serverType,
 	})
 	if err != nil {
 		return err

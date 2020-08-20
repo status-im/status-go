@@ -3181,11 +3181,11 @@ func (m *Messenger) Timesource() TimeSource {
 }
 
 // AddPushNotificationsServer adds a push notification server
-func (m *Messenger) AddPushNotificationsServer(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+func (m *Messenger) AddPushNotificationsServer(ctx context.Context, publicKey *ecdsa.PublicKey, serverType pushnotificationclient.ServerType) error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
-	return m.pushNotificationClient.AddPushNotificationsServer(publicKey)
+	return m.pushNotificationClient.AddPushNotificationsServer(publicKey, serverType)
 }
 
 // RemovePushNotificationServer removes a push notification server
@@ -3293,8 +3293,8 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
 }
 
-// GetPushNotificationServers returns the servers used for push notifications
-func (m *Messenger) GetPushNotificationServers() ([]*pushnotificationclient.PushNotificationServer, error) {
+// GetPushNotificationsServers returns the servers used for push notifications
+func (m *Messenger) GetPushNotificationsServers() ([]*pushnotificationclient.PushNotificationServer, error) {
 	if m.pushNotificationClient == nil {
 		return nil, errors.New("no push notification client")
 	}

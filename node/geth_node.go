@@ -449,6 +449,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 	cfg := &waku.Config{
 		MaxMessageSize:     wakucommon.DefaultMaxMessageSize,
 		BloomFilterMode:    wakuCfg.BloomFilterMode,
+		FullNode:           wakuCfg.FullNode,
 		MinimumAcceptedPoW: params.WakuMinimumPoW,
 	}
 

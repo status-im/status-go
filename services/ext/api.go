@@ -495,7 +495,8 @@ func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyB
 		return err
 	}
 
-	return api.service.messenger.AddPushNotificationsServer(ctx, publicKey)
+	// this is coming from a user, so it has to be a custom server
+	return api.service.messenger.AddPushNotificationsServer(ctx, publicKey, pushnotificationclient.ServerTypeCustom)
 }
 
 func (api *PublicAPI) RemovePushNotificationServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
@@ -507,8 +508,8 @@ func (api *PublicAPI) RemovePushNotificationServer(ctx context.Context, publicKe
 	return api.service.messenger.RemovePushNotificationServer(ctx, publicKey)
 }
 
-func (api *PublicAPI) GetPushNotificationServers() ([]*pushnotificationclient.PushNotificationServer, error) {
-	return api.service.messenger.GetPushNotificationServers()
+func (api *PublicAPI) GetPushNotificationsServers() ([]*pushnotificationclient.PushNotificationServer, error) {
+	return api.service.messenger.GetPushNotificationsServers()
 }
 
 func (api *PublicAPI) RegisteredForPushNotifications() (bool, error) {

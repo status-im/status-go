@@ -13,6 +13,8 @@
 // 0006_appearance.up.sql (67B)
 // 0007_enable_waku_default.up.sql (38B)
 // 0008_add_push_notifications.up.sql (349B)
+// 0009_enable_sending_push_notifications.down.sql (49B)
+// 0009_enable_sending_push_notifications.up.sql (49B)
 // doc.go (74B)
 
 package migrations
@@ -337,8 +339,48 @@ func _0008_add_push_notificationsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1595840384, 0)}
+	info := bindataFileInfo{name: "0008_add_push_notifications.up.sql", size: 349, mode: os.FileMode(0644), modTime: time.Unix(1596198373, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x5a, 0x0, 0xbf, 0xd0, 0xdd, 0xcd, 0x73, 0xe0, 0x7c, 0x56, 0xef, 0xdc, 0x57, 0x61, 0x94, 0x64, 0x70, 0xb9, 0xfa, 0xa1, 0x2a, 0x36, 0xc, 0x2f, 0xf8, 0x95, 0xa, 0x57, 0x3e, 0x7a, 0xd7, 0x12}}
+	return a, nil
+}
+
+var __0009_enable_sending_push_notificationsDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x0a\x0d\x70\x71\x0c\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x08\x76\x0d\x51\x28\x4e\xcd\x4b\x89\x2f\x28\x2d\xce\x88\xcf\xcb\x2f\xc9\x4c\xcb\x4c\x4e\x2c\xc9\xcc\xcf\x2b\x56\xb0\x55\x30\xb0\xe6\x02\x04\x00\x00\xff\xff\x57\x2d\xdb\x16\x31\x00\x00\x00")
+
+func _0009_enable_sending_push_notificationsDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0009_enable_sending_push_notificationsDownSql,
+		"0009_enable_sending_push_notifications.down.sql",
+	)
+}
+
+func _0009_enable_sending_push_notificationsDownSql() (*asset, error) {
+	bytes, err := _0009_enable_sending_push_notificationsDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0009_enable_sending_push_notifications.down.sql", size: 49, mode: os.FileMode(0644), modTime: time.Unix(1597918101, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe9, 0xae, 0x1b, 0x41, 0xcb, 0x9c, 0x2c, 0x93, 0xc6, 0x2a, 0x77, 0x3, 0xb9, 0x51, 0xe0, 0x68, 0x68, 0x0, 0xf7, 0x5b, 0xb3, 0x1e, 0x94, 0x44, 0xba, 0x9c, 0xd0, 0x3b, 0x80, 0x21, 0x6f, 0xb5}}
+	return a, nil
+}
+
+var __0009_enable_sending_push_notificationsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x0a\x0d\x70\x71\x0c\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x08\x76\x0d\x51\x28\x4e\xcd\x4b\x89\x2f\x28\x2d\xce\x88\xcf\xcb\x2f\xc9\x4c\xcb\x4c\x4e\x2c\xc9\xcc\xcf\x2b\x56\xb0\x55\x30\xb4\xe6\x02\x04\x00\x00\xff\xff\x60\x47\x19\x17\x31\x00\x00\x00")
+
+func _0009_enable_sending_push_notificationsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0009_enable_sending_push_notificationsUpSql,
+		"0009_enable_sending_push_notifications.up.sql",
+	)
+}
+
+func _0009_enable_sending_push_notificationsUpSql() (*asset, error) {
+	bytes, err := _0009_enable_sending_push_notificationsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0009_enable_sending_push_notifications.up.sql", size: 49, mode: os.FileMode(0644), modTime: time.Unix(1597918090, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1b, 0x80, 0xe4, 0x9c, 0xc8, 0xb8, 0xd5, 0xef, 0xce, 0x74, 0x9b, 0x7b, 0xdd, 0xa, 0x99, 0x1e, 0xef, 0x7f, 0xb8, 0x99, 0x84, 0x4, 0x0, 0x6b, 0x1d, 0x2c, 0xa, 0xf8, 0x2c, 0x4f, 0xb5, 0x44}}
 	return a, nil
 }
 
@@ -479,6 +521,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0008_add_push_notifications.up.sql": _0008_add_push_notificationsUpSql,
 
+	"0009_enable_sending_push_notifications.down.sql": _0009_enable_sending_push_notificationsDownSql,
+
+	"0009_enable_sending_push_notifications.up.sql": _0009_enable_sending_push_notificationsUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -523,20 +569,22 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_app.down.sql":                  &bintree{_0001_appDownSql, map[string]*bintree{}},
-	"0001_app.up.sql":                    &bintree{_0001_appUpSql, map[string]*bintree{}},
-	"0002_tokens.down.sql":               &bintree{_0002_tokensDownSql, map[string]*bintree{}},
-	"0002_tokens.up.sql":                 &bintree{_0002_tokensUpSql, map[string]*bintree{}},
-	"0003_settings.down.sql":             &bintree{_0003_settingsDownSql, map[string]*bintree{}},
-	"0003_settings.up.sql":               &bintree{_0003_settingsUpSql, map[string]*bintree{}},
-	"0004_pending_stickers.down.sql":     &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
-	"0004_pending_stickers.up.sql":       &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
-	"0005_waku_mode.down.sql":            &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
-	"0005_waku_mode.up.sql":              &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
-	"0006_appearance.up.sql":             &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
-	"0007_enable_waku_default.up.sql":    &bintree{_0007_enable_waku_defaultUpSql, map[string]*bintree{}},
-	"0008_add_push_notifications.up.sql": &bintree{_0008_add_push_notificationsUpSql, map[string]*bintree{}},
-	"doc.go":                             &bintree{docGo, map[string]*bintree{}},
+	"0001_app.down.sql":                               &bintree{_0001_appDownSql, map[string]*bintree{}},
+	"0001_app.up.sql":                                 &bintree{_0001_appUpSql, map[string]*bintree{}},
+	"0002_tokens.down.sql":                            &bintree{_0002_tokensDownSql, map[string]*bintree{}},
+	"0002_tokens.up.sql":                              &bintree{_0002_tokensUpSql, map[string]*bintree{}},
+	"0003_settings.down.sql":                          &bintree{_0003_settingsDownSql, map[string]*bintree{}},
+	"0003_settings.up.sql":                            &bintree{_0003_settingsUpSql, map[string]*bintree{}},
+	"0004_pending_stickers.down.sql":                  &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
+	"0004_pending_stickers.up.sql":                    &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
+	"0005_waku_mode.down.sql":                         &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
+	"0005_waku_mode.up.sql":                           &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
+	"0006_appearance.up.sql":                          &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
+	"0007_enable_waku_default.up.sql":                 &bintree{_0007_enable_waku_defaultUpSql, map[string]*bintree{}},
+	"0008_add_push_notifications.up.sql":              &bintree{_0008_add_push_notificationsUpSql, map[string]*bintree{}},
+	"0009_enable_sending_push_notifications.down.sql": &bintree{_0009_enable_sending_push_notificationsDownSql, map[string]*bintree{}},
+	"0009_enable_sending_push_notifications.up.sql":   &bintree{_0009_enable_sending_push_notificationsUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

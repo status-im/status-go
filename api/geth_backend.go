@@ -511,8 +511,13 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 		}
 	}()
 
+	b.log.Debug("starting node with config", "config", config)
 	// Update config with some defaults.
-	config.UpdateWithMobileDefaults()
+	if err := config.UpdateWithDefaults(); err != nil {
+		return err
+	}
+
+	b.log.Debug("updated config with defaults", "config", config)
 
 	// Start by validating configuration
 	if err := config.Validate(); err != nil {

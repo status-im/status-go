@@ -42,6 +42,7 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	assert.NotEmpty(t, c.ClusterConfig.BootNodes)
 	assert.NotEmpty(t, c.ClusterConfig.StaticNodes)
 	assert.NotEmpty(t, c.ClusterConfig.RendezvousNodes)
+	assert.NotEmpty(t, c.ClusterConfig.PushNotificationsServers)
 	// assert LES
 	assert.Equal(t, true, c.LightEthConfig.Enabled)
 	// assert peers limits
@@ -50,6 +51,9 @@ func TestNewNodeConfigWithDefaults(t *testing.T) {
 	// assert other
 	assert.Equal(t, false, c.HTTPEnabled)
 	assert.Equal(t, false, c.IPCEnabled)
+
+	assert.NoError(t, c.UpdateWithDefaults())
+	assert.NotEmpty(t, c.ShhextConfig.DefaultPushNotificationsServers)
 }
 
 func TestNewConfigFromJSON(t *testing.T) {
