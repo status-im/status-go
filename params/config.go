@@ -19,6 +19,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
 	"github.com/status-im/status-go/whisper/v6"
@@ -447,6 +448,9 @@ type NodeConfig struct {
 
 	// MailServerRegistryAddress is the MailServerRegistry contract address
 	MailServerRegistryAddress string
+
+	// PushNotificationServerConfig is the config for the push notification server
+	PushNotificationServerConfig pushnotificationserver.Config `json:"PushNotificationServerConfig"`
 }
 
 // WalletConfig extra configuration for wallet.Service.

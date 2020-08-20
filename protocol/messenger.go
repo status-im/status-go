@@ -206,7 +206,7 @@ func NewMessenger(
 
 	// Initialize push notification server
 	var pushNotificationServer *pushnotificationserver.Server
-	if c.pushNotificationServerConfig != nil {
+	if c.pushNotificationServerConfig != nil && c.pushNotificationServerConfig.Enabled {
 		c.pushNotificationServerConfig.Identity = identity
 		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(database)
 		pushNotificationServer = pushnotificationserver.New(c.pushNotificationServerConfig, pushNotificationServerPersistence, processor)
@@ -3306,6 +3306,7 @@ func (m *Messenger) StartPushNotificationsServer() error {
 	if m.pushNotificationServer == nil {
 		pushNotificationServerPersistence := pushnotificationserver.NewSQLitePersistence(m.database)
 		config := &pushnotificationserver.Config{
+			Enabled:  true,
 			Logger:   m.logger,
 			Identity: m.identity,
 		}

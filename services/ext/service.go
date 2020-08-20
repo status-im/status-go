@@ -476,7 +476,8 @@ func buildMessengerOptions(
 
 	if settings.PushNotificationsServerEnabled {
 		config := &pushnotificationserver.Config{
-			Logger: logger,
+			Enabled: true,
+			Logger:  logger,
 		}
 		options = append(options, protocol.WithPushNotificationServerConfig(config))
 	}

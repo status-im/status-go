@@ -109,6 +109,7 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Wak
 	s.Require().NoError(err)
 
 	serverConfig := &pushnotificationserver.Config{
+		Enabled:  true,
 		Logger:   s.logger,
 		Identity: privateKey,
 	}

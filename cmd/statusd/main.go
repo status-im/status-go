@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/okzk/sdnotify"
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -20,12 +21,16 @@ import (
 	gethmetrics "github.com/ethereum/go-ethereum/metrics"
 
 	"github.com/status-im/status-go/api"
+	"github.com/status-im/status-go/appdatabase"
+	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/metrics"
 	nodemetrics "github.com/status-im/status-go/metrics/node"
 	"github.com/status-im/status-go/node"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
+	"github.com/status-im/status-go/protocol"
 )
 
 const (
@@ -148,6 +153,52 @@ func main() {
 	if err != nil {
 		logger.Error("Node start failed", "error", err)
 		return
+	}
+
+	if config.PushNotificationServerConfig.Enabled {
+		if config.NodeKey == "" {
+			logger.Error("node key needs to be set if running a push notification server")
+			return
+		}
+
+		identity, err := crypto.HexToECDSA(config.NodeKey)
+		if err != nil {
+			logger.Error("node key is invalid", "error", err)
+			return
+		}
+
+		// Generate installationID from public key, so it's always the same
+		installationID, err := uuid.FromBytes(crypto.CompressPubkey(&identity.PublicKey)[:16])
+		if err != nil {
+			logger.Error("cannot create installation id", "error", err)
+			return
+		}
+
+		db, err := appdatabase.InitializeDB(config.DataDir+"/"+installationID.String()+".db", "")
+		if err != nil {
+			logger.Error("failed to initialize app db", "error", err)
+			return
+		}
+
+		options := []protocol.Option{
+			protocol.WithPushNotifications(),
+			protocol.WithPushNotificationServerConfig(&config.PushNotificationServerConfig),
+			protocol.WithDatabase(db),
+		}
+
+		messenger, err := protocol.NewMessenger(identity, gethbridge.NewNodeBridge(backend.StatusNode().GethNode()), installationID.String(), options...)
+		if err != nil {
+			logger.Error("failed to create messenger", "error", err)
+			return
+		}
+
+		// This will start the push notification server as well as
+		// the config is set to Enabled
+		err = messenger.Start()
+		if err != nil {
+			logger.Error("failed to start messenger", "error", err)
+			return
+		}
 	}
 
 	err = sdnotify.Ready()
