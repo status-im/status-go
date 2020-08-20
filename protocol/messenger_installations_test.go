@@ -172,6 +172,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	contact, err := buildContact(&contactKey.PublicKey)
 	s.Require().NoError(err)
 	contact.SystemTags = append(contact.SystemTags, contactAdded)
+	contact.LocalNickname = "Test Nickname"
 	err = s.m.SaveContact(contact)
 	s.Require().NoError(err)
 
@@ -249,6 +250,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NotNil(statusChat)
 
 	s.Require().True(actualContact.IsAdded())
+	s.Require().Equal("Test Nickname", actualContact.LocalNickname)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 

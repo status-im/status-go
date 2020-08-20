@@ -59,6 +59,7 @@ type Contact struct {
 
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
 	TributeToTalk string              `json:"tributeToTalk,omitempty"`
+	LocalNickname string              `json:"localNickname,omitempty"`
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {
@@ -119,7 +120,7 @@ func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
 // HasCustomFields returns whether the the contact has any field that is valuable
 // to the client other than the computed name/image
 func (c Contact) HasCustomFields() bool {
-	return c.IsAdded() || c.HasBeenAdded() || c.IsBlocked() || c.ENSVerified
+	return c.IsAdded() || c.HasBeenAdded() || c.IsBlocked() || c.ENSVerified || c.LocalNickname != ""
 }
 
 func contactIDFromPublicKey(key *ecdsa.PublicKey) string {
