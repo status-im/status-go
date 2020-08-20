@@ -4,10 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"errors"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -21,6 +21,7 @@ const encryptedPayloadKeyLength = 16
 const defaultGorushURL = "https://gorush.status.im"
 
 type Config struct {
+	Enabled bool
 	// Identity is our identity key
 	Identity *ecdsa.PrivateKey
 	// GorushUrl is the url for the gorush service
@@ -44,6 +45,14 @@ func New(config *Config, persistence Persistence, messageProcessor *common.Messa
 }
 
 func (s *Server) Start() error {
+	if s.config.Logger == nil {
+		logger, err := zap.NewDevelopment()
+		if err != nil {
+			return errors.Wrap(err, "failed to create a logger")
+		}
+		s.config.Logger = logger
+	}
+
 	s.config.Logger.Info("starting push notification server")
 	if s.config.Identity == nil {
 		s.config.Logger.Info("Identity nil")
