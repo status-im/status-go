@@ -50,6 +50,12 @@ func (s *MessengerInstallationSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
+	// We start the messenger in order to receive installations
+	s.Require().NoError(s.m.Start())
+}
+
+func (s *MessengerInstallationSuite) TearDownTest() {
+	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
@@ -88,6 +94,7 @@ func (s *MessengerInstallationSuite) newMessenger(shh types.Waku) *Messenger {
 
 func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	theirMessenger := s.newMessengerWithKey(s.shh, s.privateKey)
+	s.Require().NoError(theirMessenger.Start())
 
 	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -153,6 +160,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	actualChat := response.Chats[0]
 	s.Require().Equal(statusChatID, actualChat.ID)
 	s.Require().True(actualChat.Active)
+	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallation() {
@@ -174,6 +182,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// pair
 	theirMessenger := s.newMessengerWithKey(s.shh, s.privateKey)
+	s.Require().NoError(theirMessenger.Start())
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -240,6 +249,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NotNil(statusChat)
 
 	s.Require().True(actualContact.IsAdded())
+	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
@@ -247,7 +257,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	bob1 := s.m
 	// pair
 	bob2 := s.newMessengerWithKey(s.shh, s.privateKey)
+	s.Require().NoError(bob2.Start())
 	alice := s.newMessenger(s.shh)
+	s.Require().NoError(alice.Start())
 
 	err := bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -290,4 +302,6 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 		"message not received",
 	)
 	s.Require().NoError(err)
+	s.Require().NoError(bob2.Shutdown())
+	s.Require().NoError(alice.Shutdown())
 }

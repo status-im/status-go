@@ -45,6 +45,11 @@ func (s *MessengerMuteSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
+	s.Require().NoError(s.m.Start())
+}
+
+func (s *MessengerMuteSuite) TearDownTest() {
+	s.Require().NoError(s.m.Shutdown())
 }
 
 func (s *MessengerMuteSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
@@ -86,6 +91,7 @@ func (s *MessengerMuteSuite) TestSetMute() {
 	s.Require().NoError(err)
 
 	theirMessenger := s.newMessengerWithKey(s.shh, key)
+	s.Require().NoError(theirMessenger.Start())
 
 	chatID := "status"
 
@@ -107,4 +113,5 @@ func (s *MessengerMuteSuite) TestSetMute() {
 
 	s.Require().NoError(s.m.UnmuteChat(chatID))
 	s.Require().False(s.m.Chats()[0].Muted)
+	s.Require().NoError(theirMessenger.Shutdown())
 }

@@ -19,6 +19,7 @@ message PushNotificationRegistration {
   bool unregister = 9;
   bytes grant = 10;
   bool allow_from_contacts_only = 11;
+  string apn_topic = 12;
 }
 
 message PushNotificationRegistrationResponse {
@@ -65,6 +66,12 @@ message PushNotification {
   bytes public_key = 3;
   string installation_id = 4;
   bytes message = 5;
+  PushNotificationType type = 6;
+  enum PushNotificationType {
+    UNKNOWN_PUSH_NOTIFICATION_TYPE = 0;
+    MESSAGE = 1;
+    MENTION = 2;
+  }
 }
 
 message PushNotificationRequest {

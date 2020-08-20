@@ -233,12 +233,12 @@ func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 		return nil, ErrMalformedPushNotificationRegistrationInstallationID
 	}
 
-	previousRegistration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(publicKey), registration.InstallationId)
+	previousVersion, err := s.persistence.GetPushNotificationRegistrationVersion(common.HashPublicKey(publicKey), registration.InstallationId)
 	if err != nil {
 		return nil, err
 	}
 
-	if previousRegistration != nil && registration.Version <= previousRegistration.Version {
+	if registration.Version <= previousVersion {
 		return nil, ErrInvalidPushNotificationRegistrationVersion
 	}
 
@@ -290,6 +290,7 @@ func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotifica
 	for _, idAndResponse := range registrations {
 
 		registration := idAndResponse.Registration
+
 		info := &protobuf.PushNotificationQueryInfo{
 			PublicKey:      idAndResponse.ID,
 			Grant:          registration.Grant,
@@ -333,6 +334,11 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 			InstallationId: pn.InstallationId,
 		}
 
+		if pn.Type != protobuf.PushNotification_MESSAGE {
+			s.config.Logger.Warn("unhandled type")
+			continue
+		}
+
 		if err != nil {
 			s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
 			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
@@ -340,7 +346,6 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 			s.config.Logger.Warn("empty registration")
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
-			s.config.Logger.Warn("invalid access token")
 			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
 		} else {
 			// For now we just assume that the notification will be successful
@@ -362,7 +367,7 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 
 	// This can be done asynchronously
 	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
-	err := sendGoRushNotification(goRushRequest, s.config.GorushURL)
+	err := sendGoRushNotification(goRushRequest, s.config.GorushURL, s.config.Logger)
 	if err != nil {
 		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
 		// TODO: handle this error?
@@ -403,12 +408,9 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	}
 
 	if registration.Unregister {
+		s.config.Logger.Info("unregistering client")
 		// We save an empty registration, only keeping version and installation-id
-		emptyRegistration := &protobuf.PushNotificationRegistration{
-			Version:        registration.Version,
-			InstallationId: registration.InstallationId,
-		}
-		if err := s.persistence.SavePushNotificationRegistration(common.HashPublicKey(publicKey), emptyRegistration); err != nil {
+		if err := s.persistence.UnregisterPushNotificationRegistration(common.HashPublicKey(publicKey), registration.InstallationId, registration.Version); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
 			s.config.Logger.Error("failed to unregister ", zap.Error(err))
 			return response

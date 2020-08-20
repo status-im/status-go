@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
+
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -21,6 +24,7 @@ type GoRushRequestNotification struct {
 	Tokens   []string           `json:"tokens"`
 	Platform uint               `json:"platform"`
 	Message  string             `json:"message"`
+	Topic    string             `json:"topic"`
 	Data     *GoRushRequestData `json:"data"`
 }
 
@@ -53,6 +57,7 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 				Tokens:   []string{registration.DeviceToken},
 				Platform: tokenTypeToGoRushPlatform(registration.TokenType),
 				Message:  defaultNotificationMessage,
+				Topic:    registration.ApnTopic,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hex.EncodeToString(request.Message),
 					ChatID:           request.ChatId,
@@ -63,15 +68,20 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 	return goRushRequests
 }
 
-func sendGoRushNotification(request *GoRushRequest, url string) error {
+func sendGoRushNotification(request *GoRushRequest, url string, logger *zap.Logger) error {
 	payload, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
 
-	_, err = http.Post(url+"/api/push", "application/json", bytes.NewReader(payload))
+	response, err := http.Post(url+"/api/push", "application/json", bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
+	defer response.Body.Close()
+	body, _ := ioutil.ReadAll(response.Body)
+
+	logger.Info("Sent gorush request", zap.String("response", string(body)))
+
 	return nil
 }

@@ -18,9 +18,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
 var cleartext = []byte("hello")
@@ -57,9 +54,6 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		db,
 		aliceInstallationID,
 		config,
-		func(s []*multidevice.Installation) {},
-		func(s []*sharedsecret.Secret) {},
-		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "alice")),
 	)
 
@@ -70,9 +64,6 @@ func (s *EncryptionServiceTestSuite) initDatabases(config encryptorConfig) {
 		db,
 		bobInstallationID,
 		config,
-		func(s []*multidevice.Installation) {},
-		func(s []*sharedsecret.Secret) {},
-		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "bob")),
 	)
 }
@@ -130,7 +121,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 	// On the receiver side, we should be able to decrypt using our private key and the ephemeral just sent
 	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
 	s.Require().NoError(err)
-	s.Equal(cleartext, decryptedPayload1, "It correctly decrypts the payload using DH")
+	s.Equal(cleartext, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using DH")
 
 	// The next message will not be re-using the same key
 	response2, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, cleartext)
@@ -147,7 +138,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadNoBundle() {
 
 	decryptedPayload2, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response2.Message, defaultMessageID)
 	s.Require().NoError(err)
-	s.Equal(cleartext, decryptedPayload2, "It correctly decrypts the payload using DH")
+	s.Equal(cleartext, decryptedPayload2.DecryptedMessage, "It correctly decrypts the payload using DH")
 }
 
 // Alice has Bob's bundle
@@ -201,7 +192,7 @@ func (s *EncryptionServiceTestSuite) TestEncryptPayloadBundle() {
 	// Bob is able to decrypt it using the bundle
 	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response1.Message, defaultMessageID)
 	s.Require().NoError(err)
-	s.Equal(cleartext, decryptedPayload1, "It correctly decrypts the payload using X3DH")
+	s.Equal(cleartext, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using X3DH")
 }
 
 // Alice has Bob's bundle
@@ -267,7 +258,7 @@ func (s *EncryptionServiceTestSuite) TestConsequentMessagesBundle() {
 	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
 	s.Require().NoError(err)
 
-	s.Equal(cleartext2, decryptedPayload1, "It correctly decrypts the payload using X3DH")
+	s.Equal(cleartext2, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using X3DH")
 }
 
 // Alice has Bob's bundle
@@ -351,7 +342,7 @@ func (s *EncryptionServiceTestSuite) TestConversation() {
 	decryptedPayload1, err := s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, response.Message, defaultMessageID)
 	s.Require().NoError(err)
 
-	s.Equal(cleartext2, decryptedPayload1, "It correctly decrypts the payload using X3DH")
+	s.Equal(cleartext2, decryptedPayload1.DecryptedMessage, "It correctly decrypts the payload using X3DH")
 }
 
 // Previous implementation allowed max maxSkip keys in the same receiving chain
@@ -686,7 +677,7 @@ func receiver(
 			errChan <- err
 			return
 		}
-		if !reflect.DeepEqual(actualCleartext, cleartext) {
+		if !reflect.DeepEqual(actualCleartext.DecryptedMessage, cleartext) {
 			errChan <- errors.New("Decrypted value does not match")
 			return
 		}

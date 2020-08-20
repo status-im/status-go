@@ -121,9 +121,6 @@ type Config struct {
 	InstallationID string
 
 	Logger *zap.Logger
-
-	// TokenType is the type of token
-	TokenType protobuf.PushNotificationRegistration_TokenType
 }
 
 type Client struct {
@@ -141,6 +138,10 @@ type Client struct {
 	AccessToken string
 	// deviceToken is the device token for this device
 	deviceToken string
+	// TokenType is the type of token
+	tokenType protobuf.PushNotificationRegistration_TokenType
+	// APNTopic is the topic of the apn topic for push notification
+	apnTopic string
 
 	// randomReader only used for testing so we have deterministic encryption
 	reader io.Reader
@@ -155,6 +156,9 @@ type Client struct {
 	resendingLoopQuitChan chan struct{}
 
 	quit chan struct{}
+
+	// registrationSubscriptions is a list of chan of client subscribed to the registration event
+	registrationSubscriptions []chan struct{}
 }
 
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
@@ -179,16 +183,38 @@ func (c *Client) Start() error {
 
 	c.subscribeForSentMessages()
 	c.subscribeForScheduledMessages()
+
+	// We start even if push notifications are disabled, as we might
+	// actually be sending an unregister message
 	c.startRegistrationLoop()
+
 	c.startResendingLoop()
 
 	return nil
+}
+
+func (c *Client) publishOnRegistrationSubscriptions() {
+	// Publish on channels, drop if buffer is full
+	for _, s := range c.registrationSubscriptions {
+		select {
+		case s <- struct{}{}:
+		default:
+			c.config.Logger.Warn("subscription channel full, dropping message")
+		}
+	}
+}
+
+func (c *Client) quitRegistrationSubscriptions() {
+	for _, s := range c.registrationSubscriptions {
+		close(s)
+	}
 }
 
 func (c *Client) Stop() error {
 	close(c.quit)
 	c.stopRegistrationLoop()
 	c.stopResendingLoop()
+	c.quitRegistrationSubscriptions()
 	return nil
 }
 
@@ -196,6 +222,8 @@ func (c *Client) Stop() error {
 func (c *Client) Unregister() error {
 	// stop registration loop
 	c.stopRegistrationLoop()
+
+	c.config.RemoteNotificationsEnabled = false
 
 	registration := c.buildPushNotificationUnregisterMessage()
 	err := c.saveLastPushNotificationRegistration(registration, nil)
@@ -230,6 +258,12 @@ func (c *Client) Registered() (bool, error) {
 	return true, nil
 }
 
+func (c *Client) SubscribeToRegistrations() chan struct{} {
+	s := make(chan struct{}, 100)
+	c.registrationSubscriptions = append(c.registrationSubscriptions, s)
+	return s
+}
+
 func (c *Client) GetSentNotification(hashedPublicKey []byte, installationID string, messageID []byte) (*SentNotification, error) {
 	return c.persistence.GetSentNotification(hashedPublicKey, installationID, messageID)
 }
@@ -245,13 +279,20 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 		return nil
 	}
 
-	return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+	if !c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Info("remote notifications not enabled, not registering")
+		return nil
+	}
+
+	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 }
 
 // Register registers with all the servers
-func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
 	c.stopRegistrationLoop()
+
+	c.config.RemoteNotificationsEnabled = true
 
 	// reset servers
 	err := c.resetServers()
@@ -260,6 +301,8 @@ func (c *Client) Register(deviceToken string, contactIDs []*ecdsa.PublicKey, mut
 	}
 
 	c.deviceToken = deviceToken
+	c.apnTopic = apnTopic
+	c.tokenType = tokenType
 
 	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
 	if err != nil {
@@ -299,7 +342,60 @@ func (c *Client) HandlePushNotificationRegistrationResponse(publicKey *ecdsa.Pub
 	server.Registered = true
 	server.RegisteredAt = time.Now().Unix()
 
-	return c.persistence.UpsertServer(server)
+	err = c.persistence.UpsertServer(server)
+	if err != nil {
+		return err
+	}
+	c.publishOnRegistrationSubscriptions()
+
+	return nil
+}
+
+// processQueryInfo takes info about push notifications and validates them
+func (c *Client) processQueryInfo(clientPublicKey *ecdsa.PublicKey, serverPublicKey *ecdsa.PublicKey, info *protobuf.PushNotificationQueryInfo) error {
+	// make sure the public key matches
+	if !bytes.Equal(info.PublicKey, common.HashPublicKey(clientPublicKey)) {
+		c.config.Logger.Warn("reply for different key, ignoring")
+		return errors.New("reply for a different key, ignoring")
+	}
+
+	accessToken := info.AccessToken
+
+	// the user wants notification from contacts only, try to decrypt the access token to see if we are in their contacts
+	if len(accessToken) == 0 && len(info.AllowedKeyList) != 0 {
+		accessToken = c.handleAllowedKeyList(clientPublicKey, info.AllowedKeyList)
+
+	}
+
+	// no luck
+	if len(accessToken) == 0 {
+		c.config.Logger.Debug("not in the allowed key list")
+		return nil
+	}
+
+	// We check the user has allowed this server to store this particular
+	// access token, otherwise anyone could reply with a fake token
+	// and receive notifications for a user
+	if err := c.handleGrant(clientPublicKey, serverPublicKey, info.Grant, accessToken); err != nil {
+		c.config.Logger.Warn("grant verification failed, ignoring", zap.Error(err))
+		return err
+	}
+
+	pushNotificationInfo := &PushNotificationInfo{
+		PublicKey:       clientPublicKey,
+		ServerPublicKey: serverPublicKey,
+		AccessToken:     accessToken,
+		InstallationID:  info.InstallationId,
+		Version:         info.Version,
+		RetrievedAt:     time.Now().Unix(),
+	}
+
+	err := c.persistence.SavePushNotificationInfo([]*PushNotificationInfo{pushNotificationInfo})
+	if err != nil {
+		c.config.Logger.Error("failed to save push notifications", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 // HandlePushNotificationQueryResponse should update the data in the database for a given user
@@ -310,63 +406,55 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 	}
 
 	// get the public key associated with this query
-	publicKey, err := c.persistence.GetQueryPublicKey(response.MessageId)
+	clientPublicKey, err := c.persistence.GetQueryPublicKey(response.MessageId)
 	if err != nil {
 		return err
 	}
-	if publicKey == nil {
+	if clientPublicKey == nil {
 		c.config.Logger.Debug("query not found")
 		return nil
 	}
 
-	var pushNotificationInfo []*PushNotificationInfo
+	// process query, make sure to validate grant as coming from the server
 	for _, info := range response.Info {
-		// make sure the public key matches
-		if !bytes.Equal(info.PublicKey, common.HashPublicKey(publicKey)) {
-			c.config.Logger.Warn("reply for different key, ignoring")
+		err := c.processQueryInfo(clientPublicKey, serverPublicKey, info)
+		if err != nil {
+
+			c.config.Logger.Warn("failed to process info", zap.Any("info", info), zap.Error(err))
 			continue
 		}
-
-		accessToken := info.AccessToken
-
-		// the user wants notification from contacts only, try to decrypt the access token to see if we are in their contacts
-		if len(accessToken) == 0 && len(info.AllowedKeyList) != 0 {
-			accessToken = c.handleAllowedKeyList(publicKey, info.AllowedKeyList)
-
-		}
-
-		// no luck
-		if len(accessToken) == 0 {
-			c.config.Logger.Debug("not in the allowed key list")
-			continue
-		}
-
-		// We check the user has allowed this server to store this particular
-		// access token, otherwise anyone could reply with a fake token
-		// and receive notifications for a user
-		if err := c.handleGrant(publicKey, serverPublicKey, info.Grant, accessToken); err != nil {
-			c.config.Logger.Warn("grant verification failed, ignoring", zap.Error(err))
-			continue
-		}
-
-		pushNotificationInfo = append(pushNotificationInfo, &PushNotificationInfo{
-			PublicKey:       publicKey,
-			ServerPublicKey: serverPublicKey,
-			AccessToken:     accessToken,
-			InstallationID:  info.InstallationId,
-			Version:         info.Version,
-			RetrievedAt:     time.Now().Unix(),
-		})
-
 	}
-
-	err = c.persistence.SavePushNotificationInfo(pushNotificationInfo)
-	if err != nil {
-		c.config.Logger.Error("failed to save push notifications", zap.Error(err))
-		return err
-	}
-
 	return nil
+
+}
+
+// HandleContactCodeAdvertisement checks if there are any info and process them
+func (c *Client) HandleContactCodeAdvertisement(clientPublicKey *ecdsa.PublicKey, message protobuf.ContactCodeAdvertisement) error {
+	// nothing to do for our own pubkey
+	if common.IsPubKeyEqual(clientPublicKey, &c.config.Identity.PublicKey) {
+		return nil
+	}
+
+	c.config.Logger.Debug("received contact code advertisement", zap.Any("advertisement", message))
+	for _, info := range message.PushNotificationInfo {
+		c.config.Logger.Debug("handling push notification query info")
+		serverPublicKey, err := crypto.DecompressPubkey(info.ServerPublicKey)
+		if err != nil {
+			c.config.Logger.Error("could not unmarshal server pubkey", zap.Binary("server-key", info.ServerPublicKey))
+			return err
+		}
+		err = c.processQueryInfo(clientPublicKey, serverPublicKey, info)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Save query so that we won't query again to early
+	// NOTE: this is not very accurate as we might fetch an historical message,
+	// prolonging the time that we fetch new info.
+	// Most of the times it should work fine, as if the info are stale they'd be
+	// fetched again because of an error response from the push notification server
+	return c.persistence.SavePushNotificationQuery(clientPublicKey, []byte(uuid.New().String()))
 }
 
 // HandlePushNotificationResponse should set the request as processed
@@ -427,6 +515,10 @@ func (c *Client) GetPushNotificationInfo(publicKey *ecdsa.PublicKey, installatio
 	return c.persistence.GetPushNotificationInfo(publicKey, installationIDs)
 }
 
+func (c *Client) Enabled() bool {
+	return c.config.RemoteNotificationsEnabled
+}
+
 func (c *Client) EnableSending() {
 	c.config.SendEnabled = true
 }
@@ -436,17 +528,21 @@ func (c *Client) DisableSending() {
 }
 
 func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.Logger.Debug("enabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = true
-	if c.lastPushNotificationRegistration != nil {
-		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Debug("re-registering after enabling push notifications from contacts only")
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 	}
 	return nil
 }
 
 func (c *Client) DisablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+	c.config.Logger.Debug("disabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = false
-	if c.lastPushNotificationRegistration != nil {
-		return c.Register(c.deviceToken, contactIDs, mutedChatIDs)
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Debug("re-registering after disabling push notifications from contacts only")
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 	}
 	return nil
 }
@@ -545,8 +641,9 @@ func (c *Client) loadLastPushNotificationRegistration() error {
 	c.lastContactIDs = lastContactIDs
 	c.lastPushNotificationRegistration = lastRegistration
 	c.deviceToken = lastRegistration.DeviceToken
+	c.apnTopic = lastRegistration.ApnTopic
+	c.tokenType = lastRegistration.TokenType
 	return nil
-
 }
 
 func (c *Client) stopRegistrationLoop() {
@@ -807,7 +904,7 @@ func (c *Client) allowedKeyList(token []byte, contactIDs []*ecdsa.PublicKey) ([]
 // and return a new one in that case. A token is refreshed only if it's not set
 // or if a contact has been removed
 func (c *Client) getToken(contactIDs []*ecdsa.PublicKey) string {
-	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs) {
+	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs, c.lastPushNotificationRegistration.AllowFromContactsOnly, c.config.AllowFromContactsOnly) {
 		c.config.Logger.Info("refreshing access token")
 		return uuid.New().String()
 	}
@@ -830,7 +927,8 @@ func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.Pu
 
 	options := &protobuf.PushNotificationRegistration{
 		AccessToken:           token,
-		TokenType:             c.config.TokenType,
+		TokenType:             c.tokenType,
+		ApnTopic:              c.apnTopic,
 		Version:               c.getVersion(),
 		InstallationId:        c.config.InstallationID,
 		DeviceToken:           c.deviceToken,
@@ -851,8 +949,17 @@ func (c *Client) buildPushNotificationUnregisterMessage() *protobuf.PushNotifica
 	return options
 }
 
-// shouldRefreshToken tells us whether we should pull a new token, that's only necessary when a contact is removed
-func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.PublicKey) bool {
+// shouldRefreshToken tells us whether we should create a new token,
+// that's only necessary when a contact is removed
+// or allowFromContactsOnly is enabled.
+// In both cases we want to invalidate any existing token
+func (c *Client) shouldRefreshToken(oldContactIDs, newContactIDs []*ecdsa.PublicKey, oldAllowFromContactsOnly, newAllowFromContactsOnly bool) bool {
+
+	// Check if allowFromContactsOnly has just been enabled
+	if !oldAllowFromContactsOnly && newAllowFromContactsOnly {
+		return true
+	}
+
 	newContactIDsMap := make(map[string]bool)
 	for _, pk := range newContactIDs {
 		newContactIDsMap[types.EncodeHex(crypto.FromECDSAPub(pk))] = true
@@ -1017,6 +1124,7 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 		for _, i := range infos {
 			// TODO: Add ChatID, message, public_key
 			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
+				Type:           protobuf.PushNotification_MESSAGE,
 				AccessToken:    i.AccessToken,
 				PublicKey:      common.HashPublicKey(publicKey),
 				InstallationId: i.InstallationID,
@@ -1193,7 +1301,6 @@ func (c *Client) saveLastPushNotificationRegistration(registration *protobuf.Pus
 	c.lastPushNotificationRegistration = registration
 	c.lastContactIDs = contactIDs
 
-	c.startRegistrationLoop()
 	return nil
 }
 
@@ -1243,6 +1350,48 @@ func (c *Client) handleAllowedKeyList(publicKey *ecdsa.PublicKey, allowedKeyList
 		return string(token)
 	}
 	return ""
+}
+
+func (c *Client) MyPushNotificationQueryInfo() ([]*protobuf.PushNotificationQueryInfo, error) {
+
+	// Nothing to do
+	if c.lastPushNotificationRegistration == nil || c.lastPushNotificationRegistration.Unregister {
+		return nil, nil
+
+	}
+	var response []*protobuf.PushNotificationQueryInfo
+	servers, err := c.persistence.GetServers()
+	if err != nil {
+		return nil, err
+	}
+	for _, server := range servers {
+		// ignore non-registered servers
+		if !server.Registered {
+			continue
+		}
+		// build grant for this specific server
+		grant, err := c.buildGrantSignature(server.PublicKey, c.lastPushNotificationRegistration.AccessToken)
+		if err != nil {
+			c.config.Logger.Error("failed to build grant", zap.Error(err))
+			return nil, err
+		}
+
+		queryInfo := &protobuf.PushNotificationQueryInfo{
+			InstallationId: c.config.InstallationID,
+			// is this the right key?
+			PublicKey:       common.HashPublicKey(&c.config.Identity.PublicKey),
+			Version:         c.lastPushNotificationRegistration.Version,
+			Grant:           grant,
+			ServerPublicKey: crypto.CompressPubkey(server.PublicKey),
+		}
+		if c.lastPushNotificationRegistration.AllowFromContactsOnly {
+			queryInfo.AllowedKeyList = c.lastPushNotificationRegistration.AllowedKeyList
+		} else {
+			queryInfo.AccessToken = c.lastPushNotificationRegistration.AccessToken
+		}
+		response = append(response, queryInfo)
+	}
+	return response, nil
 }
 
 // queryPushNotificationInfo sends a message to any server who has the given user registered.

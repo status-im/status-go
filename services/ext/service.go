@@ -169,10 +169,14 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 func (s *Service) StartMessenger() error {
 	// Start a loop that retrieves all messages and propagates them to status-react.
 	s.cancelMessenger = make(chan struct{})
+	err := s.messenger.Start()
+	if err != nil {
+		return err
+	}
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
 	go s.verifyENSLoop(30*time.Second, s.cancelMessenger)
-	return s.messenger.Start()
+	return nil
 }
 
 func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
@@ -456,6 +460,7 @@ func buildMessengerOptions(
 ) ([]protocol.Option, error) {
 	options := []protocol.Option{
 		protocol.WithCustomLogger(logger),
+		protocol.WithPushNotifications(),
 		protocol.WithDatabase(db),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),

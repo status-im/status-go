@@ -13,9 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
-
-	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
 )
 
 func TestProtocolServiceTestSuite(t *testing.T) {
@@ -44,17 +41,11 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	bobDBKey := "bob"
 
-	addedBundlesHandler := func(addedBundles []*multidevice.Installation) {}
-	onNewSharedSecretHandler := func(secret []*sharedsecret.Secret) {}
-
 	db, err := sqlite.Open(s.aliceDBPath.Name(), aliceDBKey)
 	s.Require().NoError(err)
 	s.alice = New(
 		db,
 		"1",
-		addedBundlesHandler,
-		onNewSharedSecretHandler,
-		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "alice")),
 	)
 
@@ -63,9 +54,6 @@ func (s *ProtocolServiceTestSuite) SetupTest() {
 	s.bob = New(
 		db,
 		"2",
-		addedBundlesHandler,
-		onNewSharedSecretHandler,
-		func(*ProtocolMessageSpec) {},
 		s.logger.With(zap.String("user", "bob")),
 	)
 }
@@ -142,7 +130,6 @@ func (s *ProtocolServiceTestSuite) TestBuildAndReadDirectMessage() {
 }
 
 func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
-	var secretResponse []*sharedsecret.Secret
 	bobKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	aliceKey, err := crypto.GenerateKey()
@@ -150,12 +137,13 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 
 	payload := []byte("test")
 
-	s.bob.onNewSharedSecretHandler = func(secret []*sharedsecret.Secret) {
-		secretResponse = secret
-	}
+	_, err = s.bob.Start(bobKey)
+	s.Require().NoError(err)
+
 	msgSpec, err := s.alice.BuildDirectMessage(aliceKey, &bobKey.PublicKey, payload)
 	s.NoError(err)
 	s.NotNil(msgSpec, "It creates a message spec")
+	s.Require().NotNil(msgSpec.SharedSecret)
 
 	bundle := msgSpec.Message.GetBundles()[0]
 	s.Require().NotNil(bundle)
@@ -171,12 +159,10 @@ func (s *ProtocolServiceTestSuite) TestSecretNegotiation() {
 	_, err = s.bob.HandleMessage(bobKey, &aliceKey.PublicKey, msgSpec.Message, []byte("message-id"))
 	s.NoError(err)
 
-	s.Require().NotNil(secretResponse)
+	s.Require().NoError(s.bob.Stop())
 }
 
 func (s *ProtocolServiceTestSuite) TestPropagatingSavedSharedSecretsOnStart() {
-	var secretResponse []*sharedsecret.Secret
-
 	aliceKey, err := crypto.GenerateKey()
 	s.NoError(err)
 	bobKey, err := crypto.GenerateKey()
@@ -186,15 +172,14 @@ func (s *ProtocolServiceTestSuite) TestPropagatingSavedSharedSecretsOnStart() {
 	generatedSecret, err := s.alice.secret.Generate(aliceKey, &bobKey.PublicKey, "installation-1")
 	s.NoError(err)
 
-	s.alice.onNewSharedSecretHandler = func(secret []*sharedsecret.Secret) {
-		secretResponse = secret
-	}
+	subscriptions, err := s.alice.Start(aliceKey)
+	s.Require().NoError(err)
 
-	err = s.alice.Start(aliceKey)
-	s.NoError(err)
+	secretResponse := subscriptions.SharedSecrets
 
 	s.Require().NotNil(secretResponse)
 	s.Require().Len(secretResponse, 1)
 	s.Equal(crypto.FromECDSAPub(generatedSecret.Identity), crypto.FromECDSAPub(secretResponse[0].Identity))
 	s.Equal(generatedSecret.Key, secretResponse[0].Key)
+	s.Require().NoError(s.alice.Stop())
 }

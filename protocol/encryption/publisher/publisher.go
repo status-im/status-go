@@ -46,7 +46,7 @@ func (p *Publisher) Start() <-chan struct{} {
 
 	logger.Info("starting publisher")
 
-	p.notifyCh = make(chan struct{})
+	p.notifyCh = make(chan struct{}, 100)
 	p.quit = make(chan struct{})
 
 	go p.tickerLoop()
@@ -55,6 +55,10 @@ func (p *Publisher) Start() <-chan struct{} {
 }
 
 func (p *Publisher) Stop() {
+	// If hasn't started, ignore
+	if p.quit == nil {
+		return
+	}
 	select {
 	case _, ok := <-p.quit:
 		if !ok {
@@ -101,7 +105,11 @@ func (p *Publisher) notify() error {
 		return errNotEnoughTimePassed
 	}
 
-	p.notifyCh <- struct{}{}
+	select {
+	case p.notifyCh <- struct{}{}:
+	default:
+		p.logger.Warn("publisher channel full, dropping message")
+	}
 
 	p.persistence.setLastPublished(now)
 	return nil

@@ -500,16 +500,16 @@ func (s *ServerSuite) TestPushNotificationHandleRegistration() {
 	response = s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
 	s.Require().NotNil(response)
 	s.Require().True(response.Success)
+	s.Require().Equal(common.Shake256(cyphertext), response.RequestId)
 
 	// Check is gone from the db
 	retrievedRegistration, err = s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(common.HashPublicKey(&s.key.PublicKey), s.installationID)
 	s.Require().NoError(err)
-	s.Require().NotNil(retrievedRegistration)
-	s.Require().Empty(retrievedRegistration.AccessToken)
-	s.Require().Empty(retrievedRegistration.DeviceToken)
-	s.Require().Equal(uint64(2), retrievedRegistration.Version)
-	s.Require().Equal(s.installationID, retrievedRegistration.InstallationId)
-	s.Require().Equal(common.Shake256(cyphertext), response.RequestId)
+	s.Require().Nil(retrievedRegistration)
+	// Check version is maintained
+	version, err := s.persistence.GetPushNotificationRegistrationVersion(common.HashPublicKey(&s.key.PublicKey), s.installationID)
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(2), version)
 }
 
 func (s *ServerSuite) TestbuildPushNotificationQueryResponseNoFiltering() {

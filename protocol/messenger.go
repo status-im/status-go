@@ -56,6 +56,7 @@ var (
 // mailservers because they can also be managed by the user.
 type Messenger struct {
 	node                       types.Node
+	config                     *config
 	identity                   *ecdsa.PrivateKey
 	persistence                *sqlitePersistence
 	transport                  transport.Transport
@@ -127,50 +128,6 @@ func NewMessenger(
 		}
 	}
 
-	onNewInstallationsHandler := func(installations []*multidevice.Installation) {
-
-		for _, installation := range installations {
-			if installation.Identity == contactIDFromPublicKey(&messenger.identity.PublicKey) {
-				if _, ok := messenger.allInstallations[installation.ID]; !ok {
-					messenger.allInstallations[installation.ID] = installation
-					messenger.modifiedInstallations[installation.ID] = true
-				}
-			}
-		}
-	}
-	// Set default config fields.
-	onNewSharedSecretHandler := func(secrets []*sharedsecret.Secret) {
-		filters, err := messenger.handleSharedSecrets(secrets)
-		if err != nil {
-			slogger := logger.With(zap.String("site", "onNewSharedSecretHandler"))
-			slogger.Warn("failed to process secrets", zap.Error(err))
-		}
-
-		if c.onNegotiatedFilters != nil {
-			c.onNegotiatedFilters(filters)
-		}
-	}
-	if c.onSendContactCodeHandler == nil {
-		c.onSendContactCodeHandler = func(messageSpec *encryption.ProtocolMessageSpec) {
-			slogger := logger.With(zap.String("site", "onSendContactCodeHandler"))
-			slogger.Debug("received a SendContactCode request")
-
-			newMessage, err := common.MessageSpecToWhisper(messageSpec)
-			if err != nil {
-				slogger.Warn("failed to convert spec to Whisper message", zap.Error(err))
-				return
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			chatName := transport.ContactCodeTopic(&messenger.identity.PublicKey)
-			_, err = messenger.transport.SendPublic(ctx, newMessage, chatName)
-			if err != nil {
-				slogger.Warn("failed to send a contact code", zap.Error(err))
-			}
-		}
-	}
-
 	if c.systemMessagesTranslations == nil {
 		c.systemMessagesTranslations = defaultSystemMessagesTranslations
 	}
@@ -232,9 +189,6 @@ func NewMessenger(
 	encryptionProtocol := encryption.New(
 		database,
 		installationID,
-		onNewInstallationsHandler,
-		onNewSharedSecretHandler,
-		c.onSendContactCodeHandler,
 		logger,
 	)
 
@@ -267,8 +221,6 @@ func NewMessenger(
 
 	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
-	// Hardcoding this for now, as it's the only one we support
-	pushNotificationClientConfig.TokenType = protobuf.PushNotificationRegistration_APN_TOKEN
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
@@ -277,6 +229,7 @@ func NewMessenger(
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})
 
 	messenger = &Messenger{
+		config:                     &c,
 		node:                       node,
 		identity:                   identity,
 		persistence:                &sqlitePersistence{db: database},
@@ -299,6 +252,7 @@ func NewMessenger(
 		shutdownTasks: []func() error{
 			database.Close,
 			pushNotificationClient.Stop,
+			encryptionProtocol.Stop,
 			transp.ResetFilters,
 			transp.Stop,
 			func() error { processor.Stop(); return nil },
@@ -325,12 +279,147 @@ func (m *Messenger) Start() error {
 
 	// Start push notification client
 	if m.pushNotificationClient != nil {
+		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
+
 		if err := m.pushNotificationClient.Start(); err != nil {
 			return err
 		}
 	}
 
-	return m.encryptor.Start(m.identity)
+	// set shared secret handles
+	m.processor.SetHandleSharedSecrets(m.handleSharedSecrets)
+
+	subscriptions, err := m.encryptor.Start(m.identity)
+	if err != nil {
+		return err
+	}
+
+	// handle stored shared secrets
+	err = m.handleSharedSecrets(subscriptions.SharedSecrets)
+	if err != nil {
+		return err
+	}
+
+	m.handleEncryptionLayerSubscriptions(subscriptions)
+	return nil
+}
+
+func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
+	if m.pushNotificationClient == nil || !m.pushNotificationClient.Enabled() {
+		return nil, nil
+	}
+	m.logger.Debug("adding push notification info to contact code bundle")
+	info, err := m.pushNotificationClient.MyPushNotificationQueryInfo()
+	if err != nil {
+		return nil, err
+	}
+	if len(info) == 0 {
+		return nil, nil
+	}
+	return &protobuf.ContactCodeAdvertisement{
+		PushNotificationInfo: info,
+	}, nil
+}
+
+// handleSendContactCode sends a public message wrapped in the encryption
+// layer, which will propagate our bundle
+func (m *Messenger) handleSendContactCode() error {
+	var payload []byte
+	m.logger.Debug("sending contact code")
+	contactCodeAdvertisement, err := m.buildContactCodeAdvertisement()
+	if err != nil {
+		m.logger.Error("could not build contact code advertisement", zap.Error(err))
+	}
+
+	if contactCodeAdvertisement != nil {
+		payload, err = proto.Marshal(contactCodeAdvertisement)
+		if err != nil {
+			return err
+		}
+	}
+
+	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	rawMessage := common.RawMessage{
+		LocalChatID: contactCodeTopic,
+		MessageType: protobuf.ApplicationMetadataMessage_CONTACT_CODE_ADVERTISEMENT,
+		Payload:     payload,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = m.processor.SendPublic(ctx, contactCodeTopic, rawMessage)
+	if err != nil {
+		m.logger.Warn("failed to send a contact code", zap.Error(err))
+	}
+	return err
+}
+
+// handleSharedSecrets process the negotiated secrets received from the encryption layer
+func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
+	logger := m.logger.With(zap.String("site", "handleSharedSecrets"))
+	var result []*transport.Filter
+	for _, secret := range secrets {
+		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
+		fSecret := types.NegotiatedSecret{
+			PublicKey: secret.Identity,
+			Key:       secret.Key,
+		}
+		filter, err := m.transport.ProcessNegotiatedSecret(fSecret)
+		if err != nil {
+			return err
+		}
+		result = append(result, filter)
+	}
+	if m.config.onNegotiatedFilters != nil {
+		m.config.onNegotiatedFilters(result)
+	}
+
+	return nil
+}
+
+// handleInstallations adds the installations in the installations map
+func (m *Messenger) handleInstallations(installations []*multidevice.Installation) {
+	for _, installation := range installations {
+		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
+			if _, ok := m.allInstallations[installation.ID]; !ok {
+				m.allInstallations[installation.ID] = installation
+				m.modifiedInstallations[installation.ID] = true
+			}
+		}
+	}
+}
+
+// handleEncryptionLayerSubscriptions handles events from the encryption layer
+func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption.Subscriptions) {
+	go func() {
+		for {
+			select {
+			case <-subscriptions.SendContactCode:
+				if err := m.handleSendContactCode(); err != nil {
+					m.logger.Error("failed to publish contact code", zap.Error(err))
+				}
+
+			case <-subscriptions.Quit:
+				m.logger.Debug("quitting encryption subscription loop")
+				return
+			}
+		}
+	}()
+}
+
+// handlePushNotificationClientRegistration handles registration events
+func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
+	go func() {
+		for {
+			_, more := <-c
+			if !more {
+				return
+			}
+			if err := m.handleSendContactCode(); err != nil {
+				m.logger.Error("failed to publish contact code", zap.Error(err))
+			}
+
+		}
+	}()
 }
 
 // Init analyzes chats and contacts in order to setup filters
@@ -434,24 +523,6 @@ func (m *Messenger) Shutdown() (err error) {
 		}
 	}
 	return
-}
-
-func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) ([]*transport.Filter, error) {
-	logger := m.logger.With(zap.String("site", "handleSharedSecrets"))
-	var result []*transport.Filter
-	for _, secret := range secrets {
-		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
-		fSecret := types.NegotiatedSecret{
-			PublicKey: secret.Identity,
-			Key:       secret.Key,
-		}
-		filter, err := m.transport.ProcessNegotiatedSecret(fSecret)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, filter)
-	}
-	return result, nil
 }
 
 func (m *Messenger) EnableInstallation(id string) error {
@@ -1152,7 +1223,7 @@ func (m *Messenger) saveContact(contact *Contact) error {
 	}
 
 	// We check if it should re-register with the push notification server
-	shouldReregisterForPushNotifications := m.pushNotificationClient != nil && (m.isNewContact(contact) || m.removedContact(contact))
+	shouldReregisterForPushNotifications := (m.isNewContact(contact) || m.removedContact(contact))
 
 	err = m.persistence.SaveContact(contact, nil)
 	if err != nil {
@@ -1163,15 +1234,20 @@ func (m *Messenger) saveContact(contact *Contact) error {
 
 	// Reregister only when data has changed
 	if shouldReregisterForPushNotifications {
-		m.logger.Info("contact state changed, re-registering for push notification")
-		contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-		err := m.pushNotificationClient.Reregister(contactIDs, mutedChatIDs)
-		if err != nil {
-			return err
-		}
+		return m.reregisterForPushNotifications()
 	}
 
 	return nil
+}
+
+func (m *Messenger) reregisterForPushNotifications() error {
+	m.logger.Info("contact state changed, re-registering for push notification")
+	if m.pushNotificationClient == nil {
+		return nil
+	}
+
+	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
+	return m.pushNotificationClient.Reregister(contactIDs, mutedChatIDs)
 }
 
 func (m *Messenger) SaveContact(contact *Contact) error {
@@ -1816,6 +1892,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			for _, msg := range statusMessages {
 				publicKey := msg.SigPubKey()
 
+				m.handleInstallations(msg.Installations)
+				err := m.handleSharedSecrets(msg.SharedSecrets)
+				if err != nil {
+					// log and continue, non-critical error
+					logger.Warn("failed to handle shared secrets")
+				}
+
 				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)
 				if _, ok := messageState.AllContacts[senderID]; ok && messageState.AllContacts[senderID].IsBlocked() {
@@ -1828,6 +1911,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					logger.Warn("failed to check message exists", zap.Error(err))
 				}
 				if exists {
+					logger.Debug("messageExists", zap.String("messageID", messageID))
 					continue
 				}
 
@@ -1999,6 +2083,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 						// We continue in any case, no changes to messenger
 						continue
+					case protobuf.ContactCodeAdvertisement:
+						logger.Debug("Received ContactCodeAdvertisement")
+						if m.pushNotificationClient == nil {
+							continue
+						}
+						logger.Debug("Handling ContactCodeAdvertisement")
+						if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)); err != nil {
+							logger.Warn("failed to handle ContactCodeAdvertisement", zap.Error(err))
+						}
+						// We continue in any case, no changes to messenger
+						continue
+
 					case protobuf.PushNotificationResponse:
 						logger.Debug("Received PushNotificationResponse")
 						if m.pushNotificationClient == nil {
@@ -2060,6 +2156,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("message not handled", zap.Any("messageType", reflect.TypeOf(msg.ParsedMessage.Interface())))
 
 					}
+				} else {
+					logger.Debug("parsed message is nil")
 				}
 			}
 		}
@@ -2251,7 +2349,8 @@ func (m *Messenger) MuteChat(chatID string) error {
 
 	chat.Muted = true
 	m.allChats[chat.ID] = chat
-	return nil
+
+	return m.reregisterForPushNotifications()
 }
 
 // UnmuteChat signals to the messenger that we want to be notified
@@ -2271,7 +2370,7 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 
 	chat.Muted = false
 	m.allChats[chat.ID] = chat
-	return nil
+	return m.reregisterForPushNotifications()
 }
 
 func (m *Messenger) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
@@ -3146,7 +3245,7 @@ func (m *Messenger) addedContactsAndMutedChatIDs() ([]*ecdsa.PublicKey, []string
 }
 
 // RegisterForPushNotification register deviceToken with any push notification server enabled
-func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken string) error {
+func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType) error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
@@ -3154,7 +3253,12 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	defer m.mutex.Unlock()
 
 	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	return m.pushNotificationClient.Register(deviceToken, contactIDs, mutedChatIDs)
+	err := m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, contactIDs, mutedChatIDs)
+	if err != nil {
+		m.logger.Error("failed to register for push notifications", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 // RegisteredForPushNotifications returns whether we successfully registered with all the servers
