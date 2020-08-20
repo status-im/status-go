@@ -359,7 +359,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			device_info,
 			ens_verified,
 			ens_verified_at,
-			tribute_to_talk
+			tribute_to_talk,
+			local_nickname
 		FROM contacts
 	`)
 	if err != nil {
@@ -374,6 +375,7 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contact           Contact
 			encodedDeviceInfo []byte
 			encodedSystemTags []byte
+			nickname          sql.NullString
 		)
 		err := rows.Scan(
 			&contact.ID,
@@ -388,9 +390,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.ENSVerified,
 			&contact.ENSVerifiedAt,
 			&contact.TributeToTalk,
+			&nickname,
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		if nickname.Valid {
+			contact.LocalNickname = nickname.String
 		}
 
 		if encodedDeviceInfo != nil {
@@ -562,8 +569,9 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			device_info,
 			ens_verified,
 			ens_verified_at,
-			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			tribute_to_talk,
+			local_nickname
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
 	`)
 	if err != nil {
 		return
@@ -583,6 +591,7 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.ENSVerified,
 		contact.ENSVerifiedAt,
 		contact.TributeToTalk,
+		contact.LocalNickname,
 	)
 	return
 }

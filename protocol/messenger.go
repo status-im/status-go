@@ -1244,6 +1244,14 @@ func (m *Messenger) isNewContact(contact *Contact) bool {
 	return contact.IsAdded() && (!ok || !previousContact.IsAdded())
 }
 
+func (m *Messenger) hasNicknameChanged(contact *Contact) bool {
+	previousContact, ok := m.allContacts[contact.ID]
+	if !ok {
+		return false
+	}
+	return contact.LocalNickname != previousContact.LocalNickname
+}
+
 func (m *Messenger) removedContact(contact *Contact) bool {
 	previousContact, ok := m.allContacts[contact.ID]
 	if !ok {
@@ -1261,7 +1269,7 @@ func (m *Messenger) saveContact(contact *Contact) error {
 	contact.Identicon = identicon
 	contact.Alias = name
 
-	if m.isNewContact(contact) {
+	if m.isNewContact(contact) || m.hasNicknameChanged(contact) {
 		err := m.syncContact(context.Background(), contact)
 		if err != nil {
 			return err
@@ -1843,10 +1851,11 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationContact{
-		Clock:        clock,
-		Id:           contact.ID,
-		EnsName:      contact.Name,
-		ProfileImage: contact.Photo,
+		Clock:         clock,
+		Id:            contact.ID,
+		EnsName:       contact.Name,
+		ProfileImage:  contact.Photo,
+		LocalNickname: contact.LocalNickname,
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)
 	if err != nil {

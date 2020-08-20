@@ -209,6 +209,8 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 		}
 		contact.Photo = message.ProfileImage
 		contact.LastUpdated = message.Clock
+		contact.LocalNickname = message.LocalNickname
+
 		state.ModifiedContacts[contact.ID] = true
 		state.AllContacts[contact.ID] = contact
 	}
