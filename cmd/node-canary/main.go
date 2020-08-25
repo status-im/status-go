@@ -26,7 +26,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/ext"
-	"github.com/status-im/status-go/services/shhext"
+	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/t/helpers"
 )
 
@@ -38,13 +38,13 @@ const (
 var logger = log.New("package", "status-go/cmd/node-canary")
 
 var (
-	staticEnodeAddr     = flag.String("staticnode", "", "checks if static node talks whisper protocol (e.g. enode://abc123@1.2.3.4:30303)")
+	staticEnodeAddr     = flag.String("staticnode", "", "checks if static node talks waku protocol (e.g. enode://abc123@1.2.3.4:30303)")
 	mailserverEnodeAddr = flag.String("mailserver", "", "queries mail server for historic messages (e.g. enode://123abc@4.3.2.1:30504)")
 	publicChannel       = flag.String("channel", "status", "The public channel name to retrieve historic messages from (used with 'mailserver' flag)")
 	timeout             = flag.Int("timeout", 10, "Timeout when connecting to node or fetching messages from mailserver, in seconds")
 	period              = flag.Int("period", 24*60*60, "How far in the past to request messages from mailserver, in seconds")
-	minPow              = flag.Float64("shh.pow", params.WhisperMinimumPoW, "PoW for messages to be added to queue, in float format")
-	ttl                 = flag.Int("shh.ttl", params.WhisperTTL, "Time to live for messages, in seconds")
+	minPow              = flag.Float64("waku.pow", params.WakuMinimumPoW, "PoW for messages to be added to queue, in float format")
+	ttl                 = flag.Int("waku.ttl", params.WakuTTL, "Time to live for messages, in seconds")
 	homePath            = flag.String("home-dir", ".", "Home directory where state is stored")
 	logLevel            = flag.String("log", "INFO", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
 	logFile             = flag.String("logfile", "", "Path to the log file")
@@ -108,15 +108,15 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	defer func() { _ = clientBackend.StopNode() }()
 
 	clientNode := clientBackend.StatusNode()
-	clientGethWhisperService, err := clientNode.WhisperService()
+	clientGethWakuService, err := clientNode.WakuService()
 	if err != nil {
-		logger.Error("Could not retrieve Whisper service", "error", err)
+		logger.Error("Could not retrieve waku service", "error", err)
 		os.Exit(1)
 	}
-	clientWhisperService := gethbridge.NewGethWhisperWrapper(clientGethWhisperService)
-	clientShhExtService, err := clientNode.ShhExtService()
+	clientWakuService := gethbridge.NewGethWakuWrapper(clientGethWakuService)
+	clientWakuExtService, err := clientNode.WakuExtService()
 	if err != nil {
-		logger.Error("Could not retrieve shhext service", "error", err)
+		logger.Error("Could not retrieve wakuext service", "error", err)
 		os.Exit(1)
 	}
 
@@ -136,14 +136,14 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 	}
 
 	// add mailserver sym key
-	mailServerKeyID, err := clientWhisperService.AddSymKeyFromPassword(mailboxPassword)
+	mailServerKeyID, err := clientWakuService.AddSymKeyFromPassword(mailboxPassword)
 	if err != nil {
 		logger.Error("Error adding mailserver sym key to client peer", "error", err)
 		os.Exit(1)
 	}
 
 	mailboxPeer := mailserverNode.ID().Bytes()
-	err = clientGethWhisperService.AllowP2PMessagesFromPeer(mailboxPeer)
+	err = clientGethWakuService.AllowP2PMessagesFromPeer(mailboxPeer)
 	if err != nil {
 		logger.Error("Failed to allow P2P messages from mailserver peer", "error", err, mailserverNode.String())
 		os.Exit(1)
@@ -151,7 +151,7 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 
 	clientRPCClient := clientNode.RPCClient()
 
-	_, topic, _, err := joinPublicChat(clientWhisperService, clientRPCClient, *publicChannel)
+	_, topic, _, err := joinPublicChat(clientWakuService, clientRPCClient, *publicChannel)
 	if err != nil {
 		logger.Error("Failed to join public chat", "error", err)
 		os.Exit(1)
@@ -159,20 +159,20 @@ func verifyMailserverBehavior(mailserverNode *enode.Node) {
 
 	// watch for envelopes to be available in filters in the client
 	envelopeAvailableWatcher := make(chan types.EnvelopeEvent, 1024)
-	sub := clientWhisperService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
+	sub := clientWakuService.SubscribeEnvelopeEvents(envelopeAvailableWatcher)
 	defer sub.Unsubscribe()
 
 	// watch for mailserver responses in the client
 	mailServerResponseWatcher := make(chan types.EnvelopeEvent, 1024)
-	sub = clientWhisperService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
+	sub = clientWakuService.SubscribeEnvelopeEvents(mailServerResponseWatcher)
 	defer sub.Unsubscribe()
 
 	// request messages from mailbox
-	shhextAPI := shhext.NewPublicAPI(clientShhExtService)
-	requestIDBytes, err := shhextAPI.RequestMessages(context.TODO(),
+	wakuextAPI := wakuext.NewPublicAPI(clientWakuExtService)
+	requestIDBytes, err := wakuextAPI.RequestMessages(context.TODO(),
 		ext.MessagesRequest{
 			MailServerPeer: mailserverNode.String(),
-			From:           uint32(clientWhisperService.GetCurrentTime().Add(-time.Duration(*period) * time.Second).Unix()),
+			From:           uint32(clientWakuService.GetCurrentTime().Add(-time.Duration(*period) * time.Second).Unix()),
 			Limit:          1,
 			Topic:          topic,
 			SymKeyID:       mailServerKeyID,
@@ -282,16 +282,16 @@ func makeNodeConfig() (*params.NodeConfig, error) {
 		}
 	}
 
-	return whisperConfig(nodeConfig)
+	return wakuConfig(nodeConfig)
 }
 
-// whisperConfig creates node configuration object from flags
-func whisperConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
-	whisperConfig := &nodeConfig.WhisperConfig
-	whisperConfig.Enabled = true
-	whisperConfig.LightClient = true
-	whisperConfig.MinimumPoW = *minPow
-	whisperConfig.TTL = *ttl
+// wakuConfig creates node configuration object from flags
+func wakuConfig(nodeConfig *params.NodeConfig) (*params.NodeConfig, error) {
+	wakuConfig := &nodeConfig.WakuConfig
+	wakuConfig.Enabled = true
+	wakuConfig.LightClient = true
+	wakuConfig.MinimumPoW = *minPow
+	wakuConfig.TTL = *ttl
 
 	return nodeConfig, nil
 }
@@ -313,7 +313,7 @@ func startClientNode() (*api.GethStatusBackend, error) {
 	return clientBackend, err
 }
 
-func joinPublicChat(w types.Whisper, rpcClient *rpc.Client, name string) (string, types.TopicType, string, error) {
+func joinPublicChat(w types.Waku, rpcClient *rpc.Client, name string) (string, types.TopicType, string, error) {
 	keyID, err := w.AddSymKeyFromPassword(name)
 	if err != nil {
 		return "", types.TopicType{}, "", err
@@ -327,8 +327,8 @@ func joinPublicChat(w types.Whisper, rpcClient *rpc.Client, name string) (string
 	fullTopic := h.Sum(nil)
 	topic := types.BytesToTopic(fullTopic)
 
-	whisperAPI := w.PublicWhisperAPI()
-	filterID, err := whisperAPI.NewMessageFilter(types.Criteria{SymKeyID: keyID, Topics: []types.TopicType{topic}})
+	wakuAPI := w.PublicWakuAPI()
+	filterID, err := wakuAPI.NewMessageFilter(types.Criteria{SymKeyID: keyID, Topics: []types.TopicType{topic}})
 
 	return keyID, topic, filterID, err
 }
