@@ -62,7 +62,7 @@ message PushNotificationQueryResponse {
 
 message PushNotification {
   string access_token = 1;
-  string chat_id = 2;
+  bytes chat_id = 2;
   bytes public_key = 3;
   string installation_id = 4;
   bytes message = 5;

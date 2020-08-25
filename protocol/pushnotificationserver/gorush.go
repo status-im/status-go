@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -60,7 +61,7 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 				Topic:    registration.ApnTopic,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hex.EncodeToString(request.Message),
-					ChatID:           request.ChatId,
+					ChatID:           types.EncodeHex(request.ChatId),
 					PublicKey:        hex.EncodeToString(request.PublicKey),
 				},
 			})

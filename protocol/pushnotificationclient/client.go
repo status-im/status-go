@@ -12,7 +12,7 @@ import (
 	"errors"
 	"io"
 	"math"
-	"sort"
+	mrand "math/rand"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -59,6 +59,9 @@ const pushNotificationBackoffTime int64 = 2
 
 // RegistrationBackoffTime is the step of the exponential backoff
 const RegistrationBackoffTime int64 = 15
+
+// defaultPushNotificationsServerCount is how many push notification servers we should register with if none is selected
+const defaultPushNotificationsServersCount = 3
 
 type ServerType int
 
@@ -301,6 +304,23 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 }
 
+// pickDefaultServesr picks n servers at random
+func (c *Client) pickDefaultServers(servers []*ecdsa.PublicKey) []*ecdsa.PublicKey {
+	// shuffle and pick n at random
+	shuffledServers := make([]*ecdsa.PublicKey, len(servers))
+	copy(shuffledServers, c.config.DefaultServers)
+	mrand.Shuffle(len(shuffledServers), func(i, j int) {
+		shuffledServers[i], shuffledServers[j] = shuffledServers[j], shuffledServers[i]
+	})
+	// Take the min not to get an out of bounds slice
+	min := len(c.config.DefaultServers)
+	if min > defaultPushNotificationsServersCount {
+		min = defaultPushNotificationsServersCount
+	}
+
+	return shuffledServers[:min]
+}
+
 // Register registers with all the servers
 func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
@@ -313,9 +333,9 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 	if err != nil {
 		return err
 	}
-	if len(currentServers) == 0 {
+	if len(currentServers) == 0 && len(c.config.DefaultServers) != 0 {
 		c.config.Logger.Debug("servers empty, checking default servers")
-		for _, s := range c.config.DefaultServers {
+		for _, s := range c.pickDefaultServers(c.config.DefaultServers) {
 			err = c.AddPushNotificationsServer(s, ServerTypeDefault)
 			if err != nil {
 				return err
@@ -1117,9 +1137,12 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	// we should also retry if no response at all is received after a timeout.
 	// also we send a single notification for multiple message ids, need to check with UI what's the desired behavior
 
-	// sort by server so we tend to hit the same one
-	sort.Slice(info, func(i, j int) bool {
-		return info[i].ServerPublicKey.X.Cmp(info[j].ServerPublicKey.X) <= 0
+	// shuffle so we don't hit the same servers all the times
+	// NOTE: here's is a tradeoff, ideally we want to randomly pick a server,
+	// but hit the same servers for batched notifications, for now naively
+	// hit a random server
+	mrand.Shuffle(len(info), func(i, j int) {
+		info[i], info[j] = info[j], info[i]
 	})
 
 	installationIDsMap := make(map[string]bool)
@@ -1152,9 +1175,12 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	for _, infos := range actionableInfos {
 		var pushNotifications []*protobuf.PushNotification
 		for _, i := range infos {
-			// TODO: Add ChatID, message, public_key
+			// TODO: Add group chat ChatID
 			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
-				Type:           protobuf.PushNotification_MESSAGE,
+				Type: protobuf.PushNotification_MESSAGE,
+				// For now we set the ChatID to our own identity key, this will work fine for blocked users
+				// and muted 1-to-1 chats, but not for group chats.
+				ChatId:         common.Shake256([]byte(types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey)))),
 				AccessToken:    i.AccessToken,
 				PublicKey:      common.HashPublicKey(publicKey),
 				InstallationId: i.InstallationID,

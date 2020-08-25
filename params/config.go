@@ -618,6 +618,10 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 }
 
 func (c *NodeConfig) setDefaultPushNotificationsServers() error {
+	if c.ClusterConfig.Fleet == FleetUndefined {
+		return nil
+	}
+
 	// If empty load defaults from the fleet
 	if len(c.ClusterConfig.PushNotificationsServers) == 0 {
 		log.Debug("empty push notification servers, setting", "fleet", c.ClusterConfig.Fleet)

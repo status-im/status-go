@@ -1,6 +1,7 @@
 package pushnotificationserver
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
@@ -137,7 +138,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 // HandlePushNotificationRequest will send a gorush notification and send a response back to the user
 func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	request protobuf.PushNotificationRequest) error {
-	s.config.Logger.Debug("handling pn request")
+	s.config.Logger.Info("handling pn request")
 	response := s.buildPushNotificationRequestResponseAndSendNotification(&request)
 	if response == nil {
 		return nil
@@ -284,7 +285,7 @@ func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 // buildPushNotificationQueryResponse check if we have the client information and send them back
 func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
 
-	s.config.Logger.Debug("handling push notification query")
+	s.config.Logger.Info("handling push notification query")
 	response := &protobuf.PushNotificationQueryResponse{}
 	if query == nil || len(query.PublicKeys) == 0 {
 		return response
@@ -320,6 +321,15 @@ func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotifica
 	return response
 }
 
+func (s *Server) blockedChatID(blockedChatIDs [][]byte, chatID []byte) bool {
+	for _, blockedChatID := range blockedChatIDs {
+		if bytes.Equal(blockedChatID, chatID) {
+			return true
+		}
+	}
+	return false
+}
+
 // buildPushNotificationRequestResponseAndSendNotification will build a response
 // and fire-and-forget send a query to the gorush instance
 func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
@@ -332,7 +342,6 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 
 	response.MessageId = request.MessageId
 
-	// TODO: filter by chat id
 	// collect successful requests & registrations
 	var requestAndRegistrations []*RequestAndRegistration
 
@@ -356,6 +365,9 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
 			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
+		} else if s.blockedChatID(registration.BlockedChatList, pn.ChatId) {
+			// We report as successful but don't send the notification
+			report.Success = true
 		} else {
 			// For now we just assume that the notification will be successful
 			requestAndRegistrations = append(requestAndRegistrations, &RequestAndRegistration{
@@ -368,7 +380,7 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 		response.Reports = append(response.Reports, report)
 	}
 
-	s.config.Logger.Debug("built pn request")
+	s.config.Logger.Info("built pn request")
 	if len(requestAndRegistrations) == 0 {
 		s.config.Logger.Warn("no request and registration")
 		return response
