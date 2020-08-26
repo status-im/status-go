@@ -28,6 +28,8 @@ import (
 
 	"golang.org/x/crypto/pbkdf2"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/waku/common"
@@ -936,6 +938,31 @@ func TestSymmetricSendKeyMismatch(t *testing.T) {
 	if len(mail) > 0 {
 		t.Fatalf("received a message when keys weren't matching")
 	}
+}
+
+func TestFullNode(t *testing.T) {
+
+	config := &Config{FullNode: true}
+	w := New(config, nil)
+
+	require.True(t, w.FullNode(), "full node should be true")
+	require.True(t, common.IsFullNode(w.BloomFilter()), "bloom filter should be full")
+	require.True(t, common.IsFullNode(w.BloomFilterTolerance()), "bloom filter tolerance should be full")
+	require.Nil(t, w.TopicInterest(), "topic interest should be nil")
+
+	// Set a topic
+	require.NoError(t, w.SetTopicInterest([]common.TopicType{common.BytesToTopic([]byte("a"))}))
+
+	// Make sure everything is the same
+	require.True(t, w.FullNode(), "full node should be true")
+	require.True(t, common.IsFullNode(w.BloomFilter()), "bloom filter should be full")
+	require.True(t, common.IsFullNode(w.BloomFilterTolerance()), "bloom filter tolerance should be full")
+	require.Nil(t, w.TopicInterest(), "topic interest should be nil")
+
+	// unset full node
+	w.SetFullNode(false)
+	require.False(t, w.FullNode(), "full node should be false")
+	require.NotNil(t, w.TopicInterest(), "topic interest should not be nil")
 }
 
 func TestBloom(t *testing.T) {
