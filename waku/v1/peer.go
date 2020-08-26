@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/common"
 )
 
@@ -455,7 +456,7 @@ func (p *Peer) update() {
 
 func (p *Peer) setOptions(peerOptions StatusOptions) error {
 
-	p.logger.Debug("settings options", zap.Binary("peerID", p.ID()), zap.Any("Options", peerOptions))
+	p.logger.Debug("settings options", zap.String("peerID", types.EncodeHex(p.ID())), zap.Any("Options", peerOptions))
 
 	if err := peerOptions.Validate(); err != nil {
 		return fmt.Errorf("p [%x]: sent invalid options: %v", p.ID(), err)

@@ -44,6 +44,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/common"
 	v0 "github.com/status-im/status-go/waku/v0"
 	v1 "github.com/status-im/status-go/waku/v1"
@@ -68,6 +69,7 @@ type settings struct {
 	LightClient              bool                      // Light client mode enabled does not forward messages
 	RestrictLightClientsConn bool                      // Restrict connection between two light clients
 	SyncAllowance            int                       // Maximum time in seconds allowed to process the waku-related messages
+	FullNode                 bool                      // Whether this is to be run in FullNode settings
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -111,13 +113,14 @@ type Waku struct {
 
 // New creates a Waku client ready to communicate through the Ethereum P2P network.
 func New(cfg *Config, logger *zap.Logger) *Waku {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
+	logger.Debug("starting waku with config", zap.Any("config", cfg))
 	if cfg == nil {
 		c := DefaultConfig
 		cfg = &c
-	}
-
-	if logger == nil {
-		logger = zap.NewNop()
 	}
 
 	waku := &Waku{
@@ -139,6 +142,7 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 		MinPowTolerance:          cfg.MinimumAcceptedPoW,
 		EnableConfirmations:      cfg.EnableConfirmations,
 		LightClient:              cfg.LightClient,
+		FullNode:                 cfg.FullNode,
 		BloomFilterMode:          cfg.BloomFilterMode,
 		RestrictLightClientsConn: cfg.RestrictLightClientsConn,
 		SyncAllowance:            common.DefaultSyncAllowance,
@@ -233,6 +237,10 @@ func (w *Waku) MinPowTolerance() float64 {
 // If a message does not match the bloom, it will tantamount to spam, and the peer will
 // be disconnected.
 func (w *Waku) BloomFilter() []byte {
+	if w.FullNode() {
+		return common.MakeFullNodeBloom()
+	}
+
 	w.settingsMu.RLock()
 	defer w.settingsMu.RUnlock()
 	return w.settings.BloomFilter
@@ -243,6 +251,10 @@ func (w *Waku) BloomFilter() []byte {
 // or no change of bloom filter have ever occurred, the return value will be the same
 // as return value of BloomFilter().
 func (w *Waku) BloomFilterTolerance() []byte {
+	if w.FullNode() {
+		return common.MakeFullNodeBloom()
+	}
+
 	w.settingsMu.RLock()
 	defer w.settingsMu.RUnlock()
 	return w.settings.BloomFilterTolerance
@@ -250,6 +262,10 @@ func (w *Waku) BloomFilterTolerance() []byte {
 
 // BloomFilterMode returns whether the node is running in bloom filter mode
 func (w *Waku) BloomFilterMode() bool {
+	if w.FullNode() {
+		return true
+	}
+
 	w.settingsMu.RLock()
 	defer w.settingsMu.RUnlock()
 	return w.settings.BloomFilterMode
@@ -294,7 +310,8 @@ func (w *Waku) SetBloomFilter(bloom []byte) error {
 func (w *Waku) TopicInterest() []common.TopicType {
 	w.settingsMu.RLock()
 	defer w.settingsMu.RUnlock()
-	if w.settings.TopicInterest == nil {
+	// Return nil if FullNode as otherwise topic interest will have precedence
+	if w.settings.FullNode || w.settings.TopicInterest == nil {
 		return nil
 	}
 	topicInterest := make([]common.TopicType, len(w.settings.TopicInterest))
@@ -528,7 +545,19 @@ func (w *Waku) notifyPeersAboutPowRequirementChange(pow float64) {
 	}
 }
 
+func (w *Waku) FullNode() bool {
+	w.settingsMu.RLock()
+	// If full node, nothing to do
+	fullNode := w.settings.FullNode
+	w.settingsMu.RUnlock()
+	return fullNode
+}
+
 func (w *Waku) notifyPeersAboutBloomFilterChange(bloom []byte) {
+
+	if w.FullNode() {
+		return
+	}
 	arr := w.getPeers()
 	for _, p := range arr {
 		err := p.NotifyAboutBloomFilterChange(bloom)
@@ -543,6 +572,9 @@ func (w *Waku) notifyPeersAboutBloomFilterChange(bloom []byte) {
 }
 
 func (w *Waku) notifyPeersAboutTopicInterestChange(topicInterest []common.TopicType) {
+	if w.FullNode() {
+		return
+	}
 	arr := w.getPeers()
 	for _, p := range arr {
 		err := p.NotifyAboutTopicInterestChange(topicInterest)
@@ -1045,6 +1077,8 @@ func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	w.peers[peer] = struct{}{}
 	w.peerMu.Unlock()
 
+	w.logger.Debug("handling peer", zap.String("id", types.EncodeHex(peer.ID())))
+
 	defer func() {
 		w.peerMu.Lock()
 		delete(w.peers, peer)
@@ -1064,10 +1098,13 @@ func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 		return w.rateLimiter.Decorate(peer, rw, runLoop)
 	}
 
-	return peer.Run()
+	err := peer.Run()
+	w.logger.Debug("handled peer", zap.String("id", types.EncodeHex(peer.ID())), zap.Error(err))
+	return err
 }
 
 func (w *Waku) OnNewEnvelopes(envelopes []*common.Envelope, peer common.Peer) ([]common.EnvelopeError, error) {
+	w.logger.Debug("received new envelopes", zap.Int("count", len(envelopes)))
 	envelopeErrors := make([]common.EnvelopeError, 0)
 	trouble := false
 	for _, env := range envelopes {
@@ -1186,6 +1223,9 @@ func (w *Waku) topicInterestMatch(envelope *common.Envelope) (bool, error) {
 }
 
 func (w *Waku) topicInterestOrBloomMatch(envelope *common.Envelope) (bool, error) {
+	if w.FullNode() {
+		return true, nil
+	}
 	w.settingsMu.RLock()
 	topicInterestMode := !w.settings.BloomFilterMode
 	w.settingsMu.RUnlock()
@@ -1207,6 +1247,20 @@ func (w *Waku) SetBloomFilterMode(mode bool) {
 	w.settings.BloomFilterMode = mode
 	w.settingsMu.Unlock()
 	// Recalculate and notify topic interest or bloom, currently not implemented
+}
+
+func (w *Waku) SetFullNode(set bool) {
+	w.settingsMu.Lock()
+	w.settings.FullNode = set
+	w.settingsMu.Unlock()
+
+	// We advertise the topic interest if full node has been disabled
+	// or bloom filter if enabled, as that's how we indicate to a peer we are a full node or not
+	if set {
+		w.notifyPeersAboutBloomFilterChange(w.BloomFilter())
+	} else {
+		w.notifyPeersAboutTopicInterestChange(w.TopicInterest())
+	}
 }
 
 // addEnvelope adds an envelope to the envelope map, used for sending
