@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -17,8 +18,9 @@ type publisher interface {
 type SignalsTransmitter struct {
 	publisher
 
-	wg   sync.WaitGroup
-	quit chan struct{}
+	localNotifications *localnotifications.Broker
+	wg                 sync.WaitGroup
+	quit               chan struct{}
 }
 
 // Start runs loop in background.
@@ -47,6 +49,7 @@ func (tmr *SignalsTransmitter) Start() error {
 				}
 				return
 			case event := <-events:
+				tmr.localNotifications.PublishMessage(localnotifications.Transaction, localnotifications.TransactionEvent{Type: string(event.Type)})
 				signal.SendWalletEvent(event)
 			}
 		}

@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
@@ -80,6 +81,7 @@ type GethStatusBackend struct {
 	accountManager       *account.GethManager
 	transactor           *transactions.Transactor
 	connectionState      connectionState
+	localNotifications   *localnotifications.Broker
 	appState             appState
 	selectedAccountKeyID string
 	log                  log.Logger
@@ -96,19 +98,27 @@ func NewGethStatusBackend() *GethStatusBackend {
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	rpcFilters := rpcfilters.New(statusNode)
+	localNotifications := localnotifications.InitializeBus(1000)
+
 	return &GethStatusBackend{
-		statusNode:     statusNode,
-		accountManager: accountManager,
-		transactor:     transactor,
-		personalAPI:    personalAPI,
-		rpcFilters:     rpcFilters,
-		log:            log.New("package", "status-go/api.GethStatusBackend"),
+		statusNode:         statusNode,
+		accountManager:     accountManager,
+		transactor:         transactor,
+		personalAPI:        personalAPI,
+		rpcFilters:         rpcFilters,
+		localNotifications: localNotifications,
+		log:                log.New("package", "status-go/api.GethStatusBackend"),
 	}
 }
 
 // StatusNode returns reference to node manager
 func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 	return b.statusNode
+}
+
+// LocalNotifications returns reference to local notifications manager
+func (b *GethStatusBackend) LocalNotifications() *localnotifications.Broker {
+	return b.localNotifications
 }
 
 // AccountManager returns reference to account manager
@@ -343,6 +353,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
+
 	err = b.SelectAccount(login)
 	if err != nil {
 		return err
@@ -351,6 +362,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -510,7 +522,7 @@ func (b *GethStatusBackend) mailserversService() gethnode.ServiceConstructor {
 
 func (b *GethStatusBackend) walletService(network uint64, accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed), nil
+		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed, b.localNotifications), nil
 	}
 }
 
@@ -590,6 +602,11 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	signal.SendNodeReady()
 
 	if err := b.statusNode.StartDiscovery(); err != nil {
+		return err
+	}
+
+	err = b.localNotifications.NotificationWorker()
+	if err != nil {
 		return err
 	}
 
@@ -1118,6 +1135,7 @@ func (b *GethStatusBackend) startWallet() error {
 	}
 
 	watchAddresses := b.accountManager.WatchAddresses()
+
 	mainAccountAddress, err := b.accountManager.MainAccountAddress()
 	if err != nil {
 		return err
