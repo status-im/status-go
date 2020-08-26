@@ -1263,11 +1263,19 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	m.allContacts[contact.ID] = contact
 	for _, chat := range chats {
 		m.allChats[chat.ID] = chat
 	}
 	delete(m.allChats, contact.ID)
+
+	// re-register for push notifications
+	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return nil, err
+	}
+
 	return chats, nil
 }
 
@@ -1562,6 +1570,12 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 	return nil
 }
 
+// NOTE: this endpoint does not add the contact, the reason being is that currently
+// that's left as a responsibility to the client, which will call both `SendContactUpdate`
+// and `SaveContact` with the correct system tag.
+// Ideally we have a single endpoint that does both, but probably best to bring `ENS` name
+// on the messenger first.
+
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
 func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
 	m.mutex.Lock()
@@ -1621,10 +1635,6 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if !contact.IsAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
-		contact.SystemTags = append(contact.SystemTags, contactAdded)
 	}
 
 	response.Contacts = []*Contact{contact}

@@ -99,7 +99,12 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 
 	s.Require().Len(response.Contacts, 1)
 	contact := response.Contacts[0]
-	s.Require().True(contact.IsAdded())
+	// It should not add the contact, as that's left to `SaveContact`
+	s.Require().False(contact.IsAdded())
+
+	// add contact
+	contact.SystemTags = []string{contactAdded}
+	s.Require().NoError(theirMessenger.SaveContact(contact))
 
 	s.Require().Len(response.Chats, 1)
 	chat := response.Chats[0]
