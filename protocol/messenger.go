@@ -2125,7 +2125,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRequest")
-						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
 							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger

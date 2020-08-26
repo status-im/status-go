@@ -137,8 +137,21 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 
 // HandlePushNotificationRequest will send a gorush notification and send a response back to the user
 func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
+	messageID []byte,
 	request protobuf.PushNotificationRequest) error {
-	s.config.Logger.Info("handling pn request")
+	s.config.Logger.Info("handling pn request", zap.Binary("message-id", messageID))
+
+	// This is at-most-once semantic for now
+	exists, err := s.persistence.PushNotificationExists(messageID)
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		s.config.Logger.Info("already handled")
+		return nil
+	}
+
 	response := s.buildPushNotificationRequestResponseAndSendNotification(&request)
 	if response == nil {
 		return nil

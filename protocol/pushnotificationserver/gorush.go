@@ -2,7 +2,6 @@ package pushnotificationserver
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -60,9 +59,9 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 				Message:  defaultNotificationMessage,
 				Topic:    registration.ApnTopic,
 				Data: &GoRushRequestData{
-					EncryptedMessage: hex.EncodeToString(request.Message),
+					EncryptedMessage: types.EncodeHex(request.Message),
 					ChatID:           types.EncodeHex(request.ChatId),
-					PublicKey:        hex.EncodeToString(request.PublicKey),
+					PublicKey:        types.EncodeHex(request.PublicKey),
 				},
 			})
 	}
