@@ -46,6 +46,11 @@ func (s *Service) Start(*p2p.Server) error {
 	return s.signals.Start()
 }
 
+// GetFeed returns signals feed.
+func (s *Service) GetFeed() *event.Feed {
+	return s.feed
+}
+
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
 func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
 	reactor := NewReactor(s.db, s.feed, client, chain)

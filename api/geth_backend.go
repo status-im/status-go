@@ -966,11 +966,22 @@ func (b *GethStatusBackend) StartLocalNotifications() error {
 		b.log.Error("Retrieving of Local Notifications service failed on StartLocalNotifications", "error", err)
 		return nil
 	}
+
+	wallet, err := b.statusNode.WalletService()
+	if err != nil {
+		b.log.Error("Retrieving of wallet service failed on StartWallet", "error", err)
+		return nil
+	}
+
 	if !localPN.IsStarted() {
 		err = localPN.Start(b.statusNode.Server())
 		if err != nil {
 			b.log.Error("LocalNotifications service start failed on StartLocalNotifications", "error", err)
 			return nil
+		}
+
+		if wallet.IsStarted() {
+			localPN.SubscribeWallet(wallet.GetFeed())
 		}
 	}
 

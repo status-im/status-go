@@ -3,14 +3,17 @@ package localnotifications
 import (
 	"context"
 	"math/big"
+	"sync"
 
 	//TODO: Inspect replacement with go-ethereum/events
 	messagebus "github.com/vardius/message-bus"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -62,10 +65,12 @@ const topic = "local-notifications"
 
 // Service keeps the state of message bus
 type Service struct {
-	started bool
-	bus     messagebus.MessageBus
-	ctx     context.Context
-	db      *Database
+	started            bool
+	bus                messagebus.MessageBus
+	ctx                context.Context
+	db                 *Database
+	walletSubscription chan struct{}
+	walletWg           sync.WaitGroup
 }
 
 func NewService(db *Database, queueSize int) *Service {
@@ -81,6 +86,7 @@ func pushMessage(notification *Notification) {
 }
 
 func buildTransactionNotification(payload messagePayload) *Notification {
+	// GET Transfers by address and block, to build from it the notification
 	transaction := payload.(TransactionEvent)
 	body := notificationBody{
 		State: transaction.Type,
@@ -115,6 +121,42 @@ func (s *Service) Start(*p2p.Server) error {
 		log.Error("Could not create subscription", "error", err)
 		return err
 	}
+	return nil
+}
+
+// SubscribeWallet - Subscribes to wallet signals and redirects them into Notifications
+func (s *Service) SubscribeWallet(publisher *event.Feed) error {
+	if s.walletSubscription != nil {
+		// already running, nothing to do
+		return nil
+	}
+	s.walletSubscription = make(chan struct{})
+	events := make(chan wallet.Event, 10)
+	sub := publisher.Subscribe(events)
+
+	s.walletWg.Add(1)
+	go func() {
+		defer s.walletWg.Done()
+		for {
+			select {
+			case <-s.walletSubscription:
+				sub.Unsubscribe()
+				return
+			case err := <-sub.Err():
+				// technically event.Feed cannot send an error to subscription.Err channel.
+				// the only time we will get an event is when that channel is closed.
+				if err != nil {
+					log.Error("wallet signals transmitter failed with", "error", err)
+				}
+				return
+			case event := <-events:
+				log.Info("Process event:", event)
+				s.PublishMessage(Transaction, TransactionEvent{
+					Type: string(event.Type),
+				})
+			}
+		}
+	}()
 	return nil
 }
 

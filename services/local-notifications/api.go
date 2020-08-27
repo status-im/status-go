@@ -16,5 +16,6 @@ type API struct {
 
 func (api *API) WatchTransaction(ctx context.Context) error {
 	log.Debug("Add watch tx")
+	// TODO: Insert into DB and check when processing transactions
 	return nil
 }
