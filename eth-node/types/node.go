@@ -22,4 +22,5 @@ type Node interface {
 	GetWaku(ctx interface{}) (Waku, error)
 	AddPeer(url string) error
 	RemovePeer(url string) error
+	PeersCount() int
 }

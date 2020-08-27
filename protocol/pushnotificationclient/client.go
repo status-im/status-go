@@ -210,6 +210,16 @@ func (c *Client) Start() error {
 	return nil
 }
 
+func (c *Client) Offline() {
+	c.stopRegistrationLoop()
+	c.stopResendingLoop()
+}
+
+func (c *Client) Online() {
+	c.startRegistrationLoop()
+	c.startResendingLoop()
+}
+
 func (c *Client) publishOnRegistrationSubscriptions() {
 	// Publish on channels, drop if buffer is full
 	for _, s := range c.registrationSubscriptions {

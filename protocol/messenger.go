@@ -78,6 +78,7 @@ type Messenger struct {
 	installationID             string
 	mailserver                 []byte
 	database                   *sql.DB
+	quit                       chan struct{}
 
 	mutex sync.Mutex
 }
@@ -249,6 +250,7 @@ func NewMessenger(
 		messagesPersistenceEnabled: c.messagesPersistenceEnabled,
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
+		quit:                       make(chan struct{}),
 		shutdownTasks: []func() error{
 			database.Close,
 			pushNotificationClient.Stop,
@@ -301,7 +303,27 @@ func (m *Messenger) Start() error {
 	}
 
 	m.handleEncryptionLayerSubscriptions(subscriptions)
+	m.handleConnectionChange(m.online())
+	m.watchConnectionChange()
 	return nil
+}
+
+// handle connection change is called each time we go from offline/online or viceversa
+func (m *Messenger) handleConnectionChange(online bool) {
+	if online {
+		if m.pushNotificationClient != nil {
+			m.pushNotificationClient.Online()
+		}
+
+	} else {
+		if m.pushNotificationClient != nil {
+			m.pushNotificationClient.Offline()
+		}
+	}
+}
+
+func (m *Messenger) online() bool {
+	return m.node.PeersCount() > 0
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
@@ -403,6 +425,29 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 				return
 			}
 		}
+	}()
+}
+
+// watchConnectionChange checks the connection status and call handleConnectionChange when this changes
+func (m *Messenger) watchConnectionChange() {
+	m.logger.Debug("watching connection changes")
+	state := m.online()
+	go func() {
+		for {
+			select {
+			case <-time.After(200 * time.Millisecond):
+				newState := m.online()
+				if state != newState {
+					state = newState
+					m.logger.Debug("connection changed", zap.Bool("online", state))
+					m.handleConnectionChange(state)
+				}
+			case <-m.quit:
+				return
+			}
+
+		}
+
 	}()
 }
 
@@ -522,6 +567,7 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
+	close(m.quit)
 	return
 }
 
