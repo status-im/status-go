@@ -91,7 +91,7 @@ func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return nil, nil
 }
 
-func (c *testNode) PeersCount() int {
+func (n *testNode) PeersCount() int {
 	return 1
 }
 

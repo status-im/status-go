@@ -319,6 +319,7 @@ func (c *Client) pickDefaultServers(servers []*ecdsa.PublicKey) []*ecdsa.PublicK
 	// shuffle and pick n at random
 	shuffledServers := make([]*ecdsa.PublicKey, len(servers))
 	copy(shuffledServers, c.config.DefaultServers)
+	mrand.Seed(time.Now().Unix())
 	mrand.Shuffle(len(shuffledServers), func(i, j int) {
 		shuffledServers[i], shuffledServers[j] = shuffledServers[j], shuffledServers[i]
 	})
@@ -1151,6 +1152,7 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	// NOTE: here's is a tradeoff, ideally we want to randomly pick a server,
 	// but hit the same servers for batched notifications, for now naively
 	// hit a random server
+	mrand.Seed(time.Now().Unix())
 	mrand.Shuffle(len(info), func(i, j int) {
 		info[i], info[j] = info[j], info[i]
 	})
