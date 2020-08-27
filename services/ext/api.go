@@ -238,7 +238,6 @@ func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Fil
 }
 
 func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) error {
-	api.log.Info("saving chat", "chat", chat)
 	return api.service.messenger.SaveChat(chat)
 }
 
