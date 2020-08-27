@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -17,10 +16,8 @@ type publisher interface {
 // SignalsTransmitter transmits received events as wallet signals.
 type SignalsTransmitter struct {
 	publisher
-
-	localNotifications *localnotifications.Broker
-	wg                 sync.WaitGroup
-	quit               chan struct{}
+	wg   sync.WaitGroup
+	quit chan struct{}
 }
 
 // Start runs loop in background.
@@ -49,7 +46,6 @@ func (tmr *SignalsTransmitter) Start() error {
 				}
 				return
 			case event := <-events:
-				tmr.localNotifications.PublishMessage(localnotifications.Transaction, localnotifications.TransactionEvent{Type: string(event.Type)})
 				signal.SendWalletEvent(event)
 			}
 		}

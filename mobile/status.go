@@ -636,6 +636,12 @@ func StartWallet() string {
 	return makeJSONResponse(err)
 }
 
+// StartLocalNotifications
+func StartLocalNotifications() string {
+	err := statusBackend.StartLocalNotifications()
+	return makeJSONResponse(err)
+}
+
 // SetMobileSignalHandler setup geth callback to notify about new signal
 // used for gomobile builds
 func SetMobileSignalHandler(handler SignalHandler) {

@@ -81,7 +81,6 @@ type GethStatusBackend struct {
 	accountManager       *account.GethManager
 	transactor           *transactions.Transactor
 	connectionState      connectionState
-	localNotifications   *localnotifications.Broker
 	appState             appState
 	selectedAccountKeyID string
 	log                  log.Logger
@@ -98,27 +97,20 @@ func NewGethStatusBackend() *GethStatusBackend {
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	rpcFilters := rpcfilters.New(statusNode)
-	localNotifications := localnotifications.InitializeBus(1000)
 
 	return &GethStatusBackend{
-		statusNode:         statusNode,
-		accountManager:     accountManager,
-		transactor:         transactor,
-		personalAPI:        personalAPI,
-		rpcFilters:         rpcFilters,
-		localNotifications: localNotifications,
-		log:                log.New("package", "status-go/api.GethStatusBackend"),
+		statusNode:     statusNode,
+		accountManager: accountManager,
+		transactor:     transactor,
+		personalAPI:    personalAPI,
+		rpcFilters:     rpcFilters,
+		log:            log.New("package", "status-go/api.GethStatusBackend"),
 	}
 }
 
 // StatusNode returns reference to node manager
 func (b *GethStatusBackend) StatusNode() *node.StatusNode {
 	return b.statusNode
-}
-
-// LocalNotifications returns reference to local notifications manager
-func (b *GethStatusBackend) LocalNotifications() *localnotifications.Broker {
-	return b.localNotifications
 }
 
 // AccountManager returns reference to account manager
@@ -349,6 +341,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		WatchAddresses: watchAddrs,
 		MainAccount:    walletAddr,
 	}
+
 	err = b.StartNode(conf)
 	if err != nil {
 		return err
@@ -522,7 +515,13 @@ func (b *GethStatusBackend) mailserversService() gethnode.ServiceConstructor {
 
 func (b *GethStatusBackend) walletService(network uint64, accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed, b.localNotifications), nil
+		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed), nil
+	}
+}
+
+func (b *GethStatusBackend) localNotificationsService(network uint64) gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return localnotifications.NewService(localnotifications.NewDB(b.appDB, network), 1000), nil
 	}
 }
 
@@ -554,6 +553,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID, accountsFeed))
+	services = appendIf(config.LocalNotificationsConfig.Enabled, services, b.localNotificationsService(config.NetworkID))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
@@ -602,11 +602,6 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	signal.SendNodeReady()
 
 	if err := b.statusNode.StartDiscovery(); err != nil {
-		return err
-	}
-
-	err = b.localNotifications.NotificationWorker()
-	if err != nil {
 		return err
 	}
 
@@ -961,6 +956,23 @@ func (b *GethStatusBackend) StartWallet() error {
 	}
 
 	b.forceStopWallet = false
+
+	return nil
+}
+
+func (b *GethStatusBackend) StartLocalNotifications() error {
+	localPN, err := b.statusNode.LocalNotificationsService()
+	if err != nil {
+		b.log.Error("Retrieving of Local Notifications service failed on StartLocalNotifications", "error", err)
+		return nil
+	}
+	if !localPN.IsStarted() {
+		err = localPN.Start(b.statusNode.Server())
+		if err != nil {
+			b.log.Error("LocalNotifications service start failed on StartLocalNotifications", "error", err)
+			return nil
+		}
+	}
 
 	return nil
 }

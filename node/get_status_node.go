@@ -33,6 +33,7 @@ import (
 	"github.com/status-im/status-go/peers"
 	"github.com/status-im/status-go/rpc"
 	"github.com/status-im/status-go/services/browsers"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/shhext"
@@ -662,6 +663,17 @@ func (n *StatusNode) WakuExtService() (s *wakuext.Service, err error) {
 
 // WalletService returns wallet.Service instance if it was started.
 func (n *StatusNode) WalletService() (s *wallet.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+	return
+}
+
+// LocalNotificationsService returns localnotifications.Service instance if it was started.
+func (n *StatusNode) LocalNotificationsService() (s *localnotifications.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	err = n.gethService(&s)

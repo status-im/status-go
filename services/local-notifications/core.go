@@ -4,13 +4,14 @@ import (
 	"context"
 	"math/big"
 
+	//TODO: Inspect replacement with go-ethereum/events
 	messagebus "github.com/vardius/message-bus"
 
-	"github.com/status-im/status-go/signal"
-
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/signal"
 )
 
 type messagePayload interface{}
@@ -59,15 +60,17 @@ const (
 
 const topic = "local-notifications"
 
-// Broker keeps the state of message bus
-type Broker struct {
-	bus messagebus.MessageBus
-	ctx context.Context
+// Service keeps the state of message bus
+type Service struct {
+	started bool
+	bus     messagebus.MessageBus
+	ctx     context.Context
+	db      *Database
 }
 
-// InitializeBus - Initialize MessageBus which will handle generation of notifications
-func InitializeBus(queueSize int) *Broker {
-	return &Broker{
+func NewService(db *Database, queueSize int) *Service {
+	return &Service{
+		db:  db,
 		bus: messagebus.New(queueSize),
 		ctx: context.Background(),
 	}
@@ -99,18 +102,45 @@ func transactionsHandler(ctx context.Context, payload messagePayload) {
 	pushMessage(n)
 }
 
-// NotificationWorker - Worker which processes all incoming messages
-func (s *Broker) NotificationWorker() error {
+// PublishMessage - Send new message to be processed into a notification
+func (s *Service) PublishMessage(messageType MessageType, payload interface{}) {
+	s.bus.Publish(string(messageType), s.ctx, messagePayload(payload))
+}
+
+// Start Worker which processes all incoming messages
+func (s *Service) Start(*p2p.Server) error {
+	s.started = true
 
 	if err := s.bus.Subscribe(string(Transaction), transactionsHandler); err != nil {
 		log.Error("Could not create subscription", "error", err)
 		return err
 	}
-
 	return nil
 }
 
-// PublishMessage - Send new message to be processed into a notification
-func (s *Broker) PublishMessage(messageType MessageType, payload interface{}) {
-	s.bus.Publish(string(messageType), s.ctx, messagePayload(payload))
+// Stop worker
+func (s *Service) Stop() error {
+	s.started = false
+	return nil
+}
+
+// APIs returns list of available RPC APIs.
+func (s *Service) APIs() []rpc.API {
+	return []rpc.API{
+		{
+			Namespace: "notifications",
+			Version:   "0.1.0",
+			Service:   NewAPI(s),
+			Public:    true,
+		},
+	}
+}
+
+// Protocols returns list of p2p protocols.
+func (s *Service) Protocols() []p2p.Protocol {
+	return nil
+}
+
+func (s *Service) IsStarted() bool {
+	return s.started
 }

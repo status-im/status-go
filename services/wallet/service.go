@@ -12,18 +12,16 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/multiaccounts/accounts"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
 
 // NewService initializes service instance.
-func NewService(db *Database, accountsFeed *event.Feed, localNotifications *localnotifications.Broker) *Service {
+func NewService(db *Database, accountsFeed *event.Feed) *Service {
 	feed := &event.Feed{}
 	return &Service{
 		db:   db,
 		feed: feed,
 		signals: &SignalsTransmitter{
-			publisher:          feed,
-			localNotifications: localNotifications,
+			publisher: feed,
 		},
 		accountsFeed: accountsFeed,
 	}
@@ -31,13 +29,12 @@ func NewService(db *Database, accountsFeed *event.Feed, localNotifications *loca
 
 // Service is a wallet service.
 type Service struct {
-	feed               *event.Feed
-	db                 *Database
-	reactor            *Reactor
-	signals            *SignalsTransmitter
-	client             *ethclient.Client
-	localNotifications *localnotifications.Broker
-	started            bool
+	feed    *event.Feed
+	db      *Database
+	reactor *Reactor
+	signals *SignalsTransmitter
+	client  *ethclient.Client
+	started bool
 
 	group        *Group
 	accountsFeed *event.Feed
