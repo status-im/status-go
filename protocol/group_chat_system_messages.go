@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
@@ -27,7 +28,7 @@ func tsprintf(format string, params map[string]string) string {
 	return format
 }
 
-func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) *Message {
+func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) *common.Message {
 	var text string
 	switch e.Type {
 	case protobuf.MembershipUpdateEvent_CHAT_CREATED:
@@ -56,7 +57,7 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[p
 
 	}
 	timestamp := v1protocol.TimestampInMsFromTime(time.Now())
-	message := &Message{
+	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
 			ChatId:      e.ChatID,
 			Text:        text,
@@ -75,8 +76,8 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[p
 	return message
 }
 
-func buildSystemMessages(events []v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) []*Message {
-	var messages []*Message
+func buildSystemMessages(events []v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) []*common.Message {
+	var messages []*common.Message
 
 	for _, e := range events {
 		messages = append(messages, eventToSystemMessage(e, translations))

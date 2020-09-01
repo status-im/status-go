@@ -8,6 +8,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
@@ -50,8 +51,8 @@ type Chat struct {
 	DeletedAtClockValue uint64 `json:"deletedAtClockValue"`
 
 	// Denormalized fields
-	UnviewedMessagesCount uint     `json:"unviewedMessagesCount"`
-	LastMessage           *Message `json:"lastMessage"`
+	UnviewedMessagesCount uint            `json:"unviewedMessagesCount"`
+	LastMessage           *common.Message `json:"lastMessage"`
 
 	// Group chat fields
 	// Members are the members who have been invited to the group chat
@@ -172,7 +173,7 @@ func (c *Chat) NextClockAndTimestamp(timesource TimeSource) (uint64, uint64) {
 	return clock, timestamp
 }
 
-func (c *Chat) UpdateFromMessage(message *Message, timesource TimeSource) error {
+func (c *Chat) UpdateFromMessage(message *common.Message, timesource TimeSource) error {
 	c.Timestamp = int64(timesource.GetCurrentTime())
 
 	// If the clock of the last message is lower, we set the message

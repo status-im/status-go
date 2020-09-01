@@ -16,6 +16,7 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 )
 
 const (
@@ -92,7 +93,7 @@ func (t *TransactionValidator) verifyTransactionSignature(ctx context.Context, f
 	return nil
 }
 
-func (t *TransactionValidator) validateTokenTransfer(parameters *CommandParameters, transaction coretypes.Message) (*VerifyTransactionResponse, error) {
+func (t *TransactionValidator) validateTokenTransfer(parameters *common.CommandParameters, transaction coretypes.Message) (*VerifyTransactionResponse, error) {
 
 	data := transaction.Data()
 	if len(data) != tokenTransferDataLength {
@@ -153,7 +154,7 @@ func (t *TransactionValidator) validateToAddress(specifiedTo, actualTo string) b
 	return t.addresses[actualTo]
 }
 
-func (t *TransactionValidator) validateEthereumTransfer(parameters *CommandParameters, transaction coretypes.Message) (*VerifyTransactionResponse, error) {
+func (t *TransactionValidator) validateEthereumTransfer(parameters *common.CommandParameters, transaction coretypes.Message) (*VerifyTransactionResponse, error) {
 	toAddress := strings.ToLower(transaction.To().Hex())
 
 	if !t.validateToAddress(parameters.Address, toAddress) {
@@ -197,7 +198,7 @@ type VerifyTransactionResponse struct {
 	// The address the transaction was actually sent
 	Address string
 
-	Message     *Message
+	Message     *common.Message
 	Transaction *TransactionToValidate
 }
 
@@ -205,7 +206,7 @@ type VerifyTransactionResponse struct {
 // If a negative response is returned, i.e `Valid` is false, it should
 // not be retried.
 // If an error is returned, validation can be retried.
-func (t *TransactionValidator) validateTransaction(ctx context.Context, message coretypes.Message, parameters *CommandParameters, from *ecdsa.PublicKey) (*VerifyTransactionResponse, error) {
+func (t *TransactionValidator) validateTransaction(ctx context.Context, message coretypes.Message, parameters *common.CommandParameters, from *ecdsa.PublicKey) (*VerifyTransactionResponse, error) {
 	fromAddress := types.BytesToAddress(message.From().Bytes())
 
 	err := t.verifyTransactionSignature(ctx, from, fromAddress, parameters.TransactionHash, parameters.Signature)
@@ -268,7 +269,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 			}
 			validationResult.Message = message
 		} else {
-			commandParameters := &CommandParameters{}
+			commandParameters := &common.CommandParameters{}
 			commandParameters.TransactionHash = transaction.TransactionHash
 			commandParameters.Signature = transaction.Signature
 
@@ -304,7 +305,7 @@ func (t *TransactionValidator) ValidateTransactions(ctx context.Context) ([]*Ver
 	return response, nil
 }
 
-func (t *TransactionValidator) ValidateTransaction(ctx context.Context, parameters *CommandParameters, from *ecdsa.PublicKey) (*VerifyTransactionResponse, error) {
+func (t *TransactionValidator) ValidateTransaction(ctx context.Context, parameters *common.CommandParameters, from *ecdsa.PublicKey) (*VerifyTransactionResponse, error) {
 	t.logger.Debug("validating transaction", zap.Any("transaction", parameters), zap.Any("from", from))
 	hash := parameters.TransactionHash
 	c, cancel := context.WithTimeout(ctx, 10*time.Second)

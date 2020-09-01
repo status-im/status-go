@@ -145,7 +145,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	return nil
 }
 
-func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, message *Message) error {
+func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, message *common.Message) error {
 	message.ID = state.CurrentMessageState.MessageID
 	message.From = state.CurrentMessageState.Contact.ID
 	message.Alias = state.CurrentMessageState.Contact.Alias
@@ -182,7 +182,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 		message.OutgoingStatus = ""
 	} else {
 		// Our own message, mark as sent
-		message.OutgoingStatus = OutgoingStatusSent
+		message.OutgoingStatus = common.OutgoingStatusSent
 	}
 
 	err = chat.UpdateFromMessage(message, state.Timesource)
@@ -330,7 +330,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		logger.Warn("failed to validate message", zap.Error(err))
 		return err
 	}
-	receivedMessage := &Message{
+	receivedMessage := &common.Message{
 		ID:               state.CurrentMessageState.MessageID,
 		ChatMessage:      state.CurrentMessageState.Message,
 		From:             state.CurrentMessageState.Contact.ID,
@@ -369,7 +369,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		chat.UnviewedMessagesCount++
 	} else {
 		// Our own message, mark as sent
-		receivedMessage.OutgoingStatus = OutgoingStatusSent
+		receivedMessage.OutgoingStatus = common.OutgoingStatusSent
 	}
 
 	err = chat.UpdateFromMessage(receivedMessage, state.Timesource)
@@ -401,7 +401,7 @@ func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *Receiv
 	if err != nil {
 		return err
 	}
-	message := &Message{
+	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
 			Clock:       command.Clock,
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
@@ -410,11 +410,11 @@ func (m *MessageHandler) HandleRequestAddressForTransaction(messageState *Receiv
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
-		CommandParameters: &CommandParameters{
+		CommandParameters: &common.CommandParameters{
 			ID:           messageState.CurrentMessageState.MessageID,
 			Value:        command.Value,
 			Contract:     command.Contract,
-			CommandState: CommandStateRequestAddressForTransaction,
+			CommandState: common.CommandStateRequestAddressForTransaction,
 		},
 	}
 	return m.handleCommandMessage(messageState, message)
@@ -425,7 +425,7 @@ func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageS
 	if err != nil {
 		return err
 	}
-	message := &Message{
+	message := &common.Message{
 		ChatMessage: protobuf.ChatMessage{
 			Clock:       command.Clock,
 			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
@@ -434,11 +434,11 @@ func (m *MessageHandler) HandleRequestTransaction(messageState *ReceivedMessageS
 			MessageType: protobuf.MessageType_ONE_TO_ONE,
 			ContentType: protobuf.ChatMessage_TRANSACTION_COMMAND,
 		},
-		CommandParameters: &CommandParameters{
+		CommandParameters: &common.CommandParameters{
 			ID:           messageState.CurrentMessageState.MessageID,
 			Value:        command.Value,
 			Contract:     command.Contract,
-			CommandState: CommandStateRequestTransaction,
+			CommandState: common.CommandStateRequestTransaction,
 			Address:      command.Address,
 		},
 	}
@@ -466,7 +466,7 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 		return errors.New("Initial message must originate from us")
 	}
 
-	if initialMessage.CommandParameters.CommandState != CommandStateRequestAddressForTransaction {
+	if initialMessage.CommandParameters.CommandState != common.CommandStateRequestAddressForTransaction {
 		return errors.New("Wrong state for command")
 	}
 
@@ -475,7 +475,7 @@ func (m *MessageHandler) HandleAcceptRequestAddressForTransaction(messageState *
 	initialMessage.Text = requestAddressForTransactionAcceptedMessage
 	initialMessage.CommandParameters.Address = command.Address
 	initialMessage.Seen = false
-	initialMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionAccepted
+	initialMessage.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionAccepted
 
 	// Hide previous message
 	previousMessage, err := m.persistence.MessageByCommandID(messageState.CurrentMessageState.Contact.ID, command.Id)
@@ -536,7 +536,7 @@ func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState 
 		return errors.New("Initial message must originate from us")
 	}
 
-	if oldMessage.CommandParameters.CommandState != CommandStateRequestAddressForTransaction {
+	if oldMessage.CommandParameters.CommandState != common.CommandStateRequestAddressForTransaction {
 		return errors.New("Wrong state for command")
 	}
 
@@ -544,7 +544,7 @@ func (m *MessageHandler) HandleDeclineRequestAddressForTransaction(messageState 
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
 	oldMessage.Text = requestAddressForTransactionDeclinedMessage
 	oldMessage.Seen = false
-	oldMessage.CommandParameters.CommandState = CommandStateRequestAddressForTransactionDeclined
+	oldMessage.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionDeclined
 
 	// Hide previous message
 	err = m.persistence.HideMessage(command.Id)
@@ -577,7 +577,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 		return errors.New("Initial message must originate from us")
 	}
 
-	if oldMessage.CommandParameters.CommandState != CommandStateRequestTransaction {
+	if oldMessage.CommandParameters.CommandState != common.CommandStateRequestTransaction {
 		return errors.New("Wrong state for command")
 	}
 
@@ -585,7 +585,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	oldMessage.Timestamp = messageState.CurrentMessageState.WhisperTimestamp
 	oldMessage.Text = transactionRequestDeclinedMessage
 	oldMessage.Seen = false
-	oldMessage.CommandParameters.CommandState = CommandStateRequestTransactionDeclined
+	oldMessage.CommandParameters.CommandState = common.CommandStateRequestTransactionDeclined
 
 	// Hide previous message
 	err = m.persistence.HideMessage(command.Id)
