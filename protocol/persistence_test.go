@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -528,4 +530,34 @@ func TestSaveChat(t *testing.T) {
 	retrievedChat, err := p.Chat(chat.ID)
 	require.NoError(t, err)
 	require.Equal(t, &chat, retrievedChat)
+}
+
+func TestSaveMentions(t *testing.T) {
+	chatID := "chat-id"
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	pkString := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+
+	message := Message{
+		ID:          "1",
+		LocalChatID: chatID,
+		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		From:        "me",
+		Mentions:    []string{pkString},
+	}
+
+	err = p.SaveMessages([]*Message{&message})
+	require.NoError(t, err)
+
+	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, retrievedMessages, 1)
+	require.Len(t, retrievedMessages[0].Mentions, 1)
+	require.Equal(t, retrievedMessages[0].Mentions, message.Mentions)
+
 }
