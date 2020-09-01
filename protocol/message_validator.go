@@ -2,12 +2,15 @@ package protocol
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/v1"
 )
+
+const maxChatMessageTextLength = 4096
 
 // maxWhisperDrift is how many milliseconds we allow the clock value to differ
 // from whisperTimestamp
@@ -161,6 +164,10 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 
 	if len(strings.TrimSpace(message.Text)) == 0 {
 		return errors.New("text can't be empty")
+	}
+
+	if len(message.Text) > maxChatMessageTextLength {
+		return fmt.Errorf("text shouldn't be longer than %d", maxChatMessageTextLength)
 	}
 
 	if len(message.ChatId) == 0 {
