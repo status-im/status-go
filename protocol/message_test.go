@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -93,4 +95,22 @@ func TestGetAudioMessageMIME(t *testing.T) {
 	unknown := &protobuf.ImageMessage{Type: protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE}
 	_, err = getImageMessageMIME(unknown)
 	require.Error(t, err)
+}
+
+func TestPrepareContentMentions(t *testing.T) {
+	message := &Message{}
+	pk1, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pk1String := types.EncodeHex(crypto.FromECDSAPub(&pk1.PublicKey))
+
+	pk2, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pk2String := types.EncodeHex(crypto.FromECDSAPub(&pk2.PublicKey))
+
+	message.Text = "hey @" + pk1String + " @" + pk2String
+
+	require.NoError(t, message.PrepareContent())
+	require.Len(t, message.Mentions, 2)
+	require.Equal(t, message.Mentions[0], pk1String)
+	require.Equal(t, message.Mentions[1], pk2String)
 }
