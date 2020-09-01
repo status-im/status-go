@@ -141,7 +141,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
 	// Register bob1
-	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
@@ -167,11 +167,11 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bob1Servers, err := bob1.GetPushNotificationServers()
+	bob1Servers, err := bob1.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
 	// Register bob2
-	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
@@ -198,7 +198,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bob2Servers, err := bob2.GetPushNotificationServers()
+	bob2Servers, err := bob2.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
 	// Create one to one chat & send message
@@ -307,7 +307,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	bobInstallationIDs := []string{bob.installationID}
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	// Add alice has a contact
@@ -348,7 +348,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bobServers, err := bob.GetPushNotificationServers()
+	bobServers, err := bob.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
 	// Create one to one chat & send message
@@ -442,7 +442,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	bobInstallationIDs := []string{bob.installationID}
 
 	// Register bob
-	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	// Add alice has a contact
@@ -493,7 +493,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bobServers, err := bob.GetPushNotificationServers()
+	bobServers, err := bob.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
 	// Create one to one chat & send message
@@ -564,7 +564,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		return nil
 	})
 
-	newBobServers, err := bob.GetPushNotificationServers()
+	newBobServers, err := bob.GetPushNotificationsServers()
 	s.Require().NoError(err)
 	// Make sure access token is not the same
 	s.Require().NotEqual(newBobServers[0].AccessToken, bobServers[0].AccessToken)
@@ -653,7 +653,7 @@ func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer(
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
 	// Register bob1
-	err := bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err := bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
@@ -679,11 +679,11 @@ func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer(
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bob1Servers, err := bob1.GetPushNotificationServers()
+	bob1Servers, err := bob1.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
 	// Register bob2
-	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
@@ -710,7 +710,7 @@ func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer(
 	})
 	// Make sure we receive it
 	s.Require().NoError(err)
-	bob2Servers, err := bob2.GetPushNotificationServers()
+	bob2Servers, err := bob2.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
 	// Create one to one chat & send message
@@ -817,7 +817,7 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
 	// Register bob1
-	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey)
+	err = bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
 	s.Require().NoError(err)
 
 	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)

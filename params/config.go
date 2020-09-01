@@ -1,6 +1,8 @@
 package params
 
 import (
+	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -145,6 +147,9 @@ type WakuConfig struct {
 	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
 	LightClient bool
 
+	// FullNode should be true if waku should always acta as a full node
+	FullNode bool
+
 	// EnableMailServer is mode when node is capable of delivering expired messages on demand
 	EnableMailServer bool
 
@@ -245,6 +250,9 @@ type ClusterConfig struct {
 
 	// TrustedMailServers is a list of verified and trusted Mail Server nodes.
 	TrustedMailServers []string
+
+	// PushNotificationsServers is a list of default push notification servers.
+	PushNotificationsServers []string
 
 	// RendezvousNodes is a list rendezvous discovery nodes.
 	RendezvousNodes []string
@@ -528,6 +536,9 @@ type ShhextConfig struct {
 	VerifyENSContractAddress string
 
 	VerifyTransactionChainID int64
+
+	// DefaultPushNotificationsServers is the default-status run push notification servers
+	DefaultPushNotificationsServers []*ecdsa.PublicKey
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
@@ -606,9 +617,45 @@ func NewNodeConfigWithDefaults(dataDir string, networkID uint64, opts ...Option)
 	return c, nil
 }
 
-// UpdateWithMobileDefaults updates config with missing default values
-// tailored for the mobile nodes.
-func (c *NodeConfig) UpdateWithMobileDefaults() {
+func (c *NodeConfig) setDefaultPushNotificationsServers() error {
+	if c.ClusterConfig.Fleet == FleetUndefined {
+		return nil
+	}
+
+	// If empty load defaults from the fleet
+	if len(c.ClusterConfig.PushNotificationsServers) == 0 {
+		log.Debug("empty push notification servers, setting", "fleet", c.ClusterConfig.Fleet)
+		defaultConfig := &NodeConfig{}
+		err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", c.ClusterConfig.Fleet), defaultConfig)
+		if err != nil {
+			return err
+		}
+		c.ClusterConfig.PushNotificationsServers = defaultConfig.ClusterConfig.PushNotificationsServers
+	}
+
+	// If empty set the default servers
+	if len(c.ShhextConfig.DefaultPushNotificationsServers) == 0 {
+		log.Debug("setting default push notification servers", "cluster servers", c.ClusterConfig.PushNotificationsServers)
+		for _, pk := range c.ClusterConfig.PushNotificationsServers {
+			keyBytes, err := hex.DecodeString(pk)
+			if err != nil {
+				return err
+			}
+
+			key, err := crypto.UnmarshalPubkey(keyBytes)
+			if err != nil {
+				return err
+			}
+			c.ShhextConfig.DefaultPushNotificationsServers = append(c.ShhextConfig.DefaultPushNotificationsServers, key)
+		}
+	}
+	return nil
+}
+
+// UpdateWithDefaults updates config with missing default values, as
+// the config is only generated once and is thereafter pulled from the database.
+// The way it is stored in the database makes this step necessary as it's stored as a blob and can't be easily migrated.
+func (c *NodeConfig) UpdateWithDefaults() error {
 	// Empty APIModules will fallback to services' APIs definition.
 	// If any API is defined as public, it will be exposed.
 	// We disallow empty APIModules to avoid confusion
@@ -627,6 +674,7 @@ func (c *NodeConfig) UpdateWithMobileDefaults() {
 		c.WhisperConfig.MinimumPoW = WhisperMinimumPoW
 	}
 
+	return c.setDefaultPushNotificationsServers()
 }
 
 // NewNodeConfigWithDefaultsAndFiles creates new node configuration object

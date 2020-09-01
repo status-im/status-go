@@ -12,7 +12,7 @@ import (
 	"errors"
 	"io"
 	"math"
-	"sort"
+	mrand "math/rand"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -60,6 +60,16 @@ const pushNotificationBackoffTime int64 = 2
 // RegistrationBackoffTime is the step of the exponential backoff
 const RegistrationBackoffTime int64 = 15
 
+// defaultPushNotificationsServerCount is how many push notification servers we should register with if none is selected
+const defaultPushNotificationsServersCount = 3
+
+type ServerType int
+
+const (
+	ServerTypeDefault = iota + 1
+	ServerTypeCustom
+)
+
 type PushNotificationServer struct {
 	PublicKey     *ecdsa.PublicKey `json:"-"`
 	Registered    bool             `json:"registered,omitempty"`
@@ -67,6 +77,7 @@ type PushNotificationServer struct {
 	LastRetriedAt int64            `json:"lastRetriedAt,omitempty"`
 	RetryCount    int64            `json:"retryCount,omitempty"`
 	AccessToken   string           `json:"accessToken,omitempty"`
+	Type          ServerType       `json:"type,omitempty"`
 }
 
 func (s *PushNotificationServer) MarshalJSON() ([]byte, error) {
@@ -121,6 +132,10 @@ type Config struct {
 	InstallationID string
 
 	Logger *zap.Logger
+
+	// DefaultServers holds the push notification servers used by
+	// default if none is selected
+	DefaultServers []*ecdsa.PublicKey
 }
 
 type Client struct {
@@ -176,6 +191,8 @@ func (c *Client) Start() error {
 		return errors.New("can't start, missing message processor")
 	}
 
+	c.config.Logger.Debug("starting push notification client", zap.Any("config", c.config))
+
 	err := c.loadLastPushNotificationRegistration()
 	if err != nil {
 		return err
@@ -191,6 +208,16 @@ func (c *Client) Start() error {
 	c.startResendingLoop()
 
 	return nil
+}
+
+func (c *Client) Offline() {
+	c.stopRegistrationLoop()
+	c.stopResendingLoop()
+}
+
+func (c *Client) Online() {
+	c.startRegistrationLoop()
+	c.startResendingLoop()
 }
 
 func (c *Client) publishOnRegistrationSubscriptions() {
@@ -287,6 +314,24 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
 }
 
+// pickDefaultServesr picks n servers at random
+func (c *Client) pickDefaultServers(servers []*ecdsa.PublicKey) []*ecdsa.PublicKey {
+	// shuffle and pick n at random
+	shuffledServers := make([]*ecdsa.PublicKey, len(servers))
+	copy(shuffledServers, c.config.DefaultServers)
+	mrand.Seed(time.Now().Unix())
+	mrand.Shuffle(len(shuffledServers), func(i, j int) {
+		shuffledServers[i], shuffledServers[j] = shuffledServers[j], shuffledServers[i]
+	})
+	// Take the min not to get an out of bounds slice
+	min := len(c.config.DefaultServers)
+	if min > defaultPushNotificationsServersCount {
+		min = defaultPushNotificationsServersCount
+	}
+
+	return shuffledServers[:min]
+}
+
 // Register registers with all the servers
 func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
 	// stop registration loop
@@ -294,8 +339,23 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 
 	c.config.RemoteNotificationsEnabled = true
 
+	// check if we need to fallback on default servers
+	currentServers, err := c.persistence.GetServers()
+	if err != nil {
+		return err
+	}
+	if len(currentServers) == 0 && len(c.config.DefaultServers) != 0 {
+		c.config.Logger.Debug("servers empty, checking default servers")
+		for _, s := range c.pickDefaultServers(c.config.DefaultServers) {
+			err = c.AddPushNotificationsServer(s, ServerTypeDefault)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// reset servers
-	err := c.resetServers()
+	err = c.resetServers()
 	if err != nil {
 		return err
 	}
@@ -482,7 +542,7 @@ func (c *Client) RemovePushNotificationServer(publicKey *ecdsa.PublicKey) error 
 	return errors.New("not implemented")
 }
 
-func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey) error {
+func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey, serverType ServerType) error {
 	c.config.Logger.Debug("adding push notifications server", zap.Any("public-key", publicKey))
 	currentServers, err := c.persistence.GetServers()
 	if err != nil {
@@ -497,6 +557,7 @@ func (c *Client) AddPushNotificationsServer(publicKey *ecdsa.PublicKey) error {
 
 	err = c.persistence.UpsertServer(&PushNotificationServer{
 		PublicKey: publicKey,
+		Type:      serverType,
 	})
 	if err != nil {
 		return err
@@ -1087,9 +1148,13 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	// we should also retry if no response at all is received after a timeout.
 	// also we send a single notification for multiple message ids, need to check with UI what's the desired behavior
 
-	// sort by server so we tend to hit the same one
-	sort.Slice(info, func(i, j int) bool {
-		return info[i].ServerPublicKey.X.Cmp(info[j].ServerPublicKey.X) <= 0
+	// shuffle so we don't hit the same servers all the times
+	// NOTE: here's is a tradeoff, ideally we want to randomly pick a server,
+	// but hit the same servers for batched notifications, for now naively
+	// hit a random server
+	mrand.Seed(time.Now().Unix())
+	mrand.Shuffle(len(info), func(i, j int) {
+		info[i], info[j] = info[j], info[i]
 	})
 
 	installationIDsMap := make(map[string]bool)
@@ -1122,9 +1187,12 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	for _, infos := range actionableInfos {
 		var pushNotifications []*protobuf.PushNotification
 		for _, i := range infos {
-			// TODO: Add ChatID, message, public_key
+			// TODO: Add group chat ChatID
 			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
-				Type:           protobuf.PushNotification_MESSAGE,
+				Type: protobuf.PushNotification_MESSAGE,
+				// For now we set the ChatID to our own identity key, this will work fine for blocked users
+				// and muted 1-to-1 chats, but not for group chats.
+				ChatId:         common.Shake256([]byte(types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey)))),
 				AccessToken:    i.AccessToken,
 				PublicKey:      common.HashPublicKey(publicKey),
 				InstallationId: i.InstallationID,

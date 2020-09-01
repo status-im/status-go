@@ -28,6 +28,10 @@ func (w *TestNodeWrapper) GetWaku(_ interface{}) (types.Waku, error) {
 	return w.waku, nil
 }
 
+func (w *TestNodeWrapper) PeersCount() int {
+	return 1
+}
+
 func (w *TestNodeWrapper) AddPeer(url string) error {
 	panic("not implemented")
 }

@@ -1,11 +1,11 @@
 package pushnotificationserver
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -13,10 +13,10 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 	message1 := []byte("message-1")
 	message2 := []byte("message-2")
 	message3 := []byte("message-3")
-	hexMessage1 := hex.EncodeToString(message1)
-	hexMessage2 := hex.EncodeToString(message2)
-	hexMessage3 := hex.EncodeToString(message3)
-	chatID := "chat-id"
+	hexMessage1 := types.EncodeHex(message1)
+	hexMessage2 := types.EncodeHex(message2)
+	hexMessage3 := types.EncodeHex(message3)
+	chatID := []byte("chat-id")
 	publicKey1 := []byte("public-key-1")
 	publicKey2 := []byte("public-key-2")
 	installationID1 := "installation-id-1"
@@ -76,8 +76,8 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				Message:  defaultNotificationMessage,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage1,
-					ChatID:           chatID,
-					PublicKey:        hex.EncodeToString(publicKey1),
+					ChatID:           types.EncodeHex(chatID),
+					PublicKey:        types.EncodeHex(publicKey1),
 				},
 			},
 			{
@@ -86,8 +86,8 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				Message:  defaultNotificationMessage,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage2,
-					ChatID:           chatID,
-					PublicKey:        hex.EncodeToString(publicKey1),
+					ChatID:           types.EncodeHex(chatID),
+					PublicKey:        types.EncodeHex(publicKey1),
 				},
 			},
 			{
@@ -96,8 +96,8 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 				Message:  defaultNotificationMessage,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage3,
-					ChatID:           chatID,
-					PublicKey:        hex.EncodeToString(publicKey2),
+					ChatID:           types.EncodeHex(chatID),
+					PublicKey:        types.EncodeHex(publicKey2),
 				},
 			},
 		},

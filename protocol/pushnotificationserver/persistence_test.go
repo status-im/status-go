@@ -81,3 +81,22 @@ func (s *SQLitePersistenceSuite) TestSaveDifferentIdenities() {
 	s.Require().NoError(s.persistence.SaveIdentity(key1))
 	s.Require().Error(s.persistence.SaveIdentity(key2))
 }
+
+func (s *SQLitePersistenceSuite) TestExists() {
+	messageID1 := []byte("1")
+	messageID2 := []byte("2")
+
+	result, err := s.persistence.PushNotificationExists(messageID1)
+	s.Require().NoError(err)
+	s.Require().False(result)
+
+	result, err = s.persistence.PushNotificationExists(messageID1)
+	s.Require().NoError(err)
+
+	s.Require()
+	s.Require().True(result)
+
+	result, err = s.persistence.PushNotificationExists(messageID2)
+	s.Require().NoError(err)
+	s.Require().False(result)
+}

@@ -91,6 +91,10 @@ func (n *testNode) GetWhisper(_ interface{}) (types.Whisper, error) {
 	return nil, nil
 }
 
+func (n *testNode) PeersCount() int {
+	return 1
+}
+
 func (s *MessengerSuite) SetupTest() {
 	s.logger = tt.MustCreateTestLogger()
 

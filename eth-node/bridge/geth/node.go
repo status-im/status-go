@@ -99,3 +99,7 @@ func (w *gethNodeWrapper) RemovePeer(url string) error {
 
 	return nil
 }
+
+func (w *gethNodeWrapper) PeersCount() int {
+	return len(w.stack.Server().Peers())
+}

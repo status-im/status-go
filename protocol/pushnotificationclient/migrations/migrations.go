@@ -2,6 +2,8 @@
 // sources:
 // 1593601729_initial_schema.down.sql (144B)
 // 1593601729_initial_schema.up.sql (1.773kB)
+// 1597909626_add_server_type.down.sql (0)
+// 1597909626_add_server_type.up.sql (145B)
 // doc.go (382B)
 
 package migrations
@@ -86,7 +88,7 @@ func _1593601729_initial_schemaDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601729_initial_schema.down.sql", size: 144, mode: os.FileMode(0644), modTime: time.Unix(1595840384, 0)}
+	info := bindataFileInfo{name: "1593601729_initial_schema.down.sql", size: 144, mode: os.FileMode(0644), modTime: time.Unix(1596198373, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa, 0x95, 0x55, 0x64, 0x38, 0x40, 0x16, 0xbf, 0x8b, 0x1c, 0x18, 0xb4, 0xc5, 0x7f, 0xd0, 0xb8, 0xf0, 0x3c, 0xa2, 0x82, 0xf8, 0x8d, 0x5a, 0xd3, 0xb6, 0x6e, 0xa3, 0xb4, 0xc, 0x9, 0x33, 0x0}}
 	return a, nil
 }
@@ -106,8 +108,48 @@ func _1593601729_initial_schemaUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1593601729_initial_schema.up.sql", size: 1773, mode: os.FileMode(0644), modTime: time.Unix(1595840384, 0)}
+	info := bindataFileInfo{name: "1593601729_initial_schema.up.sql", size: 1773, mode: os.FileMode(0644), modTime: time.Unix(1596198373, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x4e, 0x1e, 0x5, 0x35, 0x9, 0xb2, 0x2d, 0x6f, 0x33, 0x63, 0xa2, 0x7a, 0x5b, 0xd2, 0x2d, 0xcb, 0x79, 0x7e, 0x6, 0xb4, 0x9d, 0x35, 0xd8, 0x9b, 0x55, 0xe5, 0xf8, 0x44, 0xca, 0xa6, 0xf3, 0xd3}}
+	return a, nil
+}
+
+var __1597909626_add_server_typeDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+
+func _1597909626_add_server_typeDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1597909626_add_server_typeDownSql,
+		"1597909626_add_server_type.down.sql",
+	)
+}
+
+func _1597909626_add_server_typeDownSql() (*asset, error) {
+	bytes, err := _1597909626_add_server_typeDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1597909626_add_server_type.down.sql", size: 0, mode: os.FileMode(0644), modTime: time.Unix(1597909727, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55}}
+	return a, nil
+}
+
+var __1597909626_add_server_typeUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x28\x2d\xce\x88\xcf\xcb\x2f\xc9\x4c\xcb\x4c\x4e\x2c\xc9\xcc\xcf\x8b\x4f\xce\xc9\x4c\xcd\x2b\x89\x2f\x4e\x2d\x2a\x4b\x2d\x2a\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x80\x08\xc5\x97\x54\x16\xa4\x2a\x78\xfa\x85\x28\xb8\xb8\xba\x39\x86\xfa\x84\x28\x18\x59\x73\x85\x06\xb8\x38\x86\x10\x61\x5a\xb0\x6b\x08\x8a\x31\xb6\x20\xcd\x5c\x80\x00\x00\x00\xff\xff\x98\x88\x1e\xcd\x91\x00\x00\x00")
+
+func _1597909626_add_server_typeUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1597909626_add_server_typeUpSql,
+		"1597909626_add_server_type.up.sql",
+	)
+}
+
+func _1597909626_add_server_typeUpSql() (*asset, error) {
+	bytes, err := _1597909626_add_server_typeUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1597909626_add_server_type.up.sql", size: 145, mode: os.FileMode(0644), modTime: time.Unix(1597909704, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc8, 0x3f, 0xe0, 0xe7, 0x57, 0x0, 0x5d, 0x60, 0xf3, 0x55, 0x64, 0x71, 0x80, 0x3c, 0xca, 0x8, 0x61, 0xb5, 0x3c, 0xe, 0xa1, 0xe4, 0x61, 0xd1, 0x4e, 0xd8, 0xb2, 0x55, 0xdd, 0x87, 0x62, 0x9b}}
 	return a, nil
 }
 
@@ -126,7 +168,7 @@ func docGo() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "doc.go", size: 382, mode: os.FileMode(0644), modTime: time.Unix(1595840384, 0)}
+	info := bindataFileInfo{name: "doc.go", size: 382, mode: os.FileMode(0644), modTime: time.Unix(1596198373, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc0, 0x2f, 0x1e, 0x64, 0x9, 0x93, 0xe4, 0x8b, 0xf2, 0x98, 0x5a, 0x45, 0xe2, 0x80, 0x88, 0x67, 0x7a, 0x2d, 0xd7, 0x4b, 0xd1, 0x73, 0xb6, 0x6d, 0x15, 0xc2, 0x0, 0x34, 0xcd, 0xa0, 0xdb, 0x20}}
 	return a, nil
 }
@@ -226,6 +268,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1593601729_initial_schema.up.sql": _1593601729_initial_schemaUpSql,
 
+	"1597909626_add_server_type.down.sql": _1597909626_add_server_typeDownSql,
+
+	"1597909626_add_server_type.up.sql": _1597909626_add_server_typeUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -270,9 +316,11 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"1593601729_initial_schema.down.sql": &bintree{_1593601729_initial_schemaDownSql, map[string]*bintree{}},
-	"1593601729_initial_schema.up.sql":   &bintree{_1593601729_initial_schemaUpSql, map[string]*bintree{}},
-	"doc.go":                             &bintree{docGo, map[string]*bintree{}},
+	"1593601729_initial_schema.down.sql":  &bintree{_1593601729_initial_schemaDownSql, map[string]*bintree{}},
+	"1593601729_initial_schema.up.sql":    &bintree{_1593601729_initial_schemaUpSql, map[string]*bintree{}},
+	"1597909626_add_server_type.down.sql": &bintree{_1597909626_add_server_typeDownSql, map[string]*bintree{}},
+	"1597909626_add_server_type.up.sql":   &bintree{_1597909626_add_server_typeUpSql, map[string]*bintree{}},
+	"doc.go":                              &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

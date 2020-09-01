@@ -2,13 +2,13 @@ package pushnotificationserver
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
 
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
@@ -59,9 +59,9 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 				Message:  defaultNotificationMessage,
 				Topic:    registration.ApnTopic,
 				Data: &GoRushRequestData{
-					EncryptedMessage: hex.EncodeToString(request.Message),
-					ChatID:           request.ChatId,
-					PublicKey:        hex.EncodeToString(request.PublicKey),
+					EncryptedMessage: types.EncodeHex(request.Message),
+					ChatID:           types.EncodeHex(request.ChatId),
+					PublicKey:        types.EncodeHex(request.PublicKey),
 				},
 			})
 	}

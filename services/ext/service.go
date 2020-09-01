@@ -483,6 +483,7 @@ func buildMessengerOptions(
 	}
 
 	options = append(options, protocol.WithPushNotificationClientConfig(&pushnotificationclient.Config{
+		DefaultServers:             config.DefaultPushNotificationsServers,
 		SendEnabled:                settings.SendPushNotifications,
 		AllowFromContactsOnly:      settings.PushNotificationsFromContactsOnly,
 		RemoteNotificationsEnabled: settings.RemotePushNotificationsEnabled,

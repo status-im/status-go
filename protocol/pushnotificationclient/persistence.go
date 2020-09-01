@@ -333,13 +333,13 @@ func (p *Persistence) GetRetriablePushNotifications() ([]*SentNotification, erro
 }
 
 func (p *Persistence) UpsertServer(server *PushNotificationServer) error {
-	_, err := p.db.Exec(`INSERT INTO push_notification_client_servers (public_key, registered, registered_at, access_token, last_retried_at, retry_count) VALUES (?,?,?,?,?,?)`, crypto.CompressPubkey(server.PublicKey), server.Registered, server.RegisteredAt, server.AccessToken, server.LastRetriedAt, server.RetryCount)
+	_, err := p.db.Exec(`INSERT INTO push_notification_client_servers (public_key, registered, registered_at, access_token, last_retried_at, retry_count, server_type) VALUES (?,?,?,?,?,?,?)`, crypto.CompressPubkey(server.PublicKey), server.Registered, server.RegisteredAt, server.AccessToken, server.LastRetriedAt, server.RetryCount, server.Type)
 	return err
 
 }
 
 func (p *Persistence) GetServers() ([]*PushNotificationServer, error) {
-	rows, err := p.db.Query(`SELECT public_key, registered, registered_at,access_token,last_retried_at, retry_count FROM push_notification_client_servers`)
+	rows, err := p.db.Query(`SELECT public_key, registered, registered_at,access_token,last_retried_at, retry_count, server_type FROM push_notification_client_servers`)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (p *Persistence) GetServers() ([]*PushNotificationServer, error) {
 	for rows.Next() {
 		server := &PushNotificationServer{}
 		var key []byte
-		err := rows.Scan(&key, &server.Registered, &server.RegisteredAt, &server.AccessToken, &server.LastRetriedAt, &server.RetryCount)
+		err := rows.Scan(&key, &server.Registered, &server.RegisteredAt, &server.AccessToken, &server.LastRetriedAt, &server.RetryCount, &server.Type)
 		if err != nil {
 			return nil, err
 		}

@@ -78,6 +78,7 @@ type Messenger struct {
 	installationID             string
 	mailserver                 []byte
 	database                   *sql.DB
+	quit                       chan struct{}
 
 	mutex sync.Mutex
 }
@@ -249,6 +250,7 @@ func NewMessenger(
 		messagesPersistenceEnabled: c.messagesPersistenceEnabled,
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
+		quit:                       make(chan struct{}),
 		shutdownTasks: []func() error{
 			database.Close,
 			pushNotificationClient.Stop,
@@ -301,7 +303,27 @@ func (m *Messenger) Start() error {
 	}
 
 	m.handleEncryptionLayerSubscriptions(subscriptions)
+	m.handleConnectionChange(m.online())
+	m.watchConnectionChange()
 	return nil
+}
+
+// handle connection change is called each time we go from offline/online or viceversa
+func (m *Messenger) handleConnectionChange(online bool) {
+	if online {
+		if m.pushNotificationClient != nil {
+			m.pushNotificationClient.Online()
+		}
+
+	} else {
+		if m.pushNotificationClient != nil {
+			m.pushNotificationClient.Offline()
+		}
+	}
+}
+
+func (m *Messenger) online() bool {
+	return m.node.PeersCount() > 0
 }
 
 func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvertisement, error) {
@@ -403,6 +425,29 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 				return
 			}
 		}
+	}()
+}
+
+// watchConnectionChange checks the connection status and call handleConnectionChange when this changes
+func (m *Messenger) watchConnectionChange() {
+	m.logger.Debug("watching connection changes")
+	state := m.online()
+	go func() {
+		for {
+			select {
+			case <-time.After(200 * time.Millisecond):
+				newState := m.online()
+				if state != newState {
+					state = newState
+					m.logger.Debug("connection changed", zap.Bool("online", state))
+					m.handleConnectionChange(state)
+				}
+			case <-m.quit:
+				return
+			}
+
+		}
+
 	}()
 }
 
@@ -522,6 +567,7 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
+	close(m.quit)
 	return
 }
 
@@ -1263,11 +1309,19 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	m.allContacts[contact.ID] = contact
 	for _, chat := range chats {
 		m.allChats[chat.ID] = chat
 	}
 	delete(m.allChats, contact.ID)
+
+	// re-register for push notifications
+	err = m.reregisterForPushNotifications()
+	if err != nil {
+		return nil, err
+	}
+
 	return chats, nil
 }
 
@@ -1562,6 +1616,12 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 	return nil
 }
 
+// NOTE: this endpoint does not add the contact, the reason being is that currently
+// that's left as a responsibility to the client, which will call both `SendContactUpdate`
+// and `SaveContact` with the correct system tag.
+// Ideally we have a single endpoint that does both, but probably best to bring `ENS` name
+// on the messenger first.
+
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
 func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
 	m.mutex.Lock()
@@ -1621,10 +1681,6 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if !contact.IsAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
-		contact.SystemTags = append(contact.SystemTags, contactAdded)
 	}
 
 	response.Contacts = []*Contact{contact}
@@ -2125,7 +2181,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRequest")
-						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
 							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
 						}
 						// We continue in any case, no changes to messenger
@@ -3181,11 +3237,11 @@ func (m *Messenger) Timesource() TimeSource {
 }
 
 // AddPushNotificationsServer adds a push notification server
-func (m *Messenger) AddPushNotificationsServer(ctx context.Context, publicKey *ecdsa.PublicKey) error {
+func (m *Messenger) AddPushNotificationsServer(ctx context.Context, publicKey *ecdsa.PublicKey, serverType pushnotificationclient.ServerType) error {
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
-	return m.pushNotificationClient.AddPushNotificationsServer(publicKey)
+	return m.pushNotificationClient.AddPushNotificationsServer(publicKey, serverType)
 }
 
 // RemovePushNotificationServer removes a push notification server
@@ -3293,8 +3349,8 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
 }
 
-// GetPushNotificationServers returns the servers used for push notifications
-func (m *Messenger) GetPushNotificationServers() ([]*pushnotificationclient.PushNotificationServer, error) {
+// GetPushNotificationsServers returns the servers used for push notifications
+func (m *Messenger) GetPushNotificationsServers() ([]*pushnotificationclient.PushNotificationServer, error) {
 	if m.pushNotificationClient == nil {
 		return nil, errors.New("no push notification client")
 	}
