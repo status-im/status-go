@@ -20,6 +20,8 @@ message PushNotificationRegistration {
   bytes grant = 10;
   bool allow_from_contacts_only = 11;
   string apn_topic = 12;
+  bool block_mentions = 13;
+  repeated bytes allowed_mentions_chat_list = 14;
 }
 
 message PushNotificationRegistrationResponse {

@@ -1,4 +1,4 @@
-package protocol
+package common
 
 import (
 	"crypto/ecdsa"
@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 

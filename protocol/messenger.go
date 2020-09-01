@@ -91,7 +91,7 @@ type RawResponse struct {
 
 type MessengerResponse struct {
 	Chats          []*Chat                     `json:"chats,omitempty"`
-	Messages       []*Message                  `json:"messages,omitempty"`
+	Messages       []*common.Message           `json:"messages,omitempty"`
 	Contacts       []*Contact                  `json:"contacts,omitempty"`
 	Installations  []*multidevice.Installation `json:"installations,omitempty"`
 	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
@@ -1689,7 +1689,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 }
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
-func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*MessengerResponse, error) {
+func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -1778,12 +1778,12 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *Message) (*Mes
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
-	response.Messages, err = m.pullMessagesAndResponsesFromDB([]*Message{message})
+	response.Messages, err = m.pullMessagesAndResponsesFromDB([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
@@ -2540,7 +2540,7 @@ func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
 	return nil
 }
 
-func (m *Messenger) MessageByID(id string) (*Message, error) {
+func (m *Messenger) MessageByID(id string) (*common.Message, error) {
 	return m.persistence.MessageByID(id)
 }
 
@@ -2548,11 +2548,11 @@ func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 	return m.persistence.MessagesExist(ids)
 }
 
-func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*Message, string, error) {
+func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
 	return m.persistence.MessageByChatID(chatID, cursor, limit)
 }
 
-func (m *Messenger) SaveMessages(messages []*Message) error {
+func (m *Messenger) SaveMessages(messages []*common.Message) error {
 	return m.persistence.SaveMessages(messages)
 }
 
@@ -2733,7 +2733,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &Message{}
+	message := &common.Message{}
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -2760,12 +2760,12 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		ResendAutomatically: true,
 	})
 
-	message.CommandParameters = &CommandParameters{
+	message.CommandParameters = &common.CommandParameters{
 		ID:           types.EncodeHex(id),
 		Value:        value,
 		Address:      address,
 		Contract:     contract,
-		CommandState: CommandStateRequestTransaction,
+		CommandState: common.CommandStateRequestTransaction,
 	}
 
 	if err != nil {
@@ -2785,13 +2785,13 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -2810,7 +2810,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &Message{}
+	message := &common.Message{}
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -2836,12 +2836,12 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		ResendAutomatically: true,
 	})
 
-	message.CommandParameters = &CommandParameters{
+	message.CommandParameters = &common.CommandParameters{
 		ID:           types.EncodeHex(id),
 		From:         from,
 		Value:        value,
 		Contract:     contract,
-		CommandState: CommandStateRequestAddressForTransaction,
+		CommandState: common.CommandStateRequestAddressForTransaction,
 	}
 
 	if err != nil {
@@ -2861,13 +2861,13 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -2902,7 +2902,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = "Request address for transaction accepted"
-	message.OutgoingStatus = OutgoingStatusSending
+	message.OutgoingStatus = common.OutgoingStatusSending
 
 	// Hide previous message
 	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
@@ -2944,7 +2944,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 
 	message.ID = types.EncodeHex(newMessageID)
 	message.CommandParameters.Address = address
-	message.CommandParameters.CommandState = CommandStateRequestAddressForTransactionAccepted
+	message.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionAccepted
 
 	err = message.PrepareContent()
 	if err != nil {
@@ -2956,13 +2956,13 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -2997,7 +2997,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = "Transaction request declined"
-	message.OutgoingStatus = OutgoingStatusSending
+	message.OutgoingStatus = common.OutgoingStatusSending
 	message.Replace = messageID
 
 	err = m.persistence.HideMessage(messageID)
@@ -3026,7 +3026,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	}
 
 	message.ID = types.EncodeHex(newMessageID)
-	message.CommandParameters.CommandState = CommandStateRequestTransactionDeclined
+	message.CommandParameters.CommandState = common.CommandStateRequestTransactionDeclined
 
 	err = message.PrepareContent()
 	if err != nil {
@@ -3038,13 +3038,13 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -3079,7 +3079,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = "Request address for transaction declined"
-	message.OutgoingStatus = OutgoingStatusSending
+	message.OutgoingStatus = common.OutgoingStatusSending
 	message.Replace = messageID
 
 	err = m.persistence.HideMessage(messageID)
@@ -3108,7 +3108,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	}
 
 	message.ID = types.EncodeHex(newMessageID)
-	message.CommandParameters.CommandState = CommandStateRequestAddressForTransactionDeclined
+	message.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionDeclined
 
 	err = message.PrepareContent()
 	if err != nil {
@@ -3120,13 +3120,13 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -3161,7 +3161,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = transactionSentTxt
-	message.OutgoingStatus = OutgoingStatusSending
+	message.OutgoingStatus = common.OutgoingStatusSending
 
 	// Hide previous message
 	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
@@ -3207,7 +3207,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.ID = types.EncodeHex(newMessageID)
 	message.CommandParameters.TransactionHash = transactionHash
 	message.CommandParameters.Signature = signature
-	message.CommandParameters.CommandState = CommandStateTransactionSent
+	message.CommandParameters.CommandState = common.CommandStateTransactionSent
 
 	err = message.PrepareContent()
 	if err != nil {
@@ -3219,13 +3219,13 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -3244,7 +3244,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, errors.New("Need to be a one-to-one chat")
 	}
 
-	message := &Message{}
+	message := &common.Message{}
 	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 	if err != nil {
 		return nil, err
@@ -3282,12 +3282,12 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	}
 
 	message.ID = types.EncodeHex(newMessageID)
-	message.CommandParameters = &CommandParameters{
+	message.CommandParameters = &common.CommandParameters{
 		TransactionHash: transactionHash,
 		Value:           value,
 		Contract:        contract,
 		Signature:       signature,
-		CommandState:    CommandStateTransactionSent,
+		CommandState:    common.CommandStateTransactionSent,
 	}
 
 	err = message.PrepareContent()
@@ -3300,13 +3300,13 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	err = m.persistence.SaveMessages([]*Message{message})
+	err = m.persistence.SaveMessages([]*common.Message{message})
 	if err != nil {
 		return nil, err
 	}
 
 	response.Chats = []*Chat{chat}
-	response.Messages = []*Message{message}
+	response.Messages = []*common.Message{message}
 	return &response, m.saveChat(chat)
 }
 
@@ -3335,7 +3335,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		return nil, err
 	}
 	for _, validationResult := range responses {
-		var message *Message
+		var message *common.Message
 		chatID := contactIDFromPublicKey(validationResult.Transaction.From)
 		chat, ok := m.allChats[chatID]
 		if !ok {
@@ -3344,7 +3344,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		if validationResult.Message != nil {
 			message = validationResult.Message
 		} else {
-			message = &Message{}
+			message = &common.Message{}
 			err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.transport)
 			if err != nil {
 				return nil, err
@@ -3365,7 +3365,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 
 		message.ID = validationResult.Transaction.MessageID
 		if message.CommandParameters == nil {
-			message.CommandParameters = &CommandParameters{}
+			message.CommandParameters = &common.CommandParameters{}
 		} else {
 			message.CommandParameters = validationResult.Message.CommandParameters
 		}
@@ -3373,7 +3373,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		message.CommandParameters.Value = validationResult.Value
 		message.CommandParameters.Contract = validationResult.Contract
 		message.CommandParameters.Address = validationResult.Address
-		message.CommandParameters.CommandState = CommandStateTransactionSent
+		message.CommandParameters.CommandState = common.CommandStateTransactionSent
 		message.CommandParameters.TransactionHash = validationResult.Transaction.TransactionHash
 
 		err = message.PrepareContent()
@@ -3422,7 +3422,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 
 // pullMessagesAndResponsesFromDB pulls all the messages and the one that have
 // been replied to from the database
-func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*Message) ([]*Message, error) {
+func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*common.Message) ([]*common.Message, error) {
 	var messageIDs []string
 	for _, message := range messages {
 		messageIDs = append(messageIDs, message.ID)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -103,9 +104,9 @@ func TestMessageByChatID(t *testing.T) {
 	count := 1000
 	pageSize := 50
 
-	var messages []*Message
+	var messages []*common.Message
 	for i := 0; i < count; i++ {
-		messages = append(messages, &Message{
+		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(i),
 			LocalChatID: chatID,
 			ChatMessage: protobuf.ChatMessage{
@@ -116,7 +117,7 @@ func TestMessageByChatID(t *testing.T) {
 
 		// Add some other chats.
 		if count%5 == 0 {
-			messages = append(messages, &Message{
+			messages = append(messages, &common.Message{
 				ID:          strconv.Itoa(count + i),
 				LocalChatID: "other-chat",
 				ChatMessage: protobuf.ChatMessage{
@@ -132,7 +133,7 @@ func TestMessageByChatID(t *testing.T) {
 	outOfOrderCount := pageSize + 1
 	allCount := count + outOfOrderCount
 	for i := 0; i < pageSize+1; i++ {
-		messages = append(messages, &Message{
+		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(count*2 + i),
 			LocalChatID: chatID,
 			ChatMessage: protobuf.ChatMessage{
@@ -147,13 +148,13 @@ func TestMessageByChatID(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		result []*Message
+		result []*common.Message
 		cursor string
 		iter   int
 	)
 	for {
 		var (
-			items []*Message
+			items []*common.Message
 			err   error
 		)
 
@@ -183,7 +184,7 @@ func TestMessageReplies(t *testing.T) {
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
 	chatID := testPublicChatID
-	message1 := &Message{
+	message1 := &common.Message{
 		ID:          "id-1",
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{
@@ -192,7 +193,7 @@ func TestMessageReplies(t *testing.T) {
 		},
 		From: "1",
 	}
-	message2 := &Message{
+	message2 := &common.Message{
 		ID:          "id-2",
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{
@@ -204,7 +205,7 @@ func TestMessageReplies(t *testing.T) {
 		From: "2",
 	}
 
-	message3 := &Message{
+	message3 := &common.Message{
 		ID:          "id-3",
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{
@@ -215,7 +216,7 @@ func TestMessageReplies(t *testing.T) {
 		From: "3",
 	}
 
-	messages := []*Message{message1, message2, message3}
+	messages := []*common.Message{message1, message2, message3}
 
 	err = p.SaveMessages(messages)
 	require.NoError(t, err)
@@ -227,7 +228,7 @@ func TestMessageReplies(t *testing.T) {
 	require.Nil(t, retrievedMessages[0].QuotedMessage)
 
 	require.Equal(t, "id-1", retrievedMessages[1].ResponseTo)
-	require.Equal(t, &QuotedMessage{From: "1", Text: "content-1"}, retrievedMessages[1].QuotedMessage)
+	require.Equal(t, &common.QuotedMessage{From: "1", Text: "content-1"}, retrievedMessages[1].QuotedMessage)
 
 	require.Equal(t, "", retrievedMessages[2].ResponseTo)
 	require.Nil(t, retrievedMessages[2].QuotedMessage)
@@ -242,10 +243,10 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 	count := len(clockValues)
 	pageSize := 2
 
-	var messages []*Message
+	var messages []*common.Message
 
 	for i, clock := range clockValues {
-		messages = append(messages, &Message{
+		messages = append(messages, &common.Message{
 			ID:          strconv.Itoa(i),
 			LocalChatID: chatID,
 			ChatMessage: protobuf.ChatMessage{
@@ -259,13 +260,13 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		result []*Message
+		result []*common.Message
 		cursor string
 		iter   int
 	)
 	for {
 		var (
-			items []*Message
+			items []*common.Message
 			err   error
 		)
 
@@ -324,14 +325,14 @@ func TestDeleteMessagesByChatID(t *testing.T) {
 	err = insertMinimalMessage(p, "2")
 	require.NoError(t, err)
 
-	m, _, err := p.MessageByChatID("chat-id", "", 10)
+	m, _, err := p.MessageByChatID(testPublicChatID, "", 10)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(m))
 
-	err = p.DeleteMessagesByChatID("chat-id")
+	err = p.DeleteMessagesByChatID(testPublicChatID)
 	require.NoError(t, err)
 
-	m, _, err = p.MessageByChatID("chat-id", "", 10)
+	m, _, err = p.MessageByChatID(testPublicChatID, "", 10)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(m))
 
@@ -390,7 +391,7 @@ func TestPersistenceEmojiReactions(t *testing.T) {
 	from2 := "from-2"
 	from3 := "from-3"
 
-	chatID := "chat-id"
+	chatID := testPublicChatID
 
 	err = insertMinimalMessage(p, id1)
 	require.NoError(t, err)
@@ -487,9 +488,9 @@ func openTestDB() (*sql.DB, error) {
 }
 
 func insertMinimalMessage(p sqlitePersistence, id string) error {
-	return p.SaveMessages([]*Message{{
+	return p.SaveMessages([]*common.Message{{
 		ID:          id,
-		LocalChatID: "chat-id",
+		LocalChatID: testPublicChatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
 	}})
@@ -512,7 +513,7 @@ func TestMessagesAudioDurationMsNull(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 
-	m, _, err = p.MessageByChatID("chat-id", "", 10)
+	m, _, err = p.MessageByChatID(testPublicChatID, "", 10)
 	require.NoError(t, err)
 	require.Len(t, m, 1)
 }
@@ -523,7 +524,7 @@ func TestSaveChat(t *testing.T) {
 	p := sqlitePersistence{db: db}
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
-	chat.LastMessage = &Message{}
+	chat.LastMessage = &common.Message{}
 	err = p.SaveChat(chat)
 	require.NoError(t, err)
 
@@ -533,7 +534,7 @@ func TestSaveChat(t *testing.T) {
 }
 
 func TestSaveMentions(t *testing.T) {
-	chatID := "chat-id"
+	chatID := testPublicChatID
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
@@ -543,7 +544,7 @@ func TestSaveMentions(t *testing.T) {
 
 	pkString := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
 
-	message := Message{
+	message := common.Message{
 		ID:          "1",
 		LocalChatID: chatID,
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
@@ -551,7 +552,7 @@ func TestSaveMentions(t *testing.T) {
 		Mentions:    []string{pkString},
 	}
 
-	err = p.SaveMessages([]*Message{&message})
+	err = p.SaveMessages([]*common.Message{&message})
 	require.NoError(t, err)
 
 	retrievedMessages, _, err := p.MessageByChatID(chatID, "", 10)

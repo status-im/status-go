@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -288,9 +289,9 @@ func (s *MessengerSuite) TestInit() {
 	}
 }
 
-func buildTestMessage(chat Chat) *Message {
+func buildTestMessage(chat Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
-	message := &Message{}
+	message := &common.Message{}
 	message.Text = "text-input-message"
 	message.ChatId = chat.ID
 	message.Clock = clock
@@ -322,7 +323,7 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	inputMessage2.ID = "2"
 	inputMessage2.Seen = false
 
-	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
+	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
 	count, err := s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
@@ -346,7 +347,7 @@ func (s *MessengerSuite) TestMarkAllRead() {
 	inputMessage2.ID = "2"
 	inputMessage2.Seen = false
 
-	err = s.m.SaveMessages([]*Message{inputMessage1, inputMessage2})
+	err = s.m.SaveMessages([]*common.Message{inputMessage1, inputMessage2})
 	s.Require().NoError(err)
 
 	err = s.m.MarkAllRead(chat.ID)
@@ -374,7 +375,7 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
-	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_PUBLIC_GROUP, outputMessage.MessageType)
 
@@ -389,7 +390,7 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&recipientKey.PublicKey))
 	chat := CreateOneToOneChat(pkString, &recipientKey.PublicKey, s.m.transport)
 
-	inputMessage := &Message{}
+	inputMessage := &common.Message{}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(&chat)
@@ -405,7 +406,7 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
-	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_ONE_TO_ONE, outputMessage.MessageType)
 }
@@ -422,13 +423,13 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	_, err = s.m.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.NoError(err)
 
-	inputMessage := &Message{}
+	inputMessage := &common.Message{}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err = s.m.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
+	s.Require().NoError(err)
 	s.Require().Equal(1, len(response.Messages), "it returns the message")
 	outputMessage := response.Messages[0]
 
@@ -438,7 +439,7 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
-	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_PRIVATE_GROUP, outputMessage.MessageType)
 }
@@ -450,7 +451,7 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 
 	chat := response.Chats[0]
 
-	inputMessage := &Message{}
+	inputMessage := &common.Message{}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
 	err = s.m.SaveChat(chat)
@@ -466,7 +467,7 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
-	s.Require().Equal(outputMessage.OutgoingStatus, OutgoingStatusSending, "it marks the message as sending")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_PRIVATE_GROUP, outputMessage.MessageType)
 }
@@ -962,7 +963,7 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &Message{},
+		LastMessage:           &common.Message{},
 	}
 
 	s.Require().NoError(s.m.SaveChat(&chat))
@@ -987,7 +988,7 @@ func (s *MessengerSuite) TestDeleteChat() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &Message{},
+		LastMessage:           &common.Message{},
 	}
 
 	s.Require().NoError(s.m.SaveChat(&chat))
@@ -1010,7 +1011,7 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &Message{},
+		LastMessage:           &common.Message{},
 	}
 
 	s.Require().NoError(s.m.SaveChat(&chat))
@@ -1044,7 +1045,7 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &Message{},
+		LastMessage:           &common.Message{},
 	}
 	contact := Contact{
 		ID: testPK,
@@ -1133,7 +1134,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		LastClockValue:        20,
 		DeletedAtClockValue:   30,
 		UnviewedMessagesCount: 40,
-		LastMessage:           &Message{},
+		LastMessage:           &common.Message{},
 	}
 	s.Require().NoError(s.m.SaveChat(&chat))
 	savedChats := s.m.Chats()
@@ -1211,7 +1212,7 @@ func (s *MessengerSuite) TestBlockContact() {
 
 	contact.Name = "blocked"
 
-	messages := []*Message{
+	messages := []*common.Message{
 		{
 			ID:          "test-1",
 			LocalChatID: chat2.ID,
@@ -1479,7 +1480,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -1500,7 +1501,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
 
 	// We decline the request
 	response, err = theirMessenger.DeclineRequestAddressForTransaction(context.Background(), receiverMessage.ID)
@@ -1514,7 +1515,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().NotNil(senderMessage.CommandParameters)
 	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
-	s.Require().Equal(CommandStateRequestAddressForTransactionDeclined, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransactionDeclined, senderMessage.CommandParameters.CommandState)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
 
@@ -1535,7 +1536,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().NotNil(receiverMessage.CommandParameters)
 	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
-	s.Require().Equal(CommandStateRequestAddressForTransactionDeclined, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransactionDeclined, receiverMessage.CommandParameters.CommandState)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
 	s.Require().Equal(initialCommandID, receiverMessage.Replace)
 	s.Require().NoError(theirMessenger.Shutdown())
@@ -1574,7 +1575,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
-	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
 	s.Require().NotEmpty(senderMessage.ID)
 	s.Require().Equal("", senderMessage.Replace)
 
@@ -1638,7 +1639,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	s.Require().Equal(transactionHash, receiverMessage.CommandParameters.TransactionHash)
 	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
 	s.Require().Equal("", receiverMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
 	s.Require().Equal(senderMessage.ID, receiverMessage.ID)
 	s.Require().Equal("", receiverMessage.Replace)
 	s.Require().NoError(theirMessenger.Shutdown())
@@ -1677,7 +1678,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
-	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
 	s.Require().NotEmpty(senderMessage.ID)
 
 	var transactions []*TransactionToValidate
@@ -1741,7 +1742,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	s.Require().Equal(transactionHash, receiverMessage.CommandParameters.TransactionHash)
 	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
 	s.Require().Equal("", receiverMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
 	s.Require().Equal(senderMessage.ID, receiverMessage.ID)
 	s.Require().Equal(senderMessage.Replace, senderMessage.Replace)
 	s.Require().NoError(theirMessenger.Shutdown())
@@ -1775,7 +1776,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -1796,7 +1797,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransaction, receiverMessage.CommandParameters.CommandState)
 
 	// We accept the request
 	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
@@ -1810,7 +1811,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().NotNil(senderMessage.CommandParameters)
 	s.Require().Equal(value, senderMessage.CommandParameters.Value)
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
-	s.Require().Equal(CommandStateRequestAddressForTransactionAccepted, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransactionAccepted, senderMessage.CommandParameters.CommandState)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
 	s.Require().Equal("some-address", senderMessage.CommandParameters.Address)
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
@@ -1832,7 +1833,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().NotNil(receiverMessage.CommandParameters)
 	s.Require().Equal(value, receiverMessage.CommandParameters.Value)
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
-	s.Require().Equal(CommandStateRequestAddressForTransactionAccepted, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestAddressForTransactionAccepted, receiverMessage.CommandParameters.CommandState)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
 	s.Require().Equal("some-address", receiverMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, receiverMessage.Replace)
@@ -1868,7 +1869,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(receiverAddressString, senderMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -1890,7 +1891,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestTransaction, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestTransaction, receiverMessage.CommandParameters.CommandState)
 
 	response, err = theirMessenger.DeclineRequestTransaction(context.Background(), initialCommandID)
 	s.Require().NoError(err)
@@ -1904,7 +1905,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal("Transaction request declined", senderMessage.Text)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
-	s.Require().Equal(CommandStateRequestTransactionDeclined, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestTransactionDeclined, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -1924,7 +1925,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().Equal("Transaction request declined", receiverMessage.Text)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
 	s.Require().Equal(initialCommandID, receiverMessage.Replace)
-	s.Require().Equal(CommandStateRequestTransactionDeclined, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestTransactionDeclined, receiverMessage.CommandParameters.CommandState)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
@@ -1957,7 +1958,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().Equal(contract, senderMessage.CommandParameters.Contract)
 	s.Require().Equal(receiverAddressString, senderMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, senderMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestTransaction, senderMessage.CommandParameters.CommandState)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -1979,7 +1980,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().Equal(contract, receiverMessage.CommandParameters.Contract)
 	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
-	s.Require().Equal(CommandStateRequestTransaction, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateRequestTransaction, receiverMessage.CommandParameters.CommandState)
 
 	transactionHash := "0x412a851ac2ae51cad34a56c8a9cfee55d577ac5e1ac71cf488a2f2093a373799"
 	signature, err := buildSignature(theirMessenger.identity, &theirMessenger.identity.PublicKey, transactionHash)
@@ -2003,7 +2004,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().Equal(signature, senderMessage.CommandParameters.Signature)
 	s.Require().NotEmpty(senderMessage.ID)
 	s.Require().Equal(receiverMessage.ID, senderMessage.Replace)
-	s.Require().Equal(CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateTransactionSent, senderMessage.CommandParameters.CommandState)
 
 	var transactions []*TransactionToValidate
 	// Wait for the message to reach its destination
@@ -2068,7 +2069,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().Equal(receiverAddressString, receiverMessage.CommandParameters.Address)
 	s.Require().Equal(initialCommandID, receiverMessage.CommandParameters.ID)
 	s.Require().Equal(signature, receiverMessage.CommandParameters.Signature)
-	s.Require().Equal(CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
+	s.Require().Equal(common.CommandStateTransactionSent, receiverMessage.CommandParameters.CommandState)
 	s.Require().Equal(senderMessage.ID, receiverMessage.ID)
 	s.Require().Equal(senderMessage.Replace, senderMessage.Replace)
 	s.Require().NoError(theirMessenger.Shutdown())
@@ -2102,7 +2103,7 @@ func (m *mockSendMessagesRequest) SendMessagesRequest(peerID []byte, request typ
 }
 
 func (s *MessengerSuite) TestMessageJSON() {
-	message := &Message{
+	message := &common.Message{
 		ID:          "test-1",
 		LocalChatID: "local-chat-id",
 		Alias:       "alias",
@@ -2121,7 +2122,7 @@ func (s *MessengerSuite) TestMessageJSON() {
 	s.Require().NoError(err)
 	s.Require().Equal(expectedJSON, string(messageJSON))
 
-	decodedMessage := &Message{}
+	decodedMessage := &common.Message{}
 	err = json.Unmarshal([]byte(expectedJSON), decodedMessage)
 	s.Require().NoError(err)
 	s.Require().Equal(message, decodedMessage)
@@ -2186,14 +2187,14 @@ func (s *MessageHandlerSuite) TestRun() {
 		Name           string
 		Error          bool
 		Chat           Chat // Chat to create
-		Message        Message
+		Message        common.Message
 		SigPubKey      *ecdsa.PublicKey
 		ExpectedChatID string
 	}{
 		{
 			Name: "Public chat",
 			Chat: CreatePublicChat("test-chat", &testTimeSource{}),
-			Message: Message{
+			Message: common.Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
 					MessageType: protobuf.MessageType_PUBLIC_GROUP,
@@ -2205,7 +2206,7 @@ func (s *MessageHandlerSuite) TestRun() {
 		{
 			Name: "Private message from myself with existing chat",
 			Chat: CreateOneToOneChat("test-private-chat", &key1.PublicKey, &testTimeSource{}),
-			Message: Message{
+			Message: common.Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
 					MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -2217,7 +2218,7 @@ func (s *MessageHandlerSuite) TestRun() {
 		{
 			Name: "Private message from other with existing chat",
 			Chat: CreateOneToOneChat("test-private-chat", &key2.PublicKey, &testTimeSource{}),
-			Message: Message{
+			Message: common.Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
 					MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -2229,7 +2230,7 @@ func (s *MessageHandlerSuite) TestRun() {
 		},
 		{
 			Name: "Private message from myself without chat",
-			Message: Message{
+			Message: common.Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
 					MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -2241,7 +2242,7 @@ func (s *MessageHandlerSuite) TestRun() {
 		},
 		{
 			Name: "Private message from other without chat",
-			Message: Message{
+			Message: common.Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "test-chat",
 					MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -2258,7 +2259,7 @@ func (s *MessageHandlerSuite) TestRun() {
 		},
 		{
 			Name: "Private group message",
-			Message: Message{
+			Message: common.Message{
 				ChatMessage: protobuf.ChatMessage{
 					ChatId:      "non-existing-chat",
 					MessageType: protobuf.MessageType_PRIVATE_GROUP,

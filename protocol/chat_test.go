@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/status-im/status-go/protocol/common"
 )
 
 type ChatTestSuite struct {
@@ -75,7 +77,7 @@ func (s *ChatTestSuite) TestValidateChat() {
 func (s *ChatTestSuite) TestUpdateFromMessage() {
 
 	// Base case, clock is higher
-	message := &Message{}
+	message := &common.Message{}
 	chat := &Chat{}
 
 	message.Clock = 1
@@ -84,7 +86,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(1), chat.LastClockValue)
 
 	// Clock is lower and lastMessage is not nil
-	message = &Message{}
+	message = &common.Message{}
 	lastMessage := message
 	chat = &Chat{LastClockValue: 2, LastMessage: lastMessage}
 
@@ -94,7 +96,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(2), chat.LastClockValue)
 
 	// Clock is lower and lastMessage is nil
-	message = &Message{}
+	message = &common.Message{}
 	chat = &Chat{LastClockValue: 2}
 
 	message.Clock = 1
@@ -103,7 +105,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(2), chat.LastClockValue)
 
 	// Clock is higher but lastMessage has lower clock message then the receiving one
-	message = &Message{}
+	message = &common.Message{}
 	chat = &Chat{LastClockValue: 2}
 
 	message.Clock = 1
@@ -112,7 +114,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 	s.Require().Equal(uint64(2), chat.LastClockValue)
 
 	chat.LastClockValue = 4
-	message = &Message{}
+	message = &common.Message{}
 	message.Clock = 3
 	s.Require().NoError(chat.UpdateFromMessage(message, &testTimeSource{}))
 	s.Require().Equal(chat.LastMessage, message)
@@ -122,7 +124,7 @@ func (s *ChatTestSuite) TestUpdateFromMessage() {
 
 func (s *ChatTestSuite) TestSerializeJSON() {
 
-	message := &Message{}
+	message := &common.Message{}
 	chat := &Chat{}
 
 	message.Clock = 1

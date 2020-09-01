@@ -14,6 +14,7 @@ import (
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/tt"
 )
 
@@ -105,7 +106,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 		Transaction              coretypes.Message
 		OverrideSignatureChatKey *ecdsa.PublicKey
 		OverrideTransactionHash  string
-		Parameters               *CommandParameters
+		Parameters               *common.CommandParameters
 		WalletKey                *ecdsa.PrivateKey
 		From                     *ecdsa.PublicKey
 	}{
@@ -123,7 +124,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value: "23",
 			},
 			WalletKey: senderWalletKey,
@@ -143,7 +144,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value:   "23",
 				Address: strings.ToLower(myAddress1.Hex()),
 			},
@@ -162,7 +163,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value:   "23",
 				Address: strings.ToLower(myAddress1.Hex()),
 			},
@@ -182,7 +183,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value:   "23",
 				Address: strings.ToLower(myAddress1.Hex()),
 			},
@@ -202,7 +203,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				false,
 			),
 			OverrideTransactionHash: "0xdd9202df5e2f3611b5b6b716aef2a3543cc0bdd7506f50926e0869b83c8383b9",
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value: "23",
 			},
 			WalletKey: senderWalletKey,
@@ -221,7 +222,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value:   "23",
 				Address: strings.ToLower(myAddress2.Hex()),
 			},
@@ -240,7 +241,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value: "23",
 			},
 			WalletKey: senderWalletKey,
@@ -259,7 +260,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				nil,
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Value: "23",
 			},
 			WalletKey: senderWalletKey,
@@ -279,7 +280,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(transferFunction, myAddress1, big.NewInt(int64(23))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Value:    "23",
 			},
@@ -300,7 +301,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(transferFunction, myAddress1, big.NewInt(int64(23))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Address:  strings.ToLower(myAddress1.Hex()),
 				Value:    "23",
@@ -322,7 +323,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(transferFunction, myAddress1, big.NewInt(int64(13))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Value:    "23",
 			},
@@ -341,7 +342,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(transferFunction, myAddress1, big.NewInt(int64(23))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Address:  strings.ToLower(myAddress1.Hex()),
 				Value:    "23",
@@ -362,7 +363,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(transferFunction, myAddress1, big.NewInt(int64(23))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Address:  strings.ToLower(senderAddress.Hex()),
 				Value:    "23",
@@ -383,7 +384,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(transferFunction, myAddress2, big.NewInt(int64(23))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Address:  strings.ToLower(myAddress1.Hex()),
 				Value:    "23",
@@ -403,7 +404,7 @@ func (s *TransactionValidatorSuite) TestValidateTransactions() {
 				buildData(notTransferFunction, myAddress1, big.NewInt(int64(23))),
 				false,
 			),
-			Parameters: &CommandParameters{
+			Parameters: &common.CommandParameters{
 				Contract: contractString,
 				Value:    "23",
 			},

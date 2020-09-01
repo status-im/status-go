@@ -4,6 +4,7 @@ package shhext
 
 import (
 	"context"
+	"github.com/status-im/status-go/protocol/common"
 
 	"github.com/ethereum/go-ethereum/log"
 
@@ -465,8 +466,8 @@ func (api *NimbusPublicAPI) VerifyENSNames(details []enstypes.ENSDetails) (map[s
 }
 
 type ApplicationMessagesResponse struct {
-	Messages []*protocol.Message `json:"messages"`
-	Cursor   string              `json:"cursor"`
+	Messages []*common.Message `json:"messages"`
+	Cursor   string            `json:"cursor"`
 }
 
 func (api *NimbusPublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
@@ -501,7 +502,7 @@ func (api *PublicAPI) StartMessenger() error {
 	return api.service.StartMessenger()
 }
 
-func (api *NimbusPublicAPI) SendChatMessage(ctx context.Context, message *protocol.Message) (*protocol.MessengerResponse, error) {
+func (api *NimbusPublicAPI) SendChatMessage(ctx context.Context, message *common.Message) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendChatMessage(ctx, message)
 }
 

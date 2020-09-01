@@ -5,11 +5,12 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
-func extendMessageFromChat(message *Message, chat *Chat, key *ecdsa.PublicKey, timesource TimeSource) error {
+func extendMessageFromChat(message *common.Message, chat *Chat, key *ecdsa.PublicKey, timesource TimeSource) error {
 	clock, timestamp := chat.NextClockAndTimestamp(timesource)
 
 	message.LocalChatID = chat.ID
@@ -19,7 +20,7 @@ func extendMessageFromChat(message *Message, chat *Chat, key *ecdsa.PublicKey, t
 	message.SigPubKey = key
 	message.WhisperTimestamp = timestamp
 	message.Seen = true
-	message.OutgoingStatus = OutgoingStatusSending
+	message.OutgoingStatus = common.OutgoingStatusSending
 
 	identicon, err := identicon.GenerateBase64(message.From)
 	if err != nil {

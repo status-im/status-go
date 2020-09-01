@@ -176,6 +176,10 @@ type Client struct {
 	registrationSubscriptions []chan struct{}
 }
 
+type MessagePersistence interface {
+	MessageByID(string) (*common.Message, error)
+}
+
 func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
 	return &Client{
 		quit:             make(chan struct{}),
