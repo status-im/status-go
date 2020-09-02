@@ -325,11 +325,13 @@ func (p *MessageProcessor) SendPublic(
 	}
 
 	var newMessage *types.NewMessage
+
+	messageSpec, err := p.protocol.BuildPublicMessage(p.identity, wrappedMessage)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
+	}
+
 	if !rawMessage.SkipEncryption {
-		messageSpec, err := p.protocol.BuildPublicMessage(p.identity, wrappedMessage)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to wrap a public message in the encryption layer")
-		}
 		newMessage, err = MessageSpecToWhisper(messageSpec)
 		if err != nil {
 			return nil, err
@@ -353,6 +355,13 @@ func (p *MessageProcessor) SendPublic(
 	if err != nil {
 		return nil, err
 	}
+
+	sentMessage := &SentMessage{
+		Spec:       messageSpec,
+		MessageIDs: [][]byte{messageID},
+	}
+
+	p.notifyOnSentMessage(sentMessage)
 
 	p.transport.Track([][]byte{messageID}, hash, newMessage)
 

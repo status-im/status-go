@@ -227,7 +227,7 @@ func NewMessenger(
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
-	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor)
+	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor, &sqlitePersistence{db: database})
 
 	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database})
 
@@ -1490,8 +1490,7 @@ func (m *Messenger) reregisterForPushNotifications() error {
 		return nil
 	}
 
-	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	return m.pushNotificationClient.Reregister(contactIDs, mutedChatIDs)
+	return m.pushNotificationClient.Reregister(m.pushNotificationOptions())
 }
 
 func (m *Messenger) SaveContact(contact *Contact) error {
@@ -1758,7 +1757,7 @@ func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message
 
 	id, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:          chat.ID,
-		SendPushNotification: m.featureFlags.PushNotifications && !chat.Public(),
+		SendPushNotification: m.featureFlags.PushNotifications,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		ResendAutomatically:  true,
@@ -3488,7 +3487,7 @@ func (m *Messenger) EnableSendingPushNotifications() error {
 	return nil
 }
 
-func (m *Messenger) addedContactsAndMutedChatIDs() ([]*ecdsa.PublicKey, []string) {
+func (m *Messenger) pushNotificationOptions() *pushnotificationclient.RegistrationOptions {
 	var contactIDs []*ecdsa.PublicKey
 	var mutedChatIDs []string
 
@@ -3510,7 +3509,10 @@ func (m *Messenger) addedContactsAndMutedChatIDs() ([]*ecdsa.PublicKey, []string
 		}
 
 	}
-	return contactIDs, mutedChatIDs
+	return &pushnotificationclient.RegistrationOptions{
+		ContactIDs:   contactIDs,
+		MutedChatIDs: mutedChatIDs,
+	}
 }
 
 // RegisterForPushNotification register deviceToken with any push notification server enabled
@@ -3521,8 +3523,7 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	err := m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, contactIDs, mutedChatIDs)
+	err := m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, m.pushNotificationOptions())
 	if err != nil {
 		m.logger.Error("failed to register for push notifications", zap.Error(err))
 		return err
@@ -3546,8 +3547,7 @@ func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
+	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
 
 // DisablePushNotificationsFromContactsOnly is used to indicate that we want to received push notifications from anyone
@@ -3558,8 +3558,7 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	contactIDs, mutedChatIDs := m.addedContactsAndMutedChatIDs()
-	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(contactIDs, mutedChatIDs)
+	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
 
 // GetPushNotificationsServers returns the servers used for push notifications
