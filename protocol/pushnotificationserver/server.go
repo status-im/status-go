@@ -365,7 +365,7 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 			InstallationId: pn.InstallationId,
 		}
 
-		if pn.Type != protobuf.PushNotification_MESSAGE {
+		if pn.Type == protobuf.PushNotification_UNKNOWN_PUSH_NOTIFICATION_TYPE {
 			s.config.Logger.Warn("unhandled type")
 			continue
 		}
