@@ -363,12 +363,14 @@ func (s *Server) buildPushNotificationRequestResponse(request *protobuf.PushNoti
 	// collect successful requests & registrations
 	var requestAndRegistrations []*RequestAndRegistration
 
+	// TODO: this logic needs to be extracted and tested
 	for _, pn := range request.Requests {
 		registration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(pn.PublicKey, pn.InstallationId)
 		report := &protobuf.PushNotificationReport{
 			PublicKey:      pn.PublicKey,
 			InstallationId: pn.InstallationId,
 		}
+		s.config.Logger.Info("registration and request", zap.Any("registration", registration), zap.Any("request", pn))
 
 		if pn.Type == protobuf.PushNotification_UNKNOWN_PUSH_NOTIFICATION_TYPE {
 			s.config.Logger.Warn("unhandled type")
@@ -382,14 +384,17 @@ func (s *Server) buildPushNotificationRequestResponse(request *protobuf.PushNoti
 			s.config.Logger.Warn("empty registration")
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
+			s.config.Logger.Debug("invalid token")
 			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
-		} else if s.contains(registration.BlockedChatList, pn.ChatId) || !s.isValidMentionNotification(pn, registration) {
+		} else if s.contains(registration.BlockedChatList, pn.ChatId) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) {
 			// We report as successful but don't send the notification
 			// for privacy reasons, as otherwise we would disclose that
 			// the sending client has been blocked or that the registering
 			// client has not joined a given public chat
 			report.Success = true
+			s.config.Logger.Debug("invalid token", zap.Bool("blocked", s.contains(registration.BlockedChatList, pn.ChatId)), zap.Bool("mention", (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration))))
 		} else {
+			s.config.Logger.Debug("sending push notification")
 			// For now we just assume that the notification will be successful
 			requestAndRegistrations = append(requestAndRegistrations, &RequestAndRegistration{
 				Request:      pn,
@@ -474,6 +479,10 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	return response
 }
 
+func (s *Server) isMentionNotification(pn *protobuf.PushNotification) bool {
+	return pn.Type == protobuf.PushNotification_MENTION
+}
+
 func (s *Server) isValidMentionNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
-	return !registration.BlockMentions && pn.Type == protobuf.PushNotification_MENTION && s.contains(registration.AllowedMentionsChatList, pn.ChatId)
+	return s.isMentionNotification(pn) && !registration.BlockMentions && s.contains(registration.AllowedMentionsChatList, pn.ChatId)
 }

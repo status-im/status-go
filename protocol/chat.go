@@ -115,6 +115,16 @@ func (c *Chat) MembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
 	return stringSliceToPublicKeys(publicKeys, true)
 }
 
+func (c *Chat) JoinedMembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
+	var publicKeys []string
+	for _, item := range c.Members {
+		if item.Joined {
+			publicKeys = append(publicKeys, item.ID)
+		}
+	}
+	return stringSliceToPublicKeys(publicKeys, true)
+}
+
 func (c *Chat) HasMember(memberID string) bool {
 	for _, member := range c.Members {
 		if memberID == member.ID {
