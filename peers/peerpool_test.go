@@ -30,50 +30,21 @@ import (
 	"github.com/status-im/status-go/whisper/v6"
 )
 
-// GetFreePort asks the kernel for a free open port that is ready to use.
-func getFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		return 0, err
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
-}
-
 type PeerPoolSimulationSuite struct {
 	suite.Suite
 
 	bootnode         *p2p.Server
 	peers            []*p2p.Server
 	discovery        []discovery.Discovery
-	port             uint16
 	rendezvousServer *server.Server
 }
 
 func TestPeerPoolSimulationSuite(t *testing.T) {
 	s := &PeerPoolSimulationSuite{}
-	port, err := getFreePort()
-	if err != nil {
-		panic(err)
-	}
-	s.port = uint16(port)
-
 	suite.Run(t, s)
 }
 
-func (s *PeerPoolSimulationSuite) nextPort() uint16 {
-	port, err := getFreePort()
-	s.Require().NoError(err)
-	return uint16(port)
-}
-
 func (s *PeerPoolSimulationSuite) SetupTest() {
-	bootnodePort := s.nextPort()
 	key, _ := crypto.GenerateKey()
 	name := common.MakeName("bootnode", "1.0")
 	// 127.0.0.1 is invalidated by discovery v5
@@ -81,13 +52,14 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 		Config: p2p.Config{
 			MaxPeers:    10,
 			Name:        name,
-			ListenAddr:  fmt.Sprintf("0.0.0.0:%d", bootnodePort),
+			ListenAddr:  ":0",
 			PrivateKey:  key,
 			DiscoveryV5: true,
 			NoDiscovery: true,
 		},
 	}
 	s.Require().NoError(s.bootnode.Start())
+	bootnodePort := uint16(s.bootnode.NodeInfo().Ports.Listener)
 	bootnodeV5 := discv5.NewNode(s.bootnode.DiscV5.Self().ID, net.ParseIP("127.0.0.1"), bootnodePort, bootnodePort)
 
 	// 1 peer to initiate connection, 1 peer as a first candidate, 1 peer - for failover
@@ -100,7 +72,7 @@ func (s *PeerPoolSimulationSuite) SetupTest() {
 			Config: p2p.Config{
 				MaxPeers:         10,
 				Name:             common.MakeName("peer-"+strconv.Itoa(i), "1.0"),
-				ListenAddr:       fmt.Sprintf("0.0.0.0:%d", s.nextPort()),
+				ListenAddr:       ":0",
 				PrivateKey:       key,
 				NoDiscovery:      true,
 				BootstrapNodesV5: []*discv5.Node{bootnodeV5},

@@ -3592,6 +3592,28 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
 
+// EnablePushNotificationsBlockMentions is used to indicate that we dont want to received push notifications for mentions
+func (m *Messenger) EnablePushNotificationsBlockMentions() error {
+	if m.pushNotificationClient == nil {
+		return errors.New("no push notification client")
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.pushNotificationClient.EnablePushNotificationsBlockMentions(m.pushNotificationOptions())
+}
+
+// DisablePushNotificationsBlockMentions is used to indicate that we want to received push notifications for mentions
+func (m *Messenger) DisablePushNotificationsBlockMentions() error {
+	if m.pushNotificationClient == nil {
+		return errors.New("no push notification client")
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.pushNotificationClient.DisablePushNotificationsBlockMentions(m.pushNotificationOptions())
+}
+
 // GetPushNotificationsServers returns the servers used for push notifications
 func (m *Messenger) GetPushNotificationsServers() ([]*pushnotificationclient.PushNotificationServer, error) {
 	if m.pushNotificationClient == nil {
