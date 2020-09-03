@@ -582,3 +582,91 @@ func (s *ServerSuite) TestbuildPushNotificationQueryResponseWithFiltering() {
 	s.Require().Equal(s.installationID, queryResponse.Info[0].InstallationId)
 	s.Require().Equal(allowedKeyList, queryResponse.Info[0].AllowedKeyList)
 }
+
+func (s *ServerSuite) TestPushNotificationMentions() {
+	existingChatID := []byte("existing-chat-id")
+	nonExistingChatID := []byte("non-existing-chat-id")
+	registration := &protobuf.PushNotificationRegistration{
+		DeviceToken:             "abc",
+		AccessToken:             s.accessToken,
+		Grant:                   s.grant,
+		TokenType:               protobuf.PushNotificationRegistration_APN_TOKEN,
+		InstallationId:          s.installationID,
+		AllowedMentionsChatList: [][]byte{existingChatID},
+		Version:                 1,
+	}
+	payload, err := proto.Marshal(registration)
+	s.Require().NoError(err)
+
+	cyphertext, err := common.Encrypt(payload, s.sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response := s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().True(response.Success)
+
+	pushNotificationRequest := &protobuf.PushNotificationRequest{
+		MessageId: []byte("message-id"),
+		Requests: []*protobuf.PushNotification{
+			{
+				AccessToken:    s.accessToken,
+				PublicKey:      common.HashPublicKey(&s.key.PublicKey),
+				ChatId:         existingChatID,
+				InstallationId: s.installationID,
+				Type:           protobuf.PushNotification_MENTION,
+			},
+			{
+				AccessToken:    s.accessToken,
+				PublicKey:      common.HashPublicKey(&s.key.PublicKey),
+				ChatId:         nonExistingChatID,
+				InstallationId: s.installationID,
+				Type:           protobuf.PushNotification_MENTION,
+			},
+		},
+	}
+
+	pushNotificationResponse, requestAndRegistrations := s.server.buildPushNotificationRequestResponse(pushNotificationRequest)
+	s.Require().NotNil(pushNotificationResponse)
+	s.Require().NotNil(requestAndRegistrations)
+
+	// only one should succeed
+	s.Require().Len(requestAndRegistrations, 1)
+}
+
+func (s *ServerSuite) TestPushNotificationDisabledMentions() {
+	existingChatID := []byte("existing-chat-id")
+	registration := &protobuf.PushNotificationRegistration{
+		DeviceToken:             "abc",
+		AccessToken:             s.accessToken,
+		Grant:                   s.grant,
+		TokenType:               protobuf.PushNotificationRegistration_APN_TOKEN,
+		BlockMentions:           true,
+		InstallationId:          s.installationID,
+		AllowedMentionsChatList: [][]byte{existingChatID},
+		Version:                 1,
+	}
+	payload, err := proto.Marshal(registration)
+	s.Require().NoError(err)
+
+	cyphertext, err := common.Encrypt(payload, s.sharedKey, rand.Reader)
+	s.Require().NoError(err)
+	response := s.server.buildPushNotificationRegistrationResponse(&s.key.PublicKey, cyphertext)
+	s.Require().NotNil(response)
+	s.Require().True(response.Success)
+
+	pushNotificationRequest := &protobuf.PushNotificationRequest{
+		MessageId: []byte("message-id"),
+		Requests: []*protobuf.PushNotification{
+			{
+				AccessToken:    s.accessToken,
+				PublicKey:      common.HashPublicKey(&s.key.PublicKey),
+				ChatId:         existingChatID,
+				InstallationId: s.installationID,
+				Type:           protobuf.PushNotification_MENTION,
+			},
+		},
+	}
+
+	pushNotificationResponse, requestAndRegistrations := s.server.buildPushNotificationRequestResponse(pushNotificationRequest)
+	s.Require().NotNil(pushNotificationResponse)
+	s.Require().Nil(requestAndRegistrations)
+}
