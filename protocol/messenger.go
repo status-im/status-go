@@ -1663,9 +1663,18 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 	case ChatTypePrivateGroupChat:
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))
 		if spec.Recipients == nil {
-			spec.Recipients, err = chat.MembersAsPublicKeys()
-			if err != nil {
-				return nil, err
+			// Chat messages are only dispatched to users who joined
+			if spec.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+				spec.Recipients, err = chat.JoinedMembersAsPublicKeys()
+				if err != nil {
+					return nil, err
+				}
+
+			} else {
+				spec.Recipients, err = chat.MembersAsPublicKeys()
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 		hasPairedDevices := m.hasPairedDevices()
@@ -3519,7 +3528,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var publicChatIDs []string
 
 	for _, contact := range m.allContacts {
-		if contact.IsAdded() {
+		if contact.IsAdded() && !contact.IsBlocked() {
 			pk, err := contact.PublicKey()
 			if err != nil {
 				m.logger.Warn("could not parse contact public key")
