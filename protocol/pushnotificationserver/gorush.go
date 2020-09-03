@@ -12,7 +12,8 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-const defaultNotificationMessage = "You have a new message"
+const defaultNewMessageNotificationText = "You have a new message"
+const defaultMentionNotificationText = "Someone mentioned you"
 
 type GoRushRequestData struct {
 	EncryptedMessage string `json:"encryptedMessage"`
@@ -52,11 +53,17 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 	for _, requestAndRegistration := range requestAndRegistrations {
 		request := requestAndRegistration.Request
 		registration := requestAndRegistration.Registration
+		var text string
+		if request.Type == protobuf.PushNotification_MESSAGE {
+			text = defaultNewMessageNotificationText
+		} else {
+			text = defaultMentionNotificationText
+		}
 		goRushRequests.Notifications = append(goRushRequests.Notifications,
 			&GoRushRequestNotification{
 				Tokens:   []string{registration.DeviceToken},
 				Platform: tokenTypeToGoRushPlatform(registration.TokenType),
-				Message:  defaultNotificationMessage,
+				Message:  text,
 				Topic:    registration.ApnTopic,
 				Data: &GoRushRequestData{
 					EncryptedMessage: types.EncodeHex(request.Message),

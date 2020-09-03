@@ -33,6 +33,7 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 		{
 			Request: &protobuf.PushNotification{
 				ChatId:         chatID,
+				Type:           protobuf.PushNotification_MESSAGE,
 				PublicKey:      publicKey1,
 				InstallationId: installationID1,
 				Message:        message1,
@@ -45,6 +46,7 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 		{
 			Request: &protobuf.PushNotification{
 				ChatId:         chatID,
+				Type:           protobuf.PushNotification_MESSAGE,
 				PublicKey:      publicKey1,
 				InstallationId: installationID2,
 				Message:        message2,
@@ -57,6 +59,7 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 		{
 			Request: &protobuf.PushNotification{
 				ChatId:         chatID,
+				Type:           protobuf.PushNotification_MENTION,
 				PublicKey:      publicKey2,
 				InstallationId: installationID3,
 				Message:        message3,
@@ -73,7 +76,7 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 			{
 				Tokens:   []string{token1},
 				Platform: platform1,
-				Message:  defaultNotificationMessage,
+				Message:  defaultNewMessageNotificationText,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage1,
 					ChatID:           types.EncodeHex(chatID),
@@ -83,7 +86,7 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 			{
 				Tokens:   []string{token2},
 				Platform: platform2,
-				Message:  defaultNotificationMessage,
+				Message:  defaultNewMessageNotificationText,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage2,
 					ChatID:           types.EncodeHex(chatID),
@@ -93,7 +96,7 @@ func TestPushNotificationRegistrationToGoRushRequest(t *testing.T) {
 			{
 				Tokens:   []string{token3},
 				Platform: platform3,
-				Message:  defaultNotificationMessage,
+				Message:  defaultMentionNotificationText,
 				Data: &GoRushRequestData{
 					EncryptedMessage: hexMessage3,
 					ChatID:           types.EncodeHex(chatID),
