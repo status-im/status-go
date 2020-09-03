@@ -506,6 +506,22 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 	return api.service.messenger.DisablePushNotificationsFromContactsOnly()
 }
 
+func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", true)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.EnablePushNotificationsBlockMentions()
+}
+
+func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", false)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DisablePushNotificationsBlockMentions()
+}
+
 func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyBytes types.HexBytes) error {
 	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	if err != nil {

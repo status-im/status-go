@@ -627,6 +627,26 @@ func (c *Client) DisablePushNotificationsFromContactsOnly(options *RegistrationO
 	return nil
 }
 
+func (c *Client) EnablePushNotificationsBlockMentions(options *RegistrationOptions) error {
+	c.config.Logger.Debug("disabling push notifications for mentions")
+	c.config.BlockMentions = true
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Debug("re-registering after disabling push notifications for mentions")
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
+	}
+	return nil
+}
+
+func (c *Client) DisablePushNotificationsBlockMentions(options *RegistrationOptions) error {
+	c.config.Logger.Debug("enabling push notifications for mentions")
+	c.config.BlockMentions = false
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Debug("re-registering after enabling push notifications for mentions")
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
+	}
+	return nil
+}
+
 func encryptAccessToken(plaintext []byte, key []byte, reader io.Reader) ([]byte, error) {
 	c, err := aes.NewCipher(key)
 	if err != nil {
