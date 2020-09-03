@@ -383,10 +383,13 @@ func (s *Server) buildPushNotificationRequestResponse(request *protobuf.PushNoti
 			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
 		} else if registration.AccessToken != pn.AccessToken {
 			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
-		} else if s.contains(registration.BlockedChatList, pn.ChatId) {
+		} else if s.contains(registration.BlockedChatList, pn.ChatId) || !s.isValidMentionNotification(pn, registration) {
 			// We report as successful but don't send the notification
+			// for privacy reasons, as otherwise we would disclose that
+			// the sending client has been blocked or that the registering
+			// client has not joined a given public chat
 			report.Success = true
-		} else if s.isMessageNotification(pn) || s.isValidMentionNotification(pn, registration) {
+		} else {
 			// For now we just assume that the notification will be successful
 			requestAndRegistrations = append(requestAndRegistrations, &RequestAndRegistration{
 				Request:      pn,
@@ -469,10 +472,6 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	s.config.Logger.Info("handled push notification registration successfully")
 
 	return response
-}
-
-func (s *Server) isMessageNotification(pn *protobuf.PushNotification) bool {
-	return pn.Type == protobuf.PushNotification_MESSAGE
 }
 
 func (s *Server) isValidMentionNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {

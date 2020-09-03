@@ -1358,7 +1358,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 }
 
 func (m *Messenger) saveChat(chat *Chat) error {
-	_, ok := m.allChats[chat.ID]
+	previousChat, ok := m.allChats[chat.ID]
 	if chat.OneToOne() {
 		name, identicon, err := generateAliasAndIdenticon(chat.ID)
 		if err != nil {
@@ -1370,9 +1370,19 @@ func (m *Messenger) saveChat(chat *Chat) error {
 	}
 	// Sync chat if it's a new active public chat
 	if !ok && chat.Active && chat.Public() {
+
 		if err := m.syncPublicChat(context.Background(), chat); err != nil {
 			return err
 		}
+	}
+
+	// We check if it's a new chat, or chat.Active has changed
+	if chat.Public() && (!ok && chat.Active) || (ok && chat.Active != previousChat.Active) {
+		// Re-register for push notifications, as we want to receive mentions
+		if err := m.reregisterForPushNotifications(); err != nil {
+			return err
+		}
+
 	}
 
 	err := m.persistence.SaveChat(*chat)
@@ -1424,7 +1434,12 @@ func (m *Messenger) DeleteChat(chatID string) error {
 	if err != nil {
 		return err
 	}
-	delete(m.allChats, chatID)
+	chat, ok := m.allChats[chatID]
+
+	if ok && chat.Active && chat.Public() {
+		delete(m.allChats, chatID)
+		return m.reregisterForPushNotifications()
+	}
 
 	return nil
 }
@@ -2250,10 +2265,21 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
 						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
-						err = m.handler.HandleSyncInstallationPublicChat(messageState, p)
+						added, err := m.handler.HandleSyncInstallationPublicChat(messageState, p)
 						if err != nil {
 							logger.Warn("failed to handle SyncInstallationPublicChat", zap.Error(err))
 							continue
+						}
+
+						// We re-register as we want to receive mentions from the newly joined public chat
+						if added {
+							logger.Debug("newly synced public chat, re-registering for push notifications")
+							err := m.reregisterForPushNotifications()
+							if err != nil {
+
+								logger.Warn("could not re-register for push notifications", zap.Error(err))
+								continue
+							}
 						}
 
 					case protobuf.RequestAddressForTransaction:
@@ -3490,6 +3516,7 @@ func (m *Messenger) EnableSendingPushNotifications() error {
 func (m *Messenger) pushNotificationOptions() *pushnotificationclient.RegistrationOptions {
 	var contactIDs []*ecdsa.PublicKey
 	var mutedChatIDs []string
+	var publicChatIDs []string
 
 	for _, contact := range m.allContacts {
 		if contact.IsAdded() {
@@ -3507,11 +3534,15 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 		if chat.Muted {
 			mutedChatIDs = append(mutedChatIDs, chat.ID)
 		}
+		if chat.Active && chat.Public() {
+			publicChatIDs = append(publicChatIDs, chat.ID)
+		}
 
 	}
 	return &pushnotificationclient.RegistrationOptions{
-		ContactIDs:   contactIDs,
-		MutedChatIDs: mutedChatIDs,
+		ContactIDs:    contactIDs,
+		MutedChatIDs:  mutedChatIDs,
+		PublicChatIDs: publicChatIDs,
 	}
 }
 
