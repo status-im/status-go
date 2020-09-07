@@ -335,9 +335,7 @@ func init() {
 	proto.RegisterType((*SyncInstallation)(nil), "protobuf.SyncInstallation")
 }
 
-func init() {
-	proto.RegisterFile("pairing.proto", fileDescriptor_d61ab7221f0b5518)
-}
+func init() { proto.RegisterFile("pairing.proto", fileDescriptor_d61ab7221f0b5518) }
 
 var fileDescriptor_d61ab7221f0b5518 = []byte{
 	// 397 bytes of a gzipped FileDescriptorProto

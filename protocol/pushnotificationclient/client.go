@@ -49,7 +49,7 @@ const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
 const staleQueryTimeInSeconds = 86400
 const mentionInstallationID = "mention"
-const oneToOneChatIDLength = 65
+const oneToOneChatIDLength = 132
 
 // maxRegistrationRetries is the maximum number of attempts we do before giving up registering with a server
 const maxRegistrationRetries int64 = 12
@@ -210,8 +210,6 @@ func (c *Client) Start() error {
 	if c.messageProcessor == nil {
 		return errors.New("can't start, missing message processor")
 	}
-
-	c.config.Logger.Debug("starting push notification client", zap.Any("config", c.config))
 
 	err := c.loadLastPushNotificationRegistration()
 	if err != nil {
@@ -996,7 +994,7 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 	// If it's a public key, we use our own public key as chatID, which correspond to the chatID used by the other peer
 	// otherwise we use the group chat ID
 	var chatID string
-	if len(chatID) == oneToOneChatIDLength {
+	if len(message.ChatId) == oneToOneChatIDLength {
 		chatID = types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey))
 	} else {
 		// this is a group chat
@@ -1350,6 +1348,7 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 				// For now we set the ChatID to our own identity key, this will work fine for blocked users
 				// and muted 1-to-1 chats, but not for group chats.
 				ChatId:         common.Shake256([]byte(chatID)),
+				Author:         common.Shake256([]byte(types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey)))),
 				AccessToken:    i.AccessToken,
 				PublicKey:      common.HashPublicKey(publicKey),
 				InstallationId: i.InstallationID,

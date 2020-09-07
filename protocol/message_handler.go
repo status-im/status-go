@@ -248,11 +248,11 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 	return nil
 }
 
-func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) (bool, error) {
+func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) bool {
 	chatID := message.Id
 	_, ok := state.AllChats[chatID]
 	if ok {
-		return false, nil
+		return false
 	}
 
 	chat := CreatePublicChat(chatID, state.Timesource)
@@ -260,7 +260,7 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 	state.AllChats[chat.ID] = &chat
 	state.ModifiedChats[chat.ID] = true
 
-	return true, nil
+	return true
 }
 
 func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {

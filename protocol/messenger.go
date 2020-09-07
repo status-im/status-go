@@ -2274,11 +2274,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
 						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
-						added, err := m.handler.HandleSyncInstallationPublicChat(messageState, p)
-						if err != nil {
-							logger.Warn("failed to handle SyncInstallationPublicChat", zap.Error(err))
-							continue
-						}
+						added := m.handler.HandleSyncInstallationPublicChat(messageState, p)
 
 						// We re-register as we want to receive mentions from the newly joined public chat
 						if added {
