@@ -74,6 +74,7 @@ message PushNotification {
     MESSAGE = 1;
     MENTION = 2;
   }
+  bytes author = 7;
 }
 
 message PushNotificationRequest {

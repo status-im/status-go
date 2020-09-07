@@ -302,6 +302,7 @@ func (m *Message) parseAudio() error {
 	return nil
 }
 
+// implement interface of https://github.com/status-im/markdown/blob/b9fe921681227b1dace4b56364e15edb3b698308/ast/node.go#L701
 type MentionNodeVisitor struct {
 	mentions []string
 }
