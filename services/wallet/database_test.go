@@ -204,3 +204,53 @@ func TestCustomTokens(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 }
+
+func TestPendingTransactions(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	trx := PendingTransaction{
+		TransactionHash: common.Hash{1},
+		BlockNumber:     big.NewInt(1),
+		Address:         common.Address{1},
+		Type:            RegisterENS,
+		Data:            "someuser.stateofus.eth",
+	}
+
+	rst, err := db.GetPendingTransactions()
+	require.NoError(t, err)
+	require.Nil(t, rst)
+
+	rst, err = db.GetPendingTransactionsByAddress(trx.Address)
+	require.NoError(t, err)
+	require.Nil(t, rst)
+
+	err = db.StorePendingTransaction(trx)
+	require.NoError(t, err)
+
+	rst, err = db.GetPendingTransactionsByAddress(trx.Address)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rst))
+	require.Equal(t, trx, *rst[0])
+
+	rst, err = db.GetPendingTransactions()
+	require.NoError(t, err)
+	require.Equal(t, 1, len(rst))
+	require.Equal(t, trx, *rst[0])
+
+	rst, err = db.GetPendingTransactionsByAddress(common.Address{2})
+	require.NoError(t, err)
+	require.Nil(t, rst)
+
+	err = db.DeletePendingTransaction(trx.TransactionHash)
+	require.NoError(t, err)
+
+	rst, err = db.GetPendingTransactionsByAddress(trx.Address)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(rst))
+
+	rst, err = db.GetPendingTransactions()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(rst))
+
+}
