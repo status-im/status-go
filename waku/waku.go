@@ -65,6 +65,7 @@ type settings struct {
 	BloomFilterTolerance     []byte                    // Bloom filter tolerated by the waku node for a limited time
 	TopicInterest            map[common.TopicType]bool // Topic interest for this node
 	TopicInterestTolerance   map[common.TopicType]bool // Topic interest tolerated by the waku node for a limited time
+	SoftBlacklistedPeerIDs   map[string]bool           // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
 	BloomFilterMode          bool                      // Whether we should match against bloom-filter only
 	LightClient              bool                      // Light client mode enabled does not forward messages
 	RestrictLightClientsConn bool                      // Restrict connection between two light clients
@@ -144,8 +145,13 @@ func New(cfg *Config, logger *zap.Logger) *Waku {
 		LightClient:              cfg.LightClient,
 		FullNode:                 cfg.FullNode,
 		BloomFilterMode:          cfg.BloomFilterMode,
+		SoftBlacklistedPeerIDs:   make(map[string]bool),
 		RestrictLightClientsConn: cfg.RestrictLightClientsConn,
 		SyncAllowance:            common.DefaultSyncAllowance,
+	}
+
+	for _, peerID := range cfg.SoftBlacklistedPeerIDs {
+		waku.settings.SoftBlacklistedPeerIDs[peerID] = true
 	}
 
 	if cfg.FullNode {
@@ -1103,17 +1109,31 @@ func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	return err
 }
 
+func (w *Waku) softBlacklisted(peerID string) bool {
+	w.settingsMu.RLock()
+	defer w.settingsMu.RUnlock()
+	return w.settings.SoftBlacklistedPeerIDs[peerID]
+}
+
 func (w *Waku) OnNewEnvelopes(envelopes []*common.Envelope, peer common.Peer) ([]common.EnvelopeError, error) {
-	w.logger.Debug("received new envelopes", zap.Int("count", len(envelopes)))
 	envelopeErrors := make([]common.EnvelopeError, 0)
+	peerID := types.EncodeHex(peer.ID())
+	w.logger.Debug("received new envelopes", zap.Int("count", len(envelopes)), zap.String("peer", peerID))
 	trouble := false
+
+	if w.softBlacklisted(peerID) {
+		w.logger.Debug("peer is soft blacklisted", zap.String("peer", peerID))
+		return nil, nil
+	}
+
 	for _, env := range envelopes {
+		w.logger.Debug("received new envelope", zap.String("peer", peerID), zap.String("hash", env.Hash().Hex()))
 		cached, err := w.add(env, w.LightClientMode())
 		if err != nil {
 			_, isTimeSyncError := err.(common.TimeSyncError)
 			if !isTimeSyncError {
 				trouble = true
-				w.logger.Info("invalid envelope received", zap.Binary("peer", peer.ID()), zap.Error(err))
+				w.logger.Info("invalid envelope received", zap.String("peer", types.EncodeHex(peer.ID())), zap.Error(err))
 			}
 			envelopeErrors = append(envelopeErrors, common.ErrorToEnvelopeError(env.Hash(), err))
 		} else if cached {

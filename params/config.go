@@ -208,6 +208,9 @@ type WakuConfig struct {
 	// BloomFilterMode tells us whether we should be sending a bloom
 	// filter rather than TopicInterest
 	BloomFilterMode bool
+
+	// SoftBlacklistedPeerIDs is a list of peer ids that should be soft-blacklisted (messages should be dropped but connection kept)
+	SoftBlacklistedPeerIDs []string
 }
 
 // ----------

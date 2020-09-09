@@ -447,10 +447,11 @@ func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperCon
 
 func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*waku.Waku, error) {
 	cfg := &waku.Config{
-		MaxMessageSize:     wakucommon.DefaultMaxMessageSize,
-		BloomFilterMode:    wakuCfg.BloomFilterMode,
-		FullNode:           wakuCfg.FullNode,
-		MinimumAcceptedPoW: params.WakuMinimumPoW,
+		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
+		BloomFilterMode:        wakuCfg.BloomFilterMode,
+		FullNode:               wakuCfg.FullNode,
+		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
+		MinimumAcceptedPoW:     params.WakuMinimumPoW,
 	}
 
 	if wakuCfg.MaxMessageSize > 0 {
