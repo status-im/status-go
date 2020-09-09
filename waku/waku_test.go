@@ -31,9 +31,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/common"
 	v0 "github.com/status-im/status-go/waku/v0"
+	v1 "github.com/status-im/status-go/waku/v1"
 )
 
 var seed int64
@@ -49,19 +53,33 @@ func InitSingleTest() {
 func TestBasic(t *testing.T) {
 	w := New(nil, nil)
 	p := w.Protocols()
-	waku := p[0]
-	if waku.Name != v0.Name {
-		t.Fatalf("failed Peer Name: %v.", waku.Name)
+	waku0 := p[0]
+	waku1 := p[1]
+	if waku0.Name != v0.Name {
+		t.Fatalf("failed Peer Name: %v.", waku0.Name)
 	}
-	if uint64(waku.Version) != v0.Version {
-		t.Fatalf("failed Peer Version: %v.", waku.Version)
+	if uint64(waku0.Version) != v0.Version {
+		t.Fatalf("failed Peer Version: %v.", waku0.Version)
 	}
-	if waku.Length != v0.NumberOfMessageCodes {
-		t.Fatalf("failed Peer Length: %v.", waku.Length)
+	if waku0.Length != v0.NumberOfMessageCodes {
+		t.Fatalf("failed Peer Length: %v.", waku0.Length)
 	}
-	if waku.Run == nil {
+	if waku0.Run == nil {
 		t.Fatalf("failed waku.Run.")
 	}
+	if waku1.Name != v1.Name {
+		t.Fatalf("failed Peer Name: %v.", waku1.Name)
+	}
+	if uint64(waku1.Version) != v1.Version {
+		t.Fatalf("failed Peer Version: %v.", waku1.Version)
+	}
+	if waku1.Length != v1.NumberOfMessageCodes {
+		t.Fatalf("failed Peer Length: %v.", waku1.Length)
+	}
+	if waku1.Run == nil {
+		t.Fatalf("failed waku.Run.")
+	}
+
 	if w.GetFilter("non-existent") != nil {
 		t.Fatalf("failed GetFilter.")
 	}
@@ -1063,6 +1081,31 @@ func TestTopicInterest(t *testing.T) {
 		t.Fatalf("wrong number of topics created")
 	}
 
+}
+
+func TestOnNewEnvelopesSoftBlacklist(t *testing.T) {
+	w1 := New(nil, nil)
+
+	envelope := &common.Envelope{}
+	p2pPeer := p2p.NewPeer(enode.ID{0x4}, "test", []p2p.Cap{})
+	peer := v1.NewPeer(w1, p2pPeer, nil, nil)
+
+	// Pre-condition, we need to make sure this envelope returns an EnvelopeError
+	envelopeError, err := w1.OnNewEnvelopes([]*common.Envelope{envelope}, peer)
+	require.NoError(t, err)
+	// Make sure this envelope returns an error
+	require.NotNil(t, envelopeError)
+
+	// build black listed waku
+	cfg := &Config{
+		SoftBlacklistedPeerIDs: []string{types.EncodeHex(peer.ID())},
+	}
+	w2 := New(cfg, nil)
+
+	envelopeError, err = w2.OnNewEnvelopes([]*common.Envelope{envelope}, peer)
+	require.NoError(t, err)
+	// Since it's blacklisted, it will just drop envelopes, keep the connection open
+	require.Nil(t, envelopeError)
 }
 
 func handleError(t *testing.T, err error) {
