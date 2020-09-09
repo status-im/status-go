@@ -88,6 +88,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.response_to,
 		m2.source,
 		m2.text,
+		m2.parsed_text,
 		m2.image_base64,
 		m2.audio_duration_ms,
 		m2.audio_base64,
@@ -105,6 +106,7 @@ type scanner interface {
 
 func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *Message, others ...interface{}) error {
 	var quotedText sql.NullString
+	var quotedParsedText []byte
 	var quotedFrom sql.NullString
 	var quotedImage sql.NullString
 	var quotedAudio sql.NullString
@@ -150,6 +152,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.ResponseTo,
 		&quotedFrom,
 		&quotedText,
+		&quotedParsedText,
 		&quotedImage,
 		&quotedAudioDuration,
 		&quotedAudio,
@@ -165,6 +168,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		message.QuotedMessage = &QuotedMessage{
 			From:            quotedFrom.String,
 			Text:            quotedText.String,
+			ParsedText:      quotedParsedText,
 			Base64Image:     quotedImage.String,
 			AudioDurationMs: uint64(quotedAudioDuration.Int64),
 			Base64Audio:     quotedAudio.String,

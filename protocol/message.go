@@ -19,8 +19,9 @@ import (
 // QuotedMessage contains the original text of the message replied to
 type QuotedMessage struct {
 	// From is a public key of the author of the message.
-	From string `json:"from"`
-	Text string `json:"text"`
+	From       string          `json:"from"`
+	Text       string          `json:"text"`
+	ParsedText json.RawMessage `json:"parsedText,omitempty"`
 	// Base64Image is the converted base64 image
 	Base64Image string `json:"image,omitempty"`
 	// Base64Audio is the converted base64 audio
