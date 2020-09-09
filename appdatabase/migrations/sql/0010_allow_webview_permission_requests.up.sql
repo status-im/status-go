@@ -1,0 +1,1 @@
+ALTER TABLE settings ADD COLUMN webview_allow_permission_requests BOOLEAN DEFAULT FALSE;
