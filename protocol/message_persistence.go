@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 
 	"github.com/pkg/errors"
@@ -40,6 +41,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		audio_type,
 		audio_duration_ms,
 		audio_base64,
+		mentions,
 		command_id,
 		command_value,
 		command_from,
@@ -74,6 +76,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.image_base64,
 		COALESCE(m1.audio_duration_ms,0),
 		m1.audio_base64,
+		m1.mentions,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -104,18 +107,19 @@ type scanner interface {
 	Scan(dest ...interface{}) error
 }
 
-func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *Message, others ...interface{}) error {
+func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message *common.Message, others ...interface{}) error {
 	var quotedText sql.NullString
 	var quotedParsedText []byte
 	var quotedFrom sql.NullString
 	var quotedImage sql.NullString
 	var quotedAudio sql.NullString
 	var quotedAudioDuration sql.NullInt64
+	var serializedMentions []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
-	command := &CommandParameters{}
+	command := &common.CommandParameters{}
 	audio := &protobuf.AudioMessage{}
 
 	args := []interface{}{
@@ -138,6 +142,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Base64Image,
 		&audio.DurationMs,
 		&message.Base64Audio,
+		&serializedMentions,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -165,7 +170,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 
 	if quotedText.Valid {
-		message.QuotedMessage = &QuotedMessage{
+		message.QuotedMessage = &common.QuotedMessage{
 			From:            quotedFrom.String,
 			Text:            quotedText.String,
 			ParsedText:      quotedParsedText,
@@ -176,6 +181,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 	message.Alias = alias.String
 	message.Identicon = identicon.String
+
+	if serializedMentions != nil {
+		err := json.Unmarshal(serializedMentions, &message.Mentions)
+		if err != nil {
+			return err
+		}
+	}
 
 	switch message.ContentType {
 	case protobuf.ChatMessage_STICKER:
@@ -191,7 +203,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	return nil
 }
 
-func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]interface{}, error) {
+func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) ([]interface{}, error) {
 	sticker := message.GetSticker()
 	if sticker == nil {
 		sticker = &protobuf.StickerMessage{}
@@ -209,7 +221,16 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 
 	command := message.CommandParameters
 	if command == nil {
-		command = &CommandParameters{}
+		command = &common.CommandParameters{}
+	}
+
+	var serializedMentions []byte
+	var err error
+	if len(message.Mentions) != 0 {
+		serializedMentions, err = json.Marshal(message.Mentions)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return []interface{}{
 		message.ID,
@@ -235,6 +256,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 		audio.Type,
 		audio.DurationMs,
 		message.Base64Audio,
+		serializedMentions,
 		command.ID,
 		command.Value,
 		command.From,
@@ -250,7 +272,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *Message) ([]inte
 	}, nil
 }
 
-func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error) {
+func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*common.Message, error) {
 	var err error
 	if tx == nil {
 		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
@@ -267,7 +289,7 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 		}()
 	}
 
-	var message Message
+	var message common.Message
 
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	row := tx.QueryRow(
@@ -301,9 +323,9 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*Message, error)
 	}
 }
 
-func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*Message, error) {
+func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Message, error) {
 
-	var message Message
+	var message common.Message
 
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	row := db.db.QueryRow(
@@ -342,7 +364,7 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*Message, err
 	}
 }
 
-func (db sqlitePersistence) MessageByID(id string) (*Message, error) {
+func (db sqlitePersistence) MessageByID(id string) (*common.Message, error) {
 	return db.messageByID(nil, id)
 }
 
@@ -377,7 +399,7 @@ func (db sqlitePersistence) MessagesExist(ids []string) (map[string]bool, error)
 	return result, nil
 }
 
-func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
+func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
@@ -412,9 +434,9 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
 	}
 	defer rows.Close()
 
-	var result []*Message
+	var result []*common.Message
 	for rows.Next() {
-		var message Message
+		var message common.Message
 		if err := db.tableUserMessagesScanAllFields(rows, &message); err != nil {
 			return nil, err
 		}
@@ -427,7 +449,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*Message, error) {
 // MessageByChatID returns all messages for a given chatID in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
-func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, limit int) ([]*Message, string, error) {
+func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, limit int) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?"
@@ -470,12 +492,12 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	defer rows.Close()
 
 	var (
-		result  []*Message
+		result  []*common.Message
 		cursors []string
 	)
 	for rows.Next() {
 		var (
-			message Message
+			message common.Message
 			cursor  string
 		)
 		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
@@ -566,7 +588,7 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 	return result, nil
 }
 
-func (db sqlitePersistence) SaveMessages(messages []*Message) (err error) {
+func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error) {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return

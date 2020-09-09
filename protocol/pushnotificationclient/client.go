@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -47,6 +48,8 @@ import (
 const encryptedPayloadKeyLength = 16
 const accessTokenKeyLength = 16
 const staleQueryTimeInSeconds = 86400
+const mentionInstallationID = "mention"
+const oneToOneChatIDLength = 132
 
 // maxRegistrationRetries is the maximum number of attempts we do before giving up registering with a server
 const maxRegistrationRetries int64 = 12
@@ -103,13 +106,21 @@ type PushNotificationInfo struct {
 }
 
 type SentNotification struct {
-	PublicKey      *ecdsa.PublicKey
-	InstallationID string
-	LastTriedAt    int64
-	RetryCount     int64
-	MessageID      []byte
-	Success        bool
-	Error          protobuf.PushNotificationReport_ErrorType
+	PublicKey        *ecdsa.PublicKey
+	InstallationID   string
+	LastTriedAt      int64
+	RetryCount       int64
+	MessageID        []byte
+	ChatID           string
+	NotificationType protobuf.PushNotification_PushNotificationType
+	Success          bool
+	Error            protobuf.PushNotificationReport_ErrorType
+}
+
+type RegistrationOptions struct {
+	PublicChatIDs []string
+	MutedChatIDs  []string
+	ContactIDs    []*ecdsa.PublicKey
 }
 
 func (s *SentNotification) HashedPublicKey() []byte {
@@ -128,6 +139,9 @@ type Config struct {
 	// only from contacts
 	AllowFromContactsOnly bool
 
+	// BlockMentions indicates whether we should not receive notification for mentions
+	BlockMentions bool
+
 	// InstallationID is the installation-id for this device
 	InstallationID string
 
@@ -138,8 +152,13 @@ type Config struct {
 	DefaultServers []*ecdsa.PublicKey
 }
 
+type MessagePersistence interface {
+	MessageByID(string) (*common.Message, error)
+}
+
 type Client struct {
-	persistence *Persistence
+	persistence        *Persistence
+	messagePersistence MessagePersistence
 
 	config *Config
 
@@ -176,13 +195,14 @@ type Client struct {
 	registrationSubscriptions []chan struct{}
 }
 
-func New(persistence *Persistence, config *Config, processor *common.MessageProcessor) *Client {
+func New(persistence *Persistence, config *Config, processor *common.MessageProcessor, messagePersistence MessagePersistence) *Client {
 	return &Client{
-		quit:             make(chan struct{}),
-		config:           config,
-		messageProcessor: processor,
-		persistence:      persistence,
-		reader:           rand.Reader,
+		quit:               make(chan struct{}),
+		config:             config,
+		messageProcessor:   processor,
+		messagePersistence: messagePersistence,
+		persistence:        persistence,
+		reader:             rand.Reader,
 	}
 }
 
@@ -191,15 +211,12 @@ func (c *Client) Start() error {
 		return errors.New("can't start, missing message processor")
 	}
 
-	c.config.Logger.Debug("starting push notification client", zap.Any("config", c.config))
-
 	err := c.loadLastPushNotificationRegistration()
 	if err != nil {
 		return err
 	}
 
-	c.subscribeForSentMessages()
-	c.subscribeForScheduledMessages()
+	c.subscribeForMessageEvents()
 
 	// We start even if push notifications are disabled, as we might
 	// actually be sending an unregister message
@@ -299,7 +316,7 @@ func (c *Client) GetServers() ([]*PushNotificationServer, error) {
 	return c.persistence.GetServers()
 }
 
-func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) Reregister(options *RegistrationOptions) error {
 	c.config.Logger.Debug("re-registering")
 	if len(c.deviceToken) == 0 {
 		c.config.Logger.Info("no device token, not registering")
@@ -311,7 +328,7 @@ func (c *Client) Reregister(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string
 		return nil
 	}
 
-	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
+	return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 }
 
 // pickDefaultServesr picks n servers at random
@@ -333,7 +350,7 @@ func (c *Client) pickDefaultServers(servers []*ecdsa.PublicKey) []*ecdsa.PublicK
 }
 
 // Register registers with all the servers
-func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushNotificationRegistration_TokenType, options *RegistrationOptions) error {
 	// stop registration loop
 	c.stopRegistrationLoop()
 
@@ -364,12 +381,12 @@ func (c *Client) Register(deviceToken, apnTopic string, tokenType protobuf.PushN
 	c.apnTopic = apnTopic
 	c.tokenType = tokenType
 
-	registration, err := c.buildPushNotificationRegistrationMessage(contactIDs, mutedChatIDs)
+	registration, err := c.buildPushNotificationRegistrationMessage(options)
 	if err != nil {
 		return err
 	}
 
-	err = c.saveLastPushNotificationRegistration(registration, contactIDs)
+	err = c.saveLastPushNotificationRegistration(registration, options.ContactIDs)
 	if err != nil {
 		return err
 	}
@@ -588,22 +605,42 @@ func (c *Client) DisableSending() {
 	c.config.SendEnabled = false
 }
 
-func (c *Client) EnablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) EnablePushNotificationsFromContactsOnly(options *RegistrationOptions) error {
 	c.config.Logger.Debug("enabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = true
 	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
 		c.config.Logger.Debug("re-registering after enabling push notifications from contacts only")
-		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 	}
 	return nil
 }
 
-func (c *Client) DisablePushNotificationsFromContactsOnly(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) error {
+func (c *Client) DisablePushNotificationsFromContactsOnly(options *RegistrationOptions) error {
 	c.config.Logger.Debug("disabling push notification from contacts only")
 	c.config.AllowFromContactsOnly = false
 	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
 		c.config.Logger.Debug("re-registering after disabling push notifications from contacts only")
-		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, contactIDs, mutedChatIDs)
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
+	}
+	return nil
+}
+
+func (c *Client) EnablePushNotificationsBlockMentions(options *RegistrationOptions) error {
+	c.config.Logger.Debug("disabling push notifications for mentions")
+	c.config.BlockMentions = true
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Debug("re-registering after disabling push notifications for mentions")
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
+	}
+	return nil
+}
+
+func (c *Client) DisablePushNotificationsBlockMentions(options *RegistrationOptions) error {
+	c.config.Logger.Debug("enabling push notifications for mentions")
+	c.config.BlockMentions = false
+	if c.lastPushNotificationRegistration != nil && c.config.RemoteNotificationsEnabled {
+		c.config.Logger.Debug("re-registering after enabling push notifications for mentions")
+		return c.Register(c.deviceToken, c.apnTopic, c.tokenType, options)
 	}
 	return nil
 }
@@ -644,43 +681,37 @@ func (c *Client) generateSharedKey(publicKey *ecdsa.PublicKey) ([]byte, error) {
 	)
 }
 
-// subscribeForSentMessages subscribes for newly sent messages so we can check if we need to send a push notification
-func (c *Client) subscribeForSentMessages() {
+// subscribeForMessageEvents subscribes for newly sent/scheduled messages so we can check if we need to send a push notification
+func (c *Client) subscribeForMessageEvents() {
 	go func() {
-		c.config.Logger.Debug("subscribing for sent messages")
-		subscription := c.messageProcessor.SubscribeToSentMessages()
+		c.config.Logger.Debug("subscribing for message events")
+		sentMessagesSubscription := c.messageProcessor.SubscribeToSentMessages()
+		scheduledMessagesSubscription := c.messageProcessor.SubscribeToScheduledMessages()
 		for {
 			select {
-			case m, more := <-subscription:
-				if !more {
-					c.config.Logger.Debug("no more sent messages, quitting")
-					return
-				}
-				c.config.Logger.Debug("handling message sent")
-				if err := c.handleMessageSent(m); err != nil {
-					c.config.Logger.Error("failed to handle message", zap.Error(err))
-				}
-			case <-c.quit:
-				return
-			}
-		}
-	}()
-}
-
-// subscribeForScheduledMessages subscribes for messages scheduler for dispatch
-func (c *Client) subscribeForScheduledMessages() {
-	go func() {
-		c.config.Logger.Debug("subscribing for scheduled messages")
-		subscription := c.messageProcessor.SubscribeToScheduledMessages()
-		for {
-			select {
-			case m, more := <-subscription:
+			// order is important, since both are asynchronous, we want to process
+			// first scheduled messages, and after sent messages, otherwise we might
+			// have some race conditions.
+			// This does not completely rules them out, but reduced the window
+			// where it might happen, a single channel should be used
+			// if this actually happens.
+			case m, more := <-scheduledMessagesSubscription:
 				if !more {
 					c.config.Logger.Debug("no more scheduled messages, quitting")
 					return
 				}
 				c.config.Logger.Debug("handling message scheduled")
 				if err := c.handleMessageScheduled(m); err != nil {
+					c.config.Logger.Error("failed to handle message", zap.Error(err))
+				}
+
+			case m, more := <-sentMessagesSubscription:
+				if !more {
+					c.config.Logger.Debug("no more sent messages, quitting")
+					return
+				}
+				c.config.Logger.Debug("handling message sent")
+				if err := c.handleMessageSent(m); err != nil {
 					c.config.Logger.Error("failed to handle message", zap.Error(err))
 				}
 			case <-c.quit:
@@ -785,10 +816,9 @@ func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) e
 	return nil
 }
 
-// handleMessageSent is called every time a message is sent. It will check if
-// we need to notify on the message, and if so it will try to dispatch a push notification
-// messages might be batched, if coming from datasync for example.
+// handleMessageSent is called every time a message is sent
 func (c *Client) handleMessageSent(sentMessage *common.SentMessage) error {
+
 	c.config.Logger.Debug("sent messages", zap.Any("messageIDs", sentMessage.MessageIDs))
 
 	// Ignore if we are not sending notifications
@@ -796,6 +826,109 @@ func (c *Client) handleMessageSent(sentMessage *common.SentMessage) error {
 		c.config.Logger.Debug("send not enabled, ignoring")
 		return nil
 	}
+
+	if sentMessage.PublicKey == nil {
+		return c.handlePublicMessageSent(sentMessage)
+	}
+	return c.handleDirectMessageSent(sentMessage)
+}
+
+// saving to the database might happen after we fetch the message, so we retry
+// for a reasonable amount of time before giving up
+func (c *Client) getMessage(messageID string) (*common.Message, error) {
+	retries := 0
+	for retries < 10 {
+		message, err := c.messagePersistence.MessageByID(messageID)
+		if err == sql.ErrNoRows {
+			retries++
+			time.Sleep(300 * time.Millisecond)
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+
+		return message, nil
+	}
+	return nil, sql.ErrNoRows
+}
+
+// handlePublicMessageSent handles public messages, we notify only on mentions
+func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error {
+	// We always expect a single message, as we never batch them
+	if len(sentMessage.MessageIDs) != 1 {
+		return errors.New("batched public messages not handled")
+	}
+
+	messageID := sentMessage.MessageIDs[0]
+	c.config.Logger.Debug("handling public messages", zap.Binary("messageID", messageID))
+	tracked, err := c.persistence.TrackedMessage(messageID)
+	if err != nil {
+		return err
+	}
+
+	if !tracked {
+		c.config.Logger.Debug("messageID not tracked, nothing to do", zap.Binary("messageID", messageID))
+	}
+
+	c.config.Logger.Debug("messageID tracked", zap.Binary("messageID", messageID))
+
+	message, err := c.getMessage(types.EncodeHex(messageID))
+	if err != nil {
+		c.config.Logger.Error("could not retrieve message", zap.Error(err))
+	}
+
+	// This might happen if the user deleted their messages for example
+	if message == nil {
+		c.config.Logger.Warn("message not retrieved")
+		return nil
+	}
+
+	c.config.Logger.Debug("message found", zap.Binary("messageID", messageID))
+	for _, pkString := range message.Mentions {
+		c.config.Logger.Debug("handling mention", zap.String("publickey", pkString))
+		pubkeyBytes, err := types.DecodeHex(pkString)
+		if err != nil {
+			return err
+		}
+
+		publicKey, err := crypto.UnmarshalPubkey(pubkeyBytes)
+		if err != nil {
+			return err
+		}
+
+		// we use a synthetic installationID for mentions, as all devices need to be notified
+		shouldNotify, err := c.shouldNotifyOn(publicKey, mentionInstallationID, messageID)
+		if err != nil {
+			return err
+		}
+
+		c.config.Logger.Debug("should no mention", zap.Any("publickey", shouldNotify))
+		// we send the notifications and return the info of the devices notified
+		infos, err := c.sendNotification(publicKey, nil, messageID, message.LocalChatID, protobuf.PushNotification_MENTION)
+		if err != nil {
+			return err
+		}
+
+		// mark message as sent so we don't notify again
+		for _, i := range infos {
+			c.config.Logger.Debug("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
+			if err := c.notifiedOn(publicKey, i.InstallationID, messageID, message.LocalChatID, protobuf.PushNotification_MESSAGE); err != nil {
+				return err
+			}
+
+		}
+
+	}
+
+	return nil
+}
+
+// handleDirectMessageSent handles one to ones and private group chat messages
+// It will check if we need to notify on the message, and if so it will try to
+// dispatch a push notification messages might be batched, if coming
+// from datasync for example.
+func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error {
+	c.config.Logger.Debug("handling direct messages", zap.Any("messageIDs", sentMessage.MessageIDs))
 
 	publicKey := sentMessage.PublicKey
 
@@ -849,8 +982,27 @@ func (c *Client) handleMessageSent(sentMessage *common.SentMessage) error {
 
 	c.config.Logger.Debug("actionable messages", zap.Any("message-ids", trackedMessageIDs), zap.Any("installation-ids", installationIDs))
 
+	// Get message to check chatID. Again we use the first message for simplicity, but we should send one for each chatID. Messages though are very rarely batched.
+	message, err := c.getMessage(types.EncodeHex(trackedMessageIDs[0]))
+	if err != nil {
+		return err
+	}
+
+	// This is not the prettiest.
+	// because chatIDs are asymettric, we need to check if it's a one-to-one message or a group chat message.
+	// to do that we fingerprint the chatID.
+	// If it's a public key, we use our own public key as chatID, which correspond to the chatID used by the other peer
+	// otherwise we use the group chat ID
+	var chatID string
+	if len(message.ChatId) == oneToOneChatIDLength {
+		chatID = types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey))
+	} else {
+		// this is a group chat
+		chatID = message.ChatId
+	}
+
 	// we send the notifications and return the info of the devices notified
-	infos, err := c.sendNotification(publicKey, installationIDs, trackedMessageIDs[0])
+	infos, err := c.sendNotification(publicKey, installationIDs, trackedMessageIDs[0], chatID, protobuf.PushNotification_MESSAGE)
 	if err != nil {
 		return err
 	}
@@ -860,7 +1012,7 @@ func (c *Client) handleMessageSent(sentMessage *common.SentMessage) error {
 		for _, messageID := range trackedMessageIDs {
 
 			c.config.Logger.Debug("marking as sent ", zap.Binary("mid", messageID), zap.String("id", i.InstallationID))
-			if err := c.notifiedOn(publicKey, i.InstallationID, messageID); err != nil {
+			if err := c.notifiedOn(publicKey, i.InstallationID, messageID, chatID, protobuf.PushNotification_MESSAGE); err != nil {
 				return err
 			}
 
@@ -890,17 +1042,19 @@ func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID strin
 	return c.persistence.ShouldSendNotificationFor(publicKey, installationID, messageID)
 }
 
-// notifiedOn marks a combination of publickey/installationid/messageID as notified
-func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) error {
+// notifiedOn marks a combination of publickey/installationid/messageID/chatID/type as notified
+func (c *Client) notifiedOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte, chatID string, notificationType protobuf.PushNotification_PushNotificationType) error {
 	return c.persistence.UpsertSentNotification(&SentNotification{
-		PublicKey:      publicKey,
-		LastTriedAt:    time.Now().Unix(),
-		InstallationID: installationID,
-		MessageID:      messageID,
+		PublicKey:        publicKey,
+		LastTriedAt:      time.Now().Unix(),
+		InstallationID:   installationID,
+		MessageID:        messageID,
+		ChatID:           chatID,
+		NotificationType: notificationType,
 	})
 }
 
-func (c *Client) mutedChatIDsHashes(chatIDs []string) [][]byte {
+func (c *Client) chatIDsHashes(chatIDs []string) [][]byte {
 	var mutedChatListHashes [][]byte
 
 	for _, chatID := range chatIDs {
@@ -979,26 +1133,27 @@ func (c *Client) getVersion() uint64 {
 	return c.lastPushNotificationRegistration.Version + 1
 }
 
-func (c *Client) buildPushNotificationRegistrationMessage(contactIDs []*ecdsa.PublicKey, mutedChatIDs []string) (*protobuf.PushNotificationRegistration, error) {
-	token := c.getToken(contactIDs)
-	allowedKeyList, err := c.allowedKeyList([]byte(token), contactIDs)
+func (c *Client) buildPushNotificationRegistrationMessage(options *RegistrationOptions) (*protobuf.PushNotificationRegistration, error) {
+	token := c.getToken(options.ContactIDs)
+	allowedKeyList, err := c.allowedKeyList([]byte(token), options.ContactIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	options := &protobuf.PushNotificationRegistration{
-		AccessToken:           token,
-		TokenType:             c.tokenType,
-		ApnTopic:              c.apnTopic,
-		Version:               c.getVersion(),
-		InstallationId:        c.config.InstallationID,
-		DeviceToken:           c.deviceToken,
-		AllowFromContactsOnly: c.config.AllowFromContactsOnly,
-		Enabled:               c.config.RemoteNotificationsEnabled,
-		BlockedChatList:       c.mutedChatIDsHashes(mutedChatIDs),
-		AllowedKeyList:        allowedKeyList,
-	}
-	return options, nil
+	return &protobuf.PushNotificationRegistration{
+		AccessToken:             token,
+		TokenType:               c.tokenType,
+		ApnTopic:                c.apnTopic,
+		Version:                 c.getVersion(),
+		InstallationId:          c.config.InstallationID,
+		DeviceToken:             c.deviceToken,
+		AllowFromContactsOnly:   c.config.AllowFromContactsOnly,
+		Enabled:                 c.config.RemoteNotificationsEnabled,
+		BlockedChatList:         c.chatIDsHashes(options.MutedChatIDs),
+		BlockMentions:           c.config.BlockMentions,
+		AllowedMentionsChatList: c.chatIDsHashes(options.PublicChatIDs),
+		AllowedKeyList:          allowedKeyList,
+	}, nil
 }
 
 func (c *Client) buildPushNotificationUnregisterMessage() *protobuf.PushNotificationRegistration {
@@ -1128,7 +1283,8 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 
 // sendNotification sends an actual notification to the push notification server.
 // the notification is sent using an ephemeral key to shield the real identity of the sender
-func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte) ([]*PushNotificationInfo, error) {
+func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte, chatID string, notificationType protobuf.PushNotification_PushNotificationType) ([]*PushNotificationInfo, error) {
+
 	// get latest push notification infos
 	err := c.queryNotificationInfo(publicKey, false)
 	if err != nil {
@@ -1187,12 +1343,12 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 	for _, infos := range actionableInfos {
 		var pushNotifications []*protobuf.PushNotification
 		for _, i := range infos {
-			// TODO: Add group chat ChatID
 			pushNotifications = append(pushNotifications, &protobuf.PushNotification{
-				Type: protobuf.PushNotification_MESSAGE,
+				Type: notificationType,
 				// For now we set the ChatID to our own identity key, this will work fine for blocked users
 				// and muted 1-to-1 chats, but not for group chats.
-				ChatId:         common.Shake256([]byte(types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey)))),
+				ChatId:         common.Shake256([]byte(chatID)),
+				Author:         common.Shake256([]byte(types.EncodeHex(crypto.FromECDSAPub(&c.config.Identity.PublicKey)))),
 				AccessToken:    i.AccessToken,
 				PublicKey:      common.HashPublicKey(publicKey),
 				InstallationId: i.InstallationID,
@@ -1251,7 +1407,7 @@ func (c *Client) resendNotification(pn *SentNotification) error {
 		return err
 	}
 
-	_, err = c.sendNotification(pn.PublicKey, []string{pn.InstallationID}, pn.MessageID)
+	_, err = c.sendNotification(pn.PublicKey, []string{pn.InstallationID}, pn.MessageID, pn.ChatID, pn.NotificationType)
 	return err
 }
 
@@ -1304,6 +1460,9 @@ func (c *Client) resendingLoop() error {
 
 // registrationLoop is a loop that is running when we need to register with a push notification server, it only runs when needed, it will quit if no work is necessary.
 func (c *Client) registrationLoop() error {
+	if c.lastPushNotificationRegistration == nil {
+		return nil
+	}
 	for {
 		c.config.Logger.Debug("running registration loop")
 		servers, err := c.persistence.GetServers()

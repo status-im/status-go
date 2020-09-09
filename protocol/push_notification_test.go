@@ -641,168 +641,6 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().NoError(server.Shutdown())
 }
 
-// Here bob acts as his own server
-func (s *MessengerPushNotificationSuite) TestActAsYourOwnPushNotificationServer() {
-	bob1 := s.m
-	server := s.newPushNotificationServer(s.shh, s.m.identity)
-	bob2 := server
-	alice := s.newMessenger(s.shh)
-	// start alice and enable sending push notifications
-	s.Require().NoError(alice.Start())
-	s.Require().NoError(alice.EnableSendingPushNotifications())
-	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
-
-	// Register bob1
-	err := bob1.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
-	s.Require().NoError(err)
-
-	err = bob1.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
-
-	// Pull servers  and check we registered
-	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		_, err = bob1.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		registered, err := bob1.RegisteredForPushNotifications()
-		if err != nil {
-			return err
-		}
-		if !registered {
-			return errors.New("not registered")
-		}
-		return nil
-	})
-	// Make sure we receive it
-	s.Require().NoError(err)
-	bob1Servers, err := bob1.GetPushNotificationsServers()
-	s.Require().NoError(err)
-
-	// Register bob2
-	err = bob2.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
-	s.Require().NoError(err)
-
-	err = bob2.RegisterForPushNotifications(context.Background(), bob2DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
-	s.Require().NoError(err)
-
-	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		_, err = bob2.RetrieveAll()
-		if err != nil {
-			return err
-		}
-
-		registered, err := bob2.RegisteredForPushNotifications()
-		if err != nil {
-			return err
-		}
-		if !registered {
-			return errors.New("not registered")
-		}
-		return nil
-	})
-	// Make sure we receive it
-	s.Require().NoError(err)
-	bob2Servers, err := bob2.GetPushNotificationsServers()
-	s.Require().NoError(err)
-
-	// Create one to one chat & send message
-	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
-	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
-	s.Require().NoError(alice.SaveChat(&chat))
-	inputMessage := buildTestMessage(chat)
-	response, err := alice.SendChatMessage(context.Background(), inputMessage)
-	s.Require().NoError(err)
-	messageIDString := response.Messages[0].ID
-	messageID, err := hex.DecodeString(messageIDString[2:])
-	s.Require().NoError(err)
-
-	var info []*pushnotificationclient.PushNotificationInfo
-	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		_, err = alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-
-		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
-		if err != nil {
-			return err
-		}
-		// Check we have replies for both bob1 and bob2
-		if len(info) != 2 {
-			return errors.New("info not fetched")
-		}
-		return nil
-
-	})
-
-	s.Require().NoError(err)
-
-	// Check we have replies for both bob1 and bob2
-	var bob1Info, bob2Info *pushnotificationclient.PushNotificationInfo
-
-	if info[0].AccessToken == bob1Servers[0].AccessToken {
-		bob1Info = info[0]
-		bob2Info = info[1]
-	} else {
-		bob2Info = info[0]
-		bob1Info = info[1]
-	}
-
-	s.Require().NotNil(bob1Info)
-	s.Require().Equal(bob1.installationID, bob1Info.InstallationID)
-	s.Require().Equal(bob1Servers[0].AccessToken, bob1Info.AccessToken)
-	s.Require().Equal(&bob1.identity.PublicKey, bob1Info.PublicKey)
-
-	s.Require().NotNil(bob2Info)
-	s.Require().Equal(bob2.installationID, bob2Info.InstallationID)
-	s.Require().Equal(bob2Servers[0].AccessToken, bob2Info.AccessToken)
-	s.Require().Equal(&bob2.identity.PublicKey, bob2Info.PublicKey)
-
-	retrievedNotificationInfo, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
-
-	s.Require().NoError(err)
-	s.Require().NotNil(retrievedNotificationInfo)
-	s.Require().Len(retrievedNotificationInfo, 2)
-
-	var sentNotification *pushnotificationclient.SentNotification
-	err = tt.RetryWithBackOff(func() error {
-		_, err = server.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		_, err = alice.RetrieveAll()
-		if err != nil {
-			return err
-		}
-		sentNotification, err = alice.pushNotificationClient.GetSentNotification(common.HashPublicKey(&bob1.identity.PublicKey), bob1.installationID, messageID)
-		if err != nil {
-			return err
-		}
-		if sentNotification == nil {
-			return errors.New("sent notification not found")
-		}
-		if !sentNotification.Success {
-			return errors.New("sent notification not successul")
-		}
-		return nil
-	})
-	s.Require().NoError(err)
-	s.Require().NoError(bob2.Shutdown())
-	s.Require().NoError(alice.Shutdown())
-}
-
 func (s *MessengerPushNotificationSuite) TestContactCode() {
 
 	bob1 := s.m
@@ -850,6 +688,136 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 
 	s.Require().NoError(alice.pushNotificationClient.HandleContactCodeAdvertisement(&bob1.identity.PublicKey, *contactCodeAdvertisement))
 
+	s.Require().NoError(alice.Shutdown())
+	s.Require().NoError(server.Shutdown())
+}
+
+func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
+
+	bob := s.m
+
+	serverKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	server := s.newPushNotificationServer(s.shh, serverKey)
+
+	alice := s.newMessenger(s.shh)
+	// start alice and enable sending push notifications
+	s.Require().NoError(alice.Start())
+	s.Require().NoError(alice.EnableSendingPushNotifications())
+	bobInstallationIDs := []string{bob.installationID}
+
+	// Create public chat and join for both alice and bob
+	chat := CreatePublicChat("status", s.m.transport)
+	err = bob.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	err = bob.Join(chat)
+	s.Require().NoError(err)
+
+	err = alice.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	err = alice.Join(chat)
+	s.Require().NoError(err)
+
+	// Register bob
+	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	s.Require().NoError(err)
+
+	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
+
+	// Pull servers  and check we registered
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		registered, err := bob.RegisteredForPushNotifications()
+		if err != nil {
+			return err
+		}
+		if !registered {
+			return errors.New("not registered")
+		}
+		return nil
+	})
+	// Make sure we receive it
+	s.Require().NoError(err)
+	bobServers, err := bob.GetPushNotificationsServers()
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(chat)
+	// message contains a mention
+	inputMessage.Text = "Hey @" + types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
+	response, err := alice.SendChatMessage(context.Background(), inputMessage)
+	s.Require().NoError(err)
+	messageIDString := response.Messages[0].ID
+	messageID, err := hex.DecodeString(messageIDString[2:])
+	s.Require().NoError(err)
+
+	var bobInfo []*pushnotificationclient.PushNotificationInfo
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		bobInfo, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob.identity.PublicKey, bobInstallationIDs)
+		if err != nil {
+			return err
+		}
+		// Check we have replies for bob
+		if len(bobInfo) != 1 {
+			return errors.New("info not fetched")
+		}
+		return nil
+
+	})
+
+	s.Require().NoError(err)
+
+	s.Require().NotEmpty(bobInfo)
+	s.Require().Equal(bob.installationID, bobInfo[0].InstallationID)
+	s.Require().Equal(bobServers[0].AccessToken, bobInfo[0].AccessToken)
+	s.Require().Equal(&bob.identity.PublicKey, bobInfo[0].PublicKey)
+
+	retrievedNotificationInfo, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob.identity.PublicKey, bobInstallationIDs)
+
+	s.Require().NoError(err)
+	s.Require().NotNil(retrievedNotificationInfo)
+	s.Require().Len(retrievedNotificationInfo, 1)
+
+	var sentNotification *pushnotificationclient.SentNotification
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		sentNotification, err = alice.pushNotificationClient.GetSentNotification(common.HashPublicKey(&bob.identity.PublicKey), bob.installationID, messageID)
+		if err != nil {
+			return err
+		}
+		if sentNotification == nil {
+			return errors.New("sent notification not found")
+		}
+		if !sentNotification.Success {
+			return errors.New("sent notification not successul")
+		}
+		return nil
+	})
+	s.Require().NoError(err)
 	s.Require().NoError(alice.Shutdown())
 	s.Require().NoError(server.Shutdown())
 }

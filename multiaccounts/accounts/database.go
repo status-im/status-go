@@ -70,7 +70,9 @@ type Settings struct {
 	PushNotificationsServerEnabled bool `json:"push-notifications-server-enabled?,omitempty"`
 	// PushNotificationsFromContactsOnly indicates whether we should only receive push notifications from contacts
 	PushNotificationsFromContactsOnly bool `json:"push-notifications-from-contacts-only?,omitempty"`
-	RememberSyncingChoice             bool `json:"remember-syncing-choice?,omitempty"`
+	// PushNotificationsBlockMentions indicates whether we should receive notifications for mentions
+	PushNotificationsBlockMentions bool `json:"push-notifications-block-mentions?,omitempty"`
+	RememberSyncingChoice          bool `json:"remember-syncing-choice?,omitempty"`
 	// RemotePushNotificationsEnabled indicates whether we should be using remote notifications (ios only for now)
 	RemotePushNotificationsEnabled bool             `json:"remote-push-notifications-enabled?,omitempty"`
 	SigningPhrase                  string           `json:"signing-phrase"`
@@ -273,6 +275,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET push_notifications_from_contacts_only = ? WHERE synthetic_id = 'id'")
+	case "push-notifications-block-mentions?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET push_notifications_block_mentions = ? WHERE synthetic_id = 'id'")
 	case "send-push-notifications?":
 		_, ok := value.(bool)
 		if !ok {
@@ -337,7 +345,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_enabled, waku_bloom_filter_mode FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_enabled, waku_bloom_filter_mode FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -364,6 +372,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.PushNotificationsFromContactsOnly,
 		&s.RemotePushNotificationsEnabled,
 		&s.SendPushNotifications,
+		&s.PushNotificationsBlockMentions,
 		&s.PhotoPath,
 		&s.PinnedMailserver,
 		&s.PreferredName,

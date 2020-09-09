@@ -16,6 +16,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -315,8 +316,8 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 }
 
 type ApplicationMessagesResponse struct {
-	Messages []*protocol.Message `json:"messages"`
-	Cursor   string              `json:"cursor"`
+	Messages []*common.Message `json:"messages"`
+	Cursor   string            `json:"cursor"`
 }
 
 func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*ApplicationMessagesResponse, error) {
@@ -355,7 +356,7 @@ func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) 
 	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }
 
-func (api *PublicAPI) SendChatMessage(ctx context.Context, message *protocol.Message) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) SendChatMessage(ctx context.Context, message *common.Message) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.SendChatMessage(ctx, message)
 }
 
@@ -503,6 +504,22 @@ func (api *PublicAPI) DisablePushNotificationsFromContactsOnly(ctx context.Conte
 		return err
 	}
 	return api.service.messenger.DisablePushNotificationsFromContactsOnly()
+}
+
+func (api *PublicAPI) EnablePushNotificationsBlockMentions(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", true)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.EnablePushNotificationsBlockMentions()
+}
+
+func (api *PublicAPI) DisablePushNotificationsBlockMentions(ctx context.Context) error {
+	err := api.service.accountsDB.SaveSetting("push-notifications-block-mentions?", false)
+	if err != nil {
+		return err
+	}
+	return api.service.messenger.DisablePushNotificationsBlockMentions()
 }
 
 func (api *PublicAPI) AddPushNotificationsServer(ctx context.Context, publicKeyBytes types.HexBytes) error {

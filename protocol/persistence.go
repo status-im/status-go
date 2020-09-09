@@ -266,7 +266,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 
 		// Restore last message
 		if lastMessageBytes != nil {
-			message := &Message{}
+			message := &common.Message{}
 			if err = json.Unmarshal(lastMessageBytes, message); err != nil {
 				return
 			}
@@ -346,7 +346,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 
 		// Restore last message
 		if lastMessageBytes != nil {
-			message := &Message{}
+			message := &common.Message{}
 			if err = json.Unmarshal(lastMessageBytes, message); err != nil {
 				return nil, err
 			}

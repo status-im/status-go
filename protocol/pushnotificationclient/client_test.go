@@ -58,7 +58,7 @@ func (s *ClientSuite) SetupTest() {
 		InstallationID:             s.installationID,
 	}
 
-	s.client = New(s.persistence, config, nil)
+	s.client = New(s.persistence, config, nil, nil)
 }
 
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
@@ -74,6 +74,11 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	s.Require().NoError(err)
 	contactIDs := []*ecdsa.PublicKey{&contactKey.PublicKey}
 
+	options := &RegistrationOptions{
+		ContactIDs:   contactIDs,
+		MutedChatIDs: mutedChatList,
+	}
+
 	// Set random generator for uuid
 	var seed int64 = 1
 	uuid.SetRand(rand.New(rand.NewSource(seed)))
@@ -88,7 +93,7 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 	// Set reader
 	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 
-	options := &protobuf.PushNotificationRegistration{
+	registration := &protobuf.PushNotificationRegistration{
 		Version:         1,
 		AccessToken:     expectedUUID,
 		DeviceToken:     testDeviceToken,
@@ -97,24 +102,36 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessage() {
 		BlockedChatList: mutedChatListHashes,
 	}
 
-	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
+	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(options)
 	s.Require().NoError(err)
 
-	s.Require().Equal(options, actualMessage)
+	s.Require().Equal(registration, actualMessage)
 }
 
 func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsOnly() {
 	mutedChatList := []string{"a", "b"}
+	publicChatList := []string{"c", "d"}
 
-	// build chat lish hashes
+	// build muted chat lish hashes
 	var mutedChatListHashes [][]byte
 	for _, chatID := range mutedChatList {
 		mutedChatListHashes = append(mutedChatListHashes, common.Shake256([]byte(chatID)))
 	}
 
+	// build public chat lish hashes
+	var publicChatListHashes [][]byte
+	for _, chatID := range publicChatList {
+		publicChatListHashes = append(publicChatListHashes, common.Shake256([]byte(chatID)))
+	}
+
 	contactKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	contactIDs := []*ecdsa.PublicKey{&contactKey.PublicKey}
+	options := &RegistrationOptions{
+		ContactIDs:    contactIDs,
+		MutedChatIDs:  mutedChatList,
+		PublicChatIDs: publicChatList,
+	}
 
 	// Set random generator for uuid
 	var seed int64 = 1
@@ -144,21 +161,22 @@ func (s *ClientSuite) TestBuildPushNotificationRegisterMessageAllowFromContactsO
 	// Set reader
 	s.client.reader = bytes.NewReader([]byte(expectedUUID))
 
-	options := &protobuf.PushNotificationRegistration{
-		Version:               1,
-		AccessToken:           expectedUUID,
-		DeviceToken:           testDeviceToken,
-		InstallationId:        s.installationID,
-		AllowFromContactsOnly: true,
-		Enabled:               true,
-		BlockedChatList:       mutedChatListHashes,
-		AllowedKeyList:        [][]byte{encryptedToken},
+	registration := &protobuf.PushNotificationRegistration{
+		Version:                 1,
+		AccessToken:             expectedUUID,
+		DeviceToken:             testDeviceToken,
+		InstallationId:          s.installationID,
+		AllowFromContactsOnly:   true,
+		Enabled:                 true,
+		BlockedChatList:         mutedChatListHashes,
+		AllowedKeyList:          [][]byte{encryptedToken},
+		AllowedMentionsChatList: publicChatListHashes,
 	}
 
-	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(contactIDs, mutedChatList)
+	actualMessage, err := s.client.buildPushNotificationRegistrationMessage(options)
 	s.Require().NoError(err)
 
-	s.Require().Equal(options, actualMessage)
+	s.Require().Equal(registration, actualMessage)
 }
 
 func (s *ClientSuite) TestHandleMessageScheduled() {
@@ -183,7 +201,7 @@ func (s *ClientSuite) TestHandleMessageScheduled() {
 	s.Require().True(response)
 
 	// Save notification
-	s.Require().NoError(s.client.notifiedOn(&key1.PublicKey, installationID1, messageID))
+	s.Require().NoError(s.client.notifiedOn(&key1.PublicKey, installationID1, messageID, chatID, protobuf.PushNotification_MESSAGE))
 
 	// Second time, should not notify
 	response, err = s.client.shouldNotifyOn(&key1.PublicKey, installationID1, messageID)

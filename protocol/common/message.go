@@ -1,4 +1,4 @@
-package protocol
+package common
 
 import (
 	"crypto/ecdsa"
@@ -11,7 +11,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
+
 	"github.com/status-im/markdown"
+	"github.com/status-im/markdown/ast"
 
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -117,6 +119,9 @@ type Message struct {
 	// that has been updated
 	Replace   string           `json:"replace,omitempty"`
 	SigPubKey *ecdsa.PublicKey `json:"-"`
+
+	// Mentions is an array of mentions for a given message
+	Mentions []string
 }
 
 func (m *Message) MarshalJSON() ([]byte, error) {
@@ -151,6 +156,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Timestamp         uint64                           `json:"timestamp"`
 		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
 		MessageType       protobuf.MessageType             `json:"messageType"`
+		Mentions          []string                         `json:"mentions,omitempty"`
 	}{
 		ID:                m.ID,
 		WhisperTimestamp:  m.WhisperTimestamp,
@@ -174,6 +180,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Audio:             m.Base64Audio,
 		Timestamp:         m.Timestamp,
 		ContentType:       m.ContentType,
+		Mentions:          m.Mentions,
 		MessageType:       m.MessageType,
 		CommandParameters: m.CommandParameters,
 	}
@@ -295,10 +302,34 @@ func (m *Message) parseAudio() error {
 	return nil
 }
 
+// implement interface of https://github.com/status-im/markdown/blob/b9fe921681227b1dace4b56364e15edb3b698308/ast/node.go#L701
+type MentionNodeVisitor struct {
+	mentions []string
+}
+
+func (v *MentionNodeVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
+	// only on entering we fetch, otherwise we go on
+	if !entering {
+		return ast.GoToNext
+	}
+	switch n := node.(type) {
+	case *ast.Mention:
+		v.mentions = append(v.mentions, string(n.Literal))
+	}
+	return ast.GoToNext
+}
+
+func extractMentions(parsedText ast.Node) []string {
+	visitor := &MentionNodeVisitor{}
+	ast.Walk(parsedText, visitor)
+	return visitor.mentions
+}
+
 // PrepareContent return the parsed content of the message, the line-count and whether
 // is a right-to-left message
 func (m *Message) PrepareContent() error {
 	parsedText := markdown.Parse([]byte(m.Text), nil)
+	m.Mentions = extractMentions(parsedText)
 	jsonParsedText, err := json.Marshal(parsedText)
 	if err != nil {
 		return err

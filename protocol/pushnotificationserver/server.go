@@ -21,6 +21,8 @@ import (
 const encryptedPayloadKeyLength = 16
 const defaultGorushURL = "https://gorush.status.im"
 
+var errUnhandledPushNotificationType = errors.New("unhandled push notification type")
+
 type Config struct {
 	Enabled bool
 	// Identity is our identity key
@@ -56,7 +58,7 @@ func (s *Server) Start() error {
 
 	s.config.Logger.Info("starting push notification server")
 	if s.config.Identity == nil {
-		s.config.Logger.Info("Identity nil")
+		s.config.Logger.Debug("Identity nil")
 		// Pull identity from database
 		identity, err := s.persistence.GetIdentity()
 		if err != nil {
@@ -139,7 +141,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	messageID []byte,
 	request protobuf.PushNotificationRequest) error {
-	s.config.Logger.Info("handling pn request", zap.Binary("message-id", messageID))
+	s.config.Logger.Debug("handling pn request", zap.Binary("message-id", messageID))
 
 	// This is at-most-once semantic for now
 	exists, err := s.persistence.PushNotificationExists(messageID)
@@ -148,13 +150,19 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 	}
 
 	if exists {
-		s.config.Logger.Info("already handled")
+		s.config.Logger.Debug("already handled")
 		return nil
 	}
 
-	response := s.buildPushNotificationRequestResponseAndSendNotification(&request)
+	response, requestsAndRegistrations := s.buildPushNotificationRequestResponse(&request)
+	//AndSendNotification(&request)
 	if response == nil {
 		return nil
+	}
+	err = s.sendPushNotification(requestsAndRegistrations)
+	if err != nil {
+		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
+		return err
 	}
 	encodedMessage, err := proto.Marshal(response)
 	if err != nil {
@@ -298,7 +306,7 @@ func (s *Server) validateRegistration(publicKey *ecdsa.PublicKey, payload []byte
 // buildPushNotificationQueryResponse check if we have the client information and send them back
 func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotificationQuery) *protobuf.PushNotificationQueryResponse {
 
-	s.config.Logger.Info("handling push notification query")
+	s.config.Logger.Debug("handling push notification query")
 	response := &protobuf.PushNotificationQueryResponse{}
 	if query == nil || len(query.PublicKeys) == 0 {
 		return response
@@ -334,23 +342,65 @@ func (s *Server) buildPushNotificationQueryResponse(query *protobuf.PushNotifica
 	return response
 }
 
-func (s *Server) blockedChatID(blockedChatIDs [][]byte, chatID []byte) bool {
-	for _, blockedChatID := range blockedChatIDs {
-		if bytes.Equal(blockedChatID, chatID) {
+func (s *Server) contains(list [][]byte, chatID []byte) bool {
+	for _, list := range list {
+		if bytes.Equal(list, chatID) {
 			return true
 		}
 	}
 	return false
 }
 
-// buildPushNotificationRequestResponseAndSendNotification will build a response
-// and fire-and-forget send a query to the gorush instance
-func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request *protobuf.PushNotificationRequest) *protobuf.PushNotificationResponse {
+type reportResult struct {
+	sendNotification bool
+	report           *protobuf.PushNotificationReport
+}
+
+// buildPushNotificationReport checks the request against the registration and
+// returns whether we should send the notification and what the response should be
+func (s *Server) buildPushNotificationReport(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) (*reportResult, error) {
+	response := &reportResult{}
+	report := &protobuf.PushNotificationReport{
+		PublicKey:      pn.PublicKey,
+		InstallationId: pn.InstallationId,
+	}
+
+	if pn.Type == protobuf.PushNotification_UNKNOWN_PUSH_NOTIFICATION_TYPE {
+		s.config.Logger.Warn("unhandled type")
+		return nil, errUnhandledPushNotificationType
+	}
+
+	if registration == nil {
+		s.config.Logger.Warn("empty registration")
+		report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
+	} else if registration.AccessToken != pn.AccessToken {
+		s.config.Logger.Debug("invalid token")
+		report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
+	} else if (s.isMessageNotification(pn) && !s.isValidMessageNotification(pn, registration)) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) {
+		s.config.Logger.Debug("filtered notification")
+		// We report as successful but don't send the notification
+		// for privacy reasons, as otherwise we would disclose that
+		// the sending client has been blocked or that the registering
+		// client has not joined a given public chat
+		report.Success = true
+	} else {
+		response.sendNotification = true
+		s.config.Logger.Debug("sending push notification")
+		report.Success = true
+	}
+
+	response.report = report
+
+	return response, nil
+}
+
+// buildPushNotificationRequestResponse will build a response
+func (s *Server) buildPushNotificationRequestResponse(request *protobuf.PushNotificationRequest) (*protobuf.PushNotificationResponse, []*RequestAndRegistration) {
 	response := &protobuf.PushNotificationResponse{}
 	// We don't even send a response in this case
 	if request == nil || len(request.MessageId) == 0 {
 		s.config.Logger.Warn("empty message id")
-		return nil
+		return nil, nil
 	}
 
 	response.MessageId = request.MessageId
@@ -360,56 +410,48 @@ func (s *Server) buildPushNotificationRequestResponseAndSendNotification(request
 
 	for _, pn := range request.Requests {
 		registration, err := s.persistence.GetPushNotificationRegistrationByPublicKeyAndInstallationID(pn.PublicKey, pn.InstallationId)
-		report := &protobuf.PushNotificationReport{
-			PublicKey:      pn.PublicKey,
-			InstallationId: pn.InstallationId,
-		}
-
-		if pn.Type != protobuf.PushNotification_MESSAGE {
-			s.config.Logger.Warn("unhandled type")
-			continue
-		}
-
+		var report *protobuf.PushNotificationReport
 		if err != nil {
-			s.config.Logger.Error("failed to retrieve registration", zap.Error(err))
-			report.Error = protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE
-		} else if registration == nil {
-			s.config.Logger.Warn("empty registration")
-			report.Error = protobuf.PushNotificationReport_NOT_REGISTERED
-		} else if registration.AccessToken != pn.AccessToken {
-			report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
-		} else if s.blockedChatID(registration.BlockedChatList, pn.ChatId) {
-			// We report as successful but don't send the notification
-			report.Success = true
+			report = &protobuf.PushNotificationReport{
+				PublicKey:      pn.PublicKey,
+				Error:          protobuf.PushNotificationReport_UNKNOWN_ERROR_TYPE,
+				InstallationId: pn.InstallationId,
+			}
 		} else {
-			// For now we just assume that the notification will be successful
-			requestAndRegistrations = append(requestAndRegistrations, &RequestAndRegistration{
-				Request:      pn,
-				Registration: registration,
-			})
-			report.Success = true
+			response, err := s.buildPushNotificationReport(pn, registration)
+			if err != nil {
+				s.config.Logger.Warn("unhandled type")
+				continue
+			}
+
+			if response.sendNotification {
+				requestAndRegistrations = append(requestAndRegistrations, &RequestAndRegistration{
+					Request:      pn,
+					Registration: registration,
+				})
+			}
+			report = response.report
+
 		}
 
 		response.Reports = append(response.Reports, report)
 	}
 
-	s.config.Logger.Info("built pn request")
+	s.config.Logger.Debug("built pn request")
 	if len(requestAndRegistrations) == 0 {
 		s.config.Logger.Warn("no request and registration")
-		return response
+		return response, nil
 	}
 
-	// This can be done asynchronously
+	return response, requestAndRegistrations
+}
+
+func (s *Server) sendPushNotification(requestAndRegistrations []*RequestAndRegistration) error {
+	if len(requestAndRegistrations) == 0 {
+		return nil
+	}
 	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
-	err := sendGoRushNotification(goRushRequest, s.config.GorushURL, s.config.Logger)
-	if err != nil {
-		s.config.Logger.Error("failed to send go rush notification", zap.Error(err))
-		// TODO: handle this error?
-		// GoRush will not let us know that the sending of the push notification has failed,
-		// so this likely mean that the actual HTTP request has failed, or there was some unexpected error
-	}
-
-	return response
+	return sendGoRushNotification(goRushRequest, s.config.GorushURL, s.config.Logger)
 }
 
 // listenToPublicKeyQueryTopic listen to a topic derived from the hashed public key
@@ -424,7 +466,7 @@ func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
 // buildPushNotificationRegistrationResponse will check the registration is valid, save it, and listen to the topic for the queries
 func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.PublicKey, payload []byte) *protobuf.PushNotificationRegistrationResponse {
 
-	s.config.Logger.Info("handling push notification registration")
+	s.config.Logger.Debug("handling push notification registration")
 	response := &protobuf.PushNotificationRegistrationResponse{
 		RequestId: common.Shake256(payload),
 	}
@@ -442,7 +484,7 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	}
 
 	if registration.Unregister {
-		s.config.Logger.Info("unregistering client")
+		s.config.Logger.Debug("unregistering client")
 		// We save an empty registration, only keeping version and installation-id
 		if err := s.persistence.UnregisterPushNotificationRegistration(common.HashPublicKey(publicKey), registration.InstallationId, registration.Version); err != nil {
 			response.Error = protobuf.PushNotificationRegistrationResponse_INTERNAL_ERROR
@@ -464,7 +506,32 @@ func (s *Server) buildPushNotificationRegistrationResponse(publicKey *ecdsa.Publ
 	}
 	response.Success = true
 
-	s.config.Logger.Info("handled push notification registration successfully")
+	s.config.Logger.Debug("handled push notification registration successfully")
 
 	return response
+}
+
+func (s *Server) isMentionNotification(pn *protobuf.PushNotification) bool {
+	return pn.Type == protobuf.PushNotification_MENTION
+}
+
+// isValidMentionNotification checks:
+// this is a mention
+// mentions are enabled
+// the user joined the public chat
+// the author is not blocked
+func (s *Server) isValidMentionNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
+	return s.isMentionNotification(pn) && !registration.BlockMentions && s.contains(registration.AllowedMentionsChatList, pn.ChatId) && !s.contains(registration.BlockedChatList, pn.Author)
+}
+
+func (s *Server) isMessageNotification(pn *protobuf.PushNotification) bool {
+	return pn.Type == protobuf.PushNotification_MESSAGE
+}
+
+// isValidMentionNotification checks:
+// this is a message
+// the chat is not muted
+// the author is not blocked
+func (s *Server) isValidMessageNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
+	return s.isMessageNotification(pn) && !s.contains(registration.BlockedChatList, pn.ChatId) && !s.contains(registration.BlockedChatList, pn.Author)
 }
