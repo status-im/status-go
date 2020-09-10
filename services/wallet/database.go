@@ -590,18 +590,20 @@ const (
 	ReleaseENS     PendingTrxType = "ReleaseENS"
 	SetPubKey      PendingTrxType = "SetPubKey"
 	BuyStickerPack PendingTrxType = "BuyStickerPack"
+	WalletTransfer PendingTrxType = "WalletTransfer"
 )
 
 type PendingTransaction struct {
 	TransactionHash common.Hash    `json:"transactionHash"`
 	BlockNumber     *big.Int       `json:"blockNumber"`
-	Address         common.Address `json:"address"`
+	From            common.Address `json:"from_address"`
+	To              common.Address `json:"to_address"`
 	Type            PendingTrxType `json:"type"`
 	Data            string         `json:"data"`
 }
 
 func (db *Database) GetPendingTransactions() ([]*PendingTransaction, error) {
-	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, address, type, data FROM pending_transactions WHERE network_id = ?`, db.network)
+	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, from_address, to_address, type, data FROM pending_transactions WHERE network_id = ?`, db.network)
 	if err != nil {
 		return nil, err
 	}
@@ -610,7 +612,7 @@ func (db *Database) GetPendingTransactions() ([]*PendingTransaction, error) {
 	var rst []*PendingTransaction
 	for rows.Next() {
 		trx := &PendingTransaction{BlockNumber: new(big.Int)}
-		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.Address, &trx.Type, &trx.Data)
+		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.From, &trx.To, &trx.Type, &trx.Data)
 		if err != nil {
 			return nil, err
 		}
@@ -621,8 +623,8 @@ func (db *Database) GetPendingTransactions() ([]*PendingTransaction, error) {
 	return rst, nil
 }
 
-func (db *Database) GetPendingTransactionsByAddress(address common.Address) ([]*PendingTransaction, error) {
-	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, address, type, data FROM pending_transactions WHERE network_id = ? AND address = ?`, db.network, address)
+func (db *Database) GetPendingOutboundTransactionsByAddress(address common.Address) ([]*PendingTransaction, error) {
+	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, from_address, to_address, type, data FROM pending_transactions WHERE network_id = ? AND from_address = ?`, db.network, address)
 	if err != nil {
 		return nil, err
 	}
@@ -631,7 +633,7 @@ func (db *Database) GetPendingTransactionsByAddress(address common.Address) ([]*
 	var rst []*PendingTransaction
 	for rows.Next() {
 		trx := &PendingTransaction{BlockNumber: new(big.Int)}
-		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.Address, &trx.Type, &trx.Data)
+		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.From, &trx.To, &trx.Type, &trx.Data)
 
 		if err != nil {
 			return nil, err
@@ -644,11 +646,11 @@ func (db *Database) GetPendingTransactionsByAddress(address common.Address) ([]*
 }
 
 func (db *Database) StorePendingTransaction(trx PendingTransaction) error {
-	insert, err := db.db.Prepare("INSERT OR REPLACE INTO pending_transactions (network_id, transaction_hash, blk_number, address, type, data) VALUES (?, ?, ?, ?, ?, ?)")
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO pending_transactions (network_id, transaction_hash, blk_number, from_address, to_address, type, data) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
-	_, err = insert.Exec(db.network, trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), trx.Address, trx.Type, trx.Data)
+	_, err = insert.Exec(db.network, trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), trx.From, trx.To, trx.Type, trx.Data)
 	return err
 }
 

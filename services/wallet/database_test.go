@@ -212,7 +212,8 @@ func TestPendingTransactions(t *testing.T) {
 	trx := PendingTransaction{
 		TransactionHash: common.Hash{1},
 		BlockNumber:     big.NewInt(1),
-		Address:         common.Address{1},
+		From:            common.Address{1},
+		To:              common.Address{2},
 		Type:            RegisterENS,
 		Data:            "someuser.stateofus.eth",
 	}
@@ -221,14 +222,14 @@ func TestPendingTransactions(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	rst, err = db.GetPendingTransactionsByAddress(trx.Address)
+	rst, err = db.GetPendingOutboundTransactionsByAddress(trx.From)
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
 	err = db.StorePendingTransaction(trx)
 	require.NoError(t, err)
 
-	rst, err = db.GetPendingTransactionsByAddress(trx.Address)
+	rst, err = db.GetPendingOutboundTransactionsByAddress(trx.From)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, trx, *rst[0])
@@ -238,14 +239,14 @@ func TestPendingTransactions(t *testing.T) {
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, trx, *rst[0])
 
-	rst, err = db.GetPendingTransactionsByAddress(common.Address{2})
+	rst, err = db.GetPendingOutboundTransactionsByAddress(common.Address{2})
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
 	err = db.DeletePendingTransaction(trx.TransactionHash)
 	require.NoError(t, err)
 
-	rst, err = db.GetPendingTransactionsByAddress(trx.Address)
+	rst, err = db.GetPendingOutboundTransactionsByAddress(trx.From)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 

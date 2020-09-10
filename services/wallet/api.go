@@ -141,9 +141,9 @@ func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransacti
 	return rst, err
 }
 
-func (api *API) GetPendingTransactionsByAddress(ctx context.Context, address common.Address) ([]*PendingTransaction, error) {
+func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions by address")
-	rst, err := api.s.db.GetPendingTransactionsByAddress(address)
+	rst, err := api.s.db.GetPendingOutboundTransactionsByAddress(address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
 	return rst, err
 }
