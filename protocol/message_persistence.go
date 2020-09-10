@@ -654,7 +654,7 @@ func (db sqlitePersistence) MarkAllRead(chatID string) error {
 		_ = tx.Rollback()
 	}()
 
-	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ?`, chatID)
+	_, err = tx.Exec(`UPDATE user_messages SET seen = 1 WHERE local_chat_id = ? AND seen != 1`, chatID)
 	if err != nil {
 		return err
 	}
