@@ -659,6 +659,41 @@ func (db *Database) DeletePendingTransaction(transactionHash common.Hash) error 
 	return err
 }
 
+type Favourite struct {
+	Address common.Address `json:"address"`
+	Name    string         `json:"name"`
+}
+
+func (db *Database) GetFavourites() ([]*Favourite, error) {
+	rows, err := db.db.Query(`SELECT address, name FROM favourites`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []*Favourite
+	for rows.Next() {
+		favourite := &Favourite{}
+		err := rows.Scan(&favourite.Address, &favourite.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		rst = append(rst, favourite)
+	}
+
+	return rst, nil
+}
+
+func (db *Database) AddFavourite(favourite Favourite) error {
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO favourites (address, name) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	_, err = insert.Exec(favourite.Address, favourite.Name)
+	return err
+}
+
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
