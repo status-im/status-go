@@ -6,10 +6,12 @@ package status
 
 import (
 	ecdsa "crypto/ecdsa"
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
+
 	account "github.com/status-im/status-go/account"
 	types "github.com/status-im/status-go/eth-node/types"
-	reflect "reflect"
 )
 
 // MockWhisperService is a mock of WhisperService interface

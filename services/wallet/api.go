@@ -161,3 +161,17 @@ func (api *API) DeletePendingTransaction(ctx context.Context, transactionHash co
 	log.Debug("result from database for remove pending transaction", "err", err)
 	return err
 }
+
+func (api *API) GetFavourites(ctx context.Context) ([]*Favourite, error) {
+	log.Debug("call to get favourites")
+	rst, err := api.s.db.GetFavourites()
+	log.Debug("result from database for favourites", "len", len(rst))
+	return rst, err
+}
+
+func (api *API) AddFavourite(ctx context.Context, favourite Favourite) error {
+	log.Debug("call to create or update favourites")
+	err := api.s.db.AddFavourite(favourite)
+	log.Debug("result from database for create or update favouritesn", "err", err)
+	return err
+}

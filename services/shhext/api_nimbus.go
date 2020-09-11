@@ -4,6 +4,7 @@ package shhext
 
 import (
 	"context"
+
 	"github.com/status-im/status-go/protocol/common"
 
 	"github.com/ethereum/go-ethereum/log"
