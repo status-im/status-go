@@ -436,16 +436,9 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 		return nil, err
 	}
 
-	// NodeConfig is denormalized and we can't migrate it easily
-	// WakuEnabled is pulled from settings and it's the source
-	// of truth on whether `WakuConfig` or `WhisperConfig` should be enabled
-	if settings.WakuEnabled {
-		conf.WakuConfig.Enabled = true
-		conf.WhisperConfig.Enabled = false
-	} else {
-		conf.WakuConfig.Enabled = false
-		conf.WhisperConfig.Enabled = true
-	}
+	conf.WakuConfig.Enabled = true
+	conf.WhisperConfig.Enabled = false
+
 	// NodeConfig.Version should be taken from params.Version
 	// which is set at the compile time.
 	// What's cached is usually outdated so we overwrite it here.
