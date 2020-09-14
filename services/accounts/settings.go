@@ -16,6 +16,11 @@ type SettingsAPI struct {
 }
 
 func (api *SettingsAPI) SaveSetting(ctx context.Context, typ string, val interface{}) error {
+	// NOTE(Ferossgp): Backward compatibility, skip this for older clients instead of returning error
+	if typ == "waku-enabled" {
+		return nil
+	}
+
 	return api.db.SaveSetting(typ, val)
 }
 
