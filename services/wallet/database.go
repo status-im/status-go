@@ -583,6 +583,82 @@ func (db *Database) DeleteCustomToken(address common.Address) error {
 	return err
 }
 
+type PendingTrxType string
+
+const (
+	RegisterENS    PendingTrxType = "RegisterENS"
+	ReleaseENS     PendingTrxType = "ReleaseENS"
+	SetPubKey      PendingTrxType = "SetPubKey"
+	BuyStickerPack PendingTrxType = "BuyStickerPack"
+	WalletTransfer PendingTrxType = "WalletTransfer"
+)
+
+type PendingTransaction struct {
+	TransactionHash common.Hash    `json:"transactionHash"`
+	BlockNumber     *big.Int       `json:"blockNumber"`
+	From            common.Address `json:"from_address"`
+	To              common.Address `json:"to_address"`
+	Type            PendingTrxType `json:"type"`
+	Data            string         `json:"data"`
+}
+
+func (db *Database) GetPendingTransactions() ([]*PendingTransaction, error) {
+	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, from_address, to_address, type, data FROM pending_transactions WHERE network_id = ?`, db.network)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []*PendingTransaction
+	for rows.Next() {
+		trx := &PendingTransaction{BlockNumber: new(big.Int)}
+		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.From, &trx.To, &trx.Type, &trx.Data)
+		if err != nil {
+			return nil, err
+		}
+
+		rst = append(rst, trx)
+	}
+
+	return rst, nil
+}
+
+func (db *Database) GetPendingOutboundTransactionsByAddress(address common.Address) ([]*PendingTransaction, error) {
+	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, from_address, to_address, type, data FROM pending_transactions WHERE network_id = ? AND from_address = ?`, db.network, address)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []*PendingTransaction
+	for rows.Next() {
+		trx := &PendingTransaction{BlockNumber: new(big.Int)}
+		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.From, &trx.To, &trx.Type, &trx.Data)
+
+		if err != nil {
+			return nil, err
+		}
+
+		rst = append(rst, trx)
+	}
+
+	return rst, nil
+}
+
+func (db *Database) StorePendingTransaction(trx PendingTransaction) error {
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO pending_transactions (network_id, transaction_hash, blk_number, from_address, to_address, type, data) VALUES (?, ?, ?, ?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	_, err = insert.Exec(db.network, trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), trx.From, trx.To, trx.Type, trx.Data)
+	return err
+}
+
+func (db *Database) DeletePendingTransaction(transactionHash common.Hash) error {
+	_, err := db.db.Exec(`DELETE FROM pending_transactions WHERE transaction_hash = ?`, transactionHash)
+	return err
+}
+
 // statementCreator allows to pass transaction or database to use in consumer.
 type statementCreator interface {
 	Prepare(query string) (*sql.Stmt, error)
