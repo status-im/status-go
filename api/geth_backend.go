@@ -431,10 +431,6 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	settings, err := accountDB.GetSettings()
-	if err != nil {
-		return nil, err
-	}
 
 	conf.WakuConfig.Enabled = true
 	conf.WhisperConfig.Enabled = false
