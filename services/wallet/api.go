@@ -106,7 +106,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 }
 
 // GetTokensBalances return mapping of token balances for every account.
-func (api *API) GetTokensBalances(ctx context.Context, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*big.Int, error) {
+func (api *API) GetTokensBalances(ctx context.Context, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	if api.s.client == nil {
 		return nil, ErrServiceNotInitialized
 	}
