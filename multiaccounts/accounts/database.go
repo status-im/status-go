@@ -83,6 +83,7 @@ type Settings struct {
 	// SendPushNotifications indicates whether we should send push notifications for other clients
 	SendPushNotifications          bool             `json:"send-push-notifications?,omitempty"`
 	Appearance                     uint             `json:"appearance"`
+	UseMailservers                 bool             `json:"use-mailservers?"`
 	Usernames                      *json.RawMessage `json:"usernames,omitempty"`
 	WalletRootAddress              types.Address    `json:"wallet-root-address,omitempty"`
 	WalletSetUpPassed              bool             `json:"wallet-set-up-passed?,omitempty"`
@@ -299,6 +300,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET syncing_on_mobile_network = ? WHERE synthetic_id = 'id'")
+	case "use-mailservers?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET use_mailservers = ? WHERE synthetic_id = 'id'")
 	case "usernames":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET usernames = ? WHERE synthetic_id = 'id'")
@@ -341,7 +348,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -380,6 +387,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.StickerPacksPending,
 		&s.StickersRecentStickers,
 		&s.SyncingOnMobileNetwork,
+		&s.UseMailservers,
 		&s.Usernames,
 		&s.Appearance,
 		&s.WalletRootAddress,
