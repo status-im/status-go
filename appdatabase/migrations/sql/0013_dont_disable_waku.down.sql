@@ -1,1 +1,0 @@
-ALTER TABLE settings DROP COLUMN waku_enabled;

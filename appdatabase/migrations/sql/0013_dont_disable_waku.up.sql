@@ -1,1 +1,0 @@
-ALTER TABLE settings ADD COLUMN waku_enabled BOOLEAN DEFAULT false;
