@@ -87,7 +87,6 @@ type Settings struct {
 	WalletRootAddress              types.Address    `json:"wallet-root-address,omitempty"`
 	WalletSetUpPassed              bool             `json:"wallet-set-up-passed?,omitempty"`
 	WalletVisibleTokens            *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
-	WakuEnabled                    bool             `json:"waku-enabled,omitempty"`
 	WakuBloomFilterMode            bool             `json:"waku-bloom-filter-mode,omitempty"`
 	WebViewAllowPermissionRequests bool             `json:"webview-allow-permission-requests?,omitempty"`
 }
@@ -129,12 +128,10 @@ INSERT INTO settings (
   public_key,
   signing_phrase,
   wallet_root_address,
-  waku_enabled,
   synthetic_id
 ) VALUES (
 ?,?,?,?,?,?,?,?,?,?,
 ?,?,?,?,?,?,?,?,?,?,
-?,
 'id')`,
 		s.Address,
 		s.Currency,
@@ -156,7 +153,6 @@ INSERT INTO settings (
 		s.PublicKey,
 		s.SigningPhrase,
 		s.WalletRootAddress,
-		s.WakuEnabled,
 	)
 
 	return err
@@ -315,12 +311,6 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	case "wallet/visible-tokens":
 		value = &sqlite.JSONBlob{value}
 		update, err = db.db.Prepare("UPDATE settings SET wallet_visible_tokens = ? WHERE synthetic_id = 'id'")
-	case "waku-enabled":
-		_, ok := value.(bool)
-		if !ok {
-			return ErrInvalidConfig
-		}
-		update, err = db.db.Prepare("UPDATE settings SET waku_enabled = ? WHERE synthetic_id = 'id'")
 	case "appearance":
 		update, err = db.db.Prepare("UPDATE settings SET appearance = ? WHERE synthetic_id = 'id'")
 	case "waku-bloom-filter-mode":
@@ -351,7 +341,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_enabled, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -395,7 +385,6 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.WalletRootAddress,
 		&s.WalletSetUpPassed,
 		&s.WalletVisibleTokens,
-		&s.WakuEnabled,
 		&s.WakuBloomFilterMode,
 		&s.WebViewAllowPermissionRequests)
 	return s, err
