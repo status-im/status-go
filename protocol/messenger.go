@@ -1377,19 +1377,23 @@ func (m *Messenger) saveChat(chat *Chat) error {
 	}
 
 	// We check if it's a new chat, or chat.Active has changed
-	if chat.Public() && (!ok && chat.Active) || (ok && chat.Active != previousChat.Active) {
-		// Re-register for push notifications, as we want to receive mentions
-		if err := m.reregisterForPushNotifications(); err != nil {
-			return err
-		}
-
-	}
+	// we check here, but we only re-register once the chat has been
+	// saved an added
+	shouldRegisterForPushNotifications := chat.Public() && (!ok && chat.Active) || (ok && chat.Active != previousChat.Active)
 
 	err := m.persistence.SaveChat(*chat)
 	if err != nil {
 		return err
 	}
 	m.allChats[chat.ID] = chat
+
+	if shouldRegisterForPushNotifications {
+		// Re-register for push notifications, as we want to receive mentions
+		if err := m.reregisterForPushNotifications(); err != nil {
+			return err
+		}
+
+	}
 
 	return nil
 }
