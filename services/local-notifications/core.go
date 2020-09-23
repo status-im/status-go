@@ -25,10 +25,10 @@ type MessageType string
 type PushCategory string
 
 type notificationBody struct {
-	State string `json:"state"`
-	From  string `json:"from"`
-	To    string `json:"to"`
-	Value string `json:"value"`
+	State string         `json:"state"`
+	From  common.Address `json:"from"`
+	To    common.Address `json:"to"`
+	Value string         `json:"value"`
 }
 
 type Notification struct {
@@ -43,11 +43,11 @@ type Notification struct {
 
 // TransactionEvent - structure used to pass messages from wallet to bus
 type TransactionEvent struct {
-	Type                      string
-	BlockNumber               *big.Int
-	Accounts                  []common.Address
-	NewTransactionsPerAccount map[common.Address]int
-	ERC20                     bool
+	Type                      string                 `json:"type"`
+	BlockNumber               *big.Int               `json:"block-number"`
+	Accounts                  []common.Address       `json:"accounts"`
+	NewTransactionsPerAccount map[common.Address]int `json:"new-transactions"`
+	ERC20                     bool                   `json:"erc20"`
 }
 
 const (
@@ -69,11 +69,15 @@ type Service struct {
 	bus                messagebus.MessageBus
 	ctx                context.Context
 	db                 *Database
+	walletDB           *wallet.Database
 	walletSubscription chan struct{}
 	walletWg           sync.WaitGroup
 }
 
 func NewService(db *Database, queueSize int) *Service {
+
+	log.Info("Successful service creations")
+
 	return &Service{
 		db:  db,
 		bus: messagebus.New(queueSize),
@@ -82,30 +86,45 @@ func NewService(db *Database, queueSize int) *Service {
 }
 
 func pushMessage(notification *Notification) {
+	log.Info("Pushing a new push notification", "info", notification)
+
 	signal.SendLocalNotifications(notification)
 }
 
-func buildTransactionNotification(payload messagePayload) *Notification {
+func buildTransactionNotification(transfer wallet.Transfer) *Notification {
+	log.Info("Handled a new transaction in buildTransactionNotification", "info", transfer)
+
 	// GET Transfers by address and block, to build from it the notification
-	transaction := payload.(TransactionEvent)
 	body := notificationBody{
-		State: transaction.Type,
-		From:  transaction.Type,
-		To:    transaction.Type,
-		Value: transaction.Type,
+		State: "",
+		From:  transfer.From,
+		To:    transfer.Address,
+		Value: "",
 	}
 
 	return &Notification{
-		ID:       string(transaction.Type),
+		ID:       "",
 		Body:     body,
 		Category: "transaction",
 	}
 }
 
-func transactionsHandler(ctx context.Context, payload messagePayload) {
-	log.Info("Handled a new transactopn")
-	n := buildTransactionNotification(payload)
-	pushMessage(n)
+func (s *Service) transactionsHandler(ctx context.Context, payload messagePayload) {
+	log.Info("Handled a new transactopn", "info", payload)
+	event := payload.(TransactionEvent)
+	limit := 20
+	for _, address := range event.Accounts {
+		log.Info("Handled transfer for address", "info", address)
+		transfers, err := s.walletDB.GetTransfersByAddress(address, event.BlockNumber, int64(limit))
+		if err != nil {
+			log.Error("Could not fetch transfers", "error", err)
+		}
+
+		for _, transaction := range transfers {
+			n := buildTransactionNotification(transaction)
+			pushMessage(n)
+		}
+	}
 }
 
 // PublishMessage - Send new message to be processed into a notification
@@ -114,18 +133,22 @@ func (s *Service) PublishMessage(messageType MessageType, payload interface{}) {
 }
 
 // Start Worker which processes all incoming messages
-func (s *Service) Start(*p2p.Server) error {
+func (s *Service) Start(_ *p2p.Server) error {
 	s.started = true
 
-	if err := s.bus.Subscribe(string(Transaction), transactionsHandler); err != nil {
+	if err := s.bus.Subscribe(string(Transaction), s.transactionsHandler); err != nil {
 		log.Error("Could not create subscription", "error", err)
 		return err
 	}
+	log.Info("Successful start")
+
 	return nil
 }
 
 // SubscribeWallet - Subscribes to wallet signals and redirects them into Notifications
-func (s *Service) SubscribeWallet(publisher *event.Feed) error {
+func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Database) error {
+	s.walletDB = walletDB
+
 	if s.walletSubscription != nil {
 		// already running, nothing to do
 		return nil
@@ -150,9 +173,13 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 				}
 				return
 			case event := <-events:
-				log.Info("Process event:", event)
+				log.Error("wallet signals transmitter handled", "error", event)
 				s.PublishMessage(Transaction, TransactionEvent{
-					Type: string(event.Type),
+					Type:                      string(event.Type),
+					BlockNumber:               event.BlockNumber,
+					Accounts:                  []common.Address(event.Accounts),
+					NewTransactionsPerAccount: map[common.Address]int(event.NewTransactionsPerAccount),
+					ERC20:                     bool(event.ERC20),
 				})
 			}
 		}

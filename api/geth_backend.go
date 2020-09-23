@@ -553,7 +553,8 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID, accountsFeed))
-	services = appendIf(config.LocalNotificationsConfig.Enabled, services, b.localNotificationsService(config.NetworkID))
+	// FIXME:
+	services = appendIf(config.WalletConfig.Enabled, services, b.localNotificationsService(config.NetworkID))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
@@ -962,6 +963,7 @@ func (b *GethStatusBackend) StartWallet() error {
 
 func (b *GethStatusBackend) StartLocalNotifications() error {
 	localPN, err := b.statusNode.LocalNotificationsService()
+	b.log.Info("Starting LocalNotificationsService")
 	if err != nil {
 		b.log.Error("Retrieving of Local Notifications service failed on StartLocalNotifications", "error", err)
 		return nil
@@ -975,14 +977,17 @@ func (b *GethStatusBackend) StartLocalNotifications() error {
 
 	if !localPN.IsStarted() {
 		err = localPN.Start(b.statusNode.Server())
+
 		if err != nil {
 			b.log.Error("LocalNotifications service start failed on StartLocalNotifications", "error", err)
 			return nil
 		}
+	}
 
-		if wallet.IsStarted() {
-			localPN.SubscribeWallet(wallet.GetFeed())
-		}
+	b.log.Info("LocalNotificationsService status", "info", localPN.IsStarted())
+
+	if wallet.IsStarted() {
+		localPN.SubscribeWallet(wallet.GetFeed(), wallet.GetDB())
 	}
 
 	return nil
