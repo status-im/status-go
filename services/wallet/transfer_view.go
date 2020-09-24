@@ -48,6 +48,11 @@ func castToTransferView(t Transfer) TransferView {
 	return view
 }
 
+// CastToTransferView transforms a raw Transfer into an enriched one
+func CastToTransferView(t Transfer) TransferView {
+	return castToTransferView(t)
+}
+
 func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
 	if len(ethlog.Topics) < 3 {
 		log.Warn("not enough topics for erc20 transfer", "topics", ethlog.Topics)

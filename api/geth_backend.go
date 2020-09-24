@@ -521,7 +521,7 @@ func (b *GethStatusBackend) walletService(network uint64, accountsFeed *event.Fe
 
 func (b *GethStatusBackend) localNotificationsService(network uint64) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
-		return localnotifications.NewService(localnotifications.NewDB(b.appDB, network), 1000), nil
+		return localnotifications.NewService(localnotifications.NewDB(b.appDB, network)), nil
 	}
 }
 

@@ -1,14 +1,13 @@
 package localnotifications
 
 import (
-	"context"
 	"math/big"
 	"sync"
 
 	//TODO: Inspect replacement with go-ethereum/events
-	messagebus "github.com/vardius/message-bus"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -19,20 +18,28 @@ import (
 
 type messagePayload interface{}
 
-// MessageType - Enum defining types of message handled by the bus
-type MessageType string
-
 type PushCategory string
 
+type transactionState string
+
+const (
+	undetermined transactionState = "undetermined"
+	failed       transactionState = "failed"
+	inbound      transactionState = "inbound"
+	outbound     transactionState = "outbound"
+)
+
 type notificationBody struct {
-	State string         `json:"state"`
-	From  common.Address `json:"from"`
-	To    common.Address `json:"to"`
-	Value string         `json:"value"`
+	State    transactionState `json:"state"`
+	From     common.Address   `json:"from"`
+	To       common.Address   `json:"to"`
+	Value    *hexutil.Big     `json:"value"`
+	ERC20    bool             `json:"erc20"`
+	Contract common.Address   `json:"contract"`
 }
 
 type Notification struct {
-	ID            string           `json:"id"`
+	ID            common.Hash      `json:"id"`
 	Platform      float32          `json:"platform,omitempty"`
 	Body          notificationBody `json:"body"`
 	Category      PushCategory     `json:"category,omitempty"`
@@ -50,72 +57,80 @@ type TransactionEvent struct {
 	ERC20                     bool                   `json:"erc20"`
 }
 
-const (
-	// Transaction - Ethereum transaction
-	Transaction MessageType = "transaction"
+// MessageEvent - structure used to pass messages from chat to bus
+type MessageEvent struct{}
 
-	// Message - Waku message
-	Message MessageType = "message"
-
-	// Custom - User defined notifications
-	Custom MessageType = "custom"
-)
+// CustomEvent - structure used to pass custom user set messages to bus
+type CustomEvent struct{}
 
 const topic = "local-notifications"
+
+type transmitter struct {
+	wg   sync.WaitGroup
+	quit chan struct{}
+}
 
 // Service keeps the state of message bus
 type Service struct {
 	started            bool
-	bus                messagebus.MessageBus
-	ctx                context.Context
+	bus                *event.Feed
+	transmitter        transmitter
 	db                 *Database
 	walletDB           *wallet.Database
 	walletSubscription chan struct{}
 	walletWg           sync.WaitGroup
 }
 
-func NewService(db *Database, queueSize int) *Service {
-
-	log.Info("Successful service creations")
-
+func NewService(db *Database) *Service {
 	return &Service{
 		db:  db,
-		bus: messagebus.New(queueSize),
-		ctx: context.Background(),
+		bus: &event.Feed{},
 	}
 }
 
 func pushMessage(notification *Notification) {
 	log.Info("Pushing a new push notification", "info", notification)
-
 	signal.SendLocalNotifications(notification)
 }
 
-func buildTransactionNotification(transfer wallet.Transfer) *Notification {
-	log.Info("Handled a new transaction in buildTransactionNotification", "info", transfer)
+func buildTransactionNotification(rawTransfer wallet.Transfer) *Notification {
+	log.Info("Handled a new transfer in buildTransactionNotification", "info", rawTransfer)
 
-	// GET Transfers by address and block, to build from it the notification
+	var state = undetermined
+	transfer := wallet.CastToTransferView(rawTransfer)
+
+	switch {
+	case transfer.TxStatus == hexutil.Uint64(0):
+		state = failed
+	case transfer.Address == transfer.To:
+		state = inbound
+	default:
+		state = outbound
+	}
+
 	body := notificationBody{
-		State: "",
-		From:  transfer.From,
-		To:    transfer.Address,
-		Value: "",
+		State:    state,
+		From:     transfer.From,
+		To:       transfer.Address,
+		Value:    transfer.Value,
+		ERC20:    string(transfer.Type) == "erc20",
+		Contract: transfer.Contract,
 	}
 
 	return &Notification{
-		ID:       "",
+		ID:       transfer.ID,
 		Body:     body,
 		Category: "transaction",
 	}
 }
 
-func (s *Service) transactionsHandler(ctx context.Context, payload messagePayload) {
-	log.Info("Handled a new transactopn", "info", payload)
-	event := payload.(TransactionEvent)
+func (s *Service) transactionsHandler(payload TransactionEvent) {
+	log.Info("Handled a new transaction", "info", payload)
+
 	limit := 20
-	for _, address := range event.Accounts {
+	for _, address := range payload.Accounts {
 		log.Info("Handled transfer for address", "info", address)
-		transfers, err := s.walletDB.GetTransfersByAddress(address, event.BlockNumber, int64(limit))
+		transfers, err := s.walletDB.GetTransfersByAddress(address, payload.BlockNumber, int64(limit))
 		if err != nil {
 			log.Error("Could not fetch transfers", "error", err)
 		}
@@ -125,24 +140,6 @@ func (s *Service) transactionsHandler(ctx context.Context, payload messagePayloa
 			pushMessage(n)
 		}
 	}
-}
-
-// PublishMessage - Send new message to be processed into a notification
-func (s *Service) PublishMessage(messageType MessageType, payload interface{}) {
-	s.bus.Publish(string(messageType), s.ctx, messagePayload(payload))
-}
-
-// Start Worker which processes all incoming messages
-func (s *Service) Start(_ *p2p.Server) error {
-	s.started = true
-
-	if err := s.bus.Subscribe(string(Transaction), s.transactionsHandler); err != nil {
-		log.Error("Could not create subscription", "error", err)
-		return err
-	}
-	log.Info("Successful start")
-
-	return nil
 }
 
 // SubscribeWallet - Subscribes to wallet signals and redirects them into Notifications
@@ -174,7 +171,7 @@ func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Databa
 				return
 			case event := <-events:
 				log.Error("wallet signals transmitter handled", "error", event)
-				s.PublishMessage(Transaction, TransactionEvent{
+				s.bus.Send(TransactionEvent{
 					Type:                      string(event.Type),
 					BlockNumber:               event.BlockNumber,
 					Accounts:                  []common.Address(event.Accounts),
@@ -187,9 +184,48 @@ func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Databa
 	return nil
 }
 
+// Start Worker which processes all incoming messages
+func (s *Service) Start(_ *p2p.Server) error {
+	s.started = true
+
+	s.transmitter.quit = make(chan struct{})
+	events := make(chan TransactionEvent, 10)
+	sub := s.bus.Subscribe(events)
+
+	s.transmitter.wg.Add(1)
+	go func() {
+		defer s.transmitter.wg.Done()
+		for {
+			select {
+			case <-s.transmitter.quit:
+				sub.Unsubscribe()
+				return
+			case err := <-sub.Err():
+				if err != nil {
+					log.Error("Local notifications transmitter failed with", "error", err)
+				}
+				return
+			case event := <-events:
+				s.transactionsHandler(event)
+			}
+		}
+	}()
+
+	log.Info("Successful start")
+
+	return nil
+}
+
 // Stop worker
 func (s *Service) Stop() error {
 	s.started = false
+	if s.transmitter.quit == nil {
+		return nil
+	}
+	close(s.transmitter.quit)
+	s.transmitter.wg.Wait()
+	s.transmitter.quit = nil
+
 	return nil
 }
 
