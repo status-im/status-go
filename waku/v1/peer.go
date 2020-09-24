@@ -81,13 +81,13 @@ func (p *Peer) Start() error {
 		return err
 	}
 	go p.update()
-	p.logger.Debug("starting peer", zap.Binary("peerID", p.ID()))
+	p.logger.Debug("starting peer", zap.String("peerID", types.EncodeHex(p.ID())))
 	return nil
 }
 
 func (p *Peer) Stop() {
 	close(p.quit)
-	p.logger.Debug("stopping peer", zap.Binary("peerID", p.ID()))
+	p.logger.Debug("stopping peer", zap.String("peerID", types.EncodeHex(p.ID())))
 }
 
 func (p *Peer) NotifyAboutPowRequirementChange(pow float64) error {
@@ -185,17 +185,17 @@ func (p *Peer) Run() error {
 		// fetch the next packet
 		packet, err := p.rw.ReadMsg()
 		if err != nil {
-			logger.Info("failed to read a message", zap.Binary("peer", p.ID()), zap.Error(err))
+			logger.Info("failed to read a message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 
 		if packet.Size > p.host.MaxMessageSize() {
-			logger.Warn("oversize message received", zap.Binary("peer", p.ID()), zap.Uint32("size", packet.Size))
+			logger.Warn("oversize message received", zap.String("peerID", types.EncodeHex(p.ID())), zap.Uint32("size", packet.Size))
 			return errors.New("oversize message received")
 		}
 
 		if err := p.handlePacket(packet); err != nil {
-			logger.Warn("failed to handle packet message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			logger.Warn("failed to handle packet message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 		}
 		_ = packet.Discard()
 	}
@@ -205,37 +205,37 @@ func (p *Peer) handlePacket(packet p2p.Msg) error {
 	switch packet.Code {
 	case messagesCode:
 		if err := p.handleMessagesCode(packet); err != nil {
-			p.logger.Warn("failed to handle messagesCode message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to handle messagesCode message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	case messageResponseCode:
 		if err := p.handleMessageResponseCode(packet); err != nil {
-			p.logger.Warn("failed to handle messageResponseCode message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to handle messageResponseCode message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	case batchAcknowledgedCode:
 		if err := p.handleBatchAcknowledgeCode(packet); err != nil {
-			p.logger.Warn("failed to handle batchAcknowledgedCode message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to handle batchAcknowledgedCode message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	case statusUpdateCode:
 		if err := p.handleStatusUpdateCode(packet); err != nil {
-			p.logger.Warn("failed to decode status update message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to decode status update message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	case p2pMessageCode:
 		if err := p.handleP2PMessageCode(packet); err != nil {
-			p.logger.Warn("failed to decode direct message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to decode direct message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	case p2pRequestCode:
 		if err := p.handleP2PRequestCode(packet); err != nil {
-			p.logger.Warn("failed to decode p2p request message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to decode p2p request message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	case p2pRequestCompleteCode:
 		if err := p.handleP2PRequestCompleteCode(packet); err != nil {
-			p.logger.Warn("failed to decode p2p request complete message, peer will be disconnected", zap.Binary("peer", p.ID()), zap.Error(err))
+			p.logger.Warn("failed to decode p2p request complete message, peer will be disconnected", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 			return err
 		}
 	default:
@@ -309,7 +309,7 @@ func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {
 	if errDepReq == nil {
 		return p.host.OnDeprecatedMessagesRequest(&requestDeprecated, p)
 	}
-	p.logger.Info("failed to decode p2p request message (deprecated)", zap.Binary("peer", p.ID()), zap.Error(errDepReq))
+	p.logger.Info("failed to decode p2p request message (deprecated)", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errDepReq))
 
 	// As we failed to decode the request, let's set the offset
 	// to the beginning and try decode it again.
@@ -322,7 +322,7 @@ func (p *Peer) handleP2PRequestCode(packet p2p.Msg) error {
 	if errReq == nil {
 		return p.host.OnMessagesRequest(request, p)
 	}
-	p.logger.Info("failed to decode p2p request message", zap.Binary("peer", p.ID()), zap.Error(errReq))
+	p.logger.Info("failed to decode p2p request message", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(errReq))
 
 	return errors.New("invalid p2p request message")
 }
@@ -444,7 +444,7 @@ func (p *Peer) update() {
 
 		case <-transmit.C:
 			if err := p.broadcast(); err != nil {
-				p.logger.Debug("broadcasting failed", zap.Binary("peer", p.ID()), zap.Error(err))
+				p.logger.Debug("broadcasting failed", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 				return
 			}
 
@@ -534,7 +534,7 @@ func (p *Peer) broadcast() error {
 
 	batchHash, err := sendBundle(p.rw, bundle)
 	if err != nil {
-		p.logger.Debug("failed to deliver envelopes", zap.Binary("peer", p.ID()), zap.Error(err))
+		p.logger.Debug("failed to deliver envelopes", zap.String("peerID", types.EncodeHex(p.ID())), zap.Error(err))
 		return err
 	}
 
@@ -551,7 +551,7 @@ func (p *Peer) broadcast() error {
 		}
 		p.host.SendEnvelopeEvent(event)
 	}
-	p.logger.Debug("broadcasted bundles successfully", zap.Binary("peer", p.ID()), zap.Int("count", len(bundle)))
+	p.logger.Debug("broadcasted bundles successfully", zap.String("peerID", types.EncodeHex(p.ID())), zap.Int("count", len(bundle)))
 	return nil
 }
 
