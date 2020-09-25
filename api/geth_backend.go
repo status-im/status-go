@@ -232,6 +232,10 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 		if err != nil {
 			return err
 		}
+
+		// rename journals as well, but ignore errors
+		_ = os.Rename(oldPath+"-shm", newPath+"-shm")
+		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
 	}
 
 	b.appDB, err = appdatabase.InitializeDB(newPath, password)
