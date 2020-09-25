@@ -196,6 +196,9 @@ func (b *GethStatusBackend) DeleteMulticcount(keyUID string, keyStoreDir string)
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-shm", keyUID)),
 		filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql-wal", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-shm", keyUID)),
+		filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db-wal", keyUID)),
 	}
 	for _, path := range dbFiles {
 		if _, err := os.Stat(path); err == nil {
@@ -218,8 +221,20 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 	if len(b.rootDataDir) == 0 {
 		return errors.New("root datadir wasn't provided")
 	}
-	path := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
-	b.appDB, err = appdatabase.InitializeDB(path, password)
+
+	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
+	oldPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", account.KeyUID))
+	newPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", account.KeyUID))
+
+	_, err = os.Stat(oldPath)
+	if err == nil {
+		err := os.Rename(oldPath, newPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	b.appDB, err = appdatabase.InitializeDB(newPath, password)
 	if err != nil {
 		return err
 	}
