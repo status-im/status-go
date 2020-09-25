@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -101,7 +101,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				ChatId:      "a",
 				Clock:       1,
 				Timestamp:   2,
-				Text:        "some-text",
+				Text:        strings.Repeat("É", maxChatMessageTextLength),
 				ResponseTo:  "",
 				EnsName:     "",
 				MessageType: protobuf.MessageType_ONE_TO_ONE,
@@ -202,7 +202,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				ChatId:      "a",
 				Clock:       1,
 				Timestamp:   2,
-				Text:        fmt.Sprintf("%x", make([]byte, maxChatMessageTextLength/2+1)),
+				Text:        strings.Repeat("É", maxChatMessageTextLength+1),
 				ResponseTo:  "",
 				EnsName:     "",
 				MessageType: protobuf.MessageType_ONE_TO_ONE,

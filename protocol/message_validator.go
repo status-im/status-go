@@ -166,7 +166,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("text can't be empty")
 	}
 
-	if len(message.Text) > maxChatMessageTextLength {
+	if len([]rune(message.Text)) > maxChatMessageTextLength {
 		return fmt.Errorf("text shouldn't be longer than %d", maxChatMessageTextLength)
 	}
 
