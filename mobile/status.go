@@ -642,6 +642,12 @@ func StartLocalNotifications() string {
 	return makeJSONResponse(err)
 }
 
+// StopLocalNotifications
+func StopLocalNotifications() string {
+	err := statusBackend.StopLocalNotifications()
+	return makeJSONResponse(err)
+}
+
 // SetMobileSignalHandler setup geth callback to notify about new signal
 // used for gomobile builds
 func SetMobileSignalHandler(handler SignalHandler) {

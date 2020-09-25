@@ -961,6 +961,24 @@ func (b *GethStatusBackend) StartWallet() error {
 	return nil
 }
 
+func (b *GethStatusBackend) StopLocalNotifications() error {
+	localPN, err := b.statusNode.LocalNotificationsService()
+	if err != nil {
+		b.log.Error("Retrieving of LocalNotifications service failed on StopLocalNotifications", "error", err)
+		return nil
+	}
+
+	if localPN.IsStarted() {
+		err = localPN.Stop()
+		if err != nil {
+			b.log.Error("LocalNotifications service stop failed on StopLocalNotifications", "error", err)
+			return nil
+		}
+	}
+
+	return nil
+}
+
 func (b *GethStatusBackend) StartLocalNotifications() error {
 	localPN, err := b.statusNode.LocalNotificationsService()
 	b.log.Info("Starting LocalNotificationsService")
