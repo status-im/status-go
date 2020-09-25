@@ -191,7 +191,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 			assert.NoError(t, err)
 			addressCh <- [...]string{accountInfo.WalletAddress, accountInfo.ChatAddress, pass}
 			wgCreateAccounts.Done()
-		}("password-00" + string(i))
+		}("password-00" + fmt.Sprint(i))
 	}
 
 	// close addressCh as otherwise for loop never finishes
