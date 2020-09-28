@@ -129,16 +129,18 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 	log.Info("Handled a new transaction", "info", payload)
 
 	limit := 20
-	for _, address := range payload.Accounts {
-		log.Info("Handled transfer for address", "info", address)
-		transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
-		if err != nil {
-			log.Error("Could not fetch transfers", "error", err)
-		}
-
-		for _, transaction := range transfers {
-			n := buildTransactionNotification(transaction)
-			pushMessage(n)
+	if payload.BlockNumber != nil {
+		for _, address := range payload.Accounts {
+			log.Info("Handled transfer for address", "info", address)
+			transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
+			if err != nil {
+				log.Error("Could not fetch transfers", "error", err)
+			}
+	
+			for _, transaction := range transfers {
+				n := buildTransactionNotification(transaction)
+				pushMessage(n)
+			}
 		}
 	}
 }
@@ -171,13 +173,15 @@ func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Databa
 				}
 				return
 			case event := <-events:
-				s.bus.Send(TransactionEvent{
-					Type:                      string(event.Type),
-					BlockNumber:               event.BlockNumber,
-					Accounts:                  []common.Address(event.Accounts),
-					NewTransactionsPerAccount: map[common.Address]int(event.NewTransactionsPerAccount),
-					ERC20:                     bool(event.ERC20),
-				})
+				if event.Type == wallet.EventNewBlock {
+					s.bus.Send(TransactionEvent{
+						Type:                      string(event.Type),
+						BlockNumber:               event.BlockNumber,
+						Accounts:                  []common.Address(event.Accounts),
+						NewTransactionsPerAccount: map[common.Address]int(event.NewTransactionsPerAccount),
+						ERC20:                     bool(event.ERC20),
+					})
+				}
 			}
 		}
 	}()
