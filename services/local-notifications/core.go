@@ -75,10 +75,9 @@ type Service struct {
 	started            bool
 	bus                *event.Feed
 	transmitter        transmitter
+	walletTransmitter transmitter
 	db                 *Database
 	walletDB           *wallet.Database
-	walletSubscription chan struct{}
-	walletWg           sync.WaitGroup
 }
 
 func NewService(db *Database) *Service {
@@ -108,6 +107,8 @@ func buildTransactionNotification(rawTransfer wallet.Transfer) *Notification {
 		state = outbound
 	}
 
+	// TODO: Check if From and To have name in wallet
+	// TODO: Add chain
 	body := notificationBody{
 		State:    state,
 		From:     transfer.From,
@@ -130,7 +131,7 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 	limit := 20
 	for _, address := range payload.Accounts {
 		log.Info("Handled transfer for address", "info", address)
-		transfers, err := s.walletDB.GetTransfersByAddress(address, payload.BlockNumber, int64(limit))
+		transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
 		if err != nil {
 			log.Error("Could not fetch transfers", "error", err)
 		}
@@ -146,20 +147,20 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Database) error {
 	s.walletDB = walletDB
 
-	if s.walletSubscription != nil {
+	if s.walletTransmitter.quit != nil {
 		// already running, nothing to do
 		return nil
 	}
-	s.walletSubscription = make(chan struct{})
+	s.walletTransmitter.quit = make(chan struct{})
 	events := make(chan wallet.Event, 10)
 	sub := publisher.Subscribe(events)
 
-	s.walletWg.Add(1)
+	s.walletTransmitter.wg.Add(1)
 	go func() {
-		defer s.walletWg.Done()
+		defer s.walletTransmitter.wg.Done()
 		for {
 			select {
-			case <-s.walletSubscription:
+			case <-s.walletTransmitter.quit:
 				sub.Unsubscribe()
 				return
 			case err := <-sub.Err():
@@ -170,7 +171,6 @@ func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Databa
 				}
 				return
 			case event := <-events:
-				log.Error("wallet signals transmitter handled", "error", event)
 				s.bus.Send(TransactionEvent{
 					Type:                      string(event.Type),
 					BlockNumber:               event.BlockNumber,
@@ -219,12 +219,18 @@ func (s *Service) Start(_ *p2p.Server) error {
 // Stop worker
 func (s *Service) Stop() error {
 	s.started = false
-	if s.transmitter.quit == nil {
-		return nil
+	
+	if s.transmitter.quit != nil {
+		close(s.transmitter.quit)
+		s.transmitter.wg.Wait()
+		s.transmitter.quit = nil
 	}
-	close(s.transmitter.quit)
-	s.transmitter.wg.Wait()
-	s.transmitter.quit = nil
+
+	if s.walletTransmitter.quit != nil {
+		close(s.walletTransmitter.quit)
+		s.walletTransmitter.wg.Wait()
+		s.walletTransmitter.quit = nil
+	}
 
 	return nil
 }

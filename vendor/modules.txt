@@ -424,8 +424,6 @@ github.com/vacp2p/mvds/state/migrations
 github.com/vacp2p/mvds/store
 github.com/vacp2p/mvds/store/migrations
 github.com/vacp2p/mvds/transport
-# github.com/vardius/message-bus v1.1.5
-github.com/vardius/message-bus
 # github.com/wealdtech/go-ens/v3 v3.3.0
 github.com/wealdtech/go-ens/v3
 github.com/wealdtech/go-ens/v3/contracts/auctionregistrar

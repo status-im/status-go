@@ -84,6 +84,14 @@ func (q *transfersQuery) FilterBlockHash(blockHash common.Hash) *transfersQuery 
 	return q
 }
 
+func (q *transfersQuery) FilterBlockNumber(blockNumber *big.Int) *transfersQuery {
+	q.andOrWhere()
+	q.added = true
+	q.buf.WriteString(" blk_number = ?")
+	q.args = append(q.args, (*SQLBigInt)(blockNumber))
+	return q
+}
+
 func (q *transfersQuery) Limit(pageSize int64) *transfersQuery {
 	q.buf.WriteString(" ORDER BY blk_number DESC, hash ASC ")
 	q.buf.WriteString(" LIMIT ?")
