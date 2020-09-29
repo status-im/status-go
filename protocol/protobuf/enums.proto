@@ -10,3 +10,11 @@ enum MessageType {
   // Only local
   SYSTEM_MESSAGE_PRIVATE_GROUP = 4;
 }
+
+enum ImageType {
+  UNKNOWN_IMAGE_TYPE = 0;
+  PNG = 1;
+  JPEG = 2;
+  WEBP = 3;
+  GIF = 4;
+}
