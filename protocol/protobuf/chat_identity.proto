@@ -4,9 +4,9 @@ package protobuf;
 
 import "enums.proto";
 
-// ChatIdentity represents the user defined identity associated with their messages
+// ChatIdentity represents the user defined identity associated with their public chat key
 message ChatIdentity {
-  // Lamport timestamp of the chat message
+  // Lamport timestamp of the message
   uint64 clock = 1;
 
   // ens_name is the valid ENS name associated with the chat key
@@ -34,30 +34,12 @@ message IdentityImage {
     UNKNOWN_SOURCE_TYPE = 0;
 
     // RAW_PAYLOAD image byte data
-    // `payload` must be set
-    // `payload` is image byte data
     RAW_PAYLOAD = 1;
 
     // ENS_AVATAR uses the ENS record's resolver get-text-data.avatar data
     // The `payload` field will be ignored if ENS_AVATAR is selected
-    // The application will read and parse the ENS avatar data as image payload data
+    // The application will read and parse the ENS avatar data as image payload data, URLs will be ignored
     // The parent `ChatMessageIdentity` must have a valid `ens_name` set
     ENS_AVATAR = 2;
-  }
-
-  // ImageType is the type of profile image data
-  enum ImageType {
-    UNKNOWN_IMAGE_TYPE = 0;
-
-    // RASTER_IMAGE_FILE is payload data that can be read as a raster image
-    // examples: jpg, png, gif, webp file types
-    RASTER_IMAGE_FILE = 1;
-
-    // VECTOR_IMAGE_FILE is payload data that can be interpreted as a vector image
-    // example: svg file type
-    VECTOR_IMAGE_FILE = 2;
-
-    // AVATAR is payload data that can be parsed as avatar compilation instructions
-    AVATAR = 3;
   }
 }

@@ -13,8 +13,16 @@ enum MessageType {
 
 enum ImageType {
   UNKNOWN_IMAGE_TYPE = 0;
+
+  // Raster image files is payload data that can be read as a raster image
   PNG = 1;
   JPEG = 2;
   WEBP = 3;
   GIF = 4;
+
+  // Vector image files is payload data that can be interpreted as a vector image
+  SVG = 101;
+
+  // AVATAR is payload data that can be parsed as avatar compilation instructions
+  AVATAR = 201;
 }
