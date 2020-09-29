@@ -12,7 +12,7 @@ message ChatIdentity {
   // ens_name is the valid ENS name associated with the chat key
   string ens_name = 2;
 
-  // images is a list of images associated with an identity
+  // images is a string indexed mapping of images associated with an identity
   map<string, IdentityImage> images = 3;
 }
 
