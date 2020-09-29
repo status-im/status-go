@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package protobuf;
+
+// ChatIdentity represents the user defined identity associated with their messages
+message ChatIdentity {
+  // Lamport timestamp of the chat message
+  uint64 clock = 1;
+
+  // ens_name is the valid ENS name associated with the chat key
+  string ens_name = 2;
+
+  // images is a list of images associated with an identity
+  map<string, IdentityImage> images = 3;
+}
+
+// ProfileImage represents data associated with a user's profile image
+message IdentityImage {
+
+  // payload is a context based payload for the profile image data,
+  // context is determined by the `source_type`
+  bytes payload = 1;
+
+  // source_type signals the image payload source
+  SourceType source_type = 2;
+
+  // image_type signals the image type and method of parsing the payload
+  ImageType image_type =3;
+
+  // SourceType are the predefined types of image source allowed
+  enum SourceType {
+    UNKNOWN_SOURCE_TYPE = 0;
+
+    // RAW_PAYLOAD image byte data
+    // `payload` must be set
+    // `payload` is image byte data
+    RAW_PAYLOAD = 1;
+
+    // ENS_AVATAR uses the ENS record's resolver get-text-data.avatar data
+    // The `payload` field will be ignored if ENS_AVATAR is selected
+    // The application will read and parse the ENS avatar data as image payload data
+    // The parent `ChatMessageIdentity` must have a valid `ens_name` set
+    ENS_AVATAR = 2;
+  }
+
+  // ImageType is the type of profile image data
+  enum ImageType {
+    UNKNOWN_IMAGE_TYPE = 0;
+
+    // RASTER_IMAGE_FILE is payload data that can be read as a raster image
+    // examples: jpg, png, gif, webp file types
+    RASTER_IMAGE_FILE = 1;
+
+    // VECTOR_IMAGE_FILE is payload data that can be interpreted as a vector image
+    // example: svg file type
+    VECTOR_IMAGE_FILE = 2;
+
+    // AVATAR is payload data that can be parsed as avatar compilation instructions
+    AVATAR = 3;
+  }
+
+}
