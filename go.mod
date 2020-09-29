@@ -43,8 +43,10 @@ require (
 	github.com/multiformats/go-multibase v0.0.1
 	github.com/multiformats/go-varint v0.0.5
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/olekukonko/tablewriter v0.0.2 // indirect
+	github.com/oliamb/cutter v0.2.2
 	github.com/onsi/ginkgo v1.10.3 // indirect
 	github.com/onsi/gomega v1.7.1 // indirect
 	github.com/pborman/uuid v1.2.0
