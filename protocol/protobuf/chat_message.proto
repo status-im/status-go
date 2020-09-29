@@ -12,13 +12,6 @@ message StickerMessage {
 message ImageMessage {
   bytes payload = 1;
   ImageType type = 2;
-  enum ImageType {
-    UNKNOWN_IMAGE_TYPE = 0;
-    PNG = 1;
-    JPEG = 2;
-    WEBP = 3;
-    GIF = 4;
-  }
 }
 
 message AudioMessage {

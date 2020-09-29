@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+import "enums.proto";
+
 // ChatIdentity represents the user defined identity associated with their messages
 message ChatIdentity {
   // Lamport timestamp of the chat message
@@ -58,5 +60,4 @@ message IdentityImage {
     // AVATAR is payload data that can be parsed as avatar compilation instructions
     AVATAR = 3;
   }
-
 }
