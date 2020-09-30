@@ -14,7 +14,12 @@ type API struct {
 	s *Service
 }
 
-func (api *API) SwitchWalletNotifications(ctx context.Context, _ bool) error {
+func (api *API) NotificationPreferences(ctx context.Context) ([]NotificationPreference, error) {
+	return api.s.db.GetPreferences()
+}
+
+func (api *API) SwitchWalletNotifications(ctx context.Context, preference bool) error {
 	log.Debug("Switch Transaction Notification")
-	return nil
+	err := api.s.db.ChangeWalletPreference(preference)
+	return err
 }

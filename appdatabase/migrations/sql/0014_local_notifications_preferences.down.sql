@@ -1,0 +1,1 @@
+DROP TABLE local_notifications_preferences;

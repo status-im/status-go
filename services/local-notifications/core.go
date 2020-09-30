@@ -194,7 +194,13 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 				}
 				return
 			case event := <-events:
-				if event.Type == wallet.EventNewBlock {
+				preference, err := s.db.GetWalletPreference()
+
+				if err != nil {
+					log.Error("Could not get wallet preferences", "error", err)
+				}
+
+				if preference.Enabled && event.Type == wallet.EventNewBlock {
 					s.bus.Send(TransactionEvent{
 						Type:                      string(event.Type),
 						BlockNumber:               event.BlockNumber,
