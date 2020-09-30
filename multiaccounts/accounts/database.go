@@ -436,6 +436,21 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	return accounts, nil
 }
 
+func (db *Database) GetAccountByAddress(address types.Address) (account *Account, err error) {
+	row := db.db.QueryRow("SELECT address, wallet, chat, type, storage, pubkey, path, name, color FROM accounts  WHERE address = ? COLLATE NOCASE", address)
+
+	acc := Account{}
+	err = row.Scan(
+		&acc.Address, &acc.Wallet, &acc.Chat, &acc.Type, &acc.Storage,
+		&acc.PublicKey, &acc.Path, &acc.Name, &acc.Color)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return account, nil
+}
+
 func (db *Database) SaveAccounts(accounts []Account) (err error) {
 	var (
 		tx     *sql.Tx

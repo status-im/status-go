@@ -1,10 +1,9 @@
 package localnotifications
 
 import (
+	"database/sql"
 	"math/big"
 	"sync"
-
-	//TODO: Inspect replacement with go-ethereum/events
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -12,6 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 )
@@ -30,12 +31,15 @@ const (
 )
 
 type notificationBody struct {
-	State    transactionState `json:"state"`
-	From     common.Address   `json:"from"`
-	To       common.Address   `json:"to"`
-	Value    *hexutil.Big     `json:"value"`
-	ERC20    bool             `json:"erc20"`
-	Contract common.Address   `json:"contract"`
+	State       transactionState  `json:"state"`
+	From        common.Address    `json:"from"`
+	To          common.Address    `json:"to"`
+	FromAccount *accounts.Account `json:"fromAccount,omitempty"`
+	ToAccount   *accounts.Account `json:"toAccount,omitempty"`
+	Value       *hexutil.Big      `json:"value"`
+	ERC20       bool              `json:"erc20"`
+	Contract    common.Address    `json:"contract"`
+	Network     uint64            `json:"network"`
 }
 
 type Notification struct {
@@ -72,18 +76,24 @@ type transmitter struct {
 
 // Service keeps the state of message bus
 type Service struct {
-	started            bool
-	bus                *event.Feed
-	transmitter        transmitter
+	started           bool
+	bus               *event.Feed
+	transmitter       transmitter
 	walletTransmitter transmitter
-	db                 *Database
-	walletDB           *wallet.Database
+	db                *Database
+	walletDB          *wallet.Database
+	accountsDB        *accounts.Database
 }
 
-func NewService(db *Database) *Service {
+func NewService(appDB *sql.DB, network uint64) *Service {
+	db := NewDB(appDB, network)
+	walletDB := wallet.NewDB(appDB, network)
+	accountsDB := accounts.NewDB(appDB)
 	return &Service{
-		db:  db,
-		bus: &event.Feed{},
+		db:         db,
+		walletDB:   walletDB,
+		accountsDB: accountsDB,
+		bus:        &event.Feed{},
 	}
 }
 
@@ -92,7 +102,7 @@ func pushMessage(notification *Notification) {
 	signal.SendLocalNotifications(notification)
 }
 
-func buildTransactionNotification(rawTransfer wallet.Transfer) *Notification {
+func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Notification {
 	log.Info("Handled a new transfer in buildTransactionNotification", "info", rawTransfer)
 
 	var state = undetermined
@@ -107,15 +117,28 @@ func buildTransactionNotification(rawTransfer wallet.Transfer) *Notification {
 		state = outbound
 	}
 
-	// TODO: Check if From and To have name in wallet
-	// TODO: Add chain
+	from, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.From))
+
+	if err != nil {
+		log.Error("Could not select From account by address", "error", err)
+	}
+
+	to, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.To))
+
+	if err != nil {
+		log.Error("Could not select To account by address", "error", err)
+	}
+
 	body := notificationBody{
-		State:    state,
-		From:     transfer.From,
-		To:       transfer.Address,
-		Value:    transfer.Value,
-		ERC20:    string(transfer.Type) == "erc20",
-		Contract: transfer.Contract,
+		State:       state,
+		From:        transfer.From,
+		To:          transfer.Address,
+		FromAccount: from,
+		ToAccount:   to,
+		Value:       transfer.Value,
+		ERC20:       string(transfer.Type) == "erc20",
+		Contract:    transfer.Contract,
+		Network:     transfer.NetworkID,
 	}
 
 	return &Notification{
@@ -136,9 +159,9 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 			if err != nil {
 				log.Error("Could not fetch transfers", "error", err)
 			}
-	
+
 			for _, transaction := range transfers {
-				n := buildTransactionNotification(transaction)
+				n := s.buildTransactionNotification(transaction)
 				pushMessage(n)
 			}
 		}
@@ -146,9 +169,7 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 }
 
 // SubscribeWallet - Subscribes to wallet signals and redirects them into Notifications
-func (s *Service) SubscribeWallet(publisher *event.Feed, walletDB *wallet.Database) error {
-	s.walletDB = walletDB
-
+func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 	if s.walletTransmitter.quit != nil {
 		// already running, nothing to do
 		return nil
@@ -223,7 +244,7 @@ func (s *Service) Start(_ *p2p.Server) error {
 // Stop worker
 func (s *Service) Stop() error {
 	s.started = false
-	
+
 	if s.transmitter.quit != nil {
 		close(s.transmitter.quit)
 		s.transmitter.wg.Wait()

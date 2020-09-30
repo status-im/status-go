@@ -32,6 +32,7 @@ func castToTransferView(t Transfer) TransferView {
 	view.TxStatus = hexutil.Uint64(t.Receipt.Status)
 	view.Input = hexutil.Bytes(t.Transaction.Data())
 	view.TxHash = t.Transaction.Hash()
+	view.NetworkID = t.NetworkID
 	switch t.Type {
 	case ethTransfer:
 		view.From = t.From
@@ -96,4 +97,5 @@ type TransferView struct {
 	From        common.Address `json:"from"`
 	To          common.Address `json:"to"`
 	Contract    common.Address `json:"contract"`
+	NetworkID   uint64
 }

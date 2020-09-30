@@ -41,6 +41,7 @@ type Transfer struct {
 	Timestamp   uint64             `json:"timestamp"`
 	Transaction *types.Transaction `json:"transaction"`
 	Loaded      bool
+	NetworkID   uint64
 	// From is derived from tx signature in order to offload this computation from UI component.
 	From    common.Address `json:"from"`
 	Receipt *types.Receipt `json:"receipt"`

@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log FROM transfers"
+const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id FROM transfers"
 
 func newTransfersQuery() *transfersQuery {
 	buf := bytes.NewBuffer(nil)
@@ -118,7 +118,7 @@ func (q *transfersQuery) Scan(rows *sql.Rows) (rst []Transfer, err error) {
 		err = rows.Scan(
 			&transfer.ID, &transfer.Type, &transfer.BlockHash,
 			(*SQLBigInt)(transfer.BlockNumber), &transfer.Timestamp, &transfer.Address,
-			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log})
+			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log}, &transfer.NetworkID)
 		if err != nil {
 			return nil, err
 		}
