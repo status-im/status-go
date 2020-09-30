@@ -31,15 +31,15 @@ const (
 )
 
 type notificationBody struct {
-	State       transactionState `json:"state"`
-	From        common.Address   `json:"from"`
-	To          common.Address   `json:"to"`
-	FromAccount accounts.Account `json:"fromAccount,omitempty"`
-	ToAccount   accounts.Account `json:"toAccount,omitempty"`
-	Value       *hexutil.Big     `json:"value"`
-	ERC20       bool             `json:"erc20"`
-	Contract    common.Address   `json:"contract"`
-	Network     uint64           `json:"network"`
+	State       transactionState  `json:"state"`
+	From        common.Address    `json:"from"`
+	To          common.Address    `json:"to"`
+	FromAccount *accounts.Account `json:"fromAccount,omitempty"`
+	ToAccount   *accounts.Account `json:"toAccount,omitempty"`
+	Value       *hexutil.Big      `json:"value"`
+	ERC20       bool              `json:"erc20"`
+	Contract    common.Address    `json:"contract"`
+	Network     uint64            `json:"network"`
 }
 
 type Notification struct {
@@ -133,8 +133,8 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 		State:       state,
 		From:        transfer.From,
 		To:          transfer.Address,
-		FromAccount: *from,
-		ToAccount:   *to,
+		FromAccount: from,
+		ToAccount:   to,
 		Value:       transfer.Value,
 		ERC20:       string(transfer.Type) == "erc20",
 		Contract:    transfer.Contract,
@@ -174,6 +174,7 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 		// already running, nothing to do
 		return nil
 	}
+
 	s.walletTransmitter.quit = make(chan struct{})
 	events := make(chan wallet.Event, 10)
 	sub := publisher.Subscribe(events)
