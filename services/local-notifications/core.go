@@ -31,15 +31,15 @@ const (
 )
 
 type notificationBody struct {
-	State       transactionState  `json:"state"`
-	From        common.Address    `json:"from"`
-	To          common.Address    `json:"to"`
-	FromAccount *accounts.Account `json:"fromAccount,omitempty"`
-	ToAccount   *accounts.Account `json:"toAccount,omitempty"`
-	Value       *hexutil.Big      `json:"value"`
-	ERC20       bool              `json:"erc20"`
-	Contract    common.Address    `json:"contract"`
-	Network     uint64            `json:"network"`
+	State       transactionState `json:"state"`
+	From        common.Address   `json:"from"`
+	To          common.Address   `json:"to"`
+	FromAccount accounts.Account `json:"fromAccount,omitempty"`
+	ToAccount   accounts.Account `json:"toAccount,omitempty"`
+	Value       *hexutil.Big     `json:"value"`
+	ERC20       bool             `json:"erc20"`
+	Contract    common.Address   `json:"contract"`
+	Network     uint64           `json:"network"`
 }
 
 type Notification struct {
@@ -120,21 +120,21 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	from, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.From))
 
 	if err != nil {
-		log.Error("Could not select From account by address", "error", err)
+		log.Debug("Could not select From account by address", "error", err)
 	}
 
 	to, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.To))
 
 	if err != nil {
-		log.Error("Could not select To account by address", "error", err)
+		log.Debug("Could not select To account by address", "error", err)
 	}
 
 	body := notificationBody{
 		State:       state,
 		From:        transfer.From,
 		To:          transfer.Address,
-		FromAccount: from,
-		ToAccount:   to,
+		FromAccount: *from,
+		ToAccount:   *to,
 		Value:       transfer.Value,
 		ERC20:       string(transfer.Type) == "erc20",
 		Contract:    transfer.Contract,
