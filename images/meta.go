@@ -22,7 +22,6 @@ type Details struct {
 	SizeFile   int64
 	Quality    int
 	FileName   string
-	FileType   FileType
 	Properties string
 }
 
