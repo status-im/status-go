@@ -1,5 +1,5 @@
 CREATE TABLE local_notifications_preferences (
-    service VARCHAR NOT NULL,
+    service VARCHAR,
     event VARCHAR,
     identifier VARCHAR,
     enabled BOOLEAN DEFAULT false,

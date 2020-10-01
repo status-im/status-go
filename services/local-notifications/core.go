@@ -266,7 +266,7 @@ func (s *Service) Stop() error {
 func (s *Service) APIs() []rpc.API {
 	return []rpc.API{
 		{
-			Namespace: "notifications",
+			Namespace: "localnotifications",
 			Version:   "0.1.0",
 			Service:   NewAPI(s),
 			Public:    true,

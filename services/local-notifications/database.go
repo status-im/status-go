@@ -38,13 +38,13 @@ func (db *Database) GetPreferences() (rst []NotificationPreference, err error) {
 }
 
 func (db *Database) GetWalletPreference() (rst NotificationPreference, err error) {
-	pref := db.db.QueryRow("SELECT service, event, identifier, enabled FROM local_notifications_preferences WHERE service = 'wallet' AND event = 'transaction'")
+	pref := db.db.QueryRow("SELECT service, event, identifier, enabled FROM local_notifications_preferences WHERE service = 'wallet' AND event = 'transaction' AND identifier = 'all'")
 
 	err = pref.Scan(&rst.Service, &rst.Event, &rst.Identifier, &rst.Enabled)
 	return
 }
 
 func (db *Database) ChangeWalletPreference(preference bool) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO local_notifications_preferences (service, event, enabled) VALUES ('wallet', 'transaction',  ?)", preference)
+	_, err := db.db.Exec("INSERT OR REPLACE INTO local_notifications_preferences (service, event, identifier, enabled) VALUES ('wallet', 'transaction', 'all', ?)", preference)
 	return err
 }
