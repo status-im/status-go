@@ -21,5 +21,15 @@ func (api *API) NotificationPreferences(ctx context.Context) ([]NotificationPref
 func (api *API) SwitchWalletNotifications(ctx context.Context, preference bool) error {
 	log.Debug("Switch Transaction Notification")
 	err := api.s.db.ChangeWalletPreference(preference)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if preference {
+		api.s.StartWalletWatcher()
+	} else {
+		api.s.StopWalletWatcher()
+	}
+
+	return nil
 }

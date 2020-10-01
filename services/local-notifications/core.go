@@ -70,16 +70,16 @@ type CustomEvent struct{}
 const topic = "local-notifications"
 
 type transmitter struct {
-	wg   sync.WaitGroup
-	quit chan struct{}
+	wg        sync.WaitGroup
+	publisher *event.Feed
+	quit      chan struct{}
 }
 
 // Service keeps the state of message bus
 type Service struct {
 	started           bool
-	bus               *event.Feed
-	transmitter       transmitter
-	walletTransmitter transmitter
+	transmitter       *transmitter
+	walletTransmitter *transmitter
 	db                *Database
 	walletDB          *wallet.Database
 	accountsDB        *accounts.Database
@@ -89,11 +89,15 @@ func NewService(appDB *sql.DB, network uint64) *Service {
 	db := NewDB(appDB, network)
 	walletDB := wallet.NewDB(appDB, network)
 	accountsDB := accounts.NewDB(appDB)
+	trans := &transmitter{}
+	walletTrans := &transmitter{}
+
 	return &Service{
-		db:         db,
-		walletDB:   walletDB,
-		accountsDB: accountsDB,
-		bus:        &event.Feed{},
+		db:                db,
+		walletDB:          walletDB,
+		accountsDB:        accountsDB,
+		transmitter:       trans,
+		walletTransmitter: walletTrans,
 	}
 }
 
@@ -168,18 +172,42 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 	}
 }
 
-// SubscribeWallet - Subscribes to wallet signals and redirects them into Notifications
+// SubscribeWallet - Subscribes to wallet signals
 func (s *Service) SubscribeWallet(publisher *event.Feed) error {
+	s.walletTransmitter.publisher = publisher
+
+	preference, err := s.db.GetWalletPreference()
+
+	if err != nil {
+		log.Error("Failed to get wallet preference", "error", err)
+		return nil
+	}
+
+	if preference.Enabled {
+		s.StartWalletWatcher()
+	}
+
+	return nil
+}
+
+// StartWalletWatcher - Forward wallet events to notifications
+func (s *Service) StartWalletWatcher() {
 	if s.walletTransmitter.quit != nil {
 		// already running, nothing to do
-		return nil
+		return
+	}
+
+	if s.walletTransmitter.publisher == nil {
+		log.Error("wallet publisher was not initialized")
+		return
 	}
 
 	s.walletTransmitter.quit = make(chan struct{})
 	events := make(chan wallet.Event, 10)
-	sub := publisher.Subscribe(events)
+	sub := s.walletTransmitter.publisher.Subscribe(events)
 
 	s.walletTransmitter.wg.Add(1)
+
 	go func() {
 		defer s.walletTransmitter.wg.Done()
 		for {
@@ -197,7 +225,7 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 			case event := <-events:
 
 				if event.Type == wallet.EventNewBlock {
-					s.bus.Send(TransactionEvent{
+					s.transmitter.publisher.Send(TransactionEvent{
 						Type:                      string(event.Type),
 						BlockNumber:               event.BlockNumber,
 						Accounts:                  []common.Address(event.Accounts),
@@ -208,7 +236,15 @@ func (s *Service) SubscribeWallet(publisher *event.Feed) error {
 			}
 		}
 	}()
-	return nil
+}
+
+// StopWalletWatcher - stops watching for new wallet events
+func (s *Service) StopWalletWatcher() {
+	if s.walletTransmitter.quit != nil {
+		close(s.walletTransmitter.quit)
+		s.walletTransmitter.wg.Wait()
+		s.walletTransmitter.quit = nil
+	}
 }
 
 // Start Worker which processes all incoming messages
@@ -216,8 +252,10 @@ func (s *Service) Start(_ *p2p.Server) error {
 	s.started = true
 
 	s.transmitter.quit = make(chan struct{})
+	s.transmitter.publisher = &event.Feed{}
+
 	events := make(chan TransactionEvent, 10)
-	sub := s.bus.Subscribe(events)
+	sub := s.transmitter.publisher.Subscribe(events)
 
 	s.transmitter.wg.Add(1)
 	go func() {
