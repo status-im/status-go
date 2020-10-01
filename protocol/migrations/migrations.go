@@ -27,7 +27,7 @@
 // 1599641390_add_emoji_reactions_index.down.sql (67B)
 // 1599641390_add_emoji_reactions_index.up.sql (126B)
 // 1599720851_add_seen_index_remove_long_messages.down.sql (96B)
-// 1599720851_add_seen_index_remove_long_messages.up.sql (136B)
+// 1599720851_add_seen_index_remove_long_messages.up.sql (150B)
 // doc.go (850B)
 
 package migrations
@@ -592,7 +592,7 @@ func _1599641390_add_emoji_reactions_indexDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599641390_add_emoji_reactions_index.down.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1599682300, 0)}
+	info := bindataFileInfo{name: "1599641390_add_emoji_reactions_index.down.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1599736377, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x89, 0x39, 0x0, 0x51, 0x5b, 0x48, 0xc3, 0xf3, 0x6a, 0x96, 0xf1, 0xd2, 0xa6, 0x60, 0xa8, 0x68, 0x21, 0xb5, 0xa0, 0x11, 0x11, 0x99, 0xde, 0xad, 0xa6, 0xa7, 0x56, 0xc1, 0xb2, 0xa6, 0x63, 0xe4}}
 	return a, nil
 }
@@ -612,7 +612,7 @@ func _1599641390_add_emoji_reactions_indexUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599641390_add_emoji_reactions_index.up.sql", size: 126, mode: os.FileMode(0644), modTime: time.Unix(1599682300, 0)}
+	info := bindataFileInfo{name: "1599641390_add_emoji_reactions_index.up.sql", size: 126, mode: os.FileMode(0644), modTime: time.Unix(1599736377, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf9, 0xd8, 0xdc, 0xa7, 0xb, 0x92, 0x7a, 0x61, 0x37, 0x24, 0x1c, 0x77, 0x5e, 0xe, 0x7e, 0xfc, 0x9f, 0x98, 0x7b, 0x65, 0xe7, 0xf9, 0x71, 0x57, 0x89, 0x2d, 0x90, 0x1b, 0xf6, 0x5e, 0x37, 0xe8}}
 	return a, nil
 }
@@ -632,12 +632,12 @@ func _1599720851_add_seen_index_remove_long_messagesDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599720851_add_seen_index_remove_long_messages.down.sql", size: 96, mode: os.FileMode(0644), modTime: time.Unix(1599720983, 0)}
+	info := bindataFileInfo{name: "1599720851_add_seen_index_remove_long_messages.down.sql", size: 96, mode: os.FileMode(0644), modTime: time.Unix(1599736377, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x6f, 0x80, 0x18, 0xaf, 0xf9, 0x83, 0xd6, 0xcb, 0xa1, 0xc1, 0xf1, 0xf6, 0x32, 0x11, 0xd2, 0x72, 0xef, 0x74, 0x83, 0x53, 0x3a, 0xc4, 0x77, 0x6, 0x66, 0xa0, 0xe3, 0x5a, 0x4d, 0x1b, 0x30, 0x6}}
 	return a, nil
 }
 
-var __1599720851_add_seen_index_remove_long_messagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x0e\x72\x75\x0c\x71\x55\xf0\xf4\x73\x71\x8d\x50\x28\x4e\x4d\xcd\x8b\xcf\xc9\x4f\x4e\xcc\x89\x4f\xce\x48\x2c\x89\xcf\x4c\x89\xcf\x4c\xa9\x50\xf0\xf7\x53\x28\x2d\x4e\x2d\x8a\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\xd6\x40\x51\xa2\x03\xd6\xa6\x69\xcd\x15\x1a\xe0\x02\x32\x0a\x45\xa9\x42\xb0\x6b\x88\x42\x46\x66\x4a\xaa\x82\xad\x82\xa1\x42\xb8\x87\x6b\x90\xab\x42\x4e\x6a\x5e\x7a\x49\x86\x46\x49\x6a\x45\x89\xa6\x82\x9d\x82\x89\x81\xa5\x99\x35\x17\x20\x00\x00\xff\xff\x17\x21\xe3\x82\x88\x00\x00\x00")
+var __1599720851_add_seen_index_remove_long_messagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\xcc\xb1\x0a\xc2\x30\x14\x46\xe1\xbd\x4f\xf1\x8f\x2d\x38\x28\x88\x20\x45\x41\xec\x15\xb3\xa4\xd2\x44\xec\x16\x42\x73\x69\x02\xb1\x82\x89\xd0\xc7\x17\xdd\xba\x7f\xe7\x9c\x3b\x3a\x69\x82\x90\x0d\xf5\x10\x17\xc8\x56\x83\x7a\xa1\xb4\x42\x62\x9e\x4c\x7c\x0d\x36\x9a\xc1\xdb\x6c\x82\x33\xc1\xcd\x68\x25\x3e\x89\xdf\xe6\xc9\x29\xd9\x91\x53\xb9\x20\xab\x7f\x56\xd5\xc5\xfd\xd6\xfc\xc6\x0b\x0a\x45\x1a\x3e\x38\xc6\x01\x1b\x3c\xae\xd4\x11\x22\x4f\x63\xf6\x65\xe6\x39\x57\x38\x62\xbb\xde\xef\xea\xe2\x1b\x00\x00\xff\xff\x44\x35\x03\x9f\x96\x00\x00\x00")
 
 func _1599720851_add_seen_index_remove_long_messagesUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -652,8 +652,8 @@ func _1599720851_add_seen_index_remove_long_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1599720851_add_seen_index_remove_long_messages.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1599720954, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe2, 0x5d, 0xc6, 0x4f, 0xc8, 0x1e, 0x11, 0x83, 0xa1, 0x7f, 0x63, 0xf0, 0x78, 0xb2, 0xa1, 0x8f, 0x16, 0x91, 0xd9, 0xbc, 0x55, 0xee, 0xde, 0xe5, 0x84, 0xff, 0xba, 0xec, 0x64, 0x15, 0x11, 0x6a}}
+	info := bindataFileInfo{name: "1599720851_add_seen_index_remove_long_messages.up.sql", size: 150, mode: os.FileMode(0644), modTime: time.Unix(1601544684, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x24, 0x1c, 0xc4, 0x78, 0x91, 0xc7, 0xeb, 0xfe, 0xc8, 0xa0, 0xd8, 0x13, 0x27, 0x97, 0xc8, 0x96, 0x56, 0x97, 0x33, 0x2c, 0x1e, 0x16, 0x8a, 0xd3, 0x49, 0x99, 0x3, 0xe9, 0xbb, 0xc4, 0x5, 0x3c}}
 	return a, nil
 }
 

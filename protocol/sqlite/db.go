@@ -121,6 +121,18 @@ func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name stri
 		return errors.Wrap(err, "failed to create migration instance")
 	}
 
+	version, dirty, err := m.Version()
+	if err != nil && err != migrate.ErrNilVersion {
+		return errors.Wrap(err, "could not get version")
+	}
+
+	// Force version if dirty
+	if dirty {
+		if err = m.Force(int(version)); err != nil {
+			return errors.Wrap(err, "failed to force migration")
+		}
+	}
+
 	if err = m.Up(); err != migrate.ErrNoChange {
 		return errors.Wrap(err, "failed to migrate")
 	}
