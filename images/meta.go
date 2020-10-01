@@ -6,8 +6,10 @@ import (
 )
 
 const (
+	UNKNOWN FileType = 1 + iota
+
 	// Raster image types
-	JPEG FileType = 1 + iota
+	JPEG
 	PNG
 	GIF
 	WEBP
