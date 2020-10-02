@@ -332,10 +332,14 @@ github.com/multiformats/go-multistream
 github.com/multiformats/go-varint
 # github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 github.com/mutecomm/go-sqlcipher
+# github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+github.com/nfnt/resize
 # github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 github.com/okzk/sdnotify
 # github.com/olekukonko/tablewriter v0.0.2
 github.com/olekukonko/tablewriter
+# github.com/oliamb/cutter v0.2.2
+github.com/oliamb/cutter
 # github.com/opentracing/opentracing-go v1.1.0
 github.com/opentracing/opentracing-go
 github.com/opentracing/opentracing-go/ext
@@ -497,6 +501,10 @@ golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
 golang.org/x/image/bmp
+golang.org/x/image/riff
+golang.org/x/image/vp8
+golang.org/x/image/vp8l
+golang.org/x/image/webp
 # golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 golang.org/x/lint
 golang.org/x/lint/golint
@@ -517,7 +525,7 @@ golang.org/x/sync/syncmap
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.2
+# golang.org/x/text v0.3.3
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
