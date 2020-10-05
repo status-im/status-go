@@ -33,15 +33,15 @@ const (
 )
 
 type notificationBody struct {
-	State       transactionState `json:"state"`
-	From        common.Address   `json:"from"`
-	To          common.Address   `json:"to"`
-	FromAccount accounts.Account `json:"fromAccount,omitempty"`
-	ToAccount   accounts.Account `json:"toAccount,omitempty"`
-	Value       *hexutil.Big     `json:"value"`
-	ERC20       bool             `json:"erc20"`
-	Contract    common.Address   `json:"contract"`
-	Network     uint64           `json:"network"`
+	State       transactionState  `json:"state"`
+	From        common.Address    `json:"from"`
+	To          common.Address    `json:"to"`
+	FromAccount *accounts.Account `json:"fromAccount,omitempty"`
+	ToAccount   *accounts.Account `json:"toAccount,omitempty"`
+	Value       *hexutil.Big      `json:"value"`
+	ERC20       bool              `json:"erc20"`
+	Contract    common.Address    `json:"contract"`
+	Network     uint64            `json:"network"`
 }
 
 type Notification struct {
@@ -125,21 +125,21 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 		state = outbound
 	}
 
-	from, errFrom := s.accountsDB.GetAccountByAddress(types.Address(transfer.From))
+	from, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.From))
 
-	if errFrom != nil {
-		log.Debug("Could not select From account by address", "error", errFrom)
+	if err != nil {
+		log.Debug("Could not select From account by address", "error", err)
 	}
 
-	to, errTo := s.accountsDB.GetAccountByAddress(types.Address(transfer.To))
+	to, err := s.accountsDB.GetAccountByAddress(types.Address(transfer.To))
 
-	if errTo != nil {
-		log.Debug("Could not select To account by address", "error", errTo)
+	if err != nil {
+		log.Debug("Could not select To account by address", "error", err)
 	}
 
-	if errFrom == nil {
+	if from != nil {
 		deeplink = walletDeeplinkPrefix + from.Address.String()
-	} else if errTo == nil {
+	} else if to != nil {
 		deeplink = walletDeeplinkPrefix + to.Address.String()
 	}
 
