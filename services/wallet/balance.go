@@ -10,9 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/ierc20"
 )
+
+var requestTimeout = 20 * time.Second
 
 // GetTokensBalances takes list of accounts and tokens and returns mapping of token balances for each account.
 func GetTokensBalances(parent context.Context, client *ethclient.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
@@ -22,7 +25,7 @@ func GetTokensBalances(parent context.Context, client *ethclient.Client, account
 		response = map[common.Address]map[common.Address]*hexutil.Big{}
 	)
 	// requested current head to request balance on the same block number
-	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	ctx, cancel := context.WithTimeout(parent, requestTimeout)
 	header, err := client.HeaderByNumber(ctx, nil)
 	cancel()
 	if err != nil {
@@ -35,16 +38,21 @@ func GetTokensBalances(parent context.Context, client *ethclient.Client, account
 			return nil, err
 		}
 		for _, account := range accounts {
+			// Why we are doing this?
 			account := account
 			group.Add(func(parent context.Context) error {
-				ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+				ctx, cancel := context.WithTimeout(parent, requestTimeout)
 				balance, err := caller.BalanceOf(&bind.CallOpts{
 					BlockNumber: header.Number,
 					Context:     ctx,
 				}, account)
 				cancel()
+				// We don't want to return an error here and prevent
+				// the rest from completing
 				if err != nil {
-					return err
+					log.Error("can't fetch erc20 token balance", "account", account, "token", token, "error", err)
+
+					return nil
 				}
 				mu.Lock()
 				_, exist := response[account]

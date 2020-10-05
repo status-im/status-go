@@ -131,7 +131,7 @@ func (s *BalancesSuite) TestNoAccounts() {
 
 func (s *BalancesSuite) TestTokenNotDeployed() {
 	_, err := GetTokensBalances(context.Background(), s.client, s.accounts, []common.Address{{0x01}})
-	s.Require().EqualError(err, "no contract code at given address")
+	s.Require().NoError(err)
 }
 
 func (s *BalancesSuite) TestInterrupted() {
