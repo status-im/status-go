@@ -258,6 +258,11 @@ func (s *Service) StopWalletWatcher() {
 	}
 }
 
+// IsWatchingWallet - check if local-notifications are subscribed to wallet updates
+func (s *Service) IsWatchingWallet() bool {
+	return s.walletTransmitter != nil
+}
+
 // Start Worker which processes all incoming messages
 func (s *Service) Start(_ *p2p.Server) error {
 	s.started = true
