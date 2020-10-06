@@ -113,7 +113,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	log.Info("Handled a new transfer in buildTransactionNotification", "info", rawTransfer)
 
 	var deeplink string
-	var state = undetermined
+	state := undetermined
 	transfer := wallet.CastToTransferView(rawTransfer)
 
 	switch {
@@ -260,7 +260,7 @@ func (s *Service) StopWalletWatcher() {
 
 // IsWatchingWallet - check if local-notifications are subscribed to wallet updates
 func (s *Service) IsWatchingWallet() bool {
-	return s.walletTransmitter != nil
+	return s.walletTransmitter.quit != nil
 }
 
 // Start Worker which processes all incoming messages
