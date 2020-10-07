@@ -21,17 +21,17 @@ func setupAppTestDb(t *testing.T) (*sql.DB, func()) {
 	}
 }
 
-func setupTestDB(t *testing.T) (*Database, func()) {
-	db, stop := setupAppTestDb(t)
-
+func setupTestDB(t *testing.T, db *sql.DB) (*Database, func()) {
 	return NewDB(db, 1777), func() {
 		require.NoError(t, db.Close())
-		stop()
 	}
 }
 
 func TestWalletPreferences(t *testing.T) {
-	db, stop := setupTestDB(t)
+	appDB, appStop := setupAppTestDb(t)
+	defer appStop()
+
+	db, stop := setupTestDB(t, appDB)
 	defer stop()
 
 	enabled := true
@@ -48,7 +48,10 @@ func TestWalletPreferences(t *testing.T) {
 }
 
 func TestPreferences(t *testing.T) {
-	db, stop := setupTestDB(t)
+	appDB, appStop := setupAppTestDb(t)
+	defer appStop()
+
+	db, stop := setupTestDB(t, appDB)
 	defer stop()
 
 	enabled := true

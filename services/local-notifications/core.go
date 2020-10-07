@@ -234,7 +234,6 @@ func (s *Service) StartWalletWatcher() {
 				}
 				return
 			case event := <-events:
-
 				if event.Type == wallet.EventNewBlock {
 					s.transmitter.publisher.Send(TransactionEvent{
 						Type:                      string(event.Type),
