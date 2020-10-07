@@ -73,9 +73,10 @@ type CustomEvent struct{}
 const topic = "local-notifications"
 
 type transmitter struct {
-	wg        sync.WaitGroup
 	publisher *event.Feed
-	quit      chan struct{}
+
+	wg   sync.WaitGroup
+	quit chan struct{}
 }
 
 // Service keeps the state of message bus

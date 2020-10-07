@@ -16,6 +16,7 @@ type publisher interface {
 // SignalsTransmitter transmits received events as wallet signals.
 type SignalsTransmitter struct {
 	publisher
+
 	wg   sync.WaitGroup
 	quit chan struct{}
 }
