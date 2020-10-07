@@ -17,8 +17,6 @@ import (
 	"github.com/status-im/status-go/signal"
 )
 
-type messagePayload interface{}
-
 type PushCategory string
 
 type transactionState string
@@ -26,10 +24,9 @@ type transactionState string
 const walletDeeplinkPrefix = "status-im://wallet/"
 
 const (
-	undetermined transactionState = "undetermined"
-	failed       transactionState = "failed"
-	inbound      transactionState = "inbound"
-	outbound     transactionState = "outbound"
+	failed   transactionState = "failed"
+	inbound  transactionState = "inbound"
+	outbound transactionState = "outbound"
 )
 
 type notificationBody struct {
@@ -69,8 +66,6 @@ type MessageEvent struct{}
 
 // CustomEvent - structure used to pass custom user set messages to bus
 type CustomEvent struct{}
-
-const topic = "local-notifications"
 
 type transmitter struct {
 	publisher *event.Feed
@@ -114,7 +109,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	log.Info("Handled a new transfer in buildTransactionNotification", "info", rawTransfer)
 
 	var deeplink string
-	state := undetermined
+	var state transactionState
 	transfer := wallet.CastToTransferView(rawTransfer)
 
 	switch {
@@ -239,9 +234,9 @@ func (s *Service) StartWalletWatcher() {
 					s.transmitter.publisher.Send(TransactionEvent{
 						Type:                      string(event.Type),
 						BlockNumber:               event.BlockNumber,
-						Accounts:                  []common.Address(event.Accounts),
-						NewTransactionsPerAccount: map[common.Address]int(event.NewTransactionsPerAccount),
-						ERC20:                     bool(event.ERC20),
+						Accounts:                  event.Accounts,
+						NewTransactionsPerAccount: event.NewTransactionsPerAccount,
+						ERC20:                     event.ERC20,
 					})
 				}
 			}

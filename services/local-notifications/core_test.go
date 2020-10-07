@@ -69,7 +69,6 @@ func TestTransactionNotification(t *testing.T) {
 	s := NewService(db, 1777)
 	require.NoError(t, s.Start(nil))
 	require.Equal(t, true, s.IsStarted())
-	defer s.Stop()
 
 	var signalEvent []byte
 
@@ -120,7 +119,8 @@ func TestTransactionNotification(t *testing.T) {
 			Type  string
 			Event Notification
 		}{}
-		json.Unmarshal(signalEvent, &notification)
+
+		require.NoError(t, json.Unmarshal(signalEvent, &notification))
 
 		if notification.Type != "local-notifications" {
 			return fmt.Errorf("Wrong signal was sent")
@@ -130,4 +130,6 @@ func TestTransactionNotification(t *testing.T) {
 		}
 		return nil
 	}, 2*time.Second, 100*time.Millisecond))
+
+	require.NoError(t, s.Stop())
 }

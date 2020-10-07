@@ -37,6 +37,7 @@ func TestWalletPreferences(t *testing.T) {
 	enabled := true
 	require.NoError(t, db.ChangeWalletPreference(enabled))
 	rst, err := db.GetWalletPreference()
+	require.NoError(t, err)
 	require.Equal(t, enabled, rst.Enabled)
 
 	enabled = false

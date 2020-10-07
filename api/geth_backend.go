@@ -1016,7 +1016,12 @@ func (b *GethStatusBackend) StartLocalNotifications() error {
 		}
 	}
 
-	localPN.SubscribeWallet(wallet.GetFeed())
+	err = localPN.SubscribeWallet(wallet.GetFeed())
+
+	if err != nil {
+		b.log.Error("LocalNotifications service could not subscribe to wallet on StartLocalNotifications", "error", err)
+		return nil
+	}
 
 	return nil
 }
