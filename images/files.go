@@ -7,7 +7,6 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"net/http"
 	"os"
 
 	"golang.org/x/image/webp"
@@ -20,27 +19,45 @@ func Get(fileName string) (image.Image, error) {
 	}
 	defer file.Close()
 
-	fb := make([]byte, 12)
-	file.Read(fb)
-	ft := GetFileType(fb)
-	if ft == UNKNOWN {
-		return nil, errors.New("unsupported file type")
+	fb, err := prepareFileForDecode(file)
+	if err != nil {
+		return nil, err
 	}
 
-	var img image.Image
-	switch ft {
+	return decodeImageData(fb, file)
+}
+
+func prepareFileForDecode(file *os.File) ([]byte, error) {
+	// Read the first 14 bytes, used for performing image type checks before parsing the image data
+	fb := make([]byte, 14)
+	_, err := file.Read(fb)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reset the read cursor
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return fb, nil
+}
+
+func decodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
+	switch GetFileType(buf) {
 	case JPEG:
-		img, err = jpeg.Decode(file)
-		break
+		img, err = jpeg.Decode(r)
 	case PNG:
-		img, err = png.Decode(file)
-		break
+		img, err = png.Decode(r)
 	case GIF:
-		img, err = gif.Decode(file)
-		break
+		img, err = gif.Decode(r)
 	case WEBP:
-		img, err = webp.Decode(file)
-		break
+		img, err = webp.Decode(r)
+	case UNKNOWN:
+		fallthrough
+	default:
+		return nil, errors.New("unsupported file type")
 	}
 	if err != nil {
 		return nil, err
