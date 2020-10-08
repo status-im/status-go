@@ -890,7 +890,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		}
 
 		groupChatInvitation, err = m.persistence.InvitationByID(groupChatInvitation.ID())
-		if err != nil && err != errRecordNotFound {
+		if err != nil && err != common.ErrRecordNotFound {
 			return nil, err
 		}
 		if groupChatInvitation != nil {
@@ -3199,7 +3199,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 
 	// Hide previous message
 	previousMessage, err := m.persistence.MessageByCommandID(chatID, messageID)
-	if err != nil && err != errRecordNotFound {
+	if err != nil && err != common.ErrRecordNotFound {
 		return nil, err
 	}
 
@@ -3423,7 +3423,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		if len(message.CommandParameters.ID) != 0 {
 			// Hide previous message
 			previousMessage, err := m.persistence.MessageByCommandID(chatID, message.CommandParameters.ID)
-			if err != nil && err != errRecordNotFound {
+			if err != nil && err != common.ErrRecordNotFound {
 				return nil, err
 			}
 
