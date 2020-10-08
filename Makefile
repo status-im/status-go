@@ -287,7 +287,7 @@ test-unit: UNIT_TEST_PACKAGES = $(shell go list ./...  | \
 	grep -v /t/benchmarks | \
 	grep -v /transactions/fake )
 test-unit: ##@tests Run unit and integration tests
-	go test -v -timeout 30m -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
+	go test -v -failfast $(UNIT_TEST_PACKAGES) $(gotest_extraflags)
 	cd ./waku && go test -v -failfast ./... $(gotest_extraflags)
 
 test-unit-race: gotest_extraflags=-race
