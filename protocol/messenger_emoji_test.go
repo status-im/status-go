@@ -3,8 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +13,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -32,8 +31,7 @@ type MessengerEmojiSuite struct {
 	// a single Waku service should be shared.
 	shh types.Waku
 
-	tmpFiles []*os.File // files to clean up
-	logger   *zap.Logger
+	logger *zap.Logger
 }
 
 func (s *MessengerEmojiSuite) SetupTest() {
@@ -55,13 +53,10 @@ func (s *MessengerEmojiSuite) TearDownTest() {
 }
 
 func (s *MessengerEmojiSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpFile, err := ioutil.TempFile("", "")
-	s.Require().NoError(err)
-
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(tmpFile.Name(), "some-key"),
+		WithDatabaseConfig(sqlite.InMemoryPath, "some-key"),
 		WithDatasync(),
 	}
 	installationID := uuid.New().String()
@@ -75,8 +70,6 @@ func (s *MessengerEmojiSuite) newMessengerWithKey(shh types.Waku, privateKey *ec
 
 	err = m.Init()
 	s.Require().NoError(err)
-
-	s.tmpFiles = append(s.tmpFiles, tmpFile)
 
 	return m
 }
