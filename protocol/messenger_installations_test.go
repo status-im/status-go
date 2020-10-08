@@ -4,8 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,6 +14,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -35,8 +34,7 @@ type MessengerInstallationSuite struct {
 	// a single Waku service should be shared.
 	shh types.Waku
 
-	tmpFiles []*os.File // files to clean up
-	logger   *zap.Logger
+	logger *zap.Logger
 }
 
 func (s *MessengerInstallationSuite) SetupTest() {
@@ -59,13 +57,10 @@ func (s *MessengerInstallationSuite) TearDownTest() {
 }
 
 func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpFile, err := ioutil.TempFile("", "")
-	s.Require().NoError(err)
-
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(tmpFile.Name(), "some-key"),
+		WithDatabaseConfig(sqlite.InMemoryPath, "some-key"),
 		WithDatasync(),
 	}
 	installationID := uuid.New().String()
@@ -79,8 +74,6 @@ func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Waku, private
 
 	err = m.Init()
 	s.Require().NoError(err)
-
-	s.tmpFiles = append(s.tmpFiles, tmpFile)
 
 	return m
 }

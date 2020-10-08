@@ -6,9 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"math/big"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -63,9 +61,8 @@ type MessengerSuite struct {
 	privateKey *ecdsa.PrivateKey // private key for the main instance of Messenger
 	// If one wants to send messages between different instances of Messenger,
 	// a single Whisper service should be shared.
-	shh      types.Waku
-	tmpFiles []*os.File // files to clean up
-	logger   *zap.Logger
+	shh    types.Waku
+	logger *zap.Logger
 }
 
 type testNode struct {
@@ -111,13 +108,10 @@ func (s *MessengerSuite) SetupTest() {
 }
 
 func (s *MessengerSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpFile, err := ioutil.TempFile("", "")
-	s.Require().NoError(err)
-
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(tmpFile.Name(), "some-key"),
+		WithDatabaseConfig(":memory:", "some-key"),
 	}
 	if s.enableDataSync {
 		options = append(options, WithDatasync())
@@ -133,8 +127,6 @@ func (s *MessengerSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.P
 	err = m.Init()
 	s.Require().NoError(err)
 
-	s.tmpFiles = append(s.tmpFiles, tmpFile)
-
 	return m
 }
 
@@ -146,9 +138,6 @@ func (s *MessengerSuite) newMessenger(shh types.Waku) *Messenger {
 
 func (s *MessengerSuite) TearDownTest() {
 	s.Require().NoError(s.m.Shutdown())
-	for _, f := range s.tmpFiles {
-		_ = os.Remove(f.Name())
-	}
 	_ = s.logger.Sync()
 }
 
