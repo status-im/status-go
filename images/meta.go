@@ -25,7 +25,7 @@ type Details struct {
 
 type FileType uint
 
-func MakeDetails(imageName string, size uint, quality int, properties string) Details {
+func NewDetails(imageName string, size uint, quality int, properties string) Details {
 	return Details{
 		SizePixel:  size,
 		Quality:    quality,

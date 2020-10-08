@@ -1,21 +1,28 @@
 package images
 
 import (
-	"github.com/stretchr/testify/require"
+	"bytes"
 	"image"
+	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	path = "../_assets/tests/"
 )
 
 func TestGet(t *testing.T) {
 
-	cs := []struct{
+	cs := []struct {
 		Filepath string
-		Error bool
-		Nil bool
-		Bounds image.Rectangle
+		Error    bool
+		Nil      bool
+		Bounds   image.Rectangle
 	}{
 		{
-			"../_assets/tests/elephant.jpg",
+			"elephant.jpg",
 			false,
 			false,
 			image.Rectangle{
@@ -24,7 +31,7 @@ func TestGet(t *testing.T) {
 			},
 		},
 		{
-			"../_assets/tests/status.png",
+			"status.png",
 			false,
 			false,
 			image.Rectangle{
@@ -33,7 +40,7 @@ func TestGet(t *testing.T) {
 			},
 		},
 		{
-			"../_assets/tests/spin.gif",
+			"spin.gif",
 			false,
 			false,
 			image.Rectangle{
@@ -42,7 +49,7 @@ func TestGet(t *testing.T) {
 			},
 		},
 		{
-			"../_assets/tests/rose.webp",
+			"rose.webp",
 			false,
 			false,
 			image.Rectangle{
@@ -51,29 +58,114 @@ func TestGet(t *testing.T) {
 			},
 		},
 		{
-			"../_assets/tests/test.aac",
+			"test.aac",
 			true,
 			true,
 			image.Rectangle{},
 		},
 	}
 
-	for _, test := range cs {
-		img, err := Get(test.Filepath)
+	for _, c := range cs {
+		img, err := Get(path + c.Filepath)
 
-		if test.Error {
+		if c.Error {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
 		}
 
-		if test.Nil {
+		if c.Nil {
 			require.Nil(t, img)
 			continue
 		} else {
 			require.NotNil(t, img)
 		}
 
-		require.Exactly(t, test.Bounds, img.Bounds())
+		require.Exactly(t, c.Bounds, img.Bounds())
+	}
+}
+
+func TestRender(t *testing.T) {
+	cs := []struct {
+		FileName   string
+		RenderSize int
+	}{
+		{
+			"elephant.jpg",
+			1447,
+		},
+		{
+			"rose.webp",
+			11119,
+		},
+		{
+			"spin.gif",
+			2263,
+		},
+		{
+			"status.png",
+			5834,
+		},
+	}
+	options := Details{
+		Quality: 70,
+	}
+
+	for _, c := range cs {
+		img, err := Get(path + c.FileName)
+		require.NoError(t, err)
+
+		bb := bytes.NewBuffer([]byte{})
+		err = Render(bb, img, &options)
+		require.NoError(t, err)
+
+		require.Exactly(t, c.RenderSize, bb.Len())
+	}
+}
+
+func TestMakeAndRenderFile(t *testing.T) {
+	cs := []struct {
+		FileName   string
+		OutName    string
+		OutputSize int64
+	}{
+		{
+			"elephant.jpg",
+			"_elephant.jpg",
+			1447,
+		},
+		{
+			"rose.webp",
+			"_rose.jpg",
+			11119,
+		},
+		{
+			"spin.gif",
+			"_spin.jpg",
+			2263,
+		},
+		{
+			"status.png",
+			"_status.jpg",
+			5834,
+		},
+	}
+
+	for _, c := range cs {
+		img, err := Get(path + c.FileName)
+		require.NoError(t, err)
+
+		options := &Details{
+			FileName: path + c.OutName,
+			Quality:  70,
+		}
+
+		err = MakeAndRenderFile(img, options)
+		require.NoError(t, err)
+		require.Exactly(t, c.OutputSize, options.SizeFile)
+
+		// tidy up
+		err = os.Remove(options.FileName)
+		require.NoError(t, err)
 	}
 }

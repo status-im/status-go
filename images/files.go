@@ -105,14 +105,14 @@ func isWebp(buf []byte) bool {
 		buf[10] == 0x42 && buf[11] == 0x50
 }
 
-func Render(img image.Image, imgDetail *Details) error {
+func MakeAndRenderFile(img image.Image, imgDetail *Details) error {
 	out, err := os.Create(imgDetail.FileName)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	err = renderJpeg(out, img, imgDetail)
+	err = Render(out, img, imgDetail)
 	if err != nil {
 		return err
 	}
@@ -121,6 +121,11 @@ func Render(img image.Image, imgDetail *Details) error {
 	imgDetail.SizeFile = fi.Size()
 
 	return nil
+}
+
+func Render(w io.Writer, img image.Image, imgDetail *Details) error {
+	// Currently a wrapper for renderJpeg, but this function is useful if multiple render formats are needed
+	return renderJpeg(w, img, imgDetail)
 }
 
 func renderJpeg(w io.Writer, m image.Image, imgDetail *Details) error {
