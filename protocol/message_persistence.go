@@ -9,12 +9,6 @@ import (
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-
-	"github.com/pkg/errors"
-)
-
-var (
-	errRecordNotFound = errors.New("record not found")
 )
 
 func (db sqlitePersistence) tableUserMessagesAllFields() string {
@@ -315,7 +309,7 @@ func (db sqlitePersistence) messageByID(tx *sql.Tx, id string) (*common.Message,
 	err = db.tableUserMessagesScanAllFields(row, &message)
 	switch err {
 	case sql.ErrNoRows:
-		return nil, errRecordNotFound
+		return nil, common.ErrRecordNotFound
 	case nil:
 		return &message, nil
 	default:
@@ -356,7 +350,7 @@ func (db sqlitePersistence) MessageByCommandID(chatID, id string) (*common.Messa
 	err := db.tableUserMessagesScanAllFields(row, &message)
 	switch err {
 	case sql.ErrNoRows:
-		return nil, errRecordNotFound
+		return nil, common.ErrRecordNotFound
 	case nil:
 		return &message, nil
 	default:
@@ -854,7 +848,7 @@ func (db sqlitePersistence) EmojiReactionByID(id string) (*EmojiReaction, error)
 
 	switch err {
 	case sql.ErrNoRows:
-		return nil, errRecordNotFound
+		return nil, common.ErrRecordNotFound
 	case nil:
 		return emojiReaction, nil
 	default:
@@ -947,7 +941,7 @@ func (db sqlitePersistence) InvitationByID(id string) (*GroupChatInvitation, err
 
 	switch err {
 	case sql.ErrNoRows:
-		return nil, errRecordNotFound
+		return nil, common.ErrRecordNotFound
 	case nil:
 		return chatInvitations, nil
 	default:

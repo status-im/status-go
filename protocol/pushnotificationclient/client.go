@@ -7,7 +7,6 @@ import (
 	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -839,7 +838,7 @@ func (c *Client) getMessage(messageID string) (*common.Message, error) {
 	retries := 0
 	for retries < 10 {
 		message, err := c.messagePersistence.MessageByID(messageID)
-		if err == sql.ErrNoRows {
+		if err == common.ErrRecordNotFound {
 			retries++
 			time.Sleep(300 * time.Millisecond)
 			continue
@@ -849,7 +848,7 @@ func (c *Client) getMessage(messageID string) (*common.Message, error) {
 
 		return message, nil
 	}
-	return nil, sql.ErrNoRows
+	return nil, common.ErrRecordNotFound
 }
 
 // handlePublicMessageSent handles public messages, we notify only on mentions
