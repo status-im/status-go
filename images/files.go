@@ -105,7 +105,7 @@ func isWebp(buf []byte) bool {
 		buf[10] == 0x42 && buf[11] == 0x50
 }
 
-func MakeAndRenderFile(img image.Image, imgDetail *Details) error {
+func RenderAndMakeFile(img image.Image, imgDetail *Details) error {
 	out, err := os.Create(imgDetail.FileName)
 	if err != nil {
 		return err
