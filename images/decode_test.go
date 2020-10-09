@@ -11,7 +11,7 @@ const (
 	path = "../_assets/tests/"
 )
 
-func TestGet(t *testing.T) {
+func TestDecode(t *testing.T) {
 
 	cs := []struct {
 		Filepath string
@@ -64,7 +64,7 @@ func TestGet(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		img, err := Get(path + c.Filepath)
+		img, err := Decode(path + c.Filepath)
 
 		if c.Error {
 			require.Error(t, err)
