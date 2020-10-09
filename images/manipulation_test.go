@@ -10,7 +10,91 @@ import (
 )
 
 func TestResize(t *testing.T) {
+	sizes := []uint{80, 240, 1000}
 
+	cs := []struct{
+		Filename string
+		Bounds map[uint]image.Rectangle
+	}{
+		{
+			"elephant.jpg",
+			map[uint]image.Rectangle{
+				80:	{
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 80, Y: 80},
+				},
+				240: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 240, Y: 240},
+				},
+				1000: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 1000, Y: 1000},
+				},
+			},
+		},
+		{
+			"rose.webp",
+			map[uint]image.Rectangle{
+				80:	{
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 107, Y: 80},
+				},
+				240: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 319, Y: 240},
+				},
+				1000: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 1329, Y: 1000},
+				},
+			},
+		},
+		{
+			"spin.gif",
+			map[uint]image.Rectangle{
+				80:	{
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 80, Y: 80},
+				},
+				240: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 240, Y: 240},
+				},
+				1000: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 1000, Y: 1000},
+				},
+			},
+		},
+		{
+			"status.png",
+			map[uint]image.Rectangle{
+				80:	{
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 80, Y: 80},
+				},
+				240: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 240, Y: 240},
+				},
+				1000: {
+					Min: image.Point{X: 0, Y: 0},
+					Max: image.Point{X: 1000, Y: 1000},
+				},
+			},
+		},
+	}
+
+	for _, c := range cs {
+		img, err := Decode(path + c.Filename)
+		require.NoError(t, err)
+
+		for _, s := range sizes {
+			rsImg := Resize(s, img)
+			require.Exactly(t, c.Bounds[s], rsImg.Bounds())
+		}
+	}
 }
 
 func TestCrop(t *testing.T) {
@@ -39,7 +123,7 @@ func TestCrop(t *testing.T) {
 	}
 
 	cs := []struct{
-		FileName string
+		Filename string
 		Params   []params
 	}{
 		{
@@ -77,7 +161,7 @@ func TestCrop(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		img, err := Decode(path + c.FileName)
+		img, err := Decode(path + c.Filename)
 		require.NoError(t, err)
 
 		for _, p := range c.Params {
@@ -88,8 +172,8 @@ func TestCrop(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			require.Exactly(t, p.OutputBound.Dx(), cImg.Bounds().Dx(), c.FileName)
-			require.Exactly(t, p.OutputBound.Dy(), cImg.Bounds().Dy(), c.FileName)
+			require.Exactly(t, p.OutputBound.Dx(), cImg.Bounds().Dx(), c.Filename)
+			require.Exactly(t, p.OutputBound.Dy(), cImg.Bounds().Dy(), c.Filename)
 
 			bb := bytes.NewBuffer([]byte{})
 			err = Encode(bb, cImg, options)
