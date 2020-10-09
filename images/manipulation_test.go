@@ -3,9 +3,10 @@ package images
 import (
 	"bytes"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"image"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestResize(t *testing.T) {
@@ -76,7 +77,7 @@ func TestCrop(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		img, err := Get(path + c.FileName)
+		img, err := Decode(path + c.FileName)
 		require.NoError(t, err)
 
 		for _, p := range c.Params {
@@ -91,7 +92,7 @@ func TestCrop(t *testing.T) {
 			require.Exactly(t, p.OutputBound.Dy(), cImg.Bounds().Dy(), c.FileName)
 
 			bb := bytes.NewBuffer([]byte{})
-			err = Render(bb, cImg, options)
+			err = Encode(bb, cImg, options)
 			require.NoError(t, err)
 			require.Exactly(t, p.OutputSize, bb.Len())
 		}

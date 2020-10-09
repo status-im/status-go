@@ -12,7 +12,7 @@ import (
 	"golang.org/x/image/webp"
 )
 
-func Get(fileName string) (image.Image, error) {
+func Decode(fileName string) (image.Image, error) {
 	file, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
