@@ -160,7 +160,7 @@ func TestMakeAndRenderFile(t *testing.T) {
 			Quality:  70,
 		}
 
-		err = MakeAndRenderFile(img, options)
+		err = RenderAndMakeFile(img, options)
 		require.NoError(t, err)
 		require.Exactly(t, c.OutputSize, options.SizeFile)
 
