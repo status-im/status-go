@@ -156,6 +156,7 @@ func (b *GethStatusBackend) OpenAccounts() error {
 	}
 	db, err := multiaccounts.InitializeDB(filepath.Join(b.rootDataDir, "accounts.sql"))
 	if err != nil {
+		b.log.Error("failed to initialize accounts db", "err", err)
 		return err
 	}
 	b.multiaccountsDB = db
@@ -240,6 +241,7 @@ func (b *GethStatusBackend) ensureAppDBOpened(account multiaccounts.Account, pas
 
 	b.appDB, err = appdatabase.InitializeDB(newPath, password)
 	if err != nil {
+		b.log.Error("failed to initialize db", "err", err)
 		return err
 	}
 	return nil
