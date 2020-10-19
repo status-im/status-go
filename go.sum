@@ -652,8 +652,8 @@ github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 h1:ju5UTwk5Od
 github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
 github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e h1:iT/UJdf+SzbgkIPDe/RmlCfLEQ+ab4UMl6toBl9CGZA=
 github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
-github.com/status-im/markdown v0.0.0-20200210164614-b9fe92168122 h1:q18rWqbHHXZGKPAIuvlb2wAAA3XzlMbkEey2bhKf8GY=
-github.com/status-im/markdown v0.0.0-20200210164614-b9fe92168122/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
+github.com/status-im/markdown v0.0.0-20201019100609-fdf2b9595723 h1:knqBM/gX4XxsIpX1clXEl8oMYc5KBcgmdLyZEvMJAMk=
+github.com/status-im/markdown v0.0.0-20201019100609-fdf2b9595723/go.mod h1:9yR8woqkJIHs3sf9pEjYvaGfmhsXR1leEMAX6+Z5y+M=
 github.com/status-im/migrate/v4 v4.6.2-status.2 h1:SdC+sMDl/aI7vUlwD2qj2p7KsK4T60IS9z4/rYCCbI8=
 github.com/status-im/migrate/v4 v4.6.2-status.2/go.mod h1:c/kc90n47GZu/58nnz1OMLTf7uE4Da4gZP5qmU+A/v8=
 github.com/status-im/rendezvous v1.3.0 h1:7RK/MXXW+tlm0asKm1u7Qp7Yni6AO29a7j8+E4Lbjg4=
