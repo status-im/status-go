@@ -382,9 +382,42 @@ func (c *Strong) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&c1)
 }
 
+// StrongEmph represents markdown strong emphasis node
+type StrongEmph struct {
+	Leaf
+}
+
+func (c *StrongEmph) MarshalJSON() ([]byte, error) {
+	type StrongJSON struct {
+		Type    string `json:"type"`
+		Literal string `json:"literal"`
+		*Attribute
+	}
+	var c1 StrongJSON
+	c1.Literal = string(c.Literal)
+	c1.Attribute = c.Attribute
+	c1.Type = "strong-emph"
+
+	return json.Marshal(&c1)
+}
+
 // Del represents markdown del node
 type Del struct {
 	Leaf
+}
+
+func (c *Del) MarshalJSON() ([]byte, error) {
+	type StrongJSON struct {
+		Type    string `json:"type"`
+		Literal string `json:"literal"`
+		*Attribute
+	}
+	var c1 StrongJSON
+	c1.Literal = string(c.Literal)
+	c1.Attribute = c.Attribute
+	c1.Type = "del"
+
+	return json.Marshal(&c1)
 }
 
 // Link represents markdown link node
