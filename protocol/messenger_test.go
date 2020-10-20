@@ -289,7 +289,7 @@ func buildTestMessage(chat Chat) *common.Message {
 	message.LocalChatID = chat.ID
 	message.ContentType = protobuf.ChatMessage_TEXT_PLAIN
 	switch chat.ChatType {
-	case ChatTypePublic:
+	case ChatTypePublic, ChatTypeProfile:
 		message.MessageType = protobuf.MessageType_PUBLIC_GROUP
 	case ChatTypeOneToOne:
 		message.MessageType = protobuf.MessageType_ONE_TO_ONE
@@ -363,6 +363,33 @@ func (s *MessengerSuite) TestSendPublic() {
 	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
+	s.Require().True(outputMessage.Seen, "it marks the message as seen")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
+	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
+	s.Require().Equal(protobuf.MessageType_PUBLIC_GROUP, outputMessage.MessageType)
+
+	savedMessages, _, err := s.m.MessageByChatID(chat.ID, "", 10)
+	s.Require().NoError(err)
+	s.Require().Equal(1, len(savedMessages), "it saves the message")
+}
+
+func (s *MessengerSuite) TestSendProfile() {
+	chat := CreateProfileChat("test-chat-profile", "0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), s.m.transport)
+	chat.LastClockValue = uint64(100000000000000)
+	err := s.m.SaveChat(&chat)
+	s.NoError(err)
+	inputMessage := buildTestMessage(chat)
+	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	s.Require().Equal(1, len(response.Messages), "it returns the message")
+	outputMessage := response.Messages[0]
+
+	s.Require().Equal(uint64(100000000000001), outputMessage.Clock, "it correctly sets the clock")
+	s.Require().Equal(uint64(100000000000001), chat.LastClockValue, "it correctly sets the last-clock-value")
+	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
+	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
+	s.Require().Equal(chat.Profile, outputMessage.From, "From equal to chat Profile")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
 	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")

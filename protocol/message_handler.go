@@ -349,6 +349,11 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
+	// If profile updates check if author is the same as chat profile public key
+	if chat.ProfileUpdates() && receivedMessage.From != chat.Profile {
+		return nil
+	}
+
 	// If deleted-at is greater, ignore message
 	if chat.DeletedAtClockValue >= receivedMessage.Clock {
 		return nil
