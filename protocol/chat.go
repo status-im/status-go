@@ -28,6 +28,7 @@ const (
 	ChatTypeOneToOne ChatType = iota + 1
 	ChatTypePublic
 	ChatTypePrivateGroupChat
+	ChatTypeProfile
 )
 
 type Chat struct {
@@ -71,6 +72,9 @@ type Chat struct {
 
 	// Public key of administrator who created invitation link
 	InvitationAdmin string `json:"invitationAdmin,omitempty"`
+
+	// Public key of user profile
+	Profile string `json:"profile,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
@@ -89,6 +93,10 @@ func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
 
 func (c *Chat) Public() bool {
 	return c.ChatType == ChatTypePublic
+}
+
+func (c *Chat) ProfileUpdates() bool {
+	return c.ChatType == ChatTypeProfile
 }
 
 func (c *Chat) OneToOne() bool {
@@ -264,6 +272,18 @@ func CreatePublicChat(name string, timesource TimeSource) Chat {
 		Timestamp: int64(timesource.GetCurrentTime()),
 		Color:     chatColors[rand.Intn(len(chatColors))],
 		ChatType:  ChatTypePublic,
+	}
+}
+
+func CreateProfileChat(name string, profile string, timesource TimeSource) Chat {
+	return Chat{
+		ID:        name,
+		Name:      name,
+		Active:    true,
+		Timestamp: int64(timesource.GetCurrentTime()),
+		Color:     chatColors[rand.Intn(len(chatColors))],
+		ChatType:  ChatTypeProfile,
+		Profile:   profile,
 	}
 }
 

@@ -502,7 +502,7 @@ func (m *Messenger) Init() error {
 			continue
 		}
 		switch chat.ChatType {
-		case ChatTypePublic:
+		case ChatTypePublic, ChatTypeProfile:
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		case ChatTypeOneToOne:
 			pk, err := chat.PublicKey()
@@ -673,7 +673,7 @@ func (m *Messenger) Join(chat Chat) error {
 			return err
 		}
 		return m.transport.JoinGroup(members)
-	case ChatTypePublic:
+	case ChatTypePublic, ChatTypeProfile:
 		return m.transport.JoinPublic(chat.ID)
 	default:
 		return errors.New("chat is neither public nor private")
@@ -696,7 +696,7 @@ func (m *Messenger) Leave(chat Chat) error {
 			return err
 		}
 		return m.transport.LeaveGroup(members)
-	case ChatTypePublic:
+	case ChatTypePublic, ChatTypeProfile:
 		return m.transport.LeavePublic(chat.Name)
 	default:
 		return errors.New("chat is neither public nor private")
@@ -1657,7 +1657,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			return nil, err
 		}
 
-	case ChatTypePublic:
+	case ChatTypePublic, ChatTypeProfile:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
 		id, err = m.processor.SendPublic(ctx, chat.ID, spec)
 		if err != nil {
@@ -3796,7 +3796,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 		if err != nil {
 			return nil, err
 		}
-	case ChatTypePublic:
+	case ChatTypePublic, ChatTypeProfile:
 		l.Debug("sending public message", zap.String("chatName", chat.Name))
 		message.SetMessageType(protobuf.MessageType_PUBLIC_GROUP)
 		encodedMessage, err = proto.Marshal(message.GetProtobuf())
