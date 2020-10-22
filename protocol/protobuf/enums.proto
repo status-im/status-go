@@ -19,10 +19,4 @@ enum ImageType {
   JPEG = 2;
   WEBP = 3;
   GIF = 4;
-
-  // Vector image files is payload data that can be interpreted as a vector image
-  SVG = 101;
-
-  // AVATAR is payload data that can be parsed as avatar compilation instructions
-  AVATAR = 201;
 }
