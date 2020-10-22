@@ -24,8 +24,7 @@ func renderJpeg(w io.Writer, m image.Image, config EncodeConfig) error {
 	return jpeg.Encode(w, m, o)
 }
 
-func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size uint) error {
-	// TODO test
+func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) error {
 	q := MaxJpegQuality
 	for q > MinJpegQuality-1 {
 
@@ -50,6 +49,7 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size uint) error {
 			}
 		}
 
+		bb.Reset()
 		q -= 2
 	}
 

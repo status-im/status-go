@@ -10,15 +10,15 @@ import (
 )
 
 func TestResize(t *testing.T) {
-	sizes := []uint{80, 240, 1000}
+	sizes := []ResizeDimension{80, 240, 1000}
 
 	cs := []struct{
 		Filename string
-		Bounds map[uint]image.Rectangle
+		Bounds map[ResizeDimension]image.Rectangle
 	}{
 		{
 			"elephant.jpg",
-			map[uint]image.Rectangle{
+			map[ResizeDimension]image.Rectangle{
 				80:	{
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 80, Y: 80},
@@ -35,7 +35,7 @@ func TestResize(t *testing.T) {
 		},
 		{
 			"rose.webp",
-			map[uint]image.Rectangle{
+			map[ResizeDimension]image.Rectangle{
 				80:	{
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 107, Y: 80},
@@ -52,7 +52,7 @@ func TestResize(t *testing.T) {
 		},
 		{
 			"spin.gif",
-			map[uint]image.Rectangle{
+			map[ResizeDimension]image.Rectangle{
 				80:	{
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 80, Y: 80},
@@ -69,7 +69,7 @@ func TestResize(t *testing.T) {
 		},
 		{
 			"status.png",
-			map[uint]image.Rectangle{
+			map[ResizeDimension]image.Rectangle{
 				80:	{
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 80, Y: 80},

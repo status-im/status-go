@@ -8,16 +8,16 @@ import (
 	"github.com/oliamb/cutter"
 )
 
-func Resize(size uint, img image.Image) image.Image {
+func Resize(size ResizeDimension, img image.Image) image.Image {
 	var width, height uint
 
 	switch{
 	case img.Bounds().Max.X == img.Bounds().Max.Y:
-		width, height = size, size
+		width, height = uint(size), uint(size)
 	case img.Bounds().Max.X > img.Bounds().Max.Y:
-		width, height = 0, size
+		width, height = 0, uint(size)
 	default:
-		width, height = size, 0
+		width, height = uint(size), 0
 	}
 
 	return resize.Resize(width, height, img, resize.Bilinear)
