@@ -670,6 +670,11 @@ func isSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
 }
 
+// isLowerCaseLetter returns true if c is ascii lower case letter
+func isLowerCaseLetter(c byte) bool {
+	return (c >= 'a' && c <= 'z')
+}
+
 // isLetter returns true if c is ascii letter
 func isLetter(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
@@ -681,8 +686,13 @@ func isAlnum(c byte) bool {
 	return (c >= '0' && c <= '9') || isLetter(c)
 }
 
+// isNum returns true if c is a digit
+func isNum(c byte) bool {
+	return (c >= '0' && c <= '9')
+}
+
 func isValidStatusTagChar(c byte) bool {
-	return isAlnum(c) || c == '-'
+	return isNum(c) || isLowerCaseLetter(c) || c == '-'
 }
 
 func isValidTerminatingMentionChar(c byte) bool {
