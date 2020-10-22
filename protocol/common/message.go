@@ -358,13 +358,13 @@ func (m *Message) PrepareContent() error {
 
 func getImageMessageMIME(i *protobuf.ImageMessage) (string, error) {
 	switch i.Type {
-	case protobuf.ImageMessage_PNG:
+	case protobuf.ImageType_PNG:
 		return "png", nil
-	case protobuf.ImageMessage_JPEG:
+	case protobuf.ImageType_JPEG:
 		return "jpeg", nil
-	case protobuf.ImageMessage_WEBP:
+	case protobuf.ImageType_WEBP:
 		return "webp", nil
-	case protobuf.ImageMessage_GIF:
+	case protobuf.ImageType_GIF:
 		return "gif", nil
 	}
 	return "", errors.New("image format not supported")
