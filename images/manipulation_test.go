@@ -118,7 +118,7 @@ func TestCrop(t *testing.T) {
 		Max: image.Point{X: 1000000, Y: 1000000},
 	}
 	rect := image.Rectangle{}
-	options := &Details{
+	options := EncodeConfig{
 		Quality: 70,
 	}
 

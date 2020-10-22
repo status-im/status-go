@@ -29,7 +29,7 @@ func TestEncode(t *testing.T) {
 			5834,
 		},
 	}
-	options := Details{
+	options := EncodeConfig{
 		Quality: 70,
 	}
 
@@ -38,7 +38,7 @@ func TestEncode(t *testing.T) {
 		require.NoError(t, err)
 
 		bb := bytes.NewBuffer([]byte{})
-		err = Encode(bb, img, &options)
+		err = Encode(bb, img, options)
 		require.NoError(t, err)
 
 		require.Exactly(t, c.RenderSize, bb.Len())

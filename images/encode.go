@@ -1,19 +1,57 @@
 package images
 
 import (
+	"bytes"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"io"
 )
 
-func Encode(w io.Writer, img image.Image, imgDetail *Details) error {
-	// Currently a wrapper for renderJpeg, but this function is useful if multiple render formats are needed
-	return renderJpeg(w, img, imgDetail)
+type EncodeConfig struct {
+	Quality    int
 }
 
-func renderJpeg(w io.Writer, m image.Image, imgDetail *Details) error {
+func Encode(w io.Writer, img image.Image, config EncodeConfig) error {
+	// Currently a wrapper for renderJpeg, but this function is useful if multiple render formats are needed
+	return renderJpeg(w, img, config)
+}
+
+func renderJpeg(w io.Writer, m image.Image, config EncodeConfig) error {
 	o := new(jpeg.Options)
-	o.Quality = imgDetail.Quality
+	o.Quality = config.Quality
 
 	return jpeg.Encode(w, m, o)
+}
+
+func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size uint) error {
+	// TODO test
+	q := MaxJpegQuality
+	for q > MinJpegQuality-1 {
+
+		err := Encode(bb, img, EncodeConfig{Quality: q})
+		if err != nil {
+			return err
+		}
+
+		if DimensionSizeLimit[size].Ideal > bb.Len() {
+			return nil
+		}
+
+		if q == MinJpegQuality {
+			if DimensionSizeLimit[size].Max > bb.Len(){
+				return nil
+			} else {
+				return fmt.Errorf(
+					"image size after processing exceeds max, expect < '%d', received < '%d'",
+					DimensionSizeLimit[size].Max,
+					bb.Len(),
+				)
+			}
+		}
+
+		q -= 2
+	}
+
+	return nil
 }
