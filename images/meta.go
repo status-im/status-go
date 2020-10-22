@@ -13,10 +13,6 @@ const (
 	PNG
 	GIF
 	WEBP
-
-	// Vector image types
-	SVG
-	AI
 )
 
 type Details struct {
