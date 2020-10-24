@@ -1,13 +1,10 @@
 package statusgo
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/images"
-	"image"
 	"os"
 	"unsafe"
 
@@ -20,6 +17,7 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
