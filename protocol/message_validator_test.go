@@ -390,7 +390,7 @@ func (s *MessageValidatorSuite) TestValidatePlainTextMessage() {
 				EnsName:    "",
 				Payload: &protobuf.ChatMessage_Image{
 					Image: &protobuf.ImageMessage{
-						Type:    protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE,
+						Type:    protobuf.ImageType_UNKNOWN_IMAGE_TYPE,
 						Payload: []byte("some-payload"),
 					},
 				},
