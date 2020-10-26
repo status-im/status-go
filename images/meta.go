@@ -1,7 +1,7 @@
 package images
 
 const (
-	UNKNOWN FileType = 1 + iota
+	UNKNOWN ImageType = 1 + iota
 
 	// Raster image types
 	JPEG
@@ -37,5 +37,5 @@ type DimensionLimits struct {
 	Max   int
 }
 
-type FileType uint
+type ImageType uint
 type ResizeDimension uint

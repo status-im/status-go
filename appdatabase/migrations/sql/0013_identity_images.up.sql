@@ -6,4 +6,3 @@ CREATE TABLE IF NOT EXISTS identity_images(
     file_size int,
     resize_target int
 ) WITHOUT ROWID;
-
