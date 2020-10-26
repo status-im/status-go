@@ -17,7 +17,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/exportlogs"
 	"github.com/status-im/status-go/extkeys"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
@@ -630,15 +629,25 @@ func MultiformatDeserializePublicKey(key, outBase string) string {
 	return pk
 }
 
+// GetProfileImages returns an array of base64 encoded images related to the user's profile
+func GetProfileImages() string {
+	pis, err := statusBackend.GetProfileImages()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return pis
+}
+
 // SaveProfileImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
 // The resulting image(s) will be stored in the DB along with other user account information.
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
 func SaveProfileImage(filepath string, aX, aY, bX, bY int) string {
-	imgs, err := images.GenerateProfileImages(filepath, aX, aY, bX, bY)
+	imgs, err := statusBackend.SaveProfileImage(filepath, aX, aY, bX, bY)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
-
+	return imgs
 }
