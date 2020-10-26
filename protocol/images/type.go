@@ -5,17 +5,17 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func ImageType(buf []byte) protobuf.ImageMessage_ImageType {
+func ImageType(buf []byte) protobuf.ImageType {
 	switch images.GetFileType(buf){
 	case images.JPEG:
-		return protobuf.ImageMessage_JPEG
+		return protobuf.ImageType_JPEG
 	case images.PNG:
-		return protobuf.ImageMessage_PNG
+		return protobuf.ImageType_PNG
 	case images.GIF:
-		return protobuf.ImageMessage_GIF
+		return protobuf.ImageType_GIF
 	case images.WEBP:
-		return protobuf.ImageMessage_WEBP
+		return protobuf.ImageType_WEBP
 	default:
-		return protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE
+		return protobuf.ImageType_UNKNOWN_IMAGE_TYPE
 	}
 }

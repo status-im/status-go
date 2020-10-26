@@ -208,7 +208,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if len(image.Payload) == 0 {
 			return errors.New("image payload empty")
 		}
-		if image.Type == protobuf.ImageMessage_UNKNOWN_IMAGE_TYPE {
+		if image.Type == protobuf.ImageType_UNKNOWN_IMAGE_TYPE {
 			return errors.New("image type unknown")
 		}
 	}
