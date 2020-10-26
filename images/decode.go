@@ -2,6 +2,7 @@ package images
 
 import (
 	"errors"
+	"github.com/davecgh/go-spew/spew"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -31,6 +32,9 @@ func prepareFileForDecode(file *os.File) ([]byte, error) {
 	// Read the first 14 bytes, used for performing image type checks before parsing the image data
 	fb := make([]byte, 14)
 	_, err := file.Read(fb)
+
+	spew.Dump(fb)
+
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +49,7 @@ func prepareFileForDecode(file *os.File) ([]byte, error) {
 }
 
 func decodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
-	switch GetFileType(buf) {
+	switch GetType(buf) {
 	case JPEG:
 		img, err = jpeg.Decode(r)
 	case PNG:
@@ -66,7 +70,7 @@ func decodeImageData(buf []byte, r io.Reader) (img image.Image, err error) {
 	return img, nil
 }
 
-func GetFileType(buf []byte) FileType {
+func GetType(buf []byte) ImageType {
 	switch {
 	case isJpeg(buf):
 		return JPEG
@@ -78,6 +82,21 @@ func GetFileType(buf []byte) FileType {
 		return WEBP
 	default:
 		return UNKNOWN
+	}
+}
+
+func GetMimeType(buf []byte) (string, error) {
+	switch {
+	case isJpeg(buf):
+		return "jpeg", nil
+	case isPng(buf):
+		return "png", nil
+	case isGif(buf):
+		return "gif", nil
+	case isWebp(buf):
+		return "webp", nil
+	default:
+		return "", errors.New("image format not supported")
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 func ImageType(buf []byte) protobuf.ImageType {
-	switch images.GetFileType(buf){
+	switch images.GetType(buf){
 	case images.JPEG:
 		return protobuf.ImageType_JPEG
 	case images.PNG:

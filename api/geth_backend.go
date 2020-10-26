@@ -1270,11 +1270,16 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 	return hexEncodedSignature, nil
 }
 
+// GetProfileImages returns an array of base64 encoded images related to the user's profile
 func (b *GethStatusBackend) GetProfileImages() (string, error) {
 	// TODO
 	return "", nil
 }
 
+// SaveProfileImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
+// The resulting image(s) will be stored in the DB along with other user account information.
+// aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
+// bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
 func (b *GethStatusBackend) SaveProfileImage(filepath string, aX, aY, bX, bY int) (string, error) {
 	imgs, err := images.GenerateProfileImages(filepath, aX, aY, bX, bY)
 

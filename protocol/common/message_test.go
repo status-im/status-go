@@ -35,32 +35,6 @@ func TestPrepareContentImage(t *testing.T) {
 	require.Equal(t, expectedJPEG, message.Base64Image)
 }
 
-func TestGetImageMessageMIME(t *testing.T) {
-	jpeg := &protobuf.ImageMessage{Type: protobuf.ImageType_JPEG}
-	mime, err := getImageMessageMIME(jpeg)
-	require.NoError(t, err)
-	require.Equal(t, "jpeg", mime)
-
-	png := &protobuf.ImageMessage{Type: protobuf.ImageType_PNG}
-	mime, err = getImageMessageMIME(png)
-	require.NoError(t, err)
-	require.Equal(t, "png", mime)
-
-	webp := &protobuf.ImageMessage{Type: protobuf.ImageType_WEBP}
-	mime, err = getImageMessageMIME(webp)
-	require.NoError(t, err)
-	require.Equal(t, "webp", mime)
-
-	gif := &protobuf.ImageMessage{Type: protobuf.ImageType_GIF}
-	mime, err = getImageMessageMIME(gif)
-	require.NoError(t, err)
-	require.Equal(t, "gif", mime)
-
-	unknown := &protobuf.ImageMessage{Type: protobuf.ImageType_UNKNOWN_IMAGE_TYPE}
-	_, err = getImageMessageMIME(unknown)
-	require.Error(t, err)
-}
-
 func TestPrepareContentAudio(t *testing.T) {
 	file, err := os.Open("../../_assets/tests/test.aac")
 	require.NoError(t, err)
@@ -91,10 +65,6 @@ func TestGetAudioMessageMIME(t *testing.T) {
 	mime, err = getAudioMessageMIME(amr)
 	require.NoError(t, err)
 	require.Equal(t, "amr", mime)
-
-	unknown := &protobuf.ImageMessage{Type: protobuf.ImageType_UNKNOWN_IMAGE_TYPE}
-	_, err = getImageMessageMIME(unknown)
-	require.Error(t, err)
 }
 
 func TestPrepareContentMentions(t *testing.T) {
