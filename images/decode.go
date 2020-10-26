@@ -2,7 +2,6 @@ package images
 
 import (
 	"errors"
-	"github.com/davecgh/go-spew/spew"
 	"image"
 	"image/gif"
 	"image/jpeg"
@@ -32,9 +31,6 @@ func prepareFileForDecode(file *os.File) ([]byte, error) {
 	// Read the first 14 bytes, used for performing image type checks before parsing the image data
 	fb := make([]byte, 14)
 	_, err := file.Read(fb)
-
-	spew.Dump(fb)
-
 	if err != nil {
 		return nil, err
 	}
