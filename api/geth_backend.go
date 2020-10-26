@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/status-im/status-go/images"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -1267,4 +1268,15 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 
 	hexEncodedSignature := types.EncodeHex(signature)
 	return hexEncodedSignature, nil
+}
+
+func (b *GethStatusBackend) GetProfileImages() (string, error) {
+	// TODO
+	return "", nil
+}
+
+func (b *GethStatusBackend) SaveProfileImage(filepath string, aX, aY, bX, bY int) (string, error) {
+	imgs, err := images.GenerateProfileImages(filepath, aX, aY, bX, bY)
+
+	return nil, err
 }
