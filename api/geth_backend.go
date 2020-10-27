@@ -1271,8 +1271,8 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 	return hexEncodedSignature, nil
 }
 
-// GetProfileImages returns an array of base64 encoded images related to the user's profile
-func (b *GethStatusBackend) GetProfileImages() (string, error) {
+// GetIdentityImages returns an array of json marshalled IdentityImages assigned to the user's identity
+func (b *GethStatusBackend) GetIdentityImages() (string, error) {
 	idb := images.NewDatabase(b.appDB)
 	iis, err := idb.GetIdentityImages()
 	if err != nil {
@@ -1284,11 +1284,24 @@ func (b *GethStatusBackend) GetProfileImages() (string, error) {
 	return string(js), err
 }
 
-// SaveProfileImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
+// GetIdentityImage returns a json object representing the image with the given name
+func (b *GethStatusBackend) GetIdentityImage(name string) (string, error) {
+	idb := images.NewDatabase(b.appDB)
+	ii, err := idb.GetIdentityImage(name)
+	if err != nil {
+		return "", err
+	}
+
+	js, err := json.Marshal(ii)
+
+	return string(js), err
+}
+
+// StoreIdentityImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
 // The resulting image(s) will be stored in the DB along with other user account information.
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
-func (b *GethStatusBackend) SaveProfileImage(filepath string, aX, aY, bX, bY int) (string, error) {
+func (b *GethStatusBackend) StoreIdentityImage(filepath string, aX, aY, bX, bY int) (string, error) {
 	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
 	if err != nil {
 		return "", err
@@ -1303,4 +1316,10 @@ func (b *GethStatusBackend) SaveProfileImage(filepath string, aX, aY, bX, bY int
 	js, err := json.Marshal(iis)
 
 	return string(js), err
+}
+
+// DeleteIdentityImage deletes an IdentityImage from the db with the given name
+func (b *GethStatusBackend) DeleteIdentityImage(name string) error {
+	idb := images.NewDatabase(b.appDB)
+	return idb.DeleteIdentityImage(name)
 }
