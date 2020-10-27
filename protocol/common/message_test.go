@@ -114,3 +114,17 @@ func TestPrepareContentMentions(t *testing.T) {
 	require.Equal(t, message.Mentions[0], pk1String)
 	require.Equal(t, message.Mentions[1], pk2String)
 }
+
+func TestPrepareContentLinks(t *testing.T) {
+	message := &Message{}
+
+	link1 := "https://github.com/status-im/status-react"
+	link2 := "https://www.youtube.com/watch?v=6RYO8KCY6YE"
+
+	message.Text = "Just look at that repo " + link1 + " . And watch this video - " + link2
+
+	require.NoError(t, message.PrepareContent())
+	require.Len(t, message.Links, 2)
+	require.Equal(t, message.Links[0], link1)
+	require.Equal(t, message.Links[1], link2)
+}

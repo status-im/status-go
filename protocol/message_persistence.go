@@ -36,6 +36,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		audio_duration_ms,
 		audio_base64,
 		mentions,
+		links,
 		command_id,
 		command_value,
 		command_from,
@@ -71,6 +72,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		COALESCE(m1.audio_duration_ms,0),
 		m1.audio_base64,
 		m1.mentions,
+		m1.links,
 		m1.command_id,
 		m1.command_value,
 		m1.command_from,
@@ -109,6 +111,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedAudio sql.NullString
 	var quotedAudioDuration sql.NullInt64
 	var serializedMentions []byte
+	var serializedLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
 
@@ -137,6 +140,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&audio.DurationMs,
 		&message.Base64Audio,
 		&serializedMentions,
+		&serializedLinks,
 		&command.ID,
 		&command.Value,
 		&command.From,
@@ -178,6 +182,13 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 
 	if serializedMentions != nil {
 		err := json.Unmarshal(serializedMentions, &message.Mentions)
+		if err != nil {
+			return err
+		}
+	}
+
+	if serializedLinks != nil {
+		err := json.Unmarshal(serializedLinks, &message.Links)
 		if err != nil {
 			return err
 		}
@@ -226,6 +237,15 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 			return nil, err
 		}
 	}
+
+	var serializedLinks []byte
+	if len(message.Links) != 0 {
+		serializedLinks, err = json.Marshal(message.Links)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return []interface{}{
 		message.ID,
 		message.WhisperTimestamp,
@@ -251,6 +271,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		audio.DurationMs,
 		message.Base64Audio,
 		serializedMentions,
+		serializedLinks,
 		command.ID,
 		command.Value,
 		command.From,
