@@ -31,7 +31,7 @@ func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityIma
 		}
 
 		ii := &IdentityImage{
-			Type:         ResizeDimensionToName[s],
+			Name:         ResizeDimensionToName[s],
 			Payload:      bb.Bytes(),
 			Width:        rImg.Bounds().Dx(),
 			Height:       rImg.Bounds().Dy(),
