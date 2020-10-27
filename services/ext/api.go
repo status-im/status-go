@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/services/ext/mailservers"
 )
 
@@ -561,6 +562,16 @@ func (api *PublicAPI) SendEmojiReactionRetraction(ctx context.Context, emojiReac
 
 func (api *PublicAPI) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*protocol.EmojiReaction, error) {
 	return api.service.messenger.EmojiReactionsByChatID(chatID, cursor, limit)
+}
+
+// Urls
+
+func (api *PublicAPI) GetLinkPreviewWhitelist() []urls.Site {
+	return urls.LinkPreviewWhitelist()
+}
+
+func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPreviewData, err error) {
+	return urls.GetLinkPreviewData(link)
 }
 
 // Echo is a method for testing purposes.
