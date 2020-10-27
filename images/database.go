@@ -12,7 +12,7 @@ type Database struct {
 }
 
 type IdentityImage struct {
-	Type         string //TODO change this to Name, also in the db migration
+	Name         string
 	Payload      []byte
 	Width        int
 	Height       int
@@ -25,7 +25,7 @@ func NewDatabase(db *sql.DB) Database {
 }
 
 func (d *Database) GetIdentityImages() ([]*IdentityImage, error) {
-	rows, err := d.db.Query(`SELECT type, image_payload, width, height, file_size, resize_target FROM identity_images`)
+	rows, err := d.db.Query(`SELECT name, image_payload, width, height, file_size, resize_target FROM identity_images`)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (d *Database) GetIdentityImages() ([]*IdentityImage, error) {
 	var iis []*IdentityImage
 	for rows.Next() {
 		ii := &IdentityImage{}
-		err = rows.Scan(&ii.Type, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
+		err = rows.Scan(&ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -46,7 +46,7 @@ func (d *Database) GetIdentityImages() ([]*IdentityImage, error) {
 }
 
 func (d *Database) GetIdentityImage(it string) (*IdentityImage, error) {
-	query := "SELECT type, image_payload, width, height, file_size, resize_target FROM identity_images WHERE type = ?"
+	query := "SELECT name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE name = ?"
 	rows, err := d.db.Query(query, it)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (d *Database) GetIdentityImage(it string) (*IdentityImage, error) {
 
 	var ii IdentityImage
 	for rows.Next() {
-		err = rows.Scan(&ii.Type, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
+		err = rows.Scan(&ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func (d *Database) StoreIdentityImages(iis []*IdentityImage) (err error) {
 		_ = tx.Rollback()
 	}()
 
-	query := "INSERT INTO identity_images (type, image_payload, width, height, file_size, resize_target) VALUES (?, ?, ?, ?, ?, ?)"
+	query := "INSERT INTO identity_images (name, image_payload, width, height, file_size, resize_target) VALUES (?, ?, ?, ?, ?, ?)"
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return
@@ -86,7 +86,7 @@ func (d *Database) StoreIdentityImages(iis []*IdentityImage) (err error) {
 	defer stmt.Close()
 
 	for _, ii := range iis {
-		_, err = stmt.Exec(ii.Type, ii.Payload, ii.Width, ii.Height, ii.FileSize, ii.ResizeTarget)
+		_, err = stmt.Exec(ii.Name, ii.Payload, ii.Width, ii.Height, ii.FileSize, ii.ResizeTarget)
 		if err != nil {
 			return
 		}
@@ -96,7 +96,7 @@ func (d *Database) StoreIdentityImages(iis []*IdentityImage) (err error) {
 }
 
 func (d *Database) DeleteIdentityImage(it string) error {
-	_, err := d.db.Exec(`DELETE FROM identity_images WHERE type = ?`, it)
+	_, err := d.db.Exec(`DELETE FROM identity_images WHERE name = ?`, it)
 	return err
 }
 
@@ -118,14 +118,14 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	}
 
 	temp := struct {
-		Type         string `json:"type"`
+		Name         string `json:"type"`
 		URI          string `json:"uri"`
 		Width        int    `json:"width"`
 		Height       int    `json:"height"`
 		FileSize     int    `json:"file_size"`
 		ResizeTarget int    `json:"resize_target"`
 	}{
-		Type:         i.Type,
+		Name:         i.Name,
 		URI:          uri,
 		Width:        i.Width,
 		Height:       i.Height,
