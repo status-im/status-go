@@ -52,7 +52,7 @@ func (i IdentityImage) GetDataURI() (string, error) {
 
 	b64 := base64.StdEncoding.EncodeToString(i.Payload)
 
-	return "data:image/" + mt + ";base64," + b64 + "\\", nil
+	return "data:image/" + mt + ";base64," + b64, nil
 }
 
 func (d *Database) StoreIdentityImages() {
