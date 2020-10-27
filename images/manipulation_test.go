@@ -12,14 +12,14 @@ import (
 func TestResize(t *testing.T) {
 	sizes := []ResizeDimension{80, 240, 1000}
 
-	cs := []struct{
+	cs := []struct {
 		Filename string
-		Bounds map[ResizeDimension]image.Rectangle
+		Bounds   map[ResizeDimension]image.Rectangle
 	}{
 		{
 			"elephant.jpg",
 			map[ResizeDimension]image.Rectangle{
-				80:	{
+				80: {
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 80, Y: 80},
 				},
@@ -36,7 +36,7 @@ func TestResize(t *testing.T) {
 		{
 			"rose.webp",
 			map[ResizeDimension]image.Rectangle{
-				80:	{
+				80: {
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 107, Y: 80},
 				},
@@ -53,7 +53,7 @@ func TestResize(t *testing.T) {
 		{
 			"spin.gif",
 			map[ResizeDimension]image.Rectangle{
-				80:	{
+				80: {
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 80, Y: 80},
 				},
@@ -70,7 +70,7 @@ func TestResize(t *testing.T) {
 		{
 			"status.png",
 			map[ResizeDimension]image.Rectangle{
-				80:	{
+				80: {
 					Min: image.Point{X: 0, Y: 0},
 					Max: image.Point{X: 80, Y: 80},
 				},
@@ -98,11 +98,11 @@ func TestResize(t *testing.T) {
 }
 
 func TestCrop(t *testing.T) {
-	type params struct{
-		Rectangle image.Rectangle
+	type params struct {
+		Rectangle   image.Rectangle
 		OutputBound image.Rectangle
-		OutputSize int
-		CropError error
+		OutputSize  int
+		CropError   error
 	}
 
 	topLeftSquare := image.Rectangle{
@@ -110,7 +110,7 @@ func TestCrop(t *testing.T) {
 		Max: image.Point{X: 80, Y: 80},
 	}
 	offsetSquare := image.Rectangle{
-		Min: image.Point{X: 80,	Y: 80},
+		Min: image.Point{X: 80, Y: 80},
 		Max: image.Point{X: 160, Y: 160},
 	}
 	outOfBoundsSquare := image.Rectangle{
@@ -122,7 +122,7 @@ func TestCrop(t *testing.T) {
 		Quality: 70,
 	}
 
-	cs := []struct{
+	cs := []struct {
 		Filename string
 		Params   []params
 	}{

@@ -16,7 +16,7 @@ const (
 )
 
 var (
-	ResizeDimensions   = []ResizeDimension{80, 240}
+	ResizeDimensions = []ResizeDimension{80, 240}
 
 	// DimensionSizeLimit the size limits imposed on each resize dimension
 	// Figures are based on the following sample data https://github.com/status-im/status-react/issues/11047#issuecomment-694970473

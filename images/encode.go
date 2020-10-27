@@ -9,7 +9,7 @@ import (
 )
 
 type EncodeConfig struct {
-	Quality    int
+	Quality int
 }
 
 func Encode(w io.Writer, img image.Image, config EncodeConfig) error {
@@ -38,7 +38,7 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) e
 		}
 
 		if q == MinJpegQuality {
-			if DimensionSizeLimit[size].Max > bb.Len(){
+			if DimensionSizeLimit[size].Max > bb.Len() {
 				return nil
 			} else {
 				return fmt.Errorf(
