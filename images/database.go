@@ -95,6 +95,11 @@ func (d *Database) StoreIdentityImages(iis []IdentityImage) (err error) {
 	return
 }
 
+func (d *Database) DeleteIdentityImage(it string) error {
+	_, err := d.db.Exec(`DELETE FROM identity_images WHERE type = ?`, it)
+	return err
+}
+
 func (i IdentityImage) GetDataURI() (string, error) {
 	mt, err := GetMimeType(i.Payload)
 	if err != nil {
