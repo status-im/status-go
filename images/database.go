@@ -67,7 +67,7 @@ func (d *Database) StoreIdentityImages(iis []IdentityImage)  (err error) {
 	defer stmt.Close()
 
 	for _, ii := range iis {
-		_, err = stmt.Exec(ii)
+		_, err = stmt.Exec(ii.Type, ii.Payload, ii.Width, ii.Height, ii.FileSize, ii.ResizeTarget)
 		if err != nil {
 			return
 		}
