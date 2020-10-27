@@ -86,7 +86,7 @@ func setupTestDB(t *testing.T) (Database, func()) {
 }
 
 func seedTestDB(t *testing.T, db Database) {
-	iis := []IdentityImage{
+	iis := []*IdentityImage{
 		{
 			Type:         "thumbnail",
 			Payload:      testJpegBytes,

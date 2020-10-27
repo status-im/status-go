@@ -5,6 +5,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/status-im/status-go/images"
@@ -1272,8 +1273,15 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 
 // GetProfileImages returns an array of base64 encoded images related to the user's profile
 func (b *GethStatusBackend) GetProfileImages() (string, error) {
-	// TODO
-	return "", nil
+	idb := images.NewDatabase(b.appDB)
+	iis, err := idb.GetIdentityImages()
+	if err != nil {
+		return "", err
+	}
+
+	js, err := json.Marshal(iis)
+
+	return string(js), err
 }
 
 // SaveProfileImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
@@ -1281,7 +1289,18 @@ func (b *GethStatusBackend) GetProfileImages() (string, error) {
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
 func (b *GethStatusBackend) SaveProfileImage(filepath string, aX, aY, bX, bY int) (string, error) {
-	imgs, err := images.GenerateProfileImages(filepath, aX, aY, bX, bY)
+	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
+	if err != nil {
+		return "", err
+	}
 
-	return nil, err
+	idb := images.NewDatabase(b.appDB)
+	err = idb.StoreIdentityImages(iis)
+	if err != nil {
+		return "", err
+	}
+
+	js, err := json.Marshal(iis)
+
+	return string(js), err
 }

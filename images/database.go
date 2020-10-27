@@ -12,7 +12,7 @@ type Database struct {
 }
 
 type IdentityImage struct {
-	Type         string
+	Type         string //TODO change this to Name, also in the db migration
 	Payload      []byte
 	Width        int
 	Height       int
@@ -64,7 +64,7 @@ func (d *Database) GetIdentityImage(it string) (*IdentityImage, error) {
 	return &ii, nil
 }
 
-func (d *Database) StoreIdentityImages(iis []IdentityImage) (err error) {
+func (d *Database) StoreIdentityImages(iis []*IdentityImage) (err error) {
 	tx, err := d.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
