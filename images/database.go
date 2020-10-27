@@ -1,6 +1,7 @@
 package images
 
 import (
+	"context"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -44,6 +45,37 @@ func (d *Database) GetIdentityImages() ([]*IdentityImage, error) {
 	return iis, nil
 }
 
+func (d *Database) StoreIdentityImages(iis []IdentityImage)  (err error) {
+	tx, err := d.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	query := "INSERT INTO identity_images (type, image_payload, width, height, file_size, resize_target) VALUES (?, ?, ?, ?, ?, ?)"
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return
+	}
+	defer stmt.Close()
+
+	for _, ii := range iis {
+		_, err = stmt.Exec(ii)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (i IdentityImage) GetDataURI() (string, error) {
 	mt, err := GetMimeType(i.Payload)
 	if err != nil {
@@ -53,10 +85,6 @@ func (i IdentityImage) GetDataURI() (string, error) {
 	b64 := base64.StdEncoding.EncodeToString(i.Payload)
 
 	return "data:image/" + mt + ";base64," + b64, nil
-}
-
-func (d *Database) StoreIdentityImages() {
-	// TODO
 }
 
 func (i IdentityImage) MarshalJSON() ([]byte, error) {
