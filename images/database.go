@@ -45,7 +45,26 @@ func (d *Database) GetIdentityImages() ([]*IdentityImage, error) {
 	return iis, nil
 }
 
-func (d *Database) StoreIdentityImages(iis []IdentityImage)  (err error) {
+func (d *Database) GetIdentityImage(it string) (*IdentityImage, error) {
+	query := "SELECT type, image_payload, width, height, file_size, resize_target FROM identity_images WHERE type = ?"
+	rows, err := d.db.Query(query, it)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ii IdentityImage
+	for rows.Next() {
+		err = rows.Scan(&ii.Type, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &ii, nil
+}
+
+func (d *Database) StoreIdentityImages(iis []IdentityImage) (err error) {
 	tx, err := d.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return
