@@ -38,27 +38,29 @@ type Account struct {
 
 type Settings struct {
 	// required
-	Address                types.Address    `json:"address"`
-	ChaosMode              bool             `json:"chaos-mode?,omitempty"`
-	Currency               string           `json:"currency,omitempty"`
-	CurrentNetwork         string           `json:"networks/current-network"`
-	CustomBootnodes        *json.RawMessage `json:"custom-bootnodes,omitempty"`
-	CustomBootnodesEnabled *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
-	DappsAddress           types.Address    `json:"dapps-address"`
-	EIP1581Address         types.Address    `json:"eip1581-address"`
-	Fleet                  *string          `json:"fleet,omitempty"`
-	HideHomeTooltip        bool             `json:"hide-home-tooltip?,omitempty"`
-	InstallationID         string           `json:"installation-id"`
-	KeyUID                 string           `json:"key-uid"`
-	KeycardInstanceUID     string           `json:"keycard-instance-uid,omitempty"`
-	KeycardPAiredOn        int64            `json:"keycard-paired-on,omitempty"`
-	KeycardPairing         string           `json:"keycard-pairing,omitempty"`
-	LastUpdated            *int64           `json:"last-updated,omitempty"`
-	LatestDerivedPath      uint             `json:"latest-derived-path"`
-	LogLevel               *string          `json:"log-level,omitempty"`
-	Mnemonic               *string          `json:"mnemonic,omitempty"`
-	Name                   string           `json:"name,omitempty"`
-	Networks               *json.RawMessage `json:"networks/networks"`
+	Address                   types.Address    `json:"address"`
+	ChaosMode                 bool             `json:"chaos-mode?,omitempty"`
+	Currency                  string           `json:"currency,omitempty"`
+	CurrentNetwork            string           `json:"networks/current-network"`
+	CustomBootnodes           *json.RawMessage `json:"custom-bootnodes,omitempty"`
+	CustomBootnodesEnabled    *json.RawMessage `json:"custom-bootnodes-enabled?,omitempty"`
+	DappsAddress              types.Address    `json:"dapps-address"`
+	EIP1581Address            types.Address    `json:"eip1581-address"`
+	Fleet                     *string          `json:"fleet,omitempty"`
+	HideHomeTooltip           bool             `json:"hide-home-tooltip?,omitempty"`
+	InstallationID            string           `json:"installation-id"`
+	KeyUID                    string           `json:"key-uid"`
+	KeycardInstanceUID        string           `json:"keycard-instance-uid,omitempty"`
+	KeycardPAiredOn           int64            `json:"keycard-paired-on,omitempty"`
+	KeycardPairing            string           `json:"keycard-pairing,omitempty"`
+	LastUpdated               *int64           `json:"last-updated,omitempty"`
+	LatestDerivedPath         uint             `json:"latest-derived-path"`
+	LinkPreviewRequestEnabled bool             `json:"link-preview-request-enabled,omitempty"`
+	LinkPreviewsEnabledSites  *json.RawMessage `json:"link-previews-enabled-sites,omitempty"`
+	LogLevel                  *string          `json:"log-level,omitempty"`
+	Mnemonic                  *string          `json:"mnemonic,omitempty"`
+	Name                      string           `json:"name,omitempty"`
+	Networks                  *json.RawMessage `json:"networks/networks"`
 	// NotificationsEnabled indicates whether local notifications should be enabled (android only)
 	NotificationsEnabled bool             `json:"notifications-enabled?,omitempty"`
 	PhotoPath            string           `json:"photo-path"`
@@ -214,6 +216,15 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		update, err = db.db.Prepare("UPDATE settings SET last_updated = ? WHERE synthetic_id = 'id'")
 	case "latest-derived-path":
 		update, err = db.db.Prepare("UPDATE settings SET latest_derived_path = ? WHERE synthetic_id = 'id'")
+	case "link-preview-request-enabled":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET link_preview_request_enabled = ? WHERE synthetic_id = 'id'")
+	case "link-previews-enabled-sites":
+		value = &sqlite.JSONBlob{value}
+		update, err = db.db.Prepare("UPDATE settings SET link_previews_enabled_sites = ? WHERE synthetic_id = 'id'")
 	case "log-level":
 		update, err = db.db.Prepare("UPDATE settings SET log_level = ? WHERE synthetic_id = 'id'")
 	case "mnemonic":
@@ -348,7 +359,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, usernames, appearance, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
@@ -366,6 +377,8 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.KeycardPairing,
 		&s.LastUpdated,
 		&s.LatestDerivedPath,
+		&s.LinkPreviewRequestEnabled,
+		&s.LinkPreviewsEnabledSites,
 		&s.LogLevel,
 		&s.Mnemonic,
 		&s.Name,
