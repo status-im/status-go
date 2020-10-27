@@ -12,12 +12,12 @@ type Database struct {
 }
 
 type IdentityImage struct {
-	Type         string `json:"type"`
+	Type         string
 	Payload      []byte
-	Width        int `json:"width"`
-	Height       int `json:"height"`
-	FileSize     int `json:"file_size"`
-	ResizeTarget int `json:"resize_target"`
+	Width        int
+	Height       int
+	FileSize     int
+	ResizeTarget int
 }
 
 func NewDatabase(db *sql.DB) Database {

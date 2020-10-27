@@ -93,8 +93,8 @@ func TestDecode(t *testing.T) {
 }
 
 func TestGetType(t *testing.T) {
-	cs := []struct{
-		Buf []byte
+	cs := []struct {
+		Buf   []byte
 		Value ImageType
 	}{
 		{testJpegBytes, JPEG},
@@ -110,8 +110,8 @@ func TestGetType(t *testing.T) {
 }
 
 func TestGetMimeType(t *testing.T) {
-	cs := []struct{
-		Buf []byte
+	cs := []struct {
+		Buf   []byte
 		Value string
 		Error error
 	}{

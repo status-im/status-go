@@ -50,7 +50,7 @@ func TestEncodeToBestSize(t *testing.T) {
 	cs := []struct {
 		FileName   string
 		RenderSize int
-		Error error
+		Error      error
 	}{
 		{
 			"elephant.jpg",

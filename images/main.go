@@ -12,8 +12,8 @@ func GenerateProfileImages(filepath string, aX, aY, bX, bY int) ([][]byte, error
 	}
 
 	cropRect := image.Rectangle{
-		Min: image.Point{X: aX,	Y: aY},
-		Max: image.Point{X: bX,	Y: bY},
+		Min: image.Point{X: aX, Y: aY},
+		Max: image.Point{X: bX, Y: bY},
 	}
 	cImg, err := Crop(img, cropRect)
 	if err != nil {

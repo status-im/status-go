@@ -11,7 +11,7 @@ import (
 func Resize(size ResizeDimension, img image.Image) image.Image {
 	var width, height uint
 
-	switch{
+	switch {
 	case img.Bounds().Max.X == img.Bounds().Max.Y:
 		width, height = uint(size), uint(size)
 	case img.Bounds().Max.X > img.Bounds().Max.Y:
@@ -25,7 +25,7 @@ func Resize(size ResizeDimension, img image.Image) image.Image {
 
 func Crop(img image.Image, rect image.Rectangle) (image.Image, error) {
 
-	if img.Bounds().Max.X < rect.Max.X || img.Bounds().Max.Y < rect.Max.Y{
+	if img.Bounds().Max.X < rect.Max.X || img.Bounds().Max.Y < rect.Max.Y {
 		return nil, fmt.Errorf(
 			"crop dimensions out of bounds of image, image width '%dpx' & height '%dpx'; crop bottom right coordinate at X '%dpx' Y '%dpx'",
 			img.Bounds().Max.X, img.Bounds().Max.Y,
