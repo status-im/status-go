@@ -629,9 +629,9 @@ func MultiformatDeserializePublicKey(key, outBase string) string {
 	return pk
 }
 
-// GetProfileImages returns an array of base64 encoded images related to the user's profile
+// GetProfileImages returns an array of json marshalled IdentityImages assigned to the user's identity
 func GetProfileImages() string {
-	pis, err := statusBackend.GetProfileImages()
+	pis, err := statusBackend.GetIdentityImages()
 	if err != nil {
 		return makeJSONResponse(err)
 	}
@@ -639,15 +639,35 @@ func GetProfileImages() string {
 	return pis
 }
 
+// GetProfileImage returns a json object representing the image with the given name
+func GetProfileImage(name string) string {
+	ii, err := statusBackend.GetIdentityImage(name)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return ii
+}
+
 // SaveProfileImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
 // The resulting image(s) will be stored in the DB along with other user account information.
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
 func SaveProfileImage(filepath string, aX, aY, bX, bY int) string {
-	imgs, err := statusBackend.SaveProfileImage(filepath, aX, aY, bX, bY)
+	imgs, err := statusBackend.StoreIdentityImage(filepath, aX, aY, bX, bY)
 	if err != nil {
 		return makeJSONResponse(err)
 	}
 
 	return imgs
+}
+
+// DeleteProfileImage deletes an IdentityImage from the db with the given name
+func DeleteProfileImage(name string) string {
+	err := statusBackend.DeleteIdentityImage(name)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return "ok"
 }
