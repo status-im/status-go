@@ -5,7 +5,7 @@ import (
 	"image"
 )
 
-func GenerateProfileImages(filepath string, aX, aY, bX, bY int) ([][]byte, error) {
+func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityImage, error) {
 	img, err := Decode(filepath)
 	if err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func GenerateProfileImages(filepath string, aX, aY, bX, bY int) ([][]byte, error
 		return nil, err
 	}
 
-	imgs := make([][]byte, len(ResizeDimensions))
+	iis := make([]*IdentityImage, len(ResizeDimensions))
 	for _, s := range ResizeDimensions {
 		rImg := Resize(s, cImg)
 
@@ -29,8 +29,18 @@ func GenerateProfileImages(filepath string, aX, aY, bX, bY int) ([][]byte, error
 		if err != nil {
 			return nil, err
 		}
-		imgs = append(imgs, bb.Bytes())
+
+		ii := &IdentityImage{
+			Type:         ResizeDimensionToName[s],
+			Payload:      bb.Bytes(),
+			Width:        rImg.Bounds().Dx(),
+			Height:       rImg.Bounds().Dy(),
+			FileSize:     bb.Len(),
+			ResizeTarget: int(s),
+		}
+
+		iis = append(iis, ii)
 	}
 
-	return imgs, nil
+	return iis, nil
 }
