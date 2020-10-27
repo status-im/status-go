@@ -58,6 +58,56 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 	require.Exactly(t, expected, string(joiis))
 }
 
+func TestDatabase_GetIdentityImage(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	iis := []IdentityImage{
+		{
+			Type:         "thumbnail",
+			Payload:      testJpegBytes,
+			Width:        80,
+			Height:       80,
+			FileSize:     256,
+			ResizeTarget: 80,
+		},
+		{
+			Type:         "large",
+			Payload:      testPngBytes,
+			Width:        240,
+			Height:       300,
+			FileSize:     1024,
+			ResizeTarget: 240,
+		},
+	}
+
+	cs := []struct{
+		Name string
+		Expected string
+	}{
+		{
+			"thumbnail",
+			`{"type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`,
+		},
+		{
+			"large",
+			`{"type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240}`,
+		},
+	}
+
+	err := db.StoreIdentityImages(iis)
+	require.NoError(t, err)
+
+	for _, c := range cs {
+		oii, err := db.GetIdentityImage(c.Name)
+		require.NoError(t, err)
+
+		joii, err := json.Marshal(oii)
+		require.NoError(t, err)
+		require.Exactly(t, c.Expected, string(joii))
+	}
+}
+
 func TestIdentityImage_GetDataURI(t *testing.T) {
 	cs := []struct{
 		II IdentityImage
