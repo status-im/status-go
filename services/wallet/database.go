@@ -250,6 +250,23 @@ func (db *Database) GetTransfersByAddress(address common.Address, toBlock *big.I
 	return query.Scan(rows)
 }
 
+// GetTransfersByAddressAndBlock loads transfers for a given address and block.
+func (db *Database) GetTransfersByAddressAndBlock(address common.Address, block *big.Int, limit int64) (rst []Transfer, err error) {
+	query := newTransfersQuery().
+		FilterNetwork(db.network).
+		FilterAddress(address).
+		FilterBlockNumber(block).
+		FilterLoaded(1).
+		Limit(limit)
+
+	rows, err := db.db.Query(query.String(), query.Args()...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	return query.Scan(rows)
+}
+
 // GetBlocksByAddress loads blocks for a given address.
 func (db *Database) GetBlocksByAddress(address common.Address, limit int) (rst []*big.Int, err error) {
 	query := `SELECT blk_number FROM blocks

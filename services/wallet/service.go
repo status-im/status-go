@@ -18,9 +18,11 @@ import (
 func NewService(db *Database, accountsFeed *event.Feed) *Service {
 	feed := &event.Feed{}
 	return &Service{
-		db:           db,
-		feed:         feed,
-		signals:      &SignalsTransmitter{publisher: feed},
+		db:   db,
+		feed: feed,
+		signals: &SignalsTransmitter{
+			publisher: feed,
+		},
 		accountsFeed: accountsFeed,
 	}
 }
@@ -42,6 +44,11 @@ type Service struct {
 func (s *Service) Start(*p2p.Server) error {
 	s.group = NewGroup(context.Background())
 	return s.signals.Start()
+}
+
+// GetFeed returns signals feed.
+func (s *Service) GetFeed() *event.Feed {
+	return s.feed
 }
 
 // StartReactor separately because it requires known ethereum address, which will become available only after login.

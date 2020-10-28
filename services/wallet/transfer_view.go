@@ -32,6 +32,7 @@ func castToTransferView(t Transfer) TransferView {
 	view.TxStatus = hexutil.Uint64(t.Receipt.Status)
 	view.Input = hexutil.Bytes(t.Transaction.Data())
 	view.TxHash = t.Transaction.Hash()
+	view.NetworkID = t.NetworkID
 	switch t.Type {
 	case ethTransfer:
 		view.From = t.From
@@ -46,6 +47,11 @@ func castToTransferView(t Transfer) TransferView {
 		view.From, view.To, view.Value = from, to, (*hexutil.Big)(amount)
 	}
 	return view
+}
+
+// CastToTransferView transforms a raw Transfer into an enriched one
+func CastToTransferView(t Transfer) TransferView {
+	return castToTransferView(t)
 }
 
 func parseLog(ethlog *types.Log) (from, to common.Address, amount *big.Int) {
@@ -91,4 +97,5 @@ type TransferView struct {
 	From        common.Address `json:"from"`
 	To          common.Address `json:"to"`
 	Contract    common.Address `json:"contract"`
+	NetworkID   uint64
 }
