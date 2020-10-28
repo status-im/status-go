@@ -36,5 +36,6 @@ message ApplicationMetadataMessage {
     PUSH_NOTIFICATION_RESPONSE = 21;
     EMOJI_REACTION = 22;
     GROUP_CHAT_INVITATION = 23;
+    CHAT_IDENTITY = 24;
   }
 }
