@@ -639,7 +639,21 @@ func TestSaveMentions(t *testing.T) {
 	require.Len(t, retrievedMessages, 1)
 	require.Len(t, retrievedMessages[0].Mentions, 1)
 	require.Equal(t, retrievedMessages[0].Mentions, message.Mentions)
+}
 
+func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	chatId := "abcd1234"
+
+	err = p.SaveWhenChatIdentityLastPublished(chatId)
+	require.NoError(t, err)
+
+	ts, err := p.GetWhenChatIdentityLastPublished(chatId)
+	require.NoError(t, err)
+
+	println(&ts)
 }
 
 func TestSaveLinks(t *testing.T) {
