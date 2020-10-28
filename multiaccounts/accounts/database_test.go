@@ -206,6 +206,24 @@ func TestGetAccounts(t *testing.T) {
 	require.Equal(t, accounts, rst)
 }
 
+func TestGetAccountByAddress(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+	address := types.Address{0x01}
+	account := Account{Address: address, Chat: true, Wallet: true}
+	dilute := []Account{
+		{Address: types.Address{0x02}, PublicKey: types.HexBytes{0x01, 0x02}},
+		{Address: types.Address{0x03}, PublicKey: types.HexBytes{0x02, 0x03}},
+	}
+
+	accounts := append(dilute, account)
+
+	require.NoError(t, db.SaveAccounts(accounts))
+	rst, err := db.GetAccountByAddress(address)
+	require.NoError(t, err)
+	require.Equal(t, &account, rst)
+}
+
 func TestAddressExists(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()

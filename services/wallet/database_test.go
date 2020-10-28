@@ -122,11 +122,11 @@ func TestDBReorgTransfers(t *testing.T) {
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	require.NoError(t, db.ProcessBlocks(original.Address, original.Number, original.Number, []*DBHeader{original}))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, common.Address{1}, rcpt, nil},
+		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil},
 	}, []*DBHeader{}))
 	require.NoError(t, db.ProcessBlocks(replaced.Address, replaced.Number, replaced.Number, []*DBHeader{replaced}))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
-		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, common.Address{1}, rcpt, nil},
+		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil},
 	}, []*DBHeader{original}))
 
 	all, err := db.GetTransfers(big.NewInt(0), nil)

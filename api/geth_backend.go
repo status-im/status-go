@@ -34,6 +34,7 @@ import (
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
 	"github.com/status-im/status-go/services/browsers"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/permissions"
 	"github.com/status-im/status-go/services/personal"
@@ -96,6 +97,7 @@ func NewGethStatusBackend() *GethStatusBackend {
 	transactor := transactions.NewTransactor()
 	personalAPI := personal.NewAPI()
 	rpcFilters := rpcfilters.New(statusNode)
+
 	return &GethStatusBackend{
 		statusNode:     statusNode,
 		accountManager: accountManager,
@@ -339,10 +341,12 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 		WatchAddresses: watchAddrs,
 		MainAccount:    walletAddr,
 	}
+
 	err = b.StartNode(conf)
 	if err != nil {
 		return err
 	}
+
 	err = b.SelectAccount(login)
 	if err != nil {
 		return err
@@ -351,6 +355,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -514,6 +519,12 @@ func (b *GethStatusBackend) walletService(network uint64, accountsFeed *event.Fe
 	}
 }
 
+func (b *GethStatusBackend) localNotificationsService(network uint64) gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return localnotifications.NewService(b.appDB, network), nil
+	}
+}
+
 func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -542,6 +553,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID, accountsFeed))
+	services = appendIf(config.LocalNotificationsConfig.Enabled, services, b.localNotificationsService(config.NetworkID))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
@@ -889,17 +901,27 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 			}
 		}
 	} else if s == appStateBackground && !b.forceStopWallet {
+		localNotifications, err := b.statusNode.LocalNotificationsService()
+		if err != nil {
+			b.log.Error("Retrieving of local notifications service failed on app state change", "error", err)
+		}
+
 		wallet, err := b.statusNode.WalletService()
 		if err != nil {
 			b.log.Error("Retrieving of wallet service failed on app state change to background", "error", err)
 			return
 		}
-		err = wallet.Stop()
-		if err != nil {
-			b.log.Error("Wallet service stop failed on app state change to background", "error", err)
-			return
+
+		if !localNotifications.IsWatchingWallet() {
+			err = wallet.Stop()
+
+			if err != nil {
+				b.log.Error("Wallet service stop failed on app state change to background", "error", err)
+				return
+			}
 		}
 	}
+
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }
@@ -944,6 +966,62 @@ func (b *GethStatusBackend) StartWallet() error {
 	}
 
 	b.forceStopWallet = false
+
+	return nil
+}
+
+func (b *GethStatusBackend) StopLocalNotifications() error {
+	localPN, err := b.statusNode.LocalNotificationsService()
+	if err != nil {
+		b.log.Error("Retrieving of LocalNotifications service failed on StopLocalNotifications", "error", err)
+		return nil
+	}
+
+	if localPN.IsStarted() {
+		err = localPN.Stop()
+		if err != nil {
+			b.log.Error("LocalNotifications service stop failed on StopLocalNotifications", "error", err)
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func (b *GethStatusBackend) StartLocalNotifications() error {
+	localPN, err := b.statusNode.LocalNotificationsService()
+
+	if err != nil {
+		b.log.Error("Retrieving of local notifications service failed on StartLocalNotifications", "error", err)
+		return nil
+	}
+
+	wallet, err := b.statusNode.WalletService()
+	if err != nil {
+		b.log.Error("Retrieving of wallet service failed on StartLocalNotifications", "error", err)
+		return nil
+	}
+
+	if !wallet.IsStarted() {
+		b.log.Error("Can't start local notifications service without wallet service")
+		return nil
+	}
+
+	if !localPN.IsStarted() {
+		err = localPN.Start(b.statusNode.Server())
+
+		if err != nil {
+			b.log.Error("LocalNotifications service start failed on StartLocalNotifications", "error", err)
+			return nil
+		}
+	}
+
+	err = localPN.SubscribeWallet(wallet.GetFeed())
+
+	if err != nil {
+		b.log.Error("LocalNotifications service could not subscribe to wallet on StartLocalNotifications", "error", err)
+		return nil
+	}
 
 	return nil
 }
@@ -1118,6 +1196,7 @@ func (b *GethStatusBackend) startWallet() error {
 	}
 
 	watchAddresses := b.accountManager.WatchAddresses()
+
 	mainAccountAddress, err := b.accountManager.MainAccountAddress()
 	if err != nil {
 		return err

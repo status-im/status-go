@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log FROM transfers"
+const baseTransfersQuery = "SELECT hash, type, blk_hash, blk_number, timestamp, address, tx, sender, receipt, log, network_id FROM transfers"
 
 func newTransfersQuery() *transfersQuery {
 	buf := bytes.NewBuffer(nil)
@@ -84,6 +84,14 @@ func (q *transfersQuery) FilterBlockHash(blockHash common.Hash) *transfersQuery 
 	return q
 }
 
+func (q *transfersQuery) FilterBlockNumber(blockNumber *big.Int) *transfersQuery {
+	q.andOrWhere()
+	q.added = true
+	q.buf.WriteString(" blk_number = ?")
+	q.args = append(q.args, (*SQLBigInt)(blockNumber))
+	return q
+}
+
 func (q *transfersQuery) Limit(pageSize int64) *transfersQuery {
 	q.buf.WriteString(" ORDER BY blk_number DESC, hash ASC ")
 	q.buf.WriteString(" LIMIT ?")
@@ -110,7 +118,7 @@ func (q *transfersQuery) Scan(rows *sql.Rows) (rst []Transfer, err error) {
 		err = rows.Scan(
 			&transfer.ID, &transfer.Type, &transfer.BlockHash,
 			(*SQLBigInt)(transfer.BlockNumber), &transfer.Timestamp, &transfer.Address,
-			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log})
+			&JSONBlob{transfer.Transaction}, &transfer.From, &JSONBlob{transfer.Receipt}, &JSONBlob{transfer.Log}, &transfer.NetworkID)
 		if err != nil {
 			return nil, err
 		}
