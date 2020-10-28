@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -645,7 +646,9 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
+
 	chatId := "abcd1234"
+	now := time.Now().Unix()
 
 	err = p.SaveWhenChatIdentityLastPublished(chatId)
 	require.NoError(t, err)
@@ -653,7 +656,8 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	ts, err := p.GetWhenChatIdentityLastPublished(chatId)
 	require.NoError(t, err)
 
-	println(&ts)
+	diff := *ts - now
+	require.LessOrEqual(t, diff, int64(2))
 }
 
 func TestSaveLinks(t *testing.T) {

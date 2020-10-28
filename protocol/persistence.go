@@ -775,15 +775,15 @@ func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatId string) (*in
 	}
 	defer rows.Close()
 
-	var t *int64
+	var t int64
 	for rows.Next() {
-		err = rows.Scan(t)
+		err = rows.Scan(&t)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return t, nil
+	return &t, nil
 }
 
 func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatId string) error {
