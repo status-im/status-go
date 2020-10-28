@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/gob"
 	"encoding/json"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -765,4 +766,50 @@ func (db sqlitePersistence) TransactionsToValidate() ([]*TransactionToValidate, 
 	}
 
 	return transactions, nil
+}
+
+func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatId string) (*int64, error) {
+	rows, err := db.db.Query("SELECT clock_value FROM chat_identity_last_published WHERE chat_id = ?", chatId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var t *int64
+	for rows.Next() {
+		err = rows.Scan(t)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return t, nil
+}
+
+func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatId string) error {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	stmt, err := tx.Prepare("INSERT INTO chat_identity_last_published (chat_id, clock_value) VALUES (?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(chatId, time.Now().Unix())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
