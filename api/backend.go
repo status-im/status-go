@@ -1,6 +1,8 @@
 package api
 
 import (
+	signercore "github.com/ethereum/go-ethereum/signer/core"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -35,12 +37,14 @@ type StatusBackend interface {
 	GetNodesFromContract(rpcEndpoint string, contractAddress string) ([]string, error)
 	HashTransaction(sendArgs transactions.SendTxArgs) (transactions.SendTxArgs, types.Hash, error)
 	HashTypedData(typed typeddata.TypedData) (types.Hash, error)
+	HashTypedDataV4(typed signercore.TypedData) (types.Hash, error)
 	ResetChainData() error
 	SendTransaction(sendArgs transactions.SendTxArgs, password string) (hash types.Hash, err error)
 	SendTransactionWithSignature(sendArgs transactions.SendTxArgs, sig []byte) (hash types.Hash, err error)
 	SignHash(hexEncodedHash string) (string, error)
 	SignMessage(rpcParams personal.SignParams) (types.HexBytes, error)
 	SignTypedData(typed typeddata.TypedData, address string, password string) (types.HexBytes, error)
+	SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error)
 
 	ConnectionChange(typ string, expensive bool)
 	AppStateChange(state string)
