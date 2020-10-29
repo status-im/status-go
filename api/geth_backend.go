@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	gethnode "github.com/ethereum/go-ethereum/node"
+	signercore "github.com/ethereum/go-ethereum/signer/core"
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
@@ -853,10 +854,34 @@ func (b *GethStatusBackend) SignTypedData(typed typeddata.TypedData, address str
 	return types.HexBytes(sig), err
 }
 
+// SignTypedDataV4 accepts data and password. Gets verified account and signs typed data.
+func (b *GethStatusBackend) SignTypedDataV4(typed signercore.TypedData, address string, password string) (types.HexBytes, error) {
+	account, err := b.getVerifiedWalletAccount(address, password)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
+	sig, err := typeddata.SignTypedDataV4(typed, account.AccountKey.PrivateKey, chain)
+	if err != nil {
+		return types.HexBytes{}, err
+	}
+	return types.HexBytes(sig), err
+}
+
 // HashTypedData generates the hash of TypedData.
 func (b *GethStatusBackend) HashTypedData(typed typeddata.TypedData) (types.Hash, error) {
 	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
 	hash, err := typeddata.ValidateAndHash(typed, chain)
+	if err != nil {
+		return types.Hash{}, err
+	}
+	return types.Hash(hash), err
+}
+
+// HashTypedDataV4 generates the hash of TypedData.
+func (b *GethStatusBackend) HashTypedDataV4(typed signercore.TypedData) (types.Hash, error) {
+	chain := new(big.Int).SetUint64(b.StatusNode().Config().NetworkID)
+	hash, err := typeddata.HashTypedDataV4(typed, chain)
 	if err != nil {
 		return types.Hash{}, err
 	}

@@ -11,6 +11,7 @@ import (
 	validator "gopkg.in/go-playground/validator.v9"
 
 	"github.com/ethereum/go-ethereum/log"
+	signercore "github.com/ethereum/go-ethereum/signer/core"
 
 	"github.com/status-im/status-go/api"
 	"github.com/status-im/status-go/api/multiformat"
@@ -341,6 +342,7 @@ func SignTypedData(data, address, password string) string {
 }
 
 // HashTypedData unmarshalls data into TypedData, validates it and hashes it.
+//export HashTypeData
 func HashTypedData(data string) string {
 	var typed typeddata.TypedData
 	err := json.Unmarshal([]byte(data), &typed)
@@ -351,6 +353,31 @@ func HashTypedData(data string) string {
 		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
 	}
 	result, err := statusBackend.HashTypedData(typed)
+	return prepareJSONResponse(result.String(), err)
+}
+
+// SignTypedDataV4 unmarshall data into TypedData, validate it and signs with selected account,
+// if password matches selected account.
+//export SignTypedDataV4
+func SignTypedDataV4(data, address, password string) string {
+	var typed signercore.TypedData
+	err := json.Unmarshal([]byte(data), &typed)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	result, err := statusBackend.SignTypedDataV4(typed, address, password)
+	return prepareJSONResponse(result.String(), err)
+}
+
+// HashTypedDataV4 unmarshalls data into TypedData, validates it and hashes it.
+//export HashTypeDataV4
+func HashTypedDataV4(data string) string {
+	var typed signercore.TypedData
+	err := json.Unmarshal([]byte(data), &typed)
+	if err != nil {
+		return prepareJSONResponseWithCode(nil, err, codeFailedParseParams)
+	}
+	result, err := statusBackend.HashTypedDataV4(typed)
 	return prepareJSONResponse(result.String(), err)
 }
 
