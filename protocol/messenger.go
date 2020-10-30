@@ -723,18 +723,22 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
 
 	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
+
 	// Add members
-	event := v1protocol.NewMembersAddedEvent(members, clock)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
+	if len(members) > 0 {
+		event := v1protocol.NewMembersAddedEvent(members, clock)
+		event.ChatID = chat.ID
+		err = event.Sign(m.identity)
+		if err != nil {
+			return nil, err
+		}
+
+		err = group.ProcessEvent(event)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
 	recipients, err := stringSliceToPublicKeys(group.Members(), true)
 	if err != nil {
 		return nil, err
