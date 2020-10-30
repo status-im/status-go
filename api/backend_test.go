@@ -31,9 +31,11 @@ import (
 )
 
 var (
+	bookmarks = json.RawMessage("[]")
 	networks = json.RawMessage("{}")
 	settings = accounts.Settings{
 		Address:           types.HexToAddress("0xeC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		Bookmarks:		   &bookmarks,
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress("0xe1300f99fDF7346986CbC766903245087394ecd0"),
 		EIP1581Address:    types.HexToAddress("0xe1DDDE9235a541d1344550d969715CF43982de9f"),
@@ -654,6 +656,7 @@ func TestDeleteMulticcount(t *testing.T) {
 
 	settings := accounts.Settings{
 		Address:           types.HexToAddress(accountInfo.Address),
+		Bookmarks:		   &bookmarks,
 		CurrentNetwork:    "mainnet_rpc",
 		DappsAddress:      types.HexToAddress(accountInfo.Address),
 		EIP1581Address:    types.HexToAddress(accountInfo.Address),
