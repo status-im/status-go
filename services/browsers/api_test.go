@@ -130,3 +130,24 @@ func TestDeleteBrowser(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rst, 0)
 }
+
+func TestBookmarks(t *testing.T) {
+	api, cancel := setupTestAPI(t)
+	defer cancel()
+
+	bookmark := &Bookmark{
+		Name:     "MyBookmark",
+		Url:      "https://status.im",
+		ImageUrl: "",
+	}
+
+	require.NoError(t, api.StoreBookmark(context.TODO(), *bookmark))
+	rst, err := api.GetBookmarks(context.TODO())
+	require.NoError(t, err)
+	require.Len(t, rst, 1)
+
+	require.NoError(t, api.DeleteBookmark(context.TODO(), bookmark.Url))
+	rst, err = api.GetBookmarks(context.TODO())
+	require.NoError(t, err)
+	require.Len(t, rst, 0)
+}

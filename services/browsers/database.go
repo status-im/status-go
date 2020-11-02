@@ -122,3 +122,46 @@ func (db *Database) DeleteBrowser(id string) error {
 	_, err := db.db.Exec("DELETE from browsers WHERE id = ?", id)
 	return err
 }
+
+type BookmarksType string
+
+type Bookmark struct {
+	Url      string `json:"url"`
+	Name     string `json:"name"`
+	ImageUrl string `json:"imageUrl"`
+}
+
+func (db *Database) GetBookmarks() ([]*Bookmark, error) {
+	rows, err := db.db.Query(`SELECT url, name, image_url FROM bookmarks`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rst []*Bookmark
+	for rows.Next() {
+		bookmark := &Bookmark{}
+		err := rows.Scan(&bookmark.Url, &bookmark.Name, &bookmark.ImageUrl)
+		if err != nil {
+			return nil, err
+		}
+
+		rst = append(rst, bookmark)
+	}
+
+	return rst, nil
+}
+
+func (db *Database) StoreBookmark(bookmark Bookmark) error {
+	insert, err := db.db.Prepare("INSERT INTO bookmarks (url, name, image_url) VALUES (?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	_, err = insert.Exec(bookmark.Url, bookmark.Name, bookmark.ImageUrl)
+	return err
+}
+
+func (db *Database) DeleteBookmark(url string) error {
+	_, err := db.db.Exec(`DELETE FROM bookmarks WHERE url = ?`, url)
+	return err
+}
