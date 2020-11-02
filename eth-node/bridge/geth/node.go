@@ -101,5 +101,8 @@ func (w *gethNodeWrapper) RemovePeer(url string) error {
 }
 
 func (w *gethNodeWrapper) PeersCount() int {
+	if w.stack.Server() == nil {
+		return 0
+	}
 	return len(w.stack.Server().Peers())
 }
