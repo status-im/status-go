@@ -673,7 +673,7 @@ func (m *Messenger) Join(chat Chat) error {
 			return err
 		}
 		return m.transport.JoinGroup(members)
-	case ChatTypePublic, ChatTypeProfile:
+	case ChatTypePublic, ChatTypeProfile, ChatTypeTimeline:
 		return m.transport.JoinPublic(chat.ID)
 	default:
 		return errors.New("chat is neither public nor private")
@@ -696,7 +696,7 @@ func (m *Messenger) Leave(chat Chat) error {
 			return err
 		}
 		return m.transport.LeaveGroup(members)
-	case ChatTypePublic, ChatTypeProfile:
+	case ChatTypePublic, ChatTypeProfile, ChatTypeTimeline:
 		return m.transport.LeavePublic(chat.Name)
 	default:
 		return errors.New("chat is neither public nor private")
@@ -2587,7 +2587,22 @@ func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 }
 
 func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
-	return m.persistence.MessageByChatID(chatID, cursor, limit)
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if chat.Timeline() {
+		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
+		for _, contact := range m.allContacts {
+			if contact.IsAdded() {
+				chatIDs = append(chatIDs, "@"+contact.ID)
+			}
+		}
+		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
+	} else {
+		return m.persistence.MessageByChatID(chatID, cursor, limit)
+	}
 }
 
 func (m *Messenger) SaveMessages(messages []*common.Message) error {
