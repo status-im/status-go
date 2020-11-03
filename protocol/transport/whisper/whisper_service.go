@@ -366,6 +366,10 @@ func (a *Transport) GetCurrentTime() uint64 {
 	return uint64(a.shh.GetCurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
+func (a *Transport) MaxMessageSize() uint32 {
+	return a.shh.MaxMessageSize()
+}
+
 func (a *Transport) Stop() error {
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Stop()

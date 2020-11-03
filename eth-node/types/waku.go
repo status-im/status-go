@@ -35,6 +35,7 @@ type Waku interface {
 	AddSymKeyFromPassword(password string) (string, error)
 	DeleteSymKey(id string) bool
 	GetSymKey(id string) ([]byte, error)
+	MaxMessageSize() uint32
 
 	Subscribe(opts *SubscriptionOptions) (string, error)
 	GetFilter(id string) Filter

@@ -315,6 +315,10 @@ func (a *Transport) GetCurrentTime() uint64 {
 	return uint64(a.waku.GetCurrentTime().UnixNano() / int64(time.Millisecond))
 }
 
+func (a *Transport) MaxMessageSize() uint32 {
+	return a.waku.MaxMessageSize()
+}
+
 func (a *Transport) Stop() error {
 	if a.envelopesMonitor != nil {
 		a.envelopesMonitor.Stop()
