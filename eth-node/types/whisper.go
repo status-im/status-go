@@ -21,6 +21,7 @@ type Whisper interface {
 	SetTimeSource(timesource func() time.Time)
 	// GetCurrentTime returns current time.
 	GetCurrentTime() time.Time
+	MaxMessageSize() uint32
 
 	// GetPrivateKey retrieves the private key of the specified identity.
 	GetPrivateKey(id string) (*ecdsa.PrivateKey, error)

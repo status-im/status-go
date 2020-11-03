@@ -37,6 +37,11 @@ func (w *gethWhisperWrapper) MinPow() float64 {
 	return w.whisper.MinPow()
 }
 
+// MaxMessageSize returns the MaxMessageSize set
+func (w *gethWhisperWrapper) MaxMessageSize() uint32 {
+	return w.whisper.MaxMessageSize()
+}
+
 // BloomFilter returns the aggregated bloom filter for all the topics of interest.
 // The nodes are required to send only messages that match the advertised bloom filter.
 // If a message does not match the bloom, it will tantamount to spam, and the peer will
