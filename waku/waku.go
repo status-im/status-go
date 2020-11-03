@@ -1083,7 +1083,7 @@ func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	w.peers[peer] = struct{}{}
 	w.peerMu.Unlock()
 
-	w.logger.Debug("handling peer", zap.String("id", types.EncodeHex(peer.ID())))
+	w.logger.Info("handling peer", zap.String("peerID", types.EncodeHex(peer.ID())))
 
 	defer func() {
 		w.peerMu.Lock()
@@ -1105,7 +1105,7 @@ func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	}
 
 	err := peer.Run()
-	w.logger.Debug("handled peer", zap.String("id", types.EncodeHex(peer.ID())), zap.Error(err))
+	w.logger.Info("handled peer", zap.String("peerID", types.EncodeHex(peer.ID())), zap.Error(err))
 	return err
 }
 
