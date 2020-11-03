@@ -530,6 +530,78 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+// MessageByChatIDs returns all messages for a given chatIDs in descending order.
+// Ordering is accomplished using two concatenated values: ClockValue and ID.
+// These two values are also used to compose a cursor which is returned to the result.
+func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string, limit int) ([]*common.Message, string, error) {
+	cursorWhere := ""
+	if currCursor != "" {
+		cursorWhere = "AND cursor <= ?"
+	}
+	allFields := db.tableUserMessagesAllFieldsJoin()
+	args := make([]interface{}, len(chatIDs))
+	for i, v := range chatIDs {
+		args[i] = v
+	}
+	if currCursor != "" {
+		args = append(args, currCursor)
+	}
+	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
+	// concatenated with message ID. Results are sorted using this new column.
+	// This new column values can also be returned as a cursor for subsequent requests.
+	rows, err := db.db.Query(
+		fmt.Sprintf(`
+			SELECT
+				%s,
+				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+			FROM
+				user_messages m1
+			LEFT JOIN
+				user_messages m2
+			ON
+			m1.response_to = m2.id
+
+			LEFT JOIN
+			      contacts c
+			ON
+
+			m1.source = c.id
+			WHERE
+				NOT(m1.hide) AND m1.local_chat_id IN %s %s
+			ORDER BY cursor DESC
+			LIMIT ?
+		`, allFields, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere),
+		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+
+	var (
+		result  []*common.Message
+		cursors []string
+	)
+	for rows.Next() {
+		var (
+			message common.Message
+			cursor  string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &cursor); err != nil {
+			return nil, "", err
+		}
+		result = append(result, &message)
+		cursors = append(cursors, cursor)
+	}
+
+	var newCursor string
+	if len(result) > limit {
+		newCursor = cursors[limit]
+		result = result[:limit]
+	}
+	return result, newCursor, nil
+}
+
 // EmojiReactionsByChatID returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
 // NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
 func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {

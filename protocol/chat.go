@@ -29,6 +29,7 @@ const (
 	ChatTypePublic
 	ChatTypePrivateGroupChat
 	ChatTypeProfile
+	ChatTypeTimeline
 )
 
 type Chat struct {
@@ -97,6 +98,10 @@ func (c *Chat) Public() bool {
 
 func (c *Chat) ProfileUpdates() bool {
 	return c.ChatType == ChatTypeProfile
+}
+
+func (c *Chat) Timeline() bool {
+	return c.ChatType == ChatTypeTimeline
 }
 
 func (c *Chat) OneToOne() bool {
