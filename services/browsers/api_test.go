@@ -137,16 +137,18 @@ func TestBookmarks(t *testing.T) {
 
 	bookmark := &Bookmark{
 		Name:     "MyBookmark",
-		Url:      "https://status.im",
-		ImageUrl: "",
+		URL:      "https://status.im",
+		ImageURL: "",
 	}
 
-	require.NoError(t, api.StoreBookmark(context.TODO(), *bookmark))
+	_, err := api.StoreBookmark(context.TODO(), *bookmark)
+	require.NoError(t, err)
+
 	rst, err := api.GetBookmarks(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, rst, 1)
 
-	require.NoError(t, api.DeleteBookmark(context.TODO(), bookmark.Url))
+	require.NoError(t, api.DeleteBookmark(context.TODO(), bookmark.URL))
 	rst, err = api.GetBookmarks(context.TODO())
 	require.NoError(t, err)
 	require.Len(t, rst, 0)

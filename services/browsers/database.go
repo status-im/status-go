@@ -2,6 +2,10 @@ package browsers
 
 import (
 	"database/sql"
+
+	"github.com/mat/besticon/besticon"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Database sql wrapper for operations with browser objects.
@@ -126,9 +130,9 @@ func (db *Database) DeleteBrowser(id string) error {
 type BookmarksType string
 
 type Bookmark struct {
-	Url      string `json:"url"`
+	URL      string `json:"url"`
 	Name     string `json:"name"`
-	ImageUrl string `json:"imageUrl"`
+	ImageURL string `json:"imageUrl"`
 }
 
 func (db *Database) GetBookmarks() ([]*Bookmark, error) {
@@ -141,7 +145,7 @@ func (db *Database) GetBookmarks() ([]*Bookmark, error) {
 	var rst []*Bookmark
 	for rows.Next() {
 		bookmark := &Bookmark{}
-		err := rows.Scan(&bookmark.Url, &bookmark.Name, &bookmark.ImageUrl)
+		err := rows.Scan(&bookmark.URL, &bookmark.Name, &bookmark.ImageURL)
 		if err != nil {
 			return nil, err
 		}
@@ -152,12 +156,38 @@ func (db *Database) GetBookmarks() ([]*Bookmark, error) {
 	return rst, nil
 }
 
-func (db *Database) StoreBookmark(bookmark Bookmark) error {
-	insert, err := db.db.Prepare("INSERT INTO bookmarks (url, name, image_url) VALUES (?, ?, ?)")
+func (db *Database) StoreBookmark(bookmark Bookmark) (Bookmark, error) {
+	insert, err := db.db.Prepare("INSERT OR REPLACE INTO bookmarks (url, name, image_url) VALUES (?, ?, ?)")
+
+	if err != nil {
+		return bookmark, err
+	}
+
+	// Get the right icon
+	finder := besticon.IconFinder{}
+	icons, iconError := finder.FetchIcons(bookmark.URL)
+
+	if iconError == nil && len(icons) > 0 {
+		icon := finder.IconInSizeRange(besticon.SizeRange{48, 48, 100})
+		if icon != nil {
+			bookmark.ImageURL = icon.URL
+		} else {
+			bookmark.ImageURL = icons[0].URL
+		}
+	} else {
+		log.Error("error getting the bookmark icon", "iconError", iconError)
+	}
+
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL)
+	return bookmark, err
+}
+
+func (db *Database) UpdateBookmark(originalURL string, bookmark Bookmark) error {
+	insert, err := db.db.Prepare("UPDATE bookmarks SET url = ?, name = ?, image_url = ? WHERE url = ?")
 	if err != nil {
 		return err
 	}
-	_, err = insert.Exec(bookmark.Url, bookmark.Name, bookmark.ImageUrl)
+	_, err = insert.Exec(bookmark.URL, bookmark.Name, bookmark.ImageURL, originalURL)
 	return err
 }
 

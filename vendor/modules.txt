@@ -1,8 +1,12 @@
 # github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
+# github.com/PuerkitoBio/goquery v1.6.0
+github.com/PuerkitoBio/goquery
 # github.com/allegro/bigcache v1.2.0
 github.com/allegro/bigcache
 github.com/allegro/bigcache/queue
+# github.com/andybalholm/cascadia v1.1.0
+github.com/andybalholm/cascadia
 # github.com/aristanetworks/goarista v0.0.0-20190502180301-283422fc1708
 github.com/aristanetworks/goarista/monotime
 # github.com/beevik/ntp v0.2.0
@@ -128,6 +132,12 @@ github.com/golang-migrate/migrate/v4
 github.com/golang-migrate/migrate/v4/database
 github.com/golang-migrate/migrate/v4/internal/url
 github.com/golang-migrate/migrate/v4/source
+# github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9
+github.com/golang/groupcache
+github.com/golang/groupcache/consistenthash
+github.com/golang/groupcache/groupcachepb
+github.com/golang/groupcache/lru
+github.com/golang/groupcache/singleflight
 # github.com/golang/mock v1.4.1
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.3.4
@@ -282,6 +292,10 @@ github.com/libp2p/go-ws-transport
 github.com/libp2p/go-yamux
 # github.com/lucasb-eyer/go-colorful v1.0.3
 github.com/lucasb-eyer/go-colorful
+# github.com/mat/besticon v3.12.0+incompatible
+github.com/mat/besticon/besticon
+github.com/mat/besticon/colorfinder
+github.com/mat/besticon/ico
 # github.com/mattn/go-colorable v0.1.4
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.10
@@ -481,10 +495,12 @@ golang.org/x/crypto/ripemd160
 golang.org/x/crypto/scrypt
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh/terminal
+# golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
+golang.org/x/image/bmp
 # golang.org/x/lint v0.0.0-20190930215403-16217165b5de
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20191119073136-fc4aabc6c914
+# golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/html
@@ -494,6 +510,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/iana
 golang.org/x/net/internal/socket
 golang.org/x/net/ipv4
+golang.org/x/net/publicsuffix
 # golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/syncmap
 # golang.org/x/sys v0.0.0-20200122134326-e047566fdf82

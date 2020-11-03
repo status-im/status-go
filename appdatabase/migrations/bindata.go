@@ -30,7 +30,7 @@
 // 0016_local_notifications_preferences.down.sql (43B)
 // 0016_local_notifications_preferences.up.sql (204B)
 // 0017_bookmarks.down.sql (22B)
-// 0017_bookmarks.up.sql (146B)
+// 0017_bookmarks.up.sql (147B)
 // doc.go (74B)
 
 package migrations
@@ -695,12 +695,12 @@ func _0017_bookmarksDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0017_bookmarks.down.sql", size: 22, mode: os.FileMode(0664), modTime: time.Unix(1604328827, 0)}
+	info := bindataFileInfo{name: "0017_bookmarks.down.sql", size: 22, mode: os.FileMode(0644), modTime: time.Unix(1604421608, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9a, 0x13, 0x2a, 0x44, 0xb0, 0x3, 0x18, 0x63, 0xb8, 0x33, 0xda, 0x3a, 0xeb, 0xb8, 0xcb, 0xd1, 0x98, 0x29, 0xa7, 0xf0, 0x6, 0x9d, 0xc9, 0x62, 0xe7, 0x89, 0x7f, 0x77, 0xaf, 0xec, 0x6b, 0x8f}}
 	return a, nil
 }
 
-var __0017_bookmarksUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x54\xcb\xc1\xaa\xc2\x30\x10\x46\xe1\x7d\x9e\xe2\x5f\xb6\x70\xdf\xe0\xae\xd2\x3a\xda\xc1\x98\xc8\x74\x6a\xed\x4a\x22\x14\x91\x36\x16\x22\x7d\x7f\xd1\x95\x6e\x3f\xce\xa9\x85\xac\x12\xd4\x56\x8e\xc0\x5b\xf8\xa0\xa0\x33\xb7\xda\xe2\xba\x2c\x53\x8a\x79\x7a\xa2\x30\xc0\x9a\x67\x9c\xac\xd4\x8d\x95\x4f\xe4\x3b\xe7\xfe\x0c\xf0\x88\x69\x44\xc5\x3b\xf6\xfa\xe3\xf7\x14\x6f\xe3\xe5\xeb\x7a\xe3\x51\xf8\x60\x65\xc0\x9e\x06\x14\x6b\x9e\x4b\x53\xa2\x67\x6d\x42\xa7\x90\xd0\xf3\xe6\xdf\x98\x57\x00\x00\x00\xff\xff\x69\xbf\x7a\xcb\x92\x00\x00\x00")
+var __0017_bookmarksUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x6c\x8b\x3d\xaa\xc2\x40\x10\xc7\xfb\x3d\xc5\xbf\x4c\xe0\xdd\xe0\x55\x63\x1c\xc9\xe0\x9a\x95\xc9\xc4\x98\x4a\x56\x08\x22\xc9\x1a\x58\xc9\xfd\x45\x2b\x0b\xdb\xdf\x47\xa5\x4c\xc6\x30\xda\x78\x86\xec\xd0\x04\x03\x9f\xa5\xb5\x16\xd7\x65\x99\x52\xcc\xd3\x13\x85\x03\xd6\x3c\xe3\x44\x5a\xd5\xa4\x9f\xa8\xe9\xbc\xff\x73\xc0\x23\xa6\xf1\xa7\xb8\xa7\x78\x1b\x2f\x5f\xdb\x1b\x1e\x55\x0e\xa4\x03\xf6\x3c\xa0\x58\xf3\x5c\xba\x12\xbd\x58\x1d\x3a\x83\x86\x5e\xb6\xff\xce\xbd\x02\x00\x00\xff\xff\x91\xa6\x3e\xcb\x93\x00\x00\x00")
 
 func _0017_bookmarksUpSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -715,8 +715,8 @@ func _0017_bookmarksUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0017_bookmarks.up.sql", size: 146, mode: os.FileMode(0664), modTime: time.Unix(1604333997, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xed, 0x89, 0x32, 0xd, 0xcb, 0x56, 0xa9, 0x29, 0x21, 0xae, 0xa0, 0x9e, 0xeb, 0x49, 0xf, 0x6f, 0x32, 0xc8, 0x14, 0x3c, 0x95, 0xd6, 0xdc, 0xaf, 0x7d, 0x1e, 0xd0, 0xb1, 0x4d, 0x9f, 0xdc, 0xdd}}
+	info := bindataFileInfo{name: "0017_bookmarks.up.sql", size: 147, mode: os.FileMode(0644), modTime: time.Unix(1604424317, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xbc, 0x47, 0xe1, 0xe3, 0xd8, 0xc6, 0x4, 0x6d, 0x5f, 0x2f, 0xa, 0x51, 0xa6, 0x8c, 0x6a, 0xe0, 0x3d, 0x8c, 0x91, 0x47, 0xbc, 0x1, 0x75, 0x46, 0x92, 0x2, 0x18, 0x6e, 0xe3, 0x4f, 0x18, 0x57}}
 	return a, nil
 }
 

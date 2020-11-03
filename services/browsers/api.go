@@ -34,10 +34,17 @@ func (api *API) GetBookmarks(ctx context.Context) ([]*Bookmark, error) {
 	return rst, err
 }
 
-func (api *API) StoreBookmark(ctx context.Context, bookmark Bookmark) error {
+func (api *API) StoreBookmark(ctx context.Context, bookmark Bookmark) (Bookmark, error) {
 	log.Debug("call to create a bookmark")
-	err := api.db.StoreBookmark(bookmark)
+	bookmarkResult, err := api.db.StoreBookmark(bookmark)
 	log.Debug("result from database for creating a bookmark", "err", err)
+	return bookmarkResult, err
+}
+
+func (api *API) UpdateBookmark(ctx context.Context, originalURL string, bookmark Bookmark) error {
+	log.Debug("call to update a bookmark")
+	err := api.db.UpdateBookmark(originalURL, bookmark)
+	log.Debug("result from database for updating a bookmark", "err", err)
 	return err
 }
 
