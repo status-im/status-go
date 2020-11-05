@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 )
 
 type Database struct {
@@ -98,6 +99,15 @@ func (d *Database) StoreIdentityImages(iis []*IdentityImage) (err error) {
 func (d *Database) DeleteIdentityImage(it string) error {
 	_, err := d.db.Exec(`DELETE FROM identity_images WHERE name = ?`, it)
 	return err
+}
+
+func (i IdentityImage) GetType() (ImageType, error) {
+	it := GetType(i.Payload)
+	if it == UNKNOWN {
+		return it, errors.New("unsupported file type")
+	}
+
+	return it, nil
 }
 
 func (i IdentityImage) GetDataURI() (string, error) {
