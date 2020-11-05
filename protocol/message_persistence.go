@@ -467,7 +467,7 @@ func (db sqlitePersistence) MessagesByIDs(ids []string) ([]*common.Message, erro
 func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, limit int) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
-		cursorWhere = "AND cursor <= ?"
+		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := []interface{}{chatID}
@@ -536,7 +536,7 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string, limit int) ([]*common.Message, string, error) {
 	cursorWhere := ""
 	if currCursor != "" {
-		cursorWhere = "AND cursor <= ?"
+		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := make([]interface{}, len(chatIDs))
