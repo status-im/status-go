@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption"
@@ -455,6 +456,11 @@ func (m *Messenger) handleSendContactCode() error {
 		m.logger.Error("could not build contact code advertisement", zap.Error(err))
 	}
 
+	err = m.handleContactCodeChatIdentity(contactCodeAdvertisement)
+	if err != nil {
+		return err
+	}
+
 	if contactCodeAdvertisement != nil {
 		payload, err = proto.Marshal(contactCodeAdvertisement)
 		if err != nil {
@@ -475,6 +481,58 @@ func (m *Messenger) handleSendContactCode() error {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
 	return err
+}
+
+// contactCodeAdvertisement attaches a protobuf.ChatIdentity to the given protobuf.ContactCodeAdvertisement,
+// if the last time the ChatIdentity was attached was more than 24 hours ago
+func (m *Messenger) handleContactCodeChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
+	pubKey := transport.PublicKeyToStr(&m.identity.PublicKey)
+	lp, err := m.persistence.GetWhenChatIdentityLastPublished(pubKey)
+	if err != nil {
+		return err
+	}
+
+	if *lp == 0 || *lp - time.Now().Unix() > 24 * 60 * 60{
+		err = m.attachChatIdentity(cca)
+		if err != nil {
+			return err
+		}
+
+		err := m.persistence.SaveWhenChatIdentityLastPublished(pubKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// attachChatIdentity
+func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
+
+	idb := userimage.NewDatabase(m.database)
+	imgs, err := idb.GetIdentityImages()
+	if err != nil {
+		return err
+	}
+
+	// Adapt images.IdentityImage to protobuf.IdentityImage
+	ciis := make(map[string]*protobuf.IdentityImage)
+	for _, img := range imgs {
+		ciis[img.Name] = &protobuf.IdentityImage{
+			Payload:    img.Payload,
+			SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
+			ImageType:  images.ImageType(img.Payload),
+		}
+	}
+
+	cca.ChatIdentity = &protobuf.ChatIdentity{
+		Clock:   m.transport.GetCurrentTime(),
+		EnsName: "", // TODO add ENS name handling to dedicate PR
+		Images:  ciis,
+	}
+
+	return nil
 }
 
 // handleSharedSecrets process the negotiated secrets received from the encryption layer

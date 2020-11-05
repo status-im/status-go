@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+import "chat_identity.proto";
+
 message PushNotificationRegistration {
   enum TokenType {
     UNKNOWN_TOKEN_TYPE = 0;
@@ -40,6 +42,7 @@ message PushNotificationRegistrationResponse {
 
 message ContactCodeAdvertisement {
   repeated PushNotificationQueryInfo push_notification_info = 1;
+  ChatIdentity chat_identity = 2;
 }
 
 message PushNotificationQuery {
