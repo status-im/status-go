@@ -2600,9 +2600,8 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 			}
 		}
 		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
-	} else {
-		return m.persistence.MessageByChatID(chatID, cursor, limit)
 	}
+	return m.persistence.MessageByChatID(chatID, cursor, limit)
 }
 
 func (m *Messenger) SaveMessages(messages []*common.Message) error {
