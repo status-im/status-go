@@ -498,9 +498,10 @@ func (m *Messenger) Init() error {
 		}
 
 		m.allChats[chat.ID] = chat
-		if !chat.Active {
+		if !chat.Active || chat.Timeline() {
 			continue
 		}
+
 		switch chat.ChatType {
 		case ChatTypePublic, ChatTypeProfile:
 			publicChatIDs = append(publicChatIDs, chat.ID)
