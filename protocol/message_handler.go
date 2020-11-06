@@ -162,7 +162,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	}
 
 	// If deleted-at is greater, ignore message
-	if chat.DeletedAtClockValue >= message.Clock {
+	if chat.DeletedAtClockValue >= message.Clock || chat.ClearedAtClockValue >= message.Clock {
 		return nil
 	}
 
@@ -355,7 +355,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	}
 
 	// If deleted-at is greater, ignore message
-	if chat.DeletedAtClockValue >= receivedMessage.Clock && !chat.Public() {
+	if (chat.DeletedAtClockValue >= receivedMessage.Clock && !chat.Public()) || chat.ClearedAtClockValue >= receivedMessage.Clock {
 		return nil
 	}
 

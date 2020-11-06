@@ -49,8 +49,12 @@ type Chat struct {
 	// LastClockValue indicates the last clock value to be used when sending messages
 	LastClockValue uint64 `json:"lastClockValue"`
 	// DeletedAtClockValue indicates the clock value at time of deletion, messages
-	// with lower clock value of this should be discarded
+	// with lower clock value of this should be discarded (except for pubchats)
 	DeletedAtClockValue uint64 `json:"deletedAtClockValue"`
+
+	// ClearedAtClockValue indicates the clock value at time of clearing chat's history,
+	// messages with lower clock value of this should be discarded
+	ClearedAtClockValue uint64 `json:"ClearedAtClockValue"`
 
 	// Denormalized fields
 	UnviewedMessagesCount uint            `json:"unviewedMessagesCount"`

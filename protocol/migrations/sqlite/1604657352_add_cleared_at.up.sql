@@ -1,0 +1,1 @@
+ALTER TABLE chats ADD COLUMN cleared_at_clock_value INT NOT NULL DEFAULT 0;

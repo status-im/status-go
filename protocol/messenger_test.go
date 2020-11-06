@@ -625,6 +625,37 @@ func (s *MessengerSuite) TestDeletedAtClockValuePubChat() {
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
+func (s *MessengerSuite) TestClearedAtClockValuePubChat() {
+	theirMessenger := s.newMessenger(s.shh)
+	s.Require().NoError(theirMessenger.Start())
+	theirChat := CreatePublicChat("status", s.m.transport)
+	err := theirMessenger.SaveChat(&theirChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status", s.m.transport)
+	err = s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	inputMessage := buildTestMessage(chat)
+
+	sentResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	chat.ClearedAtClockValue = sentResponse.Messages[0].Clock
+	err = s.m.SaveChat(&chat)
+	s.Require().NoError(err)
+
+	// Wait for the message to reach its destination
+	time.Sleep(100 * time.Millisecond)
+	response, err := s.m.RetrieveAll()
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages, 0)
+	s.Require().NoError(theirMessenger.Shutdown())
+}
+
 func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	theirMessenger := s.newMessenger(s.shh)
 	s.Require().NoError(theirMessenger.Start())

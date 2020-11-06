@@ -122,8 +122,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp, cleared_at_clock_value, deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -136,6 +136,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Active,
 		chat.ChatType,
 		chat.Timestamp,
+		chat.ClearedAtClockValue,
 		chat.DeletedAtClockValue,
 		chat.UnviewedMessagesCount,
 		chat.LastClockValue,
@@ -198,6 +199,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.type,
 			chats.timestamp,
 			chats.deleted_at_clock_value,
+			chats.cleared_at_clock_value,
 			chats.unviewed_message_count,
 			chats.last_clock_value,
 			chats.last_message,
@@ -235,6 +237,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.ChatType,
 			&chat.Timestamp,
 			&chat.DeletedAtClockValue,
+			&chat.ClearedAtClockValue,
 			&chat.UnviewedMessagesCount,
 			&chat.LastClockValue,
 			&lastMessageBytes,
@@ -309,6 +312,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			type,
 			timestamp,
 			deleted_at_clock_value,
+			cleared_at_clock_value,
 			unviewed_message_count,
 			last_clock_value,
 			last_message,
@@ -326,6 +330,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.ChatType,
 		&chat.Timestamp,
 		&chat.DeletedAtClockValue,
+		&chat.ClearedAtClockValue,
 		&chat.UnviewedMessagesCount,
 		&chat.LastClockValue,
 		&lastMessageBytes,
