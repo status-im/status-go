@@ -568,35 +568,6 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 func (s *MessengerSuite) TestDeletedAtClockValue() {
 	theirMessenger := s.newMessenger(s.shh)
 	s.Require().NoError(theirMessenger.Start())
-	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
-	err := theirMessenger.SaveChat(&theirChat)
-	s.Require().NoError(err)
-
-	ourChat := CreateOneToOneChat("our-chat", &theirMessenger.identity.PublicKey, s.m.transport)
-	ourChat.UnviewedMessagesCount = 1
-	s.Require().NoError(err)
-
-	inputMessage := buildTestMessage(theirChat)
-
-	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
-	s.NoError(err)
-	s.Require().Len(sendResponse.Messages, 1)
-
-	ourChat.DeletedAtClockValue = sendResponse.Messages[0].Clock
-	err = s.m.SaveChat(&ourChat)
-	s.NoError(err)
-
-	// Wait for the message to reach its destination
-	time.Sleep(100 * time.Millisecond)
-	response, err := s.m.RetrieveAll()
-	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 0)
-	s.Require().NoError(theirMessenger.Shutdown())
-}
-
-func (s *MessengerSuite) TestDeletedAtClockValuePubChat() {
-	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
 	theirChat := CreatePublicChat("status", s.m.transport)
 	err := theirMessenger.SaveChat(&theirChat)
 	s.Require().NoError(err)
@@ -621,7 +592,7 @@ func (s *MessengerSuite) TestDeletedAtClockValuePubChat() {
 	time.Sleep(100 * time.Millisecond)
 	response, err := s.m.RetrieveAll()
 	s.Require().NoError(err)
-	s.Require().Len(response.Messages, 1)
+	s.Require().Len(response.Messages, 0)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
