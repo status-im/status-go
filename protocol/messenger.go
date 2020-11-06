@@ -2744,6 +2744,10 @@ func (m *Messenger) VerifyENSNames(ctx context.Context, rpcEndpoint, contractAdd
 
 		if details.Error == nil {
 			contact.ENSVerified = details.Verified
+			// Increment count if not verified, even if no error
+			if !details.Verified {
+				contact.ENSVerificationRetries++
+			}
 			m.allContacts[contact.ID] = contact
 		} else {
 			m.logger.Warn("Failed to resolve ens name",
