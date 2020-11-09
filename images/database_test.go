@@ -88,7 +88,7 @@ func setupTestDB(t *testing.T) (Database, func()) {
 func seedTestDB(t *testing.T, db Database) {
 	iis := []*IdentityImage{
 		{
-			Name:         smallDimName,
+			Name:         SmallDimName,
 			Payload:      testJpegBytes,
 			Width:        80,
 			Height:       80,
@@ -96,7 +96,7 @@ func seedTestDB(t *testing.T, db Database) {
 			ResizeTarget: 80,
 		},
 		{
-			Name:         largeDimName,
+			Name:         LargeDimName,
 			Payload:      testPngBytes,
 			Width:        240,
 			Height:       300,
@@ -133,11 +133,11 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 		Expected string
 	}{
 		{
-			smallDimName,
+			SmallDimName,
 			`{"name":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`,
 		},
 		{
-			largeDimName,
+			LargeDimName,
 			`{"name":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240}`,
 		},
 	}
@@ -157,9 +157,9 @@ func TestDatabase_DeleteIdentityImage(t *testing.T) {
 	defer stop()
 	seedTestDB(t, db)
 
-	require.NoError(t, db.DeleteIdentityImage(smallDimName))
+	require.NoError(t, db.DeleteIdentityImage(SmallDimName))
 
-	oii, err := db.GetIdentityImage(smallDimName)
+	oii, err := db.GetIdentityImage(SmallDimName)
 	require.NoError(t, err)
 	require.Empty(t, oii)
 }
