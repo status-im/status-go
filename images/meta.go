@@ -17,8 +17,8 @@ const (
 	SmallDim = ResizeDimension(80)
 	LargeDim = ResizeDimension(240)
 
-	smallDimName = "thumbnail"
-	largeDimName = "large"
+	SmallDimName = "thumbnail"
+	LargeDimName = "large"
 )
 
 var (
@@ -40,14 +40,14 @@ var (
 
 	// ResizeDimensionToName maps a ResizeDimension to its assigned string name
 	ResizeDimensionToName = map[ResizeDimension]string{
-		SmallDim: smallDimName,
-		LargeDim: largeDimName,
+		SmallDim: SmallDimName,
+		LargeDim: LargeDimName,
 	}
 
 	// NameToResizeDimension maps a string name to its assigned ResizeDimension
 	NameToResizeDimension = map[string]ResizeDimension{
-		smallDimName: SmallDim,
-		largeDimName: LargeDim,
+		SmallDimName: SmallDim,
+		LargeDimName: LargeDim,
 	}
 )
 

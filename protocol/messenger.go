@@ -484,21 +484,21 @@ func (m *Messenger) handleSendContactCode() error {
 }
 
 // contactCodeAdvertisement attaches a protobuf.ChatIdentity to the given protobuf.ContactCodeAdvertisement,
-// if the last time the ChatIdentity was attached was more than 24 hours ago
+// if the `shouldPublish` conditions are met
 func (m *Messenger) handleContactCodeChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
-	pubKey := transport.PublicKeyToStr(&m.identity.PublicKey)
-	lp, err := m.persistence.GetWhenChatIdentityLastPublished(pubKey)
+	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	shouldPublish, err := m.shouldPublishChatIdentity(contactCodeTopic)
 	if err != nil {
 		return err
 	}
 
-	if *lp == 0 || *lp - time.Now().Unix() > 24 * 60 * 60{
-		err = m.attachChatIdentity(cca)
+	if shouldPublish {
+		cca.ChatIdentity, err = m.createChatIdentity("private-chat")
 		if err != nil {
 			return err
 		}
 
-		err := m.persistence.SaveWhenChatIdentityLastPublished(pubKey)
+		err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic)
 		if err != nil {
 			return err
 		}
@@ -507,32 +507,104 @@ func (m *Messenger) handleContactCodeChatIdentity(cca *protobuf.ContactCodeAdver
 	return nil
 }
 
-// attachChatIdentity
-func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
+// handleStandaloneChatIdentity sends a standalone ChatIdentity message to a public channel if the publish criteria is met
+func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
+	if chat.ChatType != ChatTypePublic {
+		return nil
+	}
+	shouldPublishChatIdentity, err := m.shouldPublishChatIdentity(chat.ID)
+	if err != nil {
+		return err
+	}
+	if !shouldPublishChatIdentity {
+		return nil
+	}
 
-	idb := userimage.NewDatabase(m.database)
-	imgs, err := idb.GetIdentityImages()
+	ci, err := m.createChatIdentity("public-chat")
 	if err != nil {
 		return err
 	}
 
-	// Adapt images.IdentityImage to protobuf.IdentityImage
-	ciis := make(map[string]*protobuf.IdentityImage)
-	for _, img := range imgs {
-		ciis[img.Name] = &protobuf.IdentityImage{
-			Payload:    img.Payload,
-			SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
-			ImageType:  images.ImageType(img.Payload),
-		}
+	payload, err := proto.Marshal(ci)
+	if err != nil {
+		return err
 	}
 
-	cca.ChatIdentity = &protobuf.ChatIdentity{
-		Clock:   m.transport.GetCurrentTime(),
-		EnsName: "", // TODO add ENS name handling to dedicate PR
-		Images:  ciis,
+	rawMessage := common.RawMessage{
+		LocalChatID: chat.ID,
+		MessageType: protobuf.ApplicationMetadataMessage_CHAT_IDENTITY,
+		Payload:     payload,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err = m.processor.SendPublic(ctx, chat.ID, rawMessage)
+	if err != nil {
+		return err
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID)
+	if err != nil {
+		return err
 	}
 
 	return nil
+}
+
+// shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
+func (m *Messenger) shouldPublishChatIdentity(chatId string) (bool, error) {
+	lp, err := m.persistence.GetWhenChatIdentityLastPublished(chatId)
+	if err != nil {
+		return false, err
+	}
+
+	return *lp == 0 || time.Now().Unix() - *lp > 24 * 60 * 60, nil
+}
+
+// createChatIdentity creates a context based protobuf.ChatIdentity.
+// context 'public-chat' will attach only the 'thumbnail' IdentityImage
+// contect 'private-chat' will attach all IdentityImage
+func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, error) {
+	ci := &protobuf.ChatIdentity{
+		Clock:   m.transport.GetCurrentTime(),
+		EnsName: "", // TODO add ENS name handling to dedicate PR
+	}
+
+	ciis := make(map[string]*protobuf.IdentityImage)
+
+	switch context {
+	case "public-chat":
+		idb := userimage.NewDatabase(m.database)
+		img, err := idb.GetIdentityImage(userimage.SmallDimName)
+		if err != nil {
+			return nil, err
+		}
+
+		ciis[userimage.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
+		ci.Images = ciis
+
+	case "private-chat":
+		idb := userimage.NewDatabase(m.database)
+		imgs, err := idb.GetIdentityImages()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, img := range imgs {
+			ciis[img.Name] = m.adaptIdentityImageToProtobuf(img)
+		}
+		ci.Images = ciis
+	}
+
+	return ci, nil
+}
+
+// adaptIdentityImageToProtobuf Adapts a images.IdentityImage to protobuf.IdentityImage
+func (m *Messenger) adaptIdentityImageToProtobuf(img *userimage.IdentityImage) *protobuf.IdentityImage {
+	return &protobuf.IdentityImage{
+		Payload:    img.Payload,
+		SourceType: protobuf.IdentityImage_RAW_PAYLOAD, // TODO add ENS avatar handling to dedicated PR
+		ImageType:  images.ImageType(img.Payload),
+	}
 }
 
 // handleSharedSecrets process the negotiated secrets received from the encryption layer
@@ -1984,7 +2056,12 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, errors.New("Chat not found")
 	}
 
-	err := extendMessageFromChat(message, chat, &m.identity.PublicKey, m.getTimesource())
+	err := m.handleStandaloneChatIdentity(chat)
+	if err != nil {
+		return nil, err
+	}
+
+	err = extendMessageFromChat(message, chat, &m.identity.PublicKey, m.getTimesource())
 	if err != nil {
 		return nil, err
 	}
