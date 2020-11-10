@@ -2534,11 +2534,22 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		}
 	}
 
+	newMessagesIds := map[string]struct{}{}
+	for _, message := range messageState.Response.Messages {
+		newMessagesIds[message.ID] = struct{}{}
+	}
+
 	messagesWithResponses, err := m.pullMessagesAndResponsesFromDB(messageState.Response.Messages)
 	if err != nil {
 		return nil, err
 	}
 	messageState.Response.Messages = messagesWithResponses
+
+	for _, message := range messageState.Response.Messages {
+		if _, ok := newMessagesIds[message.ID]; ok {
+			message.New = true
+		}
+	}
 
 	// Reset installations
 	m.modifiedInstallations = make(map[string]bool)
