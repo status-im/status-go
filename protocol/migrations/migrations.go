@@ -737,7 +737,7 @@ func _1603888149_create_chat_identity_last_published_tableDownSql() (*asset, err
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1603888149_create_chat_identity_last_published_table.down.sql", size: 40, mode: os.FileMode(0644), modTime: time.Unix(1607535443, 0)}
+	info := bindataFileInfo{name: "1603888149_create_chat_identity_last_published_table.down.sql", size: 40, mode: os.FileMode(0644), modTime: time.Unix(1608048466, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x82, 0x2a, 0x5, 0xfd, 0x9, 0xab, 0xd3, 0x3e, 0xba, 0xc4, 0x85, 0xc8, 0xcd, 0x97, 0xbd, 0x37, 0xfc, 0x18, 0x9b, 0x9d, 0x3c, 0x6e, 0xe5, 0xe8, 0xbe, 0xa4, 0xec, 0x4, 0xcf, 0x67, 0x36, 0x16}}
 	return a, nil
 }
@@ -757,7 +757,7 @@ func _1603888149_create_chat_identity_last_published_tableUpSql() (*asset, error
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1603888149_create_chat_identity_last_published_table.up.sql", size: 150, mode: os.FileMode(0644), modTime: time.Unix(1607535443, 0)}
+	info := bindataFileInfo{name: "1603888149_create_chat_identity_last_published_table.up.sql", size: 150, mode: os.FileMode(0644), modTime: time.Unix(1608048466, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x59, 0x86, 0xb3, 0xa5, 0xcb, 0x83, 0xd5, 0x17, 0x12, 0x32, 0x31, 0xdf, 0xac, 0x59, 0x7b, 0x6e, 0x7a, 0xe6, 0xd5, 0x67, 0xf2, 0xc5, 0x1f, 0x66, 0xc8, 0x7, 0x7d, 0x52, 0xe5, 0xcd, 0x6e, 0xd0}}
 	return a, nil
 }
