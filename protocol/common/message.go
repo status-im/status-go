@@ -117,7 +117,9 @@ type Message struct {
 
 	// Replace indicates that this is a replacement of a message
 	// that has been updated
-	Replace   string           `json:"replace,omitempty"`
+	Replace string `json:"replace,omitempty"`
+	New     bool   `json:"new,omitempty"`
+
 	SigPubKey *ecdsa.PublicKey `json:"-"`
 
 	// Mentions is an array of mentions for a given message
@@ -150,6 +152,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Clock             uint64                           `json:"clock"`
 		Replace           string                           `json:"replace"`
 		ResponseTo        string                           `json:"responseTo"`
+		New               bool                             `json:"new,omitempty"`
 		EnsName           string                           `json:"ensName"`
 		Image             string                           `json:"image,omitempty"`
 		Audio             string                           `json:"audio,omitempty"`
@@ -179,6 +182,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		LocalChatID:       m.LocalChatID,
 		Clock:             m.Clock,
 		ResponseTo:        m.ResponseTo,
+		New:               m.New,
 		EnsName:           m.EnsName,
 		Image:             m.Base64Image,
 		Audio:             m.Base64Audio,
