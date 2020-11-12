@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/status-im/status-go/images"
 	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -28,6 +28,7 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/multiaccounts"
@@ -1309,7 +1310,8 @@ func (b *GethStatusBackend) StoreIdentityImage(filepath string, aX, aY, bX, bY i
 	}
 
 	// TODO remove once debug has been resolved
-	b.log.Info("generated profile images", spew.Sdump(iis, aX, aY, bX, bY))
+	spew.Dump(iis, filepath, aX, aY, bX, bY)
+	b.log.Debug("generated profile images", spew.Sdump(iis, filepath, aX, aY, bX, bY))
 
 	idb := images.NewDatabase(b.appDB)
 	err = idb.StoreIdentityImages(iis)
