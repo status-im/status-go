@@ -113,7 +113,7 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 	defer stop()
 	seedTestDB(t, db)
 
-	expected := `[{"name":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240},{"name":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}]`
+	expected := `[{"type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240},{"type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}]`
 
 	oiis, err := db.GetIdentityImages()
 	require.NoError(t, err)
@@ -134,11 +134,11 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 	}{
 		{
 			SmallDimName,
-			`{"name":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`,
+			`{"type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`,
 		},
 		{
 			LargeDimName,
-			`{"name":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240}`,
+			`{"type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240}`,
 		},
 	}
 

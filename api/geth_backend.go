@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/status-im/status-go/images"
 	"math/big"
 	"os"
@@ -1306,6 +1307,9 @@ func (b *GethStatusBackend) StoreIdentityImage(filepath string, aX, aY, bX, bY i
 	if err != nil {
 		return "", err
 	}
+
+	// TODO remove once debug has been resolved
+	b.log.Info("generated profile images", spew.Sdump(iis, aX, aY, bX, bY))
 
 	idb := images.NewDatabase(b.appDB)
 	err = idb.StoreIdentityImages(iis)
