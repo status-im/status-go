@@ -20,7 +20,7 @@ func GenerateIdentityImages(filepath string, aX, aY, bX, bY int) ([]*IdentityIma
 		return nil, err
 	}
 
-	iis := make([]*IdentityImage, len(ResizeDimensions))
+	var iis []*IdentityImage
 	for _, s := range ResizeDimensions {
 		rImg := Resize(s, cImg)
 
