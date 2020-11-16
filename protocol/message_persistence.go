@@ -607,7 +607,8 @@ func (db sqlitePersistence) MessageByChatIDs(chatIDs []string, currCursor string
 func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor string, limit int) ([]*EmojiReaction, error) {
 	cursorWhere := ""
 	if currCursor != "" {
-		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?"
+		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?" //nolint: goconst
+
 	}
 	args := []interface{}{chatID, chatID}
 	if currCursor != "" {
@@ -645,6 +646,87 @@ func (db sqlitePersistence) EmojiReactionsByChatID(chatID string, currCursor str
 			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
 			LIMIT 1000
 		`, cursorWhere)
+
+	rows, err := db.db.Query(
+		query,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []*EmojiReaction
+	for rows.Next() {
+		var emojiReaction EmojiReaction
+		err := rows.Scan(&emojiReaction.Clock,
+			&emojiReaction.From,
+			&emojiReaction.Type,
+			&emojiReaction.MessageId,
+			&emojiReaction.ChatId,
+			&emojiReaction.LocalChatID,
+			&emojiReaction.Retracted)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, &emojiReaction)
+	}
+
+	return result, nil
+}
+
+// EmojiReactionsByChatIDs returns the emoji reactions for the queried messages, up to a maximum of 100, as it's a potentially unbound number.
+// NOTE: This is not completely accurate, as the messages in the database might have change since the last call to `MessageByChatID`.
+func (db sqlitePersistence) EmojiReactionsByChatIDs(chatIDs []string, currCursor string, limit int) ([]*EmojiReaction, error) {
+	cursorWhere := ""
+	if currCursor != "" {
+		cursorWhere = "AND substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id <= ?" //nolint: goconst
+
+	}
+	chatsLen := len(chatIDs)
+	args := make([]interface{}, chatsLen*2)
+	for i, v := range chatIDs {
+		args[i] = v
+	}
+	for i, v := range chatIDs {
+		args[chatsLen+i] = v
+	}
+	if currCursor != "" {
+		args = append(args, currCursor)
+	}
+	args = append(args, limit)
+	// NOTE: We match against local_chat_id for security reasons.
+	// As a user could potentially send an emoji reaction for a one to
+	// one/group chat that has no access to.
+	// We also limit the number of emoji to a reasonable number (1000)
+	// for now, as we don't want the client to choke on this.
+	// The issue is that your own emoji might not be returned in such cases,
+	// allowing the user to react to a post multiple times.
+	// Jakubgs: Returning the whole list seems like a real overkill.
+	// This will get very heavy in threads that have loads of reactions on loads of messages.
+	// A more sensible response would just include a count and a bool telling you if you are in the list.
+	// nolint: gosec
+	query := fmt.Sprintf(`
+			SELECT
+			    e.clock_value,
+			    e.source,
+			    e.emoji_id,
+			    e.message_id,
+			    e.chat_id,
+			    e.local_chat_id,
+			    e.retracted
+			FROM
+				emoji_reactions e
+			WHERE NOT(e.retracted)
+			AND
+			e.local_chat_id IN %s
+			AND
+			e.message_id IN
+			(SELECT id FROM user_messages m WHERE NOT(m.hide) AND m.local_chat_id IN %s %s
+			ORDER BY substr('0000000000000000000000000000000000000000000000000000000000000000' || m.clock_value, -64, 64) || m.id DESC LIMIT ?)
+			LIMIT 1000
+		`, "(?"+strings.Repeat(",?", chatsLen-1)+")", "(?"+strings.Repeat(",?", chatsLen-1)+")", cursorWhere)
 
 	rows, err := db.db.Query(
 		query,

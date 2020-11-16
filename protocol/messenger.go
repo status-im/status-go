@@ -3751,6 +3751,20 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 }
 
 func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit int) ([]*EmojiReaction, error) {
+	chat, err := m.persistence.Chat(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	if chat.Timeline() {
+		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
+		for _, contact := range m.allContacts {
+			if contact.IsAdded() {
+				chatIDs = append(chatIDs, "@"+contact.ID)
+			}
+		}
+		return m.persistence.EmojiReactionsByChatIDs(chatIDs, cursor, limit)
+	}
 	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
 }
 
