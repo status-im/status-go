@@ -174,7 +174,9 @@ func init() {
 	proto.RegisterType((*ApplicationMetadataMessage)(nil), "protobuf.ApplicationMetadataMessage")
 }
 
-func init() { proto.RegisterFile("application_metadata_message.proto", fileDescriptor_ad09a6406fcf24c7) }
+func init() {
+	proto.RegisterFile("application_metadata_message.proto", fileDescriptor_ad09a6406fcf24c7)
+}
 
 var fileDescriptor_ad09a6406fcf24c7 = []byte{
 	// 493 bytes of a gzipped FileDescriptorProto
