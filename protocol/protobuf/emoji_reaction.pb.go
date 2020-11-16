@@ -151,7 +151,9 @@ func init() {
 	proto.RegisterType((*EmojiReaction)(nil), "protobuf.EmojiReaction")
 }
 
-func init() { proto.RegisterFile("emoji_reaction.proto", fileDescriptor_0a088c907bbc7ed6) }
+func init() {
+	proto.RegisterFile("emoji_reaction.proto", fileDescriptor_0a088c907bbc7ed6)
+}
 
 var fileDescriptor_0a088c907bbc7ed6 = []byte{
 	// 305 bytes of a gzipped FileDescriptorProto

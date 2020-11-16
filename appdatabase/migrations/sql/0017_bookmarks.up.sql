@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS bookmarks (
+  url VARCHAR NOT NULL,
+  name VARCHAR NOT NULL,
+  image_url VARCHAR,
+  PRIMARY KEY (url)
+) WITHOUT ROWID;
+
