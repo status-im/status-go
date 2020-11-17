@@ -442,14 +442,15 @@ func (c *newBlocksTransfersCommand) getTransfers(parent context.Context, header 
 // - runs fast indexing for each account separately
 // - starts listening to new blocks and watches for reorgs
 type controlCommand struct {
-	accounts    []common.Address
-	db          *Database
-	eth         *ETHTransferDownloader
-	erc20       *ERC20TransfersDownloader
-	chain       *big.Int
-	client      *ethclient.Client
-	feed        *event.Feed
-	safetyDepth *big.Int
+	accounts       []common.Address
+	db             *Database
+	eth            *ETHTransferDownloader
+	erc20          *ERC20TransfersDownloader
+	chain          *big.Int
+	client         *ethclient.Client
+	feed           *event.Feed
+	safetyDepth    *big.Int
+	watchNewBlocks bool
 }
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
@@ -558,7 +559,7 @@ func loadTransfers(ctx context.Context, accounts []common.Address, db *Database,
 		}
 
 		for _, block := range blocks {
-			erc20 := &transfersCommand{
+			transfers := &transfersCommand{
 				db:      db,
 				client:  client,
 				address: address,
@@ -570,8 +571,8 @@ func loadTransfers(ctx context.Context, accounts []common.Address, db *Database,
 				},
 				block: block,
 			}
-			commands = append(commands, erc20)
-			group.Add(erc20.Command())
+			commands = append(commands, transfers)
+			group.Add(transfers.Command())
 		}
 	}
 	select {
@@ -731,12 +732,6 @@ func (c *controlCommand) Run(parent context.Context) error {
 	if target.Cmp(zero) <= 0 {
 		target = zero
 	}
-	ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-	head, err = c.client.HeaderByNumber(ctx, target)
-	cancel()
-	if err != nil {
-		return err
-	}
 
 	fromByAddress := map[common.Address]*big.Int{}
 	toByAddress := map[common.Address]*big.Int{}
@@ -748,7 +743,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		}
 
 		fromByAddress[address] = from
-		toByAddress[address] = head.Number
+		toByAddress[address] = target
 	}
 
 	bCache := newBalanceCache()
@@ -779,30 +774,56 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return err
 	}
 
+	for _, address := range c.accounts {
+		for _, header := range cmnd.foundHeaders[address] {
+			c.feed.Send(Event{
+				Type:                      EventNewBlock,
+				BlockNumber:               header.Number,
+				Accounts:                  []common.Address{address},
+				NewTransactionsPerAccount: map[common.Address]int{address: 20},
+			})
+		}
+	}
+
 	c.feed.Send(Event{
 		Type:        EventRecentHistoryReady,
 		Accounts:    c.accounts,
-		BlockNumber: head.Number,
+		BlockNumber: target,
 	})
 
-	log.Info("watching new blocks", "start from", head.Number)
-	cmd := &newBlocksTransfersCommand{
-		db:                   c.db,
-		chain:                c.chain,
-		client:               c.client,
-		accounts:             c.accounts,
-		eth:                  c.eth,
-		erc20:                c.erc20,
-		feed:                 c.feed,
-		initialFrom:          toDBHeader(head),
-		from:                 toDBHeader(head),
-		lastFetchedBlockTime: time.Now(),
-	}
+	if c.watchNewBlocks {
+		ctx, cancel = context.WithTimeout(parent, 3*time.Second)
+		head, err = c.client.HeaderByNumber(ctx, target)
+		cancel()
+		if err != nil {
+			return err
+		}
 
-	err = cmd.Command()(parent)
-	if err != nil {
-		log.Warn("error on running newBlocksTransfersCommand", "err", err)
-		return err
+		log.Info("watching new blocks", "start from", target)
+		cmd := &newBlocksTransfersCommand{
+			db:                   c.db,
+			chain:                c.chain,
+			client:               c.client,
+			accounts:             c.accounts,
+			eth:                  c.eth,
+			erc20:                c.erc20,
+			feed:                 c.feed,
+			initialFrom:          toDBHeader(head),
+			from:                 toDBHeader(head),
+			lastFetchedBlockTime: time.Now(),
+		}
+
+		err = cmd.Command()(parent)
+		if err != nil {
+			log.Warn("error on running newBlocksTransfersCommand", "err", err)
+			return err
+		}
+	} else {
+		c.feed.Send(Event{
+			Type:        EventNewBlock,
+			BlockNumber: target,
+			Accounts:    []common.Address{},
+		})
 	}
 
 	log.Info("end control command")
@@ -965,6 +986,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 	}
 
 	foundHeaders := map[common.Address][]*DBHeader{}
+	maxBlockNumber := big.NewInt(0)
 	for _, address := range c.accounts {
 		ethHeaders := ethHeadersByAddress[address]
 		erc20Headers := erc20HeadersByAddress[address]
@@ -972,12 +994,24 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 		allHeaders := append(ethHeaders, erc20Headers...)
 		foundHeaders[address] = allHeaders
 
+		for _, header := range allHeaders {
+			if header.Number.Cmp(maxBlockNumber) == 1 {
+				maxBlockNumber = header.Number
+			}
+		}
+
 		log.Debug("saving headers", "len", len(allHeaders), "address")
 		err = c.db.ProcessBlocks(address, newFromByAddress[address], c.toByAddress[address], allHeaders)
 		if err != nil {
 			return err
 		}
 	}
+
+	c.feed.Send(Event{
+		Type:        EventMaxKnownBlock,
+		BlockNumber: maxBlockNumber,
+		Accounts:    c.accounts,
+	})
 
 	c.foundHeaders = foundHeaders
 

@@ -518,8 +518,8 @@ func StopWallet() string {
 }
 
 // StartWallet
-func StartWallet() string {
-	err := statusBackend.StartWallet()
+func StartWallet(watchNewBlocks bool) string {
+	err := statusBackend.StartWallet(watchNewBlocks)
 	return makeJSONResponse(err)
 }
 

@@ -54,11 +54,12 @@ type Notification struct {
 
 // TransactionEvent - structure used to pass messages from wallet to bus
 type TransactionEvent struct {
-	Type                      string                 `json:"type"`
-	BlockNumber               *big.Int               `json:"block-number"`
-	Accounts                  []common.Address       `json:"accounts"`
-	NewTransactionsPerAccount map[common.Address]int `json:"new-transactions"`
-	ERC20                     bool                   `json:"erc20"`
+	Type                      string                      `json:"type"`
+	BlockNumber               *big.Int                    `json:"block-number"`
+	Accounts                  []common.Address            `json:"accounts"`
+	NewTransactionsPerAccount map[common.Address]int      `json:"new-transactions"`
+	ERC20                     bool                        `json:"erc20"`
+	MaxKnownBlocks            map[common.Address]*big.Int `json:"max-known-blocks"`
 }
 
 // MessageEvent - structure used to pass messages from chat to bus
@@ -165,15 +166,17 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 	limit := 20
 	if payload.BlockNumber != nil {
 		for _, address := range payload.Accounts {
-			log.Info("Handled transfer for address", "info", address)
-			transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
-			if err != nil {
-				log.Error("Could not fetch transfers", "error", err)
-			}
+			if payload.BlockNumber.Cmp(payload.MaxKnownBlocks[address]) == 1 {
+				log.Info("Handled transfer for address", "info", address)
+				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
+				if err != nil {
+					log.Error("Could not fetch transfers", "error", err)
+				}
 
-			for _, transaction := range transfers {
-				n := s.buildTransactionNotification(transaction)
-				pushMessage(n)
+				for _, transaction := range transfers {
+					n := s.buildTransactionNotification(transaction)
+					pushMessage(n)
+				}
 			}
 		}
 	}
@@ -215,6 +218,7 @@ func (s *Service) StartWalletWatcher() {
 
 	s.walletTransmitter.wg.Add(1)
 
+	maxKnownBlocks := map[common.Address]*big.Int{}
 	go func() {
 		defer s.walletTransmitter.wg.Done()
 		for {
@@ -230,14 +234,21 @@ func (s *Service) StartWalletWatcher() {
 				}
 				return
 			case event := <-events:
-				if event.Type == wallet.EventNewBlock {
+				if event.Type == wallet.EventNewBlock && len(maxKnownBlocks) > 0 {
 					s.transmitter.publisher.Send(TransactionEvent{
 						Type:                      string(event.Type),
 						BlockNumber:               event.BlockNumber,
 						Accounts:                  event.Accounts,
 						NewTransactionsPerAccount: event.NewTransactionsPerAccount,
 						ERC20:                     event.ERC20,
+						MaxKnownBlocks:            maxKnownBlocks,
 					})
+				} else if event.Type == wallet.EventMaxKnownBlock {
+					for _, address := range event.Accounts {
+						if _, ok := maxKnownBlocks[address]; !ok {
+							maxKnownBlocks[address] = event.BlockNumber
+						}
+					}
 				}
 			}
 		}

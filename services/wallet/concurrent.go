@@ -110,12 +110,6 @@ func checkRanges(parent context.Context, client reactorClient, cache BalanceCach
 			}
 			if lb.Cmp(hb) == 0 {
 				log.Debug("balances are equal", "from", from, "to", to)
-				// In case if balances are equal but non zero we want to check if
-				// eth_getTransactionCount return different values, because there
-				// still might be transactions
-				if lb.Cmp(zero) != 0 {
-					return nil
-				}
 
 				ln, err := client.NonceAt(ctx, account, from)
 				if err != nil {
