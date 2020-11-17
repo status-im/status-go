@@ -553,7 +553,8 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())
 	services = appendIf(config.MailserversConfig.Enabled, services, b.mailserversService())
 	services = appendIf(config.WalletConfig.Enabled, services, b.walletService(config.NetworkID, accountsFeed))
-	services = appendIf(config.LocalNotificationsConfig.Enabled, services, b.localNotificationsService(config.NetworkID))
+	// We ignore for now local notifications flag as users who are upgrading have no mean to enable it
+	services = append(services, b.localNotificationsService(config.NetworkID))
 
 	manager := b.accountManager.GetManager()
 	if manager == nil {
@@ -912,7 +913,8 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 			return
 		}
 
-		if !localNotifications.IsWatchingWallet() {
+		// If we have no local notifications, force wallet stop, otherwise check if it's watching the wallet
+		if localNotifications == nil || (localNotifications != nil && !localNotifications.IsWatchingWallet()) {
 			err = wallet.Stop()
 
 			if err != nil {
