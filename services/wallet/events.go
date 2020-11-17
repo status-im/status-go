@@ -11,7 +11,8 @@ type EventType string
 
 const (
 	// EventNewBlock emitted when new block was added to the same canonical chan.
-	EventNewBlock EventType = "newblock"
+	EventNewBlock      EventType = "newblock"
+	EventMaxKnownBlock EventType = "maxKnownBlock"
 	// EventReorg emitted when canonical chain was changed. In this case, BlockNumber will be an earliest added block.
 	EventReorg EventType = "reorg"
 	// EventNewHistory emitted if transfer from older block was added.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
@@ -70,22 +69,14 @@ func (d *IterativeDownloader) Next(parent context.Context) ([]*DBHeader, *big.In
 		from = d.from
 	}
 	log.Info("load erc20 transfers in range", "from", from, "to", to)
-	headres, err := d.downloader.GetHeadersInRange(parent, from, to)
+	headers, err := d.downloader.GetHeadersInRange(parent, from, to)
 	if err != nil {
 		log.Error("failed to get transfer in between two bloks", "from", from, "to", to, "error", err)
 		return nil, nil, nil, err
 	}
-	// use integers instead of DBHeader
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	header, err := d.client.HeaderByNumber(ctx, from)
-	cancel()
-	if err != nil {
-		log.Error("failed to get header by number", "from", d.from, "to", to, "error", err)
-		return nil, nil, nil, err
-	}
 
-	d.previous, d.to = d.to, header.Number
-	return headres, d.from, to, nil
+	d.previous, d.to = d.to, from
+	return headers, d.from, to, nil
 }
 
 // Revert reverts last step progress. Should be used if application failed to process transfers.

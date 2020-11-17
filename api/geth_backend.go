@@ -882,26 +882,7 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
-	if s == appStateForeground && !b.forceStopWallet {
-		wallet, err := b.statusNode.WalletService()
-		if err != nil {
-			b.log.Error("Retrieving of wallet service failed on app state change to active", "error", err)
-			return
-		}
-		if !wallet.IsStarted() {
-			err = wallet.Start(b.statusNode.Server())
-			if err != nil {
-				b.log.Error("Wallet service start failed on app state change to active", "error", err)
-				return
-			}
-
-			err = b.startWallet()
-			if err != nil {
-				b.log.Error("Wallet reactor start failed on app state change to active", "error", err)
-				return
-			}
-		}
-	} else if s == appStateBackground && !b.forceStopWallet {
+	if s == appStateBackground {
 		localNotifications, err := b.statusNode.LocalNotificationsService()
 		if err != nil {
 			b.log.Error("Retrieving of local notifications service failed on app state change", "error", err)
@@ -947,7 +928,7 @@ func (b *GethStatusBackend) StopWallet() error {
 	return nil
 }
 
-func (b *GethStatusBackend) StartWallet() error {
+func (b *GethStatusBackend) StartWallet(watchNewBlocks bool) error {
 	wallet, err := b.statusNode.WalletService()
 	if err != nil {
 		b.log.Error("Retrieving of wallet service failed on StartWallet", "error", err)
@@ -960,7 +941,7 @@ func (b *GethStatusBackend) StartWallet() error {
 			return nil
 		}
 
-		err = b.startWallet()
+		err = b.startWallet(watchNewBlocks)
 		if err != nil {
 			b.log.Error("Wallet reactor start failed on StartWallet", "error", err)
 			return nil
@@ -1187,7 +1168,7 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 	return nil
 }
 
-func (b *GethStatusBackend) startWallet() error {
+func (b *GethStatusBackend) startWallet(watchNewBlocks bool) error {
 	if !b.statusNode.Config().WalletConfig.Enabled {
 		return nil
 	}
@@ -1197,7 +1178,11 @@ func (b *GethStatusBackend) startWallet() error {
 		return err
 	}
 
-	watchAddresses := b.accountManager.WatchAddresses()
+	accountsDB := accounts.NewDB(b.appDB)
+	watchAddresses, err := accountsDB.GetWalletAddresses()
+	if err != nil {
+		return err
+	}
 
 	mainAccountAddress, err := b.accountManager.MainAccountAddress()
 	if err != nil {
@@ -1220,7 +1205,8 @@ func (b *GethStatusBackend) startWallet() error {
 	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,
-		new(big.Int).SetUint64(b.statusNode.Config().NetworkID))
+		new(big.Int).SetUint64(b.statusNode.Config().NetworkID),
+		watchNewBlocks)
 }
 
 // InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.

@@ -32,7 +32,7 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 func reorgSafetyDepth(chain *big.Int) *big.Int {
 	switch chain.Int64() {
 	case int64(params.MainNetworkID):
-		return big.NewInt(5)
+		return big.NewInt(2)
 	case int64(params.RopstenNetworkID):
 		return big.NewInt(15)
 	default:
@@ -63,21 +63,23 @@ type reactorClient interface {
 }
 
 // NewReactor creates instance of the Reactor.
-func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, chain *big.Int) *Reactor {
+func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, chain *big.Int, watchNewBlocks bool) *Reactor {
 	return &Reactor{
-		db:     db,
-		client: client,
-		feed:   feed,
-		chain:  chain,
+		db:             db,
+		client:         client,
+		feed:           feed,
+		chain:          chain,
+		watchNewBlocks: watchNewBlocks,
 	}
 }
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	client *ethclient.Client
-	db     *Database
-	feed   *event.Feed
-	chain  *big.Int
+	client         *ethclient.Client
+	db             *Database
+	feed           *event.Feed
+	chain          *big.Int
+	watchNewBlocks bool
 
 	mu    sync.Mutex
 	group *Group
@@ -96,9 +98,10 @@ func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 			signer:   signer,
 			db:       r.db,
 		},
-		erc20:       NewERC20TransfersDownloader(r.client, accounts, signer),
-		feed:        r.feed,
-		safetyDepth: reorgSafetyDepth(r.chain),
+		erc20:          NewERC20TransfersDownloader(r.client, accounts, signer),
+		feed:           r.feed,
+		safetyDepth:    reorgSafetyDepth(r.chain),
+		watchNewBlocks: r.watchNewBlocks,
 	}
 
 	return ctl
