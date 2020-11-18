@@ -4,8 +4,8 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
-
 	"github.com/pkg/errors"
+	"github.com/status-im/status-go/images"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -796,6 +796,67 @@ func (m *MessageHandler) HandleGroupChatInvitation(state *ReceivedMessageState, 
 	}
 
 	state.GroupChatInvitations[groupChatInvitation.ID()] = groupChatInvitation
+
+	return nil
+}
+
+// HandleChatIdentity handles an incoming protobuf.ChatIdentity
+// extracts contact information stored in the protobuf and adds it to the user's contact for update.
+func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.ChatIdentity) error {
+	logger := m.logger.With(zap.String("site", "HandleChatIdentity"))
+	contact := state.CurrentMessageState.Contact
+	chat, ok := state.AllChats[contact.ID]
+	if !ok {
+		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
+		// We don't want to show the chat to the user
+		chat.Active = false
+	}
+
+	logger.Info("Handling contact update")
+
+	// TODO investigate potential race condition where user updates this contact's details and the contact update's
+	//  clock value is just less than the ChatIdentity clock and the ChatIdentity is processed first.
+	//  In this case the contact update would not be processed
+	//
+	//  TODO Potential fix: create an ChatIdentity last updated field on the contact table.
+	if contact.LastUpdated < ci.Clock {
+		logger.Info("Updating contact")
+		if !contact.HasBeenAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
+			contact.SystemTags = append(contact.SystemTags, contactRequestReceived)
+		}
+
+		// TODO handle ENS things
+		/* if contact.Name != message.EnsName {
+			contact.Name = message.EnsName
+			contact.ENSVerified = false
+		} */
+
+		// Get the largest
+		var name string
+		var iiSize int
+		for n, ii := range ci.Images {
+			if iiSize < len(ii.Payload) {
+				iiSize = len(ii.Payload)
+				name = n
+			}
+		}
+
+		dataUri, err := images.GetPayloadDataURI(ci.Images[name].Payload)
+		if err != nil {
+			return err
+		}
+		contact.Photo = dataUri
+		contact.LastUpdated = ci.Clock
+		state.ModifiedContacts[contact.ID] = true
+		state.AllContacts[contact.ID] = contact
+	}
+
+	if chat.LastClockValue < ci.Clock {
+		chat.LastClockValue = ci.Clock
+	}
+
+	state.ModifiedChats[chat.ID] = true
+	state.AllChats[chat.ID] = chat
 
 	return nil
 }

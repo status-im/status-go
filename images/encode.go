@@ -2,6 +2,7 @@ package images
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -54,4 +55,15 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) e
 	}
 
 	return nil
+}
+
+func GetPayloadDataURI(payload []byte) (string, error) {
+	mt, err := GetMimeType(payload)
+	if err != nil {
+		return "", err
+	}
+
+	b64 := base64.StdEncoding.EncodeToString(payload)
+
+	return "data:image/" + mt + ";base64," + b64, nil
 }
