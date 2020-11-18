@@ -32,8 +32,10 @@ type Transport interface {
 	Track(identifiers [][]byte, hash []byte, newMessage *types.NewMessage)
 
 	InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error)
+	InitPublicFilters(chatIDs []string) ([]*Filter, error)
 	LoadFilters(filters []*Filter) ([]*Filter, error)
 	RemoveFilters(filters []*Filter) error
+	RemoveFilterByChatID(string) error
 	ResetFilters() error
 	Filters() []*Filter
 	LoadKeyFilters(*ecdsa.PrivateKey) (*Filter, error)

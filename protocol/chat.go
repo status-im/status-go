@@ -2,13 +2,13 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"math/rand"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
@@ -30,7 +30,10 @@ const (
 	ChatTypePrivateGroupChat
 	ChatTypeProfile
 	ChatTypeTimeline
+	ChatTypeCommunityChat
 )
+
+const pkStringLength = 68
 
 type Chat struct {
 	// ID is the id of the chat, for public chats it is the name e.g. status, for one-to-one
@@ -76,6 +79,9 @@ type Chat struct {
 
 	// Public key of user profile
 	Profile string `json:"profile,omitempty"`
+
+	// CommunityID is the id of the community it belongs to
+	CommunityID string `json:"communityId,omitempty"`
 }
 
 func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
@@ -83,13 +89,7 @@ func (c *Chat) PublicKey() (*ecdsa.PublicKey, error) {
 	if c.ChatType != ChatTypeOneToOne {
 		return nil, nil
 	}
-	pkey, err := hex.DecodeString(c.ID[2:])
-	if err != nil {
-		return nil, err
-	}
-	// Safety check, make sure is well formed
-	return crypto.UnmarshalPubkey(pkey)
-
+	return common.HexToPubkey(c.ID)
 }
 
 func (c *Chat) Public() bool {
@@ -106,6 +106,15 @@ func (c *Chat) Timeline() bool {
 
 func (c *Chat) OneToOne() bool {
 	return c.ChatType == ChatTypeOneToOne
+}
+
+func (c *Chat) CommunityChatID() string {
+	if c.ChatType != ChatTypeCommunityChat {
+		return c.ID
+	}
+
+	// Strips out the local prefix of the community-id
+	return c.ID[pkStringLength:]
 }
 
 func (c *Chat) Validate() error {
@@ -125,7 +134,7 @@ func (c *Chat) MembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
 	for idx, item := range c.Members {
 		publicKeys[idx] = item.ID
 	}
-	return stringSliceToPublicKeys(publicKeys, true)
+	return stringSliceToPublicKeys(publicKeys)
 }
 
 func (c *Chat) JoinedMembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
@@ -135,7 +144,7 @@ func (c *Chat) JoinedMembersAsPublicKeys() ([]*ecdsa.PublicKey, error) {
 			publicKeys = append(publicKeys, member.ID)
 		}
 	}
-	return stringSliceToPublicKeys(publicKeys, true)
+	return stringSliceToPublicKeys(publicKeys)
 }
 
 func (c *Chat) HasMember(memberID string) bool {
@@ -185,7 +194,7 @@ func (c *Chat) updateChatFromGroupMembershipChanges(myID string, g *v1protocol.G
 
 // NextClockAndTimestamp returns the next clock value
 // and the current timestamp
-func (c *Chat) NextClockAndTimestamp(timesource TimeSource) (uint64, uint64) {
+func (c *Chat) NextClockAndTimestamp(timesource common.TimeSource) (uint64, uint64) {
 	clock := c.LastClockValue
 	timestamp := timesource.GetCurrentTime()
 	if clock == 0 || clock < timestamp {
@@ -196,7 +205,7 @@ func (c *Chat) NextClockAndTimestamp(timesource TimeSource) (uint64, uint64) {
 	return clock, timestamp
 }
 
-func (c *Chat) UpdateFromMessage(message *common.Message, timesource TimeSource) error {
+func (c *Chat) UpdateFromMessage(message *common.Message, timesource common.TimeSource) error {
 	c.Timestamp = int64(timesource.GetCurrentTime())
 
 	// If the clock of the last message is lower, we set the message
@@ -241,25 +250,21 @@ type ChatMember struct {
 }
 
 func (c ChatMember) PublicKey() (*ecdsa.PublicKey, error) {
-	b, err := types.DecodeHex(c.ID)
-	if err != nil {
-		return nil, err
-	}
-	return crypto.UnmarshalPubkey(b)
+	return common.HexToPubkey(c.ID)
 }
 
 func oneToOneChatID(publicKey *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(publicKey))
 }
 
-func OneToOneFromPublicKey(pk *ecdsa.PublicKey, timesource TimeSource) *Chat {
+func OneToOneFromPublicKey(pk *ecdsa.PublicKey, timesource common.TimeSource) *Chat {
 	chatID := types.EncodeHex(crypto.FromECDSAPub(pk))
 	newChat := CreateOneToOneChat(chatID[:8], pk, timesource)
 
 	return &newChat
 }
 
-func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource TimeSource) Chat {
+func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource common.TimeSource) Chat {
 	return Chat{
 		ID:        oneToOneChatID(publicKey),
 		Name:      name,
@@ -269,7 +274,34 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource Time
 	}
 }
 
-func CreatePublicChat(name string, timesource TimeSource) Chat {
+func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) Chat {
+	color := orgChat.Identity.Color
+	if color == "" {
+		color = chatColors[rand.Intn(len(chatColors))]
+	}
+
+	return Chat{
+		CommunityID: orgID,
+		Name:        orgChat.Identity.DisplayName,
+		Active:      true,
+		Color:       color,
+		ID:          orgID + chatID,
+		Timestamp:   int64(timesource.GetCurrentTime()),
+		ChatType:    ChatTypeCommunityChat,
+	}
+}
+
+func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []Chat {
+	var chats []Chat
+	orgID := org.IDString()
+
+	for chatID, chat := range org.Chats() {
+		chats = append(chats, CreateCommunityChat(orgID, chatID, chat, timesource))
+	}
+	return chats
+}
+
+func CreatePublicChat(name string, timesource common.TimeSource) Chat {
 	return Chat{
 		ID:        name,
 		Name:      name,
@@ -280,7 +312,7 @@ func CreatePublicChat(name string, timesource TimeSource) Chat {
 	}
 }
 
-func CreateProfileChat(name string, profile string, timesource TimeSource) Chat {
+func CreateProfileChat(name string, profile string, timesource common.TimeSource) Chat {
 	return Chat{
 		ID:        name,
 		Name:      name,
@@ -292,7 +324,7 @@ func CreateProfileChat(name string, profile string, timesource TimeSource) Chat 
 	}
 }
 
-func CreateGroupChat(timesource TimeSource) Chat {
+func CreateGroupChat(timesource common.TimeSource) Chat {
 	return Chat{
 		Active:    true,
 		Color:     chatColors[rand.Intn(len(chatColors))],
@@ -301,22 +333,11 @@ func CreateGroupChat(timesource TimeSource) Chat {
 	}
 }
 
-func stringSliceToPublicKeys(slice []string, prefixed bool) ([]*ecdsa.PublicKey, error) {
+func stringSliceToPublicKeys(slice []string) ([]*ecdsa.PublicKey, error) {
 	result := make([]*ecdsa.PublicKey, len(slice))
 	for idx, item := range slice {
-		var (
-			b   []byte
-			err error
-		)
-		if prefixed {
-			b, err = types.DecodeHex(item)
-		} else {
-			b, err = hex.DecodeString(item)
-		}
-		if err != nil {
-			return nil, err
-		}
-		result[idx], err = crypto.UnmarshalPubkey(b)
+		var err error
+		result[idx], err = common.HexToPubkey(item)
 		if err != nil {
 			return nil, err
 		}

@@ -11,8 +11,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 
 	"go.uber.org/zap"
@@ -25,16 +27,20 @@ const (
 )
 
 type MessageHandler struct {
-	identity    *ecdsa.PrivateKey
-	persistence *sqlitePersistence
-	logger      *zap.Logger
+	identity           *ecdsa.PrivateKey
+	persistence        *sqlitePersistence
+	transport          transport.Transport
+	communitiesManager *communities.Manager
+	logger             *zap.Logger
 }
 
-func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persistence *sqlitePersistence) *MessageHandler {
+func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persistence *sqlitePersistence, communitiesManager *communities.Manager, transport transport.Transport) *MessageHandler {
 	return &MessageHandler{
-		identity:    identity,
-		persistence: persistence,
-		logger:      logger}
+		identity:           identity,
+		persistence:        persistence,
+		communitiesManager: communitiesManager,
+		transport:          transport,
+		logger:             logger}
 }
 
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
@@ -324,6 +330,81 @@ func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, mes
 	return nil
 }
 
+// HandleCommunityDescription handles an community description
+func (m *MessageHandler) HandleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityDescription, rawPayload []byte) error {
+	community, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, &description, rawPayload)
+	if err != nil {
+		return err
+	}
+
+	state.AllCommunities[community.IDString()] = community
+
+	// If we haven't joined the org, nothing to do
+	if !community.Joined() {
+		return nil
+	}
+
+	// Update relevant chats names and add new ones
+	// Currently removal is not supported
+	chats := CreateCommunityChats(community, state.Timesource)
+	var chatIDs []string
+	for i, chat := range chats {
+
+		oldChat, ok := state.AllChats[chat.ID]
+		if !ok {
+			// Beware, don't use the reference in the range (i.e chat) as it's a shallow copy
+			state.AllChats[chat.ID] = &chats[i]
+
+			state.ModifiedChats[chat.ID] = true
+			chatIDs = append(chatIDs, chat.ID)
+			// Update name, currently is the only field is mutable
+		} else if oldChat.Name != chat.Name {
+			state.AllChats[chat.ID].Name = chat.Name
+			state.ModifiedChats[chat.ID] = true
+		}
+	}
+
+	// Load transport filters
+	filters, err := m.transport.InitPublicFilters(chatIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, filter := range filters {
+		state.AllFilters[filter.ChatID] = filter
+	}
+
+	return nil
+}
+
+// HandleCommunityInvitation handles an community invitation
+func (m *MessageHandler) HandleCommunityInvitation(state *ReceivedMessageState, signer *ecdsa.PublicKey, invitation protobuf.CommunityInvitation, rawPayload []byte) error {
+	if invitation.PublicKey == nil {
+		return errors.New("invalid pubkey")
+	}
+	pk, err := crypto.DecompressPubkey(invitation.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	if !common.IsPubKeyEqual(pk, &m.identity.PublicKey) {
+		return errors.New("invitation not for us")
+	}
+
+	community, err := m.communitiesManager.HandleCommunityInvitation(signer, &invitation, rawPayload)
+	if err != nil {
+		return err
+	}
+	state.AllCommunities[community.IDString()] = community
+
+	return nil
+}
+
+// HandleWrappedCommunityDescriptionMessage handles a wrapped community description
+func (m *MessageHandler) HandleWrappedCommunityDescriptionMessage(state *ReceivedMessageState, payload []byte) (*communities.Community, error) {
+	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
+}
+
 func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	logger := m.logger.With(zap.String("site", "handleChatMessage"))
 	if err := ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
@@ -395,6 +476,17 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		state.AllContacts[contact.ID] = contact
 	}
 
+	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
+		m.logger.Debug("Handling community content type")
+
+		community, err := m.HandleWrappedCommunityDescriptionMessage(state, receivedMessage.GetCommunity())
+		if err != nil {
+			return err
+		}
+		receivedMessage.CommunityID = community.IDString()
+
+		state.AllCommunities[community.IDString()] = community
+	}
 	// Add to response
 	state.Response.Messages = append(state.Response.Messages, receivedMessage)
 
@@ -602,7 +694,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, timesource TimeSource) (*Chat, error) {
+func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, timesource common.TimeSource) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
@@ -651,6 +743,26 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 			newChat := CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
 			chat = &newChat
 		}
+		return chat, nil
+	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
+		chatID := chatEntity.GetChatId()
+		chat := chats[chatID]
+		if chat == nil {
+			return nil, errors.New("received community chat chatEntity for non-existing chat")
+		}
+
+		if chat.CommunityID == "" || chat.ChatType != ChatTypeCommunityChat {
+			return nil, errors.New("not an community chat")
+		}
+
+		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID(), chatEntity.GetGrant())
+		if err != nil {
+			return nil, err
+		}
+		if !canPost {
+			return nil, errors.New("user can't post")
+		}
+
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_PRIVATE_GROUP:
 		// In the case of a group chatEntity, ChatID is the same for all messages belonging to a group.

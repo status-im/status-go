@@ -121,6 +121,19 @@ func (s *FiltersManager) Init(
 	return allFilters, nil
 }
 
+func (s *FiltersManager) InitPublicFilters(chatIDs []string) ([]*Filter, error) {
+	var filters []*Filter
+	// Add public, one-to-one and negotiated filters.
+	for _, chatID := range chatIDs {
+		f, err := s.LoadPublic(chatID)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, f)
+	}
+	return filters, nil
+}
+
 // DEPRECATED
 func (s *FiltersManager) InitWithFilters(filters []*Filter) ([]*Filter, error) {
 	var (
@@ -215,6 +228,19 @@ func (s *FiltersManager) Remove(filters ...*Filter) error {
 	}
 
 	return nil
+}
+
+// Remove remove all the filters associated with a chat/identity
+func (s *FiltersManager) RemoveFilterByChatID(chatID string) error {
+	s.mutex.Lock()
+	filter, ok := s.filters[chatID]
+	s.mutex.Unlock()
+
+	if !ok {
+		return nil
+	}
+
+	return s.Remove(filter)
 }
 
 // LoadPartitioned creates a filter for a partitioned topic.
