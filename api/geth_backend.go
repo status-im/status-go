@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -1308,10 +1306,6 @@ func (b *GethStatusBackend) StoreIdentityImage(filepath string, aX, aY, bX, bY i
 	if err != nil {
 		return "", err
 	}
-
-	// TODO remove once debug has been resolved
-	spew.Dump(iis, filepath, aX, aY, bX, bY)
-	b.log.Debug("generated profile images", spew.Sdump(iis, filepath, aX, aY, bX, bY))
 
 	idb := images.NewDatabase(b.appDB)
 	err = idb.StoreIdentityImages(iis)
