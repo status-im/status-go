@@ -456,16 +456,17 @@ func (m *Messenger) handleSendContactCode() error {
 		m.logger.Error("could not build contact code advertisement", zap.Error(err))
 	}
 
+	if contactCodeAdvertisement == nil {
+		contactCodeAdvertisement = &protobuf.ContactCodeAdvertisement{}
+	}
 	err = m.handleContactCodeChatIdentity(contactCodeAdvertisement)
 	if err != nil {
 		return err
 	}
 
-	if contactCodeAdvertisement != nil {
-		payload, err = proto.Marshal(contactCodeAdvertisement)
-		if err != nil {
-			return err
-		}
+	payload, err = proto.Marshal(contactCodeAdvertisement)
+	if err != nil {
+		return err
 	}
 
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
@@ -562,7 +563,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatId string) (bool, error) {
 
 // createChatIdentity creates a context based protobuf.ChatIdentity.
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
-// contect 'private-chat' will attach all IdentityImage
+// context 'private-chat' will attach all IdentityImage
 func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, error) {
 	ci := &protobuf.ChatIdentity{
 		Clock:   m.transport.GetCurrentTime(),
@@ -2665,13 +2666,26 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					case protobuf.ContactCodeAdvertisement:
 						logger.Debug("Received ContactCodeAdvertisement")
+
+						cca := msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)
+						if cca.ChatIdentity != nil {
+
+							logger.Debug("Received ContactCodeAdvertisement ChatIdentity")
+							err = m.handler.HandleChatIdentity(messageState, *cca.ChatIdentity)
+							if err != nil {
+								logger.Warn("failed to handle ContactCodeAdvertisement ChatIdentity", zap.Error(err))
+								// No continue as Chat Identity may fail but the rest of the cca may process fine.
+							}
+						}
+
 						if m.pushNotificationClient == nil {
 							continue
 						}
 						logger.Debug("Handling ContactCodeAdvertisement")
-						if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)); err != nil {
+						if err := m.pushNotificationClient.HandleContactCodeAdvertisement(publicKey, cca); err != nil {
 							logger.Warn("failed to handle ContactCodeAdvertisement", zap.Error(err))
 						}
+
 						// We continue in any case, no changes to messenger
 						continue
 
@@ -2722,6 +2736,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handler.HandleGroupChatInvitation(messageState, msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation))
 						if err != nil {
 							logger.Warn("failed to handle GroupChatInvitation", zap.Error(err))
+							continue
+						}
+					case protobuf.ChatIdentity:
+						logger.Debug("Received ChatIdentity")
+						err = m.handler.HandleChatIdentity(messageState, msg.ParsedMessage.Interface().(protobuf.ChatIdentity))
+						if err != nil {
+							logger.Warn("failed to handle ChatIdentity", zap.Error(err))
 							continue
 						}
 

@@ -3,7 +3,6 @@ package images
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 )
@@ -114,14 +113,7 @@ func (i IdentityImage) GetType() (ImageType, error) {
 }
 
 func (i IdentityImage) GetDataURI() (string, error) {
-	mt, err := GetMimeType(i.Payload)
-	if err != nil {
-		return "", err
-	}
-
-	b64 := base64.StdEncoding.EncodeToString(i.Payload)
-
-	return "data:image/" + mt + ";base64," + b64, nil
+	return GetPayloadDataURI(i.Payload)
 }
 
 func (i IdentityImage) MarshalJSON() ([]byte, error) {
