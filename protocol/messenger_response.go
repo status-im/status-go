@@ -2,20 +2,28 @@ package protocol
 
 import (
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 type MessengerResponse struct {
-	Chats          []*Chat                     `json:"chats,omitempty"`
-	Messages       []*common.Message           `json:"messages,omitempty"`
-	Contacts       []*Contact                  `json:"contacts,omitempty"`
-	Installations  []*multidevice.Installation `json:"installations,omitempty"`
-	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
-	Invitations    []*GroupChatInvitation      `json:"invitations,omitempty"`
+	Chats            []*Chat                         `json:"chats,omitempty"`
+	RemovedChats     []string                        `json:"removedChats,omitempty"`
+	Messages         []*common.Message               `json:"messages,omitempty"`
+	Contacts         []*Contact                      `json:"contacts,omitempty"`
+	Installations    []*multidevice.Installation     `json:"installations,omitempty"`
+	EmojiReactions   []*EmojiReaction                `json:"emojiReactions,omitempty"`
+	Invitations      []*GroupChatInvitation          `json:"invitations,omitempty"`
+	Communities      []*communities.Community        `json:"communities,omitempty"`
+	CommunityChanges []*communities.CommunityChanges `json:"communitiesChanges,omitempty"`
+	Filters          []*transport.Filter             `json:"filters,omitempty"`
+	RemovedFilters   []string                        `json:"removedFilters,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0 && len(m.Invitations) == 0
+
+	return len(m.Chats)+len(m.Messages)+len(m.Contacts)+len(m.Installations)+len(m.Invitations)+len(m.EmojiReactions)+len(m.Communities)+len(m.CommunityChanges)+len(m.Filters)+len(m.RemovedFilters)+len(m.RemovedChats) == 0
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces

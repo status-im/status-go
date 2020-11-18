@@ -10,7 +10,7 @@ import (
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
 
-func extendMessageFromChat(message *common.Message, chat *Chat, key *ecdsa.PublicKey, timesource TimeSource) error {
+func extendMessageFromChat(message *common.Message, chat *Chat, key *ecdsa.PublicKey, timesource common.TimeSource) error {
 	clock, timestamp := chat.NextClockAndTimestamp(timesource)
 
 	message.LocalChatID = chat.ID

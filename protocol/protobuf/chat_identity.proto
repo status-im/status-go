@@ -14,6 +14,14 @@ message ChatIdentity {
 
   // images is a string indexed mapping of images associated with an identity
   map<string, IdentityImage> images = 3;
+
+  // display name is the user set identity, valid only for organisations
+  string display_name = 4;
+
+  // description is the user set description, valid only for organisations
+  string description = 5;
+
+  string color = 6;
 }
 
 // ProfileImage represents data associated with a user's profile image

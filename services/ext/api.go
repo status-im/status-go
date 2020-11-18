@@ -17,6 +17,7 @@ import (
 	"github.com/status-im/status-go/mailserver"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -314,6 +315,53 @@ func (api *PublicAPI) GetOurInstallations() []*multidevice.Installation {
 // SetInstallationMetadata sets the metadata for our own installation
 func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multidevice.InstallationMetadata) error {
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
+}
+
+func (api *PublicAPI) Communities(parent context.Context) ([]*communities.Community, error) {
+	return api.service.messenger.Communities()
+}
+
+func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.Community, error) {
+	return api.service.messenger.JoinedCommunities()
+}
+
+func (api *PublicAPI) JoinCommunity(parent context.Context, communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.JoinCommunity(communityID)
+}
+
+func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.LeaveCommunity(communityID)
+}
+
+func (api *PublicAPI) CreateCommunity(description *protobuf.CommunityDescription) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunity(description)
+
+}
+
+func (api *PublicAPI) ExportCommunity(id string) (string, error) {
+	key, err := api.service.messenger.ExportCommunity(id)
+	if err != nil {
+		return "", err
+	}
+	return types.EncodeHex(crypto.FromECDSA(key)), nil
+}
+
+func (api *PublicAPI) ImportCommunity(hexPrivateKey string) (*protocol.MessengerResponse, error) {
+	// Strip the 0x from the beginning
+	privateKey, err := crypto.HexToECDSA(hexPrivateKey[2:])
+	if err != nil {
+		return nil, err
+	}
+	return api.service.messenger.ImportCommunity(privateKey)
+
+}
+
+func (api *PublicAPI) CreateCommunityChat(orgID string, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityChat(orgID, c)
+}
+
+func (api *PublicAPI) InviteUserToCommunity(orgID, userPublicKey string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.InviteUserToCommunity(orgID, userPublicKey)
 }
 
 type ApplicationMessagesResponse struct {

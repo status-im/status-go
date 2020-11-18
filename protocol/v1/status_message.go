@@ -34,6 +34,8 @@ type StatusMessage struct {
 	TransportPayload []byte `json:"-"`
 	// DecryptedPayload is the payload after having been processed by the encryption layer
 	DecryptedPayload []byte `json:"decryptedPayload"`
+	// UnwrappedPayload is the payload after having been unwrapped from the applicaition metadata layer
+	UnwrappedPayload []byte `json:"unwrappedPayload"`
 
 	// ID is the canonical ID of the message
 	ID types.HexBytes `json:"id"`
@@ -64,7 +66,7 @@ func (m *StatusMessage) MarshalJSON() ([]byte, error) {
 		Timestamp uint32         `json:"timestamp"`
 	}{
 		ID:        m.ID,
-		Payload:   string(m.DecryptedPayload),
+		Payload:   string(m.UnwrappedPayload),
 		Timestamp: m.TransportMessage.Timestamp,
 		From:      m.TransportMessage.Sig,
 	}
@@ -176,7 +178,7 @@ func (m *StatusMessage) HandleApplicationMetadata() error {
 	m.ApplicationMetadataLayerSigPubKey = recoveredKey
 	// Calculate ID using the wrapped record
 	m.ID = MessageID(recoveredKey, m.DecryptedPayload)
-	m.DecryptedPayload = message.Payload
+	m.UnwrappedPayload = message.Payload
 	m.Type = message.Type
 	return nil
 
@@ -242,9 +244,13 @@ func (m *StatusMessage) HandleApplication() error {
 		return m.unmarshalProtobufData(new(protobuf.EmojiReaction))
 	case protobuf.ApplicationMetadataMessage_GROUP_CHAT_INVITATION:
 		return m.unmarshalProtobufData(new(protobuf.GroupChatInvitation))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_DESCRIPTION:
+		return m.unmarshalProtobufData(new(protobuf.CommunityDescription))
+	case protobuf.ApplicationMetadataMessage_COMMUNITY_INVITATION:
+		return m.unmarshalProtobufData(new(protobuf.CommunityInvitation))
 	case protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION:
 		// This message is a bit different as it's encrypted, so we pass it straight through
-		v := reflect.ValueOf(m.DecryptedPayload)
+		v := reflect.ValueOf(m.UnwrappedPayload)
 		m.ParsedMessage = &v
 		return nil
 	case protobuf.ApplicationMetadataMessage_CHAT_IDENTITY:
@@ -262,7 +268,7 @@ func (m *StatusMessage) unmarshalProtobufData(pb proto.Message) error {
 		ptr = rv.Addr().Interface().(proto.Message)
 	}
 
-	err := proto.Unmarshal(m.DecryptedPayload, ptr)
+	err := proto.Unmarshal(m.UnwrappedPayload, ptr)
 	if err != nil {
 		m.ParsedMessage = nil
 		log.Printf("[message::DecodeMessage] could not decode %T: %#x, err: %v", pb, m.Hash, err.Error())

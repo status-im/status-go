@@ -52,7 +52,11 @@ message ChatMessage {
     StickerMessage sticker = 9;
     ImageMessage image = 10;
     AudioMessage audio = 11;
+    bytes community = 12;
   }
+
+  // Grant for community chat messages
+  bytes grant = 13;
 
   enum ContentType {
     UNKNOWN_CONTENT_TYPE = 0;
@@ -65,5 +69,6 @@ message ChatMessage {
     SYSTEM_MESSAGE_CONTENT_PRIVATE_GROUP = 6;
     IMAGE = 7;
     AUDIO = 8;
+    COMMUNITY = 9;
   }
 }

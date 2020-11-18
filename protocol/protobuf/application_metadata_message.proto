@@ -37,5 +37,7 @@ message ApplicationMetadataMessage {
     EMOJI_REACTION = 22;
     GROUP_CHAT_INVITATION = 23;
     CHAT_IDENTITY = 24;
+    COMMUNITY_DESCRIPTION = 25;
+    COMMUNITY_INVITATION = 26;
   }
 }

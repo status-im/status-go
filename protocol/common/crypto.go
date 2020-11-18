@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/sha3"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/eth-node/types"
 )
 
 const nonceLength = 12
@@ -68,4 +69,16 @@ func Shake256(buf []byte) []byte {
 func IsPubKeyEqual(a, b *ecdsa.PublicKey) bool {
 	// the curve is always the same, just compare the points
 	return a.X.Cmp(b.X) == 0 && a.Y.Cmp(b.Y) == 0
+}
+
+func PubkeyToHex(key *ecdsa.PublicKey) string {
+	return types.EncodeHex(crypto.FromECDSAPub(key))
+}
+
+func HexToPubkey(pk string) (*ecdsa.PublicKey, error) {
+	bytes, err := types.DecodeHex(pk)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.UnmarshalPubkey(bytes)
 }
