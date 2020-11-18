@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"context"
+	"errors"
 	"math/big"
 	"time"
 
@@ -13,6 +14,11 @@ import (
 func SetupIterativeDownloader(
 	db *Database, client HeaderReader, address common.Address,
 	downloader BatchDownloader, size *big.Int, to *big.Int, from *big.Int) (*IterativeDownloader, error) {
+
+	if to == nil || from == nil {
+		return nil, errors.New("to or from cannot be nil")
+	}
+
 	adjustedSize := big.NewInt(0).Div(big.NewInt(0).Sub(to, from), big.NewInt(10))
 	if adjustedSize.Cmp(size) == 1 {
 		size = adjustedSize
