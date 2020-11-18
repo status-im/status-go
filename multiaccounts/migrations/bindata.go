@@ -2,6 +2,8 @@
 // sources:
 // 0001_accounts.down.sql (21B)
 // 0001_accounts.up.sql (163B)
+// 1605007189_identity_images.down.sql (29B)
+// 1605007189_identity_images.up.sql (266B)
 // doc.go (74B)
 
 package migrations
@@ -108,6 +110,46 @@ func _0001_accountsUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "0001_accounts.up.sql", size: 163, mode: os.FileMode(0644), modTime: time.Unix(1599559876, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xf2, 0xfa, 0x99, 0x8e, 0x96, 0xb3, 0x13, 0x6c, 0x1f, 0x6, 0x27, 0xc5, 0xd2, 0xd4, 0xe0, 0xa5, 0x26, 0x82, 0xa7, 0x26, 0xf2, 0x68, 0x9d, 0xed, 0x9c, 0x3d, 0xbb, 0xdc, 0x37, 0x28, 0xbc, 0x1}}
+	return a, nil
+}
+
+var __1605007189_identity_imagesDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\x09\xf2\x0f\x50\x08\x71\x74\xf2\x71\x55\xc8\x4c\x49\xcd\x2b\xc9\x2c\xa9\x8c\xcf\xcc\x4d\x4c\x4f\x2d\xb6\xe6\xe5\x02\x04\x00\x00\xff\xff\xa1\x22\x72\x37\x1d\x00\x00\x00")
+
+func _1605007189_identity_imagesDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1605007189_identity_imagesDownSql,
+		"1605007189_identity_images.down.sql",
+	)
+}
+
+func _1605007189_identity_imagesDownSql() (*asset, error) {
+	bytes, err := _1605007189_identity_imagesDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1605007189_identity_images.down.sql", size: 29, mode: os.FileMode(0644), modTime: time.Unix(1608048506, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2f, 0xcf, 0xa7, 0xae, 0xd5, 0x4f, 0xcd, 0x14, 0x63, 0x9, 0xbe, 0x39, 0x49, 0x18, 0x96, 0xb2, 0xa3, 0x8, 0x7d, 0x41, 0xdb, 0x50, 0x5d, 0xf5, 0x4d, 0xa2, 0xd, 0x8f, 0x57, 0x79, 0x77, 0x67}}
+	return a, nil
+}
+
+var __1605007189_identity_imagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x5c\xce\xc1\x6a\xc3\x30\x10\x04\xd0\xbb\xc1\xff\x30\xc7\x04\xf2\x07\x3d\xc9\xaa\x42\x44\x55\x29\x28\x72\xd3\x9c\x84\x40\x5b\x7b\x69\xe2\x96\x44\x50\xdc\xaf\x2f\x75\x7c\x30\x39\xee\x63\x76\x18\xe9\x95\x08\x0a\x41\x34\x46\x41\x6f\x61\x5d\x80\x7a\xd7\x87\x70\x00\x67\x1a\x0a\x97\x31\xf2\x25\x75\x74\x5b\xd5\x15\x00\x7c\xd2\xd8\x72\xc6\x9b\xf0\x72\x27\xfc\xe6\x8e\x43\xba\xd0\x03\x4d\x4f\xf1\x3b\x8d\xe7\xaf\x94\xd1\x18\xd7\x4c\xdd\xb6\x35\x66\x4e\xfc\x70\x2e\x3d\x78\x28\xf3\xdd\x13\x77\x7d\x59\xc0\x07\x9f\x29\xde\xf8\x97\x16\x76\xa5\x7f\x88\x25\x5d\x3b\x5a\x66\xf7\x5e\xbf\x0a\x7f\xc2\x8b\x3a\x61\x75\xdf\xb8\x99\x66\xad\xe1\x2c\xa4\xb3\x5b\xa3\x65\x80\x57\x7b\x23\xa4\xaa\xab\x35\x8e\x3a\xec\x5c\x1b\xe0\xdd\x51\x3f\x3f\xd5\xd5\x5f\x00\x00\x00\xff\xff\xec\x31\x60\x93\x0a\x01\x00\x00")
+
+func _1605007189_identity_imagesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1605007189_identity_imagesUpSql,
+		"1605007189_identity_images.up.sql",
+	)
+}
+
+func _1605007189_identity_imagesUpSql() (*asset, error) {
+	bytes, err := _1605007189_identity_imagesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1605007189_identity_images.up.sql", size: 266, mode: os.FileMode(0644), modTime: time.Unix(1608048507, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe, 0x33, 0xd, 0xf1, 0x5c, 0xb0, 0x64, 0x4e, 0xec, 0x89, 0xa1, 0x6, 0x56, 0x70, 0x36, 0xca, 0xe5, 0x6c, 0xd8, 0xdd, 0x45, 0xce, 0xc3, 0xe9, 0x66, 0xbd, 0x1c, 0x23, 0xe8, 0x42, 0xb6, 0x17}}
 	return a, nil
 }
 
@@ -226,6 +268,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0001_accounts.up.sql": _0001_accountsUpSql,
 
+	"1605007189_identity_images.down.sql": _1605007189_identity_imagesDownSql,
+
+	"1605007189_identity_images.up.sql": _1605007189_identity_imagesUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -270,9 +316,11 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_accounts.down.sql": &bintree{_0001_accountsDownSql, map[string]*bintree{}},
-	"0001_accounts.up.sql":   &bintree{_0001_accountsUpSql, map[string]*bintree{}},
-	"doc.go":                 &bintree{docGo, map[string]*bintree{}},
+	"0001_accounts.down.sql":              &bintree{_0001_accountsDownSql, map[string]*bintree{}},
+	"0001_accounts.up.sql":                &bintree{_0001_accountsUpSql, map[string]*bintree{}},
+	"1605007189_identity_images.down.sql": &bintree{_1605007189_identity_imagesDownSql, map[string]*bintree{}},
+	"1605007189_identity_images.up.sql":   &bintree{_1605007189_identity_imagesUpSql, map[string]*bintree{}},
+	"doc.go":                              &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
