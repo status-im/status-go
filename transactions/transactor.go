@@ -240,7 +240,7 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	defer func() {
 		// nonce should be incremented only if tx completed without error
 		// if upstream node returned nonce higher than ours we will stick to it
-		if err == nil {
+		if err == nil && args.Nonce == nil {
 			t.localNonce.Store(args.From, nonce+1)
 		}
 		t.addrLock.UnlockAddr(args.From)
@@ -248,14 +248,20 @@ func (t *Transactor) validateAndPropagate(selectedAccount *account.SelectedExtKe
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), t.rpcCallTimeout)
 	defer cancel()
-	nonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, common.Address(args.From))
-	if err != nil {
-		return hash, err
-	}
-	// if upstream node returned nonce higher than ours we will use it, as it probably means
-	// that another client was used for sending transactions
-	if localNonce > nonce {
-		nonce = localNonce
+
+	if args.Nonce == nil {
+
+		nonce, err = t.pendingNonceProvider.PendingNonceAt(ctx, common.Address(args.From))
+		if err != nil {
+			return hash, err
+		}
+		// if upstream node returned nonce higher than ours we will use it, as it probably means
+		// that another client was used for sending transactions
+		if localNonce > nonce {
+			nonce = localNonce
+		}
+	} else {
+		nonce = uint64(*args.Nonce)
 	}
 	gasPrice := (*big.Int)(args.GasPrice)
 	if args.GasPrice == nil {
