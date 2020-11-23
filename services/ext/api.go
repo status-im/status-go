@@ -597,9 +597,12 @@ func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	}
 
 	payload := mailserver.MessagesRequestPayload{
-		Lower:  r.From,
-		Upper:  r.To,
+		Lower: r.From,
+		Upper: r.To,
+		// We need to pass bloom filter for
+		// backward compatibility
 		Bloom:  createBloomFilter(r),
+		Topics: topicsToByteArray(r.Topics),
 		Limit:  r.Limit,
 		Cursor: cursor,
 		// Client must tell the MailServer if it supports batch responses.
@@ -608,6 +611,16 @@ func MakeMessagesRequestPayload(r MessagesRequest) ([]byte, error) {
 	}
 
 	return rlp.EncodeToBytes(payload)
+}
+
+func topicsToByteArray(topics []types.TopicType) [][]byte {
+
+	var response [][]byte
+	for idx := range topics {
+		response = append(response, topics[idx][:])
+	}
+
+	return response
 }
 
 func createBloomFilter(r MessagesRequest) []byte {
