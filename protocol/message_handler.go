@@ -841,11 +841,11 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 			}
 		}
 
-		dataUri, err := images.GetPayloadDataURI(ci.Images[name].Payload)
+		dataURI, err := images.GetPayloadDataURI(ci.Images[name].Payload)
 		if err != nil {
 			return err
 		}
-		contact.Photo = dataUri
+		contact.Photo = dataURI
 		contact.LastUpdated = ci.Clock
 		state.ModifiedContacts[contact.ID] = true
 		state.AllContacts[contact.ID] = contact

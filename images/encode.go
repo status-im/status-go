@@ -41,13 +41,12 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) e
 		if q == MinJpegQuality {
 			if DimensionSizeLimit[size].Max > bb.Len() {
 				return nil
-			} else {
-				return fmt.Errorf(
-					"image size after processing exceeds max, expect < '%d', received < '%d'",
-					DimensionSizeLimit[size].Max,
-					bb.Len(),
-				)
 			}
+			return fmt.Errorf(
+				"image size after processing exceeds max, expect < '%d', received < '%d'",
+				DimensionSizeLimit[size].Max,
+				bb.Len(),
+			)
 		}
 
 		bb.Reset()

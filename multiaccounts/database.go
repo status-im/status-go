@@ -81,8 +81,8 @@ func (db *Database) DeleteAccount(keyUID string) error {
 
 // Account images
 
-func (db *Database) GetIdentityImages(keyUid string) ([]*images.IdentityImage, error) {
-	rows, err := db.db.Query(`SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ?`, keyUid)
+func (db *Database) GetIdentityImages(keyUID string) ([]*images.IdentityImage, error) {
+	rows, err := db.db.Query(`SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ?`, keyUID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +102,8 @@ func (db *Database) GetIdentityImages(keyUid string) ([]*images.IdentityImage, e
 	return iis, nil
 }
 
-func (db *Database) GetIdentityImage(keyUid, it string) (*images.IdentityImage, error) {
-	rows, err := db.db.Query("SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ? AND name = ?", keyUid, it)
+func (db *Database) GetIdentityImage(keyUID, it string) (*images.IdentityImage, error) {
+	rows, err := db.db.Query("SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ? AND name = ?", keyUID, it)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (db *Database) GetIdentityImage(keyUid, it string) (*images.IdentityImage, 
 
 	var ii images.IdentityImage
 	for rows.Next() {
-		err = rows.Scan(&ii.KeyUID ,&ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
+		err = rows.Scan(&ii.KeyUID, &ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +120,7 @@ func (db *Database) GetIdentityImage(keyUid, it string) (*images.IdentityImage, 
 	return &ii, nil
 }
 
-func (db *Database) StoreIdentityImages(keyUid string, iis []*images.IdentityImage) error {
+func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityImage) error {
 	// Because SQL INSERTs are triggered in a loop use a tx to ensure a single call to the DB.
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
@@ -142,7 +142,7 @@ func (db *Database) StoreIdentityImages(keyUid string, iis []*images.IdentityIma
 
 		_, err := tx.Exec(
 			"INSERT INTO identity_images (key_uid, name, image_payload, width, height, file_size, resize_target) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			keyUid,
+			keyUID,
 			ii.Name,
 			ii.Payload,
 			ii.Width,
@@ -158,7 +158,7 @@ func (db *Database) StoreIdentityImages(keyUid string, iis []*images.IdentityIma
 	return nil
 }
 
-func (db *Database) DeleteIdentityImage(keyUid string) error {
-	_, err := db.db.Exec(`DELETE FROM identity_images WHERE key_uid = ?`, keyUid)
+func (db *Database) DeleteIdentityImage(keyUID string) error {
+	_, err := db.db.Exec(`DELETE FROM identity_images WHERE key_uid = ?`, keyUID)
 	return err
 }
