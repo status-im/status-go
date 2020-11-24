@@ -4,6 +4,8 @@
 // 0001_accounts.up.sql (163B)
 // 1605007189_identity_images.down.sql (29B)
 // 1605007189_identity_images.up.sql (268B)
+// 1606224181_drop_photo_path_from_accounts.down.sql (76B)
+// 1606224181_drop_photo_path_from_accounts.up.sql (675B)
 // doc.go (74B)
 
 package migrations
@@ -153,6 +155,46 @@ func _1605007189_identity_imagesUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1606224181_drop_photo_path_from_accountsDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\xb1\x0a\xc4\x20\x0c\x06\xe0\x3d\x4f\x91\xf7\x70\x8a\x1a\x0e\x41\xe3\xe1\xfd\x07\x5d\xc5\xc5\xa9\x16\x6a\xdf\xbf\x9f\xd7\x4f\x32\x46\x13\xfb\x49\x40\xaa\xe6\x88\x24\x43\x1b\x43\x7c\x56\xee\x63\xac\xe7\xdc\x37\x49\x8c\x1c\x6a\xfe\x17\xe3\x6b\xae\xbd\xbe\x7d\x4f\x86\x1e\x70\x44\xa1\x96\x92\xe0\xde\x00\x00\x00\xff\xff\xb3\x5f\x64\x53\x4c\x00\x00\x00")
+
+func _1606224181_drop_photo_path_from_accountsDownSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1606224181_drop_photo_path_from_accountsDownSql,
+		"1606224181_drop_photo_path_from_accounts.down.sql",
+	)
+}
+
+func _1606224181_drop_photo_path_from_accountsDownSql() (*asset, error) {
+	bytes, err := _1606224181_drop_photo_path_from_accountsDownSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.down.sql", size: 76, mode: os.FileMode(0644), modTime: time.Unix(1606224883, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0x14, 0xfc, 0xb9, 0x6e, 0x1, 0x27, 0x56, 0x83, 0xdd, 0xa7, 0x1a, 0x2, 0x38, 0x2b, 0x5, 0xb4, 0xf8, 0x69, 0xe7, 0x49, 0x52, 0xc8, 0x47, 0x28, 0xcd, 0x64, 0xb5, 0x43, 0x7a, 0x11, 0xc7}}
+	return a, nil
+}
+
+var __1606224181_drop_photo_path_from_accountsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xa4\xd2\xc1\xae\xa2\x30\x14\x06\xe0\x3d\x4f\xf1\x2f\x95\x90\xf0\x00\xae\x10\x3a\x4a\x06\x81\xd4\x32\xea\x6a\xac\xd0\x48\x23\xb4\x0d\x96\x4c\x7c\xfb\x89\x88\xde\x48\xee\x5d\xdc\xdc\xed\x81\xff\x9c\x9f\x2f\xf8\x2e\x42\x6d\x6e\xb0\xb5\x00\x2f\x4b\xdd\x2b\x7b\x85\xe5\xa7\x46\x40\x2a\xab\xc1\x61\x45\x6b\x1e\x13\x0f\x64\x1f\x26\x45\x44\x86\xb7\x8f\xa6\xd6\x56\xe7\xdc\xd6\x47\x94\xba\xe9\x5b\x05\xd7\x77\x42\x4a\x02\x46\xc0\xc8\x26\xcf\x68\x40\x0f\x60\xc1\x32\x21\xaf\xd5\x7f\x4f\xbc\xbc\xf4\x66\xe6\x00\xc0\x45\xdc\x0a\x59\xe1\x4f\x40\xc3\x75\x40\x91\xd3\x78\x73\x4f\xfc\x26\x07\x6f\x78\xae\x78\x2b\xc0\xc8\x9e\x21\xcd\x18\xd2\x22\x49\x1e\xf3\x46\x9f\xa5\x62\xb2\x15\x57\xcb\x5b\x83\x65\xbc\x42\x9c\x32\xef\xb9\xb3\xe4\x5d\x95\x73\xd9\x49\x75\x1e\xd2\xce\x1c\xbb\x98\xad\xb3\x82\x81\x66\xbb\x38\x5a\x38\x71\xba\x25\x94\xdd\x43\xd9\xb4\x19\xb6\x24\x21\x21\x1b\xbb\x79\x43\x07\x6f\x72\xd1\x9b\x5e\xf9\x45\xb3\xcd\x6b\xd1\xc2\x71\x7c\x17\x51\xa7\xcd\xc0\xa4\x9b\x6a\x0a\xcb\x55\x85\x4e\x94\x9d\xe0\x56\xe0\x9f\xb4\x35\x78\xd3\x8c\x86\xd7\xd1\x38\x4e\x57\x6f\xc2\xae\xef\x44\x34\xcb\x27\x9c\x8b\x97\xf7\xdb\x78\xf6\x9d\xf6\xf3\xcf\x3d\x7e\x0e\x31\x8a\x3e\x3c\x98\xac\x6e\xe8\x8d\x87\xea\x09\xf3\xf1\x5f\x7d\xf1\x71\xcf\xfc\xff\x00\x00\x00\xff\xff\x50\xd5\xcd\xce\xa3\x02\x00\x00")
+
+func _1606224181_drop_photo_path_from_accountsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1606224181_drop_photo_path_from_accountsUpSql,
+		"1606224181_drop_photo_path_from_accounts.up.sql",
+	)
+}
+
+func _1606224181_drop_photo_path_from_accountsUpSql() (*asset, error) {
+	bytes, err := _1606224181_drop_photo_path_from_accountsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.up.sql", size: 675, mode: os.FileMode(0644), modTime: time.Unix(1606225159, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xa7, 0x3a, 0x8e, 0xc7, 0x1a, 0xfc, 0x95, 0x2c, 0x3, 0xf4, 0x6b, 0xd0, 0x1f, 0xb6, 0xf9, 0x48, 0x99, 0xef, 0xcc, 0x97, 0xc4, 0x63, 0x94, 0x4, 0x82, 0xb8, 0xf5, 0xc2, 0xe0, 0x3c, 0x3e, 0x18}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -272,6 +314,10 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1605007189_identity_images.up.sql": _1605007189_identity_imagesUpSql,
 
+	"1606224181_drop_photo_path_from_accounts.down.sql": _1606224181_drop_photo_path_from_accountsDownSql,
+
+	"1606224181_drop_photo_path_from_accounts.up.sql": _1606224181_drop_photo_path_from_accountsUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -316,11 +362,13 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_accounts.down.sql":              &bintree{_0001_accountsDownSql, map[string]*bintree{}},
-	"0001_accounts.up.sql":                &bintree{_0001_accountsUpSql, map[string]*bintree{}},
-	"1605007189_identity_images.down.sql": &bintree{_1605007189_identity_imagesDownSql, map[string]*bintree{}},
-	"1605007189_identity_images.up.sql":   &bintree{_1605007189_identity_imagesUpSql, map[string]*bintree{}},
-	"doc.go":                              &bintree{docGo, map[string]*bintree{}},
+	"0001_accounts.down.sql":                            &bintree{_0001_accountsDownSql, map[string]*bintree{}},
+	"0001_accounts.up.sql":                              &bintree{_0001_accountsUpSql, map[string]*bintree{}},
+	"1605007189_identity_images.down.sql":               &bintree{_1605007189_identity_imagesDownSql, map[string]*bintree{}},
+	"1605007189_identity_images.up.sql":                 &bintree{_1605007189_identity_imagesUpSql, map[string]*bintree{}},
+	"1606224181_drop_photo_path_from_accounts.down.sql": &bintree{_1606224181_drop_photo_path_from_accountsDownSql, map[string]*bintree{}},
+	"1606224181_drop_photo_path_from_accounts.up.sql":   &bintree{_1606224181_drop_photo_path_from_accountsUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

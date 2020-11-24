@@ -28,6 +28,7 @@ type ContactDeviceInfo struct {
 
 // Contact has information about a "Contact". A contact is not necessarily one
 // that we added or added us, that's based on SystemTags.
+// TODO remove use of photoPath in Contact{}
 type Contact struct {
 	// ID of the contact. It's a hex-encoded public key (prefixed with 0x).
 	ID string `json:"id"`

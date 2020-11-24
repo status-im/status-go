@@ -644,7 +644,6 @@ func TestDeleteMulticcount(t *testing.T) {
 	account := multiaccounts.Account{
 		Name:           "foo",
 		Timestamp:      1,
-		PhotoPath:      "path",
 		KeycardPairing: "pairing",
 		KeyUID:         generateAccount.KeyUID,
 	}

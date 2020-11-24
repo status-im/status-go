@@ -9,9 +9,6 @@ import (
 	"github.com/status-im/status-go/sqlite"
 )
 
-// TODO remove reference to PhotoPath
-// TODO write migration to drop PhotoPath
-
 // Account stores public information about account.
 type Account struct {
 	Name           string   `json:"name"`

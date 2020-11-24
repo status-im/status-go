@@ -2215,6 +2215,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 }
 
 // SyncDevices sends all public chats and contacts to paired devices
+// TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
