@@ -379,10 +379,8 @@ func (m *Messenger) handleSendContactCode() error {
 
 // handleSharedSecrets process the negotiated secrets received from the encryption layer
 func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
-	logger := m.logger.With(zap.String("site", "handleSharedSecrets"))
 	var result []*transport.Filter
 	for _, secret := range secrets {
-		logger.Debug("received shared secret", zap.Binary("identity", crypto.FromECDSAPub(secret.Identity)))
 		fSecret := types.NegotiatedSecret{
 			PublicKey: secret.Identity,
 			Key:       secret.Key,

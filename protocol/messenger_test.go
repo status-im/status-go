@@ -950,6 +950,15 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	s.Require().Len(response.Chats, 1)
 	s.Require().False(response.Chats[0].Active)
 
+	// Retrieve messages so user is removed
+	_, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Chats) > 0 && len(r.Chats[0].Members) == 1 },
+		"leave group chat not received",
+	)
+
+	s.Require().NoError(err)
+
 	// And we get re-invited
 	_, err = s.m.AddMembersToGroupChat(context.Background(), ourChat.ID, members)
 	s.NoError(err)
