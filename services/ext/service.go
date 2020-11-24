@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"github.com/status-im/status-go/multiaccounts"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -70,6 +71,7 @@ type Service struct {
 	connManager      *mailservers.ConnectionManager
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
 	accountsDB       *accounts.Database
+	multiAccountsDB  *multiaccounts.Database
 }
 
 // Make sure that Service implements node.Service interface.
@@ -115,7 +117,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *zap.Logger) error {
+func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, logger *zap.Logger) error {
 	if !s.config.PFSEnabled {
 		return nil
 	}
@@ -147,8 +149,9 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, logger *z
 		Logger:                logger,
 	}
 	s.accountsDB = accounts.NewDB(db)
+	s.multiAccountsDB = multiAccountDb
 
-	options, err := buildMessengerOptions(s.config, identity, db, envelopesMonitorConfig, s.accountsDB, logger)
+	options, err := buildMessengerOptions(s.config, identity, db, s.multiAccountsDB, envelopesMonitorConfig, s.accountsDB, logger)
 	if err != nil {
 		return err
 	}
@@ -454,6 +457,7 @@ func buildMessengerOptions(
 	config params.ShhextConfig,
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
+	multiAccounts *multiaccounts.Database,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	accountsDB *accounts.Database,
 	logger *zap.Logger,
@@ -462,6 +466,7 @@ func buildMessengerOptions(
 		protocol.WithCustomLogger(logger),
 		protocol.WithPushNotifications(),
 		protocol.WithDatabase(db),
+		protocol.WithMultiAccounts(multiAccounts),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
 	}

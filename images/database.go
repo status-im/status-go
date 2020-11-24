@@ -1,106 +1,18 @@
 package images
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 )
 
-type Database struct {
-	db *sql.DB
-}
-
 type IdentityImage struct {
+	KeyUID       string
 	Name         string
 	Payload      []byte
 	Width        int
 	Height       int
 	FileSize     int
 	ResizeTarget int
-}
-
-func NewDatabase(db *sql.DB) Database {
-	return Database{db: db}
-}
-
-func (d *Database) GetIdentityImages() ([]*IdentityImage, error) {
-	rows, err := d.db.Query(`SELECT name, image_payload, width, height, file_size, resize_target FROM identity_images`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var iis []*IdentityImage
-	for rows.Next() {
-		ii := &IdentityImage{}
-		err = rows.Scan(&ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
-		if err != nil {
-			return nil, err
-		}
-
-		iis = append(iis, ii)
-	}
-
-	return iis, nil
-}
-
-func (d *Database) GetIdentityImage(it string) (*IdentityImage, error) {
-	query := "SELECT name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE name = ?"
-	rows, err := d.db.Query(query, it)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var ii IdentityImage
-	for rows.Next() {
-		err = rows.Scan(&ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &ii, nil
-}
-
-func (d *Database) StoreIdentityImages(iis []*IdentityImage) (err error) {
-	tx, err := d.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err == nil {
-			err = tx.Commit()
-			return
-		}
-		// don't shadow original error
-		_ = tx.Rollback()
-	}()
-
-	query := "INSERT INTO identity_images (name, image_payload, width, height, file_size, resize_target) VALUES (?, ?, ?, ?, ?, ?)"
-	stmt, err := tx.Prepare(query)
-	if err != nil {
-		return
-	}
-	defer stmt.Close()
-
-	for _, ii := range iis {
-		if ii == nil {
-			continue
-		}
-		_, err = stmt.Exec(ii.Name, ii.Payload, ii.Width, ii.Height, ii.FileSize, ii.ResizeTarget)
-		if err != nil {
-			return
-		}
-	}
-
-	return
-}
-
-func (d *Database) DeleteIdentityImage(it string) error {
-	_, err := d.db.Exec(`DELETE FROM identity_images WHERE name = ?`, it)
-	return err
 }
 
 func (i IdentityImage) GetType() (ImageType, error) {
@@ -123,6 +35,7 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	}
 
 	temp := struct {
+		KeyUID       string `json:"key_uid"`
 		Name         string `json:"type"`
 		URI          string `json:"uri"`
 		Width        int    `json:"width"`
@@ -130,6 +43,7 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 		FileSize     int    `json:"file_size"`
 		ResizeTarget int    `json:"resize_target"`
 	}{
+		KeyUID:       i.KeyUID,
 		Name:         i.Name,
 		URI:          uri,
 		Width:        i.Width,
