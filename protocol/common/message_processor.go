@@ -108,7 +108,7 @@ func NewMessageProcessor(
 		// Messages will be tried to send in any case, even if they exceed this
 		// value
 		ds.Init(p.sendDataSync, transport.MaxMessageSize()/4*3, logger)
-		ds.Start(300 * time.Millisecond)
+		ds.Start(datasync.DatasyncTicker)
 	}
 
 	return p, nil
