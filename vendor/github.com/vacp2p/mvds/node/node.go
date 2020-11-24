@@ -545,7 +545,7 @@ func (n *Node) insertSyncState(groupID *state.GroupID, messageID state.MessageID
 
 func (n *Node) updateSendEpoch(s state.State) state.State {
 	s.SendCount += 1
-	s.SendEpoch += n.nextEpoch(s.SendCount, n.epoch)
+	s.SendEpoch = n.nextEpoch(s.SendCount, n.epoch)
 	return s
 }
 
