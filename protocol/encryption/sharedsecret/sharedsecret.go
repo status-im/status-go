@@ -49,14 +49,6 @@ func (s *SharedSecret) generate(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *
 		return nil, err
 	}
 
-	logger := s.logger.With(zap.String("site", "generate"))
-
-	logger.Debug(
-		"saving a shared key",
-		zap.Binary("their-public-key", crypto.FromECDSAPub(theirPublicKey)),
-		zap.String("installation-id", installationID),
-	)
-
 	theirIdentity := crypto.CompressPubkey(theirPublicKey)
 	if err = s.persistence.Add(theirIdentity, sharedKey, installationID); err != nil {
 		return nil, err
@@ -72,14 +64,6 @@ func (s *SharedSecret) Generate(myPrivateKey *ecdsa.PrivateKey, theirPublicKey *
 
 // Agreed returns true if a secret has been acknowledged by all the installationIDs.
 func (s *SharedSecret) Agreed(myPrivateKey *ecdsa.PrivateKey, myInstallationID string, theirPublicKey *ecdsa.PublicKey, theirInstallationIDs []string) (*Secret, bool, error) {
-	logger := s.logger.With(zap.String("site", "Agreed"))
-
-	logger.Debug(
-		"checking if shared secret is acknowledged",
-		zap.Binary("their-public-key", crypto.FromECDSAPub(theirPublicKey)),
-		zap.Strings("their-installation-ids", theirInstallationIDs),
-	)
-
 	secret, err := s.generate(myPrivateKey, theirPublicKey, myInstallationID)
 	if err != nil {
 		return nil, false, err
@@ -97,7 +81,6 @@ func (s *SharedSecret) Agreed(myPrivateKey *ecdsa.PrivateKey, myInstallationID s
 
 	for _, installationID := range theirInstallationIDs {
 		if !response.installationIDs[installationID] {
-			logger.Debug("no shared secret for installation", zap.String("installation-id", installationID))
 			return secret, false, nil
 		}
 	}

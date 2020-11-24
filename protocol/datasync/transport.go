@@ -67,6 +67,11 @@ func (t *NodeTransport) Send(_ state.PeerID, peer state.PeerID, payload protobuf
 	payloads := splitPayloadInBatches(&payload, int(t.maxMessageSize))
 	for _, payload := range payloads {
 
+		if !payload.IsValid() {
+			t.logger.Error("payload is invalid")
+			continue
+		}
+
 		data, err := proto.Marshal(payload)
 		if err != nil {
 			return err
