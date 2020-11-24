@@ -818,11 +818,8 @@ func (c *Client) queryNotificationInfo(publicKey *ecdsa.PublicKey, force bool) e
 // handleMessageSent is called every time a message is sent
 func (c *Client) handleMessageSent(sentMessage *common.SentMessage) error {
 
-	c.config.Logger.Debug("sent messages", zap.Any("messageIDs", sentMessage.MessageIDs))
-
 	// Ignore if we are not sending notifications
 	if !c.config.SendEnabled {
-		c.config.Logger.Debug("send not enabled, ignoring")
 		return nil
 	}
 

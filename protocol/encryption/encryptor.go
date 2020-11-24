@@ -13,6 +13,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/crypto/ecies"
+	"github.com/status-im/status-go/eth-node/types"
 
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 )
@@ -244,9 +245,14 @@ func (s *encryptor) DecryptPayload(myIdentityKey *ecdsa.PrivateKey, theirIdentit
 
 	// We should not be sending a signal if it's coming from us, as we receive our own messages
 	if msg == nil && !samePublicKeys(*theirIdentityKey, myIdentityKey.PublicKey) {
+		s.logger.Debug("message is coming from someone else, but not targeting our installation id")
 		return nil, ErrDeviceNotFound
-	} else if msg == nil {
+	} else if msg == nil && theirInstallationID != s.config.InstallationID {
+		s.logger.Debug("message is coming from same public key, but different installation id")
 		return nil, ErrNotPairedDevice
+	} else if msg == nil && theirInstallationID == s.config.InstallationID {
+		s.logger.Debug("message is coming from us and is nil")
+		return nil, nil
 	}
 
 	payload := msg.GetPayload()
@@ -461,9 +467,8 @@ func (s *encryptor) GetPublicBundle(theirIdentityKey *ecdsa.PublicKey, installat
 func (s *encryptor) EncryptPayload(theirIdentityKey *ecdsa.PublicKey, myIdentityKey *ecdsa.PrivateKey, installations []*multidevice.Installation, payload []byte) (map[string]*DirectMessageProtocol, []*multidevice.Installation, error) {
 	logger := s.logger.With(
 		zap.String("site", "EncryptPayload"),
-		zap.Binary("their-identity-key", crypto.FromECDSAPub(theirIdentityKey)))
+		zap.String("their-identity-key", types.EncodeHex(crypto.FromECDSAPub(theirIdentityKey))))
 
-	logger.Debug("encrypting payload")
 	// Which installations we are sending the message to
 	var targetedInstallations []*multidevice.Installation
 
