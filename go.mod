@@ -48,7 +48,6 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.0
-	github.com/prometheus/common v0.9.1
 	github.com/russolsen/ohyeah v0.0.0-20160324131710-f4938c005315 // indirect
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
@@ -63,7 +62,7 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
-	github.com/vacp2p/mvds v0.0.23
+	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 	github.com/wealdtech/go-ens/v3 v3.3.0
 	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0

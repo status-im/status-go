@@ -426,7 +426,7 @@ github.com/tsenart/tb
 # github.com/tyler-smith/go-bip39 v1.0.2
 github.com/tyler-smith/go-bip39
 github.com/tyler-smith/go-bip39/wordlists
-# github.com/vacp2p/mvds v0.0.23
+# github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 github.com/vacp2p/mvds/node
 github.com/vacp2p/mvds/node/migrations
 github.com/vacp2p/mvds/peers
