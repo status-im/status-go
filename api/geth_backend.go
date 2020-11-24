@@ -5,7 +5,6 @@ package api
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -26,7 +25,6 @@ import (
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/logutils"
 	"github.com/status-im/status-go/mailserver/registry"
 	"github.com/status-im/status-go/multiaccounts"
@@ -291,7 +289,7 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 		return err
 	}
 	b.accountManager.SetAccountAddresses(walletAddr, watchAddrs...)
-	err = b.injectAccountIntoServices()
+	err = b.injectAccountsIntoServices()
 	if err != nil {
 		return err
 	}
@@ -595,7 +593,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	// Handle a case when a node is stopped and resumed.
 	// If there is no account selected, an error is returned.
 	if _, err := b.accountManager.SelectedChatAccount(); err == nil {
-		if err := b.injectAccountIntoServices(); err != nil {
+		if err := b.injectAccountsIntoServices(); err != nil {
 			return err
 		}
 	} else if err != account.ErrNoAccountSelected {
@@ -1099,14 +1097,14 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 		return err
 	}
 
-	if err := b.injectAccountIntoServices(); err != nil {
+	if err := b.injectAccountsIntoServices(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (b *GethStatusBackend) injectAccountIntoServices() error {
+func (b *GethStatusBackend) injectAccountsIntoServices() error {
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
 		return err
@@ -1135,7 +1133,7 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 			return err
 		}
 
-		if err := st.InitProtocol(identity, b.appDB, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, logutils.ZapLogger()); err != nil {
 			return err
 		}
 		return nil
@@ -1163,7 +1161,7 @@ func (b *GethStatusBackend) injectAccountIntoServices() error {
 			return err
 		}
 
-		if err := st.InitProtocol(identity, b.appDB, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, logutils.ZapLogger()); err != nil {
 			return err
 		}
 	}
@@ -1225,7 +1223,7 @@ func (b *GethStatusBackend) InjectChatAccount(chatKeyHex, _ string) error {
 	}
 	b.accountManager.SetChatAccount(chatKey)
 
-	return b.injectAccountIntoServices()
+	return b.injectAccountsIntoServices()
 }
 
 func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {
@@ -1269,57 +1267,4 @@ func (b *GethStatusBackend) SignHash(hexEncodedHash string) (string, error) {
 
 	hexEncodedSignature := types.EncodeHex(signature)
 	return hexEncodedSignature, nil
-}
-
-// GetIdentityImages returns an array of json marshalled IdentityImages assigned to the user's identity
-func (b *GethStatusBackend) GetIdentityImages() (string, error) {
-	idb := images.NewDatabase(b.appDB)
-	iis, err := idb.GetIdentityImages()
-	if err != nil {
-		return "", err
-	}
-
-	js, err := json.Marshal(iis)
-
-	return string(js), err
-}
-
-// GetIdentityImage returns a json object representing the image with the given name
-func (b *GethStatusBackend) GetIdentityImage(name string) (string, error) {
-	idb := images.NewDatabase(b.appDB)
-	ii, err := idb.GetIdentityImage(name)
-	if err != nil {
-		return "", err
-	}
-
-	js, err := json.Marshal(ii)
-
-	return string(js), err
-}
-
-// StoreIdentityImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
-// The resulting image(s) will be stored in the DB along with other user account information.
-// aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
-// bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
-func (b *GethStatusBackend) StoreIdentityImage(filepath string, aX, aY, bX, bY int) (string, error) {
-	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
-	if err != nil {
-		return "", err
-	}
-
-	idb := images.NewDatabase(b.appDB)
-	err = idb.StoreIdentityImages(iis)
-	if err != nil {
-		return "", err
-	}
-
-	js, err := json.Marshal(iis)
-
-	return string(js), err
-}
-
-// DeleteIdentityImage deletes an IdentityImage from the db with the given name
-func (b *GethStatusBackend) DeleteIdentityImage(name string) error {
-	idb := images.NewDatabase(b.appDB)
-	return idb.DeleteIdentityImage(name)
 }

@@ -122,6 +122,7 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
+// TODO remove photoPath from settings
 func (db *Database) CreateSettings(s Settings, nodecfg params.NodeConfig) error {
 	_, err := db.db.Exec(`
 INSERT INTO settings (

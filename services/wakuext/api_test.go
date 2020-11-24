@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/status-im/status-go/multiaccounts"
 	"io/ioutil"
 	"math"
 	"net"
@@ -129,7 +130,12 @@ func TestInitProtocol(t *testing.T) {
 	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/db.sql", tmpdir), "password")
 	require.NoError(t, err)
 
-	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
+	tmpfile, err := ioutil.TempFile("", "multi-accounts-tests-")
+	require.NoError(t, err)
+	multiAccounts, err := multiaccounts.InitializeDB(tmpfile.Name())
+	require.NoError(t, err)
+
+	err = service.InitProtocol(privateKey, sqlDB, multiAccounts, zap.NewNop())
 	require.NoError(t, err)
 }
 
@@ -181,10 +187,18 @@ func (s *ShhExtSuite) createAndAddNode() {
 	service := New(config, nodeWrapper, nil, nil, db)
 	sqlDB, err := appdatabase.InitializeDB(fmt.Sprintf("%s/%d", s.dir, idx), "password")
 	s.Require().NoError(err)
+
+	tmpfile, err := ioutil.TempFile("", "multi-accounts-tests-")
+	s.Require().NoError(err)
+	multiAccounts, err := multiaccounts.InitializeDB(tmpfile.Name())
+	s.Require().NoError(err)
+
 	privateKey, err := crypto.GenerateKey()
 	s.NoError(err)
-	err = service.InitProtocol(privateKey, sqlDB, zap.NewNop())
+
+	err = service.InitProtocol(privateKey, sqlDB, multiAccounts, zap.NewNop())
 	s.NoError(err)
+
 	err = stack.Register(func(n *node.ServiceContext) (node.Service, error) {
 		return service, nil
 	})

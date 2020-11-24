@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"database/sql"
+	"github.com/status-im/status-go/multiaccounts"
 
 	"go.uber.org/zap"
 
@@ -30,6 +31,7 @@ type config struct {
 	// The database instance has a higher priority.
 	dbConfig dbConfig
 	db       *sql.DB
+	multiAccount *multiaccounts.Database
 
 	verifyTransactionClient EthClient
 
@@ -88,6 +90,13 @@ func WithVerifyTransactionClient(client EthClient) Option {
 func WithDatabase(db *sql.DB) Option {
 	return func(c *config) error {
 		c.db = db
+		return nil
+	}
+}
+
+func WithMultiAccounts(ma *multiaccounts.Database) Option {
+	return func(c *config) error {
+		c.multiAccount = ma
 		return nil
 	}
 }

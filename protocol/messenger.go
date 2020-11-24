@@ -3,8 +3,11 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/multiaccounts"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -78,6 +81,7 @@ type Messenger struct {
 	installationID             string
 	mailserver                 []byte
 	database                   *sql.DB
+	multiAccounts              *multiaccounts.Database
 	quit                       chan struct{}
 
 	mutex sync.Mutex
@@ -277,6 +281,7 @@ func NewMessenger(
 		messagesPersistenceEnabled: c.messagesPersistenceEnabled,
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
+		multiAccounts:              c.multiAccount,
 		quit:                       make(chan struct{}),
 		shutdownTasks: []func() error{
 			database.Close,
@@ -565,6 +570,9 @@ func (m *Messenger) shouldPublishChatIdentity(chatId string) (bool, error) {
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
 // context 'private-chat' will attach all IdentityImage
 func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, error) {
+	keyUIDBytes := sha256.Sum256(gethcrypto.FromECDSAPub(&m.identity.PublicKey))
+	keyUID := types.EncodeHex(keyUIDBytes[:])
+
 	ci := &protobuf.ChatIdentity{
 		Clock:   m.transport.GetCurrentTime(),
 		EnsName: "", // TODO add ENS name handling to dedicate PR
@@ -574,8 +582,7 @@ func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, 
 
 	switch context {
 	case "public-chat":
-		idb := userimage.NewDatabase(m.database)
-		img, err := idb.GetIdentityImage(userimage.SmallDimName)
+		img, err := m.multiAccounts.GetIdentityImage(keyUID, userimage.SmallDimName)
 		if err != nil {
 			return nil, err
 		}
@@ -584,8 +591,7 @@ func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, 
 		ci.Images = ciis
 
 	case "private-chat":
-		idb := userimage.NewDatabase(m.database)
-		imgs, err := idb.GetIdentityImages()
+		imgs, err := m.multiAccounts.GetIdentityImages(keyUID)
 		if err != nil {
 			return nil, err
 		}

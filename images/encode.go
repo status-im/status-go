@@ -58,6 +58,10 @@ func EncodeToBestSize(bb *bytes.Buffer, img image.Image, size ResizeDimension) e
 }
 
 func GetPayloadDataURI(payload []byte) (string, error) {
+	if len(payload) == 0 {
+		return "", nil
+	}
+
 	mt, err := GetMimeType(payload)
 	if err != nil {
 		return "", err
