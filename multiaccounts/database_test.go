@@ -66,13 +66,13 @@ func TestLoginUpdate(t *testing.T) {
 // Profile Image tests
 
 var (
-	keyUid = "0xdeadbeef"
-	keyUid2 = "0x1337beef"
+	keyUID  = "0xdeadbeef"
+	keyUID2 = "0x1337beef"
 )
 
 func seedTestDB(t *testing.T, db *Database) {
 	iis := images.SampleIdentityImages()
-	require.NoError(t, db.StoreIdentityImages(keyUid, iis))
+	require.NoError(t, db.StoreIdentityImages(keyUID, iis))
 }
 
 func TestDatabase_GetIdentityImages(t *testing.T) {
@@ -82,14 +82,14 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 
 	expected := `[{"key_uid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240},{"key_uid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}]`
 
-	oiis, err := db.GetIdentityImages(keyUid)
+	oiis, err := db.GetIdentityImages(keyUID)
 	require.NoError(t, err)
 
 	joiis, err := json.Marshal(oiis)
 	require.NoError(t, err)
 	require.Exactly(t, expected, string(joiis))
 
-	oiis, err = db.GetIdentityImages(keyUid2)
+	oiis, err = db.GetIdentityImages(keyUID2)
 	require.NoError(t, err)
 
 	require.Exactly(t, 0, len(oiis))
@@ -101,22 +101,22 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 	seedTestDB(t, db)
 
 	cs := []struct {
-		KeyUid string
+		KeyUid   string
 		Name     string
 		Expected string
 	}{
 		{
-			keyUid,
+			keyUID,
 			images.SmallDimName,
 			`{"key_uid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`,
 		},
 		{
-			keyUid,
+			keyUID,
 			images.LargeDimName,
 			`{"key_uid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240}`,
 		},
 		{
-			keyUid2,
+			keyUID2,
 			images.LargeDimName,
 			`{"key_uid":"","type":"","uri":"","width":0,"height":0,"file_size":0,"resize_target":0}`,
 		},
@@ -137,9 +137,9 @@ func TestDatabase_DeleteIdentityImage(t *testing.T) {
 	defer stop()
 	seedTestDB(t, db)
 
-	require.NoError(t, db.DeleteIdentityImage(keyUid))
+	require.NoError(t, db.DeleteIdentityImage(keyUID))
 
-	oii, err := db.GetIdentityImage(keyUid, images.SmallDimName)
+	oii, err := db.GetIdentityImage(keyUID, images.SmallDimName)
 	require.NoError(t, err)
 	require.Empty(t, oii)
 }

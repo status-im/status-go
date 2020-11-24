@@ -647,13 +647,13 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.NoError(t, err)
 	p := sqlitePersistence{db: db}
 
-	chatId := "abcd1234"
+	chatID := "0xabcd1234"
 	now := time.Now().Unix()
 
-	err = p.SaveWhenChatIdentityLastPublished(chatId)
+	err = p.SaveWhenChatIdentityLastPublished(chatID)
 	require.NoError(t, err)
 
-	ts, err := p.GetWhenChatIdentityLastPublished(chatId)
+	ts, err := p.GetWhenChatIdentityLastPublished(chatID)
 	require.NoError(t, err)
 
 	// Check that the save happened in the last 2 seconds
@@ -661,7 +661,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.LessOrEqual(t, diff, int64(2))
 
 	// Require unsaved values to be zero
-	ts2, err := p.GetWhenChatIdentityLastPublished("deadbeef")
+	ts2, err := p.GetWhenChatIdentityLastPublished("0xdeadbeef")
 	require.NoError(t, err)
 	require.Exactly(t, int64(0), *ts2)
 }

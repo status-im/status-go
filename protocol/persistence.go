@@ -768,8 +768,8 @@ func (db sqlitePersistence) TransactionsToValidate() ([]*TransactionToValidate, 
 	return transactions, nil
 }
 
-func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatId string) (*int64, error) {
-	rows, err := db.db.Query("SELECT clock_value FROM chat_identity_last_published WHERE chat_id = ?", chatId)
+func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatID string) (*int64, error) {
+	rows, err := db.db.Query("SELECT clock_value FROM chat_identity_last_published WHERE chat_id = ?", chatID)
 	if err != nil {
 		return nil, err
 	}
@@ -786,7 +786,7 @@ func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatId string) (*in
 	return &t, nil
 }
 
-func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatId string) error {
+func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatID string) error {
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -806,7 +806,7 @@ func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatId string) err
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(chatId, time.Now().Unix())
+	_, err = stmt.Exec(chatID, time.Now().Unix())
 	if err != nil {
 		return err
 	}

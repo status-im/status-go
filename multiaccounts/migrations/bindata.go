@@ -4,7 +4,7 @@
 // 0001_accounts.up.sql (163B)
 // 1605007189_identity_images.down.sql (29B)
 // 1605007189_identity_images.up.sql (268B)
-// 1606224181_drop_photo_path_from_accounts.down.sql (76B)
+// 1606224181_drop_photo_path_from_accounts.down.sql (47B)
 // 1606224181_drop_photo_path_from_accounts.up.sql (675B)
 // doc.go (74B)
 
@@ -155,7 +155,7 @@ func _1605007189_identity_imagesUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1606224181_drop_photo_path_from_accountsDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\xb1\x0a\xc4\x20\x0c\x06\xe0\x3d\x4f\x91\xf7\x70\x8a\x1a\x0e\x41\xe3\xe1\xfd\x07\x5d\xc5\xc5\xa9\x16\x6a\xdf\xbf\x9f\xd7\x4f\x32\x46\x13\xfb\x49\x40\xaa\xe6\x88\x24\x43\x1b\x43\x7c\x56\xee\x63\xac\xe7\xdc\x37\x49\x8c\x1c\x6a\xfe\x17\xe3\x6b\xae\xbd\xbe\x7d\x4f\x86\x1e\x70\x44\xa1\x96\x92\xe0\xde\x00\x00\x00\xff\xff\xb3\x5f\x64\x53\x4c\x00\x00\x00")
+var __1606224181_drop_photo_path_from_accountsDownSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x4c\x4e\xce\x2f\xcd\x2b\x29\xe6\x72\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\xc8\xc8\x2f\xc9\x0f\x48\x2c\xc9\x50\x08\x71\x8d\x08\xb1\x06\x04\x00\x00\xff\xff\xc2\xe6\xd6\xb1\x2f\x00\x00\x00")
 
 func _1606224181_drop_photo_path_from_accountsDownSqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -170,8 +170,8 @@ func _1606224181_drop_photo_path_from_accountsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.down.sql", size: 76, mode: os.FileMode(0644), modTime: time.Unix(1606224883, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0x14, 0xfc, 0xb9, 0x6e, 0x1, 0x27, 0x56, 0x83, 0xdd, 0xa7, 0x1a, 0x2, 0x38, 0x2b, 0x5, 0xb4, 0xf8, 0x69, 0xe7, 0x49, 0x52, 0xc8, 0x47, 0x28, 0xcd, 0x64, 0xb5, 0x43, 0x7a, 0x11, 0xc7}}
+	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.down.sql", size: 47, mode: os.FileMode(0644), modTime: time.Unix(1606258709, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdc, 0x18, 0x37, 0x1a, 0x2, 0x2b, 0x46, 0x72, 0xe0, 0x25, 0xa6, 0x7c, 0x59, 0xa4, 0xde, 0x3a, 0x78, 0x30, 0x9a, 0xc6, 0xbf, 0x24, 0x96, 0xa6, 0x4, 0xa4, 0x73, 0x92, 0xc6, 0x18, 0xe4, 0xfc}}
 	return a, nil
 }
 
