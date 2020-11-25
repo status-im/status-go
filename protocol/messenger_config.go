@@ -29,8 +29,8 @@ type config struct {
 
 	// A path to a database or a database instance is required.
 	// The database instance has a higher priority.
-	dbConfig dbConfig
-	db       *sql.DB
+	dbConfig     dbConfig
+	db           *sql.DB
 	multiAccount *multiaccounts.Database
 
 	verifyTransactionClient EthClient
