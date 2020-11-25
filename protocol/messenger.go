@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"

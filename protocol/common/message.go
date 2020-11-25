@@ -14,6 +14,7 @@ import (
 
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
+
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
