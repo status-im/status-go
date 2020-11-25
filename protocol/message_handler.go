@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/status-im/status-go/images"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"

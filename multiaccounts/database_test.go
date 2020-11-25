@@ -101,7 +101,7 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 	seedTestDB(t, db)
 
 	cs := []struct {
-		KeyUid   string
+		KeyUID   string
 		Name     string
 		Expected string
 	}{
@@ -123,7 +123,7 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 	}
 
 	for _, c := range cs {
-		oii, err := db.GetIdentityImage(c.KeyUid, c.Name)
+		oii, err := db.GetIdentityImage(c.KeyUID, c.Name)
 		require.NoError(t, err)
 
 		joii, err := json.Marshal(oii)

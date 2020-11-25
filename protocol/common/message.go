@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/status-im/status-go/images"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -16,6 +15,7 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
