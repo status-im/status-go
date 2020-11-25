@@ -563,7 +563,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return false, err
 	}
 
-	return *lp == 0 || time.Now().Unix() - *lp > 24 * 60 * 60, nil
+	return *lp == 0 || time.Now().Unix()-*lp > 24*60*60, nil
 }
 
 // createChatIdentity creates a context based protobuf.ChatIdentity.
