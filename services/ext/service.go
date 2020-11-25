@@ -4,13 +4,10 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"github.com/status-im/status-go/multiaccounts"
 	"math/big"
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/status-im/status-go/services/wallet"
 
 	"github.com/syndtr/goleveldb/leveldb"
 
@@ -24,19 +21,20 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/db"
-	"github.com/status-im/status-go/multiaccounts/accounts"
-	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/services/ext/mailservers"
-	"github.com/status-im/status-go/signal"
-
-	"go.uber.org/zap"
-
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/ext/mailservers"
+	"github.com/status-im/status-go/services/wallet"
+	"github.com/status-im/status-go/signal"
+
+	"go.uber.org/zap"
 )
 
 const (
