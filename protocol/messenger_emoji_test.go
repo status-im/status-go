@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"github.com/status-im/status-go/multiaccounts"
 	"io/ioutil"
 	"testing"
 
@@ -14,6 +13,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
