@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"math/big"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/tt"
@@ -108,10 +110,16 @@ func (s *MessengerSuite) SetupTest() {
 }
 
 func (s *MessengerSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
+	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
+	s.Require().NoError(err)
+	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	s.Require().NoError(err)
+
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
 		WithDatabaseConfig(":memory:", "some-key"),
+		WithMultiAccounts(madb),
 	}
 	if s.enableDataSync {
 		options = append(options, WithDatasync())
