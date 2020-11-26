@@ -3,6 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"github.com/status-im/status-go/multiaccounts"
+	"io/ioutil"
 	"testing"
 
 	"github.com/google/uuid"
@@ -53,10 +55,16 @@ func (s *MessengerEmojiSuite) TearDownTest() {
 }
 
 func (s *MessengerEmojiSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
+	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
+	s.Require().NoError(err)
+	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	s.Require().NoError(err)
+
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
 		WithDatabaseConfig(sqlite.InMemoryPath, "some-key"),
+		WithMultiAccounts(madb),
 		WithDatasync(),
 	}
 	installationID := uuid.New().String()
