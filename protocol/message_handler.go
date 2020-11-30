@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
-
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -833,21 +832,24 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 			contact.ENSVerified = false
 		} */
 
-		// Get the largest
-		var name string
-		var iiSize int
-		for n, ii := range ci.Images {
-			if iiSize < len(ii.Payload) {
-				iiSize = len(ii.Payload)
-				name = n
+		if len(ci.Images) > 0 {
+			// Get the largest
+			var name string
+			var iiSize int
+			for n, ii := range ci.Images {
+				if iiSize < len(ii.Payload) {
+					iiSize = len(ii.Payload)
+					name = n
+				}
 			}
+
+			dataURI, err := images.GetPayloadDataURI(ci.Images[name].Payload)
+			if err != nil {
+				return err
+			}
+			contact.Photo = dataURI
 		}
 
-		dataURI, err := images.GetPayloadDataURI(ci.Images[name].Payload)
-		if err != nil {
-			return err
-		}
-		contact.Photo = dataURI
 		contact.LastUpdated = ci.Clock
 		state.ModifiedContacts[contact.ID] = true
 		state.AllContacts[contact.ID] = contact

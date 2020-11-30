@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
+	"io/ioutil"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
@@ -78,12 +80,18 @@ func (s *MessengerPushNotificationSuite) newMessengerWithOptions(shh types.Waku,
 }
 
 func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
+	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
+	s.Require().NoError(err)
+	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
+	s.Require().NoError(err)
+
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
 		WithDatabaseConfig(sqlite.InMemoryPath, ""),
 		WithDatasync(),
 		WithPushNotifications(),
+		WithMultiAccounts(madb),
 	}
 	return s.newMessengerWithOptions(shh, privateKey, options)
 }
