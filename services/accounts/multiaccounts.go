@@ -2,9 +2,9 @@ package accounts
 
 import (
 	"errors"
-	"github.com/status-im/status-go/images"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 )
 
