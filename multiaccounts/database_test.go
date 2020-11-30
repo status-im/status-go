@@ -80,7 +80,7 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 	defer stop()
 	seedTestDB(t, db)
 
-	expected := `[{"key_uid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240},{"key_uid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}]`
+	expected := `[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]`
 
 	oiis, err := db.GetIdentityImages(keyUID)
 	require.NoError(t, err)
@@ -108,17 +108,17 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 		{
 			keyUID,
 			images.SmallDimName,
-			`{"key_uid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`,
+			`{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}`,
 		},
 		{
 			keyUID,
 			images.LargeDimName,
-			`{"key_uid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"file_size":1024,"resize_target":240}`,
+			`{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240}`,
 		},
 		{
 			keyUID2,
 			images.LargeDimName,
-			`{"key_uid":"","type":"","uri":"","width":0,"height":0,"file_size":0,"resize_target":0}`,
+			`{"keyUid":"","type":"","uri":"","width":0,"height":0,"fileSize":0,"resizeTarget":0}`,
 		},
 	}
 

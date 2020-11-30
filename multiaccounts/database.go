@@ -11,11 +11,11 @@ import (
 
 // Account stores public information about account.
 type Account struct {
-	Name           string   `json:"name"`
-	Timestamp      int64    `json:"timestamp"`
-	KeycardPairing string   `json:"keycard-pairing"`
-	KeyUID         string   `json:"key-uid"`
-	ImageURIs      []string `json:"image-uris"`
+	Name           string                 `json:"name"`
+	Timestamp      int64                  `json:"timestamp"`
+	KeycardPairing string                 `json:"keycard-pairing"`
+	KeyUID         string                 `json:"key-uid"`
+	Images         []images.IdentityImage `json:"images"`
 }
 
 type Database struct {
@@ -40,22 +40,71 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT name, loginTimestamp, keycardPairing, keyUid from accounts ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	var rst []Account
-	inthelper := sql.NullInt64{}
+	accs := map[string]*Account{}
+	accLoginTimestamp := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
-		err = rows.Scan(&acc.Name, &inthelper, &acc.KeycardPairing, &acc.KeyUID)
+		ii := &images.IdentityImage{}
+		iiName := sql.NullString{}
+		iiWidth := sql.NullInt64{}
+		iiHeight := sql.NullInt64{}
+		iiFileSize := sql.NullInt64{}
+		iiResizeTarget := sql.NullInt64{}
+
+		err = rows.Scan(
+			&acc.Name,
+			&accLoginTimestamp,
+			&acc.KeycardPairing,
+			&acc.KeyUID,
+			&iiName,
+			&ii.Payload,
+			&iiWidth,
+			&iiHeight,
+			&iiFileSize,
+			&iiResizeTarget,
+		)
 		if err != nil {
 			return nil, err
 		}
-		acc.Timestamp = inthelper.Int64
-		rst = append(rst, acc)
+
+		acc.Timestamp = accLoginTimestamp.Int64
+
+		ii.KeyUID = acc.KeyUID
+		ii.Name = iiName.String
+		ii.Width = int(iiWidth.Int64)
+		ii.Height = int(iiHeight.Int64)
+		ii.FileSize = int(iiFileSize.Int64)
+		ii.ResizeTarget = int(iiResizeTarget.Int64)
+
+		if ii.Name == "" && len(ii.Payload) == 0 && ii.Width == 0 && ii.Height == 0 && ii.FileSize == 0 && ii.ResizeTarget == 0 {
+			ii = nil
+		}
+
+		if ii != nil {
+			a, ok := accs[acc.Name]
+			if ok {
+				a.Images = append(a.Images, *ii)
+			} else {
+				acc.Images = append(acc.Images, *ii)
+			}
+		}
+
+		accs[acc.Name] = &acc
 	}
+
+	// Yes, I know, I'm converting a map into a slice, this is to maintain the function signature and API behaviour and
+	// not need to loop through the slice searching for an account with a given keyUID
+	for _, a := range accs {
+		rst = append(rst, *a)
+	}
+
 	return rst, nil
 }
 
@@ -140,9 +189,10 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityIma
 			continue
 		}
 
+		ii.KeyUID = keyUID
 		_, err := tx.Exec(
 			"INSERT INTO identity_images (key_uid, name, image_payload, width, height, file_size, resize_target) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			keyUID,
+			ii.KeyUID,
 			ii.Name,
 			ii.Payload,
 			ii.Width,
