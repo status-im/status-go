@@ -3,7 +3,6 @@ package ext
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -590,47 +589,31 @@ func (api *PublicAPI) Echo(ctx context.Context, message string) (string, error) 
 //
 
 // GetIdentityImages returns an array of json marshalled IdentityImages assigned to the user's identity
-func (api *PublicAPI) GetIdentityImages(keyUID string) (string, error) {
-	iis, err := api.service.multiAccountsDB.GetIdentityImages(keyUID)
-	if err != nil {
-		return "", err
-	}
-
-	js, err := json.Marshal(iis)
-
-	return string(js), err
+func (api *PublicAPI) GetIdentityImages(keyUID string) ([]*images.IdentityImage, error) {
+	return api.service.multiAccountsDB.GetIdentityImages(keyUID)
 }
 
 // GetIdentityImage returns a json object representing the image with the given name
-func (api *PublicAPI) GetIdentityImage(keyUID, name string) (string, error) {
-	ii, err := api.service.multiAccountsDB.GetIdentityImage(keyUID, name)
-	if err != nil {
-		return "", err
-	}
-
-	js, err := json.Marshal(ii)
-
-	return string(js), err
+func (api *PublicAPI) GetIdentityImage(keyUID, name string) (*images.IdentityImage, error) {
+	return api.service.multiAccountsDB.GetIdentityImage(keyUID, name)
 }
 
 // StoreIdentityImage takes the filepath of an image, crops it as per the rect coords and finally resizes the image.
 // The resulting image(s) will be stored in the DB along with other user account information.
 // aX and aY represent the pixel coordinates of the upper left corner of the image's cropping area
 // bX and bY represent the pixel coordinates of the lower right corner of the image's cropping area
-func (api *PublicAPI) StoreIdentityImage(keyUID, filepath string, aX, aY, bX, bY int) (string, error) {
+func (api *PublicAPI) StoreIdentityImage(keyUID, filepath string, aX, aY, bX, bY int) ([]*images.IdentityImage, error) {
 	iis, err := images.GenerateIdentityImages(filepath, aX, aY, bX, bY)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	err = api.service.multiAccountsDB.StoreIdentityImages(keyUID, iis)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	js, err := json.Marshal(iis)
-
-	return string(js), err
+	return iis, err
 }
 
 // DeleteIdentityImage deletes an IdentityImage from the db with the given name
