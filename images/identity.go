@@ -35,13 +35,13 @@ func (i IdentityImage) MarshalJSON() ([]byte, error) {
 	}
 
 	temp := struct {
-		KeyUID       string `json:"key_uid"`
+		KeyUID       string `json:"keyUid"`
 		Name         string `json:"type"`
 		URI          string `json:"uri"`
 		Width        int    `json:"width"`
 		Height       int    `json:"height"`
-		FileSize     int    `json:"file_size"`
-		ResizeTarget int    `json:"resize_target"`
+		FileSize     int    `json:"fileSize"`
+		ResizeTarget int    `json:"resizeTarget"`
 	}{
 		KeyUID:       i.KeyUID,
 		Name:         i.Name,
