@@ -42,12 +42,6 @@ const PubKeyStringLength = 132
 
 const transactionSentTxt = "Transaction sent"
 
-var (
-	ErrChatIDEmpty    = errors.New("chat ID is empty")
-	ErrChatNotFound   = errors.New("can't find chat")
-	ErrNotImplemented = errors.New("not implemented")
-)
-
 // Messenger is a entity managing chats and messages.
 // It acts as a bridge between the application and encryption
 // layers.
@@ -87,19 +81,6 @@ type Messenger struct {
 type RawResponse struct {
 	Filter   *transport.Filter           `json:"filter"`
 	Messages []*v1protocol.StatusMessage `json:"messages"`
-}
-
-type MessengerResponse struct {
-	Chats          []*Chat                     `json:"chats,omitempty"`
-	Messages       []*common.Message           `json:"messages,omitempty"`
-	Contacts       []*Contact                  `json:"contacts,omitempty"`
-	Installations  []*multidevice.Installation `json:"installations,omitempty"`
-	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
-	Invitations    []*GroupChatInvitation      `json:"invitations,omitempty"`
-}
-
-func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats) == 0 && len(m.Messages) == 0 && len(m.Contacts) == 0 && len(m.Installations) == 0 && len(m.Invitations) == 0
 }
 
 type dbConfig struct {
@@ -1722,7 +1703,32 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	return m.sendChatMessage(ctx, message)
+}
 
+// SendChatMessages takes a array of messages and sends it based on the corresponding chats
+func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Message) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	var response MessengerResponse
+
+	for _, message := range messages {
+		messageResponse, err := m.sendChatMessage(ctx, message)
+		if err != nil {
+			return nil, err
+		}
+		err = response.Merge(messageResponse)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &response, nil
+}
+
+// SendChatMessage takes a minimal message and sends it based on the corresponding chat
+func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
 	if len(message.ImagePath) != 0 {
 		file, err := os.Open(message.ImagePath)
 		if err != nil {

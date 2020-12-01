@@ -365,6 +365,10 @@ func (api *PublicAPI) ReSendChatMessage(ctx context.Context, messageID string) e
 	return api.service.messenger.ReSendChatMessage(ctx, messageID)
 }
 
+func (api *PublicAPI) SendChatMessages(ctx context.Context, messages []*common.Message) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendChatMessages(ctx, messages)
+}
+
 func (api *PublicAPI) RequestTransaction(ctx context.Context, chatID, value, contract, address string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.RequestTransaction(ctx, chatID, value, contract, address)
 }
