@@ -13,6 +13,7 @@ import (
 type Account struct {
 	Name           string                 `json:"name"`
 	Timestamp      int64                  `json:"timestamp"`
+	Identicon      string                 `json:"identicon"`
 	KeycardPairing string                 `json:"keycard-pairing"`
 	KeyUID         string                 `json:"key-uid"`
 	Images         []images.IdentityImage `json:"images"`
@@ -40,7 +41,7 @@ func (db *Database) Close() error {
 }
 
 func (db *Database) GetAccounts() ([]Account, error) {
-	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
+	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +52,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	accLoginTimestamp := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
+		accIdenticon := sql.NullString{}
 		ii := &images.IdentityImage{}
 		iiName := sql.NullString{}
 		iiWidth := sql.NullInt64{}
@@ -61,6 +63,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 		err = rows.Scan(
 			&acc.Name,
 			&accLoginTimestamp,
+			&accIdenticon,
 			&acc.KeycardPairing,
 			&acc.KeyUID,
 			&iiName,
@@ -75,6 +78,7 @@ func (db *Database) GetAccounts() ([]Account, error) {
 		}
 
 		acc.Timestamp = accLoginTimestamp.Int64
+		acc.Identicon = accIdenticon.String
 
 		ii.KeyUID = acc.KeyUID
 		ii.Name = iiName.String
@@ -109,12 +113,12 @@ func (db *Database) GetAccounts() ([]Account, error) {
 }
 
 func (db *Database) SaveAccount(account Account) error {
-	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (name, keycardPairing, keyUid) VALUES (?, ?, ?)", account.Name, account.KeycardPairing, account.KeyUID)
+	_, err := db.db.Exec("INSERT OR REPLACE INTO accounts (name, identicon, keycardPairing, keyUid) VALUES (?, ?, ?)", account.Name, account.Identicon, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
 func (db *Database) UpdateAccount(account Account) error {
-	_, err := db.db.Exec("UPDATE accounts SET name = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.KeycardPairing, account.KeyUID)
+	_, err := db.db.Exec("UPDATE accounts SET name = ?, identicon = ?, keycardPairing = ? WHERE keyUid = ?", account.Name, account.Identicon, account.KeycardPairing, account.KeyUID)
 	return err
 }
 
