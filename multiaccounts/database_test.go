@@ -70,7 +70,7 @@ var (
 	keyUID2 = "0x1337beef"
 )
 
-func seedTestDB(t *testing.T, db *Database) {
+func seedTestDBWithIdentityImages(t *testing.T, db *Database, keyUID string) {
 	iis := images.SampleIdentityImages()
 	require.NoError(t, db.StoreIdentityImages(keyUID, iis))
 }
@@ -78,7 +78,7 @@ func seedTestDB(t *testing.T, db *Database) {
 func TestDatabase_GetIdentityImages(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	seedTestDB(t, db)
+	seedTestDBWithIdentityImages(t, db, keyUID)
 
 	expected := `[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]`
 
@@ -98,7 +98,7 @@ func TestDatabase_GetIdentityImages(t *testing.T) {
 func TestDatabase_GetIdentityImage(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	seedTestDB(t, db)
+	seedTestDBWithIdentityImages(t, db, keyUID)
 
 	cs := []struct {
 		KeyUID   string
@@ -135,11 +135,44 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 func TestDatabase_DeleteIdentityImage(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
-	seedTestDB(t, db)
+	seedTestDBWithIdentityImages(t, db, keyUID)
 
 	require.NoError(t, db.DeleteIdentityImage(keyUID))
 
 	oii, err := db.GetIdentityImage(keyUID, images.SmallDimName)
 	require.NoError(t, err)
 	require.Empty(t, oii)
+}
+
+func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	testAccs := []Account{
+		{Name: "string", KeyUID: keyUID, Identicon: "data"},
+		{Name: "string", KeyUID: keyUID2},
+		{Name: "string", KeyUID: keyUID2 + "2"},
+		{Name: "string", KeyUID: keyUID2 + "3"},
+	}
+	expected := `[{"name":"string","timestamp":100,"identicon":"data","keycard-pairing":"","key-uid":"0xdeadbeef","images":[{"keyUid":"0xdeadbeef","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0xdeadbeef","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]},{"name":"string","timestamp":10,"identicon":"","keycard-pairing":"","key-uid":"0x1337beef","images":null},{"name":"string","timestamp":0,"identicon":"","keycard-pairing":"","key-uid":"0x1337beef2","images":null},{"name":"string","timestamp":0,"identicon":"","keycard-pairing":"","key-uid":"0x1337beef3","images":[{"keyUid":"0x1337beef3","type":"large","uri":"data:image/png;base64,iVBORw0KGgoAAAANSUg=","width":240,"height":300,"fileSize":1024,"resizeTarget":240},{"keyUid":"0x1337beef3","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}]}]`
+
+	for _, a := range testAccs {
+		require.NoError(t, db.SaveAccount(a))
+	}
+
+	seedTestDBWithIdentityImages(t, db, keyUID)
+	seedTestDBWithIdentityImages(t, db, keyUID2 + "3")
+
+	err := db.UpdateAccountTimestamp(keyUID, 100)
+	require.NoError(t, err)
+	err = db.UpdateAccountTimestamp(keyUID2, 10)
+	require.NoError(t, err)
+
+	accs, err := db.GetAccounts()
+	require.NoError(t, err)
+
+	accJson, err := json.Marshal(accs)
+	require.NoError(t, err)
+
+	require.Exactly(t, expected, string(accJson))
 }

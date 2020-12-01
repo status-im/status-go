@@ -48,10 +48,9 @@ func (db *Database) GetAccounts() ([]Account, error) {
 	defer rows.Close()
 
 	var rst []Account
-	accs := map[string]*Account{}
-	accLoginTimestamp := sql.NullInt64{}
 	for rows.Next() {
 		acc := Account{}
+		accLoginTimestamp := sql.NullInt64{}
 		accIdenticon := sql.NullString{}
 		ii := &images.IdentityImage{}
 		iiName := sql.NullString{}
@@ -91,22 +90,24 @@ func (db *Database) GetAccounts() ([]Account, error) {
 			ii = nil
 		}
 
+		// Last index
+		li := len(rst) - 1
+
+		// Don't process nil identity images
 		if ii != nil {
-			a, ok := accs[acc.Name]
-			if ok {
-				a.Images = append(a.Images, *ii)
+			// attach the identity image to a previously created account if present, check keyUID matches
+			if len(rst) > 0 && rst[li].KeyUID == acc.KeyUID {
+				rst[li].Images = append(rst[li].Images, *ii)
+				// else attach the identity image to the newly created account
 			} else {
 				acc.Images = append(acc.Images, *ii)
 			}
 		}
 
-		accs[acc.Name] = &acc
-	}
-
-	// Yes, I know, I'm converting a map into a slice, this is to maintain the function signature and API behaviour and
-	// not need to loop through the slice searching for an account with a given keyUID
-	for _, a := range accs {
-		rst = append(rst, *a)
+		// Append newly created account only if this is the first loop or the keyUID doesn't match
+		if len(rst) == 0 || rst[li].KeyUID != acc.KeyUID {
+			rst = append(rst, acc)
+		}
 	}
 
 	return rst, nil
