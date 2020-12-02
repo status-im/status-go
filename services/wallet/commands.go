@@ -451,6 +451,7 @@ type controlCommand struct {
 	feed           *event.Feed
 	safetyDepth    *big.Int
 	watchNewBlocks bool
+	errorsCount    int
 }
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
@@ -708,6 +709,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 	head, err := c.client.HeaderByNumber(ctx, nil)
 	cancel()
 	if err != nil {
+		if c.NewError(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -720,11 +724,17 @@ func (c *controlCommand) Run(parent context.Context) error {
 	lastKnownEthBlocks, accountsWithoutHistory, err := c.db.GetLastKnownBlockByAddresses(c.accounts)
 	if err != nil {
 		log.Error("failed to load last head from database", "error", err)
+		if c.NewError(err) {
+			return nil
+		}
 		return err
 	}
 
 	fromMap, err := findFirstRanges(parent, accountsWithoutHistory, head.Number, c.client)
 	if err != nil {
+		if c.NewError(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -760,6 +770,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 
 	err = cmnd.Command()(parent)
 	if err != nil {
+		if c.NewError(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -771,6 +784,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 	}
 	_, err = c.LoadTransfers(parent, downloader, 40)
 	if err != nil {
+		if c.NewError(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -796,6 +812,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 		head, err = c.client.HeaderByNumber(ctx, target)
 		cancel()
 		if err != nil {
+			if c.NewError(err) {
+				return nil
+			}
 			return err
 		}
 
@@ -815,6 +834,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 
 		err = cmd.Command()(parent)
 		if err != nil {
+			if c.NewError(err) {
+				return nil
+			}
 			log.Warn("error on running newBlocksTransfersCommand", "err", err)
 			return err
 		}
@@ -828,6 +850,19 @@ func (c *controlCommand) Run(parent context.Context) error {
 
 	log.Info("end control command")
 	return err
+}
+
+func (c *controlCommand) NewError(err error) bool {
+	c.errorsCount++
+	log.Error("controlCommand error", "error", err, "counter", c.errorsCount)
+	if c.errorsCount >= 3 {
+		c.feed.Send(Event{
+			Type:    EventFetchingHistoryError,
+			Message: err.Error(),
+		})
+		return true
+	}
+	return false
 }
 
 func (c *controlCommand) Command() Command {

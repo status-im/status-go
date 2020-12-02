@@ -102,6 +102,7 @@ func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 		feed:           r.feed,
 		safetyDepth:    reorgSafetyDepth(r.chain),
 		watchNewBlocks: r.watchNewBlocks,
+		errorsCount:    0,
 	}
 
 	return ctl

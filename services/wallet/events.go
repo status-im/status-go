@@ -21,6 +21,8 @@ const (
 	EventFetchingRecentHistory EventType = "recent-history-fetching"
 	// EventRecentHistoryFetched emitted when fetching of lastest tx history is started
 	EventRecentHistoryReady EventType = "recent-history-ready"
+	// EventRecentHistoryError emitted when fetching of tx history failed
+	EventFetchingHistoryError EventType = "fetching-history-error"
 )
 
 // Event is a type for wallet events.
@@ -30,4 +32,5 @@ type Event struct {
 	Accounts                  []common.Address       `json:"accounts"`
 	NewTransactionsPerAccount map[common.Address]int `json:"newTransactions"`
 	ERC20                     bool                   `json:"erc20"`
+	Message                   string                 `json:"message"`
 }
