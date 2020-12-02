@@ -247,6 +247,8 @@ func (m *StatusMessage) HandleApplication() error {
 		v := reflect.ValueOf(m.DecryptedPayload)
 		m.ParsedMessage = &v
 		return nil
+	case protobuf.ApplicationMetadataMessage_CHAT_IDENTITY:
+		return m.unmarshalProtobufData(new(protobuf.ChatIdentity))
 	}
 	return nil
 }
