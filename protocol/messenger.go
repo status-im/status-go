@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -17,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -573,6 +576,9 @@ func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, 
 	keyUIDBytes := sha256.Sum256(gethcrypto.FromECDSAPub(&m.identity.PublicKey))
 	keyUID := types.EncodeHex(keyUIDBytes[:])
 
+	m.logger.Info(fmt.Sprintf("generated keyUID '%s' from PublicKey", keyUID))
+	m.logger.Info(fmt.Sprintf("context '%s'", context))
+
 	ci := &protobuf.ChatIdentity{
 		Clock:   m.transport.GetCurrentTime(),
 		EnsName: "", // TODO add ENS name handling to dedicate PR
@@ -582,23 +588,34 @@ func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, 
 
 	switch context {
 	case "public-chat":
+		m.logger.Info(fmt.Sprintf("handling public-chat ChatIdentity"))
+
 		img, err := m.multiAccounts.GetIdentityImage(keyUID, userimage.SmallDimName)
 		if err != nil {
 			return nil, err
 		}
 
+		imgJson, _ := json.Marshal(img)
+		m.logger.Info(fmt.Sprintf("public-chat images.IdentityImage '%s' '%s'", string(imgJson), spew.Sdump(img)))
+
 		ciis[userimage.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
+		m.logger.Info(fmt.Sprintf("public-chat protobuf.IdentityImage '%s'", spew.Sdump(ciis)))
 		ci.Images = ciis
 
 	case "private-chat":
+		m.logger.Info(fmt.Sprintf("handling private-chat ChatIdentity"))
 		imgs, err := m.multiAccounts.GetIdentityImages(keyUID)
 		if err != nil {
 			return nil, err
 		}
 
+		imgsJson, _ := json.Marshal(imgs)
+		m.logger.Info(fmt.Sprintf("private-chat images.IdentityImage '%s' '%s'", string(imgsJson), spew.Sdump(imgs)))
+
 		for _, img := range imgs {
 			ciis[img.Name] = m.adaptIdentityImageToProtobuf(img)
 		}
+		m.logger.Info(fmt.Sprintf("private-chat protobuf.IdentityImage '%s'", spew.Sdump(ciis)))
 		ci.Images = ciis
 	}
 
