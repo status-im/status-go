@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 type OembedData struct {
@@ -18,11 +19,13 @@ type LinkPreviewData struct {
 	Site         string `json:"site"`
 	Title        string `json:"title"`
 	ThumbnailURL string `json:"thumbnailUrl"`
+	ContentType  string `json:"contentType"`
 }
 
 type Site struct {
-	Title   string `json:"title"`
-	Address string `json:"address"`
+	Title        string `json:"title"`
+	Address      string `json:"address"`
+	ImageSite    bool   `json:imageSite`
 }
 
 const YouTubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
@@ -30,12 +33,24 @@ const YouTubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
 func LinkPreviewWhitelist() []Site {
 	return []Site{
 		Site{
-			Title:   "YouTube",
-			Address: "youtube.com",
+			Title:     "YouTube",
+			Address:   "youtube.com",
+			ImageSite: false,
 		},
 		Site{
-			Title:   "YouTube shortener",
-			Address: "youtu.be",
+			Title:     "YouTube shortener",
+			Address:   "youtu.be",
+			ImageSite: false,
+		},
+		Site{
+			Title:     "Tenor GIFs",
+			Address:   "tenor.com",
+			ImageSite: true,
+		},
+		Site{
+			Title:     "GIPHY GIFs",
+			Address:   "giphy.com",
+			ImageSite: true,
 		},
 	}
 }
@@ -87,9 +102,23 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return previewData, fmt.Errorf("Cant't parse link %s", link)
 	}
 
-	switch url.Hostname() {
-	case "youtube.com", "www.youtube.com", "youtu.be":
-		return GetYoutubePreviewData(link)
+	hostname := strings.ToLower(url.Hostname())
+	youtubeHostnames := []string{"youtube.com", "www.youtube.com", "youtu.be"}
+	for _, youtubeHostname := range youtubeHostnames {
+		if youtubeHostname == hostname {
+			return GetYoutubePreviewData(link)
+		}
+	}
+	for _, site := range LinkPreviewWhitelist() {
+		if strings.HasSuffix(hostname, site.Address) && site.ImageSite {
+			content, contentErr := GetURLContent(link)
+			if contentErr != nil {
+				return previewData, contentErr
+			}
+			previewData.ThumbnailURL = link
+			previewData.ContentType = http.DetectContentType(content)
+			return previewData, nil
+		}
 	}
 
 	return previewData, fmt.Errorf("Link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
