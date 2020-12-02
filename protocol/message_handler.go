@@ -821,7 +821,7 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 	//  In this case the contact update would not be processed
 	//
 	//  TODO Potential fix: create an ChatIdentity last updated field on the contact table.
-	logger.Debug(fmt.Sprintf("Update times, contact.LastUpdated '%d', ChatIdentity.Clock '%d'", contact.LastUpdated, ci.Clock))
+	logger.Info(fmt.Sprintf("Update times, contact.LastUpdated '%d', ChatIdentity.Clock '%d'", contact.LastUpdated, ci.Clock))
 	if contact.LastUpdated < ci.Clock {
 		logger.Info("Updating contact")
 		if !contact.HasBeenAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
@@ -834,7 +834,7 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 			contact.ENSVerified = false
 		} */
 
-		logger.Debug(fmt.Sprintf("ChatIdentity has %d images attached", len(ci.Images)))
+		logger.Info(fmt.Sprintf("ChatIdentity has %d images attached", len(ci.Images)))
 		if len(ci.Images) > 0 {
 			// Get the largest
 			var name string
@@ -846,7 +846,7 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 				}
 			}
 
-			logger.Debug(fmt.Sprintf("largest image : name '%s', size '%d'", name, iiSize))
+			logger.Info(fmt.Sprintf("largest image : name '%s', size '%d'", name, iiSize))
 
 			dataURI, err := images.GetPayloadDataURI(ci.Images[name].Payload)
 			if err != nil {
@@ -854,7 +854,7 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 			}
 			contact.Photo = dataURI
 
-			logger.Debug(fmt.Sprintf("image payload '%s'", dataURI))
+			logger.Info(fmt.Sprintf("image payload '%s'", dataURI))
 		}
 
 		contact.LastUpdated = ci.Clock
