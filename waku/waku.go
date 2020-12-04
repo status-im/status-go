@@ -1099,7 +1099,9 @@ func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
 	if w.rateLimiter != nil {
 		runLoop := func(out p2p.MsgReadWriter) error {
 			peer.SetRWWriter(out)
-			return peer.Run()
+			err := peer.Run()
+			w.logger.Info("handled peer", zap.String("peerID", types.EncodeHex(peer.ID())), zap.Error(err))
+			return err
 		}
 		return w.rateLimiter.Decorate(peer, rw, runLoop)
 	}
