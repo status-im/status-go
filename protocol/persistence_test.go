@@ -589,3 +589,34 @@ func TestSaveLinks(t *testing.T) {
 	require.Equal(t, retrievedMessages[0].Links, message.Links)
 
 }
+
+func TestHideMessage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	chatID := testPublicChatID
+	message := &common.Message{
+		ID:          "id-1",
+		LocalChatID: chatID,
+		ChatMessage: protobuf.ChatMessage{
+			Text:  "content-1",
+			Clock: uint64(1),
+		},
+		From: "1",
+	}
+
+	messages := []*common.Message{message}
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	err = p.HideMessage(message.ID)
+	require.NoError(t, err)
+
+	var actualHidden, actualSeen bool
+	err = p.db.QueryRow("SELECT hide, seen FROM user_messages WHERE id = ?", message.ID).Scan(&actualHidden, &actualSeen)
+
+	require.NoError(t, err)
+	require.True(t, actualHidden)
+	require.True(t, actualSeen)
+}

@@ -319,6 +319,11 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 	s.Require().NoError(err)
 	s.Require().Equal(uint64(1), count)
 
+	// Make sure that if it's not seen, it does not return a count of 1
+	count, err = s.m.MarkMessagesSeen(chat.ID, []string{inputMessage1.ID})
+	s.Require().NoError(err)
+	s.Require().Equal(uint64(0), count)
+
 	chats := s.m.Chats()
 	s.Require().Len(chats, 1)
 	s.Require().Equal(uint(1), chats[0].UnviewedMessagesCount)

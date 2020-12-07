@@ -800,7 +800,7 @@ func (db sqlitePersistence) DeleteMessage(id string) error {
 }
 
 func (db sqlitePersistence) HideMessage(id string) error {
-	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1 WHERE id = ?`, id)
+	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1, seen = 1 WHERE id = ?`, id)
 	return err
 }
 
@@ -851,7 +851,7 @@ func (db sqlitePersistence) MarkMessagesSeen(chatID string, ids []string) (uint6
 	}
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
-	q := "UPDATE user_messages SET seen = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
+	q := "UPDATE user_messages SET seen = 1 WHERE NOT(seen) AND id IN (" + inVector + ")" // nolint: gosec
 	_, err = tx.Exec(q, idsArgs...)
 	if err != nil {
 		return 0, err

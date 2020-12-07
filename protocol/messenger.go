@@ -2813,6 +2813,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 
 	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
+	message.Seen = true
 	message.Text = "Request transaction"
 
 	request := &protobuf.RequestTransaction{
@@ -2890,6 +2891,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 
 	message.MessageType = protobuf.MessageType_ONE_TO_ONE
 	message.ContentType = protobuf.ChatMessage_TRANSACTION_COMMAND
+	message.Seen = true
 	message.Text = "Request address for transaction"
 
 	request := &protobuf.RequestAddressForTransaction{
@@ -2974,6 +2976,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = "Request address for transaction accepted"
+	message.Seen = true
 	message.OutgoingStatus = common.OutgoingStatusSending
 
 	// Hide previous message
@@ -3069,6 +3072,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = "Transaction request declined"
+	message.Seen = true
 	message.OutgoingStatus = common.OutgoingStatusSending
 	message.Replace = messageID
 
@@ -3151,6 +3155,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
 	message.Text = "Request address for transaction declined"
+	message.Seen = true
 	message.OutgoingStatus = common.OutgoingStatusSending
 	message.Replace = messageID
 
@@ -3232,6 +3237,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
 	message.Timestamp = timestamp
+	message.Seen = true
 	message.Text = transactionSentTxt
 	message.OutgoingStatus = common.OutgoingStatusSending
 
@@ -3329,6 +3335,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	clock, timestamp := chat.NextClockAndTimestamp(m.transport)
 	message.Clock = clock
 	message.WhisperTimestamp = timestamp
+	message.Seen = true
 	message.Timestamp = timestamp
 	message.Text = transactionSentTxt
 
