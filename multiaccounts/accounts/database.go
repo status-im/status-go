@@ -36,6 +36,20 @@ type Account struct {
 	Color     string         `json:"color"`
 }
 
+const (
+	accountTypeGenerated = "generated"
+	accountTypeKey       = "key"
+	accountTypeSeed      = "seed"
+	accountTypeWatch     = "watch"
+)
+
+// IsOwnAccount returns true if this is an account we have the private key for
+// NOTE: Wallet flag can't be used as it actually indicates that it's the default
+// Wallet
+func (a *Account) IsOwnAccount() bool {
+	return a.Wallet || a.Type == accountTypeSeed || a.Type == accountTypeGenerated || a.Type == accountTypeKey
+}
+
 type Settings struct {
 	// required
 	Address                   types.Address    `json:"address"`
