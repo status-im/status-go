@@ -746,6 +746,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 			"[mailserver:DeliverMail] request failed",
 			"peerID", peerID.String(),
 			"requestID", reqID.String(),
+			"err", err,
 		)
 		return
 	}
