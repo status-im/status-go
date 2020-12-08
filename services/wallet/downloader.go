@@ -296,7 +296,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 		header := &DBHeader{
 			Number: big.NewInt(int64(l.BlockNumber)),
 			Hash:   l.BlockHash,
-			Erc20Transfer: &Transfer{
+			Erc20Transfers: []*Transfer{{
 				Address:     address,
 				BlockNumber: big.NewInt(int64(l.BlockNumber)),
 				BlockHash:   l.BlockHash,
@@ -304,9 +304,7 @@ func (d *ERC20TransfersDownloader) blocksFromLogs(parent context.Context, logs [
 				From:        address,
 				Loaded:      false,
 				Type:        erc20Transfer,
-				Log:         &l,
-			},
-		}
+				Log:         &l}}}
 
 		concurrent.Add(func(ctx context.Context) error {
 			concurrent.PushHeader(header)

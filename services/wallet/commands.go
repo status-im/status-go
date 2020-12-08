@@ -990,9 +990,27 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 	for _, address := range c.accounts {
 		ethHeaders := ethHeadersByAddress[address]
 		erc20Headers := erc20HeadersByAddress[address]
-
 		allHeaders := append(ethHeaders, erc20Headers...)
-		foundHeaders[address] = allHeaders
+
+		uniqHeadersByHash := map[common.Hash]*DBHeader{}
+		for _, header := range allHeaders {
+			uniqHeader, ok := uniqHeadersByHash[header.Hash]
+			if ok {
+				if len(header.Erc20Transfers) > 0 {
+					uniqHeader.Erc20Transfers = append(uniqHeader.Erc20Transfers, header.Erc20Transfers...)
+				}
+				uniqHeadersByHash[header.Hash] = uniqHeader
+			} else {
+				uniqHeadersByHash[header.Hash] = header
+			}
+		}
+
+		uniqHeaders := []*DBHeader{}
+		for _, header := range uniqHeadersByHash {
+			uniqHeaders = append(uniqHeaders, header)
+		}
+
+		foundHeaders[address] = uniqHeaders
 
 		for _, header := range allHeaders {
 			if header.Number.Cmp(maxBlockNumber) == 1 {
@@ -1000,8 +1018,8 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 			}
 		}
 
-		log.Debug("saving headers", "len", len(allHeaders), "address")
-		err = c.db.ProcessBlocks(address, newFromByAddress[address], c.toByAddress[address], allHeaders)
+		log.Debug("saving headers", "len", len(uniqHeaders), "address")
+		err = c.db.ProcessBlocks(address, newFromByAddress[address], c.toByAddress[address], uniqHeaders)
 		if err != nil {
 			return err
 		}

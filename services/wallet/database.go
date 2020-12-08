@@ -15,12 +15,12 @@ import (
 
 // DBHeader fields from header that are stored in database.
 type DBHeader struct {
-	Number        *big.Int
-	Hash          common.Hash
-	Timestamp     uint64
-	Erc20Transfer *Transfer
-	Network       uint64
-	Address       common.Address
+	Number         *big.Int
+	Hash           common.Hash
+	Timestamp      uint64
+	Erc20Transfers []*Transfer
+	Network        uint64
+	Address        common.Address
 	// Head is true if the block was a head at the time it was pulled from chain.
 	Head bool
 	// Loaded is true if trasfers from this block has been already fetched
@@ -765,23 +765,25 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 		if err != nil {
 			return err
 		}
-		if header.Erc20Transfer != nil {
-			res, err := updateTx.Exec(&JSONBlob{header.Erc20Transfer.Log}, network, account, header.Erc20Transfer.ID)
-			if err != nil {
-				return err
-			}
-			affected, err := res.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if affected > 0 {
-				continue
-			}
+		if len(header.Erc20Transfers) > 0 {
+			for _, transfer := range header.Erc20Transfers {
+				res, err := updateTx.Exec(&JSONBlob{transfer.Log}, network, account, transfer.ID)
+				if err != nil {
+					return err
+				}
+				affected, err := res.RowsAffected()
+				if err != nil {
+					return err
+				}
+				if affected > 0 {
+					continue
+				}
 
-			_, err = insertTx.Exec(network, account, account, header.Erc20Transfer.ID, (*SQLBigInt)(header.Number), header.Hash, erc20Transfer, header.Erc20Transfer.Timestamp, &JSONBlob{header.Erc20Transfer.Log})
-			if err != nil {
-				log.Error("error saving erc20transfer", "err", err)
-				return err
+				_, err = insertTx.Exec(network, account, account, transfer.ID, (*SQLBigInt)(header.Number), header.Hash, erc20Transfer, transfer.Timestamp, &JSONBlob{transfer.Log})
+				if err != nil {
+					log.Error("error saving erc20transfer", "err", err)
+					return err
+				}
 			}
 		}
 	}

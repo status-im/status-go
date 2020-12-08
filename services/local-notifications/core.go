@@ -166,7 +166,7 @@ func (s *Service) transactionsHandler(payload TransactionEvent) {
 	limit := 20
 	if payload.BlockNumber != nil {
 		for _, address := range payload.Accounts {
-			if payload.BlockNumber.Cmp(payload.MaxKnownBlocks[address]) == 1 {
+			if payload.BlockNumber.Cmp(payload.MaxKnownBlocks[address]) >= 0 {
 				log.Info("Handled transfer for address", "info", address)
 				transfers, err := s.walletDB.GetTransfersByAddressAndBlock(address, payload.BlockNumber, int64(limit))
 				if err != nil {
@@ -235,14 +235,26 @@ func (s *Service) StartWalletWatcher() {
 				return
 			case event := <-events:
 				if event.Type == wallet.EventNewBlock && len(maxKnownBlocks) > 0 {
-					s.transmitter.publisher.Send(TransactionEvent{
-						Type:                      string(event.Type),
-						BlockNumber:               event.BlockNumber,
-						Accounts:                  event.Accounts,
-						NewTransactionsPerAccount: event.NewTransactionsPerAccount,
-						ERC20:                     event.ERC20,
-						MaxKnownBlocks:            maxKnownBlocks,
-					})
+					newBlocks := false
+					for _, address := range event.Accounts {
+						if _, ok := maxKnownBlocks[address]; !ok {
+							newBlocks = true
+							maxKnownBlocks[address] = event.BlockNumber
+						} else if event.BlockNumber.Cmp(maxKnownBlocks[address]) == 1 {
+							maxKnownBlocks[address] = event.BlockNumber
+							newBlocks = true
+						}
+					}
+					if newBlocks {
+						s.transmitter.publisher.Send(TransactionEvent{
+							Type:                      string(event.Type),
+							BlockNumber:               event.BlockNumber,
+							Accounts:                  event.Accounts,
+							NewTransactionsPerAccount: event.NewTransactionsPerAccount,
+							ERC20:                     event.ERC20,
+							MaxKnownBlocks:            maxKnownBlocks,
+						})
+					}
 				} else if event.Type == wallet.EventMaxKnownBlock {
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {
