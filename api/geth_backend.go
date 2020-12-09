@@ -78,6 +78,7 @@ type GethStatusBackend struct {
 	personalAPI          *personal.PublicAPI
 	rpcFilters           *rpcfilters.Service
 	multiaccountsDB      *multiaccounts.Database
+	account              *multiaccounts.Account
 	accountManager       *account.GethManager
 	transactor           *transactions.Transactor
 	connectionState      connectionState
@@ -266,6 +267,8 @@ func (b *GethStatusBackend) startNodeWithKey(acc multiaccounts.Account, password
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
+
+	b.account = &acc
 	accountsDB := accounts.NewDB(b.appDB)
 	walletAddr, err := accountsDB.GetWalletAddress()
 	if err != nil {
@@ -322,6 +325,7 @@ func (b *GethStatusBackend) startNodeWithAccount(acc multiaccounts.Account, pass
 	if err := logutils.OverrideRootLogWithConfig(conf, false); err != nil {
 		return err
 	}
+	b.account = &acc
 	accountsDB := accounts.NewDB(b.appDB)
 	chatAddr, err := accountsDB.GetChatAddress()
 	if err != nil {
@@ -1104,6 +1108,14 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 	return nil
 }
 
+func (b *GethStatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
+	if b.account == nil {
+		return nil, errors.New("master key account is nil in the GetStatusBackend")
+	}
+
+	return b.account, nil
+}
+
 func (b *GethStatusBackend) injectAccountsIntoServices() error {
 	chatAccount, err := b.accountManager.SelectedChatAccount()
 	if err != nil {
@@ -1127,13 +1139,18 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		return err
 	}
 
+	acc, err := b.GetActiveAccount()
+	if err != nil {
+		return err
+	}
+
 	if whisperService != nil {
 		st, err := b.statusNode.ShhExtService()
 		if err != nil {
 			return err
 		}
 
-		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}
 		return nil
@@ -1161,7 +1178,7 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 			return err
 		}
 
-		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, logutils.ZapLogger()); err != nil {
+		if err := st.InitProtocol(identity, b.appDB, b.multiaccountsDB, acc, logutils.ZapLogger()); err != nil {
 			return err
 		}
 	}

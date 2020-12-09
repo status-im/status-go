@@ -79,3 +79,12 @@ type GeneratedAndDerivedAccountInfo struct {
 	GeneratedAccountInfo
 	Derived map[string]AccountInfo `json:"derived"`
 }
+
+func IdentifiedAccountInfoFromExtKey(extKey *extkeys.ExtendedKey) IdentifiedAccountInfo {
+	acc := account{
+		privateKey:  extKey.ToECDSA(),
+		extendedKey: extKey,
+	}
+
+	return acc.toIdentifiedAccountInfo("")
+}

@@ -46,7 +46,7 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	s.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
 	// create an account
-	accountInfo, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
+	_, accountInfo, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// ensure that there is still no accounts returned
@@ -131,7 +131,7 @@ func (s *AccountsTestSuite) TestRecoverAccount() {
 	s.NotNil(keyStore)
 
 	// create an acc
-	accountInfo, mnemonic, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
+	_, accountInfo, mnemonic, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s, mnemonic:%s}",
 		accountInfo.WalletAddress, accountInfo.WalletPubKey, accountInfo.ChatAddress, accountInfo.ChatPubKey, mnemonic)
@@ -172,12 +172,12 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	defer s.StopTestBackend()
 
 	// create an account
-	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
+	_, accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s}",
 		accountInfo1.WalletAddress, accountInfo1.WalletPubKey, accountInfo1.ChatAddress, accountInfo1.ChatPubKey)
 
-	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
+	_, accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s}",
 		accountInfo2.WalletAddress, accountInfo2.WalletPubKey, accountInfo2.ChatAddress, accountInfo2.ChatPubKey)
@@ -218,9 +218,9 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.StartTestBackend()
 
 	// create test accounts
-	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
+	_, accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
-	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
+	_, accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(utils.TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// make sure that no account is selected by default
