@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
@@ -23,7 +24,7 @@ type WhisperService interface {
 type AccountManager interface {
 	AddressToDecryptedAccount(string, string) (types.Account, *types.Key, error)
 	SelectAccount(account.LoginParams) error
-	CreateAccount(password string) (accountInfo account.Info, mnemonic string, err error)
+	CreateAccount(password string) (mkInfo generator.IdentifiedAccountInfo, accountInfo account.Info, mnemonic string, err error)
 }
 
 // Service represents our own implementation of status status operations.
