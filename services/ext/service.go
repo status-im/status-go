@@ -70,6 +70,7 @@ type Service struct {
 	lastUsedMonitor  *mailservers.LastUsedConnectionMonitor
 	accountsDB       *accounts.Database
 	multiAccountsDB  *multiaccounts.Database
+	account          *multiaccounts.Account
 }
 
 // Make sure that Service implements node.Service interface.
@@ -115,7 +116,7 @@ func (s *Service) GetPeer(rawURL string) (*enode.Node, error) {
 	return enode.ParseV4(rawURL)
 }
 
-func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, logger *zap.Logger) error {
+func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAccountDb *multiaccounts.Database, acc *multiaccounts.Account, logger *zap.Logger) error {
 	if !s.config.PFSEnabled {
 		return nil
 	}
@@ -148,8 +149,9 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAcco
 	}
 	s.accountsDB = accounts.NewDB(db)
 	s.multiAccountsDB = multiAccountDb
+	s.account = acc
 
-	options, err := buildMessengerOptions(s.config, identity, db, s.multiAccountsDB, envelopesMonitorConfig, s.accountsDB, logger)
+	options, err := buildMessengerOptions(s.config, identity, db, s.multiAccountsDB, acc, envelopesMonitorConfig, s.accountsDB, logger)
 	if err != nil {
 		return err
 	}
@@ -456,6 +458,7 @@ func buildMessengerOptions(
 	identity *ecdsa.PrivateKey,
 	db *sql.DB,
 	multiAccounts *multiaccounts.Database,
+	account *multiaccounts.Account,
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig,
 	accountsDB *accounts.Database,
 	logger *zap.Logger,
@@ -465,6 +468,7 @@ func buildMessengerOptions(
 		protocol.WithPushNotifications(),
 		protocol.WithDatabase(db),
 		protocol.WithMultiAccounts(multiAccounts),
+		protocol.WithAccount(account),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
 	}

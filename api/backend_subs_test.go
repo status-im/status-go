@@ -242,7 +242,7 @@ func initNodeAndLogin(t *testing.T, backend *GethStatusBackend) (string, string)
 	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
 	err = backend.StartNode(config)
 	require.NoError(t, err)
-	info, _, err := backend.AccountManager().CreateAccount(password)
+	_, info, _, err := backend.AccountManager().CreateAccount(password)
 	require.NoError(t, err)
 
 	loginParams := account.LoginParams{

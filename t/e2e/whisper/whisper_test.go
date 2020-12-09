@@ -108,11 +108,11 @@ func (s *WhisperTestSuite) TestSelectAccount() {
 	s.NoError(err)
 
 	// create account 1
-	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	_, accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// create account 2
-	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account2.Password)
+	_, accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account2.Password)
 	s.NoError(err)
 
 	// make sure that identities are not injected yet
@@ -142,7 +142,7 @@ func (s *WhisperTestSuite) TestLogout() {
 	s.NoError(err)
 
 	// create an account
-	accountInfo, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	_, accountInfo, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// make sure that identity doesn't exist (yet) in Whisper
@@ -162,9 +162,9 @@ func (s *WhisperTestSuite) TestSelectedAccountOnRestart() {
 	whisperService := s.WhisperService()
 
 	// create test accounts
-	accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	_, accountInfo1, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
-	accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account2.Password)
+	_, accountInfo2, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account2.Password)
 	s.NoError(err)
 
 	// make sure that identity is not (yet injected)
@@ -259,7 +259,7 @@ func (s *WhisperTestSuite) TestSelectedChatKeyIsUsedInWhisper() {
 	s.NoError(err)
 
 	// create an account
-	accountInfo, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
+	_, accountInfo, _, err := s.Backend.AccountManager().CreateAccount(TestConfig.Account1.Password)
 	s.NoError(err)
 
 	// select account

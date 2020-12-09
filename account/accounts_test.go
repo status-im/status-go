@@ -146,7 +146,7 @@ func (s *ManagerTestSuite) SetupTest() {
 	testPassword := "test-password"
 
 	// Initial test - create test account
-	accountInfo, mnemonic, err := s.accManager.CreateAccount(testPassword)
+	_, accountInfo, mnemonic, err := s.accManager.CreateAccount(testPassword)
 	s.Require().NoError(err)
 	s.Require().NotEmpty(accountInfo.WalletAddress)
 	s.Require().NotEmpty(accountInfo.WalletPubKey)

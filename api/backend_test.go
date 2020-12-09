@@ -187,7 +187,7 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wgCreateAccounts.Add(1)
 		go func(pass string) {
-			accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
+			_, accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
 			assert.NoError(t, err)
 			addressCh <- [...]string{accountInfo.WalletAddress, accountInfo.ChatAddress, pass}
 			wgCreateAccounts.Done()

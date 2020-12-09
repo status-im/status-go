@@ -32,6 +32,7 @@ type config struct {
 	dbConfig     dbConfig
 	db           *sql.DB
 	multiAccount *multiaccounts.Database
+	account      *multiaccounts.Account
 
 	verifyTransactionClient EthClient
 
@@ -97,6 +98,13 @@ func WithDatabase(db *sql.DB) Option {
 func WithMultiAccounts(ma *multiaccounts.Database) Option {
 	return func(c *config) error {
 		c.multiAccount = ma
+		return nil
+	}
+}
+
+func WithAccount(acc *multiaccounts.Account) Option {
+	return func(c *config) error {
+		c.account = acc
 		return nil
 	}
 }
