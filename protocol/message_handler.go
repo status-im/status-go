@@ -848,6 +848,11 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 
 			logger.Info(fmt.Sprintf("largest image : name '%s', size '%d'", name, iiSize))
 
+			if ci.Images[name] == nil {
+				logger.Info("image empty")
+				return errors.New("image empty")
+			}
+
 			dataURI, err := images.GetPayloadDataURI(ci.Images[name].Payload)
 			if err != nil {
 				return err
