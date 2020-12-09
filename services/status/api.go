@@ -72,7 +72,7 @@ type SignupResponse struct {
 
 // Signup is an implementation of `status_signup` or `web3.status.signup` API
 func (api *PublicAPI) Signup(context context.Context, req SignupRequest) (res SignupResponse, err error) {
-	accountInfo, mnemonic, err := api.s.am.CreateAccount(req.Password)
+	_, accountInfo, mnemonic, err := api.s.am.CreateAccount(req.Password)
 	if err != nil {
 		err = errors.New("could not create the specified account : " + err.Error())
 		return
