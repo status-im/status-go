@@ -393,9 +393,11 @@ func resizeYCbCr(in *ycc, out *ycc, scale float64, coeffs []int16, offset []int,
 			}
 
 			xo := (y-newBounds.Min.Y)*out.Stride + (x-newBounds.Min.X)*3
-			out.Pix[xo+0] = clampUint8(p[0] / sum)
-			out.Pix[xo+1] = clampUint8(p[1] / sum)
-			out.Pix[xo+2] = clampUint8(p[2] / sum)
+			if sum != 0 {
+				out.Pix[xo+0] = clampUint8(p[0] / sum)
+				out.Pix[xo+1] = clampUint8(p[1] / sum)
+				out.Pix[xo+2] = clampUint8(p[2] / sum)
+			}
 		}
 	}
 }
