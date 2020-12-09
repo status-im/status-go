@@ -1109,9 +1109,9 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 }
 
 func (b *GethStatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
-	/*if b.account == nil {
+	if b.account == nil {
 		return nil, errors.New("master key account is nil in the GethStatusBackend")
-	}*/
+	}
 
 	return b.account, nil
 }
