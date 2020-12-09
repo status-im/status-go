@@ -6,6 +6,8 @@ import (
 
 	"github.com/nfnt/resize"
 	"github.com/oliamb/cutter"
+
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func Resize(size ResizeDimension, img image.Image) image.Image {
@@ -19,6 +21,8 @@ func Resize(size ResizeDimension, img image.Image) image.Image {
 	default:
 		width, height = uint(size), 0
 	}
+
+	log.Info("resizing", "size", size, "width", width, "height", height, "img", img)
 
 	return resize.Resize(width, height, img, resize.Bilinear)
 }
