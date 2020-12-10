@@ -561,6 +561,17 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
 func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
+
+	// Check we have at least one image
+	imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
+	if err != nil {
+		return false, err
+	}
+
+	if len(imgs) == 0 {
+		return false, nil
+	}
+
 	lp, err := m.persistence.GetWhenChatIdentityLastPublished(chatID)
 	if err != nil {
 		return false, err
