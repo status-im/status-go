@@ -3,6 +3,8 @@ package images
 import (
 	"encoding/json"
 	"errors"
+
+	"github.com/status-im/status-go/eth-node/crypto"
 )
 
 type IdentityImage struct {
@@ -22,6 +24,10 @@ func (i IdentityImage) GetType() (ImageType, error) {
 	}
 
 	return it, nil
+}
+
+func (i IdentityImage) Hash() []byte {
+	return crypto.Keccak256(i.Payload)
 }
 
 func (i IdentityImage) GetDataURI() (string, error) {

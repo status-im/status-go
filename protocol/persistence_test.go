@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"database/sql"
 	"io/ioutil"
 	"math"
@@ -648,22 +649,26 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	p := sqlitePersistence{db: db}
 
 	chatID := "0xabcd1234"
+	hash := []byte{0x1}
 	now := time.Now().Unix()
 
-	err = p.SaveWhenChatIdentityLastPublished(chatID)
+	err = p.SaveWhenChatIdentityLastPublished(chatID, hash)
 	require.NoError(t, err)
 
-	ts, err := p.GetWhenChatIdentityLastPublished(chatID)
+	ts, actualHash, err := p.GetWhenChatIdentityLastPublished(chatID)
 	require.NoError(t, err)
 
 	// Check that the save happened in the last 2 seconds
 	diff := *ts - now
 	require.LessOrEqual(t, diff, int64(2))
 
+	require.True(t, bytes.Equal(hash, actualHash))
+
 	// Require unsaved values to be zero
-	ts2, err := p.GetWhenChatIdentityLastPublished("0xdeadbeef")
+	ts2, actualHash2, err := p.GetWhenChatIdentityLastPublished("0xdeadbeef")
 	require.NoError(t, err)
 	require.Exactly(t, int64(0), *ts2)
+	require.Nil(t, actualHash2)
 }
 
 func TestSaveLinks(t *testing.T) {
