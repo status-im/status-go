@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 // errors
@@ -15,10 +16,11 @@ var (
 )
 
 type LoginParams struct {
-	ChatAddress    types.Address   `json:"chatAddress"`
-	Password       string          `json:"password"`
-	MainAccount    types.Address   `json:"mainAccount"`
-	WatchAddresses []types.Address `json:"watchAddresses"`
+	ChatAddress    types.Address         `json:"chatAddress"`
+	Password       string                `json:"password"`
+	MainAccount    types.Address         `json:"mainAccount"`
+	WatchAddresses []types.Address       `json:"watchAddresses"`
+	MultiAccount   *multiaccounts.Account `json:"multiAccount"`
 }
 
 type ErrZeroAddress struct {

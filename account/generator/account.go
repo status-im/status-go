@@ -3,10 +3,12 @@ package generator
 import (
 	"crypto/ecdsa"
 	"crypto/sha256"
+	"time"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
+	"github.com/status-im/status-go/multiaccounts"
 )
 
 type account struct {
@@ -80,11 +82,18 @@ type GeneratedAndDerivedAccountInfo struct {
 	Derived map[string]AccountInfo `json:"derived"`
 }
 
-func IdentifiedAccountInfoFromExtKey(extKey *extkeys.ExtendedKey) IdentifiedAccountInfo {
+func GeneratedAccountInfoFromExtKey(mnemonic string, extKey *extkeys.ExtendedKey) GeneratedAccountInfo {
 	acc := account{
 		privateKey:  extKey.ToECDSA(),
 		extendedKey: extKey,
 	}
 
-	return acc.toIdentifiedAccountInfo("")
+	return acc.toGeneratedAccountInfo("", mnemonic)
+}
+
+func (ga *GeneratedAccountInfo) ToMultiAccount() *multiaccounts.Account {
+	return &multiaccounts.Account{
+		Timestamp:      time.Now().Unix(),
+		KeyUID:         ga.KeyUID,
+	}
 }

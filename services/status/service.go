@@ -24,7 +24,7 @@ type WhisperService interface {
 type AccountManager interface {
 	AddressToDecryptedAccount(string, string) (types.Account, *types.Key, error)
 	SelectAccount(account.LoginParams) error
-	CreateAccount(password string) (mkInfo generator.IdentifiedAccountInfo, accountInfo account.Info, mnemonic string, err error)
+	CreateAccount(password string) (mkInfo generator.GeneratedAccountInfo, accountInfo account.Info, mnemonic string, err error)
 }
 
 // Service represents our own implementation of status status operations.

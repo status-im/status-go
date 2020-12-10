@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/status-im/status-go/account/generator"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -181,15 +182,20 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 
 	var wgCreateAccounts sync.WaitGroup
 	count := 3
-	addressCh := make(chan [3]string, count) // use buffered channel to avoid blocking
+	type AccountData struct {
+		MasterAccount generator.GeneratedAccountInfo
+		AccountInfo account.Info
+		Password string
+	}
+	addressCh := make(chan AccountData, count) // use buffered channel to avoid blocking
 
 	// create new accounts concurrently
 	for i := 0; i < count; i++ {
 		wgCreateAccounts.Add(1)
 		go func(pass string) {
-			_, accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
+			MKInfo, accountInfo, _, err := backend.AccountManager().CreateAccount(pass)
 			assert.NoError(t, err)
-			addressCh <- [...]string{accountInfo.WalletAddress, accountInfo.ChatAddress, pass}
+			addressCh <- AccountData{MKInfo, accountInfo, pass}
 			wgCreateAccounts.Done()
 		}("password-00" + fmt.Sprint(i))
 	}
@@ -200,17 +206,18 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	// select, reselect or logout concurrently
 	var wg sync.WaitGroup
 
-	for tuple := range addressCh {
+	for accountData := range addressCh {
 		wg.Add(1)
-		go func(tuple [3]string) {
+		go func(accountData AccountData) {
 			loginParams := account.LoginParams{
-				MainAccount: types.HexToAddress(tuple[0]),
-				ChatAddress: types.HexToAddress(tuple[1]),
-				Password:    tuple[2],
+				MainAccount: types.HexToAddress(accountData.AccountInfo.WalletAddress),
+				ChatAddress: types.HexToAddress(accountData.AccountInfo.ChatAddress),
+				Password:    accountData.Password,
+				MultiAccount: accountData.MasterAccount.ToMultiAccount(),
 			}
 			assert.NoError(t, backend.SelectAccount(loginParams))
 			wg.Done()
-		}(tuple)
+		}(accountData)
 
 		wg.Add(1)
 		go func() {
@@ -234,6 +241,8 @@ func TestBackendInjectChatAccount(t *testing.T) {
 	defer func() {
 		require.NoError(t, backend.StopNode())
 	}()
+
+	backend.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	chatPrivKey, err := gethcrypto.GenerateKey()
 	require.NoError(t, err)
@@ -445,6 +454,8 @@ func TestSignHash(t *testing.T) {
 	defer func() {
 		require.NoError(t, backend.StopNode())
 	}()
+
+	backend.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	var testCases = []struct {
 		name                 string
