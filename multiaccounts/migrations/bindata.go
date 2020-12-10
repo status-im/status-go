@@ -170,7 +170,7 @@ func _1606224181_drop_photo_path_from_accountsDownSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.down.sql", size: 892, mode: os.FileMode(0644), modTime: time.Unix(1607535565, 0)}
+	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.down.sql", size: 892, mode: os.FileMode(0644), modTime: time.Unix(1608048573, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x90, 0x24, 0x17, 0x7, 0x80, 0x93, 0x6f, 0x8d, 0x5d, 0xaa, 0x8c, 0x79, 0x15, 0x5d, 0xb3, 0x19, 0xd7, 0xd8, 0x39, 0xf9, 0x3a, 0x63, 0x8f, 0x81, 0x15, 0xb6, 0xd6, 0x9a, 0x37, 0xa8, 0x8e, 0x9b}}
 	return a, nil
 }
@@ -190,7 +190,7 @@ func _1606224181_drop_photo_path_from_accountsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.up.sql", size: 866, mode: os.FileMode(0644), modTime: time.Unix(1607535565, 0)}
+	info := bindataFileInfo{name: "1606224181_drop_photo_path_from_accounts.up.sql", size: 866, mode: os.FileMode(0644), modTime: time.Unix(1608048573, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xff, 0x4c, 0x97, 0xee, 0xef, 0x82, 0xb8, 0x6c, 0x71, 0xbb, 0x50, 0x7b, 0xe6, 0xd9, 0x22, 0x31, 0x7c, 0x1a, 0xfe, 0x91, 0x28, 0xf6, 0x6, 0x36, 0xe, 0xb1, 0xf1, 0xc8, 0x25, 0xac, 0x7e, 0xd6}}
 	return a, nil
 }

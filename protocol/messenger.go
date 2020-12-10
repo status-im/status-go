@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
@@ -507,7 +508,15 @@ func (m *Messenger) handleContactCodeChatIdentity(cca *protobuf.ContactCodeAdver
 			return err
 		}
 
-		err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic)
+		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+		if err != nil {
+			return err
+		}
+		if img == nil {
+			return errors.New("could not find image")
+		}
+
+		err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, img.Hash())
 		if err != nil {
 			return err
 		}
@@ -551,7 +560,15 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return err
 	}
 
-	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID)
+	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+	if err != nil {
+		return err
+	}
+	if img == nil {
+		return errors.New("could not find image")
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(chat.ID, img.Hash())
 	if err != nil {
 		return err
 	}
@@ -563,18 +580,22 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 
 	// Check we have at least one image
-	imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
+	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 	if err != nil {
 		return false, err
 	}
 
-	if len(imgs) == 0 {
+	if img == nil {
 		return false, nil
 	}
 
-	lp, err := m.persistence.GetWhenChatIdentityLastPublished(chatID)
+	lp, hash, err := m.persistence.GetWhenChatIdentityLastPublished(chatID)
 	if err != nil {
 		return false, err
+	}
+
+	if !bytes.Equal(hash, img.Hash()) {
+		return true, nil
 	}
 
 	return *lp == 0 || time.Now().Unix()-*lp > 24*60*60, nil
