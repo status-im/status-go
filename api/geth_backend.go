@@ -1101,6 +1101,10 @@ func (b *GethStatusBackend) SelectAccount(loginParams account.LoginParams) error
 		return err
 	}
 
+	if loginParams.MultiAccount != nil {
+		b.account = loginParams.MultiAccount
+	}
+
 	if err := b.injectAccountsIntoServices(); err != nil {
 		return err
 	}

@@ -61,8 +61,8 @@ func (m *Manager) AccountsGenerator() *generator.Generator {
 // BIP44-compatible keys are generated: CKD#1 is stored as account key, CKD#2 stored as sub-account root
 // Public key of CKD#1 is returned, with CKD#2 securely encoded into account key file (to be used for
 // sub-account derivations)
-func (m *Manager) CreateAccount(password string) (generator.IdentifiedAccountInfo, Info, string, error) {
-	var mkInfo generator.IdentifiedAccountInfo
+func (m *Manager) CreateAccount(password string) (generator.GeneratedAccountInfo, Info, string, error) {
+	var mkInfo generator.GeneratedAccountInfo
 	info := Info{}
 
 	// generate mnemonic phrase
@@ -82,7 +82,7 @@ func (m *Manager) CreateAccount(password string) (generator.IdentifiedAccountInf
 		return mkInfo, info, "", fmt.Errorf("can not create master extended key: %v", err)
 	}
 
-	mkInfo = generator.IdentifiedAccountInfoFromExtKey(extKey)
+	mkInfo = generator.GeneratedAccountInfoFromExtKey(mnemonic, extKey)
 
 	// import created key into account keystore
 	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
