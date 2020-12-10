@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"github.com/status-im/status-go/account/generator"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -131,13 +132,17 @@ var signuptests = []struct {
 		},
 		expectedError: nil,
 		prepareExpectations: func(s *StatusSuite) {
+			mKInfo := generator.GeneratedAccountInfo{
+				IdentifiedAccountInfo: generator.IdentifiedAccountInfo{},
+				Mnemonic:              "",
+			}
 			accountInfo := account.Info{
 				WalletAddress: "addr",
 				WalletPubKey:  "pubkey",
 				ChatAddress:   "addr",
 				ChatPubKey:    "pubkey",
 			}
-			s.am.EXPECT().CreateAccount("password").Return(accountInfo, "mnemonic", nil)
+			s.am.EXPECT().CreateAccount("password").Return(mKInfo, accountInfo, "mnemonic", nil)
 		},
 	},
 	{
@@ -149,7 +154,11 @@ var signuptests = []struct {
 		},
 		expectedError: errors.New("could not create the specified account : foo"),
 		prepareExpectations: func(s *StatusSuite) {
-			s.am.EXPECT().CreateAccount("password").Return(account.Info{}, "", errors.New("foo"))
+			mKInfo := generator.GeneratedAccountInfo{
+				IdentifiedAccountInfo: generator.IdentifiedAccountInfo{},
+				Mnemonic:              "",
+			}
+			s.am.EXPECT().CreateAccount("password").Return(mKInfo, account.Info{}, "", errors.New("foo"))
 		},
 	},
 }

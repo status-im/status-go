@@ -11,6 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 
 	account "github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
 	types "github.com/status-im/status-go/eth-node/types"
 )
 
@@ -106,13 +107,14 @@ func (mr *MockAccountManagerMockRecorder) SelectAccount(arg0 interface{}) *gomoc
 }
 
 // CreateAccount mocks base method
-func (m *MockAccountManager) CreateAccount(password string) (account.Info, string, error) {
+func (m *MockAccountManager) CreateAccount(password string) (generator.GeneratedAccountInfo, account.Info, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateAccount", password)
-	ret0, _ := ret[0].(account.Info)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(generator.GeneratedAccountInfo)
+	ret1, _ := ret[1].(account.Info)
+	ret2, _ := ret[2].(string)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
 }
 
 // CreateAccount indicates an expected call of CreateAccount

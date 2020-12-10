@@ -63,7 +63,7 @@ func TestIdentityImage_MarshalJSON(t *testing.T) {
 		FileSize:     256,
 		ResizeTarget: 80,
 	}
-	expected := `{"key_uid":"","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"file_size":256,"resize_target":80}`
+	expected := `{"keyUid":"","type":"thumbnail","uri":"data:image/jpeg;base64,/9j/2wCEAFA3PEY8MlA=","width":80,"height":80,"fileSize":256,"resizeTarget":80}`
 
 	js, err := json.Marshal(ii)
 	require.NoError(t, err)
