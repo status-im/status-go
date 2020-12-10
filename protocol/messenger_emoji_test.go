@@ -91,6 +91,7 @@ func (s *MessengerEmojiSuite) newMessenger(shh types.Waku) *Messenger {
 
 func (s *MessengerEmojiSuite) TestSendEmoji() {
 	alice := s.m
+	alice.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
