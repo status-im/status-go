@@ -22,6 +22,18 @@ func generate(seed uint64) string {
 	return fmt.Sprintf("%s %s %s", adjective1, adjective2, animal)
 }
 
+func Generate2(seed uint64) string {
+	generator := newLSFR(poly, seed)
+	adjective1Index := generator.next() % uint64(len(adjectives))
+	adjective2Index := generator.next() % uint64(len(adjectives))
+	animalIndex := generator.next() % uint64(len(animals))
+	adjective1 := adjectives[adjective1Index]
+	adjective2 := adjectives[adjective2Index]
+	animal := animals[animalIndex]
+
+	return fmt.Sprintf("%s %s %s", adjective1, adjective2, animal)
+}
+
 // GenerateFromPublicKey returns the 3 words name given an *ecdsa.PublicKey
 func GenerateFromPublicKey(publicKey *ecdsa.PublicKey) string {
 	// Here we truncate the public key to the least significant 64 bits

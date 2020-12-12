@@ -29,14 +29,14 @@
       "enode://30211cbd81c25f07b03a0196d56e6ce4604bb13db773ff1c0ea2253547fafd6c06eae6ad3533e2ba39d59564cfbdbb5e2ce7c137a5ebb85e99dcfc7a75f99f55@23.236.58.92:443"
     ]
   },
-  "DataDir": "./ethereum/mainnet",
+  "DataDir": "/Users/Franklyn/development/project/from_github/status-go/cmd/spam/data",
   "EnableNTPSync": true,
-  "KeyStoreDir": "./keystore",
+  "KeyStoreDir": "/Users/Franklyn/development/project/from_github/status-go/cmd/spam/data/keystore",
   "ListenAddr": ":30304",
 
   "LogEnabled":true,
   "LogMobileSystem":false,
-  "LogDir":"./ethereum/mainnet/log",
+  "LogDir":"/Users/Franklyn/development/project/from_github/status-go/cmd/spam",
   "LogFile":"node.log",
   "LogLevel":"INFO",
   "LogMaxBackups":3,

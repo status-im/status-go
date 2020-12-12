@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/google/uuid"
@@ -13,13 +14,13 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/protocol"
 	. "github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/services/wakuext"
 	"golang.org/x/crypto/ssh/terminal"
 	stdlog "log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
@@ -122,13 +123,42 @@ const DEFAULT_NETWORKS = `
 ]
 `
 
-func main() {
+var spamMessage = flag.String("m", "for the inefficient of status team>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>0", `Log level, one of: "ERROR", "WARN", "INFO", "DEBUG", and "TRACE"`)
+var sleepSecond = flag.Int("s", 30, "-s 30")
+var times = flag.Int("t", 1, "-6 1")
 
+func main() {
+	//for i:=0;i<10;i++{
+	//	fmt.Println(rand.Float64()*10)
+	//}
+	flag.Parse()
+
+	rand.Seed(time.Now().Unix())
+
+	//fmt.Println(generateMessage())
+	doSpam()
+}
+
+func generateMessage() string {
+	messages := []string{"Oi", "Hi", "Hello", "Hii", "Hola", "Hello everyone!!\nHow are you ??",
+		"Ou", "First time here", "Hello guys", "hi...", "Hai friends", "Hai", "SNT -> 20$", "O",
+		"✋", "✋🏻", "🖐🏿", "👋🏻", "👄", "💋", "👀", "👁", "👣", "👧", "🤜", "Hi there!", "Sup sup", "Hey!", "Bom dia"}
+
+	message := messages[int(rand.Float64()*float64(len(messages)))]
+	//length := int(rand.Float64()*100)
+	//for i:=0; i<length;i++{
+	//	message = message+" "+ alias.Generate2(uint64(rand.Float64() * 0x7fffffffffffffff))
+	//}
+
+	return message
+}
+
+func doSpam() {
 	nodeConfig, err := params.NewNodeConfigWithDefaultsAndFiles(
 		getDefaultDataDir(),
 		uint64(1),
 		[]params.Option{},
-		[]string{"/Users/Franklyn/development/project/from_github/status-go/_examples/waku.json"},
+		[]string{"/Users/Franklyn/development/project/from_github/status-go/cmd/spam/waku.json"},
 	)
 	if err != nil {
 		spamLogger.Error(err.Error())
@@ -153,12 +183,6 @@ func main() {
 
 	fmt.Printf("data dir: %s\n", getDefaultDataDir())
 
-	//err = backend.StartWallet()
-	//if err != nil {
-	//	spamLogger.Error("Failed to start wallet", "error", err)
-	//	return
-	//}
-
 	const pwd = "yyyyyy"
 	pathStrings := []string{PATH_WALLET_ROOT, PATH_EIP_1581, PATH_WHISPER, PATH_DEFAULT_WALLET}
 	accs, err := backend.AccountManager().
@@ -169,9 +193,9 @@ func main() {
 	_, err = backend.AccountManager().
 		AccountsGenerator().
 		StoreDerivedAccounts(generateAccount.ID, pwd, pathStrings)
-
+	//fmt.Println("Mnemonic => ",generateAccount.Mnemonic)
 	name, err := alias.GenerateFromPublicKeyString(generateAccount.Derived[PATH_WHISPER].PublicKey)
-	photoPath, err := protocol.Identicon(generateAccount.Derived[PATH_WHISPER].PublicKey)
+	photoPath, err := Identicon(generateAccount.Derived[PATH_WHISPER].PublicKey)
 
 	//networks := json.RawMessage("{}")
 	networks := json.RawMessage(DEFAULT_NETWORKS)
@@ -199,7 +223,7 @@ func main() {
 		InstallationID:    installationID,
 	}
 
-	backend.UpdateRootDataDir("./ethereum")
+	backend.UpdateRootDataDir("/Users/Franklyn/development/project/from_github/status-go/cmd/spam")
 	backend.OpenAccounts()
 	//backend.SaveAccount(multiAccount)
 	//修复DefaultPushNotificationsServers不能序列化存储到db的问题
@@ -243,6 +267,12 @@ func main() {
 		return
 	}
 
+	/*err = backend.StartWallet()
+	if err != nil {
+		spamLogger.Error("Failed to start wallet", "error", err)
+		return
+	}*/
+
 	//loginParams := account.LoginParams{
 	//	ChatAddress: types.HexToAddress(generateAccountInfo.ChatAddress),
 	//	MainAccount: types.HexToAddress(generateAccountInfo.WalletAddress),
@@ -260,6 +290,7 @@ func main() {
 	//	return
 	//}
 	//fmt.Printf("startMessenger response: %s\n",resp)
+
 	statusNode := backend.StatusNode()
 	st, err := statusNode.WakuExtService()
 	if err != nil {
@@ -274,20 +305,38 @@ func main() {
 	}
 
 	api := st.APIs()[0].Service.(*wakuext.PublicAPI)
-
-	//channels := []string{"introductions","status-keycard","dap-ps","status","status-chinese","statusphere","support","crypto","markets","status-standups","status-watercooler","status-protocol","defi","status-townhall-questions"}
-	channels := []string{"test-chat1", "test-chat2"}
+	//channels := []string{"introductions","status-keycard","dap-ps","status","status-chinese","statusphere","support","crypto","markets","defi","status-townhall-questions","status-korean","indonesian","status-naija","status-filipino","status-indian","status-spanish","status-turkish","status-brasil","status-russian","chitchat","status-japanese","tech","status-marketing","nimbus-general","embark"}
+	//channels := []string{"status-chinese"}
+	channels := []string{"status", "status-chinese", "crypto", "support", "markets"}
 	chats := make([]Chat, len(channels))
-	for i := 0; i < len(chats); i++ {
-		chats[i] = CreatePublicChat(channels[i], &testTimeSource{})
-		err = api.SaveChat(context.TODO(), &chats[i])
+	j := int(rand.Float64() * float64(len(channels)))
+	//for i := 0; i < len(chats); i++ {
+	for i := 0; i < 1; i++ {
+		//chats[i] = CreatePublicChat(channels[i], &testTimeSource{})
+		chats[j] = CreatePublicChat(channels[j], &testTimeSource{})
+		//err = api.SaveChat(context.TODO(), &chats[i])
+		err = api.SaveChat(context.TODO(), &chats[j])
 		if err != nil {
 			spamLogger.Error("Failed to SaveChat", "error", err)
 			return
 		}
-		message := buildTestMessage(chats[i])
-		for i := 0; i < 1; i++ {
-			_, err := api.SendChatMessage(context.TODO(), message)
+
+		//err = api.Join(chats[i])
+		//if err != nil {
+		//	spamLogger.Error("Failed to join chat", "error", err)
+		//	return
+		//}
+
+		//resp, err := api.ChatMessages(chats[i].ID,"",20)
+		//if err != nil {
+		//	spamLogger.Error("Failed to ChatMessages", "error", err)
+		//	return
+		//}
+		//fmt.Println("ChatMessages response =>",resp)
+		//chat := chats[i]
+		chat := chats[j]
+		for i := 0; i < *times; i++ {
+			_, err := api.SendChatMessage(context.TODO(), buildTestMessage(chat))
 			if err != nil {
 				spamLogger.Error("Failed to StartMessenger", "error", err)
 				return
@@ -295,9 +344,14 @@ func main() {
 			//fmt.Println("SendChatMessage response => ",resp)
 		}
 
-		fmt.Println("done channel:", channels[i])
+		//fmt.Println("done channel:", channels[i])
+		fmt.Println("done channel:", channels[j])
 	}
 
+	//time.Sleep(time.Duration(*sleepSecond)*time.Second)
+	s := int(rand.Float64() * 10)
+	fmt.Printf("sleep for %d minutes.\n", s)
+	time.Sleep(time.Duration(s) * time.Minute)
 	//gethNode := statusNode.GethNode()
 	//if gethNode != nil {
 	//	// wait till node has been stopped
@@ -317,8 +371,9 @@ func (t *testTimeSource) GetCurrentTime() uint64 {
 func buildTestMessage(chat Chat) *Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
 	message := &Message{}
-	//message.Text = "for the inefficient of status team>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-	message.Text = "hi"
+	//message.Text = *spamMessage
+	//message.Text = fmt.Sprintf("%s | %.16f", *spamMessage, rand.Float64())
+	message.Text = generateMessage()
 	message.ChatId = chat.ID
 	message.Clock = clock
 	message.Timestamp = timestamp
