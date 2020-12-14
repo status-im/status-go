@@ -39,4 +39,6 @@ type Transport interface {
 	LoadKeyFilters(*ecdsa.PrivateKey) (*Filter, error)
 	ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error)
 	RetrieveRawAll() (map[Filter][]*types.Message, error)
+
+	SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) error
 }

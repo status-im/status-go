@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"os"
 	"reflect"
@@ -41,6 +42,9 @@ import (
 const PubKeyStringLength = 132
 
 const transactionSentTxt = "Transaction sent"
+
+const emojiResendMinDelay = 30
+const emojiResendMaxCount = 3
 
 // Messenger is a entity managing chats and messages.
 // It acts as a bridge between the application and encryption
@@ -86,6 +90,45 @@ type RawResponse struct {
 type dbConfig struct {
 	dbPath string
 	dbKey  string
+}
+
+type EnvelopeEventsInterceptor struct {
+	EnvelopeEventsHandler transport.EnvelopeEventsHandler
+	Messenger             *Messenger
+}
+
+// EnvelopeSent triggered when envelope delivered at least to 1 peer.
+func (interceptor EnvelopeEventsInterceptor) EnvelopeSent(identifiers [][]byte) {
+	if interceptor.Messenger != nil {
+		var ids []string
+		for _, identifierBytes := range identifiers {
+			ids = append(ids, types.EncodeHex(identifierBytes))
+		}
+
+		err := interceptor.Messenger.processSentMessages(ids)
+		if err != nil {
+			interceptor.Messenger.logger.Info("Messenger failed to process sent messages", zap.Error(err))
+		}
+	}
+	interceptor.EnvelopeEventsHandler.EnvelopeSent(identifiers)
+}
+
+// EnvelopeExpired triggered when envelope is expired but wasn't delivered to any peer.
+func (interceptor EnvelopeEventsInterceptor) EnvelopeExpired(identifiers [][]byte, err error) {
+	//we don't track expired events in Messenger, so just redirect to handler
+	interceptor.EnvelopeEventsHandler.EnvelopeExpired(identifiers, err)
+}
+
+// MailServerRequestCompleted triggered when the mailserver sends a message to notify that the request has been completed
+func (interceptor EnvelopeEventsInterceptor) MailServerRequestCompleted(requestID types.Hash, lastEnvelopeHash types.Hash, cursor []byte, err error) {
+	//we don't track mailserver requests in Messenger, so just redirect to handler
+	interceptor.EnvelopeEventsHandler.MailServerRequestCompleted(requestID, lastEnvelopeHash, cursor, err)
+}
+
+// MailServerRequestExpired triggered when the mailserver request expires
+func (interceptor EnvelopeEventsInterceptor) MailServerRequestExpired(hash types.Hash) {
+	//we don't track mailserver requests in Messenger, so just redirect to handler
+	interceptor.EnvelopeEventsHandler.MailServerRequestExpired(hash)
 }
 
 func NewMessenger(
@@ -248,9 +291,85 @@ func NewMessenger(
 		logger: logger,
 	}
 
-	logger.Debug("messages persistence", zap.Bool("enabled", c.messagesPersistenceEnabled))
+	if c.envelopesMonitorConfig != nil {
+		interceptor := EnvelopeEventsInterceptor{c.envelopesMonitorConfig.EnvelopeEventsHandler, messenger}
+		err := messenger.transport.SetEnvelopeEventsHandler(interceptor)
+		if err != nil {
+			logger.Info("Unable to set envelopes event handler", zap.Error(err))
+		}
+	}
 
+	logger.Debug("messages persistence", zap.Bool("enabled", c.messagesPersistenceEnabled))
 	return messenger, nil
+}
+
+func (m *Messenger) processSentMessages(ids []string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for _, id := range ids {
+		rawMessage, err := m.persistence.RawMessageByID(id)
+		if err != nil {
+			return errors.Wrapf(err, "Can't get raw message with id %v", id)
+		}
+
+		rawMessage.Sent = true
+
+		err = m.persistence.SaveRawMessage(rawMessage)
+		if err != nil {
+			return errors.Wrapf(err, "Can't save raw message marked as sent")
+		}
+	}
+
+	return nil
+}
+
+func shouldResendEmojiReaction(message *common.RawMessage, t TimeSource) (bool, error) {
+	if message.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION {
+		return false, errors.New("Should resend only emoji reactions")
+	}
+
+	if message.Sent {
+		return false, errors.New("Should resend only non-sent messages")
+	}
+
+	if message.SendCount > emojiResendMaxCount {
+		return false, nil
+	}
+
+	//exponential backoff depends on how many attempts to send message already made
+	backoff := uint64(math.Pow(2, float64(message.SendCount-1))) * emojiResendMinDelay * uint64(time.Second)
+	backoffElapsed := t.GetCurrentTime() > (message.LastSent + backoff)
+	return backoffElapsed, nil
+}
+
+func (m *Messenger) resendExpiredEmojiReactions() error {
+	ids, err := m.persistence.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
+	if err != nil {
+		return errors.Wrapf(err, "Can't get expired reactions from db")
+	}
+
+	for _, id := range ids {
+		rawMessage, err := m.persistence.RawMessageByID(id)
+		if err != nil {
+			return errors.Wrapf(err, "Can't get raw message with id %v", id)
+		}
+
+		if ok, err := shouldResendEmojiReaction(rawMessage, m.getTimesource()); ok {
+			err = m.persistence.SaveRawMessage(rawMessage)
+			if err != nil {
+				return errors.Wrapf(err, "Can't save raw message marked as non-expired")
+			}
+
+			err = m.reSendRawMessage(context.Background(), rawMessage.ID)
+			if err != nil {
+				return errors.Wrapf(err, "Can't resend expired message with id %v", rawMessage.ID)
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *Messenger) Start() error {
@@ -288,6 +407,7 @@ func (m *Messenger) Start() error {
 	m.handleEncryptionLayerSubscriptions(subscriptions)
 	m.handleConnectionChange(m.online())
 	m.watchConnectionChange()
+	m.watchExpiredEmojis()
 	return nil
 }
 
@@ -297,7 +417,6 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Online()
 		}
-
 	} else {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Offline()
@@ -426,9 +545,27 @@ func (m *Messenger) watchConnectionChange() {
 			case <-m.quit:
 				return
 			}
-
 		}
+	}()
+}
 
+// watchExpiredEmojis regularly checks for expired emojis and invoke their resending
+func (m *Messenger) watchExpiredEmojis() {
+	m.logger.Debug("watching expired emojis")
+	go func() {
+		for {
+			select {
+			case <-time.After(time.Second):
+				if m.online() {
+					err := m.resendExpiredEmojiReactions()
+					if err != nil {
+						m.logger.Debug("Error when resending expired emoji reactions", zap.Error(err))
+					}
+				}
+			case <-m.quit:
+				return
+			}
+		}
 	}()
 }
 
@@ -1545,11 +1682,8 @@ func (m *Messenger) GetContactByID(pubKey string) *Contact {
 	return m.allContacts[pubKey]
 }
 
-// ReSendChatMessage pulls a message from the database and sends it again
-func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
+// pull a message from the database and send it again
+func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) error {
 	message, err := m.persistence.RawMessageByID(messageID)
 	if err != nil {
 		return err
@@ -1566,8 +1700,17 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 		MessageType:         message.MessageType,
 		Recipients:          message.Recipients,
 		ResendAutomatically: message.ResendAutomatically,
+		SendCount:           message.SendCount,
 	})
 	return err
+}
+
+// ReSendChatMessage pulls a message from the database and sends it again
+func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.reSendRawMessage(ctx, messageID)
 }
 
 func (m *Messenger) hasPairedDevices() bool {
@@ -1691,6 +1834,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 	}
 	spec.ID = types.EncodeHex(id)
 	spec.SendCount++
+	spec.LastSent = m.getTimesource().GetCurrentTime()
 	err = m.persistence.SaveRawMessage(&spec)
 	if err != nil {
 		return nil, err
@@ -3517,10 +3661,6 @@ func (m *Messenger) getTimesource() TimeSource {
 	return m.transport
 }
 
-func (m *Messenger) Timesource() TimeSource {
-	return m.getTimesource()
-}
-
 // AddPushNotificationsServer adds a push notification server
 func (m *Messenger) AddPushNotificationsServer(ctx context.Context, publicKey *ecdsa.PublicKey, serverType pushnotificationclient.ServerType) error {
 	if m.pushNotificationClient == nil {
@@ -3748,7 +3888,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 
 	err = m.persistence.SaveEmojiReaction(emojiR)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Can't save emoji reaction in db")
 	}
 
 	return &response, nil

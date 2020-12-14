@@ -383,3 +383,11 @@ func (a *Transport) waitForRequestCompleted(ctx context.Context, requestID []byt
 		}
 	}
 }
+
+func (a *Transport) SetEnvelopeEventsHandler(handler transport.EnvelopeEventsHandler) error {
+	if a.envelopesMonitor == nil {
+		return errors.New("Current transport has no envelopes monitor")
+	}
+	a.envelopesMonitor.handler = handler
+	return nil
+}
