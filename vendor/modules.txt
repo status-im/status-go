@@ -191,6 +191,8 @@ github.com/jbenet/goprocess/periodic
 github.com/jinzhu/copier
 # github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9
 github.com/karalabe/usb
+# github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
+github.com/keighl/metabolize
 # github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
 github.com/kilic/bls12-381
 # github.com/koron/go-ssdp v0.0.0-20191105050749-2e1c40ed0b5d

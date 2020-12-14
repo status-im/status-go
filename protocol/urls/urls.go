@@ -3,6 +3,7 @@ package urls
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/keighl/metabolize"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,9 +16,9 @@ type OembedData struct {
 }
 
 type LinkPreviewData struct {
-	Site         string `json:"site"`
-	Title        string `json:"title"`
-	ThumbnailURL string `json:"thumbnailUrl"`
+	Site         string `json:"site" meta:"og:site_name"`
+	Title        string `json:"title" meta:"og:title"`
+	ThumbnailURL string `json:"thumbnailUrl" meta:"og:image"`
 }
 
 type Site struct {
@@ -36,6 +37,10 @@ func LinkPreviewWhitelist() []Site {
 		Site{
 			Title:   "YouTube shortener",
 			Address: "youtu.be",
+		},
+		Site{
+			Title:   "GitHub",
+			Address: "github.com",
 		},
 	}
 }
@@ -80,6 +85,21 @@ func GetYoutubePreviewData(link string) (previewData LinkPreviewData, err error)
 	return previewData, nil
 }
 
+func GetGithubPreviewData(link string) (previewData LinkPreviewData, err error) {
+	res, err := http.Get(link)
+
+	if err != nil {
+		return previewData, fmt.Errorf("Can't get content from link %s", link)
+	}
+
+	err = metabolize.Metabolize(res.Body, &previewData)
+	if err != nil {
+		return previewData, fmt.Errorf("Can't get meta info from link %s", link)
+	}
+
+	return previewData, nil
+}
+
 func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 
 	url, err := url.Parse(link)
@@ -90,6 +110,8 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	switch url.Hostname() {
 	case "youtube.com", "www.youtube.com", "youtu.be":
 		return GetYoutubePreviewData(link)
+	case "github.com":
+		return GetGithubPreviewData(link)
 	}
 
 	return previewData, fmt.Errorf("Link %s isn't whitelisted. Hostname - %s", link, url.Hostname())

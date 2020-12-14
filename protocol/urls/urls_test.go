@@ -1,9 +1,8 @@
 package urls
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestGetLinkPreviewData(t *testing.T) {
@@ -28,5 +27,17 @@ func TestGetLinkPreviewData(t *testing.T) {
 
 	_, err = GetLinkPreviewData("https://www.test.com/unknown")
 	require.Error(t, err)
+
+	metabolize := LinkPreviewData{
+		Site:         "GitHub",
+		Title:        "qfrank/metabolize",
+		ThumbnailURL: "https://avatars3.githubusercontent.com/u/12406719?s=400&v=4",
+	}
+
+	previewData, err = GetLinkPreviewData("https://github.com/qfrank/metabolize")
+	require.NoError(t, err)
+	require.Equal(t, metabolize.Site, previewData.Site)
+	require.Equal(t, metabolize.Title, previewData.Title)
+	require.Equal(t, metabolize.ThumbnailURL, previewData.ThumbnailURL)
 
 }
