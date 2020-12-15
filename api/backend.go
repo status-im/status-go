@@ -45,7 +45,6 @@ type StatusBackend interface {
 	ConnectionChange(typ string, expensive bool)
 	AppStateChange(state string)
 
-	InjectChatAccount(chatKeyHex, encryptionKeyHex string) error // NOTE: Only used in lib and in tests
 	ExtractGroupMembershipSignatures(signaturePairs [][2]string) ([]string, error)
 	SignGroupMembership(content string) (string, error)
 }

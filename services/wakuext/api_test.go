@@ -135,7 +135,7 @@ func TestInitProtocol(t *testing.T) {
 	multiAccounts, err := multiaccounts.InitializeDB(tmpfile.Name())
 	require.NoError(t, err)
 
-	acc := &multiaccounts.Account{ KeyUID: "0xdeadbeef" }
+	acc := &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	err = service.InitProtocol(privateKey, sqlDB, multiAccounts, acc, zap.NewNop())
 	require.NoError(t, err)
@@ -198,7 +198,7 @@ func (s *ShhExtSuite) createAndAddNode() {
 	privateKey, err := crypto.GenerateKey()
 	s.NoError(err)
 
-	acc := &multiaccounts.Account{ KeyUID: "0xdeadbeef" }
+	acc := &multiaccounts.Account{KeyUID: "0xdeadbeef"}
 
 	err = service.InitProtocol(privateKey, sqlDB, multiAccounts, acc, zap.NewNop())
 	s.NoError(err)

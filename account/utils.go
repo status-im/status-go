@@ -16,10 +16,10 @@ var (
 )
 
 type LoginParams struct {
-	ChatAddress    types.Address         `json:"chatAddress"`
-	Password       string                `json:"password"`
-	MainAccount    types.Address         `json:"mainAccount"`
-	WatchAddresses []types.Address       `json:"watchAddresses"`
+	ChatAddress    types.Address          `json:"chatAddress"`
+	Password       string                 `json:"password"`
+	MainAccount    types.Address          `json:"mainAccount"`
+	WatchAddresses []types.Address        `json:"watchAddresses"`
 	MultiAccount   *multiaccounts.Account `json:"multiAccount"`
 }
 

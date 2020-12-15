@@ -4,8 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"github.com/status-im/status-go/account/generator"
 	"testing"
+
+	"github.com/status-im/status-go/account/generator"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/suite"
