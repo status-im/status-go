@@ -161,7 +161,7 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 	}
 
 	seedTestDBWithIdentityImages(t, db, keyUID)
-	seedTestDBWithIdentityImages(t, db, keyUID2 + "3")
+	seedTestDBWithIdentityImages(t, db, keyUID2+"3")
 
 	err := db.UpdateAccountTimestamp(keyUID, 100)
 	require.NoError(t, err)
@@ -171,8 +171,8 @@ func TestDatabase_GetAccountsWithIdentityImages(t *testing.T) {
 	accs, err := db.GetAccounts()
 	require.NoError(t, err)
 
-	accJson, err := json.Marshal(accs)
+	accJSON, err := json.Marshal(accs)
 	require.NoError(t, err)
 
-	require.Exactly(t, expected, string(accJson))
+	require.Exactly(t, expected, string(accJSON))
 }

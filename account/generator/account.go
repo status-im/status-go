@@ -76,8 +76,8 @@ type IdentifiedAccountInfo struct {
 
 func (iai *IdentifiedAccountInfo) ToMultiAccount() *multiaccounts.Account {
 	return &multiaccounts.Account{
-		Timestamp:      time.Now().Unix(),
-		KeyUID:         iai.KeyUID,
+		Timestamp: time.Now().Unix(),
+		KeyUID:    iai.KeyUID,
 	}
 }
 
