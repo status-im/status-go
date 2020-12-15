@@ -82,7 +82,8 @@ func (m *Manager) CreateAccount(password string) (generator.GeneratedAccountInfo
 		return mkInfo, info, "", fmt.Errorf("can not create master extended key: %v", err)
 	}
 
-	mkInfo = generator.GeneratedAccountInfoFromExtKey(mnemonic, extKey)
+	acc := generator.NewAccount(nil, extKey)
+	mkInfo = acc.ToGeneratedAccountInfo("", mnemonic)
 
 	// import created key into account keystore
 	info.WalletAddress, info.WalletPubKey, err = m.importExtendedKey(extkeys.KeyPurposeWallet, extKey, password)
