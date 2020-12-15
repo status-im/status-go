@@ -928,23 +928,6 @@ func (b *nimbusStatusBackend) injectAccountIntoServices() error {
 //	)
 // }
 
-// InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.
-// TODO: change the interface and omit the last argument.
-func (b *nimbusStatusBackend) InjectChatAccount(chatKeyHex, _ string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.accountManager.Logout()
-
-	chatKey, err := crypto.HexToECDSA(chatKeyHex)
-	if err != nil {
-		return err
-	}
-	b.accountManager.SetChatAccount(chatKey)
-
-	return b.injectAccountIntoServices()
-}
-
 func appendIf(condition bool, services []nimbussvc.ServiceConstructor, service nimbussvc.ServiceConstructor) []nimbussvc.ServiceConstructor {
 	if !condition {
 		return services

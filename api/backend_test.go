@@ -5,13 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/account/generator"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/status-im/status-go/account/generator"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,8 +185,8 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	count := 3
 	type AccountData struct {
 		MasterAccount generator.GeneratedAccountInfo
-		AccountInfo account.Info
-		Password string
+		AccountInfo   account.Info
+		Password      string
 	}
 	addressCh := make(chan AccountData, count) // use buffered channel to avoid blocking
 
@@ -210,9 +211,9 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func(accountData AccountData) {
 			loginParams := account.LoginParams{
-				MainAccount: types.HexToAddress(accountData.AccountInfo.WalletAddress),
-				ChatAddress: types.HexToAddress(accountData.AccountInfo.ChatAddress),
-				Password:    accountData.Password,
+				MainAccount:  types.HexToAddress(accountData.AccountInfo.WalletAddress),
+				ChatAddress:  types.HexToAddress(accountData.AccountInfo.ChatAddress),
+				Password:     accountData.Password,
 				MultiAccount: accountData.MasterAccount.ToMultiAccount(),
 			}
 			assert.NoError(t, backend.SelectAccount(loginParams))
@@ -227,53 +228,6 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	}
 
 	wg.Wait()
-}
-
-func TestBackendInjectChatAccount(t *testing.T) {
-	utils.Init()
-
-	backend := NewGethStatusBackend()
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-	err = backend.StartNode(config)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, backend.StopNode())
-	}()
-
-	backend.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
-
-	chatPrivKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-	encryptionPrivKey, err := gethcrypto.GenerateKey()
-	require.NoError(t, err)
-
-	chatPrivKeyHex := hex.EncodeToString(gethcrypto.FromECDSA(chatPrivKey))
-	chatPubKeyHex := types.EncodeHex(gethcrypto.FromECDSAPub(&chatPrivKey.PublicKey))
-	encryptionPrivKeyHex := hex.EncodeToString(gethcrypto.FromECDSA(encryptionPrivKey))
-
-	whisperService, err := backend.StatusNode().WhisperService()
-	require.NoError(t, err)
-
-	// public key should not be already in whisper
-	require.False(t, whisperService.HasKeyPair(chatPubKeyHex), "identity already present in whisper")
-
-	// call InjectChatAccount
-	require.NoError(t, backend.InjectChatAccount(chatPrivKeyHex, encryptionPrivKeyHex))
-
-	// public key should now be in whisper
-	require.True(t, whisperService.HasKeyPair(chatPubKeyHex), "identity not injected into whisper")
-
-	// wallet account should not be selected
-	mainAccountAddress, err := backend.AccountManager().MainAccountAddress()
-	require.Equal(t, types.Address{}, mainAccountAddress)
-	require.Equal(t, account.ErrNoAccountSelected, err)
-
-	// selected chat account should have the key injected previously
-	chatAcc, err := backend.AccountManager().SelectedChatAccount()
-	require.Nil(t, err)
-	require.Equal(t, chatPrivKey, chatAcc.AccountKey.PrivateKey)
 }
 
 func TestBackendConnectionChangesConcurrently(t *testing.T) {
@@ -440,48 +394,6 @@ func TestStartStopMultipleTimes(t *testing.T) {
 	require.NoError(t, backend.StopNode())
 	require.NoError(t, backend.StartNode(config))
 	require.NoError(t, backend.StopNode())
-}
-
-func TestSignHash(t *testing.T) {
-	utils.Init()
-
-	backend := NewGethStatusBackend()
-	config, err := utils.MakeTestNodeConfig(params.StatusChainNetworkID)
-	require.NoError(t, err)
-	require.NoError(t, backend.AccountManager().InitKeystore(config.KeyStoreDir))
-
-	require.NoError(t, backend.StartNode(config))
-	defer func() {
-		require.NoError(t, backend.StopNode())
-	}()
-
-	backend.account = &multiaccounts.Account{KeyUID: "0xdeadbeef"}
-
-	var testCases = []struct {
-		name                 string
-		chatPrivKeyHex       string
-		hashHex              string
-		expectedSignatureHex string
-	}{
-		{
-			name:                 "tc1",
-			chatPrivKeyHex:       "facadefacadefacadefacadefacadefacadefacadefacadefacadefacadefaca",
-			hashHex:              "0xa4735de5193362fe856416000105cdfa6ce56265607311cebae93b26e5adf438",
-			expectedSignatureHex: "0x176c971bae188c663614fc535ac9dbf62871dfeaadb38645809a510d28b3c4b0245415d5547c1b27f7cfea3341564f9c6981421144d3606b455346be69bd078c01",
-		},
-	}
-
-	const dummyEncKey = "facadefacadefacadefacadefacadefacadefacadefacadefacadefacadefaca"
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.NoError(t, backend.InjectChatAccount(tc.chatPrivKeyHex, dummyEncKey))
-
-			signature, err := backend.SignHash(tc.hashHex)
-			require.NoError(t, err)
-			require.Equal(t, signature, tc.expectedSignatureHex)
-		})
-	}
 }
 
 func TestHashTypedData(t *testing.T) {
