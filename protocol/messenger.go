@@ -2413,7 +2413,6 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 		Clock:         clock,
 		Id:            contact.ID,
 		EnsName:       contact.Name,
-		ProfileImage:  contact.Photo,
 		LocalNickname: contact.LocalNickname,
 	}
 	encodedMessage, err := proto.Marshal(syncMessage)

@@ -671,6 +671,54 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	require.Nil(t, actualHash2)
 }
 
+func TestSaveContactIdentityImage(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+
+	err = p.SaveContact(&Contact{ID: contactID}, nil)
+	require.NoError(t, err)
+
+	jpegType := []byte{0xff, 0xd8, 0xff, 0x1}
+	identityImages := make(map[string]*protobuf.IdentityImage)
+	identityImages["large"] = &protobuf.IdentityImage{
+		Payload:    jpegType,
+		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageType:  protobuf.ImageType_PNG,
+	}
+
+	identityImages["small"] = &protobuf.IdentityImage{
+		Payload:    jpegType,
+		SourceType: protobuf.IdentityImage_RAW_PAYLOAD,
+		ImageType:  protobuf.ImageType_PNG,
+	}
+
+	images := &protobuf.ChatIdentity{
+		Clock:  1,
+		Images: identityImages,
+	}
+
+	result, err := p.SaveContactChatIdentity(contactID, images)
+	require.NoError(t, err)
+	require.True(t, result)
+
+	// Save again same clock, it should return false
+	result, err = p.SaveContactChatIdentity(contactID, images)
+	require.NoError(t, err)
+	require.False(t, result)
+
+	contacts, err := p.Contacts()
+	require.NoError(t, err)
+	require.Len(t, contacts, 1)
+
+	require.Len(t, contacts[0].Images, 2)
+}
+
 func TestSaveLinks(t *testing.T) {
 	chatID := testPublicChatID
 	db, err := openTestDB()

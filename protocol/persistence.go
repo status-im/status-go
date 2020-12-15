@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -378,44 +379,50 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 }
 
 func (db sqlitePersistence) Contacts() ([]*Contact, error) {
+	allContacts := make(map[string]*Contact)
+
 	rows, err := db.db.Query(`
 		SELECT
-			id,
-			address,
-			name,
-			alias,
-			identicon,
-			photo,
-			last_updated,
-			system_tags,
-			device_info,
-			ens_verified,
-			ens_verified_at,
-			tribute_to_talk,
-			local_nickname
-		FROM contacts
+			c.id,
+			c.address,
+			c.name,
+			c.alias,
+			c.identicon,
+			c.last_updated,
+			c.system_tags,
+			c.device_info,
+			c.ens_verified,
+			c.ens_verified_at,
+			c.tribute_to_talk,
+			c.local_nickname,
+			i.image_type,
+			i.payload
+		FROM contacts c LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id
 	`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var response []*Contact
-
 	for rows.Next() {
+
 		var (
 			contact           Contact
 			encodedDeviceInfo []byte
 			encodedSystemTags []byte
 			nickname          sql.NullString
+			imageType         sql.NullString
+			imagePayload      []byte
 		)
+
+		contact.Images = make(map[string]images.IdentityImage)
+
 		err := rows.Scan(
 			&contact.ID,
 			&contact.Address,
 			&contact.Name,
 			&contact.Alias,
 			&contact.Identicon,
-			&contact.Photo,
 			&contact.LastUpdated,
 			&encodedSystemTags,
 			&encodedDeviceInfo,
@@ -423,6 +430,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.ENSVerifiedAt,
 			&contact.TributeToTalk,
 			&nickname,
+			&imageType,
+			&imagePayload,
 		)
 		if err != nil {
 			return nil, err
@@ -448,10 +457,87 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			}
 		}
 
-		response = append(response, &contact)
+		previousContact, ok := allContacts[contact.ID]
+		if !ok {
+
+			if imageType.Valid {
+				contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
+			}
+
+			allContacts[contact.ID] = &contact
+
+		} else if imageType.Valid {
+			previousContact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
+			allContacts[contact.ID] = previousContact
+
+		}
 	}
 
+	var response []*Contact
+	for key := range allContacts {
+		response = append(response, allContacts[key])
+
+	}
 	return response, nil
+}
+
+func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdentity *protobuf.ChatIdentity) (updated bool, err error) {
+	if chatIdentity.Clock == 0 {
+		return false, errors.New("clock value unset")
+	}
+
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	for imageType, image := range chatIdentity.Images {
+		var exists bool
+		err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_identity_contacts WHERE contact_id = ? AND image_type = ? AND clock_value >= ?)`, contactID, imageType, chatIdentity.Clock).Scan(&exists)
+		if err != nil {
+			return false, err
+		}
+
+		if exists {
+			continue
+		}
+
+		stmt, err := tx.Prepare(`INSERT INTO chat_identity_contacts (contact_id, image_type, clock_value, payload) VALUES (?, ?, ?, ?)`)
+		if err != nil {
+			return false, err
+		}
+		defer stmt.Close()
+		if image.Payload == nil {
+			continue
+		}
+
+		// Validate image URI to make sure it's serializable
+		_, err = images.GetPayloadDataURI(image.Payload)
+		if err != nil {
+			return false, err
+		}
+
+		_, err = stmt.Exec(
+			contactID,
+			imageType,
+			chatIdentity.Clock,
+			image.Payload,
+		)
+		if err != nil {
+			return false, err
+		}
+		updated = true
+	}
+
+	return
 }
 
 func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
@@ -649,15 +735,15 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 			name,
 			alias,
 			identicon,
-			photo,
 			last_updated,
 			system_tags,
 			device_info,
 			ens_verified,
 			ens_verified_at,
 			tribute_to_talk,
-			local_nickname
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
+			local_nickname,
+			photo
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?)
 	`)
 	if err != nil {
 		return
@@ -670,7 +756,6 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.Name,
 		contact.Alias,
 		contact.Identicon,
-		contact.Photo,
 		contact.LastUpdated,
 		encodedSystemTags.Bytes(),
 		encodedDeviceInfo.Bytes(),
@@ -678,6 +763,9 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		contact.ENSVerifiedAt,
 		contact.TributeToTalk,
 		contact.LocalNickname,
+		// Photo is not used anymore but constrained to be NOT NULL
+		// we set it to blank for now to avoid a migration of the table
+		"",
 	)
 	return
 }

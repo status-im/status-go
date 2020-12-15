@@ -6,6 +6,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/identity/alias"
 	"github.com/status-im/status-go/protocol/identity/identicon"
 )
@@ -28,7 +29,6 @@ type ContactDeviceInfo struct {
 
 // Contact has information about a "Contact". A contact is not necessarily one
 // that we added or added us, that's based on SystemTags.
-// TODO remove use of photoPath in Contact{}
 type Contact struct {
 	// ID of the contact. It's a hex-encoded public key (prefixed with 0x).
 	ID string `json:"id"`
@@ -49,8 +49,6 @@ type Contact struct {
 	Alias string `json:"alias,omitempty"`
 	// Identicon generated from public key
 	Identicon string `json:"identicon"`
-	// Photo is the base64 encoded photo
-	Photo string `json:"photoPath,omitempty"`
 	// LastUpdated is the last time we received an update from the contact
 	// updates should be discarded if last updated is less than the one stored
 	LastUpdated uint64 `json:"lastUpdated"`
@@ -61,6 +59,8 @@ type Contact struct {
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
 	TributeToTalk string              `json:"tributeToTalk,omitempty"`
 	LocalNickname string              `json:"localNickname,omitempty"`
+
+	Images map[string]images.IdentityImage `json:"images"`
 }
 
 func (c Contact) PublicKey() (*ecdsa.PublicKey, error) {

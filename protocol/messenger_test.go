@@ -631,7 +631,6 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	blockedContact := Contact{
 		ID:            publicKeyHex,
 		Name:          "contact-name",
-		Photo:         "contact-photo",
 		LastUpdated:   20,
 		SystemTags:    []string{contactBlocked},
 		TributeToTalk: "talk",
@@ -1192,7 +1191,6 @@ func (s *MessengerSuite) TestBlockContact() {
 	contact := Contact{
 		ID:          testPK,
 		Name:        "contact-name",
-		Photo:       "contact-photo",
 		LastUpdated: 20,
 		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
@@ -1375,7 +1373,6 @@ func (s *MessengerSuite) TestContactPersistence() {
 		ID: testPK,
 
 		Name:        "contact-name",
-		Photo:       "contact-photo",
 		LastUpdated: 20,
 		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{
@@ -1410,7 +1407,6 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 	contact := Contact{
 		ID:          contactID,
 		Name:        "contact-name",
-		Photo:       "contact-photo",
 		LastUpdated: 20,
 		SystemTags:  []string{contactAdded, contactRequestReceived},
 		DeviceInfo: []ContactDeviceInfo{

@@ -157,20 +157,13 @@ func (db *Database) GetIdentityImages(keyUID string) ([]*images.IdentityImage, e
 }
 
 func (db *Database) GetIdentityImage(keyUID, it string) (*images.IdentityImage, error) {
-	rows, err := db.db.Query("SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ? AND name = ?", keyUID, it)
-	if err != nil {
+	var ii images.IdentityImage
+	err := db.db.QueryRow("SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ? AND name = ?", keyUID, it).Scan(&ii.KeyUID, &ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var ii images.IdentityImage
-	for rows.Next() {
-		err = rows.Scan(&ii.KeyUID, &ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return &ii, nil
 }
 
