@@ -332,7 +332,7 @@ github.com/multiformats/go-multistream
 github.com/multiformats/go-varint
 # github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
 github.com/mutecomm/go-sqlcipher
-# github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+# github.com/nfnt/resize v0.0.0-00010101000000-000000000000 => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 github.com/nfnt/resize
 # github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 github.com/okzk/sdnotify
