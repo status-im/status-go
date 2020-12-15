@@ -118,7 +118,7 @@ func TestDatabase_GetIdentityImage(t *testing.T) {
 		{
 			keyUID2,
 			images.LargeDimName,
-			`{"keyUid":"","type":"","uri":"","width":0,"height":0,"fileSize":0,"resizeTarget":0}`,
+			"null",
 		},
 	}
 
