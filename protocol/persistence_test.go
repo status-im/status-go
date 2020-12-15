@@ -378,6 +378,77 @@ func TestUpdateMessageOutgoingStatus(t *testing.T) {
 	require.Equal(t, "new-status", m.OutgoingStatus)
 }
 
+func TestMessagesIDsByType(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	ids, err := p.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+
+	err = p.SaveRawMessage(minimalRawMessage("chat-message-id", protobuf.ApplicationMetadataMessage_CHAT_MESSAGE))
+	require.NoError(t, err)
+	ids, err = p.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ids))
+	require.Equal(t, "chat-message-id", ids[0])
+
+	ids, err = p.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+
+	err = p.SaveRawMessage(minimalRawMessage("emoji-message-id", protobuf.ApplicationMetadataMessage_EMOJI_REACTION))
+	require.NoError(t, err)
+	ids, err = p.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ids))
+	require.Equal(t, "emoji-message-id", ids[0])
+}
+
+func TestExpiredEmojiReactionsIDs(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	ids, err := p.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+
+	//save expired chat message
+	rawChatMessage := minimalRawMessage("chat-message-id", protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	rawChatMessage.Sent = false
+	err = p.SaveRawMessage(rawChatMessage)
+	require.NoError(t, err)
+
+	//make sure it doesn't apper in an expired emoji reactions list
+	ids, err = p.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
+	require.NoError(t, err)
+	require.Empty(t, ids)
+
+	//save expired emoji message
+	rawEmojiReaction := minimalRawMessage("emoji-message-id", protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+	rawEmojiReaction.Sent = false
+	err = p.SaveRawMessage(rawEmojiReaction)
+	require.NoError(t, err)
+
+	//make sure it appered in expired emoji reactions list
+	ids, err = p.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ids))
+
+	//save non-expired emoji reaction
+	rawEmojiReaction2 := minimalRawMessage("emoji-message-id2", protobuf.ApplicationMetadataMessage_EMOJI_REACTION)
+	rawEmojiReaction2.Sent = true
+	err = p.SaveRawMessage(rawEmojiReaction2)
+	require.NoError(t, err)
+
+	//make sure it didn't appear in expired emoji reactions list
+	ids, err = p.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(ids))
+}
+
 func TestPersistenceEmojiReactions(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
@@ -494,6 +565,14 @@ func insertMinimalMessage(p sqlitePersistence, id string) error {
 		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
 		From:        "me",
 	}})
+}
+
+func minimalRawMessage(id string, messageType protobuf.ApplicationMetadataMessage_Type) *common.RawMessage {
+	return &common.RawMessage{
+		ID:          id,
+		LocalChatID: "test-chat",
+		MessageType: messageType,
+	}
 }
 
 // Regression test making sure that if audio_duration_ms is null, no error is thrown

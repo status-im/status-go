@@ -11,6 +11,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/protobuf"
 )
 
 var (
@@ -478,7 +479,7 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		   resend_automatically,
 		   recipients,
 		   skip_encryption,
-		   send_push_notification,
+			 send_push_notification,
 		   payload
 		)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -512,7 +513,7 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 			  resend_automatically,
 			  recipients,
 			  skip_encryption,
-			  send_push_notification,
+				send_push_notification,
 			  payload
 			FROM
 				raw_messages
@@ -551,6 +552,60 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 	}
 
 	return message, nil
+}
+
+func (db sqlitePersistence) RawMessagesIDsByType(t protobuf.ApplicationMetadataMessage_Type) ([]string, error) {
+	ids := []string{}
+
+	rows, err := db.db.Query(`
+			SELECT
+			  id
+			FROM
+				raw_messages
+			WHERE
+			message_type = ?`,
+		t)
+	if err != nil {
+		return ids, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return ids, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
+}
+
+func (db sqlitePersistence) ExpiredEmojiReactionsIDs(maxSendCount int) ([]string, error) {
+	ids := []string{}
+
+	rows, err := db.db.Query(`
+			SELECT
+			  id
+			FROM
+				raw_messages
+			WHERE
+			message_type = ? AND sent = ? AND send_count <= ?`,
+		protobuf.ApplicationMetadataMessage_EMOJI_REACTION, false, maxSendCount)
+	if err != nil {
+		return ids, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return ids, err
+		}
+		ids = append(ids, id)
+	}
+
+	return ids, nil
 }
 
 func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error) {
