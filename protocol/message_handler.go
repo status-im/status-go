@@ -237,7 +237,6 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 			contact.Name = message.EnsName
 			contact.ENSVerified = false
 		}
-		contact.Photo = message.ProfileImage
 		contact.LastUpdated = message.Clock
 		contact.LocalNickname = message.LocalNickname
 
@@ -286,7 +285,6 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 			contact.Name = message.EnsName
 			contact.ENSVerified = false
 		}
-		contact.Photo = message.ProfileImage
 		contact.LastUpdated = message.Clock
 		state.ModifiedContacts[contact.ID] = true
 		state.AllContacts[contact.ID] = contact
@@ -807,72 +805,23 @@ func (m *MessageHandler) HandleGroupChatInvitation(state *ReceivedMessageState, 
 func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.ChatIdentity) error {
 	logger := m.logger.With(zap.String("site", "HandleChatIdentity"))
 	contact := state.CurrentMessageState.Contact
-	chat, ok := state.AllChats[contact.ID]
-	if !ok {
-		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
 
 	logger.Info("Handling contact update")
+	newImages, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
+	if err != nil {
+		return err
+	}
+	if newImages {
+		for imageType, image := range ci.Images {
+			if contact.Images == nil {
+				contact.Images = make(map[string]images.IdentityImage)
+			}
+			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
 
-	// TODO investigate potential race condition where user updates this contact's details and the contact update's
-	//  clock value is just less than the ChatIdentity clock and the ChatIdentity is processed first.
-	//  In this case the contact update would not be processed
-	//
-	//  TODO Potential fix: create an ChatIdentity last updated field on the contact table.
-	logger.Info(fmt.Sprintf("Update times, contact.LastUpdated '%d', ChatIdentity.Clock '%d'", contact.LastUpdated, ci.Clock))
-	if contact.LastUpdated < ci.Clock {
-		logger.Info("Updating contact")
-		if !contact.HasBeenAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
-			contact.SystemTags = append(contact.SystemTags, contactRequestReceived)
 		}
-
-		// TODO handle ENS things
-		/* if contact.Name != message.EnsName {
-			contact.Name = message.EnsName
-			contact.ENSVerified = false
-		} */
-
-		logger.Info(fmt.Sprintf("ChatIdentity has %d images attached", len(ci.Images)))
-		if len(ci.Images) > 0 {
-			// Get the largest
-			var name string
-			var iiSize int
-			for n, ii := range ci.Images {
-				if iiSize < len(ii.Payload) {
-					iiSize = len(ii.Payload)
-					name = n
-				}
-			}
-
-			logger.Info(fmt.Sprintf("largest image : name '%s', size '%d'", name, iiSize))
-
-			if ci.Images[name] == nil {
-				logger.Info("image empty")
-				return errors.New("image empty")
-			}
-
-			dataURI, err := images.GetPayloadDataURI(ci.Images[name].Payload)
-			if err != nil {
-				return err
-			}
-			contact.Photo = dataURI
-
-			logger.Info(fmt.Sprintf("image payload '%s'", dataURI))
-		}
-
-		contact.LastUpdated = ci.Clock
 		state.ModifiedContacts[contact.ID] = true
 		state.AllContacts[contact.ID] = contact
 	}
-
-	if chat.LastClockValue < ci.Clock {
-		chat.LastClockValue = ci.Clock
-	}
-
-	state.ModifiedChats[chat.ID] = true
-	state.AllChats[chat.ID] = chat
 
 	return nil
 }

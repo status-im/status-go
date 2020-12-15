@@ -112,7 +112,6 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 
 	receivedContact := response.Contacts[0]
 	s.Require().Equal(theirName, receivedContact.Name)
-	s.Require().Equal(theirPicture, receivedContact.Photo)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
@@ -135,7 +134,6 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	receivedContact = response.Contacts[0]
 	s.Require().Equal(theirContactID, receivedContact.ID)
 	s.Require().Equal(newName, receivedContact.Name)
-	s.Require().Equal(newPicture, receivedContact.Photo)
 	s.Require().False(receivedContact.ENSVerified)
 	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
