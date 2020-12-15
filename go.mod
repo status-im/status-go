@@ -8,6 +8,8 @@ replace github.com/Sirupsen/logrus v1.4.2 => github.com/sirupsen/logrus v1.4.2
 
 replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.20190717161051-705d9623b7c1
 
+replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
+
 require (
 	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/beevik/ntp v0.2.0
@@ -15,8 +17,6 @@ require (
 	github.com/cenkalti/backoff/v3 v3.2.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
-	github.com/docker/docker v1.13.1
-	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/ethereum/go-ethereum v1.9.5
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
@@ -44,7 +44,7 @@ require (
 	github.com/multiformats/go-multibase v0.0.1
 	github.com/multiformats/go-varint v0.0.5
 	github.com/mutecomm/go-sqlcipher v0.0.0-20190227152316-55dbde17881f
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	github.com/nfnt/resize v0.0.0-00010101000000-000000000000
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/olekukonko/tablewriter v0.0.2 // indirect
 	github.com/oliamb/cutter v0.2.2
@@ -57,7 +57,6 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-ethereum v1.9.1 // indirect
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
 	github.com/status-im/migrate/v4 v4.6.2-status.2
