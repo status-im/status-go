@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
+	"github.com/status-im/status-go/account/generator"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -85,6 +86,9 @@ func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Waku, pri
 	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
 	s.Require().NoError(err)
 
+	acc := generator.NewAccount(privateKey, nil)
+	iai := acc.ToIdentifiedAccountInfo("")
+
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
@@ -92,6 +96,7 @@ func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Waku, pri
 		WithDatasync(),
 		WithPushNotifications(),
 		WithMultiAccounts(madb),
+		WithAccount(iai.ToMultiAccount()),
 	}
 	return s.newMessengerWithOptions(shh, privateKey, options)
 }
