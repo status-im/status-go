@@ -19,6 +19,10 @@ type Account struct {
 	Images         []images.IdentityImage `json:"images"`
 }
 
+type MultiAccountMarshaller interface {
+	ToMultiAccount() *Account
+}
+
 type Database struct {
 	db *sql.DB
 }

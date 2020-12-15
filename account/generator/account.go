@@ -11,12 +11,23 @@ import (
 	"github.com/status-im/status-go/multiaccounts"
 )
 
-type account struct {
+type Account struct {
 	privateKey  *ecdsa.PrivateKey
 	extendedKey *extkeys.ExtendedKey
 }
 
-func (a *account) toAccountInfo() AccountInfo {
+func NewAccount(privateKey *ecdsa.PrivateKey, extKey *extkeys.ExtendedKey) Account {
+	if privateKey == nil {
+		privateKey = extKey.ToECDSA()
+	}
+
+	return Account{
+		privateKey:  privateKey,
+		extendedKey: extKey,
+	}
+}
+
+func (a *Account) ToAccountInfo() AccountInfo {
 	publicKeyHex := types.EncodeHex(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	addressHex := crypto.PubkeyToAddress(a.privateKey.PublicKey).Hex()
 
@@ -26,8 +37,8 @@ func (a *account) toAccountInfo() AccountInfo {
 	}
 }
 
-func (a *account) toIdentifiedAccountInfo(id string) IdentifiedAccountInfo {
-	info := a.toAccountInfo()
+func (a *Account) ToIdentifiedAccountInfo(id string) IdentifiedAccountInfo {
+	info := a.ToAccountInfo()
 	keyUID := sha256.Sum256(crypto.FromECDSAPub(&a.privateKey.PublicKey))
 	keyUIDHex := types.EncodeHex(keyUID[:])
 	return IdentifiedAccountInfo{
@@ -37,8 +48,8 @@ func (a *account) toIdentifiedAccountInfo(id string) IdentifiedAccountInfo {
 	}
 }
 
-func (a *account) toGeneratedAccountInfo(id string, mnemonic string) GeneratedAccountInfo {
-	idInfo := a.toIdentifiedAccountInfo(id)
+func (a *Account) ToGeneratedAccountInfo(id string, mnemonic string) GeneratedAccountInfo {
+	idInfo := a.ToIdentifiedAccountInfo(id)
 	return GeneratedAccountInfo{
 		IdentifiedAccountInfo: idInfo,
 		Mnemonic:              mnemonic,
@@ -63,6 +74,13 @@ type IdentifiedAccountInfo struct {
 	KeyUID string `json:"keyUid"`
 }
 
+func (iai *IdentifiedAccountInfo) ToMultiAccount() *multiaccounts.Account {
+	return &multiaccounts.Account{
+		Timestamp:      time.Now().Unix(),
+		KeyUID:         iai.KeyUID,
+	}
+}
+
 // GeneratedAccountInfo contains IdentifiedAccountInfo and the mnemonic of an account.
 type GeneratedAccountInfo struct {
 	IdentifiedAccountInfo
@@ -80,20 +98,4 @@ func (a GeneratedAccountInfo) toGeneratedAndDerived(derived map[string]AccountIn
 type GeneratedAndDerivedAccountInfo struct {
 	GeneratedAccountInfo
 	Derived map[string]AccountInfo `json:"derived"`
-}
-
-func GeneratedAccountInfoFromExtKey(mnemonic string, extKey *extkeys.ExtendedKey) GeneratedAccountInfo {
-	acc := account{
-		privateKey:  extKey.ToECDSA(),
-		extendedKey: extKey,
-	}
-
-	return acc.toGeneratedAccountInfo("", mnemonic)
-}
-
-func (ga *GeneratedAccountInfo) ToMultiAccount() *multiaccounts.Account {
-	return &multiaccounts.Account{
-		Timestamp:      time.Now().Unix(),
-		KeyUID:         ga.KeyUID,
-	}
 }

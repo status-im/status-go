@@ -32,14 +32,14 @@ type AccountManager interface {
 
 type Generator struct {
 	am       AccountManager
-	accounts map[string]*account
+	accounts map[string]*Account
 	sync.Mutex
 }
 
 func New(am AccountManager) *Generator {
 	return &Generator{
 		am:       am,
-		accounts: make(map[string]*account),
+		accounts: make(map[string]*Account),
 	}
 }
 
@@ -76,13 +76,13 @@ func (g *Generator) ImportPrivateKey(privateKeyHex string) (IdentifiedAccountInf
 		return IdentifiedAccountInfo{}, err
 	}
 
-	acc := &account{
+	acc := &Account{
 		privateKey: privateKey,
 	}
 
 	id := g.addAccount(acc)
 
-	return acc.toIdentifiedAccountInfo(id), nil
+	return acc.ToIdentifiedAccountInfo(id), nil
 }
 
 func (g *Generator) ImportJSONKey(json string, password string) (IdentifiedAccountInfo, error) {
@@ -91,13 +91,13 @@ func (g *Generator) ImportJSONKey(json string, password string) (IdentifiedAccou
 		return IdentifiedAccountInfo{}, err
 	}
 
-	acc := &account{
+	acc := &Account{
 		privateKey: key.PrivateKey,
 	}
 
 	id := g.addAccount(acc)
 
-	return acc.toIdentifiedAccountInfo(id), nil
+	return acc.ToIdentifiedAccountInfo(id), nil
 }
 
 func (g *Generator) ImportMnemonic(mnemonicPhrase string, bip39Passphrase string) (GeneratedAccountInfo, error) {
@@ -107,14 +107,14 @@ func (g *Generator) ImportMnemonic(mnemonicPhrase string, bip39Passphrase string
 		return GeneratedAccountInfo{}, fmt.Errorf("can not create master extended key: %v", err)
 	}
 
-	acc := &account{
+	acc := &Account{
 		privateKey:  masterExtendedKey.ToECDSA(),
 		extendedKey: masterExtendedKey,
 	}
 
 	id := g.addAccount(acc)
 
-	return acc.toGeneratedAccountInfo(id, mnemonicPhrase), nil
+	return acc.ToGeneratedAccountInfo(id, mnemonicPhrase), nil
 }
 
 func (g *Generator) GenerateAndDeriveAddresses(mnemonicPhraseLength int, n int, bip39Passphrase string, pathStrings []string) ([]GeneratedAndDerivedAccountInfo, error) {
@@ -152,7 +152,7 @@ func (g *Generator) DeriveAddresses(accountID string, pathStrings []string) (map
 	pathAccountsInfo := make(map[string]AccountInfo)
 
 	for pathString, childAccount := range pathAccounts {
-		pathAccountsInfo[pathString] = childAccount.toAccountInfo()
+		pathAccountsInfo[pathString] = childAccount.ToAccountInfo()
 	}
 
 	return pathAccountsInfo, nil
@@ -214,18 +214,18 @@ func (g *Generator) LoadAccount(address string, password string) (IdentifiedAcco
 		return IdentifiedAccountInfo{}, err
 	}
 
-	acc := &account{
+	acc := &Account{
 		privateKey:  key.PrivateKey,
 		extendedKey: key.ExtendedKey,
 	}
 
 	id := g.addAccount(acc)
 
-	return acc.toIdentifiedAccountInfo(id), nil
+	return acc.ToIdentifiedAccountInfo(id), nil
 }
 
-func (g *Generator) deriveChildAccounts(acc *account, pathStrings []string) (map[string]*account, error) {
-	pathAccounts := make(map[string]*account)
+func (g *Generator) deriveChildAccounts(acc *Account, pathStrings []string) (map[string]*Account, error) {
+	pathAccounts := make(map[string]*Account)
 
 	for _, pathString := range pathStrings {
 		childAccount, err := g.deriveChildAccount(acc, pathString)
@@ -239,7 +239,7 @@ func (g *Generator) deriveChildAccounts(acc *account, pathStrings []string) (map
 	return pathAccounts, nil
 }
 
-func (g *Generator) deriveChildAccount(acc *account, pathString string) (*account, error) {
+func (g *Generator) deriveChildAccount(acc *Account, pathString string) (*Account, error) {
 	_, path, err := decodePath(pathString)
 	if err != nil {
 		return nil, err
@@ -258,13 +258,13 @@ func (g *Generator) deriveChildAccount(acc *account, pathString string) (*accoun
 		return nil, err
 	}
 
-	return &account{
+	return &Account{
 		privateKey:  childExtendedKey.ToECDSA(),
 		extendedKey: childExtendedKey,
 	}, nil
 }
 
-func (g *Generator) store(acc *account, password string) (AccountInfo, error) {
+func (g *Generator) store(acc *Account, password string) (AccountInfo, error) {
 	if acc.extendedKey != nil {
 		if _, _, err := g.am.ImportSingleExtendedKey(acc.extendedKey, password); err != nil {
 			return AccountInfo{}, err
@@ -277,10 +277,10 @@ func (g *Generator) store(acc *account, password string) (AccountInfo, error) {
 
 	g.Reset()
 
-	return acc.toAccountInfo(), nil
+	return acc.ToAccountInfo(), nil
 }
 
-func (g *Generator) addAccount(acc *account) string {
+func (g *Generator) addAccount(acc *Account) string {
 	g.Lock()
 	defer g.Unlock()
 
@@ -295,10 +295,10 @@ func (g *Generator) Reset() {
 	g.Lock()
 	defer g.Unlock()
 
-	g.accounts = make(map[string]*account)
+	g.accounts = make(map[string]*Account)
 }
 
-func (g *Generator) findAccount(accountID string) (*account, error) {
+func (g *Generator) findAccount(accountID string) (*Account, error) {
 	g.Lock()
 	defer g.Unlock()
 

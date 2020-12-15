@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -20,7 +19,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	gethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/status-im/status-go/account/generator"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -119,11 +118,15 @@ func (s *MessengerSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.P
 	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
 	s.Require().NoError(err)
 
+	acc := generator.NewAccount(privateKey, nil)
+	iai := acc.ToIdentifiedAccountInfo("")
+
 	options := []Option{
 		WithCustomLogger(s.logger),
 		WithMessagesPersistenceEnabled(),
 		WithDatabaseConfig(":memory:", "some-key"),
 		WithMultiAccounts(madb),
+		WithAccount(iai.ToMultiAccount()),
 	}
 	if s.enableDataSync {
 		options = append(options, WithDatasync())
@@ -2521,8 +2524,8 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 }
 
 func (s *MessengerSuite) TestChatIdentity() {
-	keyUIDBytes := sha256.Sum256(gethcrypto.FromECDSAPub(&s.m.identity.PublicKey))
-	keyUID := types.EncodeHex(keyUIDBytes[:])
+	keyUID := "0xdeadbeef"
+	s.m.account = &multiaccounts.Account{KeyUID: keyUID}
 
 	err := s.m.multiAccounts.SaveAccount(multiaccounts.Account{Name: "string", KeyUID: keyUID})
 	s.Require().NoError(err)
