@@ -5,13 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/status-im/status-go/account/generator"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/status-im/status-go/account/generator"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,8 +185,8 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 	count := 3
 	type AccountData struct {
 		MasterAccount generator.GeneratedAccountInfo
-		AccountInfo account.Info
-		Password string
+		AccountInfo   account.Info
+		Password      string
 	}
 	addressCh := make(chan AccountData, count) // use buffered channel to avoid blocking
 
@@ -210,9 +211,9 @@ func TestBackendAccountsConcurrently(t *testing.T) {
 		wg.Add(1)
 		go func(accountData AccountData) {
 			loginParams := account.LoginParams{
-				MainAccount: types.HexToAddress(accountData.AccountInfo.WalletAddress),
-				ChatAddress: types.HexToAddress(accountData.AccountInfo.ChatAddress),
-				Password:    accountData.Password,
+				MainAccount:  types.HexToAddress(accountData.AccountInfo.WalletAddress),
+				ChatAddress:  types.HexToAddress(accountData.AccountInfo.ChatAddress),
+				Password:     accountData.Password,
 				MultiAccount: accountData.MasterAccount.ToMultiAccount(),
 			}
 			assert.NoError(t, backend.SelectAccount(loginParams))
