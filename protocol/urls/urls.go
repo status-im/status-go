@@ -25,7 +25,7 @@ type LinkPreviewData struct {
 type Site struct {
 	Title        string `json:"title"`
 	Address      string `json:"address"`
-	ImageSite    bool   `json:imageSite`
+	ImageSite    bool   `json:"imageSite"`
 }
 
 const YouTubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
