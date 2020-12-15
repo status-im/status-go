@@ -6,7 +6,6 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -45,9 +44,16 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-const PubKeyStringLength = 132
+type chatContext string
 
-const transactionSentTxt = "Transaction sent"
+const (
+	PubKeyStringLength = 132
+
+	transactionSentTxt = "Transaction sent"
+
+	publicChat  chatContext = "public-chat"
+	privateChat chatContext = "private-chat"
+)
 
 const emojiResendMinDelay = 30
 const emojiResendMaxCount = 3
@@ -503,7 +509,7 @@ func (m *Messenger) handleContactCodeChatIdentity(cca *protobuf.ContactCodeAdver
 	}
 
 	if shouldPublish {
-		cca.ChatIdentity, err = m.createChatIdentity("private-chat")
+		cca.ChatIdentity, err = m.createChatIdentity(privateChat)
 		if err != nil {
 			return err
 		}
@@ -538,7 +544,7 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 		return nil
 	}
 
-	ci, err := m.createChatIdentity("public-chat")
+	ci, err := m.createChatIdentity(publicChat)
 	if err != nil {
 		return err
 	}
@@ -604,7 +610,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 // createChatIdentity creates a context based protobuf.ChatIdentity.
 // context 'public-chat' will attach only the 'thumbnail' IdentityImage
 // context 'private-chat' will attach all IdentityImage
-func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, error) {
+func (m *Messenger) createChatIdentity(context chatContext) (*protobuf.ChatIdentity, error) {
 	m.logger.Info(fmt.Sprintf("account keyUID '%s'", m.account.KeyUID))
 	m.logger.Info(fmt.Sprintf("context '%s'", context))
 
@@ -616,36 +622,38 @@ func (m *Messenger) createChatIdentity(context string) (*protobuf.ChatIdentity, 
 	ciis := make(map[string]*protobuf.IdentityImage)
 
 	switch context {
-	case "public-chat":
-		m.logger.Info(fmt.Sprintf("handling public-chat ChatIdentity"))
+	case publicChat:
+		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
 
 		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 		if err != nil {
 			return nil, err
 		}
 
-		imgJson, _ := json.Marshal(img)
-		m.logger.Info(fmt.Sprintf("public-chat images.IdentityImage '%s' '%s'", string(imgJson), spew.Sdump(img)))
+		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(img)))
 
 		ciis[userimage.SmallDimName] = m.adaptIdentityImageToProtobuf(img)
-		//m.logger.Info(fmt.Sprintf("public-chat protobuf.IdentityImage '%s'", spew.Sdump(ciis)))
+		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
 
-	case "private-chat":
-		m.logger.Info(fmt.Sprintf("handling private-chat ChatIdentity"))
+	case privateChat:
+		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
+
 		imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
 		if err != nil {
 			return nil, err
 		}
 
-		imgsJson, _ := json.Marshal(imgs)
-		m.logger.Info(fmt.Sprintf("private-chat images.IdentityImage '%s' '%s'", string(imgsJson), spew.Sdump(imgs)))
+		m.logger.Debug(fmt.Sprintf("%s images.IdentityImage '%s'", context, spew.Sdump(imgs)))
 
 		for _, img := range imgs {
 			ciis[img.Name] = m.adaptIdentityImageToProtobuf(img)
 		}
-		m.logger.Info(fmt.Sprintf("private-chat protobuf.IdentityImage '%s'", spew.Sdump(ciis)))
+		m.logger.Debug(fmt.Sprintf("%s protobuf.IdentityImage '%s'", context, spew.Sdump(ciis)))
 		ci.Images = ciis
+
+	default:
+		return ci, fmt.Errorf("unknown ChatIdentity context '%s'", context)
 	}
 
 	return ci, nil
