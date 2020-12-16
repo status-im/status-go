@@ -856,19 +856,19 @@ func (db sqlitePersistence) TransactionsToValidate() ([]*TransactionToValidate, 
 	return transactions, nil
 }
 
-func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatID string) (t *int64, hash []byte, err error) {
+func (db sqlitePersistence) GetWhenChatIdentityLastPublished(chatID string) (t int64, hash []byte, err error) {
 	rows, err := db.db.Query("SELECT clock_value, hash FROM chat_identity_last_published WHERE chat_id = ?", chatID)
 	if err != nil {
-		return nil, nil, err
+		return t, nil, err
 	}
 	defer func() {
 		err = rows.Close()
 	}()
 
 	for rows.Next() {
-		err = rows.Scan(t, &hash)
+		err = rows.Scan(&t, &hash)
 		if err != nil {
-			return nil, nil, err
+			return t, nil, err
 		}
 	}
 
