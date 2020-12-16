@@ -320,9 +320,6 @@ func NewMessenger(
 }
 
 func (m *Messenger) processSentMessages(ids []string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	for _, id := range ids {
 		rawMessage, err := m.persistence.RawMessageByID(id)
 		if err != nil {
