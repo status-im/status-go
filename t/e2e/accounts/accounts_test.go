@@ -1,7 +1,6 @@
 package accounts
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
@@ -11,19 +10,29 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/extkeys"
 	"github.com/status-im/status-go/t/e2e"
 	"github.com/status-im/status-go/t/utils"
 )
 
-func buildLoginParams(mainAccountAddress, chatAddress, password string, watchAddresses []types.Address) account.LoginParams {
+func buildLoginParams(mainAccountAddress, chatAddress, password string, watchAddresses []types.Address) (account.LoginParams, error) {
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		return account.LoginParams{}, err
+	}
+
+	acc := generator.NewAccount(privateKey, nil)
+	iai := acc.ToIdentifiedAccountInfo("")
+
 	return account.LoginParams{
 		ChatAddress:    types.HexToAddress(chatAddress),
 		Password:       password,
 		MainAccount:    types.HexToAddress(mainAccountAddress),
 		WatchAddresses: watchAddresses,
-	}
+		MultiAccount:   iai.ToMultiAccount(),
+	}, nil
 }
 
 func TestAccountsTestSuite(t *testing.T) {
@@ -54,15 +63,17 @@ func (s *AccountsTestSuite) TestAccountsList() {
 	s.NoError(err)
 	s.Zero(len(accounts), "accounts returned, while there should be none (we haven't logged in yet)")
 
-	// select account (sub-accounts will be created for this key)
-	err = s.Backend.SelectAccount(
-		buildLoginParams(
-			accountInfo.WalletAddress,
-			accountInfo.ChatAddress,
-			utils.TestConfig.Account1.Password,
-			nil,
-		),
+	loginParams, err := buildLoginParams(
+		accountInfo.WalletAddress,
+		accountInfo.ChatAddress,
+		utils.TestConfig.Account1.Password,
+		nil,
 	)
+
+	s.Require().NoError(err)
+
+	// select account (sub-accounts will be created for this key)
+	err = s.Backend.SelectAccount(loginParams)
 	s.NoError(err, "account selection failed")
 
 	// at this point main account should show up
@@ -182,36 +193,24 @@ func (s *AccountsTestSuite) TestSelectAccount() {
 	s.T().Logf("Account created: {walletAddress: %s, walletKey: %s, chatAddress: %s, chatKey: %s}",
 		accountInfo2.WalletAddress, accountInfo2.WalletPubKey, accountInfo2.ChatAddress, accountInfo2.ChatPubKey)
 
+	loginParams, err := buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword", nil)
+	s.Require().NoError(err)
 	// try selecting with wrong password
-	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword", nil))
+	err = s.Backend.SelectAccount(loginParams)
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error(), "select account is expected to throw error: wrong password used")
 
-	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, utils.TestConfig.Account1.Password, nil))
+	loginParams, err = buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, utils.TestConfig.Account1.Password, nil)
+	s.Require().NoError(err)
+
+	err = s.Backend.SelectAccount(loginParams)
 	s.NoError(err)
 
 	// select another account, make sure that previous account is wiped out from Whisper cache
-	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, nil)))
-}
-
-func (s *AccountsTestSuite) TestSetChatAccount() {
-	s.StartTestBackend()
-	defer s.StopTestBackend()
-
-	chatPrivKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	chatPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(chatPrivKey))
-
-	encryptionPrivKey, err := crypto.GenerateKey()
-	s.Require().NoError(err)
-	encryptionPrivKeyHex := hex.EncodeToString(crypto.FromECDSA(encryptionPrivKey))
-
-	err = s.Backend.InjectChatAccount(chatPrivKeyHex, encryptionPrivKeyHex)
+	loginParams, err = buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, nil)
 	s.Require().NoError(err)
 
-	selectedChatAccount, err := s.Backend.AccountManager().SelectedChatAccount()
-	s.Require().NoError(err)
-	s.Equal(chatPrivKey, selectedChatAccount.AccountKey.PrivateKey)
+	s.NoError(s.Backend.SelectAccount(loginParams))
 }
 
 func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
@@ -232,7 +231,10 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 	s.Nil(selectedChatAccount)
 
 	// select account
-	err = s.Backend.SelectAccount(buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword", nil))
+	loginParams, err := buildLoginParams(accountInfo1.WalletAddress, accountInfo1.ChatAddress, "wrongPassword", nil)
+	s.Require().NoError(err)
+
+	err = s.Backend.SelectAccount(loginParams)
 	expectedErr := errors.New("cannot retrieve a valid key for a given account: could not decrypt key with given password")
 	s.EqualError(expectedErr, err.Error())
 
@@ -240,7 +242,11 @@ func (s *AccountsTestSuite) TestSelectedAccountOnRestart() {
 		types.HexToAddress("0x00000000000000000000000000000000000001"),
 		types.HexToAddress("0x00000000000000000000000000000000000002"),
 	}
-	s.NoError(s.Backend.SelectAccount(buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, watchAddresses)))
+
+	loginParams, err = buildLoginParams(accountInfo2.WalletAddress, accountInfo2.ChatAddress, utils.TestConfig.Account1.Password, watchAddresses)
+	s.Require().NoError(err)
+
+	s.NoError(s.Backend.SelectAccount(loginParams))
 
 	// stop node (and all of its sub-protocols)
 	nodeConfig := s.Backend.StatusNode().Config()

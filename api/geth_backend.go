@@ -1230,23 +1230,6 @@ func (b *GethStatusBackend) startWallet(watchNewBlocks bool) error {
 		watchNewBlocks)
 }
 
-// InjectChatAccount selects the current chat account using chatKeyHex and injects the key into whisper.
-// TODO: change the interface and omit the last argument.
-func (b *GethStatusBackend) InjectChatAccount(chatKeyHex, _ string) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.accountManager.Logout()
-
-	chatKey, err := ethcrypto.HexToECDSA(chatKeyHex)
-	if err != nil {
-		return err
-	}
-	b.accountManager.SetChatAccount(chatKey)
-
-	return b.injectAccountsIntoServices()
-}
-
 func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {
 	if !condition {
 		return services
