@@ -22,7 +22,7 @@ func Resize(size ResizeDimension, img image.Image) image.Image {
 		width, height = uint(size), 0
 	}
 
-	log.Info("resizing", "size", size, "width", width, "height", height, "img", img)
+	log.Info("resizing", "size", size, "width", width, "height", height)
 
 	return resize.Resize(width, height, img, resize.Bilinear)
 }
