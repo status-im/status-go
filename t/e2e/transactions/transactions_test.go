@@ -12,6 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/status-im/status-go/account"
+	"github.com/status-im/status-go/account/generator"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -23,12 +25,21 @@ import (
 
 type initFunc func([]byte, *transactions.SendTxArgs)
 
-func buildLoginParams(mainAccountAddress, chatAddress, password string) account.LoginParams {
-	return account.LoginParams{
-		ChatAddress: types.HexToAddress(chatAddress),
-		Password:    password,
-		MainAccount: types.HexToAddress(mainAccountAddress),
+func buildLoginParams(mainAccountAddress, chatAddress, password string) (account.LoginParams, error) {
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		return account.LoginParams{}, err
 	}
+
+	acc := generator.NewAccount(privateKey, nil)
+	iai := acc.ToIdentifiedAccountInfo("")
+
+	return account.LoginParams{
+		ChatAddress:  types.HexToAddress(chatAddress),
+		Password:     password,
+		MainAccount:  types.HexToAddress(mainAccountAddress),
+		MultiAccount: iai.ToMultiAccount(),
+	}, nil
 }
 
 func TestTransactionsTestSuite(t *testing.T) {
@@ -85,11 +96,14 @@ func (s *TransactionsTestSuite) TestCallUpstreamPrivateRPCSendTransaction() {
 func (s *TransactionsTestSuite) sendTransactionUsingRPCClient(
 	callRPCFn func(string) (string, error),
 ) {
-	err := s.Backend.SelectAccount(buildLoginParams(
+	loginParams, err := buildLoginParams(
 		utils.TestConfig.Account1.WalletAddress,
 		utils.TestConfig.Account1.ChatAddress,
 		utils.TestConfig.Account1.Password,
-	))
+	)
+	s.Require().NoError(err)
+
+	err = s.Backend.SelectAccount(loginParams)
 	s.NoError(err)
 
 	result, err := callRPCFn(`{
