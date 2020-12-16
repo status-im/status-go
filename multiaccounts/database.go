@@ -44,14 +44,15 @@ func (db *Database) Close() error {
 	return db.db.Close()
 }
 
-func (db *Database) GetAccounts() ([]Account, error) {
+func (db *Database) GetAccounts() (rst []Account, err error) {
 	rows, err := db.db.Query("SELECT  a.name, a.loginTimestamp, a.identicon, a.keycardPairing, a.keyUid, ii.name, ii.image_payload, ii.width, ii.height, ii.file_size, ii.resize_target FROM accounts AS a LEFT JOIN identity_images AS ii ON ii.key_uid = a.keyUid ORDER BY loginTimestamp DESC")
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		err = rows.Close()
+	}()
 
-	var rst []Account
 	for rows.Next() {
 		acc := Account{}
 		accLoginTimestamp := sql.NullInt64{}
@@ -139,14 +140,15 @@ func (db *Database) DeleteAccount(keyUID string) error {
 
 // Account images
 
-func (db *Database) GetIdentityImages(keyUID string) ([]*images.IdentityImage, error) {
+func (db *Database) GetIdentityImages(keyUID string) (iis []*images.IdentityImage, err error) {
 	rows, err := db.db.Query(`SELECT key_uid, name, image_payload, width, height, file_size, resize_target FROM identity_images WHERE key_uid = ?`, keyUID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		err = rows.Close()
+	}()
 
-	var iis []*images.IdentityImage
 	for rows.Next() {
 		ii := &images.IdentityImage{}
 		err = rows.Scan(&ii.KeyUID, &ii.Name, &ii.Payload, &ii.Width, &ii.Height, &ii.FileSize, &ii.ResizeTarget)
@@ -171,7 +173,7 @@ func (db *Database) GetIdentityImage(keyUID, it string) (*images.IdentityImage, 
 	return &ii, nil
 }
 
-func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityImage) error {
+func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityImage) (err error) {
 	// Because SQL INSERTs are triggered in a loop use a tx to ensure a single call to the DB.
 	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
 	if err != nil {
