@@ -117,6 +117,7 @@ func TestTransactionNotification(t *testing.T) {
 		Accounts:    []common.Address{header.Address},
 	})
 
+	// TODO RESOLVE Error here.
 	require.NoError(t, utils.Eventually(func() error {
 		if signalEvent == nil {
 			return fmt.Errorf("Signal was not handled")
@@ -131,7 +132,7 @@ func TestTransactionNotification(t *testing.T) {
 		if notification.Type != "local-notifications" {
 			return fmt.Errorf("Wrong signal was sent")
 		}
-		if notification.Event.Body.To != header.Address {
+		if notification.Event.Body.(*NotificationBody).To != header.Address {
 			return fmt.Errorf("Transaction to address is wrong")
 		}
 		return nil

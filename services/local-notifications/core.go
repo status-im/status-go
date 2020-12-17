@@ -2,6 +2,8 @@ package localnotifications
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -21,15 +23,24 @@ type PushCategory string
 
 type transactionState string
 
-const walletDeeplinkPrefix = "status-im://wallet/"
+type NotificationType string
 
 const (
+	walletDeeplinkPrefix = "status-im://wallet/"
+
 	failed   transactionState = "failed"
 	inbound  transactionState = "inbound"
 	outbound transactionState = "outbound"
+
+	TypeTransaction NotificationType = "transaction"
 )
 
-type notificationBody struct {
+type Body interface {
+	GetType() NotificationType
+}
+
+type NotificationBody struct {
+	Type        NotificationType
 	State       transactionState  `json:"state"`
 	From        common.Address    `json:"from"`
 	To          common.Address    `json:"to"`
@@ -42,14 +53,14 @@ type notificationBody struct {
 }
 
 type Notification struct {
-	ID            common.Hash      `json:"id"`
-	Platform      float32          `json:"platform,omitempty"`
-	Body          notificationBody `json:"body"`
-	Category      PushCategory     `json:"category,omitempty"`
-	Deeplink      string           `json:"deepLink,omitempty"`
-	Image         string           `json:"imageUrl,omitempty"`
-	IsScheduled   bool             `json:"isScheduled,omitempty"`
-	ScheduledTime string           `json:"scheduleTime,omitempty"`
+	ID            common.Hash  `json:"id"`
+	Platform      float32      `json:"platform,omitempty"`
+	Body          Body
+	Category      PushCategory `json:"category,omitempty"`
+	Deeplink      string       `json:"deepLink,omitempty"`
+	Image         string       `json:"imageUrl,omitempty"`
+	IsScheduled   bool         `json:"isScheduled,omitempty"`
+	ScheduledTime string       `json:"scheduleTime,omitempty"`
 }
 
 // TransactionEvent - structure used to pass messages from wallet to bus
@@ -101,6 +112,53 @@ func NewService(appDB *sql.DB, network uint64) *Service {
 	}
 }
 
+func (nb *NotificationBody) GetType() NotificationType {
+	return nb.Type
+}
+
+// TODO I suspect that this JsonMarshaller isn't working as expected
+//  RESOLVE : TestTransactionNotification: core_test.go:120:
+//        	Error Trace:	core_test.go:120
+//        	Error:      	Received unexpected error:
+//        	            	Signal was not handled
+//        	Test:       	TestTransactionNotification
+func (n *Notification) MarshalJSON() (body []byte, err error) {
+
+	switch n.Body.GetType() {
+	case TypeTransaction:
+		tx := n.Body.(*NotificationBody)
+		body, err = json.Marshal(tx)
+		if err != nil {
+			return nil, err
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown NotificationType '%s'", n.Body.GetType())
+	}
+
+	alias := struct {
+		ID            common.Hash  `json:"id"`
+		Platform      float32      `json:"platform,omitempty"`
+		Body          []byte       `json:"body"`
+		Category      PushCategory `json:"category,omitempty"`
+		Deeplink      string       `json:"deepLink,omitempty"`
+		Image         string       `json:"imageUrl,omitempty"`
+		IsScheduled   bool         `json:"isScheduled,omitempty"`
+		ScheduledTime string       `json:"scheduleTime,omitempty"`
+	}{
+		n.ID,
+		n.Platform,
+		body,
+		n.Category,
+		n.Deeplink,
+		n.Image,
+		n.IsScheduled,
+		n.ScheduledTime,
+	}
+
+	return json.Marshal(alias)
+}
+
 func pushMessage(notification *Notification) {
 	log.Info("Pushing a new push notification", "info", notification)
 	signal.SendLocalNotifications(notification)
@@ -140,7 +198,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 		deeplink = walletDeeplinkPrefix + to.Address.String()
 	}
 
-	body := notificationBody{
+	body := NotificationBody{
 		State:       state,
 		From:        transfer.From,
 		To:          transfer.Address,
@@ -154,7 +212,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 
 	return &Notification{
 		ID:       transfer.ID,
-		Body:     body,
+		Body:     &body,
 		Deeplink: deeplink,
 		Category: "transaction",
 	}
