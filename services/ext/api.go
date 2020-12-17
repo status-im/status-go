@@ -317,27 +317,33 @@ func (api *PublicAPI) SetInstallationMetadata(installationID string, data *multi
 	return api.service.messenger.SetInstallationMetadata(installationID, data)
 }
 
+// Communities returns a list of communities that are stored
 func (api *PublicAPI) Communities(parent context.Context) ([]*communities.Community, error) {
 	return api.service.messenger.Communities()
 }
 
+// JoinedCommunities returns a list of communities that the user has joined
 func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.Community, error) {
 	return api.service.messenger.JoinedCommunities()
 }
 
+// JoinCommunity joins a community with the given ID
 func (api *PublicAPI) JoinCommunity(parent context.Context, communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.JoinCommunity(communityID)
 }
 
+// LeaveCommunity leaves a commuity with the given ID
 func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveCommunity(communityID)
 }
 
+// CreateCommunity creates a new community with the provided description
 func (api *PublicAPI) CreateCommunity(description *protobuf.CommunityDescription) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunity(description)
 
 }
 
+// ExportCommunity exports the private key of the community with given ID
 func (api *PublicAPI) ExportCommunity(id string) (string, error) {
 	key, err := api.service.messenger.ExportCommunity(id)
 	if err != nil {
@@ -346,6 +352,7 @@ func (api *PublicAPI) ExportCommunity(id string) (string, error) {
 	return types.EncodeHex(crypto.FromECDSA(key)), nil
 }
 
+// ImportCommunity imports a community with the given private key in hex
 func (api *PublicAPI) ImportCommunity(hexPrivateKey string) (*protocol.MessengerResponse, error) {
 	// Strip the 0x from the beginning
 	privateKey, err := crypto.HexToECDSA(hexPrivateKey[2:])
@@ -356,10 +363,12 @@ func (api *PublicAPI) ImportCommunity(hexPrivateKey string) (*protocol.Messenger
 
 }
 
+// CreateCommunityChat creates a community chat in the given community
 func (api *PublicAPI) CreateCommunityChat(orgID string, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateCommunityChat(orgID, c)
 }
 
+// InviteUserToCommunity invites the used with pk to the community with ID
 func (api *PublicAPI) InviteUserToCommunity(orgID, userPublicKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.InviteUserToCommunity(orgID, userPublicKey)
 }
