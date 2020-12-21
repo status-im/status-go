@@ -112,43 +112,58 @@ func (s *MessengerSuite) SetupTest() {
 	s.Require().NoError(s.m.Start())
 }
 
-func (s *MessengerSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
+func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
 	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	s.Require().NoError(err)
+	if err != nil {
+		return nil, err
+	}
 	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
-	s.Require().NoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	acc := generator.NewAccount(privateKey, nil)
 	iai := acc.ToIdentifiedAccountInfo("")
 
 	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
+		WithCustomLogger(logger),
 		WithDatabaseConfig(":memory:", "some-key"),
 		WithMultiAccounts(madb),
 		WithAccount(iai.ToMultiAccount()),
+		WithDatasync(),
 	}
-	if s.enableDataSync {
-		options = append(options, WithDatasync())
-	}
+
+	options = append(options, extraOptions...)
+
 	m, err := NewMessenger(
 		privateKey,
 		&testNode{shh: shh},
 		uuid.New().String(),
 		options...,
 	)
-	s.Require().NoError(err)
+	if err != nil {
+		return nil, err
+	}
 
 	err = m.Init()
-	s.Require().NoError(err)
+	if err != nil {
+		return nil, err
+	}
 
-	return m
+	err = m.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 func (s *MessengerSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
-	return s.newMessengerWithKey(shh, privateKey)
+	messenger, err := newMessengerWithKey(shh, privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	return messenger
 }
 
 func (s *MessengerSuite) TearDownTest() {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -56,40 +54,21 @@ func (s *MessengerInstallationSuite) TearDownTest() {
 	s.Require().NoError(s.m.Shutdown())
 }
 
-func (s *MessengerInstallationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(sqlite.InMemoryPath, "some-key"),
-		WithDatasync(),
-	}
-	installationID := uuid.New().String()
-	m, err := NewMessenger(
-		privateKey,
-		&testNode{shh: shh},
-		installationID,
-		options...,
-	)
-	s.Require().NoError(err)
-
-	err = m.Init()
-	s.Require().NoError(err)
-
-	return m
-}
-
 func (s *MessengerInstallationSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey)
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	s.Require().NoError(err)
+
+	return messenger
 }
 
 func (s *MessengerInstallationSuite) TestReceiveInstallation() {
-	theirMessenger := s.newMessengerWithKey(s.shh, s.privateKey)
-	s.Require().NoError(theirMessenger.Start())
+	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.Require().NoError(err)
 
-	err := theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
+	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
@@ -175,8 +154,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	s.Require().NoError(err)
 
 	// pair
-	theirMessenger := s.newMessengerWithKey(s.shh, s.privateKey)
-	s.Require().NoError(theirMessenger.Start())
+	theirMessenger, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.Require().NoError(err)
 
 	err = theirMessenger.SetInstallationMetadata(theirMessenger.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
@@ -251,12 +230,11 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 
 	bob1 := s.m
 	// pair
-	bob2 := s.newMessengerWithKey(s.shh, s.privateKey)
-	s.Require().NoError(bob2.Start())
+	bob2, err := newMessengerWithKey(s.shh, s.privateKey, s.logger, nil)
+	s.Require().NoError(err)
 	alice := s.newMessenger(s.shh)
-	s.Require().NoError(alice.Start())
 
-	err := bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
+	err = bob2.SetInstallationMetadata(bob2.installationID, &multidevice.InstallationMetadata{
 		Name:       "their-name",
 		DeviceType: "their-device-type",
 	})
