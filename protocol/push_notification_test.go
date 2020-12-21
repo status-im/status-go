@@ -5,23 +5,18 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
-	"io/ioutil"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
-	"github.com/status-im/status-go/account/generator"
 	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -65,47 +60,13 @@ func (s *MessengerPushNotificationSuite) TearDownTest() {
 	_ = s.logger.Sync()
 }
 
-func (s *MessengerPushNotificationSuite) newMessengerWithOptions(shh types.Waku, privateKey *ecdsa.PrivateKey, options []Option) *Messenger {
-	m, err := NewMessenger(
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		options...,
-	)
-	s.Require().NoError(err)
-
-	err = m.Init()
-	s.Require().NoError(err)
-
-	return m
-}
-
-func (s *MessengerPushNotificationSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	s.Require().NoError(err)
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
-	s.Require().NoError(err)
-
-	acc := generator.NewAccount(privateKey, nil)
-	iai := acc.ToIdentifiedAccountInfo("")
-
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(sqlite.InMemoryPath, ""),
-		WithDatasync(),
-		WithPushNotifications(),
-		WithMultiAccounts(madb),
-		WithAccount(iai.ToMultiAccount()),
-	}
-	return s.newMessengerWithOptions(shh, privateKey, options)
-}
-
 func (s *MessengerPushNotificationSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey)
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, []Option{WithPushNotifications()})
+	s.Require().NoError(err)
+	return messenger
 }
 
 func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
@@ -117,20 +78,18 @@ func (s *MessengerPushNotificationSuite) newPushNotificationServer(shh types.Wak
 	}
 
 	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(sqlite.InMemoryPath, "some-key"),
 		WithPushNotificationServerConfig(serverConfig),
-		WithDatasync(),
 	}
-	return s.newMessengerWithOptions(shh, privateKey, options)
+	messenger, err := newMessengerWithKey(shh, privateKey, s.logger, options)
+	s.Require().NoError(err)
+	return messenger
 }
 
 func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	bob1 := s.m
-	bob2 := s.newMessengerWithKey(s.shh, s.m.identity)
-	s.Require().NoError(bob2.Start())
+	bob2, err := newMessengerWithKey(s.shh, s.m.identity, s.logger, []Option{WithPushNotifications()})
+	s.Require().NoError(err)
 
 	serverKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)

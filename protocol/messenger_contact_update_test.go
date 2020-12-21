@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -48,32 +47,13 @@ func (s *MessengerContactUpdateSuite) TearDownTest() {
 	s.Require().NoError(s.m.Shutdown())
 }
 
-func (s *MessengerContactUpdateSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(":memory:", "some-key"),
-		WithDatasync(),
-	}
-	m, err := NewMessenger(
-		privateKey,
-		&testNode{shh: shh},
-		uuid.New().String(),
-		options...,
-	)
-	s.Require().NoError(err)
-
-	err = m.Init()
-	s.Require().NoError(err)
-
-	return m
-}
-
 func (s *MessengerContactUpdateSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey)
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	return messenger
 }
 
 func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {

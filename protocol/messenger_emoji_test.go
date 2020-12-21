@@ -3,10 +3,8 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
-	"io/ioutil"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/zap"
 
@@ -15,7 +13,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -54,39 +51,13 @@ func (s *MessengerEmojiSuite) TearDownTest() {
 	s.Require().NoError(s.m.Shutdown())
 }
 
-func (s *MessengerEmojiSuite) newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey) *Messenger {
-	tmpfile, err := ioutil.TempFile("", "accounts-tests-")
-	s.Require().NoError(err)
-	madb, err := multiaccounts.InitializeDB(tmpfile.Name())
-	s.Require().NoError(err)
-
-	options := []Option{
-		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
-		WithDatabaseConfig(sqlite.InMemoryPath, "some-key"),
-		WithMultiAccounts(madb),
-		WithDatasync(),
-	}
-	installationID := uuid.New().String()
-	m, err := NewMessenger(
-		privateKey,
-		&testNode{shh: shh},
-		installationID,
-		options...,
-	)
-	s.Require().NoError(err)
-
-	err = m.Init()
-	s.Require().NoError(err)
-
-	return m
-}
-
 func (s *MessengerEmojiSuite) newMessenger(shh types.Waku) *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	return s.newMessengerWithKey(s.shh, privateKey)
+	messenger, err := newMessengerWithKey(s.shh, privateKey, s.logger, nil)
+	s.Require().NoError(err)
+	return messenger
 }
 
 func (s *MessengerEmojiSuite) TestSendEmoji() {
@@ -95,8 +66,8 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
-	bob := s.newMessengerWithKey(s.shh, key)
-	s.Require().NoError(bob.Start())
+	bob, err := newMessengerWithKey(s.shh, key, s.logger, nil)
+	s.Require().NoError(err)
 
 	chatID := statusChatID
 
