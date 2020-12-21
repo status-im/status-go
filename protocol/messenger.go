@@ -79,8 +79,8 @@ type Messenger struct {
 	logger                     *zap.Logger
 	verifyTransactionClient    EthClient
 	featureFlags               common.FeatureFlags
-	messagesPersistenceEnabled bool
 	shutdownTasks              []func() error
+	shouldPublishContactCode   bool
 	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
 	allChats                   map[string]*Chat
 	allContacts                map[string]*Contact
@@ -287,7 +287,6 @@ func NewMessenger(
 		allInstallations:           make(map[string]*multidevice.Installation),
 		installationID:             installationID,
 		modifiedInstallations:      make(map[string]bool),
-		messagesPersistenceEnabled: c.messagesPersistenceEnabled,
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
@@ -315,7 +314,6 @@ func NewMessenger(
 		}
 	}
 
-	logger.Debug("messages persistence", zap.Bool("enabled", c.messagesPersistenceEnabled))
 	return messenger, nil
 }
 
@@ -421,6 +419,7 @@ func (m *Messenger) Start() error {
 	m.handleConnectionChange(m.online())
 	m.watchConnectionChange()
 	m.watchExpiredEmojis()
+	m.watchIdentityImageChanges()
 	return nil
 }
 
@@ -430,6 +429,15 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Online()
 		}
+
+		if m.shouldPublishContactCode {
+			if err := m.handleSendContactCode(); err != nil {
+				m.logger.Error("could not publish on contact code", zap.Error(err))
+				return
+			}
+			m.shouldPublishContactCode = false
+		}
+
 	} else {
 		if m.pushNotificationClient != nil {
 			m.pushNotificationClient.Offline()
@@ -749,6 +757,34 @@ func (m *Messenger) watchExpiredEmojis() {
 					if err != nil {
 						m.logger.Debug("Error when resending expired emoji reactions", zap.Error(err))
 					}
+				}
+			case <-m.quit:
+				return
+			}
+		}
+	}()
+}
+
+// watchIdentityImageChanges checks for identity images changes and publishes to the contact code when it happens
+func (m *Messenger) watchIdentityImageChanges() {
+	m.logger.Debug("watching identity image changes")
+	if m.multiAccounts == nil {
+		return
+	}
+
+	channel := m.multiAccounts.SubscribeToIdentityImageChanges()
+
+	go func() {
+		for {
+			select {
+			case <-channel:
+				if m.online() {
+					if err := m.handleSendContactCode(); err != nil {
+						m.logger.Error("failed to publish contact code", zap.Error(err))
+					}
+
+				} else {
+					m.shouldPublishContactCode = true
 				}
 			case <-m.quit:
 				return
