@@ -368,9 +368,14 @@ func (api *PublicAPI) CreateCommunityChat(orgID string, c *protobuf.CommunityCha
 	return api.service.messenger.CreateCommunityChat(orgID, c)
 }
 
-// InviteUserToCommunity invites the used with pk to the community with ID
+// InviteUserToCommunity invites the user with pk to the community with ID
 func (api *PublicAPI) InviteUserToCommunity(orgID, userPublicKey string) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.InviteUserToCommunity(orgID, userPublicKey)
+}
+
+// RemoveUserFromCommunity removes the user with pk from the community with ID
+func (api *PublicAPI) RemoveUserFromCommunity(orgID, userPublicKey string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveUserFromCommunity(orgID, userPublicKey)
 }
 
 type ApplicationMessagesResponse struct {
