@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts/migrations"
 	"github.com/status-im/status-go/sqlite"
@@ -24,7 +25,8 @@ type MultiAccountMarshaller interface {
 }
 
 type Database struct {
-	db *sql.DB
+	db                         *sql.DB
+	identityImageSubscriptions []chan struct{}
 }
 
 // InitializeDB creates db file at a given path and applies migrations.
@@ -209,7 +211,26 @@ func (db *Database) StoreIdentityImages(keyUID string, iis []*images.IdentityIma
 		}
 	}
 
+	db.publishOnIdentityImageSubscriptions()
+
 	return nil
+}
+
+func (db *Database) SubscribeToIdentityImageChanges() chan struct{} {
+	s := make(chan struct{}, 100)
+	db.identityImageSubscriptions = append(db.identityImageSubscriptions, s)
+	return s
+}
+
+func (db *Database) publishOnIdentityImageSubscriptions() {
+	// Publish on channels, drop if buffer is full
+	for _, s := range db.identityImageSubscriptions {
+		select {
+		case s <- struct{}{}:
+		default:
+			log.Warn("subscription channel full, dropping message")
+		}
+	}
 }
 
 func (db *Database) DeleteIdentityImage(keyUID string) error {
