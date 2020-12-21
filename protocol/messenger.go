@@ -2043,6 +2043,22 @@ func (m *Messenger) InviteUserToCommunity(orgID, pkString string) (*MessengerRes
 	}, nil
 }
 
+func (m *Messenger) RemoveUserFromCommunity(orgID, pkString string) (*MessengerResponse, error) {
+	publicKey, err := common.HexToPubkey(pkString)
+	if err != nil {
+		return nil, err
+	}
+
+	org, err := m.communitiesManager.RemoveUserFromCommunity(orgID, publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MessengerResponse{
+		Communities: []*communities.Community{org},
+	}, nil
+}
+
 func (m *Messenger) DeleteChat(chatID string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

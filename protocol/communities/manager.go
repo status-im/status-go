@@ -317,6 +317,30 @@ func (m *Manager) InviteUserToCommunity(idString string, pk *ecdsa.PublicKey) (*
 	return community, nil
 }
 
+func (m *Manager) RemoveUserFromCommunity(idString string, pk *ecdsa.PublicKey) (*Community, error) {
+	community, err := m.GetByIDString(idString)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	_, err = community.RemoveUserFromOrg(pk)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
 func (m *Manager) GetByIDString(idString string) (*Community, error) {
 	id, err := types.DecodeHex(idString)
 	if err != nil {
