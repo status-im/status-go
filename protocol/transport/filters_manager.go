@@ -231,16 +231,21 @@ func (s *FiltersManager) Remove(filters ...*Filter) error {
 }
 
 // Remove remove all the filters associated with a chat/identity
-func (s *FiltersManager) RemoveFilterByChatID(chatID string) error {
+func (s *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
 	s.mutex.Lock()
 	filter, ok := s.filters[chatID]
 	s.mutex.Unlock()
 
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
-	return s.Remove(filter)
+	err := s.Remove(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return filter, nil
 }
 
 // LoadPartitioned creates a filter for a partitioned topic.

@@ -143,7 +143,7 @@ func (a *Transport) RemoveFilters(filters []*transport.Filter) error {
 	return a.filters.Remove(filters...)
 }
 
-func (a *Transport) RemoveFilterByChatID(chatID string) error {
+func (a *Transport) RemoveFilterByChatID(chatID string) (*transport.Filter, error) {
 	return a.filters.RemoveFilterByChatID(chatID)
 }
 

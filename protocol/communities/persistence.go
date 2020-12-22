@@ -43,7 +43,6 @@ func (p *Persistence) queryCommunities(query string) (response []*Community, err
 
 		}
 		err = rows.Close()
-		return
 	}()
 
 	for rows.Next() {

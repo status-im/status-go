@@ -77,7 +77,6 @@ func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateK
 
 	options := []Option{
 		WithCustomLogger(s.logger),
-		WithMessagesPersistenceEnabled(),
 		WithDatabaseConfig(tmpFile.Name(), ""),
 		WithDatasync(),
 	}
@@ -510,5 +509,4 @@ func (s *MessengerCommunitiesSuite) TestImportCommunity() {
 	community = response.Communities[0]
 	s.Require().True(community.Joined())
 	s.Require().True(community.IsAdmin())
-	s.Require().True(community.HasMember(&newUser.PublicKey))
 }

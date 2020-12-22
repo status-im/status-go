@@ -35,7 +35,7 @@ type Transport interface {
 	InitPublicFilters(chatIDs []string) ([]*Filter, error)
 	LoadFilters(filters []*Filter) ([]*Filter, error)
 	RemoveFilters(filters []*Filter) error
-	RemoveFilterByChatID(string) error
+	RemoveFilterByChatID(string) (*Filter, error)
 	ResetFilters() error
 	Filters() []*Filter
 	LoadKeyFilters(*ecdsa.PrivateKey) (*Filter, error)
