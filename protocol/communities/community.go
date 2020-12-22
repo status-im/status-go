@@ -297,11 +297,13 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	return o.config.CommunityDescription, nil
 }
 
+// TODO: this should accept a request from a user to join and perform any validation
 func (o *Community) AcceptRequestToJoin(pk *ecdsa.PublicKey) (*protobuf.CommunityRequestJoinResponse, error) {
 
 	return nil, nil
 }
 
+// TODO: this should decline a request from a user to join
 func (o *Community) DeclineRequestToJoin(pk *ecdsa.PublicKey) (*protobuf.CommunityRequestJoinResponse, error) {
 	return nil, nil
 }
@@ -437,10 +439,10 @@ func (o *Community) HandleRequestJoin(signer *ecdsa.PublicKey, request *protobuf
 	}
 
 	if len(request.ChatId) != 0 {
-		return o.handleRequestJoinWithChatID(signer, request)
+		return o.handleRequestJoinWithChatID(request)
 	}
 
-	err := o.handleRequestJoinWithoutChatID(signer, request)
+	err := o.handleRequestJoinWithoutChatID(request)
 	if err != nil {
 		return err
 	}
@@ -453,9 +455,8 @@ func (o *Community) IsAdmin() bool {
 	return o.config.PrivateKey != nil
 }
 
-func (o *Community) handleRequestJoinWithChatID(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestJoin) error {
+func (o *Community) handleRequestJoinWithChatID(request *protobuf.CommunityRequestJoin) error {
 
-	var chat *protobuf.CommunityChat
 	chat, ok := o.config.CommunityDescription.Chats[request.ChatId]
 
 	if !ok {
@@ -474,7 +475,7 @@ func (o *Community) handleRequestJoinWithChatID(signer *ecdsa.PublicKey, request
 	return nil
 }
 
-func (o *Community) handleRequestJoinWithoutChatID(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestJoin) error {
+func (o *Community) handleRequestJoinWithoutChatID(request *protobuf.CommunityRequestJoin) error {
 
 	// If they want access to the org only, check that the org is ON_REQUEST
 	if o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_ON_REQUEST {

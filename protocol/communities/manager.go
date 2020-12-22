@@ -222,6 +222,7 @@ func (m *Manager) HandleCommunityDescriptionMessage(signer *ecdsa.PublicKey, des
 	return community, nil
 }
 
+// TODO: Finish implementing this
 func (m *Manager) HandleCommunityInvitation(signer *ecdsa.PublicKey, invitation *protobuf.CommunityInvitation, payload []byte) (*Community, error) {
 	m.logger.Debug("Handling wrapped community description message")
 

@@ -44,8 +44,8 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start(nil))
 
-	s.bob = s.newMessenger(s.shh)
-	s.alice = s.newMessenger(s.shh)
+	s.bob = s.newMessenger()
+	s.alice = s.newMessenger()
 	s.Require().NoError(s.bob.Start())
 	s.Require().NoError(s.alice.Start())
 }
@@ -84,7 +84,7 @@ func (s *MessengerCommunitiesSuite) newMessengerWithKey(shh types.Waku, privateK
 	return s.newMessengerWithOptions(shh, privateKey, options)
 }
 
-func (s *MessengerCommunitiesSuite) newMessenger(shh types.Waku) *Messenger {
+func (s *MessengerCommunitiesSuite) newMessenger() *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -92,7 +92,7 @@ func (s *MessengerCommunitiesSuite) newMessenger(shh types.Waku) *Messenger {
 }
 
 func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
-	alice := s.newMessenger(s.shh)
+	alice := s.newMessenger()
 
 	description := &protobuf.CommunityDescription{
 		Permissions: &protobuf.CommunityPermissions{
