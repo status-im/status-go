@@ -755,11 +755,18 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 			return nil, errors.New("not an community chat")
 		}
 
+		var emojiReaction bool
+		// We allow emoji reactions from anyone
+		switch chatEntity.(type) {
+		case *EmojiReaction:
+			emojiReaction = true
+		}
+
 		canPost, err := m.communitiesManager.CanPost(chatEntity.GetSigPubKey(), chat.CommunityID, chat.CommunityChatID(), chatEntity.GetGrant())
 		if err != nil {
 			return nil, err
 		}
-		if !canPost {
+		if !emojiReaction && !canPost {
 			return nil, errors.New("user can't post")
 		}
 
