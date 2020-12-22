@@ -2082,59 +2082,42 @@ func (m *Messenger) DeleteChat(chatID string) error {
 	return nil
 }
 
-func (m *Messenger) isNewContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts[contact.ID]
-	return contact.IsAdded() && (!ok || !previousContact.IsAdded())
+func (m *Messenger) DeactivateChat(chatID string) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.deactivateChat(chatID)
 }
 
-func (m *Messenger) hasNicknameChanged(contact *Contact) bool {
-	previousContact, ok := m.allContacts[contact.ID]
+func (m *Messenger) deactivateChat(chatID string) (*MessengerResponse, error) {
+	var response MessengerResponse
+	chat, ok := m.allChats[chatID]
 	if !ok {
-		return false
+		return nil, ErrChatNotFound
 	}
-	return contact.LocalNickname != previousContact.LocalNickname
-}
 
-func (m *Messenger) removedContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts[contact.ID]
-	if !ok {
-		return false
-	}
-	return previousContact.IsAdded() && !contact.IsAdded()
-}
+	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
-func (m *Messenger) saveContact(contact *Contact) error {
-	name, identicon, err := generateAliasAndIdenticon(contact.ID)
+	err := m.persistence.DeactivateChat(chat, clock)
+
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	contact.Identicon = identicon
-	contact.Alias = name
-
-	if m.isNewContact(contact) || m.hasNicknameChanged(contact) {
-		err := m.syncContact(context.Background(), contact)
+	// We re-register as our options have changed and we don't want to
+	// receive PN from mentions in this chat anymore
+	if chat.Public() {
+		err := m.reregisterForPushNotifications()
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	// We check if it should re-register with the push notification server
-	shouldReregisterForPushNotifications := (m.isNewContact(contact) || m.removedContact(contact))
+	m.allChats[chatID] = chat
 
-	err = m.persistence.SaveContact(contact, nil)
-	if err != nil {
-		return err
-	}
+	response.Chats = []*Chat{chat}
+	// TODO: Remove filters
 
-	m.allContacts[contact.ID] = contact
-
-	// Reregister only when data has changed
-	if shouldReregisterForPushNotifications {
-		return m.reregisterForPushNotifications()
-	}
-
-	return nil
+	return &response, nil
 }
 
 func (m *Messenger) reregisterForPushNotifications() error {
@@ -2144,55 +2127,6 @@ func (m *Messenger) reregisterForPushNotifications() error {
 	}
 
 	return m.pushNotificationClient.Reregister(m.pushNotificationOptions())
-}
-
-func (m *Messenger) SaveContact(contact *Contact) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	return m.saveContact(contact)
-}
-
-func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	chats, err := m.persistence.BlockContact(contact)
-	if err != nil {
-		return nil, err
-	}
-
-	m.allContacts[contact.ID] = contact
-	for _, chat := range chats {
-		m.allChats[chat.ID] = chat
-	}
-	delete(m.allChats, contact.ID)
-
-	// re-register for push notifications
-	err = m.reregisterForPushNotifications()
-	if err != nil {
-		return nil, err
-	}
-
-	return chats, nil
-}
-
-func (m *Messenger) Contacts() []*Contact {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	var contacts []*Contact
-	for _, contact := range m.allContacts {
-		if contact.HasCustomFields() {
-			contacts = append(contacts, contact)
-		}
-	}
-	return contacts
-}
-
-// GetContactByID assumes pubKey includes 0x prefix
-func (m *Messenger) GetContactByID(pubKey string) *Contact {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	return m.allContacts[pubKey]
 }
 
 // pull a message from the database and send it again
@@ -2524,106 +2458,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	return &response, m.saveChat(chat)
 }
 
-// Send contact updates to all contacts added by us
-func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	myID := contactIDFromPublicKey(&m.identity.PublicKey)
-
-	if _, err := m.sendContactUpdate(ctx, myID, ensName, profileImage); err != nil {
-		return err
-	}
-
-	// TODO: This should not be sending paired messages, as we do it above
-	for _, contact := range m.allContacts {
-		if contact.IsAdded() {
-			if _, err := m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// NOTE: this endpoint does not add the contact, the reason being is that currently
-// that's left as a responsibility to the client, which will call both `SendContactUpdate`
-// and `SaveContact` with the correct system tag.
-// Ideally we have a single endpoint that does both, but probably best to bring `ENS` name
-// on the messenger first.
-
-// SendContactUpdate sends a contact update to a user and adds the user to contacts
-func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	return m.sendContactUpdate(ctx, chatID, ensName, profileImage)
-}
-
-func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
-	var response MessengerResponse
-
-	contact, ok := m.allContacts[chatID]
-	if !ok {
-		pubkeyBytes, err := types.DecodeHex(chatID)
-		if err != nil {
-			return nil, err
-		}
-
-		publicKey, err := crypto.UnmarshalPubkey(pubkeyBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		contact, err = buildContact(publicKey)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	chat, ok := m.allChats[chatID]
-	if !ok {
-		publicKey, err := contact.PublicKey()
-		if err != nil {
-			return nil, err
-		}
-		chat = OneToOneFromPublicKey(publicKey, m.getTimesource())
-		// We don't want to show the chat to the user
-		chat.Active = false
-	}
-
-	m.allChats[chat.ID] = chat
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-
-	contactUpdate := &protobuf.ContactUpdate{
-		Clock:        clock,
-		EnsName:      ensName,
-		ProfileImage: profileImage}
-	encodedMessage, err := proto.Marshal(contactUpdate)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID:         chatID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_CONTACT_UPDATE,
-		ResendAutomatically: true,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	response.Contacts = []*Contact{contact}
-	response.Chats = []*Chat{chat}
-
-	chat.LastClockValue = clock
-	err = m.saveChat(chat)
-	if err != nil {
-		return nil, err
-	}
-	return &response, m.saveContact(contact)
-}
-
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) error {
@@ -2914,7 +2748,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if c, ok := messageState.AllContacts[senderID]; ok {
 					contact = c
 				} else {
-					c, err := buildContact(publicKey)
+					c, err := buildContact(senderID, publicKey)
 					if err != nil {
 						logger.Info("failed to build contact", zap.Error(err))
 						continue
@@ -3374,6 +3208,32 @@ func (m *Messenger) DeleteMessage(id string) error {
 
 func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
+}
+
+func (m *Messenger) ClearHistory(id string) (*MessengerResponse, error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.clearHistory(id)
+
+}
+
+func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
+	chat, ok := m.allChats[id]
+	if !ok {
+		return nil, ErrChatNotFound
+	}
+
+	clock, _ := chat.NextClockAndTimestamp(m.transport)
+
+	err := m.persistence.ClearHistory(chat, clock)
+	if err != nil {
+		return nil, err
+	}
+
+	m.allChats[id] = chat
+
+	response := &MessengerResponse{Chats: []*Chat{chat}}
+	return response, nil
 }
 
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.

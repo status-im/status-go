@@ -415,6 +415,22 @@ func (api *PublicAPI) MarkAllRead(chatID string) error {
 	return api.service.messenger.MarkAllRead(chatID)
 }
 
+func (api *PublicAPI) AddContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AddContact(ctx, pubKey)
+}
+
+func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveContact(ctx, pubKey)
+}
+
+func (api *PublicAPI) ClearHistory(chatID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ClearHistory(chatID)
+}
+
+func (api *PublicAPI) DeactivateChat(chatID string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeactivateChat(chatID)
+}
+
 func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
 	return api.service.messenger.UpdateMessageOutgoingStatus(id, newOutgoingStatus)
 }

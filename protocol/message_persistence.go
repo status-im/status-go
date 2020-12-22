@@ -818,8 +818,27 @@ func (db sqlitePersistence) HideMessage(id string) error {
 }
 
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
-	_, err := db.db.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
-	return err
+	return db.deleteMessagesByChatID(id, nil)
+}
+
+func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err error) {
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
+	return
 }
 
 func (db sqlitePersistence) MarkAllRead(chatID string) error {
@@ -1135,4 +1154,80 @@ func (db sqlitePersistence) InvitationByID(id string) (*GroupChatInvitation, err
 	default:
 		return nil, err
 	}
+}
+
+// ClearHistory deletes all the messages for a chat and updates it's values
+func (db sqlitePersistence) ClearHistory(chat *Chat, currentClockValue uint64) (err error) {
+	var tx *sql.Tx
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	err = db.clearHistory(chat, currentClockValue, tx)
+
+	return
+}
+
+// Deactivate chat sets a chat as inactive and clear its history
+func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64) (err error) {
+	var tx *sql.Tx
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	err = db.deactivateChat(chat, currentClockValue, tx)
+
+	return
+}
+
+func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+	chat.Active = false
+	err := db.saveChat(tx, *chat)
+	if err != nil {
+		return err
+	}
+
+	return db.clearHistory(chat, currentClockValue, tx)
+}
+
+func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+	// Set deleted at clock value if it's not a public chat so that
+	// old messages will be discarded
+	if !chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
+		if chat.LastMessage != nil && chat.LastMessage.Clock != 0 {
+			chat.DeletedAtClockValue = chat.LastMessage.Clock
+		}
+		chat.DeletedAtClockValue = currentClockValue
+	}
+
+	chat.LastMessage = nil
+	chat.UnviewedMessagesCount = 0
+
+	err := db.deleteMessagesByChatID(chat.ID, tx)
+	if err != nil {
+		return err
+	}
+
+	err = db.saveChat(tx, *chat)
+	return err
 }

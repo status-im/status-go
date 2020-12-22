@@ -221,15 +221,8 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 
 	contact, ok := state.AllContacts[message.Id]
 	if !ok {
-		publicKeyBytes, err := hex.DecodeString(message.Id[2:])
-		if err != nil {
-			return err
-		}
-		publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
-		if err != nil {
-			return err
-		}
-		contact, err = buildContact(publicKey)
+		var err error
+		contact, err = buildContactFromPkString(message.Id)
 		if err != nil {
 			return err
 		}
