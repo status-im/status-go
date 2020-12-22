@@ -1956,14 +1956,26 @@ func (m *Messenger) LeaveCommunity(communityID string) (*MessengerResponse, erro
 			return nil, err
 		}
 		response.RemovedChats = append(response.RemovedChats, orgChatID)
-		response.RemovedFilters = append(response.RemovedFilters, orgChatID)
+
+		filter, err := m.transport.RemoveFilterByChatID(orgChatID)
+		if err != nil {
+			return nil, err
+		}
+
+		if filter != nil {
+			response.RemovedFilters = append(response.RemovedFilters, filter)
+		}
 	}
 
-	err = m.transport.RemoveFilterByChatID(communityID)
+	filter, err := m.transport.RemoveFilterByChatID(communityID)
 	if err != nil {
 		return nil, err
 	}
-	response.RemovedFilters = append(response.RemovedFilters, communityID)
+
+	if filter != nil {
+		response.RemovedFilters = append(response.RemovedFilters, filter)
+	}
+
 	response.Communities = []*communities.Community{org}
 	return response, nil
 }

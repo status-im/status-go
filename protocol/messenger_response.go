@@ -18,7 +18,7 @@ type MessengerResponse struct {
 	Communities      []*communities.Community        `json:"communities,omitempty"`
 	CommunityChanges []*communities.CommunityChanges `json:"communitiesChanges,omitempty"`
 	Filters          []*transport.Filter             `json:"filters,omitempty"`
-	RemovedFilters   []string                        `json:"removedFilters,omitempty"`
+	RemovedFilters   []*transport.Filter             `json:"removedFilters,omitempty"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
