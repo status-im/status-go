@@ -178,7 +178,7 @@ func (db sqlitePersistence) DeleteChat(chatID string) (err error) {
 		return
 	}
 
-	_, err := tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, chatID)
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, chatID)
 	return
 }
 

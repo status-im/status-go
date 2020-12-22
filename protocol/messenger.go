@@ -2304,7 +2304,9 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 		if err != nil {
 			return nil, err
 		}
-		if !canPost {
+
+		// We allow emoji reactions by anyone
+		if spec.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION && !canPost {
 			m.logger.Error("can't post on chat", zap.String("chat-id", chat.ID), zap.String("chat-name", chat.Name))
 
 			return nil, errors.New("can't post on chat")
