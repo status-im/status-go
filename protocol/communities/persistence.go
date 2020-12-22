@@ -28,14 +28,23 @@ func (p *Persistence) SaveCommunity(community *Community) error {
 	return err
 }
 
-func (p *Persistence) queryCommunities(query string) ([]*Community, error) {
-	var response []*Community
+func (p *Persistence) queryCommunities(query string) (response []*Community, err error) {
 
 	rows, err := p.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err != nil {
+			// Don't shadow original error
+			_ = rows.Close()
+			return
+
+		}
+		err = rows.Close()
+		return
+	}()
 
 	for rows.Next() {
 		var publicKeyBytes, privateKeyBytes, descriptionBytes []byte

@@ -401,7 +401,7 @@ func (m *MessageHandler) HandleCommunityInvitation(state *ReceivedMessageState, 
 }
 
 // HandleWrappedCommunityDescriptionMessage handles a wrapped community description
-func (m *MessageHandler) HandleWrappedCommunityDescriptionMessage(state *ReceivedMessageState, payload []byte) (*communities.Community, error) {
+func (m *MessageHandler) HandleWrappedCommunityDescriptionMessage(payload []byte) (*communities.Community, error) {
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
 }
 
@@ -479,7 +479,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		m.logger.Debug("Handling community content type")
 
-		community, err := m.HandleWrappedCommunityDescriptionMessage(state, receivedMessage.GetCommunity())
+		community, err := m.HandleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity())
 		if err != nil {
 			return err
 		}
