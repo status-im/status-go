@@ -119,3 +119,35 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
+
+func (s *MessengerContactUpdateSuite) TestAddContact() {
+	contactID := types.EncodeHex(crypto.FromECDSAPub(&s.m.identity.PublicKey))
+
+	theirMessenger := s.newMessenger(s.shh)
+	s.Require().NoError(theirMessenger.Start())
+
+	response, err := theirMessenger.AddContact(context.Background(), contactID)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+
+	s.Require().Len(response.Contacts, 1)
+	contact := response.Contacts[0]
+
+	// It adds the profile chat and the one to one chat
+	s.Require().Len(response.Chats, 2)
+
+	// It should add the contact
+	s.Require().True(contact.IsAdded())
+
+	// Wait for the message to reach its destination
+	response, err = WaitOnMessengerResponse(
+		s.m,
+		func(r *MessengerResponse) bool { return len(r.Contacts) > 0 },
+		"contact request not received",
+	)
+	s.Require().NoError(err)
+
+	receivedContact := response.Contacts[0]
+	s.Require().True(receivedContact.HasBeenAdded())
+	s.Require().NotEmpty(receivedContact.LastUpdated)
+}

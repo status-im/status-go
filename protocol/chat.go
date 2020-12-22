@@ -312,10 +312,14 @@ func CreatePublicChat(name string, timesource common.TimeSource) Chat {
 	}
 }
 
-func CreateProfileChat(name string, profile string, timesource common.TimeSource) Chat {
+func buildProfileChatID(publicKeyString string) string {
+	return "@" + publicKeyString
+}
+
+func CreateProfileChat(id string, profile string, timesource common.TimeSource) Chat {
 	return Chat{
-		ID:        name,
-		Name:      name,
+		ID:        id,
+		Name:      id,
 		Active:    true,
 		Timestamp: int64(timesource.GetCurrentTime()),
 		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
