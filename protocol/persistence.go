@@ -158,9 +158,28 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	return err
 }
 
-func (db sqlitePersistence) DeleteChat(chatID string) error {
-	_, err := db.db.Exec("DELETE FROM chats WHERE id = ?", chatID)
-	return err
+func (db sqlitePersistence) DeleteChat(chatID string) (err error) {
+	var tx *sql.Tx
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec("DELETE FROM chats WHERE id = ?", chatID)
+	if err != nil {
+		return
+	}
+
+	_, err := tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, chatID)
+	return
 }
 
 func (db sqlitePersistence) MuteChat(chatID string) error {
