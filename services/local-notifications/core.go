@@ -3,7 +3,6 @@ package localnotifications
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -16,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/protocol"
+	protocolcommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 )
@@ -34,14 +35,10 @@ const (
 	outbound transactionState = "outbound"
 
 	TypeTransaction NotificationType = "transaction"
+	TypeMessage     NotificationType = "message"
 )
 
-type Body interface {
-	GetType() NotificationType
-}
-
-type NotificationBody struct {
-	Type        NotificationType  `json:"type"`
+type notificationBody struct {
 	State       transactionState  `json:"state"`
 	From        common.Address    `json:"from"`
 	To          common.Address    `json:"to"`
@@ -53,27 +50,35 @@ type NotificationBody struct {
 	Network     uint64            `json:"network"`
 }
 
+type notificationMessageBody struct {
+	Message *protocolcommon.Message `json:"message"`
+	Contact *protocol.Contact       `json:"contact"`
+	Chat    *protocol.Chat          `json:"chat"`
+}
+
 type Notification struct {
 	ID            common.Hash `json:"id"`
 	Platform      float32     `json:"platform,omitempty"`
-	Body          Body
-	Category      PushCategory `json:"category,omitempty"`
-	Deeplink      string       `json:"deepLink,omitempty"`
-	Image         string       `json:"imageUrl,omitempty"`
-	IsScheduled   bool         `json:"isScheduled,omitempty"`
-	ScheduledTime string       `json:"scheduleTime,omitempty"`
+	Body          interface{}
+	BodyType      NotificationType `json:"bodyType"`
+	Category      PushCategory     `json:"category,omitempty"`
+	Deeplink      string           `json:"deepLink,omitempty"`
+	Image         string           `json:"imageUrl,omitempty"`
+	IsScheduled   bool             `json:"isScheduled,omitempty"`
+	ScheduledTime string           `json:"scheduleTime,omitempty"`
 }
 
 // notificationAlias is an interim struct used for json un/marshalling
 type notificationAlias struct {
-	ID            common.Hash     `json:"id"`
-	Platform      float32         `json:"platform,omitempty"`
-	Body          json.RawMessage `json:"body"`
-	Category      PushCategory    `json:"category,omitempty"`
-	Deeplink      string          `json:"deepLink,omitempty"`
-	Image         string          `json:"imageUrl,omitempty"`
-	IsScheduled   bool            `json:"isScheduled,omitempty"`
-	ScheduledTime string          `json:"scheduleTime,omitempty"`
+	ID            common.Hash      `json:"id"`
+	Platform      float32          `json:"platform,omitempty"`
+	Body          json.RawMessage  `json:"body"`
+	BodyType      NotificationType `json:"bodyType"`
+	Category      PushCategory     `json:"category,omitempty"`
+	Deeplink      string           `json:"deepLink,omitempty"`
+	Image         string           `json:"imageUrl,omitempty"`
+	IsScheduled   bool             `json:"isScheduled,omitempty"`
+	ScheduledTime string           `json:"scheduleTime,omitempty"`
 }
 
 // TransactionEvent - structure used to pass messages from wallet to bus
@@ -125,30 +130,34 @@ func NewService(appDB *sql.DB, network uint64) *Service {
 	}
 }
 
-func (nb *NotificationBody) GetType() NotificationType {
-	return nb.Type
-}
-
 func (n *Notification) MarshalJSON() ([]byte, error) {
 	var body json.RawMessage
 	var err error
 
-	switch n.Body.GetType() {
+	switch n.BodyType {
 	case TypeTransaction:
-		tx := n.Body.(*NotificationBody)
-		body, err = json.Marshal(tx)
+		nb := n.Body.(*notificationBody)
+		body, err = json.Marshal(nb)
+		if err != nil {
+			return nil, err
+		}
+
+	case TypeMessage:
+		nmb := n.Body.(*notificationMessageBody)
+		body, err = json.Marshal(nmb)
 		if err != nil {
 			return nil, err
 		}
 
 	default:
-		return nil, fmt.Errorf("unknown NotificationType '%s'", n.Body.GetType())
+		return nil, fmt.Errorf("unknown NotificationType '%s'", n.BodyType)
 	}
 
 	alias := notificationAlias{
 		n.ID,
 		n.Platform,
 		body,
+		n.BodyType,
 		n.Category,
 		n.Deeplink,
 		n.Image,
@@ -166,6 +175,7 @@ func (n *Notification) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	n.BodyType = alias.BodyType
 	n.Category = alias.Category
 	n.Platform = alias.Platform
 	n.ID = alias.ID
@@ -174,33 +184,26 @@ func (n *Notification) UnmarshalJSON(data []byte) error {
 	n.IsScheduled = alias.IsScheduled
 	n.ScheduledTime = alias.ScheduledTime
 
-	// TODO(Samuel): This is rather inelegant.
-	//  I don't like unmarshalling into a map[string]interface{} just to extract the Body.Type
-	//  and then unmarshalling again into the valid Body type struct
-	var bodyAlias map[string]interface{}
-	err = json.Unmarshal(alias.Body, &bodyAlias)
+	switch n.BodyType {
+	case TypeTransaction:
+		return n.unmarshalAndAttachBody(alias.Body, &notificationBody{})
+
+	case TypeMessage:
+		return n.unmarshalAndAttachBody(alias.Body, &notificationMessageBody{})
+
+	default:
+		return fmt.Errorf("unknown NotificationType '%s'", n.BodyType)
+	}
+}
+
+func (n *Notification) unmarshalAndAttachBody(body json.RawMessage, bodyStruct interface{}) error {
+	err := json.Unmarshal(body, &bodyStruct)
 	if err != nil {
 		return err
 	}
 
-	bt, ok := bodyAlias["type"]
-	if !ok {
-		return errors.New("json unmarshalling Notification, body does not contain 'type' field")
-	}
-
-	switch NotificationType(bt.(string)) {
-	case TypeTransaction:
-		nb := NotificationBody{}
-		err = json.Unmarshal(alias.Body, &nb)
-		if err != nil {
-			return err
-		}
-
-		n.Body = &nb
-		return nil
-	default:
-		return fmt.Errorf("unknown NotificationType '%s'", bt)
-	}
+	n.Body = bodyStruct
+	return nil
 }
 
 func pushMessage(notification *Notification) {
@@ -242,8 +245,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 		deeplink = walletDeeplinkPrefix + to.Address.String()
 	}
 
-	body := NotificationBody{
-		Type:        TypeTransaction,
+	body := notificationBody{
 		State:       state,
 		From:        transfer.From,
 		To:          transfer.Address,
@@ -256,6 +258,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	}
 
 	return &Notification{
+		BodyType: TypeTransaction,
 		ID:       transfer.ID,
 		Body:     &body,
 		Deeplink: deeplink,

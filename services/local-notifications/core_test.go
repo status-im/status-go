@@ -131,7 +131,7 @@ func TestTransactionNotification(t *testing.T) {
 		if notification.Type != "local-notifications" {
 			return fmt.Errorf("wrong signal was sent")
 		}
-		if notification.Event.Body.(*NotificationBody).To != header.Address {
+		if notification.Event.Body.(*notificationBody).To != header.Address {
 			return fmt.Errorf("transaction to address is wrong")
 		}
 		return nil
