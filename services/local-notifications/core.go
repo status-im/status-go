@@ -3,6 +3,7 @@ package localnotifications
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -40,7 +41,7 @@ type Body interface {
 }
 
 type NotificationBody struct {
-	Type        NotificationType
+	Type        NotificationType  `json:"type"`
 	State       transactionState  `json:"state"`
 	From        common.Address    `json:"from"`
 	To          common.Address    `json:"to"`
@@ -53,14 +54,26 @@ type NotificationBody struct {
 }
 
 type Notification struct {
-	ID            common.Hash  `json:"id"`
-	Platform      float32      `json:"platform,omitempty"`
+	ID            common.Hash `json:"id"`
+	Platform      float32     `json:"platform,omitempty"`
 	Body          Body
 	Category      PushCategory `json:"category,omitempty"`
 	Deeplink      string       `json:"deepLink,omitempty"`
 	Image         string       `json:"imageUrl,omitempty"`
 	IsScheduled   bool         `json:"isScheduled,omitempty"`
 	ScheduledTime string       `json:"scheduleTime,omitempty"`
+}
+
+// notificationAlias is an interim struct used for json un/marshalling
+type notificationAlias struct {
+	ID            common.Hash     `json:"id"`
+	Platform      float32         `json:"platform,omitempty"`
+	Body          json.RawMessage `json:"body"`
+	Category      PushCategory    `json:"category,omitempty"`
+	Deeplink      string          `json:"deepLink,omitempty"`
+	Image         string          `json:"imageUrl,omitempty"`
+	IsScheduled   bool            `json:"isScheduled,omitempty"`
+	ScheduledTime string          `json:"scheduleTime,omitempty"`
 }
 
 // TransactionEvent - structure used to pass messages from wallet to bus
@@ -116,13 +129,9 @@ func (nb *NotificationBody) GetType() NotificationType {
 	return nb.Type
 }
 
-// TODO I suspect that this JsonMarshaller isn't working as expected
-//  RESOLVE : TestTransactionNotification: core_test.go:120:
-//        	Error Trace:	core_test.go:120
-//        	Error:      	Received unexpected error:
-//        	            	Signal was not handled
-//        	Test:       	TestTransactionNotification
-func (n *Notification) MarshalJSON() (body []byte, err error) {
+func (n *Notification) MarshalJSON() ([]byte, error) {
+	var body json.RawMessage
+	var err error
 
 	switch n.Body.GetType() {
 	case TypeTransaction:
@@ -136,16 +145,7 @@ func (n *Notification) MarshalJSON() (body []byte, err error) {
 		return nil, fmt.Errorf("unknown NotificationType '%s'", n.Body.GetType())
 	}
 
-	alias := struct {
-		ID            common.Hash  `json:"id"`
-		Platform      float32      `json:"platform,omitempty"`
-		Body          []byte       `json:"body"`
-		Category      PushCategory `json:"category,omitempty"`
-		Deeplink      string       `json:"deepLink,omitempty"`
-		Image         string       `json:"imageUrl,omitempty"`
-		IsScheduled   bool         `json:"isScheduled,omitempty"`
-		ScheduledTime string       `json:"scheduleTime,omitempty"`
-	}{
+	alias := notificationAlias{
 		n.ID,
 		n.Platform,
 		body,
@@ -157,6 +157,50 @@ func (n *Notification) MarshalJSON() (body []byte, err error) {
 	}
 
 	return json.Marshal(alias)
+}
+
+func (n *Notification) UnmarshalJSON(data []byte) error {
+	var alias notificationAlias
+	err := json.Unmarshal(data, &alias)
+	if err != nil {
+		return err
+	}
+
+	n.Category = alias.Category
+	n.Platform = alias.Platform
+	n.ID = alias.ID
+	n.Image = alias.Image
+	n.Deeplink = alias.Deeplink
+	n.IsScheduled = alias.IsScheduled
+	n.ScheduledTime = alias.ScheduledTime
+
+	// TODO(Samuel): This is rather inelegant.
+	//  I don't like unmarshalling into a map[string]interface{} just to extract the Body.Type
+	//  and then unmarshalling again into the valid Body type struct
+	var bodyAlias map[string]interface{}
+	err = json.Unmarshal(alias.Body, &bodyAlias)
+	if err != nil {
+		return err
+	}
+
+	bt, ok := bodyAlias["type"]
+	if !ok {
+		return errors.New("json unmarshalling Notification, body does not contain 'type' field")
+	}
+
+	switch NotificationType(bt.(string)) {
+	case TypeTransaction:
+		nb := NotificationBody{}
+		err = json.Unmarshal(alias.Body, &nb)
+		if err != nil {
+			return err
+		}
+
+		n.Body = &nb
+		return nil
+	default:
+		return fmt.Errorf("unknown NotificationType '%s'", bt)
+	}
 }
 
 func pushMessage(notification *Notification) {
@@ -199,6 +243,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	}
 
 	body := NotificationBody{
+		Type:        TypeTransaction,
 		State:       state,
 		From:        transfer.From,
 		To:          transfer.Address,

@@ -117,7 +117,6 @@ func TestTransactionNotification(t *testing.T) {
 		Accounts:    []common.Address{header.Address},
 	})
 
-	// TODO RESOLVE Error here.
 	require.NoError(t, utils.Eventually(func() error {
 		if signalEvent == nil {
 			return fmt.Errorf("Signal was not handled")
