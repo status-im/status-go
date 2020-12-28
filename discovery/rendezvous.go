@@ -128,7 +128,7 @@ func (r *Rendezvous) MakeRecord() (record enr.Record, err error) {
 }
 
 func (r *Rendezvous) register(topic string, record enr.Record) error {
-	srv := r.servers[rand.Intn(len(r.servers))]
+	srv := r.servers[rand.Intn(len(r.servers))] // nolint: gosec
 	ctx, cancel := context.WithTimeout(r.rootCtx, requestTimeout)
 	defer cancel()
 
@@ -198,7 +198,7 @@ func (r *Rendezvous) Discover(
 			}
 			ticker = time.NewTicker(newPeriod)
 		case <-ticker.C:
-			srv := r.servers[rand.Intn(len(r.servers))]
+			srv := r.servers[rand.Intn(len(r.servers))] // nolint: gosec
 			records, err := r.discoverRequest(srv, topic)
 			if err == context.Canceled {
 				return err

@@ -45,7 +45,7 @@ func (s *APITestSuite) TestCHTUpdate() {
 func (s *APITestSuite) TestRaceConditions() {
 	cnt := 25
 	progress := make(chan struct{}, cnt)
-	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano())) // nolint: gosec
 
 	nodeConfig1, err := utils.MakeTestNodeConfig(utils.GetNetworkID())
 	s.NoError(err)
@@ -86,10 +86,11 @@ func (s *APITestSuite) TestRaceConditions() {
 	}
 
 	for i := 0; i < cnt; i++ {
-		randConfig := nodeConfigs[rnd.Intn(len(nodeConfigs))]
-		randFunc := funcsToTest[rnd.Intn(len(funcsToTest))]
+		randConfig := nodeConfigs[rnd.Intn(len(nodeConfigs))] // nolint: gosec
+		randFunc := funcsToTest[rnd.Intn(len(funcsToTest))]   // nolint: gosec
 
-		if rnd.Intn(100) > 75 { // introduce random delays
+		// introduce random delays
+		if rnd.Intn(100) > 75 { // nolint: gosec
 			time.Sleep(500 * time.Millisecond)
 		}
 		s.NoError(s.backend.AccountManager().InitKeystore(randConfig.KeyStoreDir))

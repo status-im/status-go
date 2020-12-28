@@ -2,19 +2,14 @@ package peers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"strconv"
 	"testing"
 	"time"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	ma "github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/storage"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -93,24 +88,6 @@ func (s *PeerPoolSimulationSuite) setupEthV5() {
 	}
 }
 
-func (s *PeerPoolSimulationSuite) setupRendezvous() {
-	priv, _, err := lcrypto.GenerateKeyPair(lcrypto.Secp256k1, 0)
-	s.Require().NoError(err)
-	laddr, err := ma.NewMultiaddr(fmt.Sprintf("/ip4/127.0.0.1/tcp/7777"))
-	s.Require().NoError(err)
-	db, err := leveldb.Open(storage.NewMemStorage(), nil)
-	s.Require().NoError(err)
-	s.rendezvousServer = server.NewServer(laddr, priv, server.NewStorage(db))
-	s.Require().NoError(s.rendezvousServer.Start())
-	for i := range s.peers {
-		peer := s.peers[i]
-		d, err := discovery.NewRendezvous([]ma.Multiaddr{s.rendezvousServer.Addr()}, peer.PrivateKey, peer.Self())
-		s.NoError(err)
-		s.NoError(d.Start())
-		s.discovery[i] = d
-	}
-}
-
 func (s *PeerPoolSimulationSuite) TearDown() {
 	s.bootnode.Stop()
 	for i := range s.peers {
@@ -168,98 +145,6 @@ func (s *PeerPoolSimulationSuite) TestPeerPoolCacheEthV5() {
 		tp := topicPool.(*TopicPool)
 		s.Equal(cache, tp.cache)
 	}
-}
-
-func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailoverEthV5() {
-	s.T().Skip("Skipping due to being flaky")
-	s.setupEthV5()
-	s.singleTopicDiscoveryWithFailover()
-}
-
-func (s *PeerPoolSimulationSuite) TestSingleTopicDiscoveryWithFailoverRendezvous() {
-	s.T().Skip("Skipping due to being flaky")
-	s.setupRendezvous()
-	s.singleTopicDiscoveryWithFailover()
-}
-
-func (s *PeerPoolSimulationSuite) singleTopicDiscoveryWithFailover() {
-	var err error
-	// Buffered channels must be used because we expect the events
-	// to be in the same order. Use a buffer length greater than
-	// the expected number of events to avoid deadlock.
-	poolEvents := make(chan string, 10)
-	summaries := make(chan []*p2p.PeerInfo, 10)
-	signal.SetDefaultNodeNotificationHandler(func(jsonEvent string) {
-		var envelope struct {
-			Type  string
-			Event json.RawMessage
-		}
-		s.NoError(json.Unmarshal([]byte(jsonEvent), &envelope))
-
-		switch typ := envelope.Type; typ {
-		case signal.EventDiscoveryStarted, signal.EventDiscoveryStopped:
-			poolEvents <- envelope.Type
-		case signal.EventDiscoverySummary:
-			poolEvents <- envelope.Type
-			var summary []*p2p.PeerInfo
-			s.NoError(json.Unmarshal(envelope.Event, &summary))
-			summaries <- summary
-		}
-	})
-	defer signal.ResetDefaultNodeNotificationHandler()
-
-	topic := discv5.Topic("cap=test")
-	// simulation should only rely on fast sync
-	config := map[discv5.Topic]params.Limits{
-		topic: params.NewLimits(1, 1), // limits are chosen for simplicity of the simulation
-	}
-	peerPoolOpts := &Options{100 * time.Millisecond, 100 * time.Millisecond, 0, true, 0, nil, ""}
-	cache, err := newInMemoryCache()
-	s.Require().NoError(err)
-	peerPool := NewPeerPool(s.discovery[1], config, cache, peerPoolOpts)
-
-	// create and start topic registry
-	register := NewRegister(s.discovery[0], topic)
-	s.Require().NoError(register.Start())
-
-	// subscribe for peer events before starting the peer pool
-	events := make(chan *p2p.PeerEvent, 20)
-	subscription := s.peers[1].SubscribeEvents(events)
-	defer subscription.Unsubscribe()
-
-	// start the peer pool
-	s.Require().NoError(peerPool.Start(s.peers[1], nil))
-	defer peerPool.Stop()
-	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-
-	// wait for the peer to be found and connected
-	connectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeAdd)
-	s.Equal(s.peers[0].Self().ID(), connectedPeer)
-	// as the upper limit was reached, Discovery should be stoped
-	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
-	s.Len(<-summaries, 1)
-
-	// stop topic register and the connected peer
-	register.Stop()
-	s.peers[0].Stop()
-	disconnectedPeer := s.getPeerFromEvent(events, p2p.PeerEventTypeDrop)
-	s.Equal(connectedPeer, disconnectedPeer)
-	s.Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Len(<-summaries, 0)
-	// Discovery should be restarted because the number of peers dropped
-	// below the lower limit.
-	s.Equal(signal.EventDiscoveryStarted, s.getPoolEvent(poolEvents))
-
-	// register the second peer
-	register = NewRegister(s.discovery[2], topic)
-	s.Require().NoError(register.Start())
-	defer register.Stop()
-	s.Equal(s.peers[2].Self().ID(), s.getPeerFromEvent(events, p2p.PeerEventTypeAdd))
-	// Discovery can be stopped again.
-	s.Require().Equal(signal.EventDiscoverySummary, s.getPoolEvent(poolEvents))
-	s.Equal(signal.EventDiscoveryStopped, s.getPoolEvent(poolEvents))
-	s.Len(<-summaries, 1)
 }
 
 // TestPeerPoolMaxPeersOverflow verifies that following scenario will not occur:

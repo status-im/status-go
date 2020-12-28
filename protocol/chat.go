@@ -277,7 +277,7 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
-		color = chatColors[rand.Intn(len(chatColors))]
+		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
 	}
 
 	return Chat{
@@ -307,7 +307,7 @@ func CreatePublicChat(name string, timesource common.TimeSource) Chat {
 		Name:      name,
 		Active:    true,
 		Timestamp: int64(timesource.GetCurrentTime()),
-		Color:     chatColors[rand.Intn(len(chatColors))],
+		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
 		ChatType:  ChatTypePublic,
 	}
 }
@@ -318,7 +318,7 @@ func CreateProfileChat(name string, profile string, timesource common.TimeSource
 		Name:      name,
 		Active:    true,
 		Timestamp: int64(timesource.GetCurrentTime()),
-		Color:     chatColors[rand.Intn(len(chatColors))],
+		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
 		ChatType:  ChatTypeProfile,
 		Profile:   profile,
 	}
@@ -327,7 +327,7 @@ func CreateProfileChat(name string, profile string, timesource common.TimeSource
 func CreateGroupChat(timesource common.TimeSource) Chat {
 	return Chat{
 		Active:    true,
-		Color:     chatColors[rand.Intn(len(chatColors))],
+		Color:     chatColors[rand.Intn(len(chatColors))], // nolint: gosec
 		Timestamp: int64(timesource.GetCurrentTime()),
 		ChatType:  ChatTypePrivateGroupChat,
 	}

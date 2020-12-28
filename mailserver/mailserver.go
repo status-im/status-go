@@ -826,7 +826,7 @@ func (s *mailServer) DeliverMail(peerID, reqID types.Hash, req MessagesRequestPa
 func (s *mailServer) SyncMail(peerID types.Hash, req MessagesRequestPayload) error {
 	log.Info("Started syncing envelopes", "peer", peerID.String(), "req", req)
 
-	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000))
+	requestID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), rand.Intn(1000)) // nolint: gosec
 
 	syncAttemptsCounter.Inc()
 

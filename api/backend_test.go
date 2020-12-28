@@ -240,7 +240,7 @@ func TestBackendConnectionChangesConcurrently(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func() {
-			connIdx := rand.Intn(len(connections))
+			connIdx := rand.Intn(len(connections)) // nolint: gosec
 			backend.ConnectionChange(connections[connIdx], false)
 			wg.Done()
 		}()
