@@ -25,11 +25,7 @@ func (api *API) SwitchWalletNotifications(ctx context.Context, preference bool) 
 		return err
 	}
 
-	if preference {
-		api.s.StartWalletWatcher()
-	} else {
-		api.s.StopWalletWatcher()
-	}
+	api.s.WatchingEnabled = preference
 
 	return nil
 }

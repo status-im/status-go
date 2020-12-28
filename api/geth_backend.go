@@ -886,29 +886,6 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	b.log.Info("App State changed", "new-state", s)
 	b.appState = s
 
-	if s == appStateBackground {
-		localNotifications, err := b.statusNode.LocalNotificationsService()
-		if err != nil {
-			b.log.Error("Retrieving of local notifications service failed on app state change", "error", err)
-		}
-
-		wallet, err := b.statusNode.WalletService()
-		if err != nil {
-			b.log.Error("Retrieving of wallet service failed on app state change to background", "error", err)
-			return
-		}
-
-		// If we have no local notifications, force wallet stop, otherwise check if it's watching the wallet
-		if localNotifications == nil || (localNotifications != nil && !localNotifications.IsWatchingWallet()) {
-			err = wallet.Stop()
-
-			if err != nil {
-				b.log.Error("Wallet service stop failed on app state change to background", "error", err)
-				return
-			}
-		}
-	}
-
 	// TODO: put node in low-power mode if the app is in background (or inactive)
 	// and normal mode if the app is in foreground.
 }

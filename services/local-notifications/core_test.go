@@ -47,7 +47,7 @@ func TestWalletSubscription(t *testing.T) {
 	require.Equal(t, true, s.IsStarted())
 
 	require.NoError(t, s.SubscribeWallet(feed))
-	require.Equal(t, false, s.IsWatchingWallet())
+	require.Equal(t, true, s.IsWatchingWallet())
 
 	s.StartWalletWatcher()
 	require.Equal(t, true, s.IsWatchingWallet())
@@ -80,6 +80,7 @@ func TestTransactionNotification(t *testing.T) {
 
 	feed := &event.Feed{}
 	require.NoError(t, s.SubscribeWallet(feed))
+	s.WatchingEnabled = true
 
 	s.StartWalletWatcher()
 
