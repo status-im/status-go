@@ -20,7 +20,7 @@ func TestPeerPriorityQueueSorting(t *testing.T) {
 
 	// shuffle discTimes
 	for i := range discTimes {
-		j := rand.Intn(i + 1)
+		j := rand.Intn(i + 1) //nolint: gosec
 		discTimes[i], discTimes[j] = discTimes[j], discTimes[i]
 	}
 

@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/les"
 	gethnode "github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 
 	"github.com/status-im/status-go/whisper/v6"
 
@@ -184,86 +183,6 @@ func TestStatusNodeAddPeer(t *testing.T) {
 	require.NoError(t, n.AddPeer(peerURL))
 	require.NoError(t, <-errCh)
 	require.Equal(t, 1, n.PeerCount())
-}
-
-func TestStatusNodeReconnectStaticPeers(t *testing.T) {
-	// Skipping as flaky
-	t.Skip()
-	var err error
-
-	peer, err := gethnode.New(&gethnode.Config{
-		P2P: p2p.Config{
-			MaxPeers:    math.MaxInt32,
-			NoDiscovery: true,
-			ListenAddr:  ":0",
-		},
-		NoUSB: true,
-	})
-	require.NoError(t, err)
-	require.NoError(t, peer.Start())
-	defer func() { require.NoError(t, peer.Stop()) }()
-
-	var errCh <-chan error
-
-	peerURL := peer.Server().Self().URLv4()
-	n := New()
-
-	// checks before node is started
-	require.EqualError(t, n.ReconnectStaticPeers(), ErrNoRunningNode.Error())
-
-	// start status node
-	config := params.NodeConfig{
-		MaxPeers: math.MaxInt32,
-		ClusterConfig: params.ClusterConfig{
-			Enabled:     true,
-			StaticNodes: []string{peerURL},
-		},
-	}
-	require.NoError(t, n.Start(&config, nil))
-	defer func() { require.NoError(t, n.Stop()) }()
-
-	// checks after node is started
-	// it may happen that the peer is already connected
-	// because it was already added to `StaticNodes`
-	connected, err := isPeerConnected(n, peerURL)
-	require.NoError(t, err)
-	if !connected {
-		errCh = helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*30)
-		require.NoError(t, <-errCh)
-	}
-	require.Equal(t, 1, n.PeerCount())
-	require.Equal(t, peer.Server().Self().ID().String(), n.GethNode().Server().PeersInfo()[0].ID)
-
-	// reconnect static peers
-	errDropCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeDrop, time.Second*30)
-
-	// it takes at least 30 seconds to bring back previously connected peer
-	errAddCh := helpers.WaitForPeerAsync(n.Server(), peerURL, p2p.PeerEventTypeAdd, time.Second*60)
-	require.NoError(t, n.ReconnectStaticPeers())
-	// first check if a peer gets disconnected
-	require.NoError(t, <-errDropCh)
-	require.NoError(t, <-errAddCh)
-}
-
-func isPeerConnected(node *StatusNode, peerURL string) (bool, error) {
-	if !node.IsRunning() {
-		return false, ErrNoRunningNode
-	}
-
-	parsedPeer, err := enode.ParseV4(peerURL)
-	if err != nil {
-		return false, err
-	}
-
-	server := node.GethNode().Server()
-
-	for _, peer := range server.PeersInfo() {
-		if peer.ID == parsedPeer.ID().String() {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func TestStatusNodeRendezvousDiscovery(t *testing.T) {

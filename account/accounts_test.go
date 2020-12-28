@@ -87,7 +87,7 @@ func TestVerifyAccountPassword(t *testing.T) {
 				require.Fail(t, "no error reported, but account key is missing")
 			}
 			accountAddress := types.BytesToAddress(types.FromHex(testCase.address))
-			if accountKey.Address != accountAddress {
+			if accountKey.Address != accountAddress { // nolint: staticcheck
 				require.Fail(t, "account mismatch: have %s, want %s", accountKey.Address.Hex(), accountAddress.Hex())
 			}
 		}

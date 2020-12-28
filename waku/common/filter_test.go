@@ -658,7 +658,7 @@ func TestWatchers(t *testing.T) {
 
 	var envelopes [NumMessages]*Envelope
 	for i = 0; i < NumMessages; i++ {
-		j = mrand.Uint32() % NumFilters
+		j = mrand.Uint32() % NumFilters // nolint: gosec
 		e = generateCompatibeEnvelope(t, tst[j].f)
 		envelopes[i] = e
 		tst[j].msgCnt++
@@ -714,7 +714,7 @@ func TestWatchers(t *testing.T) {
 	envelopes[0] = e
 	tst[0].msgCnt++
 	for i = 1; i < NumMessages; i++ {
-		j = mrand.Uint32() % NumFilters
+		j = mrand.Uint32() % NumFilters // nolint: gosec
 		e = generateCompatibeEnvelope(t, tst[j].f)
 		envelopes[i] = e
 		tst[j].msgCnt++

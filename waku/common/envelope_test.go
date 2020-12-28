@@ -65,7 +65,7 @@ func TestEnvelopeOpenAcceptsOnlyOneKeyTypeInFilter(t *testing.T) {
 	params := MessageParams{
 		PoW:      0.01,
 		WorkTime: 1,
-		TTL:      uint32(mrand.Intn(1024)),
+		TTL:      uint32(mrand.Intn(1024)), // nolint: gosec
 		Payload:  make([]byte, 50),
 		KeySym:   symKey,
 		Dst:      nil,

@@ -320,7 +320,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 	ctx, cancel = context.WithTimeout(parent, 10*time.Second)
 	latestHeader, removed, latestValidSavedBlock, reorgSpotted, err := c.onNewBlock(ctx, c.from, nextHeader)
 	cancel()
-	if err != nil {
+	if err != nil || latestHeader == nil {
 		log.Error("failed to process new header", "header", nextHeader, "error", err)
 		return err
 	}
@@ -358,7 +358,7 @@ func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
 			Accounts:    uniqueAccountsFromHeaders(removed),
 		})
 	}
-	log.Info("before sending new block event", "latest", latestHeader != nil, "removed", len(removed), "len", len(uniqueAccountsFromTransfers(all)))
+	log.Info("before sending new block event", "removed", len(removed), "len", len(uniqueAccountsFromTransfers(all)))
 
 	c.feed.Send(Event{
 		Type:                      EventNewBlock,
