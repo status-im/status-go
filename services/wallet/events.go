@@ -23,6 +23,8 @@ const (
 	EventRecentHistoryReady EventType = "recent-history-ready"
 	// EventRecentHistoryError emitted when fetching of tx history failed
 	EventFetchingHistoryError EventType = "fetching-history-error"
+	// EventNonArchivalNodeDetected emitted when a connection to a non archival node is detected
+	EventNonArchivalNodeDetected EventType = "non-archival-node-detected"
 )
 
 // Event is a type for wallet events.

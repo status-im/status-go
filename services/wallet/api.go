@@ -56,7 +56,15 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 
 		from, err := findFirstRange(ctx, address, block, api.s.client)
 		if err != nil {
-			return nil, err
+			if nonArchivalNodeError(err) {
+				api.s.feed.Send(Event{
+					Type: EventNonArchivalNodeDetected,
+				})
+				from = big.NewInt(0).Sub(block, big.NewInt(100))
+			} else {
+				log.Error("first range error", "error", err)
+				return nil, err
+			}
 		}
 		fromByAddress := map[common.Address]*big.Int{address: from}
 		toByAddress := map[common.Address]*big.Int{address: block}

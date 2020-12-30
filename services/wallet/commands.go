@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,6 +25,7 @@ type ethHistoricalCommand struct {
 	balanceCache *balanceCache
 	feed         *event.Feed
 	foundHeaders []*DBHeader
+	error        error
 	noLimit      bool
 
 	from, to, resultingFrom *big.Int
@@ -43,7 +45,8 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	from, headers, err := findBlocksWithEthTransfers(ctx, c.client, c.balanceCache, c.eth, c.address, c.from, c.to, c.noLimit)
 
 	if err != nil {
-		return err
+		c.error = err
+		return nil
 	}
 
 	c.foundHeaders = headers
@@ -442,16 +445,17 @@ func (c *newBlocksTransfersCommand) getTransfers(parent context.Context, header 
 // - runs fast indexing for each account separately
 // - starts listening to new blocks and watches for reorgs
 type controlCommand struct {
-	accounts       []common.Address
-	db             *Database
-	eth            *ETHTransferDownloader
-	erc20          *ERC20TransfersDownloader
-	chain          *big.Int
-	client         *ethclient.Client
-	feed           *event.Feed
-	safetyDepth    *big.Int
-	watchNewBlocks bool
-	errorsCount    int
+	accounts           []common.Address
+	db                 *Database
+	eth                *ETHTransferDownloader
+	erc20              *ERC20TransfersDownloader
+	chain              *big.Int
+	client             *ethclient.Client
+	feed               *event.Feed
+	safetyDepth        *big.Int
+	watchNewBlocks     bool
+	errorsCount        int
+	nonArchivalRPCNode bool
 }
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
@@ -488,6 +492,9 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 		resultingFromByAddress := map[common.Address]*big.Int{}
 		headers := map[common.Address][]*DBHeader{}
 		for _, command := range commands {
+			if command.error != nil {
+				return nil, nil, command.error
+			}
 			resultingFromByAddress[command.address] = command.resultingFrom
 			headers[command.address] = command.foundHeaders
 		}
@@ -730,12 +737,16 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return err
 	}
 
-	fromMap, err := findFirstRanges(parent, accountsWithoutHistory, head.Number, c.client)
-	if err != nil {
-		if c.NewError(err) {
-			return nil
+	fromMap := map[common.Address]*big.Int{}
+
+	if !c.nonArchivalRPCNode {
+		fromMap, err = findFirstRanges(parent, accountsWithoutHistory, head.Number, c.client)
+		if err != nil {
+			if c.NewError(err) {
+				return nil
+			}
+			return err
 		}
-		return err
 	}
 
 	target := new(big.Int).Sub(head.Number, c.safetyDepth)
@@ -750,6 +761,9 @@ func (c *controlCommand) Run(parent context.Context) error {
 		from, ok := lastKnownEthBlocks[address]
 		if !ok {
 			from = fromMap[address]
+		}
+		if c.nonArchivalRPCNode {
+			from = big.NewInt(0).Sub(target, big.NewInt(100))
 		}
 
 		fromByAddress[address] = from
@@ -774,6 +788,13 @@ func (c *controlCommand) Run(parent context.Context) error {
 			return nil
 		}
 		return err
+	}
+
+	if cmnd.error != nil {
+		if c.NewError(cmnd.error) {
+			return nil
+		}
+		return cmnd.error
 	}
 
 	downloader := &ETHTransferDownloader{
@@ -852,9 +873,21 @@ func (c *controlCommand) Run(parent context.Context) error {
 	return err
 }
 
+func nonArchivalNodeError(err error) bool {
+	return strings.Contains(err.Error(), "missing trie node") ||
+		strings.Contains(err.Error(), "project ID does not have access to archive state")
+}
+
 func (c *controlCommand) NewError(err error) bool {
 	c.errorsCount++
 	log.Error("controlCommand error", "error", err, "counter", c.errorsCount)
+	if nonArchivalNodeError(err) {
+		log.Info("Non archival node detected")
+		c.nonArchivalRPCNode = true
+		c.feed.Send(Event{
+			Type: EventNonArchivalNodeDetected,
+		})
+	}
 	if c.errorsCount >= 3 {
 		c.feed.Send(Event{
 			Type:    EventFetchingHistoryError,
@@ -994,6 +1027,7 @@ type findAndCheckBlockRangeCommand struct {
 	toByAddress   map[common.Address]*big.Int
 	foundHeaders  map[common.Address][]*DBHeader
 	noLimit       bool
+	error         error
 }
 
 func (c *findAndCheckBlockRangeCommand) Command() Command {
@@ -1007,7 +1041,8 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 	log.Debug("start findAndCHeckBlockRangeCommand")
 	newFromByAddress, ethHeadersByAddress, err := c.fastIndex(parent, c.balanceCache, c.fromByAddress, c.toByAddress)
 	if err != nil {
-		return err
+		c.error = err
+		return nil
 	}
 	if c.noLimit {
 		newFromByAddress = map[common.Address]*big.Int{}
