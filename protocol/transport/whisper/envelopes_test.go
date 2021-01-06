@@ -33,16 +33,16 @@ func (s *EnvelopesMonitorSuite) SetupTest() {
 	s.monitor = NewEnvelopesMonitor(
 		nil,
 		transport.EnvelopesMonitorConfig{
-			EnvelopeEventsHandler:          nil,
-			MaxAttempts:                    0,
-			MailserverConfirmationsEnabled: false,
-			IsMailserver:                   func(types.EnodeID) bool { return false },
-			Logger:                         zap.NewNop(),
+			EnvelopeEventsHandler:            nil,
+			MaxAttempts:                      0,
+			AwaitOnlyMailServerConfirmations: false,
+			IsMailserver:                     func(types.EnodeID) bool { return false },
+			Logger:                           zap.NewNop(),
 		},
 	)
 }
 
-func (s *EnvelopesMonitorSuite) TestConfirmed() {
+func (s *EnvelopesMonitorSuite) TestEnvelopePosted() {
 	s.monitor.Add(testIDs, testHash, types.NewMessage{})
 	s.Contains(s.monitor.envelopes, testHash)
 	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
@@ -51,7 +51,7 @@ func (s *EnvelopesMonitorSuite) TestConfirmed() {
 		Hash:  testHash,
 	})
 	s.Contains(s.monitor.envelopes, testHash)
-	s.Equal(EnvelopeSent, s.monitor.envelopes[testHash])
+	s.Equal(EnvelopePosted, s.monitor.envelopes[testHash])
 }
 
 func (s *EnvelopesMonitorSuite) TestConfirmedWithAcknowledge() {
@@ -97,7 +97,7 @@ func (s *EnvelopesMonitorSuite) TestRemoved() {
 
 func (s *EnvelopesMonitorSuite) TestIgnoreNotFromMailserver() {
 	// enables filter in the tracker to drop confirmations from non-mailserver peers
-	s.monitor.mailServerConfirmation = true
+	s.monitor.awaitOnlyMailServerConfirmations = true
 	s.monitor.Add(testIDs, testHash, types.NewMessage{})
 	s.monitor.handleEvent(types.EnvelopeEvent{
 		Event: types.EventEnvelopeSent,

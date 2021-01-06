@@ -452,6 +452,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 		FullNode:               wakuCfg.FullNode,
 		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
 		MinimumAcceptedPoW:     params.WakuMinimumPoW,
+		EnableConfirmations:    wakuCfg.EnableConfirmations,
 	}
 
 	if wakuCfg.MaxMessageSize > 0 {

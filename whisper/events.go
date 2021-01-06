@@ -18,7 +18,7 @@ const (
 	// And event, ideally, should contain information about peer that sent envelope to us.
 	EventEnvelopeReceived EventType = "envelope.received"
 	// EventBatchAcknowledged is sent when batch of envelopes was acknowledged by a peer.
-	EventBatchAcknowledged EventType = "batch.acknowleged"
+	EventBatchAcknowledged EventType = "batch.acknowledged"
 	// EventEnvelopeAvailable fires when envelop is available for filters
 	EventEnvelopeAvailable EventType = "envelope.available"
 	// EventMailServerRequestSent fires when such request is sent.
