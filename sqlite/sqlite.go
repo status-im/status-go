@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 
 	_ "github.com/mutecomm/go-sqlcipher" // We require go sqlcipher that overrides default implementation
 )
@@ -17,6 +18,55 @@ const (
 	// WALMode for sqlite.
 	WALMode = "wal"
 )
+
+// DecryptDB completely removes the encryption from the db
+func DecryptDB(oldPath, newPath, key string) error {
+
+	db, err := openDB(oldPath, key)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`ATTACH DATABASE '` + newPath + `' AS plaintext KEY ''`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`SELECT sqlcipher_export('plaintext')`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`DETACH DATABASE plaintext`)
+	return err
+}
+
+// EncryptDB takes a plaintext database and adds encryption
+func EncryptDB(unencryptedPath, encryptedPath, key string) error {
+
+	_ = os.Remove(encryptedPath)
+
+	db, err := OpenUnecryptedDB(unencryptedPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`ATTACH DATABASE '` + encryptedPath + `' AS encrypted KEY '` + key + `'`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(fmt.Sprintf("PRAGMA encrypted.kdf_iter = '%d'", kdfIterationsNumber))
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`SELECT sqlcipher_export('encrypted')`)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`DETACH DATABASE encrypted`)
+	return err
+}
 
 func openDB(path, key string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", path)
