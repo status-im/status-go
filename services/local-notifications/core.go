@@ -38,6 +38,10 @@ const (
 	TypeMessage     NotificationType = "message"
 )
 
+var (
+	marshalTypeMismatchErr = "notification type mismatch, expected '%s', Body could not be marshalled into this type"
+)
+
 type notificationBody struct {
 	State       transactionState  `json:"state"`
 	From        common.Address    `json:"from"`
@@ -136,17 +140,23 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 
 	switch n.BodyType {
 	case TypeTransaction:
-		nb := n.Body.(*notificationBody)
-		body, err = json.Marshal(nb)
-		if err != nil {
-			return nil, err
+		if nb, ok := n.Body.(*notificationBody); ok {
+			body, err = json.Marshal(nb)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf(marshalTypeMismatchErr, n.BodyType)
 		}
 
 	case TypeMessage:
-		nmb := n.Body.(*notificationMessageBody)
-		body, err = json.Marshal(nmb)
-		if err != nil {
-			return nil, err
+		if nmb, ok := n.Body.(*notificationMessageBody); ok {
+			body, err = json.Marshal(nmb)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf(marshalTypeMismatchErr, n.BodyType)
 		}
 
 	default:
