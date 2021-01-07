@@ -400,6 +400,60 @@ func (b *GethStatusBackend) StartNodeWithAccount(acc multiaccounts.Account, pass
 	return err
 }
 
+func (b *GethStatusBackend) ExportUnencryptedDatabase(acc multiaccounts.Account, password, directory string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.appDB != nil {
+		return nil
+	}
+	if len(b.rootDataDir) == 0 {
+		return errors.New("root datadir wasn't provided")
+	}
+
+	// Migrate file path to fix issue https://github.com/status-im/status-go/issues/2027
+	oldPath := filepath.Join(b.rootDataDir, fmt.Sprintf("app-%x.sql", acc.KeyUID))
+	newPath := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", acc.KeyUID))
+
+	_, err := os.Stat(oldPath)
+	if err == nil {
+		err := os.Rename(oldPath, newPath)
+		if err != nil {
+			return err
+		}
+
+		// rename journals as well, but ignore errors
+		_ = os.Rename(oldPath+"-shm", newPath+"-shm")
+		_ = os.Rename(oldPath+"-wal", newPath+"-wal")
+	}
+
+	err = appdatabase.DecryptDatabase(newPath, directory, password)
+	if err != nil {
+		b.log.Error("failed to initialize db", "err", err)
+		return err
+	}
+	return nil
+}
+
+func (b *GethStatusBackend) ImportUnencryptedDatabase(acc multiaccounts.Account, password, databasePath string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.appDB != nil {
+		return nil
+	}
+	if len(b.rootDataDir) == 0 {
+		return errors.New("root datadir wasn't provided")
+	}
+
+	path := filepath.Join(b.rootDataDir, fmt.Sprintf("%s.db", acc.KeyUID))
+
+	err := appdatabase.EncryptDatabase(databasePath, path, password)
+	if err != nil {
+		b.log.Error("failed to initialize db", "err", err)
+		return err
+	}
+	return nil
+}
+
 func (b *GethStatusBackend) SaveAccountAndStartNodeWithKey(acc multiaccounts.Account, password string, settings accounts.Settings, nodecfg *params.NodeConfig, subaccs []accounts.Account, keyHex string) error {
 	err := b.SaveAccount(acc)
 	if err != nil {
