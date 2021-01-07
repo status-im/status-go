@@ -118,6 +118,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var serializedLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
+	var communityID sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -143,7 +144,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Base64Image,
 		&audio.DurationMs,
 		&message.Base64Audio,
-		&message.CommunityID,
+		&communityID,
 		&serializedMentions,
 		&serializedLinks,
 		&command.ID,
@@ -186,6 +187,10 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	}
 	message.Alias = alias.String
 	message.Identicon = identicon.String
+
+	if communityID.Valid {
+		message.CommunityID = communityID.String
+	}
 
 	if serializedMentions != nil {
 		err := json.Unmarshal(serializedMentions, &message.Mentions)

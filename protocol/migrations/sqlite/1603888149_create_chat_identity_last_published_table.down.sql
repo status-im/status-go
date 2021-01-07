@@ -1,1 +1,0 @@
-DROP TABLE chat_identity_last_published;

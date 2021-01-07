@@ -1,1 +1,0 @@
-DROP TABLE group_chat_invitations;
