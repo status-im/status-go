@@ -445,6 +445,16 @@ func (a *Transport) waitForRequestCompleted(ctx context.Context, requestID []byt
 	}
 }
 
+// NOTE: currently not used as whisper is not maintained anymore
+func (a *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
+	return nil
+}
+
+// NOTE: currently not used as whisper is not maintained anymore
+func (a *Transport) CleanMessagesProcessed(timestamp uint64) error {
+	return nil
+}
+
 func (a *Transport) SetEnvelopeEventsHandler(handler transport.EnvelopeEventsHandler) error {
 	if a.envelopesMonitor == nil {
 		return errors.New("Current transport has no envelopes monitor")
