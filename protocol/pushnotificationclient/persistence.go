@@ -309,7 +309,7 @@ func (p *Persistence) UpdateNotificationResponse(messageID []byte, response *pro
 
 func (p *Persistence) GetRetriablePushNotifications() ([]*SentNotification, error) {
 	var notifications []*SentNotification
-	rows, err := p.db.Query(`SELECT retry_count, last_tried_at, error, success, public_key, installation_id, message_id,chat_id, notification_type FROM push_notification_client_sent_notifications WHERE NOT success AND error = ?`, protobuf.PushNotificationReport_WRONG_TOKEN)
+	rows, err := p.db.Query(`SELECT retry_count, last_tried_at, error, success, public_key, installation_id, message_id,chat_id, notification_type FROM push_notification_client_sent_notifications WHERE NOT success AND error = ? AND retry_count <= ?`, protobuf.PushNotificationReport_WRONG_TOKEN, maxPushNotificationRetries)
 	if err != nil {
 		return nil, err
 	}
