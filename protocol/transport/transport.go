@@ -42,5 +42,8 @@ type Transport interface {
 	ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*Filter, error)
 	RetrieveRawAll() (map[Filter][]*types.Message, error)
 
+	ConfirmMessagesProcessed([]string, uint64) error
+	CleanMessagesProcessed(uint64) error
+
 	SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) error
 }

@@ -67,6 +67,7 @@ type Transport struct {
 	keysManager *wakuServiceKeysManager
 	filters     *transport.FiltersManager
 	logger      *zap.Logger
+	cache       *transport.ProcessedMessageIDsCache
 
 	mailservers      []string
 	envelopesMonitor *EnvelopesMonitor
@@ -103,6 +104,7 @@ func NewTransport(
 	t := &Transport{
 		waku:             waku,
 		api:              api,
+		cache:            transport.NewProcessedMessageIDsCache(db),
 		envelopesMonitor: envelopesMonitor,
 		keysManager: &wakuServiceKeysManager{
 			waku:              waku,
@@ -217,9 +219,32 @@ func (a *Transport) RetrieveRawAll() (map[transport.Filter][]*types.Message, err
 	for _, filter := range allFilters {
 		msgs, err := a.api.GetFilterMessages(filter.FilterID)
 		if err != nil {
+			a.logger.Warn("failed to fetch messages", zap.Error(err))
 			continue
 		}
-		result[*filter] = append(result[*filter], msgs...)
+		if len(msgs) == 0 {
+			continue
+		}
+
+		ids := make([]string, len(msgs))
+		for i := range msgs {
+			id := types.EncodeHex(msgs[i].Hash)
+			ids[i] = id
+		}
+
+		hits, err := a.cache.Hits(ids)
+		if err != nil {
+			a.logger.Error("failed to check messages exists", zap.Error(err))
+			return nil, err
+		}
+
+		for i := range msgs {
+			// Exclude anything that is a cache hit
+			if !hits[types.EncodeHex(msgs[i].Hash)] {
+				result[*filter] = append(result[*filter], msgs[i])
+			}
+		}
+
 	}
 
 	return result, nil
@@ -388,6 +413,17 @@ func (a *Transport) waitForRequestCompleted(ctx context.Context, requestID []byt
 			return nil, ctx.Err()
 		}
 	}
+}
+
+// ConfirmMessagesProcessed marks the messages as processed in the cache so
+// they won't be passed to the next layer anymore
+func (a *Transport) ConfirmMessagesProcessed(ids []string, timestamp uint64) error {
+	return a.cache.Add(ids, timestamp)
+}
+
+// CleanMessagesProcessed clears the messages that are older than timestamp
+func (a *Transport) CleanMessagesProcessed(timestamp uint64) error {
+	return a.cache.Clean(timestamp)
 }
 
 func (a *Transport) SetEnvelopeEventsHandler(handler transport.EnvelopeEventsHandler) error {
