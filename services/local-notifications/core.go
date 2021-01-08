@@ -54,7 +54,7 @@ type notificationBody struct {
 	Network     uint64            `json:"network"`
 }
 
-type notificationMessageBody struct {
+type NotificationMessageBody struct {
 	Message *protocolcommon.Message `json:"message"`
 	Contact *protocol.Contact       `json:"contact"`
 	Chat    *protocol.Chat          `json:"chat"`
@@ -150,7 +150,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		}
 
 	case TypeMessage:
-		if nmb, ok := n.Body.(*notificationMessageBody); ok {
+		if nmb, ok := n.Body.(*NotificationMessageBody); ok {
 			body, err = json.Marshal(nmb)
 			if err != nil {
 				return nil, err
@@ -199,7 +199,7 @@ func (n *Notification) UnmarshalJSON(data []byte) error {
 		return n.unmarshalAndAttachBody(alias.Body, &notificationBody{})
 
 	case TypeMessage:
-		return n.unmarshalAndAttachBody(alias.Body, &notificationMessageBody{})
+		return n.unmarshalAndAttachBody(alias.Body, &NotificationMessageBody{})
 
 	default:
 		return fmt.Errorf("unknown NotificationType '%s'", n.BodyType)
@@ -214,6 +214,12 @@ func (n *Notification) unmarshalAndAttachBody(body json.RawMessage, bodyStruct i
 
 	n.Body = bodyStruct
 	return nil
+}
+
+func PushMessages(ns []Notification) {
+	for _, n := range ns {
+		pushMessage(&n)
+	}
 }
 
 func pushMessage(notification *Notification) {

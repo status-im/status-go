@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 
 	"github.com/pkg/errors"
 
@@ -397,6 +398,19 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// Add to response
 	state.Response.Messages = append(state.Response.Messages, receivedMessage)
+
+	// Create notification to pass to `localnotifications.PushMessages()`
+	state.Notifications = append(state.Notifications, localnotifications.Notification{
+		Body:          localnotifications.NotificationMessageBody{
+			Message: receivedMessage,
+			Contact: contact,
+			Chat:    chat,
+		},
+		BodyType:      localnotifications.TypeMessage,
+		Category:      "", // TODO what category do we want?
+		Deeplink:      "", // TODO find what if any Deeplink should be used here
+		Image:         "", // TODO do we want to attach any image data contained on the MessageBody{}?
+	})
 
 	return nil
 }
