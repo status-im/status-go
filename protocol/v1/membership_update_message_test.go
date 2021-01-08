@@ -324,3 +324,171 @@ func TestMembershipUpdateEventEqual(t *testing.T) {
 	u2.Signature = []byte("different-signature")
 	require.False(t, u1.Equal(u2))
 }
+
+func TestAbridgedEvents(t *testing.T) {
+	var clock uint64 = 0
+	creator, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	creatorID := publicKeyToString(&creator.PublicKey)
+
+	member1, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	member1ID := publicKeyToString(&member1.PublicKey)
+
+	member2, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	member2ID := publicKeyToString(&member2.PublicKey)
+
+	member3, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	member3ID := publicKeyToString(&member3.PublicKey)
+
+	member4, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	member4ID := publicKeyToString(&member4.PublicKey)
+
+	g, err := NewGroupWithCreator("name-0", clock, creator)
+	require.NoError(t, err)
+	clock++
+
+	// Full events is only a single one
+	require.Len(t, g.Events(), 1)
+	// same as abridged
+	require.Len(t, g.AbridgedEvents(&creator.PublicKey), 1)
+
+	// We change name of the chat
+	nameChangedEvent1 := NewNameChangedEvent("name-1", clock)
+	nameChangedEvent1.From = creatorID
+	nameChangedEvent1.ChatID = g.chatID
+	err = g.ProcessEvent(nameChangedEvent1)
+	require.NoError(t, err)
+	clock++
+
+	// We change name of the chat again
+	nameChangedEvent2 := NewNameChangedEvent("name-2", clock)
+	nameChangedEvent2.From = creatorID
+	nameChangedEvent2.ChatID = g.chatID
+	err = g.ProcessEvent(nameChangedEvent2)
+	require.NoError(t, err)
+	clock++
+
+	// Full events is 3 events
+	require.Len(t, g.Events(), 3)
+	// While abridged should exclude the first name-1 event
+	require.Len(t, g.AbridgedEvents(&creator.PublicKey), 2)
+	require.Equal(t, g.AbridgedEvents(&creator.PublicKey)[1].Name, "name-2")
+
+	// Add a new member
+	newMemberEvent1 := NewMembersAddedEvent([]string{member1ID}, clock)
+	newMemberEvent1.From = creatorID
+	newMemberEvent1.ChatID = g.chatID
+	err = g.ProcessEvent(newMemberEvent1)
+	require.NoError(t, err)
+	clock++
+
+	// Full events is 4 events
+	require.Len(t, g.Events(), 4)
+	// While abridged, given we are the creator, we only take 2 events and ignore
+	// the member created event
+	require.Len(t, g.AbridgedEvents(&creator.PublicKey), 2)
+	require.Equal(t, g.AbridgedEvents(&creator.PublicKey)[1].Name, "name-2")
+
+	// While abridged, given we are the new member, we take 3 events
+	// that are relevant to us
+	require.Len(t, g.AbridgedEvents(&member1.PublicKey), 3)
+	require.Equal(t, g.AbridgedEvents(&member1.PublicKey)[1].Name, "name-2")
+	require.Equal(t, g.AbridgedEvents(&member1.PublicKey)[2].Members, []string{member1ID})
+
+	// We join the chat
+	joinedEvent1 := NewMemberJoinedEvent(clock)
+	joinedEvent1.From = member1ID
+	joinedEvent1.ChatID = g.chatID
+	err = g.ProcessEvent(joinedEvent1)
+	require.NoError(t, err)
+	clock++
+
+	// Full events is 5 events
+	require.Len(t, g.Events(), 5)
+	// While abridged, given we are the creator, we only take 2 events and ignore
+	// the member created event
+	require.Len(t, g.AbridgedEvents(&creator.PublicKey), 2)
+	require.Equal(t, g.AbridgedEvents(&creator.PublicKey)[1].Name, "name-2")
+
+	// While abridged, given we are the new member, we take 4 events
+	// that are relevant to us
+	require.Len(t, g.AbridgedEvents(&member1.PublicKey), 4)
+
+	// Next is the tricky case, a user that has been invited by someone
+	// made an admin. We need to follow the history of admins so
+	// that whoever receives the message can see that Creator-> Invited A -> Made A admin -> A Invited B
+
+	// Creator makes member1 Admin
+	addedAdminEvent1 := NewAdminsAddedEvent([]string{member1ID}, clock)
+	addedAdminEvent1.From = creatorID
+	addedAdminEvent1.ChatID = g.chatID
+	err = g.ProcessEvent(addedAdminEvent1)
+	require.NoError(t, err)
+	clock++
+
+	// member1 adds member2
+	newMemberEvent2 := NewMembersAddedEvent([]string{member2ID}, clock)
+	newMemberEvent2.From = member1ID
+	newMemberEvent2.ChatID = g.chatID
+	err = g.ProcessEvent(newMemberEvent2)
+	require.NoError(t, err)
+	clock++
+
+	// member1 makes member2 admin
+	addedAdminEvent2 := NewAdminsAddedEvent([]string{member2ID}, clock)
+	addedAdminEvent2.From = member1ID
+	addedAdminEvent2.ChatID = g.chatID
+	err = g.ProcessEvent(addedAdminEvent2)
+	require.NoError(t, err)
+	clock++
+
+	// member2 adds member3
+	newMemberEvent3 := NewMembersAddedEvent([]string{member3ID}, clock)
+	newMemberEvent3.From = member2ID
+	newMemberEvent3.ChatID = g.chatID
+	err = g.ProcessEvent(newMemberEvent3)
+	require.NoError(t, err)
+	clock++
+
+	// member1 makes member3 admin
+	addedAdminEvent3 := NewAdminsAddedEvent([]string{member3ID}, clock)
+	addedAdminEvent3.From = member1ID
+	addedAdminEvent3.ChatID = g.chatID
+	err = g.ProcessEvent(addedAdminEvent3)
+	require.NoError(t, err)
+	clock++
+
+	// member3 adds member4
+	newMemberEvent4 := NewMembersAddedEvent([]string{member4ID}, clock)
+	newMemberEvent4.From = member3ID
+	newMemberEvent4.ChatID = g.chatID
+	err = g.ProcessEvent(newMemberEvent4)
+	require.NoError(t, err)
+
+	// Now we check that the history has been correctly followed
+	// Full events is 4 events
+	require.Len(t, g.Events(), 11)
+	// While abridged, given we are the creator, we only take 2 events and ignore
+	// the member created event
+	require.Len(t, g.AbridgedEvents(&creator.PublicKey), 2)
+	require.Equal(t, g.AbridgedEvents(&creator.PublicKey)[1].Name, "name-2")
+
+	// While abridged, given we are the new member, we take 3 events
+	// that are relevant to us
+	require.Len(t, g.AbridgedEvents(&member4.PublicKey), 9)
+
+	// We build a group from the abridged events
+
+	group, err := NewGroupWithEvents(g.chatID, g.AbridgedEvents(&member4.PublicKey))
+	require.NoError(t, err)
+
+	// Make sure the chatID, name is the same
+	require.Equal(t, g.name, group.name)
+	require.Equal(t, g.chatID, group.chatID)
+	// Make sure that user 4 is a member
+	require.True(t, group.IsMember(member4ID))
+}

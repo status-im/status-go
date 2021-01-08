@@ -284,16 +284,10 @@ func (p *MessageProcessor) SendPairInstallation(
 	return messageID, nil
 }
 
-// EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
-// All the events in a group are encoded and added to the payload
-func (p *MessageProcessor) EncodeMembershipUpdate(
-	group *v1protocol.Group,
+func (p *MessageProcessor) encodeMembershipUpdate(
+	message v1protocol.MembershipUpdateMessage,
 	chatEntity ChatEntity,
 ) ([]byte, error) {
-	message := v1protocol.MembershipUpdateMessage{
-		ChatID: group.ChatID(),
-		Events: group.Events(),
-	}
 
 	if chatEntity != nil {
 		chatEntityProtobuf := chatEntity.GetProtobuf()
@@ -312,6 +306,33 @@ func (p *MessageProcessor) EncodeMembershipUpdate(
 	}
 
 	return encodedMessage, nil
+}
+
+// EncodeMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
+// All the events in a group are encoded and added to the payload
+func (p *MessageProcessor) EncodeMembershipUpdate(
+	group *v1protocol.Group,
+	chatEntity ChatEntity,
+) ([]byte, error) {
+	message := v1protocol.MembershipUpdateMessage{
+		ChatID: group.ChatID(),
+		Events: group.Events(),
+	}
+
+	return p.encodeMembershipUpdate(message, chatEntity)
+}
+
+// EncodeAbridgedMembershipUpdate takes a group and an optional chat message and returns the protobuf representation to be sent on the wire.
+// Only the events relevant to the sender are encoded
+func (p *MessageProcessor) EncodeAbridgedMembershipUpdate(
+	group *v1protocol.Group,
+	chatEntity ChatEntity,
+) ([]byte, error) {
+	message := v1protocol.MembershipUpdateMessage{
+		ChatID: group.ChatID(),
+		Events: group.AbridgedEvents(&p.identity.PublicKey),
+	}
+	return p.encodeMembershipUpdate(message, chatEntity)
 }
 
 // SendPublic takes encoded data, encrypts it and sends through the wire.

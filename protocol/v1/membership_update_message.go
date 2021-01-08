@@ -42,7 +42,7 @@ func MembershipUpdateEventFromProtobuf(chatID string, raw []byte) (*MembershipUp
 		return nil, errors.Wrap(err, "failed to extract signature")
 	}
 
-	from := types.EncodeHex(crypto.FromECDSAPub(publicKey))
+	from := publicKeyToString(publicKey)
 
 	err = proto.Unmarshal(encodedEvent, &decodedEvent)
 	if err != nil {
@@ -147,7 +147,7 @@ func (u *MembershipUpdateEvent) Sign(key *ecdsa.PrivateKey) error {
 		return err
 	}
 	u.Signature = signature
-	u.From = types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+	u.From = publicKeyToString(&key.PublicKey)
 	return nil
 }
 
@@ -241,7 +241,7 @@ type Group struct {
 }
 
 func groupChatID(creator *ecdsa.PublicKey) string {
-	return uuid.New().String() + "-" + types.EncodeHex(crypto.FromECDSAPub(creator))
+	return uuid.New().String() + "-" + publicKeyToString(creator)
 }
 
 func NewGroupWithEvents(chatID string, events []MembershipUpdateEvent) (*Group, error) {
@@ -312,6 +312,78 @@ func (g Group) Name() string {
 
 func (g Group) Events() []MembershipUpdateEvent {
 	return g.events
+}
+
+func isInSlice(m string, set []string) bool {
+	for _, k := range set {
+		if k == m {
+			return true
+		}
+
+	}
+	return false
+}
+
+// AbridgedEvents returns the minimum set of events for a user to publish a post
+func (g Group) AbridgedEvents(publicKey *ecdsa.PublicKey) []MembershipUpdateEvent {
+	var events []MembershipUpdateEvent
+	var nameChangedEventFound bool
+	var joinedEventFound bool
+	memberID := publicKeyToString(publicKey)
+	var addedEventFound bool
+	nextInChain := memberID
+	// Iterate in reverse
+	for i := len(g.events) - 1; i >= 0; i-- {
+		event := g.events[i]
+		switch event.Type {
+		case protobuf.MembershipUpdateEvent_CHAT_CREATED:
+			events = append(events, event)
+		case protobuf.MembershipUpdateEvent_NAME_CHANGED:
+			if nameChangedEventFound {
+				continue
+			}
+			events = append(events, event)
+			nameChangedEventFound = true
+		case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
+			// If we already have an added event
+			// or the user is not in slice, ignore
+			if addedEventFound {
+				continue
+			}
+
+			areWeTheTarget := isInSlice(nextInChain, event.Members)
+
+			// If it's us, and we have been added by the creator, no more work to do, this is authoritative
+			if areWeTheTarget && g.events[0].From == event.From {
+				addedEventFound = true
+				events = append(events, event)
+
+			} else if areWeTheTarget {
+				// if it's us and we haven't been added by the creator, we follow the history of whoever invited us
+				nextInChain = event.From
+				events = append(events, event)
+			}
+		case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
+			if joinedEventFound || event.From != memberID {
+				continue
+			}
+			joinedEventFound = true
+			events = append(events, event)
+
+		case protobuf.MembershipUpdateEvent_ADMINS_ADDED:
+			if isInSlice(nextInChain, event.Members) {
+				events = append(events, event)
+			}
+		}
+
+	}
+
+	// Reverse events
+	for i, j := 0, len(events)-1; i < j; i, j = i+1, j-1 {
+		events[i], events[j] = events[j], events[i]
+	}
+
+	return events
 }
 
 func (g Group) Members() []string {
