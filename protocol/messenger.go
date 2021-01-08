@@ -4525,7 +4525,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 			return nil, err
 		}
 
-		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
+		encodedMessage, err = m.processor.EncodeAbridgedMembershipUpdate(group, message)
 		if err != nil {
 			return nil, err
 		}
