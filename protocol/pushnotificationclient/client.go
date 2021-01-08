@@ -1425,6 +1425,8 @@ func (c *Client) resendingLoop() error {
 			return nil
 		}
 
+		c.config.Logger.Debug("have some retriable notifications", zap.Int("retryable-notifications", len(retriableNotifications)))
+
 		for _, pn := range retriableNotifications {
 
 			// check if we should retry the notification
@@ -1443,8 +1445,15 @@ func (c *Client) resendingLoop() error {
 		}
 
 		nextRetry := lowestNextRetry - time.Now().Unix()
+
+		// Give some room, sleep at least a second
+		if nextRetry < 1 {
+			nextRetry = 1
+		}
+
 		// how long should we sleep for?
 		waitFor := time.Duration(nextRetry)
+
 		select {
 
 		case <-time.After(waitFor * time.Second):
