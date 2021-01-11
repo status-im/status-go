@@ -77,8 +77,8 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	response, err := theirMessenger.SendPairInstallation(context.Background())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
-	s.Require().False(response.Chats[0].Active)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -119,18 +119,18 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 	s.Require().True(actualContact.IsAdded())
 
 	chat := CreatePublicChat(statusChatID, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"sync chat not received",
 	)
 
 	s.Require().NoError(err)
 
-	actualChat := response.Chats[0]
+	actualChat := response.Chats()[0]
 	s.Require().Equal(statusChatID, actualChat.ID)
 	s.Require().True(actualChat.Active)
 	s.Require().NoError(theirMessenger.Shutdown())
@@ -151,7 +151,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	// add chat
 	chat := CreatePublicChat(statusChatID, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	// pair
@@ -166,8 +166,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 	response, err := theirMessenger.SendPairInstallation(context.Background())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
-	s.Require().False(response.Chats[0].Active)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -200,7 +200,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 			return err
 		}
 
-		allChats = append(allChats, response.Chats...)
+		allChats = append(allChats, response.Chats()...)
 
 		if len(allChats) >= 2 && len(response.Contacts) == 1 {
 			actualContact = response.Contacts[0]
@@ -243,8 +243,8 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 	response, err := bob2.SendPairInstallation(context.Background())
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
-	s.Require().False(response.Chats[0].Active)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
@@ -263,9 +263,9 @@ func (s *MessengerInstallationSuite) TestSyncInstallationNewMessages() {
 
 	alicePkString := types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))
 	chat := CreateOneToOneChat(alicePkString, &alice.identity.PublicKey, bob1.transport)
-	s.Require().NoError(bob1.SaveChat(&chat))
+	s.Require().NoError(bob1.SaveChat(chat))
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 

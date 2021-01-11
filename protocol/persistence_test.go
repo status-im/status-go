@@ -606,12 +606,12 @@ func TestSaveChat(t *testing.T) {
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
 	chat.LastMessage = &common.Message{}
-	err = p.SaveChat(chat)
+	err = p.SaveChat(*chat)
 	require.NoError(t, err)
 
 	retrievedChat, err := p.Chat(chat.ID)
 	require.NoError(t, err)
-	require.Equal(t, &chat, retrievedChat)
+	require.Equal(t, chat, retrievedChat)
 }
 
 func TestSaveMentions(t *testing.T) {
@@ -821,7 +821,7 @@ func TestDeactivatePublicChat(t *testing.T) {
 	publicChat.LastMessage = &lastMessage
 	publicChat.UnviewedMessagesCount = 1
 
-	err = p.DeactivateChat(&publicChat, currentClockValue)
+	err = p.DeactivateChat(publicChat, currentClockValue)
 
 	// It does not set deleted at for a public chat
 	require.NoError(t, err)
@@ -890,7 +890,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 	chat.LastMessage = &lastMessage
 	chat.UnviewedMessagesCount = 1
 
-	err = p.DeactivateChat(&chat, currentClockValue)
+	err = p.DeactivateChat(chat, currentClockValue)
 
 	// It does set deleted at for a public chat
 	require.NoError(t, err)

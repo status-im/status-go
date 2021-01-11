@@ -131,12 +131,33 @@ func (a *Transport) InitPublicFilters(chatIDs []string) ([]*transport.Filter, er
 	return a.filters.InitPublicFilters(chatIDs)
 }
 
+func (a *Transport) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*transport.Filter, error) {
+	return a.filters.InitCommunityFilters(pks)
+}
+
 func (a *Transport) Filters() []*transport.Filter {
 	return a.filters.Filters()
 }
 
 func (a *Transport) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return a.filters.InitWithFilters(filters)
+}
+
+func (a *Transport) SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+	if err := a.addSig(newMessage); err != nil {
+		return nil, err
+	}
+
+	// We load the filter to make sure we can post on it
+	filter, err := a.filters.LoadPublic(transport.PubkeyToHex(publicKey))
+	if err != nil {
+		return nil, err
+	}
+
+	newMessage.Topic = filter.Topic
+	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+
+	return a.shhAPI.Post(ctx, *newMessage)
 }
 
 func (a *Transport) RemoveFilters(filters []*transport.Filter) error {
@@ -159,9 +180,8 @@ func (a *Transport) ProcessNegotiatedSecret(secret types.NegotiatedSecret) (*tra
 	return filter, nil
 }
 
-func (a *Transport) JoinPublic(chatID string) error {
-	_, err := a.filters.LoadPublic(chatID)
-	return err
+func (a *Transport) JoinPublic(chatID string) (*transport.Filter, error) {
+	return a.filters.LoadPublic(chatID)
 }
 
 func (a *Transport) LeavePublic(chatID string) error {
@@ -172,13 +192,8 @@ func (a *Transport) LeavePublic(chatID string) error {
 	return a.filters.Remove(chat)
 }
 
-func (a *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) error {
-	_, err := a.filters.LoadDiscovery()
-	if err != nil {
-		return err
-	}
-	_, err = a.filters.LoadContactCode(publicKey)
-	return err
+func (a *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*transport.Filter, error) {
+	return a.filters.LoadContactCode(publicKey)
 }
 
 func (a *Transport) LeavePrivate(publicKey *ecdsa.PublicKey) error {
@@ -186,18 +201,16 @@ func (a *Transport) LeavePrivate(publicKey *ecdsa.PublicKey) error {
 	return a.filters.Remove(filters...)
 }
 
-func (a *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) error {
-	_, err := a.filters.LoadDiscovery()
-	if err != nil {
-		return err
-	}
+func (a *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*transport.Filter, error) {
+	var filters []*transport.Filter
 	for _, pk := range publicKeys {
-		_, err = a.filters.LoadContactCode(pk)
+		f, err := a.filters.LoadContactCode(pk)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		filters = append(filters, f)
 	}
-	return nil
+	return filters, nil
 }
 
 func (a *Transport) LeaveGroup(publicKeys []*ecdsa.PublicKey) error {

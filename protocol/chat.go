@@ -261,11 +261,11 @@ func OneToOneFromPublicKey(pk *ecdsa.PublicKey, timesource common.TimeSource) *C
 	chatID := types.EncodeHex(crypto.FromECDSAPub(pk))
 	newChat := CreateOneToOneChat(chatID[:8], pk, timesource)
 
-	return &newChat
+	return newChat
 }
 
-func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource common.TimeSource) Chat {
-	return Chat{
+func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource common.TimeSource) *Chat {
+	return &Chat{
 		ID:        oneToOneChatID(publicKey),
 		Name:      name,
 		Timestamp: int64(timesource.GetCurrentTime()),
@@ -274,13 +274,13 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 	}
 }
 
-func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) Chat {
+func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, timesource common.TimeSource) *Chat {
 	color := orgChat.Identity.Color
 	if color == "" {
 		color = chatColors[rand.Intn(len(chatColors))] // nolint: gosec
 	}
 
-	return Chat{
+	return &Chat{
 		CommunityID: orgID,
 		Name:        orgChat.Identity.DisplayName,
 		Active:      true,
@@ -291,8 +291,8 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 	}
 }
 
-func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []Chat {
-	var chats []Chat
+func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []*Chat {
+	var chats []*Chat
 	orgID := org.IDString()
 
 	for chatID, chat := range org.Chats() {
@@ -301,8 +301,8 @@ func CreateCommunityChats(org *communities.Community, timesource common.TimeSour
 	return chats
 }
 
-func CreatePublicChat(name string, timesource common.TimeSource) Chat {
-	return Chat{
+func CreatePublicChat(name string, timesource common.TimeSource) *Chat {
+	return &Chat{
 		ID:        name,
 		Name:      name,
 		Active:    true,
@@ -316,8 +316,8 @@ func buildProfileChatID(publicKeyString string) string {
 	return "@" + publicKeyString
 }
 
-func CreateProfileChat(id string, profile string, timesource common.TimeSource) Chat {
-	return Chat{
+func CreateProfileChat(id string, profile string, timesource common.TimeSource) *Chat {
+	return &Chat{
 		ID:        id,
 		Name:      id,
 		Active:    true,

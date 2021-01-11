@@ -4,17 +4,18 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
 type Transport interface {
 	Stop() error
 
-	JoinPrivate(publicKey *ecdsa.PublicKey) error
+	JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error)
 	LeavePrivate(publicKey *ecdsa.PublicKey) error
-	JoinGroup(publicKeys []*ecdsa.PublicKey) error
+	JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error)
 	LeaveGroup(publicKeys []*ecdsa.PublicKey) error
-	JoinPublic(chatID string) error
+	JoinPublic(chatID string) (*Filter, error)
 	LeavePublic(chatID string) error
 	GetCurrentTime() uint64
 	MaxMessageSize() uint32
@@ -23,6 +24,7 @@ type Transport interface {
 	SendPrivateWithSharedSecret(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey, secret []byte) ([]byte, error)
 	SendPrivateWithPartitioned(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error)
 	SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error)
+	SendCommunityMessage(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error)
 	SendMessagesRequest(
 		ctx context.Context,
 		peerID []byte,
@@ -34,6 +36,7 @@ type Transport interface {
 
 	InitFilters(chatIDs []string, publicKeys []*ecdsa.PublicKey) ([]*Filter, error)
 	InitPublicFilters(chatIDs []string) ([]*Filter, error)
+	InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filter, error)
 	LoadFilters(filters []*Filter) ([]*Filter, error)
 	RemoveFilters(filters []*Filter) error
 	RemoveFilterByChatID(string) (*Filter, error)
@@ -47,4 +50,8 @@ type Transport interface {
 	CleanMessagesProcessed(uint64) error
 
 	SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) error
+}
+
+func PubkeyToHex(key *ecdsa.PublicKey) string {
+	return types.EncodeHex(crypto.FromECDSAPub(key))
 }

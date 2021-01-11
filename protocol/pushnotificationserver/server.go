@@ -460,7 +460,8 @@ func (s *Server) listenToPublicKeyQueryTopic(hashedPublicKey []byte) error {
 		return nil
 	}
 	encodedPublicKey := hex.EncodeToString(hashedPublicKey)
-	return s.messageProcessor.JoinPublic(encodedPublicKey)
+	_, err := s.messageProcessor.JoinPublic(encodedPublicKey)
+	return err
 }
 
 // buildPushNotificationRegistrationResponse will check the registration is valid, save it, and listen to the topic for the queries

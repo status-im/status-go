@@ -80,8 +80,8 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	contact.SystemTags = []string{contactAdded}
 	s.Require().NoError(theirMessenger.SaveContact(contact))
 
-	s.Require().Len(response.Chats, 1)
-	chat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	chat := response.Chats()[0]
 	s.Require().False(chat.Active, "It does not create an active chat")
 
 	// Wait for the message to reach its destination
@@ -137,7 +137,7 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	contact := response.Contacts[0]
 
 	// It adds the profile chat and the one to one chat
-	s.Require().Len(response.Chats, 2)
+	s.Require().Len(response.Chats(), 2)
 
 	// It should add the contact
 	s.Require().True(contact.IsAdded())

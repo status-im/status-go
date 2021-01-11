@@ -14,6 +14,7 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
+	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
@@ -31,15 +32,17 @@ type MessageHandler struct {
 	identity           *ecdsa.PrivateKey
 	persistence        *sqlitePersistence
 	transport          transport.Transport
+	ensVerifier        *ens.Verifier
 	communitiesManager *communities.Manager
 	logger             *zap.Logger
 }
 
-func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persistence *sqlitePersistence, communitiesManager *communities.Manager, transport transport.Transport) *MessageHandler {
+func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persistence *sqlitePersistence, communitiesManager *communities.Manager, transport transport.Transport, ensVerifier *ens.Verifier) *MessageHandler {
 	return &MessageHandler{
 		identity:           identity,
 		persistence:        persistence,
 		communitiesManager: communitiesManager,
+		ensVerifier:        ensVerifier,
 		transport:          transport,
 		logger:             logger}
 }
@@ -141,8 +144,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 
 	// Store in chats map as it might be a new one
 	messageState.AllChats[chat.ID] = chat
-	// Set in the map
-	messageState.ModifiedChats[chat.ID] = true
+	messageState.Response.AddChat(chat)
 
 	if message.Message != nil {
 		messageState.CurrentMessageState.Message = *message.Message
@@ -202,7 +204,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	// Set chat active
 	chat.Active = true
 	// Set in the modified maps chat
-	state.ModifiedChats[chat.ID] = true
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	// Add to response
@@ -258,8 +260,8 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 
 	chat := CreatePublicChat(chatID, state.Timesource)
 
-	state.AllChats[chat.ID] = &chat
-	state.ModifiedChats[chat.ID] = true
+	state.AllChats[chat.ID] = chat
+	state.Response.AddChat(chat)
 
 	return true
 }
@@ -294,7 +296,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 		chat.LastClockValue = message.Clock
 	}
 
-	state.ModifiedChats[chat.ID] = true
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	return nil
@@ -326,12 +328,15 @@ func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, mes
 
 // HandleCommunityDescription handles an community description
 func (m *MessageHandler) HandleCommunityDescription(state *ReceivedMessageState, signer *ecdsa.PublicKey, description protobuf.CommunityDescription, rawPayload []byte) error {
-	community, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, &description, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityDescriptionMessage(signer, &description, rawPayload)
 	if err != nil {
 		return err
 	}
 
-	state.AllCommunities[community.IDString()] = community
+	community := communityResponse.Community
+
+	state.Response.AddCommunity(community)
+	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 
 	// If we haven't joined the org, nothing to do
 	if !community.Joined() {
@@ -347,14 +352,14 @@ func (m *MessageHandler) HandleCommunityDescription(state *ReceivedMessageState,
 		oldChat, ok := state.AllChats[chat.ID]
 		if !ok {
 			// Beware, don't use the reference in the range (i.e chat) as it's a shallow copy
-			state.AllChats[chat.ID] = &chats[i]
+			state.AllChats[chat.ID] = chats[i]
 
-			state.ModifiedChats[chat.ID] = true
+			state.Response.AddChat(chat)
 			chatIDs = append(chatIDs, chat.ID)
 			// Update name, currently is the only field is mutable
 		} else if oldChat.Name != chat.Name {
 			state.AllChats[chat.ID].Name = chat.Name
-			state.ModifiedChats[chat.ID] = true
+			state.Response.AddChat(chat)
 		}
 	}
 
@@ -385,17 +390,37 @@ func (m *MessageHandler) HandleCommunityInvitation(state *ReceivedMessageState, 
 		return errors.New("invitation not for us")
 	}
 
-	community, err := m.communitiesManager.HandleCommunityInvitation(signer, &invitation, rawPayload)
+	communityResponse, err := m.communitiesManager.HandleCommunityInvitation(signer, &invitation, rawPayload)
 	if err != nil {
 		return err
 	}
-	state.AllCommunities[community.IDString()] = community
+
+	community := communityResponse.Community
+
+	state.Response.AddCommunity(community)
+	state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 
 	return nil
 }
 
-// HandleWrappedCommunityDescriptionMessage handles a wrapped community description
-func (m *MessageHandler) HandleWrappedCommunityDescriptionMessage(payload []byte) (*communities.Community, error) {
+// HandleCommunityRequestToJoin handles an community request to join
+func (m *MessageHandler) HandleCommunityRequestToJoin(state *ReceivedMessageState, signer *ecdsa.PublicKey, requestToJoinProto protobuf.CommunityRequestToJoin) error {
+	if requestToJoinProto.CommunityId == nil {
+		return errors.New("invalid community id")
+	}
+
+	requestToJoin, err := m.communitiesManager.HandleCommunityRequestToJoin(signer, &requestToJoinProto)
+	if err != nil {
+		return err
+	}
+
+	state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
+
+	return nil
+}
+
+// handleWrappedCommunityDescriptionMessage handles a wrapped community description
+func (m *MessageHandler) handleWrappedCommunityDescriptionMessage(payload []byte) (*communities.CommunityResponse, error) {
 	return m.communitiesManager.HandleWrappedCommunityDescriptionMessage(payload)
 }
 
@@ -466,26 +491,35 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set chat active
 	chat.Active = true
 	// Set in the modified maps chat
-	state.ModifiedChats[chat.ID] = true
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	contact := state.CurrentMessageState.Contact
-	if hasENSNameChanged(contact, receivedMessage.EnsName, receivedMessage.Clock) {
-		contact.ResetENSVerification(receivedMessage.Clock, receivedMessage.EnsName)
-		state.ModifiedContacts[contact.ID] = true
-		state.AllContacts[contact.ID] = contact
+	if receivedMessage.EnsName != "" {
+		oldRecord, err := m.ensVerifier.Add(contact.ID, receivedMessage.EnsName, receivedMessage.Clock)
+		if err != nil {
+			m.logger.Warn("failed to verify ENS name", zap.Error(err))
+		} else if oldRecord == nil {
+			// If oldRecord is nil, a new verification process will take place
+			// so we reset the record
+			contact.ENSVerified = false
+			state.ModifiedContacts[contact.ID] = true
+			state.AllContacts[contact.ID] = contact
+		}
 	}
 
 	if receivedMessage.ContentType == protobuf.ChatMessage_COMMUNITY {
 		m.logger.Debug("Handling community content type")
 
-		community, err := m.HandleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity())
+		communityResponse, err := m.handleWrappedCommunityDescriptionMessage(receivedMessage.GetCommunity())
 		if err != nil {
 			return err
 		}
+		community := communityResponse.Community
 		receivedMessage.CommunityID = community.IDString()
 
-		state.AllCommunities[community.IDString()] = community
+		state.Response.AddCommunity(community)
+		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 	}
 	// Add to response
 	state.Response.Messages = append(state.Response.Messages, receivedMessage)
@@ -729,8 +763,7 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 				return nil, errors.Wrap(err, "failed to decode pubkey")
 			}
 
-			newChat := CreateOneToOneChat(chatID[:8], pubKey, timesource)
-			chat = &newChat
+			chat = CreateOneToOneChat(chatID[:8], pubKey, timesource)
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_ONE_TO_ONE:
@@ -740,8 +773,7 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 		chat := chats[chatID]
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
-			newChat := CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
-			chat = &newChat
+			chat = CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
@@ -863,7 +895,7 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 		chat.LastClockValue = pbEmojiR.Clock
 	}
 
-	state.ModifiedChats[chat.ID] = true
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	// save emoji reaction

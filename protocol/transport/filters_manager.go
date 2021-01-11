@@ -75,9 +75,6 @@ func (s *FiltersManager) Init(
 	chatIDs []string,
 	publicKeys []*ecdsa.PublicKey,
 ) ([]*Filter, error) {
-	logger := s.logger.With(zap.String("site", "Init"))
-
-	logger.Info("initializing")
 
 	// Load our contact code.
 	_, err := s.LoadContactCode(&s.privateKey.PublicKey)
@@ -131,6 +128,36 @@ func (s *FiltersManager) InitPublicFilters(chatIDs []string) ([]*Filter, error) 
 			return nil, err
 		}
 		filters = append(filters, f)
+	}
+	return filters, nil
+}
+
+func (s *FiltersManager) InitCommunityFilters(pks []*ecdsa.PrivateKey) ([]*Filter, error) {
+	var filters []*Filter
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for _, pk := range pks {
+
+		identityStr := PublicKeyToStr(&pk.PublicKey)
+		rawFilter, err := s.addAsymmetric(identityStr, pk, true)
+		if err != nil {
+			return nil, err
+
+		}
+		filterID := identityStr + "-admin"
+		filter := &Filter{
+			ChatID:   filterID,
+			FilterID: rawFilter.FilterID,
+			Topic:    rawFilter.Topic,
+			Identity: identityStr,
+			Listen:   true,
+			OneToOne: true,
+		}
+
+		s.filters[filterID] = filter
+
+		filters = append(filters, filter)
 	}
 	return filters, nil
 }

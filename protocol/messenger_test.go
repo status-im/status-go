@@ -334,12 +334,12 @@ func buildTestMessage(chat Chat) *common.Message {
 func (s *MessengerSuite) TestMarkMessagesSeen() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.UnviewedMessagesCount = 2
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
-	inputMessage1 := buildTestMessage(chat)
+	inputMessage1 := buildTestMessage(*chat)
 	inputMessage1.ID = "1"
 	inputMessage1.Seen = false
-	inputMessage2 := buildTestMessage(chat)
+	inputMessage2 := buildTestMessage(*chat)
 	inputMessage2.ID = "2"
 	inputMessage2.Seen = false
 
@@ -363,12 +363,12 @@ func (s *MessengerSuite) TestMarkMessagesSeen() {
 func (s *MessengerSuite) TestMarkAllRead() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.UnviewedMessagesCount = 2
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.Require().NoError(err)
-	inputMessage1 := buildTestMessage(chat)
+	inputMessage1 := buildTestMessage(*chat)
 	inputMessage1.ID = "1"
 	inputMessage1.Seen = false
-	inputMessage2 := buildTestMessage(chat)
+	inputMessage2 := buildTestMessage(*chat)
 	inputMessage2.ID = "2"
 	inputMessage2.Seen = false
 
@@ -386,9 +386,9 @@ func (s *MessengerSuite) TestMarkAllRead() {
 func (s *MessengerSuite) TestSendPublic() {
 	chat := CreatePublicChat("test-chat", s.m.transport)
 	chat.LastClockValue = uint64(100000000000000)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
@@ -412,9 +412,9 @@ func (s *MessengerSuite) TestSendPublic() {
 func (s *MessengerSuite) TestSendProfile() {
 	chat := CreateProfileChat("test-chat-profile", "0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), s.m.transport)
 	chat.LastClockValue = uint64(100000000000000)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
@@ -445,7 +445,7 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 	inputMessage := &common.Message{}
 	inputMessage.ChatId = chat.ID
 	chat.LastClockValue = uint64(100000000000000)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.NoError(err)
 	response, err := s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -466,9 +466,9 @@ func (s *MessengerSuite) TestSendPrivateOneToOne() {
 func (s *MessengerSuite) TestSendPrivateGroup() {
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	chat := response.Chats[0]
+	chat := response.Chats()[0]
 	key, err := crypto.GenerateKey()
 	s.NoError(err)
 	members := []string{"0x" + hex.EncodeToString(crypto.FromECDSAPub(&key.PublicKey))}
@@ -499,9 +499,9 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	chat := response.Chats[0]
+	chat := response.Chats()[0]
 
 	inputMessage := &common.Message{}
 	inputMessage.ChatId = chat.ID
@@ -527,12 +527,12 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 // Make sure public messages sent by us are not
 func (s *MessengerSuite) TestRetrieveOwnPublic() {
 	chat := CreatePublicChat("status", s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
 	// Right-to-left text
 	text := "پيل اندر خانه يي تاريک بود عرضه را آورده بودندش هنود  i\nاز براي ديدنش مردم بسي اندر آن ظلمت همي شد هر کسي"
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 	inputMessage.ChatId = chat.ID
 	inputMessage.Text = text
 
@@ -548,8 +548,8 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 	s.True(textMessage.RTL)
 	s.Equal(1, textMessage.LineCount)
 
-	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
 	// It does not set the unviewed messages count
 	s.Require().Equal(uint(0), actualChat.UnviewedMessagesCount)
 	// It updates the last message clock value
@@ -564,17 +564,17 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err = theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = s.m.Join(chat)
+	_, err = s.m.Join(chat)
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -591,8 +591,8 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Messages, 1)
-	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
 	// It sets the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
 	// It updates the last message clock value
@@ -607,23 +607,23 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err = theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = s.m.Join(chat)
+	_, err = s.m.Join(chat)
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	sentResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
 
 	chat.DeletedAtClockValue = sentResponse.Messages[0].Clock
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	// Wait for the message to reach its destination
@@ -639,28 +639,27 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err = theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = s.m.Join(chat)
+	_, err = s.m.Join(chat)
 	s.Require().NoError(err)
 
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 	blockedContact := Contact{
-		ID:            publicKeyHex,
-		Name:          "contact-name",
-		LastUpdated:   20,
-		SystemTags:    []string{contactBlocked},
-		TributeToTalk: "talk",
+		ID:          publicKeyHex,
+		Name:        "contact-name",
+		LastUpdated: 20,
+		SystemTags:  []string{contactBlocked},
 	}
 
 	s.Require().NoError(s.m.SaveContact(&blockedContact))
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	_, err = theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -678,17 +677,17 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err = theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = s.m.Join(chat)
+	_, err = s.m.Join(chat)
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	sendResponse1, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
@@ -707,8 +706,8 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Messages, 1)
-	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
 	// It sets the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
 	// It updates the last message clock value
@@ -733,17 +732,17 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("our-chat", &theirMessenger.identity.PublicKey, s.m.transport)
 	ourChat.UnviewedMessagesCount = 1
 	// Make chat inactive
 	ourChat.Active = false
-	err = s.m.SaveChat(&ourChat)
+	err = s.m.SaveChat(ourChat)
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(theirChat)
+	inputMessage := buildTestMessage(*theirChat)
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -758,8 +757,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Equal(len(response.Chats), 1)
-	actualChat := response.Chats[0]
+	s.Require().Equal(len(response.Chats()), 1)
+	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(2), actualChat.UnviewedMessagesCount)
 	// It updates the last message clock value
@@ -776,10 +775,10 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
-	err = theirMessenger.SaveChat(&chat)
+	err = theirMessenger.SaveChat(chat)
 	s.NoError(err)
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -796,8 +795,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
 	// It updates the last message clock value
@@ -814,10 +813,10 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	err = theirMessenger.SaveChat(&chat)
+	err = theirMessenger.SaveChat(chat)
 	s.NoError(err)
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	sendResponse, err := theirMessenger.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -829,7 +828,7 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	s.NoError(err)
 
 	s.Require().Equal(len(response.Messages), 0)
-	s.Require().Equal(len(response.Chats), 0)
+	s.Require().Equal(len(response.Chats()), 0)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
@@ -841,9 +840,9 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.Require().NoError(err)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
 	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	ourChat := response.Chats[0]
+	ourChat := response.Chats()[0]
 
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
@@ -855,7 +854,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	// Retrieve their messages so that the chat is created
 	_, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
@@ -866,7 +865,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"no joining group event received",
 	)
 	s.Require().NoError(err)
@@ -886,8 +885,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
 	// It updates the last message clock value
@@ -904,9 +903,9 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	s.Require().NoError(err)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	ourChat := response.Chats[0]
+	ourChat := response.Chats()[0]
 
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
@@ -918,7 +917,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	// Retrieve their messages so that the chat is created
 	_, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
@@ -929,7 +928,7 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	// Wait for join group event
 	_, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"no joining group event received",
 	)
 	s.Require().NoError(err)
@@ -940,13 +939,13 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 	// Retrieve their messages so that the chat is created
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Chats, 1)
-	actualChat := response.Chats[0]
+	s.Require().Len(response.Chats(), 1)
+	actualChat := response.Chats()[0]
 	s.Require().Equal(newName, actualChat.Name)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
@@ -959,9 +958,9 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	s.Require().NoError(err)
 	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	ourChat := response.Chats[0]
+	ourChat := response.Chats()[0]
 
 	err = s.m.SaveChat(ourChat)
 	s.NoError(err)
@@ -973,7 +972,7 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	// Retrieve their messages so that the chat is created
 	_, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
@@ -984,7 +983,7 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	// Wait for join group event
 	_, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"no joining group event received",
 	)
 	s.Require().NoError(err)
@@ -992,13 +991,13 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	response, err = theirMessenger.LeaveGroupChat(context.Background(), ourChat.ID, true)
 	s.NoError(err)
 
-	s.Require().Len(response.Chats, 1)
-	s.Require().False(response.Chats[0].Active)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	// Retrieve messages so user is removed
 	_, err = WaitOnMessengerResponse(
 		s.m,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 && len(r.Chats[0].Members) == 1 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 && len(r.Chats()[0].Members) == 1 },
 		"leave group chat not received",
 	)
 
@@ -1011,19 +1010,19 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	// Retrieve their messages so that the chat is created
 	response, err = WaitOnMessengerResponse(
 		theirMessenger,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Chats, 1)
-	s.Require().True(response.Chats[0].Active)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().True(response.Chats()[0].Active)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
 func (s *MessengerSuite) TestChatPersistencePublic() {
-	chat := Chat{
+	chat := &Chat{
 		ID:                    "chat-name",
 		Name:                  "chat-name",
 		Color:                 "#fffff",
@@ -1036,19 +1035,18 @@ func (s *MessengerSuite) TestChatPersistencePublic() {
 		LastMessage:           &common.Message{},
 	}
 
-	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
 	s.Require().Equal(1, len(savedChats))
 
 	actualChat := savedChats[0]
-	expectedChat := &chat
 
-	s.Require().Equal(actualChat, expectedChat)
+	s.Require().Equal(chat, actualChat)
 }
 
 func (s *MessengerSuite) TestDeleteChat() {
 	chatID := "chatid"
-	chat := Chat{
+	chat := &Chat{
 		ID:                    chatID,
 		Name:                  "chat-name",
 		Color:                 "#fffff",
@@ -1061,7 +1059,7 @@ func (s *MessengerSuite) TestDeleteChat() {
 		LastMessage:           &common.Message{},
 	}
 
-	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
 	s.Require().Equal(1, len(savedChats))
 
@@ -1071,7 +1069,7 @@ func (s *MessengerSuite) TestDeleteChat() {
 }
 
 func (s *MessengerSuite) TestChatPersistenceUpdate() {
-	chat := Chat{
+	chat := &Chat{
 		ID:                    "chat-name",
 		Name:                  "chat-name",
 		Color:                 "#fffff",
@@ -1084,28 +1082,26 @@ func (s *MessengerSuite) TestChatPersistenceUpdate() {
 		LastMessage:           &common.Message{},
 	}
 
-	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
 	s.Require().Equal(1, len(savedChats))
 
 	actualChat := savedChats[0]
-	expectedChat := &chat
 
-	s.Require().Equal(expectedChat, actualChat)
+	s.Require().Equal(chat, actualChat)
 
 	chat.Name = "updated-name-1"
-	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveChat(chat))
 	updatedChats := s.m.Chats()
 	s.Require().Equal(1, len(updatedChats))
 
 	actualUpdatedChat := updatedChats[0]
-	expectedUpdatedChat := &chat
 
-	s.Require().Equal(expectedUpdatedChat, actualUpdatedChat)
+	s.Require().Equal(chat, actualUpdatedChat)
 }
 
 func (s *MessengerSuite) TestChatPersistenceOneToOne() {
-	chat := Chat{
+	chat := &Chat{
 		ID:                    testPK,
 		Name:                  testPK,
 		Color:                 "#fffff",
@@ -1127,20 +1123,19 @@ func (s *MessengerSuite) TestChatPersistenceOneToOne() {
 	pk, err := crypto.UnmarshalPubkey(publicKeyBytes)
 	s.Require().NoError(err)
 
-	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveChat(chat))
 	s.Require().NoError(s.m.SaveContact(&contact))
 	savedChats := s.m.Chats()
 	s.Require().Equal(1, len(savedChats))
 
 	actualChat := savedChats[0]
-	expectedChat := &chat
 
 	actualPk, err := actualChat.PublicKey()
 	s.Require().NoError(err)
 
 	s.Require().Equal(pk, actualPk)
 
-	s.Require().Equal(expectedChat, actualChat)
+	s.Require().Equal(chat, actualChat)
 	s.Require().NotEmpty(actualChat.Identicon)
 	s.Require().NotEmpty(actualChat.Alias)
 }
@@ -1159,7 +1154,7 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 	s.Require().NoError(err)
 	member3ID := types.EncodeHex(crypto.FromECDSAPub(&member3Key.PublicKey))
 
-	chat := Chat{
+	chat := &Chat{
 		ID:        "chat-id",
 		Name:      "chat-id",
 		Color:     "#fffff",
@@ -1206,14 +1201,13 @@ func (s *MessengerSuite) TestChatPersistencePrivateGroupChat() {
 		UnviewedMessagesCount: 40,
 		LastMessage:           &common.Message{},
 	}
-	s.Require().NoError(s.m.SaveChat(&chat))
+	s.Require().NoError(s.m.SaveChat(chat))
 	savedChats := s.m.Chats()
 	s.Require().Equal(1, len(savedChats))
 
 	actualChat := savedChats[0]
-	expectedChat := &chat
 
-	s.Require().Equal(expectedChat, actualChat)
+	s.Require().Equal(chat, actualChat)
 }
 
 func (s *MessengerSuite) TestBlockContact() {
@@ -1234,10 +1228,9 @@ func (s *MessengerSuite) TestBlockContact() {
 				FCMToken:       "token-2",
 			},
 		},
-		TributeToTalk: "talk",
 	}
 
-	chat1 := Chat{
+	chat1 := &Chat{
 		ID:                    contact.ID,
 		Name:                  "chat-name",
 		Color:                 "#fffff",
@@ -1249,7 +1242,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		UnviewedMessagesCount: 40,
 	}
 
-	chat2 := Chat{
+	chat2 := &Chat{
 		ID:                    "chat-2",
 		Name:                  "chat-name",
 		Color:                 "#fffff",
@@ -1261,7 +1254,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		UnviewedMessagesCount: 40,
 	}
 
-	chat3 := Chat{
+	chat3 := &Chat{
 		ID:                    "chat-3",
 		Name:                  "chat-name",
 		Color:                 "#fffff",
@@ -1273,9 +1266,9 @@ func (s *MessengerSuite) TestBlockContact() {
 		UnviewedMessagesCount: 40,
 	}
 
-	s.Require().NoError(s.m.SaveChat(&chat1))
-	s.Require().NoError(s.m.SaveChat(&chat2))
-	s.Require().NoError(s.m.SaveChat(&chat3))
+	s.Require().NoError(s.m.SaveChat(chat1))
+	s.Require().NoError(s.m.SaveChat(chat2))
+	s.Require().NoError(s.m.SaveChat(chat3))
 
 	s.Require().NoError(s.m.SaveContact(&contact))
 
@@ -1416,7 +1409,6 @@ func (s *MessengerSuite) TestContactPersistence() {
 				FCMToken:       "token-2",
 			},
 		},
-		TributeToTalk: "talk",
 	}
 
 	s.Require().NoError(s.m.SaveContact(&contact))
@@ -1450,7 +1442,6 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 				FCMToken:       "token-2",
 			},
 		},
-		TributeToTalk: "talk",
 	}
 
 	s.Require().NoError(s.m.SaveContact(&contact))
@@ -1485,9 +1476,9 @@ func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
 	members := []string{testPK}
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", members)
 	s.NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	chat := response.Chats[0]
+	chat := response.Chats()[0]
 
 	s.Require().Equal("test", chat.Name)
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
@@ -1499,9 +1490,9 @@ func (s *MessengerSuite) TestCreateGroupChatWithMembers() {
 func (s *MessengerSuite) TestAddMembersToChat() {
 	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.Require().NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 
-	chat := response.Chats[0]
+	chat := response.Chats()[0]
 
 	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
@@ -1509,10 +1500,10 @@ func (s *MessengerSuite) TestAddMembersToChat() {
 
 	response, err = s.m.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.Require().NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
-	chat = response.Chats[0]
+	chat = response.Chats()[0]
 
 	publicKeyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	keyHex := "0x" + hex.EncodeToString(crypto.FromECDSAPub(&key.PublicKey))
@@ -1528,7 +1519,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
@@ -1536,7 +1527,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	response, err := s.m.RequestAddressForTransaction(context.Background(), theirPkString, myAddress.Hex(), value, contract)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage := response.Messages[0]
@@ -1559,7 +1550,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage := response.Messages[0]
@@ -1574,7 +1565,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	// We decline the request
 	response, err = theirMessenger.DeclineRequestAddressForTransaction(context.Background(), receiverMessage.ID)
 	s.Require().NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage = response.Messages[0]
@@ -1595,7 +1586,7 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage = response.Messages[0]
@@ -1623,7 +1614,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	transactionHash := testTransactionHash
@@ -1633,7 +1624,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	response, err := s.m.SendTransaction(context.Background(), theirPkString, value, contract, transactionHash, signature)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage := response.Messages[0]
@@ -1695,7 +1686,7 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage := response.Messages[0]
@@ -1727,7 +1718,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	transactionHash := testTransactionHash
@@ -1737,7 +1728,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	response, err := s.m.SendTransaction(context.Background(), theirPkString, value, contract, transactionHash, signature)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage := response.Messages[0]
@@ -1799,7 +1790,7 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage := response.Messages[0]
@@ -1829,13 +1820,13 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	response, err := s.m.RequestAddressForTransaction(context.Background(), theirPkString, myAddress.Hex(), value, contract)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage := response.Messages[0]
@@ -1858,7 +1849,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage := response.Messages[0]
@@ -1873,7 +1864,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	// We accept the request
 	response, err = theirMessenger.AcceptRequestAddressForTransaction(context.Background(), receiverMessage.ID, "some-address")
 	s.Require().NoError(err)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage = response.Messages[0]
@@ -1895,7 +1886,7 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage = response.Messages[0]
@@ -1922,13 +1913,13 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	response, err := s.m.RequestTransaction(context.Background(), theirPkString, value, contract, receiverAddressString)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage := response.Messages[0]
@@ -1952,7 +1943,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage := response.Messages[0]
@@ -1968,7 +1959,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	response, err = theirMessenger.DeclineRequestTransaction(context.Background(), initialCommandID)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage = response.Messages[0]
@@ -1988,7 +1979,7 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage = response.Messages[0]
@@ -2012,13 +2003,13 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
 	response, err := s.m.RequestTransaction(context.Background(), theirPkString, value, contract, receiverAddressString)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage := response.Messages[0]
@@ -2042,7 +2033,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage := response.Messages[0]
@@ -2061,7 +2052,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	response, err = theirMessenger.AcceptRequestTransaction(context.Background(), transactionHash, initialCommandID, signature)
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	senderMessage = response.Messages[0]
@@ -2128,7 +2119,7 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	s.Require().NoError(err)
 
 	s.Require().NotNil(response)
-	s.Require().Len(response.Chats, 1)
+	s.Require().Len(response.Chats(), 1)
 	s.Require().Len(response.Messages, 1)
 
 	receiverMessage = response.Messages[0]
@@ -2225,9 +2216,9 @@ func (s *MessengerSuite) TestSentEventTracking() {
 
 	//when message sent, its sent field should be "false" until we got confirmation
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -2248,9 +2239,9 @@ func (s *MessengerSuite) TestSentEventTracking() {
 func (s *MessengerSuite) TestLastSentField() {
 	//send message
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -2335,9 +2326,9 @@ func (s *MessengerSuite) TestShouldResendEmoji() {
 func (s *MessengerSuite) TestMessageSent() {
 	//send message
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -2360,9 +2351,9 @@ func (s *MessengerSuite) TestMessageSent() {
 func (s *MessengerSuite) TestResendExpiredEmojis() {
 	//send message
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err := s.m.SaveChat(chat)
 	s.NoError(err)
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 
 	_, err = s.m.SendChatMessage(context.Background(), inputMessage)
 	s.NoError(err)
@@ -2431,7 +2422,7 @@ func (s *MessageHandlerSuite) TestRun() {
 	testCases := []struct {
 		Name           string
 		Error          bool
-		Chat           Chat // Chat to create
+		Chat           *Chat // Chat to create
 		Message        common.Message
 		SigPubKey      *ecdsa.PublicKey
 		ExpectedChatID string
@@ -2518,8 +2509,8 @@ func (s *MessageHandlerSuite) TestRun() {
 	for idx, tc := range testCases {
 		s.Run(tc.Name, func() {
 			chatsMap := make(map[string]*Chat)
-			if tc.Chat.ID != "" {
-				chatsMap[tc.Chat.ID] = &tc.Chat
+			if tc.Chat != nil && tc.Chat.ID != "" {
+				chatsMap[tc.Chat.ID] = tc.Chat
 			}
 
 			message := tc.Message

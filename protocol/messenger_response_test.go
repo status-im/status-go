@@ -13,19 +13,17 @@ func TestMessengerResponseMergeChats(t *testing.T) {
 	chat1 := &Chat{ID: "1"}
 	modifiedChat1 := &Chat{ID: "1", Name: "name"}
 	chat2 := &Chat{ID: "3"}
-	response1 := &MessengerResponse{
-		Chats: []*Chat{chat1},
-	}
+	response1 := &MessengerResponse{}
+	response1.AddChat(chat1)
 
-	response2 := &MessengerResponse{
-		Chats: []*Chat{modifiedChat1, chat2},
-	}
+	response2 := &MessengerResponse{}
+	response2.AddChats([]*Chat{modifiedChat1, chat2})
 
 	require.NoError(t, response1.Merge(response2))
 
-	require.Len(t, response1.Chats, 2)
-	require.Equal(t, modifiedChat1, response1.Chats[0])
-	require.Equal(t, chat2, response1.Chats[1])
+	require.Len(t, response1.Chats(), 2)
+	require.Equal(t, modifiedChat1, response1.chats[modifiedChat1.ID])
+	require.Equal(t, chat2, response1.chats[chat2.ID])
 }
 
 func TestMessengerResponseMergeMessages(t *testing.T) {

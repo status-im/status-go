@@ -20,7 +20,8 @@ type config struct {
 	// This needs to be exposed until we move here mailserver logic
 	// as otherwise the client is not notified of a new filter and
 	// won't be pulling messages from mailservers until it reloads the chats/filters
-	onNegotiatedFilters func([]*transport.Filter)
+	onNegotiatedFilters  func([]*transport.Filter)
+	onContactENSVerified func(*MessengerResponse)
 
 	// systemMessagesTranslations holds translations for system-messages
 	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
@@ -37,7 +38,9 @@ type config struct {
 	mailserversDatabase *mailservers.Database
 	account             *multiaccounts.Account
 
-	verifyTransactionClient EthClient
+	verifyTransactionClient  EthClient
+	verifyENSURL             string
+	verifyENSContractAddress string
 
 	pushNotificationServerConfig *pushnotificationserver.Config
 	pushNotificationClientConfig *pushnotificationclient.Config
@@ -152,6 +155,15 @@ func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 func WithDeliveredHandler(h MessageDeliveredHandler) Option {
 	return func(c *config) error {
 		c.messageDeliveredHandler = h
+		return nil
+	}
+}
+
+func WithENSVerificationConfig(onENSVerified func(*MessengerResponse), url, address string) Option {
+	return func(c *config) error {
+		c.onContactENSVerified = onENSVerified
+		c.verifyENSURL = url
+		c.verifyENSContractAddress = address
 		return nil
 	}
 }

@@ -180,8 +180,16 @@ func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	}
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
-	go s.verifyENSLoop(30*time.Second, s.cancelMessenger)
 	return response, nil
+}
+
+func publishMessengerResponse(response *protocol.MessengerResponse) {
+	if !response.IsEmpty() {
+		PublisherSignalHandler{}.NewMessages(response)
+		localnotifications.SendMessageNotifications(response.Notifications)
+		// Clear notifications as not used for now
+		response.Notifications = nil
+	}
 }
 
 func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
@@ -196,10 +204,7 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 				log.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
-			if !response.IsEmpty() {
-				PublisherSignalHandler{}.NewMessages(response)
-				localnotifications.SendMessageNotifications(response.Notifications)
-			}
+			publishMessengerResponse(response)
 		case <-cancel:
 			return
 		}
@@ -270,35 +275,6 @@ func (c *verifyTransactionClient) TransactionByHash(ctx context.Context, hash ty
 	return coremessage, coretypes.TransactionStatus(receipt.Status), nil
 }
 
-func (s *Service) verifyENSLoop(tick time.Duration, cancel <-chan struct{}) {
-	if s.config.VerifyENSURL == "" || s.config.VerifyENSContractAddress == "" {
-		log.Warn("not starting ENS loop")
-		return
-	}
-
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	ctx, cancelVerifyENS := context.WithCancel(context.Background())
-
-	for {
-		select {
-		case <-ticker.C:
-			response, err := s.messenger.VerifyENSNames(ctx, s.config.VerifyENSURL, s.config.VerifyENSContractAddress)
-			if err != nil {
-				log.Error("failed to validate ens", "err", err)
-				continue
-			}
-			if !response.IsEmpty() {
-				PublisherSignalHandler{}.NewMessages(response)
-			}
-		case <-cancel:
-			cancelVerifyENS()
-			return
-		}
-	}
-}
-
 func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct{}) {
 	if s.config.VerifyTransactionURL == "" {
 		log.Warn("not starting transaction loop")
@@ -329,10 +305,8 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 				log.Error("failed to validate transactions", "err", err)
 				continue
 			}
-			if !response.IsEmpty() {
-				PublisherSignalHandler{}.NewMessages(response)
-				localnotifications.SendMessageNotifications(response.Notifications)
-			}
+			publishMessengerResponse(response)
+
 		case <-cancel:
 			cancelVerifyTransaction()
 			return
@@ -478,11 +452,14 @@ func buildMessengerOptions(
 		protocol.WithAccount(account),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
-		protocol.WithDeliveredHandler(messageDeliveredHandler)}
+		protocol.WithDeliveredHandler(messageDeliveredHandler),
+		protocol.WithENSVerificationConfig(publishMessengerResponse, config.VerifyENSURL, config.VerifyENSContractAddress),
+	}
 
 	if config.DataSyncEnabled {
 		options = append(options, protocol.WithDatasync())
 	}
+
 	settings, err := accountsDB.GetSettings()
 	if err != sql.ErrNoRows && err != nil {
 		return nil, err

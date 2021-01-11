@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
 )
@@ -25,8 +26,12 @@ type ManagerSuite struct {
 func (s *ManagerSuite) SetupTest() {
 	db, err := sqlite.OpenInMemory()
 	s.Require().NoError(err)
-	m, err := NewManager(db, nil)
+	key, err := crypto.GenerateKey()
 	s.Require().NoError(err)
+	s.Require().NoError(err)
+	m, err := NewManager(&key.PublicKey, db, nil, nil)
+	s.Require().NoError(err)
+	s.Require().NoError(m.Start())
 	s.manager = m
 }
 

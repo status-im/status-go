@@ -12,6 +12,12 @@ message Grant {
 }
 
 message CommunityMember {
+  enum Roles {
+    UNKNOWN_ROLE = 0;
+    ROLE_ALL = 1;
+    ROLE_MANAGE_USERS = 2;
+  }
+  repeated Roles roles = 1;
 }
 
 message CommunityPermissions {
@@ -49,14 +55,16 @@ message CommunityInvitation {
   bytes public_key = 4;
 }
 
-message CommunityRequestJoin {
-  string ens_name = 1;
-  string chat_id = 2;
-  bytes community_id = 3;
+message CommunityRequestToJoin {
+  uint64 clock = 1;
+  string ens_name = 2;
+  string chat_id = 3;
+  bytes community_id = 4;
 }
 
-message CommunityRequestJoinResponse {
-  CommunityDescription community = 1;
-  bool accepted = 2;
-  bytes grant = 3;
+message CommunityRequestToJoinResponse {
+  uint64 clock = 1;
+  CommunityDescription community = 2;
+  bool accepted = 3;
+  bytes grant = 4;
 }

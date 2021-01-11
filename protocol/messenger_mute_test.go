@@ -69,13 +69,13 @@ func (s *MessengerMuteSuite) TestSetMute() {
 
 	chat := CreatePublicChat(chatID, s.m.transport)
 
-	err = s.m.SaveChat(&chat)
+	err = s.m.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = s.m.Join(chat)
+	_, err = s.m.Join(chat)
 	s.Require().NoError(err)
 
-	err = theirMessenger.SaveChat(&chat)
+	err = theirMessenger.SaveChat(chat)
 	s.Require().NoError(err)
 
 	s.Require().NoError(s.m.MuteChat(chatID))
