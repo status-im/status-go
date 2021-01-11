@@ -209,9 +209,9 @@ func (n *Notification) unmarshalAndAttachBody(body json.RawMessage, bodyStruct i
 	return nil
 }
 
-func pushMessages(ns []Notification) {
+func pushMessages(ns []*Notification) {
 	for _, n := range ns {
-		pushMessage(&n)
+		pushMessage(n)
 	}
 }
 
@@ -471,9 +471,9 @@ func (s *Service) IsStarted() bool {
 }
 
 func SendMessageNotifications(mnb []protocol.MessageNotificationBody) {
-	var ns []Notification
+	var ns []*Notification
 	for _, n := range mnb {
-		ns = append(ns, Notification{
+		ns = append(ns, &Notification{
 			Body:     n,
 			BodyType: TypeMessage,
 			Category: "", // TODO what category do we want?
