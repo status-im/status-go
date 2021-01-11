@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	stdlog "log"
 	"os"
 	"os/signal"
@@ -399,11 +400,13 @@ func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration, can
 	for {
 		select {
 		case <-ticker.C:
-			_, err := messenger.RetrieveAll()
+			mr, err := messenger.RetrieveAll()
 			if err != nil {
 				logger.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
+
+			localnotifications.SendMessageNotifications(mr.Notifications)
 		case <-cancel:
 			return
 		}

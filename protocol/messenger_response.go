@@ -12,6 +12,9 @@ type MessengerResponse struct {
 	Installations  []*multidevice.Installation `json:"installations,omitempty"`
 	EmojiReactions []*EmojiReaction            `json:"emojiReactions,omitempty"`
 	Invitations    []*GroupChatInvitation      `json:"invitations,omitempty"`
+
+	// Notifications a list of MessageNotificationBody derived from received messages that are useful to notify the user about
+	Notifications []MessageNotificationBody `json:"notifications"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {

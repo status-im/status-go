@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -2490,8 +2489,6 @@ type ReceivedMessageState struct {
 	Response *MessengerResponse
 	// Timesource is a time source for clock values/timestamps.
 	Timesource TimeSource
-	// Notifications a list of Notifications derived from received messages
-	Notifications []localnotifications.Notification
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
@@ -2917,9 +2914,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	// Reset installations
 	m.modifiedInstallations = make(map[string]bool)
-
-	// sends notifications messages to the OS level application
-	localnotifications.PushMessages(messageState.Notifications)
 
 	return messageState.Response, nil
 }

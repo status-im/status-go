@@ -16,7 +16,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol"
-	protocolcommon "github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 )
@@ -52,12 +51,6 @@ type notificationBody struct {
 	ERC20       bool              `json:"erc20"`
 	Contract    common.Address    `json:"contract"`
 	Network     uint64            `json:"network"`
-}
-
-type NotificationMessageBody struct {
-	Message *protocolcommon.Message `json:"message"`
-	Contact *protocol.Contact       `json:"contact"`
-	Chat    *protocol.Chat          `json:"chat"`
 }
 
 type Notification struct {
@@ -150,7 +143,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		}
 
 	case TypeMessage:
-		if nmb, ok := n.Body.(*NotificationMessageBody); ok {
+		if nmb, ok := n.Body.(*protocol.MessageNotificationBody); ok {
 			body, err = json.Marshal(nmb)
 			if err != nil {
 				return nil, err
@@ -199,7 +192,7 @@ func (n *Notification) UnmarshalJSON(data []byte) error {
 		return n.unmarshalAndAttachBody(alias.Body, &notificationBody{})
 
 	case TypeMessage:
-		return n.unmarshalAndAttachBody(alias.Body, &NotificationMessageBody{})
+		return n.unmarshalAndAttachBody(alias.Body, &protocol.MessageNotificationBody{})
 
 	default:
 		return fmt.Errorf("unknown NotificationType '%s'", n.BodyType)
@@ -216,7 +209,7 @@ func (n *Notification) unmarshalAndAttachBody(body json.RawMessage, bodyStruct i
 	return nil
 }
 
-func PushMessages(ns []Notification) {
+func pushMessages(ns []Notification) {
 	for _, n := range ns {
 		pushMessage(&n)
 	}
@@ -475,4 +468,20 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 func (s *Service) IsStarted() bool {
 	return s.started
+}
+
+func SendMessageNotifications(mnb []protocol.MessageNotificationBody) {
+	var ns []Notification
+	for _, n := range mnb {
+		ns = append(ns, Notification{
+			Body:     n,
+			BodyType: TypeMessage,
+			Category: "", // TODO what category do we want?
+			Deeplink: "", // TODO find what if any Deeplink should be used here
+			Image:    "", // TODO do we want to attach any image data contained on the MessageBody{}?
+		})
+	}
+
+	// sends notifications messages to the OS level application
+	pushMessages(ns)
 }
