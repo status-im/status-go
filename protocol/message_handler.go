@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"

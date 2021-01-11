@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	stdlog "log"
 	"os"
 	"os/signal"
@@ -32,6 +31,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
 
 const (
