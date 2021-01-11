@@ -1,4 +1,4 @@
-package protocol
+package common
 
 // TimeSource provides a unified way of getting the current time.
 // The intention is to always use a synchronized time source

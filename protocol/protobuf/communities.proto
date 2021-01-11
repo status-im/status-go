@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+import "chat_identity.proto";
+
+package protobuf;
+
+message Grant {
+  bytes community_id = 1;
+  bytes member_id = 2;
+  string chat_id = 3;
+  uint64 clock = 4;
+}
+
+message CommunityMember {
+}
+
+message CommunityPermissions {
+  enum Access {
+    UNKNOWN_ACCESS = 0;
+    NO_MEMBERSHIP = 1;
+    INVITATION_ONLY = 2;
+    ON_REQUEST = 3;
+  }
+
+  bool ens_only = 1;
+  // https://gitlab.matrix.org/matrix-org/olm/blob/master/docs/megolm.md is a candidate for the algorithm to be used in case we want to have private communityal chats, lighter than pairwise encryption using the DR, less secure, but more efficient for large number of participants
+  bool private = 2;
+  Access access = 3;
+}
+
+message CommunityDescription {
+  uint64 clock = 1;
+  map<string,CommunityMember> members = 2;
+  CommunityPermissions permissions = 3;
+  ChatIdentity identity = 5;
+  map<string,CommunityChat> chats = 6;
+}
+
+message CommunityChat {
+  map<string,CommunityMember> members = 1;
+  CommunityPermissions permissions = 2;
+  ChatIdentity identity = 3;
+}
+
+message CommunityInvitation {
+  bytes community_description = 1;
+  bytes grant = 2;
+  string chat_id = 3;
+  bytes public_key = 4;
+}
+
+message CommunityRequestJoin {
+  string ens_name = 1;
+  string chat_id = 2;
+  bytes community_id = 3;
+}
+
+message CommunityRequestJoinResponse {
+  CommunityDescription community = 1;
+  bool accepted = 2;
+  bytes grant = 3;
+}

@@ -9,6 +9,7 @@ enum MessageType {
   PRIVATE_GROUP = 3;
   // Only local
   SYSTEM_MESSAGE_PRIVATE_GROUP = 4;
+  COMMUNITY_CHAT = 5;
 }
 
 enum ImageType {

@@ -31,6 +31,8 @@ type QuotedMessage struct {
 	Base64Audio string `json:"audio,omitempty"`
 	// AudioDurationMs is the audio duration in milliseconds
 	AudioDurationMs uint64 `json:"audioDurationMs,omitempty"`
+	// CommunityID is the id of the community advertised
+	CommunityID string `json:"communityId,omitempty"`
 }
 
 type CommandState int
@@ -116,6 +118,9 @@ type Message struct {
 	// AudioPath is the path of the audio to be sent
 	AudioPath string `json:"audioPath,omitempty"`
 
+	// CommunityID is the id of the community to advertise
+	CommunityID string `json:"communityId,omitempty"`
+
 	// Replace indicates that this is a replacement of a message
 	// that has been updated
 	Replace string `json:"replace,omitempty"`
@@ -158,6 +163,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Image             string                           `json:"image,omitempty"`
 		Audio             string                           `json:"audio,omitempty"`
 		AudioDurationMs   uint64                           `json:"audioDurationMs,omitempty"`
+		CommunityID       string                           `json:"communityId,omitempty"`
 		Sticker           *StickerAlias                    `json:"sticker"`
 		CommandParameters *CommandParameters               `json:"commandParameters"`
 		Timestamp         uint64                           `json:"timestamp"`
@@ -187,6 +193,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		EnsName:           m.EnsName,
 		Image:             m.Base64Image,
 		Audio:             m.Base64Audio,
+		CommunityID:       m.CommunityID,
 		Timestamp:         m.Timestamp,
 		ContentType:       m.ContentType,
 		Mentions:          m.Mentions,

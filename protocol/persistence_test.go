@@ -776,3 +776,135 @@ func TestHideMessage(t *testing.T) {
 	require.True(t, actualHidden)
 	require.True(t, actualSeen)
 }
+
+func TestDeactivatePublicChat(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	publicChatID := "public-chat-id"
+	var currentClockValue uint64 = 10
+
+	timesource := &testTimeSource{}
+	lastMessage := common.Message{
+		ID:          "0x01",
+		LocalChatID: publicChatID,
+		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		From:        "me",
+	}
+	lastMessage.Clock = 20
+
+	require.NoError(t, p.SaveMessages([]*common.Message{&lastMessage}))
+
+	publicChat := CreatePublicChat(publicChatID, timesource)
+	publicChat.LastMessage = &lastMessage
+	publicChat.UnviewedMessagesCount = 1
+
+	err = p.DeactivateChat(&publicChat, currentClockValue)
+
+	// It does not set deleted at for a public chat
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), publicChat.DeletedAtClockValue)
+
+	// It sets the lastMessage to nil
+	require.Nil(t, publicChat.LastMessage)
+
+	// It sets unviewed messages count
+	require.Equal(t, uint(0), publicChat.UnviewedMessagesCount)
+
+	// It sets active as false
+	require.False(t, publicChat.Active)
+
+	// It deletes messages
+	messages, _, err := p.MessageByChatID(publicChatID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	// Reload chat to make sure it has been save
+	dbChat, err := p.Chat(publicChatID)
+
+	require.NoError(t, err)
+	require.NotNil(t, dbChat)
+
+	// Same checks on the chat pulled from the db
+	// It does not set deleted at for a public chat
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), dbChat.DeletedAtClockValue)
+
+	// It sets the lastMessage to nil
+	require.Nil(t, dbChat.LastMessage)
+
+	// It sets unviewed messages count
+	require.Equal(t, uint(0), dbChat.UnviewedMessagesCount)
+
+	// It sets active as false
+	require.False(t, dbChat.Active)
+}
+
+func TestDeactivateOneToOneChat(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+
+	pkString := types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey))
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	var currentClockValue uint64 = 10
+
+	timesource := &testTimeSource{}
+
+	chat := CreateOneToOneChat(pkString, &key.PublicKey, timesource)
+
+	lastMessage := common.Message{
+		ID:          "0x01",
+		LocalChatID: chat.ID,
+		ChatMessage: protobuf.ChatMessage{Text: "some-text"},
+		From:        "me",
+	}
+	lastMessage.Clock = 20
+
+	require.NoError(t, p.SaveMessages([]*common.Message{&lastMessage}))
+
+	chat.LastMessage = &lastMessage
+	chat.UnviewedMessagesCount = 1
+
+	err = p.DeactivateChat(&chat, currentClockValue)
+
+	// It does set deleted at for a public chat
+	require.NoError(t, err)
+	require.NotEqual(t, uint64(0), chat.DeletedAtClockValue)
+
+	// It sets the lastMessage to nil
+	require.Nil(t, chat.LastMessage)
+
+	// It sets unviewed messages count
+	require.Equal(t, uint(0), chat.UnviewedMessagesCount)
+
+	// It sets active as false
+	require.False(t, chat.Active)
+
+	// It deletes messages
+	messages, _, err := p.MessageByChatID(chat.ID, "", 10)
+	require.NoError(t, err)
+	require.Len(t, messages, 0)
+
+	// Reload chat to make sure it has been save
+	dbChat, err := p.Chat(chat.ID)
+
+	require.NoError(t, err)
+	require.NotNil(t, dbChat)
+
+	// Same checks on the chat pulled from the db
+	// It does set deleted at for a public chat
+	require.NoError(t, err)
+	require.NotEqual(t, uint64(0), dbChat.DeletedAtClockValue)
+
+	// It sets the lastMessage to nil
+	require.Nil(t, dbChat.LastMessage)
+
+	// It sets unviewed messages count
+	require.Equal(t, uint(0), dbChat.UnviewedMessagesCount)
+
+	// It sets active as false
+	require.False(t, dbChat.Active)
+}

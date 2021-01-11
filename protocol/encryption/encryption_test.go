@@ -641,12 +641,12 @@ func publish(
 	for i := 0; i < 200; i++ {
 
 		// Simulate 5% of the messages dropped
-		if rand.Intn(100) <= 95 {
+		if rand.Intn(100) <= 95 { // nolint: gosec
 			wg.Add(1)
 			// Simulate out of order messages
 			go func() {
 				defer wg.Done()
-				time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
+				time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond) // nolint: gosec
 				response, err := e.BuildDirectMessage(privateKey, publicKey, cleartext)
 				if err != nil {
 					errChan <- err

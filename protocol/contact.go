@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -83,6 +82,18 @@ func (c Contact) IsBlocked() bool {
 	return existsInStringSlice(c.SystemTags, contactBlocked)
 }
 
+func (c *Contact) Remove() {
+	var newSystemTags []string
+	// Remove the newSystemTags system-tag, so that the contact is
+	// not considered "added" anymore
+	for _, tag := range newSystemTags {
+		if tag != contactAdded {
+			newSystemTags = append(newSystemTags, tag)
+		}
+	}
+	c.SystemTags = newSystemTags
+}
+
 func (c *Contact) ResetENSVerification(clock uint64, name string) {
 	c.ENSVerifiedAt = 0
 	c.ENSVerified = false
@@ -101,16 +112,33 @@ func existsInStringSlice(set []string, find string) bool {
 	return false
 }
 
-func buildContact(publicKey *ecdsa.PublicKey) (*Contact, error) {
-	id := "0x" + hex.EncodeToString(crypto.FromECDSAPub(publicKey))
+func buildContactFromPkString(pkString string) (*Contact, error) {
+	publicKeyBytes, err := types.DecodeHex(pkString)
+	if err != nil {
+		return nil, err
+	}
 
-	identicon, err := identicon.GenerateBase64(id)
+	publicKey, err := crypto.UnmarshalPubkey(publicKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildContact(pkString, publicKey)
+}
+
+func buildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
+	id := types.EncodeHex(crypto.FromECDSAPub(publicKey))
+	return buildContact(id, publicKey)
+}
+
+func buildContact(publicKeyString string, publicKey *ecdsa.PublicKey) (*Contact, error) {
+	identicon, err := identicon.GenerateBase64(publicKeyString)
 	if err != nil {
 		return nil, err
 	}
 
 	contact := &Contact{
-		ID:        id,
+		ID:        publicKeyString,
 		Alias:     alias.GenerateFromPublicKey(publicKey),
 		Identicon: identicon,
 	}

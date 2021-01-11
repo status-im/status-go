@@ -125,8 +125,8 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	}
 
 	// Insert record
-	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile)
-	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO chats(id, name, color, active, type, timestamp,  deleted_at_clock_value, unviewed_message_count, last_clock_value, last_message, members, membership_updates, muted, invitation_admin, profile, community_id)
+	    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -148,6 +148,7 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 		chat.Muted,
 		chat.InvitationAdmin,
 		chat.Profile,
+		chat.CommunityID,
 	)
 
 	if err != nil {
@@ -157,9 +158,28 @@ func (db sqlitePersistence) saveChat(tx *sql.Tx, chat Chat) error {
 	return err
 }
 
-func (db sqlitePersistence) DeleteChat(chatID string) error {
-	_, err := db.db.Exec("DELETE FROM chats WHERE id = ?", chatID)
-	return err
+func (db sqlitePersistence) DeleteChat(chatID string) (err error) {
+	var tx *sql.Tx
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, err = tx.Exec("DELETE FROM chats WHERE id = ?", chatID)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, chatID)
+	return
 }
 
 func (db sqlitePersistence) MuteChat(chatID string) error {
@@ -209,6 +229,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.muted,
 			chats.invitation_admin,
 			chats.profile,
+			chats.community_id,
 			contacts.identicon,
 			contacts.alias
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
@@ -246,6 +267,7 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&chat.Muted,
 			&invitationAdmin,
 			&profile,
+			&chat.CommunityID,
 			&identicon,
 			&alias,
 		)
@@ -319,7 +341,8 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 			membership_updates,
 			muted,
 			invitation_admin,
-			profile
+			profile,
+			community_id
 		FROM chats
 		WHERE id = ?
 	`, chatID).Scan(&chat.ID,
@@ -337,6 +360,7 @@ func (db sqlitePersistence) Chat(chatID string) (*Chat, error) {
 		&chat.Muted,
 		&invitationAdmin,
 		&profile,
+		&chat.CommunityID,
 	)
 	switch err {
 	case sql.ErrNoRows:

@@ -17,8 +17,8 @@ func NewWhisperEnvelopeEventWrapper(envelopeEvent *whisper.EnvelopeEvent) *types
 	switch data := envelopeEvent.Data.(type) {
 	case []whisper.EnvelopeError:
 		wrappedData := make([]types.EnvelopeError, len(data))
-		for index, envError := range data {
-			wrappedData[index] = *NewWhisperEnvelopeErrorWrapper(&envError)
+		for index := range data {
+			wrappedData[index] = *NewWhisperEnvelopeErrorWrapper(&data[index])
 		}
 	case *whisper.MailServerResponse:
 		wrappedData = NewWhisperMailServerResponseWrapper(data)
@@ -44,8 +44,8 @@ func NewWakuEnvelopeEventWrapper(envelopeEvent *wakucommon.EnvelopeEvent) *types
 	switch data := envelopeEvent.Data.(type) {
 	case []wakucommon.EnvelopeError:
 		wrappedData := make([]types.EnvelopeError, len(data))
-		for index, envError := range data {
-			wrappedData[index] = *NewWakuEnvelopeErrorWrapper(&envError)
+		for index := range data {
+			wrappedData[index] = *NewWakuEnvelopeErrorWrapper(&data[index])
 		}
 	case *waku.MailServerResponse:
 		wrappedData = NewWakuMailServerResponseWrapper(data)

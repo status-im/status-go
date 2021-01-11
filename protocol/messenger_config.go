@@ -24,8 +24,7 @@ type config struct {
 	// Config for the envelopes monitor
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 
-	messagesPersistenceEnabled bool
-	featureFlags               common.FeatureFlags
+	featureFlags common.FeatureFlags
 
 	// A path to a database or a database instance is required.
 	// The database instance has a higher priority.
@@ -63,13 +62,6 @@ func WithOnNegotiatedFilters(h func([]*transport.Filter)) Option {
 func WithCustomLogger(logger *zap.Logger) Option {
 	return func(c *config) error {
 		c.logger = logger
-		return nil
-	}
-}
-
-func WithMessagesPersistenceEnabled() Option {
-	return func(c *config) error {
-		c.messagesPersistenceEnabled = true
 		return nil
 	}
 }

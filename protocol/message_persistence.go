@@ -35,6 +35,7 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		audio_type,
 		audio_duration_ms,
 		audio_base64,
+		community_id,
 		mentions,
 		links,
 		command_id,
@@ -71,6 +72,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.image_base64,
 		COALESCE(m1.audio_duration_ms,0),
 		m1.audio_base64,
+		m1.community_id,
 		m1.mentions,
 		m1.links,
 		m1.command_id,
@@ -91,6 +93,7 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m2.image_base64,
 		m2.audio_duration_ms,
 		m2.audio_base64,
+		m2.community_id,
 		c.alias,
 		c.identicon`
 }
@@ -110,10 +113,12 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var quotedImage sql.NullString
 	var quotedAudio sql.NullString
 	var quotedAudioDuration sql.NullInt64
+	var quotedCommunityID sql.NullString
 	var serializedMentions []byte
 	var serializedLinks []byte
 	var alias sql.NullString
 	var identicon sql.NullString
+	var communityID sql.NullString
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -139,6 +144,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.Base64Image,
 		&audio.DurationMs,
 		&message.Base64Audio,
+		&communityID,
 		&serializedMentions,
 		&serializedLinks,
 		&command.ID,
@@ -159,6 +165,7 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&quotedImage,
 		&quotedAudioDuration,
 		&quotedAudio,
+		&quotedCommunityID,
 		&alias,
 		&identicon,
 	}
@@ -175,10 +182,15 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 			Base64Image:     quotedImage.String,
 			AudioDurationMs: uint64(quotedAudioDuration.Int64),
 			Base64Audio:     quotedAudio.String,
+			CommunityID:     quotedCommunityID.String,
 		}
 	}
 	message.Alias = alias.String
 	message.Identicon = identicon.String
+
+	if communityID.Valid {
+		message.CommunityID = communityID.String
+	}
 
 	if serializedMentions != nil {
 		err := json.Unmarshal(serializedMentions, &message.Mentions)
@@ -270,6 +282,7 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		audio.Type,
 		audio.DurationMs,
 		message.Base64Audio,
+		message.CommunityID,
 		serializedMentions,
 		serializedLinks,
 		command.ID,
@@ -805,8 +818,27 @@ func (db sqlitePersistence) HideMessage(id string) error {
 }
 
 func (db sqlitePersistence) DeleteMessagesByChatID(id string) error {
-	_, err := db.db.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
-	return err
+	return db.deleteMessagesByChatID(id, nil)
+}
+
+func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err error) {
+	if tx == nil {
+		tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				err = tx.Commit()
+				return
+			}
+			// don't shadow original error
+			_ = tx.Rollback()
+		}()
+	}
+
+	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
+	return
 }
 
 func (db sqlitePersistence) MarkAllRead(chatID string) error {
@@ -1122,4 +1154,80 @@ func (db sqlitePersistence) InvitationByID(id string) (*GroupChatInvitation, err
 	default:
 		return nil, err
 	}
+}
+
+// ClearHistory deletes all the messages for a chat and updates it's values
+func (db sqlitePersistence) ClearHistory(chat *Chat, currentClockValue uint64) (err error) {
+	var tx *sql.Tx
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	err = db.clearHistory(chat, currentClockValue, tx)
+
+	return
+}
+
+// Deactivate chat sets a chat as inactive and clear its history
+func (db sqlitePersistence) DeactivateChat(chat *Chat, currentClockValue uint64) (err error) {
+	var tx *sql.Tx
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+	err = db.deactivateChat(chat, currentClockValue, tx)
+
+	return
+}
+
+func (db sqlitePersistence) deactivateChat(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+	chat.Active = false
+	err := db.saveChat(tx, *chat)
+	if err != nil {
+		return err
+	}
+
+	return db.clearHistory(chat, currentClockValue, tx)
+}
+
+func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, tx *sql.Tx) error {
+	// Set deleted at clock value if it's not a public chat so that
+	// old messages will be discarded
+	if !chat.Public() && !chat.ProfileUpdates() && !chat.Timeline() {
+		if chat.LastMessage != nil && chat.LastMessage.Clock != 0 {
+			chat.DeletedAtClockValue = chat.LastMessage.Clock
+		}
+		chat.DeletedAtClockValue = currentClockValue
+	}
+
+	chat.LastMessage = nil
+	chat.UnviewedMessagesCount = 0
+
+	err := db.deleteMessagesByChatID(chat.ID, tx)
+	if err != nil {
+		return err
+	}
+
+	err = db.saveChat(tx, *chat)
+	return err
 }

@@ -33,4 +33,7 @@ message EmojiReaction {
 
  // whether this is a rectraction of a previously sent emoji
   bool retracted = 6;
+
+  // Grant for organisation chat messages
+  bytes grant = 7;
 }

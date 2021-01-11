@@ -27,6 +27,8 @@ const reducedKdfIterationsNumber = 3200
 
 const InMemoryPath = ":memory:"
 
+var migrationsTable = "status_protocol_go_" + sqlcipher.DefaultMigrationsTable
+
 // MigrationConfig is a struct that allows to define bindata migrations.
 type MigrationConfig struct {
 	AssetNames  []string
@@ -36,19 +38,19 @@ type MigrationConfig struct {
 // Open opens or initializes a new database for a given file path.
 // MigrationConfig is optional but if provided migrations are applied automatically.
 func Open(path, key string) (*sql.DB, error) {
-	return open(path, key, reducedKdfIterationsNumber)
+	return openAndMigrate(path, key, reducedKdfIterationsNumber)
 }
 
 // OpenInMemory opens an in memory SQLite database.
 // Number of KDF iterations is reduced to 0.
 func OpenInMemory() (*sql.DB, error) {
-	return open(InMemoryPath, "", 0)
+	return openAndMigrate(InMemoryPath, "", 0)
 }
 
 // OpenWithIter allows to open a new database with a custom number of kdf iterations.
 // Higher kdf iterations number makes it slower to open the database.
 func OpenWithIter(path, key string, kdfIter int) (*sql.DB, error) {
-	return open(path, key, kdfIter)
+	return openAndMigrate(path, key, kdfIter)
 }
 
 func open(path string, key string, kdfIter int) (*sql.DB, error) {
@@ -83,17 +85,25 @@ func open(path string, key string, kdfIter int) (*sql.DB, error) {
 		return nil, err
 	}
 
-	if err := Migrate(db); err != nil {
-		return nil, err
-	}
-
 	return db, nil
 }
 
-// ApplyMigrations allows to apply bindata migrations on the current *sql.DB.
+func openAndMigrate(path string, key string, kdfIter int) (*sql.DB, error) {
+	db, err := open(path, key, kdfIter)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := Migrate(db); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+// applyMigrations allows to apply bindata migrations on the current *sql.DB.
 // `assetNames` is a list of assets with migrations and `assetGetter` is responsible
 // for returning the content of the asset with a given name.
-func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name string) ([]byte, error)) error {
+func applyMigrations(db *sql.DB, assetNames []string, assetGetter func(name string) ([]byte, error)) error {
 	resources := bindata.Resource(
 		assetNames,
 		assetGetter,
@@ -105,7 +115,7 @@ func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name stri
 	}
 
 	driver, err := sqlcipher.WithInstance(db, &sqlcipher.Config{
-		MigrationsTable: "status_protocol_go_" + sqlcipher.DefaultMigrationsTable,
+		MigrationsTable: migrationsTable,
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to create driver")
@@ -126,10 +136,15 @@ func ApplyMigrations(db *sql.DB, assetNames []string, assetGetter func(name stri
 		return errors.Wrap(err, "could not get version")
 	}
 
-	// Force version if dirty
+	err = ApplyAdHocMigrations(version, dirty, m, db)
+	if err != nil {
+		return errors.Wrap(err, "failed to apply ad-hoc migrations")
+	}
+
 	if dirty {
-		if err = m.Force(int(version)); err != nil {
-			return errors.Wrap(err, "failed to force migration")
+		err = ReplayLastMigration(version, m)
+		if err != nil {
+			return errors.Wrap(err, "failed to replay last migration")
 		}
 	}
 
@@ -151,7 +166,7 @@ func Migrate(database *sql.DB) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare status-go/protocol migrations")
 	}
-	err = ApplyMigrations(database, migrationNames, migrationGetter)
+	err = applyMigrations(database, migrationNames, migrationGetter)
 	if err != nil {
 		return errors.Wrap(err, "failed to apply status-go/protocol migrations")
 	}
