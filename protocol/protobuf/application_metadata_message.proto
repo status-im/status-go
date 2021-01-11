@@ -39,5 +39,6 @@ message ApplicationMetadataMessage {
     CHAT_IDENTITY = 24;
     COMMUNITY_DESCRIPTION = 25;
     COMMUNITY_INVITATION = 26;
+    COMMUNITY_REQUEST_TO_JOIN = 27;
   }
 }

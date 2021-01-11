@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/json"
+	"errors"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/v1"
@@ -24,8 +26,11 @@ type Config struct {
 	MarshaledCommunityDescription []byte
 	ID                            *ecdsa.PublicKey
 	Joined                        bool
+	Requested                     bool
 	Verified                      bool
 	Logger                        *zap.Logger
+	RequestedToJoinAt             uint64
+	MemberIdentity                *ecdsa.PublicKey
 }
 
 type Community struct {
@@ -34,6 +39,10 @@ type Community struct {
 }
 
 func New(config Config) (*Community, error) {
+	if config.MemberIdentity == nil {
+		return nil, errors.New("no member identity")
+	}
+
 	if config.Logger == nil {
 		logger, err := zap.NewDevelopment()
 		if err != nil {
@@ -47,21 +56,80 @@ func New(config Config) (*Community, error) {
 	return community, nil
 }
 
+type CommunityChat struct {
+	ID          string                               `json:"id"`
+	Name        string                               `json:"name"`
+	Members     map[string]*protobuf.CommunityMember `json:"members"`
+	Permissions *protobuf.CommunityPermissions       `json:"permissions"`
+	CanPost     bool                                 `json:"canPost"`
+}
+
 func (o *Community) MarshalJSON() ([]byte, error) {
-	item := struct {
-		*protobuf.CommunityDescription `json:"description"`
-		ID                             string `json:"id"`
-		Admin                          bool   `json:"admin"`
-		Verified                       bool   `json:"verified"`
-		Joined                         bool   `json:"joined"`
-	}{
-		ID:                   o.IDString(),
-		CommunityDescription: o.config.CommunityDescription,
-		Admin:                o.IsAdmin(),
-		Verified:             o.config.Verified,
-		Joined:               o.config.Joined,
+	if o.config.MemberIdentity == nil {
+		return nil, errors.New("member identity not set")
 	}
-	return json.Marshal(item)
+	communityItem := struct {
+		ID                types.HexBytes                       `json:"id"`
+		Admin             bool                                 `json:"admin"`
+		Verified          bool                                 `json:"verified"`
+		Joined            bool                                 `json:"joined"`
+		RequestedAccessAt int                                  `json:"requestedAccessAt"`
+		Name              string                               `json:"name"`
+		Description       string                               `json:"description"`
+		Chats             map[string]CommunityChat             `json:"chats"`
+		Images            map[string]images.IdentityImage      `json:"images"`
+		Permissions       *protobuf.CommunityPermissions       `json:"permissions"`
+		Members           map[string]*protobuf.CommunityMember `json:"members"`
+		CanRequestAccess  bool                                 `json:"canRequestAccess"`
+		CanManageUsers    bool                                 `json:"canManageUsers"`
+		CanJoin           bool                                 `json:"canJoin"`
+		Color             string                               `json:"color"`
+		RequestedToJoinAt uint64                               `json:"requestedToJoinAt,omitempty"`
+		IsMember          bool                                 `json:"isMember"`
+	}{
+		ID:                o.ID(),
+		Admin:             o.IsAdmin(),
+		Verified:          o.config.Verified,
+		Chats:             make(map[string]CommunityChat),
+		Joined:            o.config.Joined,
+		CanRequestAccess:  o.CanRequestAccess(o.config.MemberIdentity),
+		CanJoin:           o.canJoin(),
+		CanManageUsers:    o.CanManageUsers(o.config.MemberIdentity),
+		RequestedToJoinAt: o.RequestedToJoinAt(),
+		IsMember:          o.isMember(),
+	}
+	if o.config.CommunityDescription != nil {
+		for id, c := range o.config.CommunityDescription.Chats {
+			canPost, err := o.CanPost(o.config.MemberIdentity, id, nil)
+			if err != nil {
+				return nil, err
+			}
+			chat := CommunityChat{
+				ID:          id,
+				Name:        c.Identity.DisplayName,
+				Permissions: c.Permissions,
+				Members:     c.Members,
+				CanPost:     canPost,
+			}
+			communityItem.Chats[id] = chat
+		}
+		communityItem.Members = o.config.CommunityDescription.Members
+		communityItem.Permissions = o.config.CommunityDescription.Permissions
+		if o.config.CommunityDescription.Identity != nil {
+			communityItem.Name = o.config.CommunityDescription.Identity.DisplayName
+			communityItem.Color = o.config.CommunityDescription.Identity.Color
+			communityItem.Description = o.config.CommunityDescription.Identity.Description
+			for t, i := range o.config.CommunityDescription.Identity.Images {
+				if communityItem.Images == nil {
+					communityItem.Images = make(map[string]images.IdentityImage)
+				}
+				communityItem.Images[t] = images.IdentityImage{Name: t, Payload: i.Payload}
+
+			}
+		}
+
+	}
+	return json.Marshal(communityItem)
 }
 
 func (o *Community) initialize() {
@@ -77,23 +145,43 @@ type CommunityChatChanges struct {
 }
 
 type CommunityChanges struct {
-	MembersAdded   map[string]*protobuf.CommunityMember
-	MembersRemoved map[string]*protobuf.CommunityMember
+	Community      *Community                           `json:"community"`
+	MembersAdded   map[string]*protobuf.CommunityMember `json:"membersAdded"`
+	MembersRemoved map[string]*protobuf.CommunityMember `json:"membersRemoved"`
 
-	ChatsRemoved  map[string]*protobuf.CommunityChat
-	ChatsAdded    map[string]*protobuf.CommunityChat
-	ChatsModified map[string]*CommunityChatChanges
+	ChatsRemoved  map[string]*protobuf.CommunityChat `json:"chatsRemoved"`
+	ChatsAdded    map[string]*protobuf.CommunityChat `json:"chatsAdded"`
+	ChatsModified map[string]*CommunityChatChanges   `json:"chatsModified"`
+
+	// ShouldMemberJoin indicates whether the user should join this community
+	// automatically
+	ShouldMemberJoin bool `json:"memberAdded"`
+
+	// ShouldMemberJoin indicates whether the user should leave this community
+	// automatically
+	ShouldMemberLeave bool `json:"memberRemoved"`
 }
 
-func emptyCommunityChanges() *CommunityChanges {
-	return &CommunityChanges{
-		MembersAdded:   make(map[string]*protobuf.CommunityMember),
-		MembersRemoved: make(map[string]*protobuf.CommunityMember),
-
-		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
-		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
-		ChatsModified: make(map[string]*CommunityChatChanges),
+func (c *CommunityChanges) HasNewMember(identity string) bool {
+	if len(c.MembersAdded) == 0 {
+		return false
 	}
+	_, ok := c.MembersAdded[identity]
+	return ok
+}
+
+func (c *CommunityChanges) HasMemberLeft(identity string) bool {
+	if len(c.MembersRemoved) == 0 {
+		return false
+	}
+	_, ok := c.MembersRemoved[identity]
+	return ok
+}
+
+func (o *Community) emptyCommunityChanges() *CommunityChanges {
+	changes := emptyCommunityChanges()
+	changes.Community = o
+	return changes
 }
 
 func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*CommunityChanges, error) {
@@ -120,7 +208,7 @@ func (o *Community) CreateChat(chatID string, chat *protobuf.CommunityChat) (*Co
 
 	o.increaseClock()
 
-	changes := emptyCommunityChanges()
+	changes := o.emptyCommunityChanges()
 	changes.ChatsAdded[chatID] = chat
 	return changes, nil
 }
@@ -221,11 +309,32 @@ func (o *Community) InviteUserToChat(pk *ecdsa.PublicKey, chatID string) (*proto
 	return response, nil
 }
 
-func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
+func (o *Community) getMember(pk *ecdsa.PublicKey) *protobuf.CommunityMember {
 
 	key := common.PubkeyToHex(pk)
-	_, ok := o.config.CommunityDescription.Members[key]
-	return ok
+	member := o.config.CommunityDescription.Members[key]
+	return member
+}
+
+func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
+
+	member := o.getMember(pk)
+	return member != nil
+}
+
+func (o *Community) hasPermission(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) bool {
+	member := o.getMember(pk)
+	if member == nil {
+		return false
+	}
+
+	for _, r := range member.Roles {
+		if r == role {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (o *Community) HasMember(pk *ecdsa.PublicKey) bool {
@@ -294,18 +403,9 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 		delete(chat.Members, key)
 	}
 
+	o.increaseClock()
+
 	return o.config.CommunityDescription, nil
-}
-
-// TODO: this should accept a request from a user to join and perform any validation
-func (o *Community) AcceptRequestToJoin(pk *ecdsa.PublicKey) (*protobuf.CommunityRequestJoinResponse, error) {
-
-	return nil, nil
-}
-
-// TODO: this should decline a request from a user to join
-func (o *Community) DeclineRequestToJoin(pk *ecdsa.PublicKey) (*protobuf.CommunityRequestJoinResponse, error) {
-	return nil, nil
 }
 
 func (o *Community) Join() {
@@ -320,7 +420,8 @@ func (o *Community) Joined() bool {
 	return o.config.Joined
 }
 
-func (o *Community) HandleCommunityDescription(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
+// UpdateCommunityDescription will update the community to the new community description and return a list of changes
+func (o *Community) UpdateCommunityDescription(signer *ecdsa.PublicKey, description *protobuf.CommunityDescription, rawMessage []byte) (*CommunityChanges, error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -333,14 +434,14 @@ func (o *Community) HandleCommunityDescription(signer *ecdsa.PublicKey, descript
 		return nil, err
 	}
 
-	response := emptyCommunityChanges()
+	response := o.emptyCommunityChanges()
 
 	if description.Clock <= o.config.CommunityDescription.Clock {
 		return response, nil
 	}
 
-	// We only calculate changes if we joined the org, otherwise not interested
-	if o.config.Joined {
+	// We only calculate changes if we joined the community or we requested access, otherwise not interested
+	if o.config.Joined || o.config.RequestedToJoinAt > 0 {
 		// Check for new members at the org level
 		for pk, member := range description.Members {
 			if _, ok := o.config.CommunityDescription.Members[pk]; !ok {
@@ -423,8 +524,8 @@ func (o *Community) HandleCommunityDescription(signer *ecdsa.PublicKey, descript
 	return response, nil
 }
 
-// HandleRequestJoin handles a request, checks that the right permissions are applied and returns an CommunityRequestJoinResponse
-func (o *Community) HandleRequestJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestJoin) error {
+// ValidateRequestToJoin validates a request, checks that the right permissions are applied
+func (o *Community) ValidateRequestToJoin(signer *ecdsa.PublicKey, request *protobuf.CommunityRequestToJoin) error {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -439,15 +540,14 @@ func (o *Community) HandleRequestJoin(signer *ecdsa.PublicKey, request *protobuf
 	}
 
 	if len(request.ChatId) != 0 {
-		return o.handleRequestJoinWithChatID(request)
+		return o.validateRequestToJoinWithChatID(request)
 	}
 
-	err := o.handleRequestJoinWithoutChatID(request)
+	err := o.validateRequestToJoinWithoutChatID(request)
 	if err != nil {
 		return err
 	}
 
-	// Store request to join
 	return nil
 }
 
@@ -455,7 +555,7 @@ func (o *Community) IsAdmin() bool {
 	return o.config.PrivateKey != nil
 }
 
-func (o *Community) handleRequestJoinWithChatID(request *protobuf.CommunityRequestJoin) error {
+func (o *Community) validateRequestToJoinWithChatID(request *protobuf.CommunityRequestToJoin) error {
 
 	chat, ok := o.config.CommunityDescription.Chats[request.ChatId]
 
@@ -475,7 +575,15 @@ func (o *Community) handleRequestJoinWithChatID(request *protobuf.CommunityReque
 	return nil
 }
 
-func (o *Community) handleRequestJoinWithoutChatID(request *protobuf.CommunityRequestJoin) error {
+func (o *Community) OnRequest() bool {
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_ON_REQUEST
+}
+
+func (o *Community) InvitationOnly() bool {
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_INVITATION_ONLY
+}
+
+func (o *Community) validateRequestToJoinWithoutChatID(request *protobuf.CommunityRequestToJoin) error {
 
 	// If they want access to the org only, check that the org is ON_REQUEST
 	if o.config.CommunityDescription.Permissions.Access != protobuf.CommunityPermissions_ON_REQUEST {
@@ -485,7 +593,7 @@ func (o *Community) handleRequestJoinWithoutChatID(request *protobuf.CommunityRe
 	return nil
 }
 
-func (o *Community) ID() []byte {
+func (o *Community) ID() types.HexBytes {
 	return crypto.CompressPubkey(o.config.ID)
 }
 
@@ -495,6 +603,10 @@ func (o *Community) IDString() string {
 
 func (o *Community) PrivateKey() *ecdsa.PrivateKey {
 	return o.config.PrivateKey
+}
+
+func (o *Community) PublicKey() *ecdsa.PublicKey {
+	return o.config.ID
 }
 
 func (o *Community) marshaledDescription() ([]byte, error) {
@@ -702,6 +814,77 @@ func (o *Community) increaseClock() {
 	o.config.CommunityDescription.Clock = o.nextClock()
 }
 
+func (o *Community) Clock() uint64 {
+	return o.config.CommunityDescription.Clock
+}
+
+func (o *Community) CanRequestAccess(pk *ecdsa.PublicKey) bool {
+	if o.hasMember(pk) {
+		return false
+	}
+
+	if o.config.CommunityDescription == nil {
+		return false
+	}
+
+	if o.config.CommunityDescription.Permissions == nil {
+		return false
+	}
+
+	return o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_ON_REQUEST
+}
+
+func (o *Community) CanManageUsers(pk *ecdsa.PublicKey) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.IsAdmin() {
+		return true
+	}
+
+	if !o.hasMember(pk) {
+		return false
+	}
+
+	return o.hasPermission(pk, protobuf.CommunityMember_ROLE_ALL) || o.hasPermission(pk, protobuf.CommunityMember_ROLE_MANAGE_USERS)
+
+}
+func (o *Community) isMember() bool {
+	return o.hasMember(o.config.MemberIdentity)
+}
+
+// CanJoin returns whether a user can join the community, only if it's
+func (o *Community) canJoin() bool {
+	if o.config.Joined {
+		return false
+	}
+
+	if o.IsAdmin() {
+		return true
+	}
+
+	if o.config.CommunityDescription.Permissions.Access == protobuf.CommunityPermissions_NO_MEMBERSHIP {
+		return true
+	}
+
+	return o.isMember()
+}
+
+func (o *Community) RequestedToJoinAt() uint64 {
+	return o.config.RequestedToJoinAt
+}
+
 func (o *Community) nextClock() uint64 {
 	return o.config.CommunityDescription.Clock + 1
+}
+
+func emptyCommunityChanges() *CommunityChanges {
+	return &CommunityChanges{
+		MembersAdded:   make(map[string]*protobuf.CommunityMember),
+		MembersRemoved: make(map[string]*protobuf.CommunityMember),
+
+		ChatsRemoved:  make(map[string]*protobuf.CommunityChat),
+		ChatsAdded:    make(map[string]*protobuf.CommunityChat),
+		ChatsModified: make(map[string]*CommunityChatChanges),
+	}
 }

@@ -15,4 +15,5 @@ var ErrInvalidCommunityDescriptionMemberInChatButNotInOrg = errors.New("invalid 
 var ErrNotAdmin = errors.New("no admin privileges for this community")
 var ErrInvalidGrant = errors.New("invalid grant")
 var ErrNotAuthorized = errors.New("not authorized")
+var ErrAlreadyMember = errors.New("already a member")
 var ErrInvalidMessage = errors.New("invalid community description message")

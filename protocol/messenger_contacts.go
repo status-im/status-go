@@ -56,12 +56,10 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	profileChat, ok := m.allChats[profileChatID]
 
 	if !ok {
-		builtChat := CreateProfileChat(profileChatID, contact.ID, m.getTimesource())
-		profileChat = &builtChat
+		profileChat = CreateProfileChat(profileChatID, contact.ID, m.getTimesource())
 	}
 
-	// TODO: return filters in messenger response
-	err = m.Join(*profileChat)
+	filters, err := m.Join(profileChat)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +71,8 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		return nil, err
 	}
 
-	response.Chats = append(response.Chats, profileChat)
+	response.Filters = filters
+	response.AddChat(profileChat)
 
 	publicKey, err := contact.PublicKey()
 	if err != nil {
@@ -291,7 +290,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 	}
 
 	response.Contacts = []*Contact{contact}
-	response.Chats = []*Chat{chat}
+	response.AddChat(chat)
 
 	chat.LastClockValue = clock
 	err = m.saveChat(chat)

@@ -152,6 +152,23 @@ func (p *MessageProcessor) SendPrivate(
 	return p.sendPrivate(ctx, recipient, rawMessage)
 }
 
+// SendCommunityMessage takes encoded data, encrypts it and sends through the wire
+// using the community topic and their key
+func (p *MessageProcessor) SendCommunityMessage(
+	ctx context.Context,
+	recipient *ecdsa.PublicKey,
+	rawMessage RawMessage,
+) ([]byte, error) {
+	p.logger.Debug(
+		"sending a community message",
+		zap.String("public-key", types.EncodeHex(crypto.FromECDSAPub(recipient))),
+		zap.String("site", "SendPrivate"),
+	)
+	rawMessage.Sender = p.identity
+
+	return p.sendCommunity(ctx, recipient, &rawMessage)
+}
+
 // SendGroup takes encoded data, encrypts it and sends through the wire,
 // always return the messageID
 func (p *MessageProcessor) SendGroup(
@@ -183,6 +200,38 @@ func (p *MessageProcessor) SendGroup(
 			return nil, errors.Wrap(err, "failed to send message")
 		}
 	}
+	return messageID, nil
+}
+
+// sendCommunity sends data to the recipient identifying with a given public key.
+func (p *MessageProcessor) sendCommunity(
+	ctx context.Context,
+	recipient *ecdsa.PublicKey,
+	rawMessage *RawMessage,
+) ([]byte, error) {
+	p.logger.Debug("sending community message", zap.String("recipient", types.EncodeHex(crypto.FromECDSAPub(recipient))))
+
+	wrappedMessage, err := p.wrapMessageV1(rawMessage)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to wrap message")
+	}
+
+	messageID := v1protocol.MessageID(&rawMessage.Sender.PublicKey, wrappedMessage)
+	rawMessage.ID = types.EncodeHex(messageID)
+
+	// Notify before dispatching, otherwise the dispatch subscription might happen
+	// earlier than the scheduled
+	p.notifyOnScheduledMessage(rawMessage)
+
+	messageIDs := [][]byte{messageID}
+	hash, newMessage, err := p.sendCommunityRawMessage(ctx, recipient, wrappedMessage, messageIDs)
+	if err != nil {
+		p.logger.Error("failed to send a community message", zap.Error(err))
+		return nil, errors.Wrap(err, "failed to send a message spec")
+	}
+
+	p.transport.Track(messageIDs, hash, newMessage)
+
 	return messageID, nil
 }
 
@@ -619,6 +668,24 @@ func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, rawMessage
 	return hash, newMessage, nil
 }
 
+// sendCommunityRawMessage sends a message not wrapped in an encryption layer
+// to a community
+func (p *MessageProcessor) sendCommunityRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+	newMessage := &types.NewMessage{
+		TTL:       whisperTTL,
+		Payload:   payload,
+		PowTarget: calculatePoW(payload),
+		PowTime:   whisperPoWTime,
+	}
+
+	hash, err := p.transport.SendCommunityMessage(ctx, newMessage, publicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return hash, newMessage, nil
+}
+
 // sendMessageSpec analyses the spec properties and selects a proper transport method.
 func (p *MessageProcessor) sendMessageSpec(ctx context.Context, publicKey *ecdsa.PublicKey, messageSpec *encryption.ProtocolMessageSpec, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage, err := MessageSpecToWhisper(messageSpec)
@@ -690,8 +757,8 @@ func (p *MessageProcessor) notifyOnScheduledMessage(message *RawMessage) {
 	}
 }
 
-func (p *MessageProcessor) JoinPublic(chatID string) error {
-	return p.transport.JoinPublic(chatID)
+func (p *MessageProcessor) JoinPublic(id string) (*transport.Filter, error) {
+	return p.transport.JoinPublic(id)
 }
 
 // AddEphemeralKey adds an ephemeral key that we will be listening to

@@ -75,6 +75,10 @@ func PubkeyToHex(key *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.FromECDSAPub(key))
 }
 
+func PubkeyToHexBytes(key *ecdsa.PublicKey) types.HexBytes {
+	return crypto.FromECDSAPub(key)
+}
+
 func HexToPubkey(pk string) (*ecdsa.PublicKey, error) {
 	bytes, err := types.DecodeHex(pk)
 	if err != nil {

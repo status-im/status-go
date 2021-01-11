@@ -185,8 +185,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
-	s.Require().NoError(alice.SaveChat(&chat))
-	inputMessage := buildTestMessage(chat)
+	s.Require().NoError(alice.SaveChat(chat))
+	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 	messageIDString := response.Messages[0].ID
@@ -344,8 +344,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
-	s.Require().NoError(alice.SaveChat(&chat))
-	inputMessage := buildTestMessage(chat)
+	s.Require().NoError(alice.SaveChat(chat))
+	inputMessage := buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 	messageIDString := response.Messages[0].ID
@@ -500,8 +500,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	// Create one to one chat & send message
 	pkString := hex.EncodeToString(crypto.FromECDSAPub(&s.m.identity.PublicKey))
 	chat := CreateOneToOneChat(pkString, &s.m.identity.PublicKey, alice.transport)
-	s.Require().NoError(alice.SaveChat(&chat))
-	inputMessage := buildTestMessage(chat)
+	s.Require().NoError(alice.SaveChat(chat))
+	inputMessage := buildTestMessage(*chat)
 	_, err = alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 
@@ -571,7 +571,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	s.Require().NotEqual(newBobServers[0].AccessToken, bobServers[0].AccessToken)
 
 	// Send another message, here the token will not be valid
-	inputMessage = buildTestMessage(chat)
+	inputMessage = buildTestMessage(*chat)
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)
 	s.Require().NoError(err)
 	messageIDString := response.Messages[0].ID
@@ -720,16 +720,16 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 
 	// Create public chat and join for both alice and bob
 	chat := CreatePublicChat("status", s.m.transport)
-	err = bob.SaveChat(&chat)
+	err = bob.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = bob.Join(chat)
+	_, err = bob.Join(chat)
 	s.Require().NoError(err)
 
-	err = alice.SaveChat(&chat)
+	err = alice.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = alice.Join(chat)
+	_, err = alice.Join(chat)
 	s.Require().NoError(err)
 
 	// Register bob
@@ -772,7 +772,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 	bobServers, err := bob.GetPushNotificationsServers()
 	s.Require().NoError(err)
 
-	inputMessage := buildTestMessage(chat)
+	inputMessage := buildTestMessage(*chat)
 	// message contains a mention
 	inputMessage.Text = "Hey @" + types.EncodeHex(crypto.FromECDSAPub(&bob.identity.PublicKey))
 	response, err := alice.SendChatMessage(context.Background(), inputMessage)

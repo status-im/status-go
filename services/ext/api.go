@@ -21,6 +21,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/protocol/urls"
 	"github.com/status-im/status-go/services/ext/mailservers"
@@ -200,10 +201,6 @@ func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*Metad
 	return api.service.ConfirmMessagesProcessed(encryptionIDs)
 }
 
-func (api *PublicAPI) Join(chat protocol.Chat) error {
-	return api.service.messenger.Join(chat)
-}
-
 func (api *PublicAPI) Leave(chat protocol.Chat) error {
 	return api.service.messenger.Leave(chat)
 }
@@ -258,6 +255,10 @@ func (api *PublicAPI) LoadFilters(parent context.Context, chats []*transport.Fil
 
 func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) error {
 	return api.service.messenger.SaveChat(chat)
+}
+
+func (api *PublicAPI) CreateOneToOneChat(parent context.Context, request *requests.CreateOneToOneChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateOneToOneChat(request)
 }
 
 func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
@@ -328,28 +329,28 @@ func (api *PublicAPI) JoinedCommunities(parent context.Context) ([]*communities.
 }
 
 // JoinCommunity joins a community with the given ID
-func (api *PublicAPI) JoinCommunity(parent context.Context, communityID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) JoinCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.JoinCommunity(communityID)
 }
 
 // LeaveCommunity leaves a commuity with the given ID
-func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID string) (*protocol.MessengerResponse, error) {
+func (api *PublicAPI) LeaveCommunity(parent context.Context, communityID types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveCommunity(communityID)
 }
 
 // CreateCommunity creates a new community with the provided description
-func (api *PublicAPI) CreateCommunity(description *protobuf.CommunityDescription) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateCommunity(description)
+func (api *PublicAPI) CreateCommunity(request *requests.CreateCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunity(request)
 
 }
 
 // ExportCommunity exports the private key of the community with given ID
-func (api *PublicAPI) ExportCommunity(id string) (string, error) {
+func (api *PublicAPI) ExportCommunity(id types.HexBytes) (types.HexBytes, error) {
 	key, err := api.service.messenger.ExportCommunity(id)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return types.EncodeHex(crypto.FromECDSA(key)), nil
+	return crypto.FromECDSA(key), nil
 }
 
 // ImportCommunity imports a community with the given private key in hex
@@ -364,18 +365,48 @@ func (api *PublicAPI) ImportCommunity(hexPrivateKey string) (*protocol.Messenger
 }
 
 // CreateCommunityChat creates a community chat in the given community
-func (api *PublicAPI) CreateCommunityChat(orgID string, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.CreateCommunityChat(orgID, c)
+func (api *PublicAPI) CreateCommunityChat(communityID types.HexBytes, c *protobuf.CommunityChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateCommunityChat(communityID, c)
 }
 
-// InviteUserToCommunity invites the user with pk to the community with ID
-func (api *PublicAPI) InviteUserToCommunity(orgID, userPublicKey string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.InviteUserToCommunity(orgID, userPublicKey)
+// InviteUsersToCommunity invites the users with pks to the community with ID
+func (api *PublicAPI) InviteUsersToCommunity(request *requests.InviteUsersToCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.InviteUsersToCommunity(request)
+}
+
+// ShareCommunity share the community with a set of users
+func (api *PublicAPI) ShareCommunity(request *requests.ShareCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ShareCommunity(request)
 }
 
 // RemoveUserFromCommunity removes the user with pk from the community with ID
-func (api *PublicAPI) RemoveUserFromCommunity(orgID, userPublicKey string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.RemoveUserFromCommunity(orgID, userPublicKey)
+func (api *PublicAPI) RemoveUserFromCommunity(communityID types.HexBytes, userPublicKey string) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RemoveUserFromCommunity(communityID, userPublicKey)
+}
+
+// MyPendingRequestsToJoin returns the pending requests for the logged in user
+func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.MyPendingRequestsToJoin()
+}
+
+// PendingRequestsToJoinForCommunity returns the pending requests to join for a given community
+func (api *PublicAPI) PendingRequestsToJoinForCommunity(id types.HexBytes) ([]*communities.RequestToJoin, error) {
+	return api.service.messenger.PendingRequestsToJoinForCommunity(id)
+}
+
+// AcceptRequestToJoinCommunity accepts a pending request to join a community
+func (api *PublicAPI) AcceptRequestToJoinCommunity(request *requests.AcceptRequestToJoinCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptRequestToJoinCommunity(request)
+}
+
+// DeclineRequestToJoinCommunity accepts a pending request to join a community
+func (api *PublicAPI) DeclineRequestToJoinCommunity(request *requests.DeclineRequestToJoinCommunity) error {
+	return api.service.messenger.DeclineRequestToJoinCommunity(request)
+}
+
+// RequestToJoinCommunity requests to join a particular community
+func (api *PublicAPI) RequestToJoinCommunity(request *requests.RequestToJoinCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestToJoinCommunity(request)
 }
 
 type ApplicationMessagesResponse struct {
@@ -654,6 +685,10 @@ func (api *PublicAPI) GetLinkPreviewWhitelist() []urls.Site {
 
 func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPreviewData, err error) {
 	return urls.GetLinkPreviewData(link)
+}
+
+func (api *PublicAPI) EnsVerified(pk, ensName string) error {
+	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
 // Echo is a method for testing purposes.

@@ -37,13 +37,6 @@ type Contact struct {
 	Name string `json:"name,omitempty"`
 	// EnsVerified whether we verified the name of the contact
 	ENSVerified bool `json:"ensVerified"`
-	// EnsVerifiedAt the time we last verified the name
-	ENSVerifiedAt uint64 `json:"ensVerifiedAt"`
-	// LastENSClockValue is the last clock value of when we
-	// received an ENS name for the user
-	LastENSClockValue uint64 `json:"lastENSClockValue"`
-	// ENSVerificationRetries is how many times we retried the ENS
-	ENSVerificationRetries uint64 `json:"ensVerificationRetries"`
 	// Generated username name of the contact
 	Alias string `json:"alias,omitempty"`
 	// Identicon generated from public key
@@ -56,7 +49,6 @@ type Contact struct {
 	SystemTags []string `json:"systemTags"`
 
 	DeviceInfo    []ContactDeviceInfo `json:"deviceInfo"`
-	TributeToTalk string              `json:"tributeToTalk,omitempty"`
 	LocalNickname string              `json:"localNickname,omitempty"`
 
 	Images map[string]images.IdentityImage `json:"images"`
@@ -92,14 +84,6 @@ func (c *Contact) Remove() {
 		}
 	}
 	c.SystemTags = newSystemTags
-}
-
-func (c *Contact) ResetENSVerification(clock uint64, name string) {
-	c.ENSVerifiedAt = 0
-	c.ENSVerified = false
-	c.ENSVerificationRetries = 0
-	c.LastENSClockValue = clock
-	c.Name = name
 }
 
 // existsInStringSlice checks if a string is in a set.

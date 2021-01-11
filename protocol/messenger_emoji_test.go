@@ -74,21 +74,21 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 
 	chat := CreatePublicChat(chatID, alice.transport)
 
-	err = alice.SaveChat(&chat)
+	err = alice.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = alice.Join(chat)
+	_, err = alice.Join(chat)
 	s.Require().NoError(err)
 
-	err = bob.SaveChat(&chat)
+	err = bob.SaveChat(chat)
 	s.Require().NoError(err)
 
-	err = bob.Join(chat)
+	_, err = bob.Join(chat)
 	s.Require().NoError(err)
 
 	// Send chat message from bob to alice
 
-	message := buildTestMessage(chat)
+	message := buildTestMessage(*chat)
 	_, err = alice.SendChatMessage(context.Background(), message)
 	s.NoError(err)
 
@@ -153,7 +153,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 
-	chat := response.Chats[0]
+	chat := response.Chats()[0]
 	members := []string{types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey))}
 	_, err = bob.AddMembersToGroupChat(context.Background(), chat.ID, members)
 	s.NoError(err)
@@ -161,7 +161,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	// Retrieve their messages so that the chat is created
 	_, err = WaitOnMessengerResponse(
 		alice,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
@@ -172,7 +172,7 @@ func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	// Wait for the message to reach its destination
 	_, err = WaitOnMessengerResponse(
 		bob,
-		func(r *MessengerResponse) bool { return len(r.Chats) > 0 },
+		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"no joining group event received",
 	)
 	s.Require().NoError(err)

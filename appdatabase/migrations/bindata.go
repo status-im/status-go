@@ -736,7 +736,7 @@ func _0018_profile_pictures_visibilityUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0018_profile_pictures_visibility.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1611588835, 0)}
+	info := bindataFileInfo{name: "0018_profile_pictures_visibility.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1612251705, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc9, 0xe3, 0xc5, 0xec, 0x83, 0x55, 0x45, 0x57, 0x7a, 0xaa, 0xd2, 0xa7, 0x59, 0xa7, 0x87, 0xef, 0x63, 0x19, 0x9c, 0x46, 0x9c, 0xc5, 0x32, 0x89, 0xa4, 0x68, 0x70, 0xd8, 0x83, 0x43, 0xa4, 0x72}}
 	return a, nil
 }
