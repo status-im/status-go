@@ -19,11 +19,13 @@ type MessengerResponse struct {
 	CommunityChanges []*communities.CommunityChanges `json:"communitiesChanges,omitempty"`
 	Filters          []*transport.Filter             `json:"filters,omitempty"`
 	RemovedFilters   []*transport.Filter             `json:"removedFilters,omitempty"`
+
+	// Notifications a list of MessageNotificationBody derived from received messages that are useful to notify the user about
+	Notifications []MessageNotificationBody `json:"notifications"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-
-	return len(m.Chats)+len(m.Messages)+len(m.Contacts)+len(m.Installations)+len(m.Invitations)+len(m.EmojiReactions)+len(m.Communities)+len(m.CommunityChanges)+len(m.Filters)+len(m.RemovedFilters)+len(m.RemovedChats) == 0
+	return len(m.Chats)+len(m.Messages)+len(m.Contacts)+len(m.Installations)+len(m.Invitations)+len(m.EmojiReactions)+len(m.Communities)+len(m.CommunityChanges)+len(m.Filters)+len(m.RemovedFilters)+len(m.RemovedChats)+len(m.Notifications) == 0
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces

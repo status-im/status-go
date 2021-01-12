@@ -2,6 +2,8 @@ package localnotifications
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/protocol"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 )
@@ -21,12 +24,24 @@ type PushCategory string
 
 type transactionState string
 
-const walletDeeplinkPrefix = "status-im://wallet/"
+type NotificationType string
 
 const (
+	walletDeeplinkPrefix = "status-im://wallet/"
+
 	failed   transactionState = "failed"
 	inbound  transactionState = "inbound"
 	outbound transactionState = "outbound"
+
+	CategoryTransaction PushCategory = "transaction"
+	CategoryMessage     PushCategory = "newMessage"
+
+	TypeTransaction NotificationType = "transaction"
+	TypeMessage     NotificationType = "message"
+)
+
+var (
+	marshalTypeMismatchErr = "notification type mismatch, expected '%s', Body could not be marshalled into this type"
 )
 
 type notificationBody struct {
@@ -42,9 +57,23 @@ type notificationBody struct {
 }
 
 type Notification struct {
+	ID            common.Hash `json:"id"`
+	Platform      float32     `json:"platform,omitempty"`
+	Body          interface{}
+	BodyType      NotificationType `json:"bodyType"`
+	Category      PushCategory     `json:"category,omitempty"`
+	Deeplink      string           `json:"deepLink,omitempty"`
+	Image         string           `json:"imageUrl,omitempty"`
+	IsScheduled   bool             `json:"isScheduled,omitempty"`
+	ScheduledTime string           `json:"scheduleTime,omitempty"`
+}
+
+// notificationAlias is an interim struct used for json un/marshalling
+type notificationAlias struct {
 	ID            common.Hash      `json:"id"`
 	Platform      float32          `json:"platform,omitempty"`
-	Body          notificationBody `json:"body"`
+	Body          json.RawMessage  `json:"body"`
+	BodyType      NotificationType `json:"bodyType"`
 	Category      PushCategory     `json:"category,omitempty"`
 	Deeplink      string           `json:"deepLink,omitempty"`
 	Image         string           `json:"imageUrl,omitempty"`
@@ -101,6 +130,94 @@ func NewService(appDB *sql.DB, network uint64) *Service {
 	}
 }
 
+func (n *Notification) MarshalJSON() ([]byte, error) {
+	var body json.RawMessage
+	var err error
+
+	switch n.BodyType {
+	case TypeTransaction:
+		if nb, ok := n.Body.(*notificationBody); ok {
+			body, err = json.Marshal(nb)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf(marshalTypeMismatchErr, n.BodyType)
+		}
+
+	case TypeMessage:
+		if nmb, ok := n.Body.(*protocol.MessageNotificationBody); ok {
+			body, err = json.Marshal(nmb)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf(marshalTypeMismatchErr, n.BodyType)
+		}
+
+	default:
+		return nil, fmt.Errorf("unknown NotificationType '%s'", n.BodyType)
+	}
+
+	alias := notificationAlias{
+		n.ID,
+		n.Platform,
+		body,
+		n.BodyType,
+		n.Category,
+		n.Deeplink,
+		n.Image,
+		n.IsScheduled,
+		n.ScheduledTime,
+	}
+
+	return json.Marshal(alias)
+}
+
+func (n *Notification) UnmarshalJSON(data []byte) error {
+	var alias notificationAlias
+	err := json.Unmarshal(data, &alias)
+	if err != nil {
+		return err
+	}
+
+	n.BodyType = alias.BodyType
+	n.Category = alias.Category
+	n.Platform = alias.Platform
+	n.ID = alias.ID
+	n.Image = alias.Image
+	n.Deeplink = alias.Deeplink
+	n.IsScheduled = alias.IsScheduled
+	n.ScheduledTime = alias.ScheduledTime
+
+	switch n.BodyType {
+	case TypeTransaction:
+		return n.unmarshalAndAttachBody(alias.Body, &notificationBody{})
+
+	case TypeMessage:
+		return n.unmarshalAndAttachBody(alias.Body, &protocol.MessageNotificationBody{})
+
+	default:
+		return fmt.Errorf("unknown NotificationType '%s'", n.BodyType)
+	}
+}
+
+func (n *Notification) unmarshalAndAttachBody(body json.RawMessage, bodyStruct interface{}) error {
+	err := json.Unmarshal(body, &bodyStruct)
+	if err != nil {
+		return err
+	}
+
+	n.Body = bodyStruct
+	return nil
+}
+
+func pushMessages(ns []*Notification) {
+	for _, n := range ns {
+		pushMessage(n)
+	}
+}
+
 func pushMessage(notification *Notification) {
 	log.Info("Pushing a new push notification", "info", notification)
 	signal.SendLocalNotifications(notification)
@@ -153,10 +270,11 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	}
 
 	return &Notification{
+		BodyType: TypeTransaction,
 		ID:       transfer.ID,
-		Body:     body,
+		Body:     &body,
 		Deeplink: deeplink,
-		Category: "transaction",
+		Category: CategoryTransaction,
 	}
 }
 
@@ -353,4 +471,20 @@ func (s *Service) Protocols() []p2p.Protocol {
 
 func (s *Service) IsStarted() bool {
 	return s.started
+}
+
+func SendMessageNotifications(mnb []protocol.MessageNotificationBody) {
+	var ns []*Notification
+	for _, n := range mnb {
+		ns = append(ns, &Notification{
+			Body:     n,
+			BodyType: TypeMessage,
+			Category: CategoryMessage,
+			Deeplink: "", // TODO find what if any Deeplink should be used here
+			Image:    "", // TODO do we want to attach any image data contained on the MessageBody{}?
+		})
+	}
+
+	// sends notifications messages to the OS level application
+	pushMessages(ns)
 }
