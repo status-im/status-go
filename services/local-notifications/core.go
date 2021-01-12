@@ -33,6 +33,9 @@ const (
 	inbound  transactionState = "inbound"
 	outbound transactionState = "outbound"
 
+	CategoryTransaction PushCategory = "transaction"
+	CategoryMessage     PushCategory = "newMessage"
+
 	TypeTransaction NotificationType = "transaction"
 	TypeMessage     NotificationType = "message"
 )
@@ -271,7 +274,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 		ID:       transfer.ID,
 		Body:     &body,
 		Deeplink: deeplink,
-		Category: "transaction",
+		Category: CategoryTransaction,
 	}
 }
 
@@ -476,7 +479,7 @@ func SendMessageNotifications(mnb []protocol.MessageNotificationBody) {
 		ns = append(ns, &Notification{
 			Body:     n,
 			BodyType: TypeMessage,
-			Category: "", // TODO what category do we want?
+			Category: CategoryMessage,
 			Deeplink: "", // TODO find what if any Deeplink should be used here
 			Image:    "", // TODO do we want to attach any image data contained on the MessageBody{}?
 		})
