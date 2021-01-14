@@ -35,6 +35,7 @@ var (
 		PublicKey:                 "0x04211fe0f69772ecf7eb0b5bfc7678672508a9fb01f2d699096f0d59ef7fe1a0cb1e648a80190db1c0f5f088872444d846f2956d0bd84069f3f9f69335af852ac0",
 		SigningPhrase:             "yurt joey vibe",
 		SendPushNotifications:     true,
+		ProfilePicturesVisibility: ProfilePicturesVisibilityContactsOnly,
 		UseMailservers:            true,
 		LinkPreviewRequestEnabled: true,
 		WalletRootAddress:         types.HexToAddress("0x3B591fd819F86D0A6a2EF2Bcb94f77807a7De1a6")}
