@@ -42,6 +42,7 @@ type Whisper interface {
 	Subscribe(opts *SubscriptionOptions) (string, error)
 	GetFilter(id string) Filter
 	Unsubscribe(id string) error
+	UnsubscribeMany(ids []string) error
 
 	// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
 	// which is known to implement MailServer interface, and is supposed to process this

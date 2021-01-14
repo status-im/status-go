@@ -3,7 +3,7 @@ package gethbridge
 import (
 	"github.com/status-im/status-go/eth-node/types"
 	waku "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 // NewWhisperEnvelopeErrorWrapper returns a types.EnvelopeError object that mimics Geth's EnvelopeError

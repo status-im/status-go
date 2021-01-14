@@ -13,7 +13,7 @@ import (
 	gethens "github.com/status-im/status-go/eth-node/bridge/geth/ens"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 type gethNodeWrapper struct {

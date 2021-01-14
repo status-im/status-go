@@ -23,6 +23,8 @@ type Filter struct {
 	Negotiated bool `json:"negotiated"`
 	// Listen is whether we are actually listening for messages on this chat, or the filter is only created in order to be able to post on the topic
 	Listen bool `json:"listen"`
+	// Ephemeral indicates that this is an ephemeral filter
+	Ephemeral bool `json:"ephemeral"`
 }
 
 func (c *Filter) IsPublic() bool {

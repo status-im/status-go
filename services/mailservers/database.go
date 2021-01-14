@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 type Mailserver struct {
@@ -210,6 +213,7 @@ func (d *Database) DeleteGapsByChatID(chatID string) error {
 }
 
 func (d *Database) AddTopic(topic MailserverTopic) error {
+
 	chatIDs := sqlStringSlice(topic.ChatIDs)
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_topics(
 			topic,
@@ -225,6 +229,42 @@ func (d *Database) AddTopic(topic MailserverTopic) error {
 		topic.Negotiated,
 	)
 	return err
+}
+
+func (d *Database) AddTopics(topics []MailserverTopic) (err error) {
+	var tx *sql.Tx
+	tx, err = d.db.Begin()
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	for _, topic := range topics {
+		chatIDs := sqlStringSlice(topic.ChatIDs)
+		_, err = tx.Exec(`INSERT OR REPLACE INTO mailserver_topics(
+			  topic,
+			  chat_ids,
+			  last_request,
+			  discovery,
+			  negotiated
+		  ) VALUES (?, ?, ?,?,?)`,
+			topic.Topic,
+			chatIDs,
+			topic.LastRequest,
+			topic.Discovery,
+			topic.Negotiated,
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (d *Database) Topics() ([]MailserverTopic, error) {
@@ -262,6 +302,58 @@ func (d *Database) DeleteTopic(topic string) error {
 	return err
 }
 
+// SetTopics deletes all topics excepts the one set, or upsert those if
+// missing
+func (d *Database) SetTopics(filters []*transport.Filter) (err error) {
+	var tx *sql.Tx
+	tx, err = d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	if len(filters) == 0 {
+		return nil
+	}
+
+	topicsArgs := make([]interface{}, 0, len(filters))
+	for _, filter := range filters {
+		topicsArgs = append(topicsArgs, filter.Topic.String())
+	}
+
+	inVector := strings.Repeat("?, ", len(filters)-1) + "?"
+
+	// Delete topics
+	query := "DELETE FROM mailserver_topics WHERE topic NOT IN (" + inVector + ")" // nolint: gosec
+	_, err = tx.Exec(query, topicsArgs...)
+
+	// Default to now - 1.day
+	lastRequest := (time.Now().Add(-24 * time.Hour)).Unix()
+	// Insert if not existing
+	for _, filter := range filters {
+		// fetch
+		var topic string
+		err = tx.QueryRow(`SELECT topic FROM mailserver_topics WHERE topic = ?`, filter.Topic.String()).Scan(&topic)
+		if err != nil && err != sql.ErrNoRows {
+			return
+		} else if err == sql.ErrNoRows {
+			// we insert the topic
+			_, err = tx.Exec(`INSERT INTO mailserver_topics(topic,last_request,discovery,negotiated) VALUES (?,?,?,?)`, filter.Topic.String(), lastRequest, filter.Discovery, filter.Negotiated)
+		}
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (d *Database) AddChatRequestRange(req ChatRequestRange) error {
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO mailserver_chat_request_ranges(
 			chat_id,
@@ -273,6 +365,37 @@ func (d *Database) AddChatRequestRange(req ChatRequestRange) error {
 		req.HighestRequestTo,
 	)
 	return err
+}
+
+func (d *Database) AddChatRequestRanges(reqs []ChatRequestRange) (err error) {
+	var tx *sql.Tx
+	tx, err = d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+	for _, req := range reqs {
+
+		_, err = tx.Exec(`INSERT OR REPLACE INTO mailserver_chat_request_ranges(
+			chat_id,
+			lowest_request_from,
+			highest_request_to
+		) VALUES (?, ?, ?)`,
+			req.ChatID,
+			req.LowestRequestFrom,
+			req.HighestRequestTo,
+		)
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (d *Database) ChatRequestRanges() ([]ChatRequestRange, error) {

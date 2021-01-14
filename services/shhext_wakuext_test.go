@@ -14,7 +14,7 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/waku"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 func TestShhextAndWakuextInSingleNode(t *testing.T) {

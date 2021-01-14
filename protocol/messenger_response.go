@@ -5,6 +5,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/mailservers"
 )
 
 type MessengerResponse struct {
@@ -19,13 +20,16 @@ type MessengerResponse struct {
 	CommunityChanges []*communities.CommunityChanges `json:"communitiesChanges,omitempty"`
 	Filters          []*transport.Filter             `json:"filters,omitempty"`
 	RemovedFilters   []*transport.Filter             `json:"removedFilters,omitempty"`
+	Mailservers      []mailservers.Mailserver        `json:"mailservers,omitempty"`
+	MailserverTopics []mailservers.MailserverTopic   `json:"mailserverTopics,omitempty"`
+	MailserverRanges []mailservers.ChatRequestRange  `json:"mailserverRanges,omitempty"`
 
 	// Notifications a list of MessageNotificationBody derived from received messages that are useful to notify the user about
 	Notifications []MessageNotificationBody `json:"notifications"`
 }
 
 func (m *MessengerResponse) IsEmpty() bool {
-	return len(m.Chats)+len(m.Messages)+len(m.Contacts)+len(m.Installations)+len(m.Invitations)+len(m.EmojiReactions)+len(m.Communities)+len(m.CommunityChanges)+len(m.Filters)+len(m.RemovedFilters)+len(m.RemovedChats)+len(m.Notifications) == 0
+	return len(m.Chats)+len(m.Messages)+len(m.Contacts)+len(m.Installations)+len(m.Invitations)+len(m.EmojiReactions)+len(m.Communities)+len(m.CommunityChanges)+len(m.Filters)+len(m.RemovedFilters)+len(m.RemovedChats)+len(m.Notifications)+len(m.MailserverTopics)+len(m.Mailservers)+len(m.MailserverRanges) == 0
 }
 
 // Merge takes another response and appends the new Chats & new Messages and replaces

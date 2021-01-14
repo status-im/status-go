@@ -46,8 +46,10 @@ func (s *MessengerCommunitiesSuite) SetupTest() {
 
 	s.bob = s.newMessenger()
 	s.alice = s.newMessenger()
-	s.Require().NoError(s.bob.Start())
-	s.Require().NoError(s.alice.Start())
+	_, err := s.bob.Start()
+	s.Require().NoError(err)
+	_, err = s.alice.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerCommunitiesSuite) TearDownTest() {
@@ -144,9 +146,6 @@ func (s *MessengerCommunitiesSuite) TestRetrieveCommunity() {
 }
 
 func (s *MessengerCommunitiesSuite) TestJoinCommunity() {
-	// start alice and enable sending push notifications
-	s.Require().NoError(s.alice.Start())
-
 	description := &protobuf.CommunityDescription{
 		Permissions: &protobuf.CommunityPermissions{
 			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,

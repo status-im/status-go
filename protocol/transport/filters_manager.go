@@ -37,6 +37,7 @@ type FiltersService interface {
 
 	Subscribe(opts *types.SubscriptionOptions) (string, error)
 	Unsubscribe(id string) error
+	UnsubscribeMany(ids []string) error
 }
 
 type FiltersManager struct {
@@ -231,6 +232,33 @@ func (s *FiltersManager) Remove(filters ...*Filter) error {
 }
 
 // Remove remove all the filters associated with a chat/identity
+func (s *FiltersManager) RemoveNoListenFilters() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	var filterIDs []string
+	var filters []*Filter
+
+	for _, f := range filters {
+		if !f.Listen {
+			filterIDs = append(filterIDs, f.FilterID)
+			filters = append(filters, f)
+		}
+	}
+	if err := s.service.UnsubscribeMany(filterIDs); err != nil {
+		return err
+	}
+
+	for _, filter := range filters {
+		if filter.SymKeyID != "" {
+			s.service.DeleteSymKey(filter.SymKeyID)
+		}
+		delete(s.filters, filter.ChatID)
+	}
+
+	return nil
+}
+
+// Remove remove all the filters associated with a chat/identity
 func (s *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
 	s.mutex.Lock()
 	filter, ok := s.filters[chatID]
@@ -250,7 +278,12 @@ func (s *FiltersManager) RemoveFilterByChatID(chatID string) (*Filter, error) {
 
 // LoadPartitioned creates a filter for a partitioned topic.
 func (s *FiltersManager) LoadPartitioned(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen bool) (*Filter, error) {
-	return s.loadPartitioned(publicKey, identity, listen)
+	return s.loadPartitioned(publicKey, identity, listen, false)
+}
+
+// LoadEphemeral creates a filter for a partitioned/personal topic.
+func (s *FiltersManager) LoadEphemeral(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen bool) (*Filter, error) {
+	return s.loadPartitioned(publicKey, identity, listen, true)
 }
 
 // LoadPersonal creates a filter for a personal topic.
@@ -286,10 +319,10 @@ func (s *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecds
 }
 
 func (s *FiltersManager) loadMyPartitioned() (*Filter, error) {
-	return s.loadPartitioned(&s.privateKey.PublicKey, s.privateKey, true)
+	return s.loadPartitioned(&s.privateKey.PublicKey, s.privateKey, true, false)
 }
 
-func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen bool) (*Filter, error) {
+func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen, ephemeral bool) (*Filter, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -306,12 +339,13 @@ func (s *FiltersManager) loadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 	}
 
 	chat := &Filter{
-		ChatID:   chatID,
-		FilterID: filter.FilterID,
-		Topic:    filter.Topic,
-		Identity: PublicKeyToStr(publicKey),
-		Listen:   listen,
-		OneToOne: true,
+		ChatID:    chatID,
+		FilterID:  filter.FilterID,
+		Topic:     filter.Topic,
+		Identity:  PublicKeyToStr(publicKey),
+		Listen:    listen,
+		Ephemeral: ephemeral,
+		OneToOne:  true,
 	}
 
 	s.filters[chatID] = chat

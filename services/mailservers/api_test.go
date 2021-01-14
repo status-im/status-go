@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/eth-node/types"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 func setupTestDB(t *testing.T) (*Database, func()) {
@@ -54,6 +56,51 @@ func TestAddGetDeleteMailserver(t *testing.T) {
 	// Delete non-existing mailserver.
 	err = api.DeleteMailserver(context.Background(), "other-id")
 	require.NoError(t, err)
+}
+
+func TestTopic(t *testing.T) {
+	db, close := setupTestDB(t)
+	defer close()
+	topicA := "0x61000000"
+	topicD := "0x64000000"
+	topic1 := MailserverTopic{Topic: topicA, LastRequest: 1}
+	topic2 := MailserverTopic{Topic: "0x6200000", LastRequest: 2}
+	topic3 := MailserverTopic{Topic: "0x6300000", LastRequest: 3}
+
+	require.NoError(t, db.AddTopic(topic1))
+	require.NoError(t, db.AddTopic(topic2))
+	require.NoError(t, db.AddTopic(topic3))
+
+	topics, err := db.Topics()
+	require.NoError(t, err)
+	require.Len(t, topics, 3)
+
+	filters := []*transport.Filter{
+		// Existing topic, is not updated
+		{Topic: types.BytesToTopic([]byte{0x61})},
+		// Non existing topic is not inserted
+		{
+			Discovery:  true,
+			Negotiated: true,
+			Topic:      types.BytesToTopic([]byte{0x64}),
+		},
+	}
+
+	require.NoError(t, db.SetTopics(filters))
+
+	topics, err = db.Topics()
+	require.NoError(t, err)
+	require.Len(t, topics, 2)
+	require.Equal(t, topics[0].Topic, topicA)
+	require.Equal(t, topics[0].LastRequest, 1)
+
+	require.Equal(t, topics[0].Topic, topicA)
+	require.Equal(t, topics[0].LastRequest, 1)
+
+	require.Equal(t, topics[1].Topic, topicD)
+	require.NotEmpty(t, topics[1].LastRequest)
+	require.True(t, topics[1].Negotiated)
+	require.True(t, topics[1].Discovery)
 }
 
 func TestAddGetDeleteMailserverRequestGap(t *testing.T) {

@@ -43,6 +43,10 @@ func (a *API) AddMailserverTopic(ctx context.Context, topic MailserverTopic) err
 	return a.db.AddTopic(topic)
 }
 
+func (a *API) AddMailserverTopics(ctx context.Context, topics []MailserverTopic) error {
+	return a.db.AddTopics(topics)
+}
+
 func (a *API) GetMailserverTopics(ctx context.Context) ([]MailserverTopic, error) {
 	return a.db.Topics()
 }
@@ -53,6 +57,10 @@ func (a *API) DeleteMailserverTopic(ctx context.Context, topic string) error {
 
 func (a *API) AddChatRequestRange(ctx context.Context, req ChatRequestRange) error {
 	return a.db.AddChatRequestRange(req)
+}
+
+func (a *API) AddChatRequestRanges(ctx context.Context, reqs []ChatRequestRange) error {
+	return a.db.AddChatRequestRanges(reqs)
 }
 
 func (a *API) GetChatRequestRanges(ctx context.Context) ([]ChatRequestRange, error) {

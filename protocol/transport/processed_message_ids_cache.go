@@ -76,6 +76,6 @@ func (c *ProcessedMessageIDsCache) Add(ids []string, timestamp uint64) (err erro
 }
 
 func (c *ProcessedMessageIDsCache) Clean(timestamp uint64) error {
-	_, err := c.db.Exec(`REMOVE FROM transport_message_cache WHERE timestamp < ?`, timestamp)
+	_, err := c.db.Exec(`DELETE FROM transport_message_cache WHERE timestamp < ?`, timestamp)
 	return err
 }

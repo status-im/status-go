@@ -658,18 +658,20 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 		return nil, err
 	}
 
-	// Restore recipients
-	decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
-	err = decoder.Decode(&rawPubKeys)
-	if err != nil {
-		return nil, err
-	}
-	for _, pkBytes := range rawPubKeys {
-		pubkey, err := crypto.UnmarshalPubkey(pkBytes)
+	if rawPubKeys != nil {
+		// Restore recipients
+		decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
+		err = decoder.Decode(&rawPubKeys)
 		if err != nil {
 			return nil, err
 		}
-		message.Recipients = append(message.Recipients, pubkey)
+		for _, pkBytes := range rawPubKeys {
+			pubkey, err := crypto.UnmarshalPubkey(pkBytes)
+			if err != nil {
+				return nil, err
+			}
+			message.Recipients = append(message.Recipients, pubkey)
+		}
 	}
 
 	if skipGroupMessageWrap.Valid {

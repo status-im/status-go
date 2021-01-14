@@ -242,7 +242,7 @@ func main() {
 
 		// This will start the push notification server as well as
 		// the config is set to Enabled
-		err = messenger.Start()
+		_, err = messenger.Start()
 		if err != nil {
 			logger.Error("failed to start messenger", "error", err)
 			return

@@ -43,6 +43,7 @@ import (
 	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
 	shhtransp "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/mailservers"
 )
 
 type chatContext string
@@ -98,6 +99,7 @@ type Messenger struct {
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	account                    *multiaccounts.Account
+	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
 
 	mutex sync.Mutex
@@ -298,10 +300,10 @@ func NewMessenger(
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
+		mailserversDatabase:        c.mailserversDatabase,
 		account:                    c.account,
 		quit:                       make(chan struct{}),
 		shutdownTasks: []func() error{
-			database.Close,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
@@ -311,6 +313,7 @@ func NewMessenger(
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328
 			func() error { _ = logger.Sync; return nil },
+			database.Close,
 		},
 		logger: logger,
 	}
@@ -392,12 +395,12 @@ func (m *Messenger) resendExpiredEmojiReactions() error {
 	return nil
 }
 
-func (m *Messenger) Start() error {
+func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server
 	if m.pushNotificationServer != nil {
 		if err := m.pushNotificationServer.Start(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -406,7 +409,7 @@ func (m *Messenger) Start() error {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -415,13 +418,13 @@ func (m *Messenger) Start() error {
 
 	subscriptions, err := m.encryptor.Start(m.identity)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// handle stored shared secrets
 	err = m.handleSharedSecrets(subscriptions.SharedSecrets)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m.handleEncryptionLayerSubscriptions(subscriptions)
@@ -430,7 +433,49 @@ func (m *Messenger) Start() error {
 	m.watchConnectionChange()
 	m.watchExpiredEmojis()
 	m.watchIdentityImageChanges()
-	return nil
+	if err := m.cleanTopics(); err != nil {
+		return nil, err
+	}
+	response := &MessengerResponse{Filters: m.transport.Filters()}
+
+	if m.mailserversDatabase != nil {
+		mailserverTopics, err := m.mailserversDatabase.Topics()
+		if err != nil {
+			return nil, err
+		}
+		response.MailserverTopics = mailserverTopics
+
+		mailserverRanges, err := m.mailserversDatabase.ChatRequestRanges()
+		if err != nil {
+			return nil, err
+		}
+		response.MailserverRanges = mailserverRanges
+
+		mailservers, err := m.mailserversDatabase.Mailservers()
+		if err != nil {
+			return nil, err
+		}
+		response.Mailservers = mailservers
+
+	}
+	return response, nil
+}
+
+// cleanTopics remove any topic that does not have a Listen flag set
+func (m *Messenger) cleanTopics() error {
+	if m.mailserversDatabase == nil {
+		return nil
+	}
+	var filters []*transport.Filter
+	for _, f := range m.transport.Filters() {
+		if f.Listen && !f.Ephemeral {
+			filters = append(filters, f)
+		}
+	}
+
+	m.logger.Debug("keeping topics", zap.Any("filters", filters))
+
+	return m.mailserversDatabase.SetTopics(filters)
 }
 
 // handle connection change is called each time we go from offline/online or viceversa
@@ -1028,8 +1073,12 @@ func (m *Messenger) Init() error {
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
-	for _, task := range m.shutdownTasks {
+	close(m.quit)
+
+	for i, task := range m.shutdownTasks {
+		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
+			m.logger.Info("shutdown task failed", zap.Error(tErr))
 			if err == nil {
 				// First error appeared.
 				err = tErr
@@ -1040,7 +1089,6 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
-	close(m.quit)
 	return
 }
 

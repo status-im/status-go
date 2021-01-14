@@ -2,7 +2,7 @@ package gethbridge
 
 import (
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 // GetGethSyncMailRequestFrom converts a whisper SyncMailRequest struct from a SyncMailRequest struct

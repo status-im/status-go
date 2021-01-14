@@ -144,6 +144,10 @@ func (w *gethWakuWrapper) Unsubscribe(id string) error {
 	return w.waku.Unsubscribe(id)
 }
 
+func (w *gethWakuWrapper) UnsubscribeMany(ids []string) error {
+	return w.waku.UnsubscribeMany(ids)
+}
+
 func (w *gethWakuWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (types.Filter, error) {
 	return NewWakuFilterWrapper(&wakucommon.Filter{
 		KeyAsym:  keyAsym,

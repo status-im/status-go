@@ -41,7 +41,7 @@ import (
 	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/waku"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 // tickerResolution is the delta to check blockchain sync progress.

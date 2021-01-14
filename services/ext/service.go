@@ -32,6 +32,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/ext/mailservers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
+	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 
@@ -170,17 +171,17 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAcco
 	return messenger.Init()
 }
 
-func (s *Service) StartMessenger() error {
+func (s *Service) StartMessenger() (*protocol.MessengerResponse, error) {
 	// Start a loop that retrieves all messages and propagates them to status-react.
 	s.cancelMessenger = make(chan struct{})
-	err := s.messenger.Start()
+	response, err := s.messenger.Start()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	go s.retrieveMessagesLoop(time.Second, s.cancelMessenger)
 	go s.verifyTransactionLoop(30*time.Second, s.cancelMessenger)
 	go s.verifyENSLoop(30*time.Second, s.cancelMessenger)
-	return nil
+	return response, nil
 }
 
 func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{}) {
@@ -427,6 +428,7 @@ func (s *Service) Stop() error {
 
 	if s.messenger != nil {
 		if err := s.messenger.Shutdown(); err != nil {
+			log.Error("failed to stop messenger", "err", err)
 			return err
 		}
 	}
@@ -470,6 +472,7 @@ func buildMessengerOptions(
 		protocol.WithPushNotifications(),
 		protocol.WithDatabase(db),
 		protocol.WithMultiAccounts(multiAccounts),
+		protocol.WithMailserversDatabase(mailserversDB.NewDB(db)),
 		protocol.WithAccount(account),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
 		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),

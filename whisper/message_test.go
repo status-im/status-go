@@ -36,17 +36,17 @@ func generateMessageParams() (*MessageParams, error) {
 	// set all the parameters except p.Dst and p.Padding
 
 	buf := make([]byte, 4)
-	mrand.Read(buf)
-	sz := mrand.Intn(400)
+	mrand.Read(buf)       // nolint: gosec
+	sz := mrand.Intn(400) // nolint: gosec
 
 	var p MessageParams
 	p.PoW = 0.01
 	p.WorkTime = 1
-	p.TTL = uint32(mrand.Intn(1024))
+	p.TTL = uint32(mrand.Intn(1024)) // nolint: gosec
 	p.Payload = make([]byte, sz)
 	p.KeySym = make([]byte, aesKeyLength)
-	mrand.Read(p.Payload)
-	mrand.Read(p.KeySym)
+	mrand.Read(p.Payload) // nolint: gosec
+	mrand.Read(p.KeySym)  // nolint: gosec
 	p.Topic = BytesToTopic(buf)
 
 	var err error
@@ -188,7 +188,7 @@ func TestMessageSeal(t *testing.T) {
 	target := 32.0
 	params.WorkTime = 4
 	params.PoW = target
-	env.Seal(params)
+	_ = env.Seal(params)
 
 	env.calculatePoW(0)
 	pow := env.PoW()
@@ -198,7 +198,7 @@ func TestMessageSeal(t *testing.T) {
 
 	params.WorkTime = 1
 	params.PoW = 1000000000.0
-	env.Seal(params)
+	_ = env.Seal(params)
 	env.calculatePoW(0)
 	pow = env.PoW()
 	if pow < 2*target {
@@ -372,7 +372,7 @@ func singlePaddingTest(t *testing.T, padSize int) {
 	params.Padding = make([]byte, padSize)
 	params.PoW = 0.0000000001
 	pad := make([]byte, padSize)
-	_, err = mrand.Read(pad)
+	_, err = mrand.Read(pad) // nolint: gosec
 	if err != nil {
 		t.Fatalf("padding is not generated (seed %d): %s", seed, err)
 	}
@@ -411,12 +411,12 @@ func TestPadding(t *testing.T) {
 	}
 
 	for i := 0; i < 256; i++ {
-		n := mrand.Intn(256*254) + 256
+		n := mrand.Intn(256*254) + 256 // nolint: gosec
 		singlePaddingTest(t, n)
 	}
 
 	for i := 0; i < 256; i++ {
-		n := mrand.Intn(256*1024) + 256*256
+		n := mrand.Intn(256*1024) + 256*256 // nolint: gosec
 		singlePaddingTest(t, n)
 	}
 }

@@ -1019,17 +1019,29 @@ func (w *Waku) GetFilter(id string) *common.Filter {
 }
 
 // Unsubscribe removes an installed message handler.
-// TODO: This does not seem to update the bloom filter, nor topic-interest
-// Note that the filter/topic-interest needs to take into account that there
-// might be filters with duplicated topics, so it's not just a matter of removing
-// from the map, in the topic-interest case, while the bloom filter might need to
-// be rebuilt from scratch
+// TODO: This does not seem to update the bloom filter, but does update
+// the topic interest map
 func (w *Waku) Unsubscribe(id string) error {
 	ok := w.filters.Uninstall(id)
 	if !ok {
 		return fmt.Errorf("failed to unsubscribe: invalid ID '%s'", id)
 	}
-	return nil
+
+	return w.SetTopicInterest(w.filters.AllTopics())
+}
+
+// Unsubscribe removes an installed message handler.
+// TODO: This does not seem to update the bloom filter, but does update
+// the topic interest map
+func (w *Waku) UnsubscribeMany(ids []string) error {
+	for _, id := range ids {
+		w.logger.Debug("cleaning up filter", zap.String("id", id))
+		ok := w.filters.Uninstall(id)
+		if !ok {
+			w.logger.Warn("could not remove filter with id", zap.String("id", id))
+		}
+	}
+	return w.SetTopicInterest(w.filters.AllTopics())
 }
 
 // Send injects a message into the waku send queue, to be distributed in the

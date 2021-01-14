@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/status-im/status-go/params"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 func TestWhisperLightModeEnabledSetsEmptyBloomFilter(t *testing.T) {

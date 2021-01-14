@@ -24,7 +24,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 // ----------

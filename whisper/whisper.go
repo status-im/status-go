@@ -654,7 +654,7 @@ func (whisper *Whisper) NewKeyPair() (string, error) {
 		return "", fmt.Errorf("failed to generate valid key")
 	}
 
-	id, err := toDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := toDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize) // nolint: staticcheck
 	if err != nil {
 		return "", err
 	}
@@ -688,7 +688,7 @@ func (whisper *Whisper) DeleteKeyPair(key string) bool {
 
 // AddKeyPair imports a asymmetric private key and returns it identifier.
 func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
-	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize)
+	id, err := makeDeterministicID(common.ToHex(crypto.FromECDSAPub(&key.PublicKey)), keyIDSize) // nolint: staticcheck
 	if err != nil {
 		return "", err
 	}
@@ -699,7 +699,7 @@ func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	whisper.keyMu.Lock()
 	whisper.privateKeys[id] = key
 	whisper.keyMu.Unlock()
-	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey)))
+	log.Info("Whisper identity added", "id", id, "pubkey", common.ToHex(crypto.FromECDSAPub(&key.PublicKey))) // nolint: staticcheck
 
 	return id, nil
 }
@@ -886,7 +886,7 @@ func (whisper *Whisper) updateBloomFilter(f *Filter) {
 	if !BloomFilterMatch(whisper.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(whisper.BloomFilter(), aggregate)
-		whisper.SetBloomFilter(aggregate)
+		_ = whisper.SetBloomFilter(aggregate)
 	}
 }
 
@@ -902,6 +902,18 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 		return fmt.Errorf("Unsubscribe: Invalid ID")
 	}
 	return nil
+}
+
+// UnsubscribeMany removes an installed message handler.
+func (whisper *Whisper) UnsubscribeMany(ids []string) error {
+	for _, id := range ids {
+		ok := whisper.filters.Uninstall(id)
+		if !ok {
+			return fmt.Errorf("Unsubscribe: Invalid ID")
+		}
+	}
+	return nil
+
 }
 
 // Send injects a message into the whisper send queue, to be distributed in the
@@ -1276,7 +1288,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// For forward compatibility, just ignore.
 		}
 
-		packet.Discard()
+		_ = packet.Discard()
 	}
 }
 

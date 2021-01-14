@@ -302,7 +302,7 @@ func generateSecureRandomData(length int) ([]byte, error) {
 	} else if !validateDataIntegrity(x, length) {
 		return nil, errors.New("crypto/rand failed to generate secure random data")
 	}
-	_, err = mrand.Read(y)
+	_, err = mrand.Read(y) // nolint: gosec
 	if err != nil {
 		return nil, err
 	} else if !validateDataIntegrity(y, length) {
@@ -422,7 +422,7 @@ func (msg *ReceivedMessage) ValidateAndParse() bool {
 // SigToPubKey returns the public key associated to the message's
 // signature.
 func (msg *ReceivedMessage) SigToPubKey() *ecdsa.PublicKey {
-	defer func() { recover() }() // in case of invalid signature
+	defer func() { _ = recover() }() // in case of invalid signature
 
 	pub, err := crypto.SigToPub(msg.hash(), msg.Signature)
 	if err != nil {
