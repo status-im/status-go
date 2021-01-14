@@ -31,6 +31,7 @@
 // 0016_local_notifications_preferences.up.sql (204B)
 // 0017_bookmarks.down.sql (22B)
 // 0017_bookmarks.up.sql (147B)
+// 0018_profile_pictures_visibility.up.sql (84B)
 // doc.go (74B)
 
 package migrations
@@ -720,6 +721,26 @@ func _0017_bookmarksUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __0018_profile_pictures_visibilityUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0a\x42\x31\x0c\x06\xe0\xdd\x53\xfc\x57\x70\x76\x8a\xb6\x82\x10\x53\x90\x74\x2e\x28\x55\x02\x45\x4b\x13\x05\x6f\xff\x3e\x62\xcd\x37\x28\x1d\x39\xc3\x7b\x84\xbd\x5f\x0e\x4a\x09\xa7\xc2\xf5\x2a\x98\xeb\xf3\xb4\xd1\xdb\xb4\x47\x7c\x57\xf7\xf6\x33\xb7\xbb\x0d\x8b\x3f\x2e\xa2\x90\xa2\x90\xca\x8c\x94\xcf\x54\x59\xb1\x3f\xec\xb6\x00\x00\x00\xff\xff\xf9\x2a\x51\x1e\x54\x00\x00\x00")
+
+func _0018_profile_pictures_visibilityUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0018_profile_pictures_visibilityUpSql,
+		"0018_profile_pictures_visibility.up.sql",
+	)
+}
+
+func _0018_profile_pictures_visibilityUpSql() (*asset, error) {
+	bytes, err := _0018_profile_pictures_visibilityUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0018_profile_pictures_visibility.up.sql", size: 84, mode: os.FileMode(0644), modTime: time.Unix(1610637901, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc9, 0xe3, 0xc5, 0xec, 0x83, 0x55, 0x45, 0x57, 0x7a, 0xaa, 0xd2, 0xa7, 0x59, 0xa7, 0x87, 0xef, 0x63, 0x19, 0x9c, 0x46, 0x9c, 0xc5, 0x32, 0x89, 0xa4, 0x68, 0x70, 0xd8, 0x83, 0x43, 0xa4, 0x72}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -893,6 +914,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0017_bookmarks.up.sql": _0017_bookmarksUpSql,
 
+	"0018_profile_pictures_visibility.up.sql": _0018_profile_pictures_visibilityUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -968,7 +991,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0016_local_notifications_preferences.up.sql":     &bintree{_0016_local_notifications_preferencesUpSql, map[string]*bintree{}},
 	"0017_bookmarks.down.sql":                         &bintree{_0017_bookmarksDownSql, map[string]*bintree{}},
 	"0017_bookmarks.up.sql":                           &bintree{_0017_bookmarksUpSql, map[string]*bintree{}},
-	"doc.go":                                          &bintree{docGo, map[string]*bintree{}},
+	"0018_profile_pictures_visibility.up.sql":         &bintree{_0018_profile_pictures_visibilityUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
