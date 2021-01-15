@@ -173,7 +173,7 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 	messageID, err := hex.DecodeString(messageIDString[2:])
 	s.Require().NoError(err)
 
-	var info []*pushnotificationclient.PushNotificationInfo
+	infoMap := make(map[string]*pushnotificationclient.PushNotificationInfo)
 	err = tt.RetryWithBackOff(func() error {
 		_, err = server.RetrieveAll()
 		if err != nil {
@@ -184,30 +184,29 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 			return err
 		}
 
-		info, err = alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
+		info, err := alice.pushNotificationClient.GetPushNotificationInfo(&bob1.identity.PublicKey, bobInstallationIDs)
 		if err != nil {
 			return err
 		}
+		for _, i := range info {
+			infoMap[i.AccessToken] = i
+		}
+
 		// Check we have replies for both bob1 and bob2
-		if len(info) != 2 {
+		if len(infoMap) != 2 {
 			return errors.New("info not fetched")
 		}
 		return nil
 
 	})
 
-	s.Require().NoError(err)
+	s.Require().Len(infoMap, 2)
 
 	// Check we have replies for both bob1 and bob2
 	var bob1Info, bob2Info *pushnotificationclient.PushNotificationInfo
 
-	if info[0].AccessToken == bob1Servers[0].AccessToken {
-		bob1Info = info[0]
-		bob2Info = info[1]
-	} else {
-		bob2Info = info[0]
-		bob1Info = info[1]
-	}
+	bob1Info = infoMap[bob1Servers[0].AccessToken]
+	bob2Info = infoMap[bob2Servers[0].AccessToken]
 
 	s.Require().NotNil(bob1Info)
 	s.Require().Equal(bob1.installationID, bob1Info.InstallationID)
