@@ -590,10 +590,11 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		   resend_automatically,
 		   recipients,
 		   skip_encryption,
-			 send_push_notification,
+		   send_push_notification,
+		   skip_group_message_wrap,
 		   payload
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`,
 		message.ID,
 		message.LocalChatID,
 		message.LastSent,
@@ -604,6 +605,7 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		encodedRecipients.Bytes(),
 		message.SkipEncryption,
 		message.SendPushNotification,
+		message.SkipGroupMessageWrap,
 		message.Payload)
 	return err
 }
@@ -611,6 +613,7 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
+	var skipGroupMessageWrap sql.NullBool
 	message := &common.RawMessage{}
 
 	err := db.db.QueryRow(`
@@ -624,7 +627,8 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 			  resend_automatically,
 			  recipients,
 			  skip_encryption,
-				send_push_notification,
+			  send_push_notification,
+			  skip_group_message_wrap,
 			  payload
 			FROM
 				raw_messages
@@ -642,6 +646,7 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 		&encodedRecipients,
 		&message.SkipEncryption,
 		&message.SendPushNotification,
+		&skipGroupMessageWrap,
 		&message.Payload,
 	)
 	if err != nil {
@@ -660,6 +665,11 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 			return nil, err
 		}
 		message.Recipients = append(message.Recipients, pubkey)
+	}
+
+	if skipGroupMessageWrap.Valid {
+		message.SkipGroupMessageWrap = skipGroupMessageWrap.Bool
+
 	}
 
 	return message, nil

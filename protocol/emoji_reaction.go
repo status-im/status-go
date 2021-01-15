@@ -76,3 +76,8 @@ func (e EmojiReaction) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(item)
 }
+
+// WrapGroupMessage indicates whether we should wrap this in membership information
+func (e EmojiReaction) WrapGroupMessage() bool {
+	return false
+}

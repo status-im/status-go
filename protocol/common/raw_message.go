@@ -21,4 +21,5 @@ type RawMessage struct {
 	Payload              []byte
 	Sender               *ecdsa.PrivateKey
 	Recipients           []*ecdsa.PublicKey
+	SkipGroupMessageWrap bool
 }
