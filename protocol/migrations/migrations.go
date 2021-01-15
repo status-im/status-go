@@ -21,6 +21,7 @@
 // 1603888149_create_chat_identity_last_published_table.up.sql (407B)
 // 1605075346_add_communities.up.sql (6.971kB)
 // 1610117927_add_message_cache.up.sql (142B)
+// 1610959908_add_dont_wrap_to_raw_messages.up.sql (83B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -506,8 +507,28 @@ func _1610117927_add_message_cacheUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1610117927_add_message_cache.up.sql", size: 142, mode: os.FileMode(0644), modTime: time.Unix(1610715642, 0)}
+	info := bindataFileInfo{name: "1610117927_add_message_cache.up.sql", size: 142, mode: os.FileMode(0644), modTime: time.Unix(1610959528, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x34, 0xf1, 0xf0, 0x82, 0x79, 0x28, 0x19, 0xc2, 0x39, 0x6a, 0xa5, 0x96, 0x59, 0x23, 0xa0, 0xed, 0x60, 0x58, 0x86, 0x9, 0xb9, 0xad, 0xfb, 0xa, 0xe3, 0x47, 0x6e, 0xa1, 0x18, 0xe8, 0x39, 0x2c}}
+	return a, nil
+}
+
+var __1610959908_add_dont_wrap_to_raw_messagesUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4a\x2c\x8f\xcf\x4d\x2d\x2e\x4e\x4c\x4f\x2d\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\xce\xce\x2c\x88\x4f\x2f\xca\x2f\x2d\x80\x49\xc7\x97\x17\x25\x16\x28\x38\xf9\xfb\xfb\xb8\x3a\xfa\x29\xb8\xb8\xba\x39\x86\xfa\x84\x28\xb8\x39\xfa\x04\xbb\x5a\x73\x01\x02\x00\x00\xff\xff\x3c\x1f\xd3\xe4\x53\x00\x00\x00")
+
+func _1610959908_add_dont_wrap_to_raw_messagesUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1610959908_add_dont_wrap_to_raw_messagesUpSql,
+		"1610959908_add_dont_wrap_to_raw_messages.up.sql",
+	)
+}
+
+func _1610959908_add_dont_wrap_to_raw_messagesUpSql() (*asset, error) {
+	bytes, err := _1610959908_add_dont_wrap_to_raw_messagesUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1610959908_add_dont_wrap_to_raw_messages.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1610959977, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x71, 0x2, 0x9a, 0xca, 0xd4, 0x38, 0x44, 0x30, 0x2b, 0xa8, 0x27, 0x32, 0x63, 0x53, 0x22, 0x60, 0x59, 0x84, 0x23, 0x96, 0x77, 0xf0, 0x56, 0xd7, 0x94, 0xe0, 0x95, 0x28, 0x6, 0x1d, 0x4e, 0xb1}}
 	return a, nil
 }
 
@@ -684,6 +705,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1610117927_add_message_cache.up.sql": _1610117927_add_message_cacheUpSql,
 
+	"1610959908_add_dont_wrap_to_raw_messages.up.sql": _1610959908_add_dont_wrap_to_raw_messagesUpSql,
+
 	"README.md": readmeMd,
 
 	"doc.go": docGo,
@@ -751,8 +774,9 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1603888149_create_chat_identity_last_published_table.up.sql": &bintree{_1603888149_create_chat_identity_last_published_tableUpSql, map[string]*bintree{}},
 	"1605075346_add_communities.up.sql":                           &bintree{_1605075346_add_communitiesUpSql, map[string]*bintree{}},
 	"1610117927_add_message_cache.up.sql":                         &bintree{_1610117927_add_message_cacheUpSql, map[string]*bintree{}},
-	"README.md":                                                   &bintree{readmeMd, map[string]*bintree{}},
-	"doc.go":                                                      &bintree{docGo, map[string]*bintree{}},
+	"1610959908_add_dont_wrap_to_raw_messages.up.sql":             &bintree{_1610959908_add_dont_wrap_to_raw_messagesUpSql, map[string]*bintree{}},
+	"README.md": &bintree{readmeMd, map[string]*bintree{}},
+	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

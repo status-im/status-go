@@ -2266,8 +2266,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 	case ChatTypePrivateGroupChat:
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))
 		if spec.Recipients == nil {
-			// Chat messages are only dispatched to users who joined
-			if spec.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+			// Anything that is not a membership update message is only dispatched to joined users
+			// NOTE: I think here it might make sense to always invite to joined users apart from the
+			// initial message
+			if spec.MessageType != protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE {
 				spec.Recipients, err = chat.JoinedMembersAsPublicKeys()
 				if err != nil {
 					return nil, err
@@ -2280,6 +2282,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 				}
 			}
 		}
+
 		hasPairedDevices := m.hasPairedDevices()
 
 		if !hasPairedDevices {
@@ -2294,8 +2297,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			spec.Recipients = spec.Recipients[:n]
 		}
 
-		spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
-		// We always wrap in group information
+		// We skip wrapping in some cases (emoji reactions for example)
+		if !spec.SkipGroupMessageWrap {
+			spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
+		}
 		id, err = m.processor.SendGroup(ctx, spec.Recipients, spec)
 		if err != nil {
 			return nil, err
@@ -2424,7 +2429,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
-	encodedMessage, err := m.encodeChatEntity(chat, message)
+	encodedMessage, err := m.encodeChatEntity(chat, message, true)
 	if err != nil {
 		return nil, err
 	}
@@ -4379,15 +4384,16 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 		LocalChatID: chatID,
 		From:        types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey)),
 	}
-	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
+	encodedMessage, err := m.encodeChatEntity(chat, emojiR, false)
 	if err != nil {
 		return nil, err
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chatID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		LocalChatID:          chatID,
+		Payload:              encodedMessage,
+		SkipGroupMessageWrap: true,
+		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
 		ResendAutomatically: false,
@@ -4455,16 +4461,17 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	emojiR.Clock = clock
 	emojiR.Retracted = true
 
-	encodedMessage, err := m.encodeChatEntity(chat, emojiR)
+	encodedMessage, err := m.encodeChatEntity(chat, emojiR, false)
 	if err != nil {
 		return nil, err
 	}
 
 	// Send the marshalled EmojiReactionRetraction protobuf
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: emojiR.GetChatId(),
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		LocalChatID:          emojiR.GetChatId(),
+		Payload:              encodedMessage,
+		SkipGroupMessageWrap: true,
+		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
 		ResendAutomatically: false,
@@ -4488,7 +4495,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	return &response, nil
 }
 
-func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]byte, error) {
+func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity, wrapGroupMessages bool) ([]byte, error) {
 	var encodedMessage []byte
 	var err error
 	l := m.logger.With(zap.String("site", "Send"), zap.String("chatID", chat.ID))
@@ -4519,15 +4526,22 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 	case ChatTypePrivateGroupChat:
 		message.SetMessageType(protobuf.MessageType_PRIVATE_GROUP)
 		l.Debug("sending group message", zap.String("chatName", chat.Name))
+		if !wrapGroupMessages {
+			encodedMessage, err = proto.Marshal(message.GetProtobuf())
+			if err != nil {
+				return nil, err
+			}
+		} else {
 
-		group, err := newProtocolGroupFromChat(chat)
-		if err != nil {
-			return nil, err
-		}
+			group, err := newProtocolGroupFromChat(chat)
+			if err != nil {
+				return nil, err
+			}
 
-		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
-		if err != nil {
-			return nil, err
+			encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 	default:
