@@ -253,6 +253,38 @@ func (s *FiltersManager) LoadPartitioned(publicKey *ecdsa.PublicKey, identity *e
 	return s.loadPartitioned(publicKey, identity, listen)
 }
 
+// LoadPersonal creates a filter for a personal topic.
+func (s *FiltersManager) LoadPersonal(publicKey *ecdsa.PublicKey, identity *ecdsa.PrivateKey, listen bool) (*Filter, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	chatID := PersonalDiscoveryTopic(publicKey)
+	if _, ok := s.filters[chatID]; ok {
+		return s.filters[chatID], nil
+	}
+
+	// We set up a filter so we can publish,
+	// but we discard envelopes if listen is false.
+	filter, err := s.addAsymmetric(chatID, identity, listen)
+	if err != nil {
+		return nil, err
+	}
+
+	chat := &Filter{
+		ChatID:   chatID,
+		FilterID: filter.FilterID,
+		Topic:    filter.Topic,
+		Identity: PublicKeyToStr(publicKey),
+		Listen:   listen,
+		OneToOne: true,
+	}
+
+	s.filters[chatID] = chat
+
+	return chat, nil
+
+}
+
 func (s *FiltersManager) loadMyPartitioned() (*Filter, error) {
 	return s.loadPartitioned(&s.privateKey.PublicKey, s.privateKey, true)
 }

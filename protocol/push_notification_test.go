@@ -124,6 +124,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob1.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -155,6 +164,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob2.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -304,6 +322,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -449,6 +476,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -637,6 +673,15 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob1.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -703,6 +748,16 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 		if !registered {
 			return errors.New("not registered")
 		}
+
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it

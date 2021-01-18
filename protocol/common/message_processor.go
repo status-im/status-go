@@ -140,8 +140,8 @@ func (p *MessageProcessor) SendPrivate(
 	// Currently we don't support sending through datasync and setting custom waku fields,
 	// as the datasync interface is not rich enough to propagate that information, so we
 	// would have to add some complexity to handle this.
-	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryption) {
-		return nil, errors.New("setting identity, skip-encryption and datasync not supported")
+	if rawMessage.ResendAutomatically && (rawMessage.Sender != nil || rawMessage.SkipEncryption || rawMessage.SendOnPersonalTopic) {
+		return nil, errors.New("setting identity, skip-encryption or personal topic and datasync not supported")
 	}
 
 	// Set sender identity if not specified
@@ -216,7 +216,7 @@ func (p *MessageProcessor) sendPrivate(
 	} else if rawMessage.SkipEncryption {
 		// When SkipEncryption is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
-		hash, newMessage, err := p.sendPrivateRawMessage(ctx, recipient, wrappedMessage, messageIDs)
+		hash, newMessage, err := p.sendPrivateRawMessage(ctx, rawMessage, recipient, wrappedMessage, messageIDs)
 		if err != nil {
 			p.logger.Error("failed to send a private message", zap.Error(err))
 			return nil, errors.Wrap(err, "failed to send a message spec")
@@ -569,15 +569,21 @@ func (p *MessageProcessor) sendDataSync(ctx context.Context, publicKey *ecdsa.Pu
 }
 
 // sendPrivateRawMessage sends a message not wrapped in an encryption layer
-func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
+func (p *MessageProcessor) sendPrivateRawMessage(ctx context.Context, rawMessage *RawMessage, publicKey *ecdsa.PublicKey, payload []byte, messageIDs [][]byte) ([]byte, *types.NewMessage, error) {
 	newMessage := &types.NewMessage{
 		TTL:       whisperTTL,
 		Payload:   payload,
 		PowTarget: calculatePoW(payload),
 		PowTime:   whisperPoWTime,
 	}
+	var hash []byte
+	var err error
 
-	hash, err := p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+	if rawMessage.SendOnPersonalTopic {
+		hash, err = p.transport.SendPrivateOnPersonalTopic(ctx, newMessage, publicKey)
+	} else {
+		hash, err = p.transport.SendPrivateWithPartitioned(ctx, newMessage, publicKey)
+	}
 	if err != nil {
 		return nil, nil, err
 	}

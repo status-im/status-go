@@ -22,6 +22,7 @@
 // 1605075346_add_communities.up.sql (6.971kB)
 // 1610117927_add_message_cache.up.sql (142B)
 // 1610959908_add_dont_wrap_to_raw_messages.up.sql (83B)
+// 1610960912_add_send_on_personal_topic.up.sql (82B)
 // README.md (554B)
 // doc.go (850B)
 
@@ -527,8 +528,28 @@ func _1610959908_add_dont_wrap_to_raw_messagesUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1610959908_add_dont_wrap_to_raw_messages.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1610959977, 0)}
+	info := bindataFileInfo{name: "1610959908_add_dont_wrap_to_raw_messages.up.sql", size: 83, mode: os.FileMode(0644), modTime: time.Unix(1610991421, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x71, 0x2, 0x9a, 0xca, 0xd4, 0x38, 0x44, 0x30, 0x2b, 0xa8, 0x27, 0x32, 0x63, 0x53, 0x22, 0x60, 0x59, 0x84, 0x23, 0x96, 0x77, 0xf0, 0x56, 0xd7, 0x94, 0xe0, 0x95, 0x28, 0x6, 0x1d, 0x4e, 0xb1}}
+	return a, nil
+}
+
+var __1610960912_add_send_on_personal_topicUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\xc1\x0a\x82\x21\x0c\x07\xf0\x7b\x4f\xf1\x7f\x8f\x4e\x33\xe7\x69\x29\x94\x9e\x87\xd4\x88\xa0\x54\x5c\xd0\xeb\x7f\x3f\x92\xca\x37\x54\x0a\xc2\xd8\xfd\xaf\x5f\x73\xef\x2f\x73\x50\x8c\xb8\x14\x69\xd7\x0c\xb7\xf1\xd4\x39\x74\xd9\xf6\x39\xfa\x47\x7f\x73\xbd\x1f\x08\xa5\x08\x53\x46\xe4\x44\x4d\x2a\x12\xc9\x9d\xcf\xa7\x23\x00\x00\xff\xff\x14\x1b\x69\x22\x52\x00\x00\x00")
+
+func _1610960912_add_send_on_personal_topicUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1610960912_add_send_on_personal_topicUpSql,
+		"1610960912_add_send_on_personal_topic.up.sql",
+	)
+}
+
+func _1610960912_add_send_on_personal_topicUpSql() (*asset, error) {
+	bytes, err := _1610960912_add_send_on_personal_topicUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1610960912_add_send_on_personal_topic.up.sql", size: 82, mode: os.FileMode(0644), modTime: time.Unix(1610991445, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x77, 0xac, 0x2f, 0xc4, 0xd, 0xa7, 0x1b, 0x37, 0x30, 0xc2, 0x68, 0xee, 0xde, 0x54, 0x5e, 0xbf, 0x3f, 0xa0, 0xd6, 0xc6, 0x9f, 0xd4, 0x34, 0x12, 0x76, 0x1e, 0x66, 0x4a, 0xfc, 0xf, 0xee, 0xc9}}
 	return a, nil
 }
 
@@ -707,6 +728,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1610959908_add_dont_wrap_to_raw_messages.up.sql": _1610959908_add_dont_wrap_to_raw_messagesUpSql,
 
+	"1610960912_add_send_on_personal_topic.up.sql": _1610960912_add_send_on_personal_topicUpSql,
+
 	"README.md": readmeMd,
 
 	"doc.go": docGo,
@@ -775,6 +798,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1605075346_add_communities.up.sql":                           &bintree{_1605075346_add_communitiesUpSql, map[string]*bintree{}},
 	"1610117927_add_message_cache.up.sql":                         &bintree{_1610117927_add_message_cacheUpSql, map[string]*bintree{}},
 	"1610959908_add_dont_wrap_to_raw_messages.up.sql":             &bintree{_1610959908_add_dont_wrap_to_raw_messagesUpSql, map[string]*bintree{}},
+	"1610960912_add_send_on_personal_topic.up.sql":                &bintree{_1610960912_add_send_on_personal_topicUpSql, map[string]*bintree{}},
 	"README.md": &bintree{readmeMd, map[string]*bintree{}},
 	"doc.go":    &bintree{docGo, map[string]*bintree{}},
 }}

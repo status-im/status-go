@@ -22,4 +22,5 @@ type RawMessage struct {
 	Sender               *ecdsa.PrivateKey
 	Recipients           []*ecdsa.PublicKey
 	SkipGroupMessageWrap bool
+	SendOnPersonalTopic  bool
 }
