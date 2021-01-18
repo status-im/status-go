@@ -1267,6 +1267,9 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 	rawMessage := common.RawMessage{
 		Payload:     encryptedRegistration,
 		MessageType: protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REGISTRATION,
+		// We send on personal topic to avoid a lot of traffic on the partitioned topic
+		SendOnPersonalTopic: true,
+		SkipEncryption:      true,
 	}
 
 	_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, rawMessage)

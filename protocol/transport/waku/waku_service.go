@@ -305,6 +305,22 @@ func (a *Transport) SendPrivateWithPartitioned(ctx context.Context, newMessage *
 	return a.api.Post(ctx, *newMessage)
 }
 
+func (a *Transport) SendPrivateOnPersonalTopic(ctx context.Context, newMessage *types.NewMessage, publicKey *ecdsa.PublicKey) ([]byte, error) {
+	if err := a.addSig(newMessage); err != nil {
+		return nil, err
+	}
+
+	filter, err := a.filters.LoadPersonal(publicKey, a.keysManager.privateKey, false)
+	if err != nil {
+		return nil, err
+	}
+
+	newMessage.Topic = filter.Topic
+	newMessage.PublicKey = crypto.FromECDSAPub(publicKey)
+
+	return a.api.Post(ctx, *newMessage)
+}
+
 func (a *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*transport.Filter, error) {
 	return a.filters.LoadPartitioned(&key.PublicKey, key, true)
 }
