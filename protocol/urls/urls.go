@@ -12,10 +12,16 @@ import (
 	"github.com/keighl/metabolize"
 )
 
-type OembedData struct {
+type YoutubeOembedData struct {
 	ProviderName string `json:"provider_name"`
 	Title        string `json:"title"`
 	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+type GiphyOembedData struct {
+	ProviderName string `json:"provider_name"`
+	Title string `json:"title"`
+	URL   string `json:"url"`
 }
 
 type LinkPreviewData struct {
@@ -31,7 +37,8 @@ type Site struct {
 	ImageSite bool   `json:"imageSite"`
 }
 
-const YouTubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
+const YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
+const GiphyOembedLink = "https://giphy.com/services/oembed?url=%s"
 
 var httpClient = http.Client{
 	Timeout: 30 * time.Second,
@@ -78,8 +85,8 @@ func GetURLContent(url string) (data []byte, err error) {
 	return ioutil.ReadAll(response.Body)
 }
 
-func GetYoutubeOembed(url string) (data OembedData, err error) {
-	oembedLink := fmt.Sprintf(YouTubeOembedLink, url)
+func GetYoutubeOembed(url string) (data YoutubeOembedData, err error) {
+	oembedLink := fmt.Sprintf(YoutubeOembedLink, url)
 
 	jsonBytes, err := GetURLContent(oembedLink)
 	if err != nil {
@@ -119,6 +126,36 @@ func GetGithubPreviewData(link string) (previewData LinkPreviewData, err error) 
 	if err != nil {
 		return previewData, fmt.Errorf("Can't get meta info from link %s", link)
 	}
+
+	return previewData, nil
+}
+
+func GetGiphyOembed(url string) (data GiphyOembedData, err error) {
+	oembedLink := fmt.Sprintf(GiphyOembedLink, url)
+
+	jsonBytes, err := GetURLContent(oembedLink)
+
+	if err != nil {
+		return data, fmt.Errorf("Can't get bytes from Giphy oembed response at %s", oembedLink)
+	}
+
+	err = json.Unmarshal(jsonBytes, &data)
+	if err != nil {
+		return data, fmt.Errorf("Can't unmarshall json")
+	}
+
+	return data, nil
+}
+
+func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
+	oembedData, err := GetGiphyOembed(link)
+	if err != nil {
+		return previewData, err
+	}
+
+	previewData.Title = oembedData.Title
+	previewData.Site = oembedData.ProviderName
+	previewData.ThumbnailURL = oembedData.URL
 
 	return previewData, nil
 }
