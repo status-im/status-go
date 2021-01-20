@@ -2,6 +2,7 @@ package urls
 
 import (
 	"testing"
+	"strings"
 
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +43,10 @@ func TestGetGiphyPreviewData(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, bostonDynamicsEthGifData.Site, previewData.Site)
 	require.Equal(t, bostonDynamicsEthGifData.Title, previewData.Title)
-	require.Equal(t, bostonDynamicsEthGifData.ThumbnailURL, previewData.ThumbnailURL)
+
+	// Giphy oembed returns links to different servers: https://media1.giphy.com, https://media2.giphy.com and so on
+	// We don't care about the server as long as other parts are equal, so we split at "." and ignore the first item
+	require.Equal(t, strings.Split(bostonDynamicsEthGifData.ThumbnailURL, ".")[1:], strings.Split(previewData.ThumbnailURL, ".")[1:])
 
 	invalidGiphyLink := "https://giphy.com/gifs/this-gif-does-not-exist-44444"
 	_, err = GetGiphyPreviewData(invalidGiphyLink)
