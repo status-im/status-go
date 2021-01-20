@@ -1,8 +1,8 @@
 package urls
 
 import (
-	"testing"
 	"strings"
+	"testing"
 
 	"github.com/stretchr/testify/require"
 )
