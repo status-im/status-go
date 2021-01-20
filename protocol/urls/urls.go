@@ -24,6 +24,13 @@ type GiphyOembedData struct {
 	URL   string `json:"url"`
 }
 
+type TenorOembedData struct {
+	ProviderName string `json:"provider_name"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	AuthorName   string `json:"author_name"`
+}
+
+
 type LinkPreviewData struct {
 	Site         string `json:"site" meta:"og:site_name"`
 	Title        string `json:"title" meta:"og:title"`
@@ -39,6 +46,8 @@ type Site struct {
 
 const YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
 const GiphyOembedLink = "https://giphy.com/services/oembed?url=%s"
+const TenorOembedLink = "https://tenor.com/oembed?url=%s"
+
 
 var httpClient = http.Client{
 	Timeout: 30 * time.Second,
@@ -160,8 +169,37 @@ func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 	return previewData, nil
 }
 
-func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
+func GetTenorOembed(url string) (data TenorOembedData, err error) {
+	oembedLink := fmt.Sprintf(TenorOembedLink, url)
 
+	jsonBytes, err := GetURLContent(oembedLink)
+
+	if err != nil {
+		return data, fmt.Errorf("Can't get bytes from Tenor oembed response at %s", oembedLink)
+	}
+
+	err = json.Unmarshal(jsonBytes, &data)
+	if err != nil {
+		return data, fmt.Errorf("Can't unmarshall json")
+	}
+
+	return data, nil
+}
+
+func GetTenorPreviewData(link string) (previewData LinkPreviewData, err error) {
+	oembedData, err := GetTenorOembed(link)
+	if err != nil {
+		return previewData, err
+	}
+
+	previewData.Title = oembedData.AuthorName // Tenor Oembed service doesn't return title of the Gif
+	previewData.Site = oembedData.ProviderName
+	previewData.ThumbnailURL = oembedData.ThumbnailURL
+
+	return previewData, nil
+}
+
+func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	url, err := url.Parse(link)
 	if err != nil {
 		return previewData, fmt.Errorf("Cant't parse link %s", link)
@@ -176,6 +214,12 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	}
 	if "github.com" == hostname {
 		return GetGithubPreviewData(link)
+	}
+	if "giphy.com" == hostname {
+		return GetGiphyPreviewData(link)
+	}
+	if "tenor.com" == hostname {
+		return GetTenorPreviewData(link)
 	}
 
 	for _, site := range LinkPreviewWhitelist() {
