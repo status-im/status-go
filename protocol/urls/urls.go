@@ -203,33 +203,17 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	}
 
 	hostname := strings.ToLower(url.Hostname())
-	youtubeHostnames := []string{"youtube.com", "www.youtube.com", "youtu.be"}
-	for _, youtubeHostname := range youtubeHostnames {
-		if youtubeHostname == hostname {
-			return GetYoutubePreviewData(link)
-		}
-	}
-	if "github.com" == hostname {
+
+	switch hostname {
+	case "youtube.com", "youtu.be", "www.youtube.com":
+		return GetYoutubePreviewData(link)
+	case "github.com":
 		return GetGithubPreviewData(link)
-	}
-	if "giphy.com" == hostname {
+	case "giphy.com":
 		return GetGiphyPreviewData(link)
-	}
-	if "tenor.com" == hostname {
+	case "tenor.com":
 		return GetTenorPreviewData(link)
+	default:
+		return previewData, fmt.Errorf("Link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 	}
-
-	for _, site := range LinkPreviewWhitelist() {
-		if strings.HasSuffix(hostname, site.Address) && site.ImageSite {
-			content, contentErr := GetURLContent(link)
-			if contentErr != nil {
-				return previewData, contentErr
-			}
-			previewData.ThumbnailURL = link
-			previewData.ContentType = http.DetectContentType(content)
-			return previewData, nil
-		}
-	}
-
-	return previewData, fmt.Errorf("Link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 }
