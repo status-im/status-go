@@ -48,3 +48,22 @@ func TestGetGiphyPreviewData(t *testing.T) {
 	_, err = GetGiphyPreviewData(invalidGiphyLink)
 	require.Error(t, err)
 }
+
+func TestGetTenorPreviewData(t *testing.T) {
+	validTenorLink := "https://tenor.com/view/robot-dance-do-you-love-me-boston-boston-dynamics-dance-gif-19998728"
+	previewData, err := GetTenorPreviewData(validTenorLink)
+
+	gifData := LinkPreviewData{
+		Site:         "Tenor",
+		Title:        "Annihere",
+		ThumbnailURL: "https://media.tenor.com/images/975f6b95d188c277ebba62d9b5511685/tenor.gif",
+	}
+	require.NoError(t, err)
+	require.Equal(t, gifData.Site, previewData.Site)
+	require.Equal(t, gifData.Title, previewData.Title)
+	require.Equal(t, gifData.ThumbnailURL, previewData.ThumbnailURL)
+
+	invalidTenorLink := "https://giphy.com/gifs/this-gif-does-not-exist-44444"
+	_, err = GetTenorPreviewData(invalidTenorLink)
+	require.Error(t, err)
+}
