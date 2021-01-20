@@ -20,8 +20,8 @@ type YoutubeOembedData struct {
 
 type GiphyOembedData struct {
 	ProviderName string `json:"provider_name"`
-	Title string `json:"title"`
-	URL   string `json:"url"`
+	Title        string `json:"title"`
+	URL          string `json:"url"`
 }
 
 type TenorOembedData struct {
@@ -29,7 +29,6 @@ type TenorOembedData struct {
 	ThumbnailURL string `json:"thumbnail_url"`
 	AuthorName   string `json:"author_name"`
 }
-
 
 type LinkPreviewData struct {
 	Site         string `json:"site" meta:"og:site_name"`
@@ -47,7 +46,6 @@ type Site struct {
 const YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
 const GiphyOembedLink = "https://giphy.com/services/oembed?url=%s"
 const TenorOembedLink = "https://tenor.com/oembed?url=%s"
-
 
 var httpClient = http.Client{
 	Timeout: 30 * time.Second,
@@ -84,7 +82,6 @@ func LinkPreviewWhitelist() []Site {
 }
 
 func GetURLContent(url string) (data []byte, err error) {
-
 	// nolint: gosec
 	response, err := httpClient.Get(url)
 	if err != nil {
