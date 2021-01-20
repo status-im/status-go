@@ -151,7 +151,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
-		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(DOCKER_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
@@ -161,7 +161,7 @@ bootnode-image:
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
-		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(BOOTNODE_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
 
 push-docker-images: docker-image bootnode-image
@@ -186,8 +186,8 @@ ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
 	$(error The local git commit does not match the remote origin!)
 	exit 1
 endif
-	docker push $(BOOTNODE_IMAGE_NAME):latest
-	docker push $(DOCKER_IMAGE_NAME):latest
+	docker push $(BOOTNODE_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG)
+	docker push $(DOCKER_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG)
 
 install-os-dependencies:
 	_assets/scripts/install_deps.sh

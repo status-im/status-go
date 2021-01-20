@@ -2,7 +2,7 @@ version: "3"
 services:
   mailserver:
     container_name: '${CONTAINER_NAME}'
-    image: ${CONTAINER_IMAGE}
+    image: '${CONTAINER_IMG}:${CONTAINER_TAG}'
     entrypoint: bootnode
     restart: always
     command: |

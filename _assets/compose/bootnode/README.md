@@ -29,8 +29,10 @@ All settings are passed through environment variables:
 * `LISTEN_PORT` - Bootnode UDP port, by default it's `30301` but you might want to use `443`.
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).
 * `API_MODULES` - API modules to be made available via the `RPC_PORT`.
-* `CONTAINER_NAME` - Name of the container that will be created.
-* `LOG_LEVEL` - Set level of log messages to show. (__default:__ `1=ERROR`, `2=WARN`, `3=INFO`, `4=DEBUG`, `5=TRACE`)
+* `CONTAINER_IMG` - Name of the container image. (default: `statusteam/status-go`)
+* `CONTAINER_TAG` - Tag of container image to use. (default: `v0.64.3`)
+* `CONTAINER_NAME` - Name of the container that will be created. (default: `status-go-bootnode`)
+* `LOG_LEVEL` - Set level of log messages to show. (valid: `1=ERROR`, `2=WARN`, `3=INFO`, `4=DEBUG`, `5=TRACE`)
 
 # Known Issues
 

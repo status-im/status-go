@@ -10,13 +10,14 @@ UID = $(shell id -u)
 GID = $(shell id -g)
 
 # Settings
-export LOG_LEVEL       ?= 3
-export LISTEN_PORT     ?= 30301
-export API_MODULES     ?= eth,net,web3,admin
-export CONTAINER_NAME  ?= status-go-bootnode
-export CONTAINER_IMAGE ?= statusteam/bootnode:latest
+export CONTAINER_TAG  ?= v0.64.3
+export CONTAINER_IMG  ?= statusteam/bootnode
+export CONTAINER_NAME ?= status-go-bootnode
+export LOG_LEVEL      ?= 3
+export LISTEN_PORT    ?= 30301
+export API_MODULES    ?= eth,net,web3,admin
 # Necessary to make bootnode available publicly
-export PUBLIC_IP       ?= $(shell curl -s https://ipecho.net/plain)
+export PUBLIC_IP      ?= $(shell curl -s https://ipecho.net/plain)
 
 all: checks start show info enode
 
@@ -65,7 +66,7 @@ keys/nodekey: keys ##@ Generate a node key
 		-u $(UID):$(GID) \
 		--entrypoint=bootnode \
 		-v $(PWD)/keys:/keys:rw \
-		$(CONTAINER_IMAGE) \
+		$(CONTAINER_IMG) \
 		-genkey=/keys/nodekey
 	@echo "$(GRN)Created key for Bootnode: keys/nodekey$(RST)"
 
@@ -74,7 +75,7 @@ keys/nodeaddr: keys ##@ Save node address for given key
 		-u $(UID):$(GID) \
 		--entrypoint=sh \
 		-v $(PWD)/keys:/keys:rw \
-		$(CONTAINER_IMAGE) \
+		$(CONTAINER_IMG) \
 		-c 'bootnode -writeaddress -nodekey=/keys/nodekey > /keys/nodeaddr'
 
 show:

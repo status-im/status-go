@@ -31,11 +31,13 @@ All settings are passed through environment variables:
 * `METRICS_PORT` - Port exposing metrics in [Prometheus](https://prometheus.io/docs/concepts/data_model/) format
 * `RPC_PORT` - Control port making it possible to use the [JSON-RPC API](https://github.com/ethereum/wiki/wiki/JSON-RPC).
 * `API_MODULES` - API modules to be made available via the `RPC_PORT`.
-* `DATA_PATH` - Location of Mailserver storage and keys. (Default: `/var/tmp/status-go-mail`)
-* `CONTAINER_NAME` - Name of the container that will be created.
-* `REGISTER_TOPIC` - Mynamic mailserver discovery topic. (Default: `whispermail`)
-* `MAIL_PASSWORD` - Basic HTTP auth password for mailserver. (Default: `status-offline-inbox`)
-* `LOG_LEVEL` - Set level of log messages to show. (`ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)
+* `DATA_PATH` - Location of Mailserver storage and keys. (default: `/var/tmp/status-go-mail`)
+* `CONTAINER_IMG` - Name of the container image. (default: `statusteam/status-go`)
+* `CONTAINER_TAG` - Tag of container image to use. (default: `v0.64.3`) 
+* `CONTAINER_NAME` - Name of the container that will be created. (default: `status-go-mailserver`)
+* `REGISTER_TOPIC` - Mynamic mailserver discovery topic. (default: `whispermail`)
+* `MAIL_PASSWORD` - Basic HTTP auth password for mailserver. (default: `status-offline-inbox`)
+* `LOG_LEVEL` - Set level of log messages to show. (valid: `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`)
 
 The generated configuration file end up under `${DATA_PATH}/config.json`.
 
