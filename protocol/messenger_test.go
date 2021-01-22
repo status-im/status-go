@@ -491,7 +491,7 @@ func (s *MessengerSuite) TestSendPrivateGroup() {
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
-	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSent, "it marks the message as sent")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_PRIVATE_GROUP, outputMessage.MessageType)
 }
@@ -519,7 +519,7 @@ func (s *MessengerSuite) TestSendPrivateEmptyGroup() {
 	s.Require().NotEqual(uint64(0), chat.Timestamp, "it sets the timestamp")
 	s.Require().Equal("0x"+hex.EncodeToString(crypto.FromECDSAPub(&s.privateKey.PublicKey)), outputMessage.From, "it sets the From field")
 	s.Require().True(outputMessage.Seen, "it marks the message as seen")
-	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSending, "it marks the message as sending")
+	s.Require().Equal(outputMessage.OutgoingStatus, common.OutgoingStatusSent, "it marks the message as sent")
 	s.Require().NotEmpty(outputMessage.ID, "it sets the ID field")
 	s.Require().Equal(protobuf.MessageType_PRIVATE_GROUP, outputMessage.MessageType)
 }
