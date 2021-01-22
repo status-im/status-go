@@ -2262,20 +2262,20 @@ func (m *Messenger) dispatchPairInstallationMessage(ctx context.Context, spec co
 	return id, nil
 }
 
-func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage) ([]byte, error) {
+func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage) (common.RawMessage, error) {
 	var err error
 	var id []byte
 	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", spec.LocalChatID))
 	chat, ok := m.allChats[spec.LocalChatID]
 	if !ok {
-		return nil, errors.New("no chat found")
+		return spec, errors.New("no chat found")
 	}
 
 	switch chat.ChatType {
 	case ChatTypeOneToOne:
 		publicKey, err := chat.PublicKey()
 		if err != nil {
-			return nil, err
+			return spec, err
 		}
 
 		//SendPrivate will alter message identity and possibly datasyncid, so we save an unchanged
@@ -2285,40 +2285,40 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			id, err = m.processor.SendPrivate(ctx, publicKey, &spec)
 
 			if err != nil {
-				return nil, err
+				return spec, err
 			}
 		}
 
 		err = m.sendToPairedDevices(ctx, specCopyForPairedDevices)
 
 		if err != nil {
-			return nil, err
+			return spec, err
 		}
 
 	case ChatTypePublic, ChatTypeProfile:
 		logger.Debug("sending public message", zap.String("chatName", chat.Name))
 		id, err = m.processor.SendPublic(ctx, chat.ID, spec)
 		if err != nil {
-			return nil, err
+			return spec, err
 		}
 	case ChatTypeCommunityChat:
 		// TODO: add grant
 		canPost, err := m.communitiesManager.CanPost(&m.identity.PublicKey, chat.CommunityID, chat.CommunityChatID(), nil)
 		if err != nil {
-			return nil, err
+			return spec, err
 		}
 
 		// We allow emoji reactions by anyone
 		if spec.MessageType != protobuf.ApplicationMetadataMessage_EMOJI_REACTION && !canPost {
 			m.logger.Error("can't post on chat", zap.String("chat-id", chat.ID), zap.String("chat-name", chat.Name))
 
-			return nil, errors.New("can't post on chat")
+			return spec, errors.New("can't post on chat")
 		}
 
 		logger.Debug("sending community chat message", zap.String("chatName", chat.Name))
 		id, err = m.processor.SendPublic(ctx, chat.ID, spec)
 		if err != nil {
-			return nil, err
+			return spec, err
 		}
 	case ChatTypePrivateGroupChat:
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))
@@ -2329,13 +2329,13 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			if spec.MessageType != protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE {
 				spec.Recipients, err = chat.JoinedMembersAsPublicKeys()
 				if err != nil {
-					return nil, err
+					return spec, err
 				}
 
 			} else {
 				spec.Recipients, err = chat.MembersAsPublicKeys()
 				if err != nil {
-					return nil, err
+					return spec, err
 				}
 			}
 		}
@@ -2354,27 +2354,33 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			spec.Recipients = spec.Recipients[:n]
 		}
 
+		// We won't really send the message out if there's no recipients
+		if len(spec.Recipients) == 0 {
+			spec.Sent = true
+		}
+
 		// We skip wrapping in some cases (emoji reactions for example)
 		if !spec.SkipGroupMessageWrap {
 			spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
 		}
+
 		id, err = m.processor.SendGroup(ctx, spec.Recipients, spec)
 		if err != nil {
-			return nil, err
+			return spec, err
 		}
 
 	default:
-		return nil, errors.New("chat type not supported")
+		return spec, errors.New("chat type not supported")
 	}
 	spec.ID = types.EncodeHex(id)
 	spec.SendCount++
 	spec.LastSent = m.getTimesource().GetCurrentTime()
 	err = m.persistence.SaveRawMessage(&spec)
 	if err != nil {
-		return nil, err
+		return spec, err
 	}
 
-	return id, nil
+	return spec, nil
 }
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
@@ -2491,18 +2497,22 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		return nil, err
 	}
 
-	id, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage := common.RawMessage{
 		LocalChatID:          chat.ID,
 		SendPushNotification: m.featureFlags.PushNotifications,
 		Payload:              encodedMessage,
 		MessageType:          protobuf.ApplicationMetadataMessage_CHAT_MESSAGE,
 		ResendAutomatically:  true,
-	})
+	}
+	rawMessage, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	message.ID = types.EncodeHex(id)
+	if rawMessage.Sent {
+		message.OutgoingStatus = common.OutgoingStatusSent
+	}
+	message.ID = rawMessage.ID
 	err = message.PrepareContent()
 	if err != nil {
 		return nil, err
@@ -3603,7 +3613,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	if err != nil {
 		return nil, err
 	}
-	id, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_TRANSACTION,
@@ -3611,7 +3621,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	})
 
 	message.CommandParameters = &common.CommandParameters{
-		ID:           types.EncodeHex(id),
+		ID:           rawMessage.ID,
 		Value:        value,
 		Address:      address,
 		Contract:     contract,
@@ -3621,7 +3631,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	if err != nil {
 		return nil, err
 	}
-	messageID := types.EncodeHex(id)
+	messageID := rawMessage.ID
 
 	message.ID = messageID
 	message.CommandParameters.ID = messageID
@@ -3680,7 +3690,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	if err != nil {
 		return nil, err
 	}
-	id, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -3688,7 +3698,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	})
 
 	message.CommandParameters = &common.CommandParameters{
-		ID:           types.EncodeHex(id),
+		ID:           rawMessage.ID,
 		From:         from,
 		Value:        value,
 		Contract:     contract,
@@ -3698,7 +3708,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	if err != nil {
 		return nil, err
 	}
-	messageID := types.EncodeHex(id)
+	messageID := rawMessage.ID
 
 	message.ID = messageID
 	message.CommandParameters.ID = messageID
@@ -3783,7 +3793,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_ACCEPT_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -3794,7 +3804,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 		return nil, err
 	}
 
-	message.ID = types.EncodeHex(newMessageID)
+	message.ID = rawMessage.ID
 	message.CommandParameters.Address = address
 	message.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionAccepted
 
@@ -3867,7 +3877,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_TRANSACTION,
@@ -3878,7 +3888,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 		return nil, err
 	}
 
-	message.ID = types.EncodeHex(newMessageID)
+	message.ID = rawMessage.ID
 	message.CommandParameters.CommandState = common.CommandStateRequestTransactionDeclined
 
 	err = message.PrepareContent()
@@ -3950,7 +3960,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_DECLINE_REQUEST_ADDRESS_FOR_TRANSACTION,
@@ -3961,7 +3971,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 		return nil, err
 	}
 
-	message.ID = types.EncodeHex(newMessageID)
+	message.ID = rawMessage.ID
 	message.CommandParameters.CommandState = common.CommandStateRequestAddressForTransactionDeclined
 
 	err = message.PrepareContent()
@@ -4048,7 +4058,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
@@ -4059,7 +4069,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 		return nil, err
 	}
 
-	message.ID = types.EncodeHex(newMessageID)
+	message.ID = rawMessage.ID
 	message.CommandParameters.TransactionHash = transactionHash
 	message.CommandParameters.Signature = signature
 	message.CommandParameters.CommandState = common.CommandStateTransactionSent
@@ -4126,7 +4136,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	newMessageID, err := m.dispatchMessage(ctx, common.RawMessage{
+	rawMessage, err := m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID:         chat.ID,
 		Payload:             encodedMessage,
 		MessageType:         protobuf.ApplicationMetadataMessage_SEND_TRANSACTION,
@@ -4137,7 +4147,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 		return nil, err
 	}
 
-	message.ID = types.EncodeHex(newMessageID)
+	message.ID = rawMessage.ID
 	message.CommandParameters = &common.CommandParameters{
 		TransactionHash: transactionHash,
 		Value:           value,
