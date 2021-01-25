@@ -137,7 +137,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 
 	switch n.BodyType {
 	case TypeTransaction:
-		if nb, ok := n.Body.(notificationBody); ok {
+		if nb, ok := n.Body.(*notificationBody); ok {
 			body, err = json.Marshal(nb)
 			if err != nil {
 				return nil, err
@@ -147,7 +147,7 @@ func (n *Notification) MarshalJSON() ([]byte, error) {
 		}
 
 	case TypeMessage:
-		if nmb, ok := n.Body.(protocol.MessageNotificationBody); ok {
+		if nmb, ok := n.Body.(*protocol.MessageNotificationBody); ok {
 			body, err = json.Marshal(nmb)
 			if err != nil {
 				return nil, err
@@ -273,7 +273,7 @@ func (s *Service) buildTransactionNotification(rawTransfer wallet.Transfer) *Not
 	return &Notification{
 		BodyType: TypeTransaction,
 		ID:       transfer.ID,
-		Body:     body,
+		Body:     &body,
 		Deeplink: deeplink,
 		Category: CategoryTransaction,
 	}
