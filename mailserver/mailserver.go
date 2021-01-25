@@ -958,6 +958,7 @@ func (s *mailServer) createIterator(req MessagesRequestPayload) (Iterator, error
 		start:  kl.Bytes(),
 		end:    ku.Bytes(),
 		cursor: req.Cursor,
+		topics: req.Topics,
 		bloom:  req.Bloom,
 		limit:  req.Limit,
 	}
