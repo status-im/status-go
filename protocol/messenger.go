@@ -441,7 +441,7 @@ func (m *Messenger) handleConnectionChange(online bool) {
 		}
 
 		if m.shouldPublishContactCode {
-			if err := m.handleSendContactCode(); err != nil {
+			if err := m.publishContactCode(); err != nil {
 				m.logger.Error("could not publish on contact code", zap.Error(err))
 				return
 			}
@@ -476,9 +476,9 @@ func (m *Messenger) buildContactCodeAdvertisement() (*protobuf.ContactCodeAdvert
 	}, nil
 }
 
-// handleSendContactCode sends a public message wrapped in the encryption
+// publishContactCode sends a public message wrapped in the encryption
 // layer, which will propagate our bundle
-func (m *Messenger) handleSendContactCode() error {
+func (m *Messenger) publishContactCode() error {
 	var payload []byte
 	m.logger.Debug("sending contact code")
 	contactCodeAdvertisement, err := m.buildContactCodeAdvertisement()
@@ -489,7 +489,7 @@ func (m *Messenger) handleSendContactCode() error {
 	if contactCodeAdvertisement == nil {
 		contactCodeAdvertisement = &protobuf.ContactCodeAdvertisement{}
 	}
-	err = m.handleContactCodeChatIdentity(contactCodeAdvertisement)
+	err = m.attachChatIdentity(contactCodeAdvertisement)
 	if err != nil {
 		return err
 	}
@@ -516,31 +516,33 @@ func (m *Messenger) handleSendContactCode() error {
 
 // contactCodeAdvertisement attaches a protobuf.ChatIdentity to the given protobuf.ContactCodeAdvertisement,
 // if the `shouldPublish` conditions are met
-func (m *Messenger) handleContactCodeChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
+func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
 	shouldPublish, err := m.shouldPublishChatIdentity(contactCodeTopic)
 	if err != nil {
 		return err
 	}
 
-	if shouldPublish {
-		cca.ChatIdentity, err = m.createChatIdentity(privateChat)
-		if err != nil {
-			return err
-		}
+	if !shouldPublish {
+		return nil
+	}
 
-		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
-		if err != nil {
-			return err
-		}
-		if img == nil {
-			return errors.New("could not find image")
-		}
+	cca.ChatIdentity, err = m.createChatIdentity(privateChat)
+	if err != nil {
+		return err
+	}
 
-		err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, img.Hash())
-		if err != nil {
-			return err
-		}
+	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
+	if err != nil {
+		return err
+	}
+	if img == nil {
+		return errors.New("could not find image")
+	}
+
+	err = m.persistence.SaveWhenChatIdentityLastPublished(contactCodeTopic, img.Hash())
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -599,6 +601,9 @@ func (m *Messenger) handleStandaloneChatIdentity(chat *Chat) error {
 
 // shouldPublishChatIdentity returns true if the last time the ChatIdentity was attached was more than 24 hours ago
 func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
+	if m.account == nil {
+		return false, nil
+	}
 
 	// Check we have at least one image
 	img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
@@ -722,7 +727,7 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 		for {
 			select {
 			case <-subscriptions.SendContactCode:
-				if err := m.handleSendContactCode(); err != nil {
+				if err := m.publishContactCode(); err != nil {
 					m.logger.Error("failed to publish contact code", zap.Error(err))
 				}
 				// we also piggy-back to clean up cached messages
@@ -898,7 +903,7 @@ func (m *Messenger) watchIdentityImageChanges() {
 			select {
 			case <-channel:
 				if m.online() {
-					if err := m.handleSendContactCode(); err != nil {
+					if err := m.publishContactCode(); err != nil {
 						m.logger.Error("failed to publish contact code", zap.Error(err))
 					}
 
@@ -920,7 +925,7 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 			if !more {
 				return
 			}
-			if err := m.handleSendContactCode(); err != nil {
+			if err := m.publishContactCode(); err != nil {
 				m.logger.Error("failed to publish contact code", zap.Error(err))
 			}
 
