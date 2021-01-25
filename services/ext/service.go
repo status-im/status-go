@@ -31,7 +31,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
 	"github.com/status-im/status-go/services/ext/mailservers"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
@@ -198,7 +197,6 @@ func (s *Service) retrieveMessagesLoop(tick time.Duration, cancel <-chan struct{
 			}
 			if !response.IsEmpty() {
 				PublisherSignalHandler{}.NewMessages(response)
-				localnotifications.SendMessageNotifications(response.Notifications)
 			}
 		case <-cancel:
 			return
