@@ -211,6 +211,9 @@ type WakuConfig struct {
 
 	// SoftBlacklistedPeerIDs is a list of peer ids that should be soft-blacklisted (messages should be dropped but connection kept)
 	SoftBlacklistedPeerIDs []string
+
+	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
+	EnableConfirmations bool
 }
 
 // ----------
