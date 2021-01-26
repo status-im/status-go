@@ -29,12 +29,13 @@ func NewService(db *Database, accountsFeed *event.Feed) *Service {
 
 // Service is a wallet service.
 type Service struct {
-	feed    *event.Feed
-	db      *Database
-	reactor *Reactor
-	signals *SignalsTransmitter
-	client  *ethclient.Client
-	started bool
+	feed                *event.Feed
+	db                  *Database
+	reactor             *Reactor
+	signals             *SignalsTransmitter
+	client              *ethclient.Client
+	cryptoOnRampManager *CryptoOnRampManager
+	started             bool
 
 	group        *Group
 	accountsFeed *event.Feed
