@@ -46,13 +46,13 @@ func NewEnvelopesMonitor(w types.Whisper, config transport.EnvelopesMonitorConfi
 	}
 
 	return &EnvelopesMonitor{
-		w:                      w,
-		whisperAPI:             whisperAPI,
-		handler:                config.EnvelopeEventsHandler,
-		mailServerConfirmation: config.MailserverConfirmationsEnabled,
-		maxAttempts:            config.MaxAttempts,
-		isMailserver:           config.IsMailserver,
-		logger:                 logger.With(zap.Namespace("EnvelopesMonitor")),
+		w:                                w,
+		whisperAPI:                       whisperAPI,
+		handler:                          config.EnvelopeEventsHandler,
+		awaitOnlyMailServerConfirmations: config.AwaitOnlyMailServerConfirmations,
+		maxAttempts:                      config.MaxAttempts,
+		isMailserver:                     config.IsMailserver,
+		logger:                           logger.With(zap.Namespace("EnvelopesMonitor")),
 
 		// key is envelope hash (event.Hash)
 		envelopes:   map[types.Hash]EnvelopeState{},
@@ -67,11 +67,11 @@ func NewEnvelopesMonitor(w types.Whisper, config transport.EnvelopesMonitorConfi
 
 // EnvelopesMonitor is responsible for monitoring whisper envelopes state.
 type EnvelopesMonitor struct {
-	w                      types.Whisper
-	whisperAPI             types.PublicWhisperAPI
-	handler                EnvelopeEventsHandler
-	mailServerConfirmation bool
-	maxAttempts            int
+	w                                types.Whisper
+	whisperAPI                       types.PublicWhisperAPI
+	handler                          EnvelopeEventsHandler
+	awaitOnlyMailServerConfirmations bool
+	maxAttempts                      int
 
 	mu        sync.Mutex
 	envelopes map[types.Hash]EnvelopeState
@@ -157,10 +157,8 @@ func (m *EnvelopesMonitor) handleEvent(event types.EnvelopeEvent) {
 }
 
 func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
-	if m.mailServerConfirmation {
-		if !m.isMailserver(event.Peer) {
-			return
-		}
+	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
+		return
 	}
 
 	m.mu.Lock()
@@ -173,25 +171,20 @@ func (m *EnvelopesMonitor) handleEventEnvelopeSent(event types.EnvelopeEvent) {
 		return
 	}
 	m.logger.Debug("envelope is sent", zap.String("hash", event.Hash.String()), zap.String("peer", event.Peer.String()))
-	if event.Batch != (types.Hash{}) {
+
+	confirmationExpected := event.Batch != (types.Hash{})
+	if confirmationExpected {
 		if _, ok := m.batches[event.Batch]; !ok {
 			m.batches[event.Batch] = map[types.Hash]struct{}{}
 		}
 		m.batches[event.Batch][event.Hash] = struct{}{}
 		m.logger.Debug("waiting for a confirmation", zap.String("batch", event.Batch.String()))
-	} else {
-		m.envelopes[event.Hash] = EnvelopeSent
-		if m.handler != nil {
-			m.handler.EnvelopeSent(m.identifiers[event.Hash])
-		}
 	}
 }
 
 func (m *EnvelopesMonitor) handleAcknowledgedBatch(event types.EnvelopeEvent) {
-	if m.mailServerConfirmation {
-		if !m.isMailserver(event.Peer) {
-			return
-		}
+	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
+		return
 	}
 
 	m.mu.Lock()
@@ -283,10 +276,8 @@ func (m *EnvelopesMonitor) handleEnvelopeFailure(hash types.Hash, err error) {
 }
 
 func (m *EnvelopesMonitor) handleEventEnvelopeReceived(event types.EnvelopeEvent) {
-	if m.mailServerConfirmation {
-		if !m.isMailserver(event.Peer) {
-			return
-		}
+	if m.awaitOnlyMailServerConfirmations && !m.isMailserver(event.Peer) {
+		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()

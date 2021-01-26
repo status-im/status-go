@@ -7,11 +7,11 @@ import (
 )
 
 type EnvelopesMonitorConfig struct {
-	EnvelopeEventsHandler          EnvelopeEventsHandler
-	MaxAttempts                    int
-	MailserverConfirmationsEnabled bool
-	IsMailserver                   func(types.EnodeID) bool
-	Logger                         *zap.Logger
+	EnvelopeEventsHandler            EnvelopeEventsHandler
+	MaxAttempts                      int
+	AwaitOnlyMailServerConfirmations bool
+	IsMailserver                     func(types.EnodeID) bool
+	Logger                           *zap.Logger
 }
 
 // EnvelopeEventsHandler used for two different event types.

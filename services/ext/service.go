@@ -140,8 +140,8 @@ func (s *Service) InitProtocol(identity *ecdsa.PrivateKey, db *sql.DB, multiAcco
 	}
 
 	envelopesMonitorConfig := &transport.EnvelopesMonitorConfig{
-		MaxAttempts:                    s.config.MaxMessageDeliveryAttempts,
-		MailserverConfirmationsEnabled: s.config.MailServerConfirmations,
+		MaxAttempts:                      s.config.MaxMessageDeliveryAttempts,
+		AwaitOnlyMailServerConfirmations: s.config.MailServerConfirmations,
 		IsMailserver: func(peer types.EnodeID) bool {
 			return s.peerStore.Exist(peer)
 		},
