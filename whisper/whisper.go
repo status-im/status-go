@@ -459,9 +459,9 @@ func (whisper *Whisper) notifyPeersAboutBloomFilterChange(bloom []byte) {
 }
 
 func (whisper *Whisper) getPeers() []*Peer {
+	whisper.peerMu.Lock()
 	arr := make([]*Peer, len(whisper.peers))
 	i := 0
-	whisper.peerMu.Lock()
 	for p := range whisper.peers {
 		arr[i] = p
 		i++
