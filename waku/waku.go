@@ -595,9 +595,9 @@ func (w *Waku) notifyPeersAboutTopicInterestChange(topicInterest []common.TopicT
 }
 
 func (w *Waku) getPeers() []common.Peer {
+	w.peerMu.Lock()
 	arr := make([]common.Peer, len(w.peers))
 	i := 0
-	w.peerMu.Lock()
 	for p := range w.peers {
 		arr[i] = p
 		i++
