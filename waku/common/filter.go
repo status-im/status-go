@@ -102,6 +102,17 @@ func (fs *Filters) Uninstall(id string) bool {
 	return false
 }
 
+func (fs *Filters) AllTopics() []TopicType {
+	var topics []TopicType
+	fs.mutex.Lock()
+	defer fs.mutex.Unlock()
+	for t := range fs.topicMatcher {
+		topics = append(topics, t)
+	}
+
+	return topics
+}
+
 // addTopicMatcher adds a filter to the topic matchers.
 // If the filter's Topics array is empty, it will be tried on every topic.
 // Otherwise, it will be tried on the topics specified.

@@ -590,10 +590,12 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		   resend_automatically,
 		   recipients,
 		   skip_encryption,
-			 send_push_notification,
+	           send_push_notification,
+		   skip_group_message_wrap,
+		   send_on_personal_topic,
 		   payload
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		message.ID,
 		message.LocalChatID,
 		message.LastSent,
@@ -604,6 +606,8 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		encodedRecipients.Bytes(),
 		message.SkipEncryption,
 		message.SendPushNotification,
+		message.SkipGroupMessageWrap,
+		message.SendOnPersonalTopic,
 		message.Payload)
 	return err
 }
@@ -611,6 +615,8 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error) {
 	var rawPubKeys [][]byte
 	var encodedRecipients []byte
+	var skipGroupMessageWrap sql.NullBool
+	var sendOnPersonalTopic sql.NullBool
 	message := &common.RawMessage{}
 
 	err := db.db.QueryRow(`
@@ -624,7 +630,9 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 			  resend_automatically,
 			  recipients,
 			  skip_encryption,
-				send_push_notification,
+		          send_push_notification,
+			  skip_group_message_wrap,
+			  send_on_personal_topic,
 			  payload
 			FROM
 				raw_messages
@@ -642,24 +650,36 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 		&encodedRecipients,
 		&message.SkipEncryption,
 		&message.SendPushNotification,
+		&skipGroupMessageWrap,
+		&sendOnPersonalTopic,
 		&message.Payload,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Restore recipients
-	decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
-	err = decoder.Decode(&rawPubKeys)
-	if err != nil {
-		return nil, err
-	}
-	for _, pkBytes := range rawPubKeys {
-		pubkey, err := crypto.UnmarshalPubkey(pkBytes)
+	if rawPubKeys != nil {
+		// Restore recipients
+		decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
+		err = decoder.Decode(&rawPubKeys)
 		if err != nil {
 			return nil, err
 		}
-		message.Recipients = append(message.Recipients, pubkey)
+		for _, pkBytes := range rawPubKeys {
+			pubkey, err := crypto.UnmarshalPubkey(pkBytes)
+			if err != nil {
+				return nil, err
+			}
+			message.Recipients = append(message.Recipients, pubkey)
+		}
+	}
+
+	if skipGroupMessageWrap.Valid {
+		message.SkipGroupMessageWrap = skipGroupMessageWrap.Bool
+	}
+
+	if sendOnPersonalTopic.Valid {
+		message.SendOnPersonalTopic = sendOnPersonalTopic.Bool
 	}
 
 	return message, nil

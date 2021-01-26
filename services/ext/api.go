@@ -395,7 +395,7 @@ func (api *PublicAPI) ChatMessages(chatID, cursor string, limit int) (*Applicati
 	}, nil
 }
 
-func (api *PublicAPI) StartMessenger() error {
+func (api *PublicAPI) StartMessenger() (*protocol.MessengerResponse, error) {
 	return api.service.StartMessenger()
 }
 

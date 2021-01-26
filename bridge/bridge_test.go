@@ -14,7 +14,7 @@ import (
 
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 func TestEnvelopesBeingIdentical(t *testing.T) {

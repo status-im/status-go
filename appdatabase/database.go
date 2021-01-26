@@ -19,3 +19,15 @@ func InitializeDB(path, password string) (*sql.DB, error) {
 	}
 	return db, nil
 }
+
+// DecryptDatabase creates an unencrypted copy of the database and copies it
+// over to the given directory
+func DecryptDatabase(oldPath, newPath, password string) error {
+	return sqlite.DecryptDB(oldPath, newPath, password)
+}
+
+// EncryptDatabase creates an encrypted copy of the database and copies it to the
+// user path
+func EncryptDatabase(oldPath, newPath, password string) error {
+	return sqlite.EncryptDB(oldPath, newPath, password)
+}

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 type gethWhisperWrapper struct {
@@ -146,6 +146,10 @@ func (w *gethWhisperWrapper) GetFilter(id string) types.Filter {
 
 func (w *gethWhisperWrapper) Unsubscribe(id string) error {
 	return w.whisper.Unsubscribe(id)
+}
+
+func (w *gethWhisperWrapper) UnsubscribeMany(ids []string) error {
+	return w.whisper.UnsubscribeMany(ids)
 }
 
 func (w *gethWhisperWrapper) createFilterWrapper(id string, keyAsym *ecdsa.PrivateKey, keySym []byte, pow float64, topics [][]byte) (types.Filter, error) {

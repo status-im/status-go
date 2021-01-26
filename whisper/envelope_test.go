@@ -55,7 +55,7 @@ func TestPoWCalculationsWith8LeadingZeros(t *testing.T) {
 
 func TestEnvelopeOpenAcceptsOnlyOneKeyTypeInFilter(t *testing.T) {
 	symKey := make([]byte, aesKeyLength)
-	mrand.Read(symKey)
+	mrand.Read(symKey) // nolint: gosec
 
 	asymKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -65,13 +65,13 @@ func TestEnvelopeOpenAcceptsOnlyOneKeyTypeInFilter(t *testing.T) {
 	params := MessageParams{
 		PoW:      0.01,
 		WorkTime: 1,
-		TTL:      uint32(mrand.Intn(1024)),
+		TTL:      uint32(mrand.Intn(1024)), // nolint: gosec
 		Payload:  make([]byte, 50),
 		KeySym:   symKey,
 		Dst:      nil,
 	}
 
-	mrand.Read(params.Payload)
+	mrand.Read(params.Payload) // nolint: gosec
 
 	msg, err := NewSentMessage(&params)
 	if err != nil {

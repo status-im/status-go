@@ -79,7 +79,6 @@ type Filter struct {
 	id         string            // unique identifier
 
 	Messages MessageStore
-	mutex    sync.RWMutex
 }
 
 // Filters represents a collection of filters

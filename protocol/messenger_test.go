@@ -109,7 +109,8 @@ func (s *MessengerSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
-	s.Require().NoError(s.m.Start())
+	_, err := s.m.Start()
+	s.Require().NoError(err)
 }
 
 func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *zap.Logger, extraOptions []Option) (*Messenger, error) {
@@ -150,7 +151,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		return nil, err
 	}
 
-	err = m.Start()
+	_, err = m.Start()
 	if err != nil {
 		return nil, err
 	}
@@ -560,9 +561,10 @@ func (s *MessengerSuite) TestRetrieveOwnPublic() {
 // Retrieve their public message
 func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err := theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(&theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
@@ -602,9 +604,10 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 
 func (s *MessengerSuite) TestDeletedAtClockValue() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err := theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(&theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
@@ -633,9 +636,10 @@ func (s *MessengerSuite) TestDeletedAtClockValue() {
 
 func (s *MessengerSuite) TestRetrieveBlockedContact() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err := theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(&theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
@@ -671,9 +675,10 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 // Resend their public message, receive only once
 func (s *MessengerSuite) TestResendPublicMessage() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirChat := CreatePublicChat("status", s.m.transport)
-	err := theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(&theirChat)
 	s.Require().NoError(err)
 
 	chat := CreatePublicChat("status", s.m.transport)
@@ -725,9 +730,10 @@ func (s *MessengerSuite) TestResendPublicMessage() {
 // Test receiving a message on an existing private chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirChat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
-	err := theirMessenger.SaveChat(&theirChat)
+	err = theirMessenger.SaveChat(&theirChat)
 	s.Require().NoError(err)
 
 	ourChat := CreateOneToOneChat("our-chat", &theirMessenger.identity.PublicKey, s.m.transport)
@@ -767,9 +773,10 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 // Test receiving a message on an non-existing private chat
 func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	chat := CreateOneToOneChat("XXX", &s.privateKey.PublicKey, s.m.transport)
-	err := theirMessenger.SaveChat(&chat)
+	err = theirMessenger.SaveChat(&chat)
 	s.NoError(err)
 
 	inputMessage := buildTestMessage(chat)
@@ -804,9 +811,10 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 // Test receiving a message on an non-existing public chat
 func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	chat := CreatePublicChat("test-chat", s.m.transport)
-	err := theirMessenger.SaveChat(&chat)
+	err = theirMessenger.SaveChat(&chat)
 	s.NoError(err)
 
 	inputMessage := buildTestMessage(chat)
@@ -829,8 +837,9 @@ func (s *MessengerSuite) TestRetrieveTheirPublicChatNonExisting() {
 func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "id", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
 
@@ -891,8 +900,9 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 func (s *MessengerSuite) TestChangeNameGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
 
@@ -945,8 +955,9 @@ func (s *MessengerSuite) TestChangeNameGroupChat() {
 func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	var response *MessengerResponse
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
-	response, err := s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	response, err = s.m.CreateGroupChatWithMembers(context.Background(), "old-name", []string{})
 	s.NoError(err)
 	s.Require().Len(response.Chats, 1)
 
@@ -1512,11 +1523,12 @@ func (s *MessengerSuite) TestDeclineRequestAddressForTransaction() {
 	value := testValue
 	contract := testContract
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
 	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
@@ -1603,14 +1615,15 @@ func (s *MessengerSuite) TestSendEthTransaction() {
 	contract := testContract
 
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
 	transactionHash := testTransactionHash
@@ -1706,14 +1719,15 @@ func (s *MessengerSuite) TestSendTokenTransaction() {
 	contract := testContract
 
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	receiverAddress := crypto.PubkeyToAddress(theirMessenger.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
 	transactionHash := testTransactionHash
@@ -1808,13 +1822,14 @@ func (s *MessengerSuite) TestAcceptRequestAddressForTransaction() {
 	value := testValue
 	contract := testContract
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	myAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
 	response, err := s.m.RequestAddressForTransaction(context.Background(), theirPkString, myAddress.Hex(), value, contract)
@@ -1902,11 +1917,12 @@ func (s *MessengerSuite) TestDeclineRequestTransaction() {
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
 	response, err := s.m.RequestTransaction(context.Background(), theirPkString, value, contract, receiverAddressString)
@@ -1991,11 +2007,12 @@ func (s *MessengerSuite) TestRequestTransaction() {
 	receiverAddress := crypto.PubkeyToAddress(s.m.identity.PublicKey)
 	receiverAddressString := strings.ToLower(receiverAddress.Hex())
 	theirMessenger := s.newMessenger(s.shh)
-	s.Require().NoError(theirMessenger.Start())
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
 	theirPkString := types.EncodeHex(crypto.FromECDSAPub(&theirMessenger.identity.PublicKey))
 
 	chat := CreateOneToOneChat(theirPkString, &theirMessenger.identity.PublicKey, s.m.transport)
-	err := s.m.SaveChat(&chat)
+	err = s.m.SaveChat(&chat)
 	s.Require().NoError(err)
 
 	response, err := s.m.RequestTransaction(context.Background(), theirPkString, value, contract, receiverAddressString)

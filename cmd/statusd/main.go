@@ -31,7 +31,6 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/profiling"
 	"github.com/status-im/status-go/protocol"
-	localnotifications "github.com/status-im/status-go/services/local-notifications"
 )
 
 const (
@@ -242,7 +241,7 @@ func main() {
 
 		// This will start the push notification server as well as
 		// the config is set to Enabled
-		err = messenger.Start()
+		_, err = messenger.Start()
 		if err != nil {
 			logger.Error("failed to start messenger", "error", err)
 			return
@@ -400,13 +399,11 @@ func retrieveMessagesLoop(messenger *protocol.Messenger, tick time.Duration, can
 	for {
 		select {
 		case <-ticker.C:
-			mr, err := messenger.RetrieveAll()
+			_, err := messenger.RetrieveAll()
 			if err != nil {
 				logger.Error("failed to retrieve raw messages", "err", err)
 				continue
 			}
-
-			localnotifications.SendMessageNotifications(mr.Notifications)
 		case <-cancel:
 			return
 		}

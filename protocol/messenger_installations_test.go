@@ -47,7 +47,8 @@ func (s *MessengerInstallationSuite) SetupTest() {
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
 	// We start the messenger in order to receive installations
-	s.Require().NoError(s.m.Start())
+	_, err := s.m.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerInstallationSuite) TearDownTest() {

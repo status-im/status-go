@@ -628,3 +628,31 @@ func MultiformatDeserializePublicKey(key, outBase string) string {
 
 	return pk
 }
+
+// ExportUnencryptedDatabase exports the database unencrypted to the given path
+func ExportUnencryptedDatabase(accountData, password, databasePath string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.ExportUnencryptedDatabase(account, password, databasePath)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}
+
+// ImportUnencryptedDatabase imports the database unencrypted to the given directory
+func ImportUnencryptedDatabase(accountData, password, databasePath string) string {
+	var account multiaccounts.Account
+	err := json.Unmarshal([]byte(accountData), &account)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	err = statusBackend.ImportUnencryptedDatabase(account, password, databasePath)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}

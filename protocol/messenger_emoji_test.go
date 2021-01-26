@@ -44,7 +44,8 @@ func (s *MessengerEmojiSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
-	s.Require().NoError(s.m.Start())
+	_, err := s.m.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerEmojiSuite) TearDownTest() {
@@ -147,7 +148,8 @@ func (s *MessengerEmojiSuite) TestSendEmoji() {
 func (s *MessengerEmojiSuite) TestEmojiPrivateGroup() {
 	bob := s.m
 	alice := s.newMessenger(s.shh)
-	s.Require().NoError(alice.Start())
+	_, err := alice.Start()
+	s.Require().NoError(err)
 	response, err := bob.CreateGroupChatWithMembers(context.Background(), "test", []string{})
 	s.NoError(err)
 

@@ -392,3 +392,8 @@ func (m *Message) GetProtobuf() proto.Message {
 func (m *Message) SetMessageType(messageType protobuf.MessageType) {
 	m.MessageType = messageType
 }
+
+// WrapGroupMessage indicates whether we should wrap this in membership information
+func (m *Message) WrapGroupMessage() bool {
+	return true
+}

@@ -43,6 +43,7 @@ import (
 	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
 	shhtransp "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
+	"github.com/status-im/status-go/services/mailservers"
 )
 
 type chatContext string
@@ -98,6 +99,7 @@ type Messenger struct {
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
 	account                    *multiaccounts.Account
+	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
 
 	mutex sync.Mutex
@@ -298,10 +300,10 @@ func NewMessenger(
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
+		mailserversDatabase:        c.mailserversDatabase,
 		account:                    c.account,
 		quit:                       make(chan struct{}),
 		shutdownTasks: []func() error{
-			database.Close,
 			pushNotificationClient.Stop,
 			communitiesManager.Stop,
 			encryptionProtocol.Stop,
@@ -311,6 +313,7 @@ func NewMessenger(
 			// Currently this often fails, seems like it's safe to ignore them
 			// https://github.com/uber-go/zap/issues/328
 			func() error { _ = logger.Sync; return nil },
+			database.Close,
 		},
 		logger: logger,
 	}
@@ -392,12 +395,12 @@ func (m *Messenger) resendExpiredEmojiReactions() error {
 	return nil
 }
 
-func (m *Messenger) Start() error {
+func (m *Messenger) Start() (*MessengerResponse, error) {
 	m.logger.Info("starting messenger", zap.String("identity", types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))))
 	// Start push notification server
 	if m.pushNotificationServer != nil {
 		if err := m.pushNotificationServer.Start(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -406,7 +409,7 @@ func (m *Messenger) Start() error {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -415,13 +418,13 @@ func (m *Messenger) Start() error {
 
 	subscriptions, err := m.encryptor.Start(m.identity)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// handle stored shared secrets
 	err = m.handleSharedSecrets(subscriptions.SharedSecrets)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	m.handleEncryptionLayerSubscriptions(subscriptions)
@@ -430,7 +433,49 @@ func (m *Messenger) Start() error {
 	m.watchConnectionChange()
 	m.watchExpiredEmojis()
 	m.watchIdentityImageChanges()
-	return nil
+	if err := m.cleanTopics(); err != nil {
+		return nil, err
+	}
+	response := &MessengerResponse{Filters: m.transport.Filters()}
+
+	if m.mailserversDatabase != nil {
+		mailserverTopics, err := m.mailserversDatabase.Topics()
+		if err != nil {
+			return nil, err
+		}
+		response.MailserverTopics = mailserverTopics
+
+		mailserverRanges, err := m.mailserversDatabase.ChatRequestRanges()
+		if err != nil {
+			return nil, err
+		}
+		response.MailserverRanges = mailserverRanges
+
+		mailservers, err := m.mailserversDatabase.Mailservers()
+		if err != nil {
+			return nil, err
+		}
+		response.Mailservers = mailservers
+
+	}
+	return response, nil
+}
+
+// cleanTopics remove any topic that does not have a Listen flag set
+func (m *Messenger) cleanTopics() error {
+	if m.mailserversDatabase == nil {
+		return nil
+	}
+	var filters []*transport.Filter
+	for _, f := range m.transport.Filters() {
+		if f.Listen && !f.Ephemeral {
+			filters = append(filters, f)
+		}
+	}
+
+	m.logger.Debug("keeping topics", zap.Any("filters", filters))
+
+	return m.mailserversDatabase.SetTopics(filters)
 }
 
 // handle connection change is called each time we go from offline/online or viceversa
@@ -1033,8 +1078,12 @@ func (m *Messenger) Init() error {
 
 // Shutdown takes care of ensuring a clean shutdown of Messenger
 func (m *Messenger) Shutdown() (err error) {
-	for _, task := range m.shutdownTasks {
+	close(m.quit)
+
+	for i, task := range m.shutdownTasks {
+		m.logger.Debug("running shutdown task", zap.Int("n", i))
 		if tErr := task(); tErr != nil {
+			m.logger.Info("shutdown task failed", zap.Error(tErr))
 			if err == nil {
 				// First error appeared.
 				err = tErr
@@ -1045,7 +1094,6 @@ func (m *Messenger) Shutdown() (err error) {
 			}
 		}
 	}
-	close(m.quit)
 	return
 }
 
@@ -2271,8 +2319,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 	case ChatTypePrivateGroupChat:
 		logger.Debug("sending group message", zap.String("chatName", chat.Name))
 		if spec.Recipients == nil {
-			// Chat messages are only dispatched to users who joined
-			if spec.MessageType == protobuf.ApplicationMetadataMessage_CHAT_MESSAGE {
+			// Anything that is not a membership update message is only dispatched to joined users
+			// NOTE: I think here it might make sense to always invite to joined users apart from the
+			// initial message
+			if spec.MessageType != protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE {
 				spec.Recipients, err = chat.JoinedMembersAsPublicKeys()
 				if err != nil {
 					return nil, err
@@ -2285,6 +2335,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 				}
 			}
 		}
+
 		hasPairedDevices := m.hasPairedDevices()
 
 		if !hasPairedDevices {
@@ -2299,8 +2350,10 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 			spec.Recipients = spec.Recipients[:n]
 		}
 
-		spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
-		// We always wrap in group information
+		// We skip wrapping in some cases (emoji reactions for example)
+		if !spec.SkipGroupMessageWrap {
+			spec.MessageType = protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE
+		}
 		id, err = m.processor.SendGroup(ctx, spec.Recipients, spec)
 		if err != nil {
 			return nil, err
@@ -4390,9 +4443,10 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	}
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chatID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		LocalChatID:          chatID,
+		Payload:              encodedMessage,
+		SkipGroupMessageWrap: true,
+		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
 		ResendAutomatically: false,
@@ -4467,9 +4521,10 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 
 	// Send the marshalled EmojiReactionRetraction protobuf
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: emojiR.GetChatId(),
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
+		LocalChatID:          emojiR.GetChatId(),
+		Payload:              encodedMessage,
+		SkipGroupMessageWrap: true,
+		MessageType:          protobuf.ApplicationMetadataMessage_EMOJI_REACTION,
 		// Don't resend using datasync, that would create quite a lot
 		// of traffic if clicking too eagelry
 		ResendAutomatically: false,
@@ -4524,15 +4579,22 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 	case ChatTypePrivateGroupChat:
 		message.SetMessageType(protobuf.MessageType_PRIVATE_GROUP)
 		l.Debug("sending group message", zap.String("chatName", chat.Name))
+		if !message.WrapGroupMessage() {
+			encodedMessage, err = proto.Marshal(message.GetProtobuf())
+			if err != nil {
+				return nil, err
+			}
+		} else {
 
-		group, err := newProtocolGroupFromChat(chat)
-		if err != nil {
-			return nil, err
-		}
+			group, err := newProtocolGroupFromChat(chat)
+			if err != nil {
+				return nil, err
+			}
 
-		encodedMessage, err = m.processor.EncodeMembershipUpdate(group, message)
-		if err != nil {
-			return nil, err
+			encodedMessage, err = m.processor.EncodeAbridgedMembershipUpdate(group, message)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 	default:

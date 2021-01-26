@@ -11,6 +11,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
+	"github.com/status-im/status-go/services/mailservers"
 )
 
 type config struct {
@@ -28,10 +29,11 @@ type config struct {
 
 	// A path to a database or a database instance is required.
 	// The database instance has a higher priority.
-	dbConfig     dbConfig
-	db           *sql.DB
-	multiAccount *multiaccounts.Database
-	account      *multiaccounts.Account
+	dbConfig            dbConfig
+	db                  *sql.DB
+	multiAccount        *multiaccounts.Database
+	mailserversDatabase *mailservers.Database
+	account             *multiaccounts.Account
 
 	verifyTransactionClient EthClient
 
@@ -90,6 +92,13 @@ func WithDatabase(db *sql.DB) Option {
 func WithMultiAccounts(ma *multiaccounts.Database) Option {
 	return func(c *config) error {
 		c.multiAccount = ma
+		return nil
+	}
+}
+
+func WithMailserversDatabase(ma *mailservers.Database) Option {
+	return func(c *config) error {
+		c.mailserversDatabase = ma
 		return nil
 	}
 }

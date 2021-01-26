@@ -15,7 +15,7 @@ import (
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/t/utils"
 	"github.com/status-im/status-go/transactions"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 // StatusNodeTestSuite defines a test suite with StatusNode.

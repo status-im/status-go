@@ -120,7 +120,7 @@ func TestTransactionNotification(t *testing.T) {
 
 	require.NoError(t, utils.Eventually(func() error {
 		if signalEvent == nil {
-			return fmt.Errorf("signal was not handled")
+			return fmt.Errorf("Signal was not handled")
 		}
 		notification := struct {
 			Type  string
@@ -130,10 +130,10 @@ func TestTransactionNotification(t *testing.T) {
 		require.NoError(t, json.Unmarshal(signalEvent, &notification))
 
 		if notification.Type != "local-notifications" {
-			return fmt.Errorf("wrong signal was sent")
+			return fmt.Errorf("Wrong signal was sent")
 		}
-		if notification.Event.Body.(*notificationBody).To != header.Address {
-			return fmt.Errorf("transaction to address is wrong")
+		if notification.Event.Body.To != header.Address {
+			return fmt.Errorf("Transaction to address is wrong")
 		}
 		return nil
 	}, 2*time.Second, 100*time.Millisecond))

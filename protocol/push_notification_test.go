@@ -52,7 +52,8 @@ func (s *MessengerPushNotificationSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
-	s.Require().NoError(s.m.Start())
+	_, err := s.m.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerPushNotificationSuite) TearDownTest() {
@@ -97,7 +98,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
-	s.Require().NoError(alice.Start())
+	_, err = alice.Start()
+	s.Require().NoError(err)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob1.installationID, bob2.installationID}
 
@@ -124,6 +126,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob1.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -155,6 +166,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotification() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob2.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -262,7 +282,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable push notifications
-	s.Require().NoError(alice.Start())
+	_, err = alice.Start()
+	s.Require().NoError(err)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -304,6 +325,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -395,9 +425,11 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 	alice := s.newMessenger(s.shh)
 	// another contact to invalidate the token
 	frank := s.newMessenger(s.shh)
-	s.Require().NoError(frank.Start())
+	_, err = frank.Start()
+	s.Require().NoError(err)
 	// start alice and enable push notifications
-	s.Require().NoError(alice.Start())
+	_, err = alice.Start()
+	s.Require().NoError(err)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -449,6 +481,15 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -611,7 +652,8 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
-	s.Require().NoError(alice.Start())
+	_, err = alice.Start()
+	s.Require().NoError(err)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 
 	// Register bob1
@@ -637,6 +679,15 @@ func (s *MessengerPushNotificationSuite) TestContactCode() {
 		if !registered {
 			return errors.New("not registered")
 		}
+		bobServers, err := bob1.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it
@@ -662,7 +713,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 
 	alice := s.newMessenger(s.shh)
 	// start alice and enable sending push notifications
-	s.Require().NoError(alice.Start())
+	_, err = alice.Start()
+	s.Require().NoError(err)
 	s.Require().NoError(alice.EnableSendingPushNotifications())
 	bobInstallationIDs := []string{bob.installationID}
 
@@ -703,6 +755,16 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 		if !registered {
 			return errors.New("not registered")
 		}
+
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
 		return nil
 	})
 	// Make sure we receive it

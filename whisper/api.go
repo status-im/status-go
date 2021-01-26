@@ -317,12 +317,12 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (hexutil.
 
 // UninstallFilter is alias for Unsubscribe
 func (api *PublicWhisperAPI) UninstallFilter(id string) {
-	api.w.Unsubscribe(id)
+	_ = api.w.Unsubscribe(id)
 }
 
 // Unsubscribe disables and removes an existing filter.
 func (api *PublicWhisperAPI) Unsubscribe(id string) {
-	api.w.Unsubscribe(id)
+	_ = api.w.Unsubscribe(id)
 }
 
 //go:generate gencodec -type Criteria -field-override criteriaOverride -out gen_criteria_json.go
@@ -427,10 +427,10 @@ func (api *PublicWhisperAPI) Messages(ctx context.Context, crit Criteria) (*rpc.
 					}
 				}
 			case <-rpcSub.Err():
-				api.w.Unsubscribe(id)
+				_ = api.w.Unsubscribe(id)
 				return
 			case <-notifier.Closed():
-				api.w.Unsubscribe(id)
+				_ = api.w.Unsubscribe(id)
 				return
 			}
 		}

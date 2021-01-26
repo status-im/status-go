@@ -16,7 +16,7 @@ import (
 
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/t/helpers"
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 type TopicPoolSuite struct {

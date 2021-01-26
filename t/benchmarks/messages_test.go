@@ -10,7 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/node"
 
-	"github.com/status-im/status-go/whisper/v6"
+	"github.com/status-im/status-go/whisper"
 )
 
 // TestSendMessages sends messages to a peer.

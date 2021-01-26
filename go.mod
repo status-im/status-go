@@ -63,7 +63,6 @@ require (
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/extkeys v1.1.2
-	github.com/status-im/status-go/whisper/v6 v6.2.6
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.5.1
 	github.com/syndtr/goleveldb v1.0.0
@@ -74,6 +73,7 @@ require (
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/text v0.3.3 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	golang.org/x/tools v0.0.0-20200211045251-2de505fc5306 // indirect

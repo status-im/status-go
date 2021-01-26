@@ -41,7 +41,8 @@ func (s *MessengerMuteSuite) SetupTest() {
 
 	s.m = s.newMessenger(s.shh)
 	s.privateKey = s.m.identity
-	s.Require().NoError(s.m.Start())
+	_, err := s.m.Start()
+	s.Require().NoError(err)
 }
 
 func (s *MessengerMuteSuite) TearDownTest() {
