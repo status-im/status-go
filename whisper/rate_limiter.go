@@ -124,8 +124,13 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 		for {
 			packet, err := rw.ReadMsg()
 			if err != nil {
-				errC <- fmt.Errorf("failed to read packet: %v", err)
-				return
+				// We don't block as that might leak goroutines
+				select {
+				case errC <- fmt.Errorf("failed to read packet: %v", err):
+					return
+				default:
+					return
+				}
 			}
 
 			rateLimitsProcessed.Inc()
@@ -137,8 +142,13 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttleIP(ip); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedIPLimit(); err != nil {
-						errC <- fmt.Errorf("exceed rate limit by IP: %v", err)
-						return
+						// We don't block as that might leak goroutines
+						select {
+						case errC <- fmt.Errorf("exceed rate limit by IP: %v", err):
+							return
+						default:
+							return
+						}
 					}
 				}
 			}
@@ -150,15 +160,25 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 			if halted := r.throttlePeer(peerID); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedPeerLimit(); err != nil {
-						errC <- fmt.Errorf("exceeded rate limit by peer: %v", err)
-						return
+						// We don't block as that might leak goroutines
+						select {
+						case errC <- fmt.Errorf("exceeded rate limit by peer: %v", err):
+							return
+						default:
+							return
+						}
 					}
 				}
 			}
 
 			if err := in.WriteMsg(packet); err != nil {
-				errC <- fmt.Errorf("failed to write packet to pipe: %v", err)
-				return
+				// We don't block as that might leak goroutines
+				select {
+				case errC <- fmt.Errorf("failed to write packet to pipe: %v", err):
+					return
+				default:
+					return
+				}
 			}
 		}
 	}()
@@ -168,18 +188,35 @@ func (r *PeerRateLimiter) decorate(p *Peer, rw p2p.MsgReadWriter, runLoop runLoo
 		for {
 			packet, err := in.ReadMsg()
 			if err != nil {
-				errC <- fmt.Errorf("failed to read packet from pipe: %v", err)
-				return
+				// We don't block as that might leak goroutines
+				select {
+				case errC <- fmt.Errorf("failed to read packet from pipe: %v", err):
+					return
+				default:
+					return
+				}
 			}
 			if err := rw.WriteMsg(packet); err != nil {
-				errC <- fmt.Errorf("failed to write packet: %v", err)
-				return
+				// We don't block as that might leak goroutines
+				select {
+				case errC <- fmt.Errorf("failed to write packet: %v", err):
+					return
+				default:
+					return
+				}
 			}
 		}
 	}()
 
 	go func() {
-		errC <- runLoop(p, out)
+		// We don't block as that might leak goroutines
+		select {
+		case errC <- runLoop(p, out):
+			return
+		default:
+			return
+		}
+
 	}()
 
 	return <-errC

@@ -161,7 +161,11 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 	in, out := p2p.MsgPipe()
 	defer func() {
 		if err := in.Close(); err != nil {
-			errC <- err
+			// Don't block as otherwise we might leak go routines
+			select {
+			case errC <- err:
+			default:
+			}
 		}
 	}()
 	defer func() {
@@ -175,8 +179,13 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 		for {
 			packet, err := rw.ReadMsg()
 			if err != nil {
-				errC <- fmt.Errorf("failed to read packet: %v", err)
-				return
+				// Don't block as otherwise we might leak go routines
+				select {
+				case errC <- fmt.Errorf("failed to read packet: %v", err):
+					return
+				default:
+					return
+				}
 			}
 
 			RateLimitsProcessed.Inc()
@@ -190,8 +199,14 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 			if halted := r.throttleIP(ip, packet.Size); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedIPLimit(); err != nil {
-						errC <- fmt.Errorf("exceed rate limit by IP: %v", err)
-						return
+						// Don't block as otherwise we might leak go routines
+						select {
+
+						case errC <- fmt.Errorf("exceed rate limit by IP: %v", err):
+							return
+						default:
+							return
+						}
 					}
 				}
 			}
@@ -203,15 +218,25 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 			if halted := r.throttlePeer(peerID, packet.Size); halted {
 				for _, h := range r.handlers {
 					if err := h.ExceedPeerLimit(); err != nil {
-						errC <- fmt.Errorf("exceeded rate limit by peer: %v", err)
-						return
+						// Don't block as otherwise we might leak go routines
+						select {
+						case errC <- fmt.Errorf("exceeded rate limit by peer: %v", err):
+							return
+						default:
+							return
+						}
 					}
 				}
 			}
 
 			if err := in.WriteMsg(packet); err != nil {
-				errC <- fmt.Errorf("failed to write packet to pipe: %v", err)
-				return
+				// Don't block as otherwise we might leak go routines
+				select {
+				case errC <- fmt.Errorf("failed to write packet to pipe: %v", err):
+					return
+				default:
+					return
+				}
 			}
 		}
 	}()
@@ -221,18 +246,34 @@ func (r *PeerRateLimiter) Decorate(p RateLimiterPeer, rw p2p.MsgReadWriter, runL
 		for {
 			packet, err := in.ReadMsg()
 			if err != nil {
-				errC <- fmt.Errorf("failed to read packet from pipe: %v", err)
-				return
+				// Don't block as otherwise we might leak go routines
+				select {
+				case errC <- fmt.Errorf("failed to read packet from pipe: %v", err):
+					return
+				default:
+					return
+				}
 			}
 			if err := rw.WriteMsg(packet); err != nil {
-				errC <- fmt.Errorf("failed to write packet: %v", err)
-				return
+				// Don't block as otherwise we might leak go routines
+				select {
+				case errC <- fmt.Errorf("failed to write packet: %v", err):
+					return
+				default:
+					return
+				}
 			}
 		}
 	}()
 
 	go func() {
-		errC <- runLoop(out)
+		// Don't block as otherwise we might leak go routines
+		select {
+		case errC <- runLoop(out):
+			return
+		default:
+			return
+		}
 	}()
 
 	return <-errC
