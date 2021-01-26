@@ -483,6 +483,16 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	// Add to response
 	state.Response.Messages = append(state.Response.Messages, receivedMessage)
 
+	// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
+	state.Response.Notifications = append(
+		state.Response.Notifications,
+		MessageNotificationBody{
+			Message: receivedMessage,
+			Contact: contact,
+			Chat:    chat,
+		},
+	)
+
 	return nil
 }
 
