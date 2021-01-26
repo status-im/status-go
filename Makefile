@@ -1,7 +1,7 @@
 .PHONY: statusgo statusd-prune all test clean help
 .PHONY: statusgo-android statusgo-ios
 
-RELEASE_TAG := $(shell cat VERSION)
+RELEASE_TAG := v$(shell cat VERSION)
 RELEASE_BRANCH := develop
 RELEASE_DIR := /tmp/release-$(RELEASE_TAG)
 PRE_RELEASE := "1"
@@ -35,11 +35,11 @@ AUTHOR = $(shell echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
-	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT) \
 	-X github.com/status-im/status-go/vendor/github.com/ethereum/go-ethereum/metrics.EnabledStr=$(ENABLE_METRICS)'")
 BUILD_FLAGS_MOBILE ?= $(shell echo "-ldflags='\
-	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG) \
+	-X github.com/status-im/status-go/params.Version=$(RELEASE_TAG:v%=%) \
 	-X github.com/status-im/status-go/params.GitCommit=$(GIT_COMMIT)'")
 
 networkid ?= StatusChain
@@ -151,7 +151,7 @@ docker-image: ##@docker Build docker image (use DOCKER_IMAGE_NAME to set the ima
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
-		-t $(DOCKER_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(DOCKER_IMAGE_NAME):latest
 
 bootnode-image:
@@ -161,7 +161,7 @@ bootnode-image:
 		--build-arg "build_flags=$(BUILD_FLAGS)" \
 		--label "commit=$(GIT_COMMIT)" \
 		--label "author=$(AUTHOR)" \
-		-t $(BOOTNODE_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG) \
+		-t $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG) \
 		-t $(BOOTNODE_IMAGE_NAME):latest
 
 push-docker-images: docker-image bootnode-image
@@ -186,8 +186,8 @@ ifneq ("$(GIT_LOCAL)", "$(GIT_REMOTE)")
 	$(error The local git commit does not match the remote origin!)
 	exit 1
 endif
-	docker push $(BOOTNODE_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG)
-	docker push $(DOCKER_IMAGE_NAME):v$(DOCKER_IMAGE_CUSTOM_TAG)
+	docker push $(BOOTNODE_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
+	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_CUSTOM_TAG)
 
 install-os-dependencies:
 	_assets/scripts/install_deps.sh
@@ -225,8 +225,8 @@ lint-fix:
 	$(MAKE) vendor
 
 check-existing-release:
-	@git ls-remote --exit-code origin "v$(RELEASE_TAG)" >/dev/null || exit 0; \
-	echo "$(YELLOW)Release tag already exists: v$(RELEASE_TAG)$(RESET)"; \
+	@git ls-remote --exit-code origin "$(RELEASE_TAG)" >/dev/null || exit 0; \
+	echo "$(YELLOW)Release tag already exists: $(RELEASE_TAG)$(RESET)"; \
 	echo "Remove the tag/release if you want to re-create it."; \
 	exit 1;
 
@@ -240,7 +240,7 @@ release: check-existing-release
 		github-release \
 			$(shell if [ $(PRE_RELEASE) != "0" ] ; then echo "-prerelease" ; fi) \
 			"status-im/status-go" \
-			"v$(RELEASE_TAG)" \
+			"$(RELEASE_TAG)" \
 			"$(RELEASE_BRANCH)" \
 			"$(changelog)" \
 			"$(RELEASE_DIR)/*" ; \
