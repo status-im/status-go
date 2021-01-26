@@ -199,7 +199,7 @@ github.com/kilic/bls12-381
 github.com/koron/go-ssdp
 # github.com/leodido/go-urn v1.2.0
 github.com/leodido/go-urn
-# github.com/lib/pq v1.3.0
+# github.com/lib/pq v1.9.0
 github.com/lib/pq
 github.com/lib/pq/oid
 github.com/lib/pq/scram

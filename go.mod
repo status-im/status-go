@@ -31,7 +31,7 @@ require (
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
 	github.com/kilic/bls12-381 v0.0.0-20200607163746-32e1441c8a9f
 	github.com/leodido/go-urn v1.2.0 // indirect
-	github.com/lib/pq v1.3.0
+	github.com/lib/pq v1.9.0
 	github.com/libp2p/go-libp2p v0.4.2 // indirect
 	github.com/libp2p/go-libp2p-core v0.2.4
 	github.com/lucasb-eyer/go-colorful v1.0.3
