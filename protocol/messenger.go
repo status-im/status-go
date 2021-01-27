@@ -3292,7 +3292,11 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		for _, contact := range m.allContacts {
+		contacts, err := m.persistence.Contacts()
+		if err != nil {
+			return nil, "", err
+		}
+		for _, contact := range contacts {
 			if contact.IsAdded() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
