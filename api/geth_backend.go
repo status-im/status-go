@@ -628,6 +628,13 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	}); err != nil {
 		return
 	}
+	if config.WalletConfig.Enabled {
+		walletService, err := b.statusNode.WalletService()
+		if err != nil {
+			return err
+		}
+		walletService.SetClient(b.statusNode.RPCClient().Ethclient())
+	}
 	signal.SendNodeStarted()
 
 	b.transactor.SetNetworkID(config.NetworkID)

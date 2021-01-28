@@ -51,6 +51,11 @@ func (s *Service) GetFeed() *event.Feed {
 	return s.feed
 }
 
+// SetClient sets ethclient
+func (s *Service) SetClient(client *ethclient.Client) {
+	s.client = client
+}
+
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
 func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int, watchNewBlocks bool) error {
 	reactor := NewReactor(s.db, s.feed, client, chain, watchNewBlocks)
