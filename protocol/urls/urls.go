@@ -85,7 +85,7 @@ func GetURLContent(url string) (data []byte, err error) {
 	// nolint: gosec
 	response, err := httpClient.Get(url)
 	if err != nil {
-		return data, fmt.Errorf("Can't get content from link %s", url)
+		return data, fmt.Errorf("can't get content from link %s", url)
 	}
 	defer response.Body.Close()
 	return ioutil.ReadAll(response.Body)
@@ -96,12 +96,12 @@ func GetYoutubeOembed(url string) (data YoutubeOembedData, err error) {
 
 	jsonBytes, err := GetURLContent(oembedLink)
 	if err != nil {
-		return data, fmt.Errorf("Can't get bytes from youtube oembed response on %s link", oembedLink)
+		return data, fmt.Errorf("can't get bytes from youtube oembed response on %s link", oembedLink)
 	}
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("Can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json")
 	}
 
 	return data, nil
@@ -125,12 +125,12 @@ func GetGithubPreviewData(link string) (previewData LinkPreviewData, err error) 
 	res, err := httpClient.Get(link)
 
 	if err != nil {
-		return previewData, fmt.Errorf("Can't get content from link %s", link)
+		return previewData, fmt.Errorf("can't get content from link %s", link)
 	}
 
 	err = metabolize.Metabolize(res.Body, &previewData)
 	if err != nil {
-		return previewData, fmt.Errorf("Can't get meta info from link %s", link)
+		return previewData, fmt.Errorf("can't get meta info from link %s", link)
 	}
 
 	return previewData, nil
@@ -142,12 +142,12 @@ func GetGiphyOembed(url string) (data GiphyOembedData, err error) {
 	jsonBytes, err := GetURLContent(oembedLink)
 
 	if err != nil {
-		return data, fmt.Errorf("Can't get bytes from Giphy oembed response at %s", oembedLink)
+		return data, fmt.Errorf("can't get bytes from Giphy oembed response at %s", oembedLink)
 	}
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("Can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json")
 	}
 
 	return data, nil
@@ -172,12 +172,12 @@ func GetTenorOembed(url string) (data TenorOembedData, err error) {
 	jsonBytes, err := GetURLContent(oembedLink)
 
 	if err != nil {
-		return data, fmt.Errorf("Can't get bytes from Tenor oembed response at %s", oembedLink)
+		return data, fmt.Errorf("can't get bytes from Tenor oembed response at %s", oembedLink)
 	}
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("Can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json")
 	}
 
 	return data, nil
@@ -199,7 +199,7 @@ func GetTenorPreviewData(link string) (previewData LinkPreviewData, err error) {
 func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	url, err := url.Parse(link)
 	if err != nil {
-		return previewData, fmt.Errorf("Cant't parse link %s", link)
+		return previewData, fmt.Errorf("cant't parse link %s", link)
 	}
 
 	hostname := strings.ToLower(url.Hostname())
@@ -214,6 +214,6 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	case "tenor.com":
 		return GetTenorPreviewData(link)
 	default:
-		return previewData, fmt.Errorf("Link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
+		return previewData, fmt.Errorf("link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 	}
 }
