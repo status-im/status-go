@@ -48,7 +48,7 @@ var (
 		Help: "Time it takes to deliver messages to a Whisper peer.",
 	})
 	archivedErrorsCounter = prom.NewCounterVec(prom.CounterOpts{
-		Name: "mailserver_archived_envelopes_falures_total",
+		Name: "mailserver_archived_envelopes_failures_total",
 		Help: "Number of failures storing a Whisper envelope.",
 	}, []string{"db"})
 	archivedEnvelopesGauge = prom.NewGaugeVec(prom.GaugeOpts{
