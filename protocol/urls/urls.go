@@ -60,6 +60,11 @@ var httpClient = http.Client{
 func LinkPreviewWhitelist() []Site {
 	return []Site{
 		Site{
+			Title:     "Status",
+			Address:   "our.status.im",
+			ImageSite: false,
+		},
+		Site{
 			Title:     "YouTube",
 			Address:   "youtube.com",
 			ImageSite: false,
@@ -92,6 +97,11 @@ func LinkPreviewWhitelist() []Site {
 		Site{
 			Title:     "GitHub",
 			Address:   "github.com",
+			ImageSite: false,
+		},
+		Site{
+			Title:     "Medium",
+			Address:   "medium.com",
 			ImageSite: false,
 		},
 	}
@@ -136,7 +146,7 @@ func GetYoutubePreviewData(link string) (previewData LinkPreviewData, err error)
 	return previewData, nil
 }
 
-func GetGithubPreviewData(link string) (previewData LinkPreviewData, err error) {
+func GetGenericLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	// nolint: gosec
 	res, err := httpClient.Get(link)
 
@@ -256,8 +266,8 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	switch hostname {
 	case "youtube.com", "youtu.be", "www.youtube.com":
 		return GetYoutubePreviewData(link)
-	case "github.com":
-		return GetGithubPreviewData(link)
+	case "github.com", "our.status.im", "medium.com":
+		return GetGenericLinkPreviewData(link)
 	case "giphy.com", "media.giphy.com":
 		return GetGiphyPreviewData(link)
 	case "gph.is":
