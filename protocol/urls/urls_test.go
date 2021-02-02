@@ -119,3 +119,33 @@ func TestGetTenorPreviewData(t *testing.T) {
 	_, err = GetTenorPreviewData(invalidTenorLink)
 	require.Error(t, err)
 }
+
+func TestStatusLinkPreviewData(t *testing.T) {
+
+	statusSecurityAudit := LinkPreviewData{
+		Site:         "Our Status",
+		Title:        "What is a Security Audit, When You Should Get One, and How to Prepare.",
+		ThumbnailURL: "https://our.status.im/content/images/2021/02/Security-Audit-Header.png",
+	}
+
+	previewData, err := GetLinkPreviewData("https://our.status.im/what-is-a-security-audit-when-you-should-get-one-and-how-to-prepare/")
+	require.NoError(t, err)
+	require.Equal(t, statusSecurityAudit.Site, previewData.Site)
+	require.Equal(t, statusSecurityAudit.Title, previewData.Title)
+	require.Equal(t, statusSecurityAudit.ThumbnailURL, previewData.ThumbnailURL)
+}
+
+func TestMediumLinkPreviewData(t *testing.T) {
+
+	statusSecurityAudit := LinkPreviewData{
+		Site:         "Medium",
+		Title:        "A Look at the Status.im ICO Token Distribution",
+		ThumbnailURL: "https://miro.medium.com/max/700/1*Smc0y_TOL1XsofS1wxa3rg.jpeg",
+	}
+
+	previewData, err := GetLinkPreviewData("https://medium.com/the-bitcoin-podcast-blog/a-look-at-the-status-im-ico-token-distribution-f5bcf7f00907")
+	require.NoError(t, err)
+	require.Equal(t, statusSecurityAudit.Site, previewData.Site)
+	require.Equal(t, statusSecurityAudit.Title, previewData.Title)
+	require.Equal(t, statusSecurityAudit.ThumbnailURL, previewData.ThumbnailURL)
+}
