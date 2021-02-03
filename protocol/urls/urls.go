@@ -74,6 +74,11 @@ func LinkPreviewWhitelist() []Site {
 			ImageSite: true,
 		},
 		Site{
+			Title:     "GIPHY GIFs subdomain",
+			Address:   "media.giphy.com",
+			ImageSite: true,
+		},
+		Site{
 			Title:     "GitHub",
 			Address:   "github.com",
 			ImageSite: false,
