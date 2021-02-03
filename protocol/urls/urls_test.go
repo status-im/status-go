@@ -58,14 +58,41 @@ func TestGetGiphyPreviewData(t *testing.T) {
 	require.Error(t, err)
 
 
-	// Other link shapes
-	// shortLink := "https://gph.is/g/aXLyK7P"
 	mediaLink := "https://media.giphy.com/media/lcG3qwtTKSNI2i5vst/giphy.gif"
 
-	// shortLinkData, _ := GetGiphyPreviewData(shortLink)
 	mediaLinkData, _ := GetGiphyPreviewData(mediaLink)
 
 	require.Equal(t, thumbnailUrlWithoutSubdomain(mediaLinkData.ThumbnailURL), thumbnailUrlWithoutSubdomain(previewData.ThumbnailURL))
+}
+
+func TestGetGiphyLongURL(t *testing.T) {
+	shortURL := "https://gph.is/g/aXLyK7P"
+	computedLongURL, _ := GetGiphyLongURL(shortURL)
+	actualLongURL := "https://giphy.com/gifs/FullMag-robot-boston-dynamics-dance-lcG3qwtTKSNI2i5vst"
+
+	require.Equal(t, computedLongURL, actualLongURL)
+
+	_, err := GetGiphyLongURL("http://this-giphy-site-doesn-not-exist.se/bogus-url")
+	require.Error(t, err)
+
+	_, err = GetGiphyLongURL("http://gph.se/bogus-url-but-correct-domain")
+	require.Error(t, err)
+}
+
+
+func TestGetGiphyShortURLPreviewData(t *testing.T) {
+	shortURL := "https://gph.is/g/aXLyK7P"
+	previewData, err := GetGiphyShortURLPreviewData(shortURL)
+
+	bostonDynamicsEthGifData := LinkPreviewData{
+		Site:         "GIPHY",
+		Title:        "Boston Dynamics Yes GIF by FullMag - Find & Share on GIPHY",
+		ThumbnailURL: "https://media1.giphy.com/media/lcG3qwtTKSNI2i5vst/giphy.gif",
+	}
+
+	require.NoError(t, err)
+	require.Equal(t, bostonDynamicsEthGifData.Site, previewData.Site)
+	require.Equal(t, bostonDynamicsEthGifData.Title, previewData.Title)
 }
 
 func TestGetTenorPreviewData(t *testing.T) {
