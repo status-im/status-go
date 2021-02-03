@@ -74,7 +74,7 @@ func TestGetGiphyLongURL(t *testing.T) {
 	_, err := GetGiphyLongURL("http://this-giphy-site-doesn-not-exist.se/bogus-url")
 	require.Error(t, err)
 
-	_, err = GetGiphyLongURL("http://gph.se/bogus-url-but-correct-domain")
+	_, err = GetGiphyLongURL("http://gph.is/bogus-url-but-correct-domain")
 	require.Error(t, err)
 }
 
