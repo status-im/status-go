@@ -179,6 +179,7 @@ func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 // Giphy has a shortener service called gph.se, the oembed service doesn't work with shortened urls,
 // so we need to fetch the long url first
 func GetGiphyLongURL(shortURL string) (longURL string, err error) {
+	// nolint: gosec
 	res, err := http.Get(shortURL)
 
 	if err != nil {
@@ -186,22 +187,22 @@ func GetGiphyLongURL(shortURL string) (longURL string, err error) {
 	}
 
 	canonicalURL := res.Request.URL.String()
-	if (canonicalURL == shortURL) {
+	if canonicalURL == shortURL {
 		// no redirect, ie. not a valid url
 		return longURL, fmt.Errorf("unable to process Giphy's short url at %s", shortURL)
-	} else {
-		return canonicalURL, err
 	}
+
+	return canonicalURL, err
 }
 
-func GetGiphyShortURLPreviewData (shortURL string) (data LinkPreviewData, err error) {
+func GetGiphyShortURLPreviewData(shortURL string) (data LinkPreviewData, err error) {
 	longURL, err := GetGiphyLongURL(shortURL)
 
 	if err != nil {
 		return data, err
-	} else {
-		return GetGiphyPreviewData(longURL)
 	}
+
+	return GetGiphyPreviewData(longURL)
 }
 
 func GetTenorOembed(url string) (data TenorOembedData, err error) {
