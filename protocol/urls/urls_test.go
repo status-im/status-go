@@ -32,6 +32,11 @@ func TestGetLinkPreviewData(t *testing.T) {
 
 }
 
+// split at "." and ignore the first item
+func thumbnailUrlWithoutSubdomain(url string) []string {
+	return strings.Split(url, ".")[1:]
+}
+
 func TestGetGiphyPreviewData(t *testing.T) {
 	validGiphyLink := "https://giphy.com/gifs/FullMag-robot-boston-dynamics-dance-lcG3qwtTKSNI2i5vst"
 	previewData, err := GetGiphyPreviewData(validGiphyLink)
@@ -46,11 +51,21 @@ func TestGetGiphyPreviewData(t *testing.T) {
 
 	// Giphy oembed returns links to different servers: https://media1.giphy.com, https://media2.giphy.com and so on
 	// We don't care about the server as long as other parts are equal, so we split at "." and ignore the first item
-	require.Equal(t, strings.Split(bostonDynamicsEthGifData.ThumbnailURL, ".")[1:], strings.Split(previewData.ThumbnailURL, ".")[1:])
+	require.Equal(t, thumbnailUrlWithoutSubdomain(bostonDynamicsEthGifData.ThumbnailURL), thumbnailUrlWithoutSubdomain(previewData.ThumbnailURL))
 
 	invalidGiphyLink := "https://giphy.com/gifs/this-gif-does-not-exist-44444"
 	_, err = GetGiphyPreviewData(invalidGiphyLink)
 	require.Error(t, err)
+
+
+	// Other link shapes
+	// shortLink := "https://gph.is/g/aXLyK7P"
+	mediaLink := "https://media.giphy.com/media/lcG3qwtTKSNI2i5vst/giphy.gif"
+
+	// shortLinkData, _ := GetGiphyPreviewData(shortLink)
+	mediaLinkData, _ := GetGiphyPreviewData(mediaLink)
+
+	require.Equal(t, thumbnailUrlWithoutSubdomain(mediaLinkData.ThumbnailURL), thumbnailUrlWithoutSubdomain(previewData.ThumbnailURL))
 }
 
 func TestGetTenorPreviewData(t *testing.T) {
