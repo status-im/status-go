@@ -331,6 +331,7 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 			}
 			if !response.IsEmpty() {
 				PublisherSignalHandler{}.NewMessages(response)
+				localnotifications.SendMessageNotifications(response.Notifications)
 			}
 		case <-cancel:
 			cancelVerifyTransaction()

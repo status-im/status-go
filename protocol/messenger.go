@@ -2753,6 +2753,23 @@ type ReceivedMessageState struct {
 	Timesource common.TimeSource
 }
 
+// addNewMessageNotification takes a common.Message and generates a new MessageNotificationBody and appends it to the
+// []Response.Notifications if the message is m.New
+func (r *ReceivedMessageState) addNewMessageNotification(m *common.Message) {
+	if !m.New {
+		return
+	}
+
+	r.Response.Notifications = append(
+		r.Response.Notifications,
+		MessageNotificationBody{
+			Message: m,
+			Contact: r.AllContacts[contactIDFromPublicKey(m.GetSigPubKey())],
+			Chat:    r.AllChats[m.ChatId],
+		},
+	)
+}
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3234,6 +3251,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	for _, message := range messageState.Response.Messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
+
+			// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
+			messageState.addNewMessageNotification(message)
 		}
 	}
 
@@ -4196,6 +4216,18 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		response.Messages = append(response.Messages, message)
 		m.allChats[chat.ID] = chat
 		modifiedChats[chat.ID] = true
+
+		senderPubKey := message.GetSigPubKey()
+		senderID := contactIDFromPublicKey(senderPubKey)
+		contact, err := buildContact(senderID, senderPubKey)
+		if err != nil {
+			return nil, err
+		}
+		response.Notifications = append(response.Notifications, MessageNotificationBody{
+			Message: message,
+			Contact: contact,
+			Chat:    chat,
+		})
 
 	}
 	for id := range modifiedChats {
