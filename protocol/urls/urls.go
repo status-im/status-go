@@ -69,8 +69,8 @@ func LinkPreviewWhitelist() []Site {
 			ImageSite: true,
 		},
 		Site{
-			Title:     "GIPHY GIFs Short URLS",
-			Address:   "gph.se",
+			Title:     "GIPHY GIFs shortener",
+			Address:   "gph.is",
 			ImageSite: true,
 		},
 		Site{
@@ -176,7 +176,7 @@ func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 	return previewData, nil
 }
 
-// Giphy has a shortener service called gph.se, the oembed service doesn't work with shortened urls,
+// Giphy has a shortener service called gph.is, the oembed service doesn't work with shortened urls,
 // so we need to fetch the long url first
 func GetGiphyLongURL(shortURL string) (longURL string, err error) {
 	// nolint: gosec
@@ -250,7 +250,7 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return GetGithubPreviewData(link)
 	case "giphy.com":
 		return GetGiphyPreviewData(link)
-	case "gph.se":
+	case "gph.is":
 		return GetGiphyShortURLPreviewData(link)
 	case "tenor.com":
 		return GetTenorPreviewData(link)
