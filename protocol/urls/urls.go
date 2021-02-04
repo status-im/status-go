@@ -22,12 +22,16 @@ type GiphyOembedData struct {
 	ProviderName string `json:"provider_name"`
 	Title        string `json:"title"`
 	URL          string `json:"url"`
+	Height       int `json:"height"`
+	Width        int  `json:"width"`
 }
 
 type TenorOembedData struct {
 	ProviderName string `json:"provider_name"`
 	ThumbnailURL string `json:"thumbnail_url"`
 	AuthorName   string `json:"author_name"`
+	Height       int `json:"height"`
+	Width        int `json:"width"`
 }
 
 type LinkPreviewData struct {
@@ -35,6 +39,8 @@ type LinkPreviewData struct {
 	Title        string `json:"title" meta:"og:title"`
 	ThumbnailURL string `json:"thumbnailUrl" meta:"og:image"`
 	ContentType  string `json:"contentType"`
+	Height       int `json:"height"`
+	Width        int `json:"width"`
 }
 
 type Site struct {
@@ -172,6 +178,8 @@ func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
 	previewData.Title = oembedData.Title
 	previewData.Site = oembedData.ProviderName
 	previewData.ThumbnailURL = oembedData.URL
+	previewData.Height = oembedData.Height
+	previewData.Width = oembedData.Width
 
 	return previewData, nil
 }
@@ -231,6 +239,8 @@ func GetTenorPreviewData(link string) (previewData LinkPreviewData, err error) {
 	previewData.Title = oembedData.AuthorName // Tenor Oembed service doesn't return title of the Gif
 	previewData.Site = oembedData.ProviderName
 	previewData.ThumbnailURL = oembedData.ThumbnailURL
+	previewData.Height = oembedData.Height
+	previewData.Width = oembedData.Width
 
 	return previewData, nil
 }
@@ -248,7 +258,7 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 		return GetYoutubePreviewData(link)
 	case "github.com":
 		return GetGithubPreviewData(link)
-	case "giphy.com":
+	case "giphy.com", "media.giphy.com":
 		return GetGiphyPreviewData(link)
 	case "gph.is":
 		return GetGiphyShortURLPreviewData(link)
