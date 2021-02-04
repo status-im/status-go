@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/eth-node/crypto"
+	"github.com/status-im/status-go/logutils"
 )
 
 const (
@@ -32,7 +33,7 @@ type Publisher struct {
 
 func New(logger *zap.Logger) *Publisher {
 	if logger == nil {
-		logger = zap.NewNop()
+		logger = logutils.ZapLogger()
 	}
 
 	return &Publisher{
