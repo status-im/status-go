@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/ecdsa"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/status-im/markdown"
 	"github.com/status-im/markdown/ast"
 
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -396,4 +398,34 @@ func (m *Message) SetMessageType(messageType protobuf.MessageType) {
 // WrapGroupMessage indicates whether we should wrap this in membership information
 func (m *Message) WrapGroupMessage() bool {
 	return true
+}
+
+// GetPublicKey attempts to return or recreate the *ecdsa.PublicKey of the Message sender.
+// If the m.SigPubKey is set this will be returned
+// If the m.From is present the string is decoded and unmarshalled into a *ecdsa.PublicKey, the m.SigPubKey is set and returned
+// Else an error is thrown
+// This function differs from GetSigPubKey() as this function may return an error
+func (m *Message) GetSenderPubKey() (*ecdsa.PublicKey, error) {
+	// TODO requires tests
+
+	if m.SigPubKey != nil {
+		return m.SigPubKey, nil
+	}
+
+	if len(m.From) > 0 {
+		fromB, err := hex.DecodeString(m.From[2:])
+		if err != nil {
+			return nil, err
+		}
+
+		senderPubKey, err := crypto.UnmarshalPubkey(fromB)
+		if err != nil {
+			return nil, err
+		}
+
+		m.SigPubKey = senderPubKey
+		return senderPubKey, nil
+	}
+
+	return nil, errors.New("no Message.SigPubKey or Message.From set unable to get public key")
 }

@@ -2755,19 +2755,27 @@ type ReceivedMessageState struct {
 
 // addNewMessageNotification takes a common.Message and generates a new MessageNotificationBody and appends it to the
 // []Response.Notifications if the message is m.New
-func (r *ReceivedMessageState) addNewMessageNotification(m *common.Message) {
+func (r *ReceivedMessageState) addNewMessageNotification(m *common.Message) error {
 	if !m.New {
-		return
+		return nil
 	}
+
+	pubKey, err := m.GetSenderPubKey()
+	if err != nil {
+		return err
+	}
+	contactID := contactIDFromPublicKey(pubKey)
 
 	r.Response.Notifications = append(
 		r.Response.Notifications,
 		MessageNotificationBody{
 			Message: m,
-			Contact: r.AllContacts[contactIDFromPublicKey(m.GetSigPubKey())],
+			Contact: r.AllContacts[contactID],
 			Chat:    r.AllChats[m.ChatId],
 		},
 	)
+
+	return nil
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
@@ -3253,7 +3261,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			message.New = true
 
 			// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
-			messageState.addNewMessageNotification(message)
+			if err = messageState.addNewMessageNotification(message); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -4217,9 +4227,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		m.allChats[chat.ID] = chat
 		modifiedChats[chat.ID] = true
 
-		senderPubKey := message.GetSigPubKey()
-		senderID := contactIDFromPublicKey(senderPubKey)
-		contact, err := buildContact(senderID, senderPubKey)
+		contact, err := buildContactFromMessage(message)
 		if err != nil {
 			return nil, err
 		}
@@ -4638,4 +4646,13 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 	}
 
 	return encodedMessage, nil
+}
+
+func buildContactFromMessage(m *common.Message) (*Contact, error) {
+	senderPubKey, err := m.GetSenderPubKey()
+	if err != nil {
+		return nil, err
+	}
+	senderID := contactIDFromPublicKey(senderPubKey)
+	return buildContact(senderID, senderPubKey)
 }
