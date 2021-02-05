@@ -22,16 +22,16 @@ type GiphyOembedData struct {
 	ProviderName string `json:"provider_name"`
 	Title        string `json:"title"`
 	URL          string `json:"url"`
-	Height       int `json:"height"`
-	Width        int  `json:"width"`
+	Height       int    `json:"height"`
+	Width        int    `json:"width"`
 }
 
 type TenorOembedData struct {
 	ProviderName string `json:"provider_name"`
 	ThumbnailURL string `json:"thumbnail_url"`
 	AuthorName   string `json:"author_name"`
-	Height       int `json:"height"`
-	Width        int `json:"width"`
+	Height       int    `json:"height"`
+	Width        int    `json:"width"`
 }
 
 type LinkPreviewData struct {
@@ -39,8 +39,8 @@ type LinkPreviewData struct {
 	Title        string `json:"title" meta:"og:title"`
 	ThumbnailURL string `json:"thumbnailUrl" meta:"og:image"`
 	ContentType  string `json:"contentType"`
-	Height       int `json:"height"`
-	Width        int `json:"width"`
+	Height       int    `json:"height"`
+	Width        int    `json:"width"`
 }
 
 type Site struct {

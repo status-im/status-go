@@ -44,8 +44,8 @@ func TestGetGiphyPreviewData(t *testing.T) {
 		Site:         "GIPHY",
 		Title:        "Boston Dynamics Yes GIF by FullMag - Find & Share on GIPHY",
 		ThumbnailURL: "https://media1.giphy.com/media/lcG3qwtTKSNI2i5vst/giphy.gif",
-		Height:        480,
-		Width:         480,
+		Height:       480,
+		Width:        480,
 	}
 	require.NoError(t, err)
 	require.Equal(t, bostonDynamicsEthGifData.Site, previewData.Site)
