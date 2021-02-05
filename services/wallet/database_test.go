@@ -255,3 +255,143 @@ func TestPendingTransactions(t *testing.T) {
 	require.Equal(t, 0, len(rst))
 
 }
+
+func TestGetNewRanges(t *testing.T) {
+	ranges := []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(0),
+			to:   big.NewInt(10),
+		},
+		&BlocksRange{
+			from: big.NewInt(10),
+			to:   big.NewInt(20),
+		},
+	}
+
+	n, d := getNewRanges(ranges)
+	require.Equal(t, 1, len(n))
+	newRange := n[0]
+	require.Equal(t, int64(0), newRange.from.Int64())
+	require.Equal(t, int64(20), newRange.to.Int64())
+	require.Equal(t, 2, len(d))
+
+	ranges = []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(0),
+			to:   big.NewInt(11),
+		},
+		&BlocksRange{
+			from: big.NewInt(10),
+			to:   big.NewInt(20),
+		},
+	}
+
+	n, d = getNewRanges(ranges)
+	require.Equal(t, 1, len(n))
+	newRange = n[0]
+	require.Equal(t, int64(0), newRange.from.Int64())
+	require.Equal(t, int64(20), newRange.to.Int64())
+	require.Equal(t, 2, len(d))
+
+	ranges = []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(0),
+			to:   big.NewInt(20),
+		},
+		&BlocksRange{
+			from: big.NewInt(5),
+			to:   big.NewInt(15),
+		},
+	}
+
+	n, d = getNewRanges(ranges)
+	require.Equal(t, 1, len(n))
+	newRange = n[0]
+	require.Equal(t, int64(0), newRange.from.Int64())
+	require.Equal(t, int64(20), newRange.to.Int64())
+	require.Equal(t, 2, len(d))
+
+	ranges = []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(5),
+			to:   big.NewInt(15),
+		},
+		&BlocksRange{
+			from: big.NewInt(5),
+			to:   big.NewInt(20),
+		},
+	}
+
+	n, d = getNewRanges(ranges)
+	require.Equal(t, 1, len(n))
+	newRange = n[0]
+	require.Equal(t, int64(5), newRange.from.Int64())
+	require.Equal(t, int64(20), newRange.to.Int64())
+	require.Equal(t, 2, len(d))
+
+	ranges = []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(5),
+			to:   big.NewInt(10),
+		},
+		&BlocksRange{
+			from: big.NewInt(15),
+			to:   big.NewInt(20),
+		},
+	}
+
+	n, d = getNewRanges(ranges)
+	require.Equal(t, 0, len(n))
+	require.Equal(t, 0, len(d))
+
+	ranges = []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(0),
+			to:   big.NewInt(10),
+		},
+		&BlocksRange{
+			from: big.NewInt(10),
+			to:   big.NewInt(20),
+		},
+		&BlocksRange{
+			from: big.NewInt(30),
+			to:   big.NewInt(40),
+		},
+	}
+
+	n, d = getNewRanges(ranges)
+	require.Equal(t, 1, len(n))
+	newRange = n[0]
+	require.Equal(t, int64(0), newRange.from.Int64())
+	require.Equal(t, int64(20), newRange.to.Int64())
+	require.Equal(t, 2, len(d))
+
+	ranges = []*BlocksRange{
+		&BlocksRange{
+			from: big.NewInt(0),
+			to:   big.NewInt(10),
+		},
+		&BlocksRange{
+			from: big.NewInt(10),
+			to:   big.NewInt(20),
+		},
+		&BlocksRange{
+			from: big.NewInt(30),
+			to:   big.NewInt(40),
+		},
+		&BlocksRange{
+			from: big.NewInt(40),
+			to:   big.NewInt(50),
+		},
+	}
+
+	n, d = getNewRanges(ranges)
+	require.Equal(t, 2, len(n))
+	newRange = n[0]
+	require.Equal(t, int64(0), newRange.from.Int64())
+	require.Equal(t, int64(20), newRange.to.Int64())
+	newRange = n[1]
+	require.Equal(t, int64(30), newRange.from.Int64())
+	require.Equal(t, int64(50), newRange.to.Int64())
+	require.Equal(t, 4, len(d))
+}

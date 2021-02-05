@@ -56,6 +56,18 @@ func (s *Service) SetClient(client *ethclient.Client) {
 	s.client = client
 }
 
+// MergeBlocksRanges merge old blocks ranges if possible
+func (s *Service) MergeBlocksRanges(accounts []common.Address, chain uint64) error {
+	for _, account := range accounts {
+		err := s.db.mergeRanges(account, chain)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
 func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int, watchNewBlocks bool) error {
 	reactor := NewReactor(s.db, s.feed, client, chain, watchNewBlocks)

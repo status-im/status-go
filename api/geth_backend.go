@@ -1261,6 +1261,11 @@ func (b *GethStatusBackend) startWallet(watchNewBlocks bool) error {
 		}
 	}
 
+	err = wallet.MergeBlocksRanges(allAddresses, b.statusNode.Config().NetworkID)
+	if err != nil {
+		return err
+	}
+
 	return wallet.StartReactor(
 		b.statusNode.RPCClient().Ethclient(),
 		allAddresses,
