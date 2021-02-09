@@ -4227,7 +4227,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		m.allChats[chat.ID] = chat
 		modifiedChats[chat.ID] = true
 
-		contact, err := buildContactFromMessage(message)
+		contact, err := m.getOrBuildContactFromMessage(message)
 		if err != nil {
 			return nil, err
 		}
@@ -4648,11 +4648,21 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 	return encodedMessage, nil
 }
 
-func buildContactFromMessage(m *common.Message) (*Contact, error) {
-	senderPubKey, err := m.GetSenderPubKey()
+func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact, error) {
+	if c, ok := m.allContacts[msg.From]; ok {
+		return c, nil
+	}
+
+	senderPubKey, err := msg.GetSenderPubKey()
 	if err != nil {
 		return nil, err
 	}
 	senderID := contactIDFromPublicKey(senderPubKey)
-	return buildContact(senderID, senderPubKey)
+	c, err := buildContact(senderID, senderPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	m.allContacts[msg.From] = c
+	return c, nil
 }
