@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	crand "crypto/rand"
+	"crypto/x509"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -20,6 +22,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
+
+	"github.com/ethereum/go-ethereum/crypto/ecies"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
@@ -776,15 +780,16 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return err
 	}
 
+	if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityNone {
+		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesVisibility is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesVisibility))
+		return nil
+	}
+
 	ciis := make(map[string]*protobuf.IdentityImage)
 
 	switch context {
 	case publicChat:
 		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
-
-		if s.ProfilePicturesVisibility != accounts.ProfilePicturesVisibilityEveryone {
-			m.logger.Info(fmt.Sprintf("settings.ProfilePicturesVisibility is set to '%d', public chat requires '%d'", s.ProfilePicturesVisibility, accounts.ProfilePicturesVisibilityEveryone))
-		}
 
 		img, err := m.multiAccounts.GetIdentityImage(m.account.KeyUID, userimage.SmallDimName)
 		if err != nil {
@@ -799,10 +804,6 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 
 	case privateChat:
 		m.logger.Info(fmt.Sprintf("handling %s ChatIdentity", context))
-
-		if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityEveryone {
-			m.logger.Info(fmt.Sprintf("settings.ProfilePicturesVisibility is set to '%d', public chat requires '%d'", s.ProfilePicturesVisibility, accounts.ProfilePicturesVisibilityEveryone))
-		}
 
 		imgs, err := m.multiAccounts.GetIdentityImages(m.account.KeyUID)
 		if err != nil {
@@ -819,6 +820,59 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 
 	default:
 		return fmt.Errorf("unknown ChatIdentity context '%s'", context)
+	}
+
+	if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly {
+		err := m.encryptIdentityImagesWithContactPubKeys(ci.Images)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Messenger) encryptIdentityImagesWithContactPubKeys(ciis map[string]*protobuf.IdentityImage) error {
+	// Make ephemeral key
+	pk, err := crypto.GenerateKey()
+	if err != nil {
+		return err
+	}
+
+	// Marshal the ephemeral private key into bytes
+	mpk, err := x509.MarshalECPrivateKey(pk)
+	if err != nil {
+		return err
+	}
+
+	for _, ii := range ciis {
+		// Encrypt image payloads with the ephemeral public key
+		encryptedPayload, err := ecies.Encrypt(crand.Reader, ecies.ImportECDSAPublic(&pk.PublicKey), ii.Payload, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		// Overwrite the unencrypted payload with the newly encrypted payload
+		ii.Payload = encryptedPayload
+		for _, c := range m.allContacts {
+			if !c.IsAdded() {
+				continue
+			}
+
+			pubK, err := c.PublicKey()
+			if err != nil {
+				return err
+			}
+
+			// Encrypt the marshalled ephemeral private key with the contact's public key
+			empk, err := ecies.Encrypt(crand.Reader, ecies.ImportECDSAPublic(pubK), mpk, nil, nil)
+			if err != nil {
+				return err
+			}
+
+			// Append the the encrypted private key to the IdentityImage's EncryptionKeys slice.
+			ii.EncryptionKeys = append(ii.EncryptionKeys, empk)
+		}
 	}
 
 	return nil
