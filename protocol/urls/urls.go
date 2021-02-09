@@ -12,10 +12,26 @@ import (
 	"github.com/keighl/metabolize"
 )
 
-type OembedData struct {
+type YoutubeOembedData struct {
 	ProviderName string `json:"provider_name"`
 	Title        string `json:"title"`
 	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+type GiphyOembedData struct {
+	ProviderName string `json:"provider_name"`
+	Title        string `json:"title"`
+	URL          string `json:"url"`
+	Height       int    `json:"height"`
+	Width        int    `json:"width"`
+}
+
+type TenorOembedData struct {
+	ProviderName string `json:"provider_name"`
+	ThumbnailURL string `json:"thumbnail_url"`
+	AuthorName   string `json:"author_name"`
+	Height       int    `json:"height"`
+	Width        int    `json:"width"`
 }
 
 type LinkPreviewData struct {
@@ -23,6 +39,8 @@ type LinkPreviewData struct {
 	Title        string `json:"title" meta:"og:title"`
 	ThumbnailURL string `json:"thumbnailUrl" meta:"og:image"`
 	ContentType  string `json:"contentType"`
+	Height       int    `json:"height"`
+	Width        int    `json:"width"`
 }
 
 type Site struct {
@@ -31,7 +49,9 @@ type Site struct {
 	ImageSite bool   `json:"imageSite"`
 }
 
-const YouTubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
+const YoutubeOembedLink = "https://www.youtube.com/oembed?format=json&url=%s"
+const GiphyOembedLink = "https://giphy.com/services/oembed?url=%s"
+const TenorOembedLink = "https://tenor.com/oembed?url=%s"
 
 var httpClient = http.Client{
 	Timeout: 30 * time.Second,
@@ -55,8 +75,18 @@ func LinkPreviewWhitelist() []Site {
 			ImageSite: true,
 		},
 		Site{
+			Title:     "GIPHY GIFs shortener",
+			Address:   "gph.is",
+			ImageSite: true,
+		},
+		Site{
 			Title:     "GIPHY GIFs",
 			Address:   "giphy.com",
+			ImageSite: true,
+		},
+		Site{
+			Title:     "GIPHY GIFs subdomain",
+			Address:   "media.giphy.com",
 			ImageSite: true,
 		},
 		Site{
@@ -68,27 +98,26 @@ func LinkPreviewWhitelist() []Site {
 }
 
 func GetURLContent(url string) (data []byte, err error) {
-
 	// nolint: gosec
 	response, err := httpClient.Get(url)
 	if err != nil {
-		return data, fmt.Errorf("Can't get content from link %s", url)
+		return data, fmt.Errorf("can't get content from link %s", url)
 	}
 	defer response.Body.Close()
 	return ioutil.ReadAll(response.Body)
 }
 
-func GetYoutubeOembed(url string) (data OembedData, err error) {
-	oembedLink := fmt.Sprintf(YouTubeOembedLink, url)
+func GetYoutubeOembed(url string) (data YoutubeOembedData, err error) {
+	oembedLink := fmt.Sprintf(YoutubeOembedLink, url)
 
 	jsonBytes, err := GetURLContent(oembedLink)
 	if err != nil {
-		return data, fmt.Errorf("Can't get bytes from youtube oembed response on %s link", oembedLink)
+		return data, fmt.Errorf("can't get bytes from youtube oembed response on %s link", oembedLink)
 	}
 
 	err = json.Unmarshal(jsonBytes, &data)
 	if err != nil {
-		return data, fmt.Errorf("Can't unmarshall json")
+		return data, fmt.Errorf("can't unmarshall json")
 	}
 
 	return data, nil
@@ -112,46 +141,130 @@ func GetGithubPreviewData(link string) (previewData LinkPreviewData, err error) 
 	res, err := httpClient.Get(link)
 
 	if err != nil {
-		return previewData, fmt.Errorf("Can't get content from link %s", link)
+		return previewData, fmt.Errorf("can't get content from link %s", link)
 	}
 
 	err = metabolize.Metabolize(res.Body, &previewData)
 	if err != nil {
-		return previewData, fmt.Errorf("Can't get meta info from link %s", link)
+		return previewData, fmt.Errorf("can't get meta info from link %s", link)
 	}
 
 	return previewData, nil
 }
 
-func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
+func GetGiphyOembed(url string) (data GiphyOembedData, err error) {
+	oembedLink := fmt.Sprintf(GiphyOembedLink, url)
 
+	jsonBytes, err := GetURLContent(oembedLink)
+
+	if err != nil {
+		return data, fmt.Errorf("can't get bytes from Giphy oembed response at %s", oembedLink)
+	}
+
+	err = json.Unmarshal(jsonBytes, &data)
+	if err != nil {
+		return data, fmt.Errorf("can't unmarshall json")
+	}
+
+	return data, nil
+}
+
+func GetGiphyPreviewData(link string) (previewData LinkPreviewData, err error) {
+	oembedData, err := GetGiphyOembed(link)
+	if err != nil {
+		return previewData, err
+	}
+
+	previewData.Title = oembedData.Title
+	previewData.Site = oembedData.ProviderName
+	previewData.ThumbnailURL = oembedData.URL
+	previewData.Height = oembedData.Height
+	previewData.Width = oembedData.Width
+
+	return previewData, nil
+}
+
+// Giphy has a shortener service called gph.is, the oembed service doesn't work with shortened urls,
+// so we need to fetch the long url first
+func GetGiphyLongURL(shortURL string) (longURL string, err error) {
+	// nolint: gosec
+	res, err := http.Get(shortURL)
+
+	if err != nil {
+		return longURL, fmt.Errorf("can't get bytes from Giphy's short url at %s", shortURL)
+	}
+
+	canonicalURL := res.Request.URL.String()
+	if canonicalURL == shortURL {
+		// no redirect, ie. not a valid url
+		return longURL, fmt.Errorf("unable to process Giphy's short url at %s", shortURL)
+	}
+
+	return canonicalURL, err
+}
+
+func GetGiphyShortURLPreviewData(shortURL string) (data LinkPreviewData, err error) {
+	longURL, err := GetGiphyLongURL(shortURL)
+
+	if err != nil {
+		return data, err
+	}
+
+	return GetGiphyPreviewData(longURL)
+}
+
+func GetTenorOembed(url string) (data TenorOembedData, err error) {
+	oembedLink := fmt.Sprintf(TenorOembedLink, url)
+
+	jsonBytes, err := GetURLContent(oembedLink)
+
+	if err != nil {
+		return data, fmt.Errorf("can't get bytes from Tenor oembed response at %s", oembedLink)
+	}
+
+	err = json.Unmarshal(jsonBytes, &data)
+	if err != nil {
+		return data, fmt.Errorf("can't unmarshall json")
+	}
+
+	return data, nil
+}
+
+func GetTenorPreviewData(link string) (previewData LinkPreviewData, err error) {
+	oembedData, err := GetTenorOembed(link)
+	if err != nil {
+		return previewData, err
+	}
+
+	previewData.Title = oembedData.AuthorName // Tenor Oembed service doesn't return title of the Gif
+	previewData.Site = oembedData.ProviderName
+	previewData.ThumbnailURL = oembedData.ThumbnailURL
+	previewData.Height = oembedData.Height
+	previewData.Width = oembedData.Width
+
+	return previewData, nil
+}
+
+func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	url, err := url.Parse(link)
 	if err != nil {
-		return previewData, fmt.Errorf("Cant't parse link %s", link)
+		return previewData, fmt.Errorf("cant't parse link %s", link)
 	}
 
 	hostname := strings.ToLower(url.Hostname())
-	youtubeHostnames := []string{"youtube.com", "www.youtube.com", "youtu.be"}
-	for _, youtubeHostname := range youtubeHostnames {
-		if youtubeHostname == hostname {
-			return GetYoutubePreviewData(link)
-		}
-	}
-	if "github.com" == hostname {
+
+	switch hostname {
+	case "youtube.com", "youtu.be", "www.youtube.com":
+		return GetYoutubePreviewData(link)
+	case "github.com":
 		return GetGithubPreviewData(link)
+	case "giphy.com", "media.giphy.com":
+		return GetGiphyPreviewData(link)
+	case "gph.is":
+		return GetGiphyShortURLPreviewData(link)
+	case "tenor.com":
+		return GetTenorPreviewData(link)
+	default:
+		return previewData, fmt.Errorf("link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 	}
-
-	for _, site := range LinkPreviewWhitelist() {
-		if strings.HasSuffix(hostname, site.Address) && site.ImageSite {
-			content, contentErr := GetURLContent(link)
-			if contentErr != nil {
-				return previewData, contentErr
-			}
-			previewData.ThumbnailURL = link
-			previewData.ContentType = http.DetectContentType(content)
-			return previewData, nil
-		}
-	}
-
-	return previewData, fmt.Errorf("Link %s isn't whitelisted. Hostname - %s", link, url.Hostname())
 }

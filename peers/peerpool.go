@@ -322,20 +322,31 @@ func (p *PeerPool) handlePeerEventType(server *p2p.Server, event *p2p.PeerEvent,
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	var shouldRetry bool
+	var shouldStop bool
 	switch event.Type {
 	case p2p.PeerEventTypeDrop:
 		log.Debug("confirm peer dropped", "ID", event.Peer)
 		if p.handleDroppedPeer(server, event.Peer) {
-			queueRetry(immediately)
+			shouldRetry = true
 		}
 	case p2p.PeerEventTypeAdd: // skip other events
 		log.Debug("confirm peer added", "ID", event.Peer)
 		p.handleAddedPeer(server, event.Peer)
-		queueStop()
+		shouldStop = true
 	default:
 		return
 	}
+
+	// First we send the discovery summary
 	SendDiscoverySummary(server.PeersInfo())
+
+	// then we send the stop event
+	if shouldRetry {
+		queueRetry(immediately)
+	} else if shouldStop {
+		queueStop()
+	}
 }
 
 // handleAddedPeer notifies all topics about added peer.
