@@ -190,8 +190,7 @@ type Server struct {
 	checkpointAddPeer       chan *conn
 
 	// State of run loop and listenLoop.
-	lastLookup     time.Time
-	inboundHistory expHeap
+	lastLookup time.Time
 }
 
 type peerOpFunc func(map[enode.ID]*Peer)
@@ -924,12 +923,6 @@ func (srv *Server) checkInboundConn(fd net.Conn, remoteIP net.IP) error {
 		if srv.NetRestrict != nil && !srv.NetRestrict.Contains(remoteIP) {
 			return fmt.Errorf("not whitelisted in NetRestrict")
 		}
-		// Reject Internet peers that try too often.
-		srv.inboundHistory.expire(time.Now())
-		if !netutil.IsLAN(remoteIP) && srv.inboundHistory.contains(remoteIP.String()) {
-			return fmt.Errorf("too many attempts")
-		}
-		srv.inboundHistory.add(remoteIP.String(), time.Now().Add(inboundThrottleTime))
 	}
 	return nil
 }
