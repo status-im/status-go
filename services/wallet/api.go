@@ -24,6 +24,11 @@ type API struct {
 	s *Service
 }
 
+// SetInitialBlocksRange sets initial blocks range
+func (api *API) SetInitialBlocksRange(ctx context.Context) error {
+	return api.s.SetInitialBlocksRange(api.s.db.network)
+}
+
 // GetTransfersByAddress returns transfers for a single address
 func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big) ([]TransferView, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "block", toBlock, "limit", limit)

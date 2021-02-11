@@ -789,6 +789,16 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 	return nil
 }
 
+func (db *Database) UpsertRange(account common.Address, network uint64, from *big.Int, to *big.Int) error {
+	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to)
+	insert, err := db.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to))
+	return err
+}
+
 func upsertRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *big.Int) (err error) {
 	update, err := creator.Prepare(`UPDATE blocks_ranges
                 SET blk_to = ?

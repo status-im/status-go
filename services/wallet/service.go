@@ -3,6 +3,7 @@ package wallet
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -182,4 +183,27 @@ func mapToList(m map[common.Address]struct{}) []common.Address {
 
 func (s *Service) IsStarted() bool {
 	return s.started
+}
+
+func (s *Service) SetInitialBlocksRange(network uint64) error {
+	accountsDB := accounts.NewDB(s.db.db)
+	watchAddress, err := accountsDB.GetWalletAddress()
+	if err != nil {
+		return err
+	}
+
+	from := big.NewInt(0)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	header, err := s.client.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	err = s.db.UpsertRange(common.Address(watchAddress), network, from, header.Number)
+	if err != nil {
+		return err
+	}
+	return nil
 }
