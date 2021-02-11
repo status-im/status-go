@@ -41,6 +41,9 @@ message IdentityImage {
   // encryption_keys is a list of encrypted keys that can be used to decrypted an encrypted payload
   repeated bytes encryption_keys = 4;
 
+  // encrypted signals the encryption state of the payload, default is false.
+  bool encrypted = 5;
+
   // SourceType are the predefined types of image source allowed
   enum SourceType {
     UNKNOWN_SOURCE_TYPE = 0;

@@ -9,11 +9,17 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
+	"github.com/ethereum/go-ethereum/crypto/ecies"
+
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-const nonceLength = 12
+const(
+	nonceLength = 12
+	defaultECHDSharedKeyLength = 16
+	defaultECHDMACLength = 16
+)
 
 var ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
 
@@ -85,4 +91,12 @@ func HexToPubkey(pk string) (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 	return crypto.UnmarshalPubkey(bytes)
+}
+
+func MakeECDHSharedKey(yourPrivateKey *ecdsa.PrivateKey, theirPubKey *ecdsa.PublicKey) ([]byte, error) {
+	return ecies.ImportECDSA(yourPrivateKey).GenerateShared(
+		ecies.ImportECDSAPublic(theirPubKey),
+		defaultECHDSharedKeyLength,
+		defaultECHDMACLength,
+	)
 }
