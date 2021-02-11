@@ -31,7 +31,7 @@ CGO_CFLAGS = -I/$(JAVA_HOME)/include -I/$(JAVA_HOME)/include/darwin
 GOBIN = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))build/bin
 GOPATH ?= $(HOME)/go
 GIT_COMMIT = $(shell git rev-parse --short HEAD)
-AUTHOR = $(shell echo $$USER)
+AUTHOR ?= $(shell git config user.email || echo $$USER)
 
 ENABLE_METRICS ?= true
 BUILD_FLAGS ?= $(shell echo "-ldflags='\
