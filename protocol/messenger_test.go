@@ -2582,11 +2582,11 @@ func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
 	}
 
 	// Make contact keys and Contacts, set the Contacts to added
-	var contactKeys []*ecdsa.PrivateKey
-	for i:=0; i < 10; i++ {
+	contactKeys := make([]*ecdsa.PrivateKey, 10)
+	for i := range contactKeys {
 		contactKey, err := crypto.GenerateKey()
 		s.Require().NoError(err)
-		contactKeys = append(contactKeys, contactKey)
+		contactKeys[i] = contactKey
 
 		contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 		s.Require().NoError(err)
@@ -2641,4 +2641,7 @@ func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
 
 	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
 	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
+
+	// RESET Messenger identity
+	s.m.identity = sender
 }
