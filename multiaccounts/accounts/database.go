@@ -21,6 +21,12 @@ const (
 	ProfilePicturesVisibilityNone
 )
 
+const (
+	ProfilePicturesShowToContactsOnly = iota + 1
+	ProfilePicturesShowToEveryone
+	ProfilePicturesShowToNone
+)
+
 var (
 	// ErrWalletNotUnique returned if another account has `wallet` field set to true.
 	ErrWalletNotUnique = errors.New("another account is set to be default wallet. disable it before using new")
@@ -110,6 +116,8 @@ type Settings struct {
 	// SendPushNotifications indicates whether we should send push notifications for other clients
 	SendPushNotifications bool `json:"send-push-notifications?,omitempty"`
 	Appearance            uint `json:"appearance"`
+	// ProfilePicturesShowTo indicates to whom the user shows their profile picture to (contacts, everyone)
+	ProfilePicturesShowTo          uint             `json:"profile-pictures-show-to"`
 	// ProfilePicturesVisibility indicates who we want to see profile pictures of (contacts, everyone or none)
 	ProfilePicturesVisibility      uint             `json:"profile-pictures-visibility"`
 	UseMailservers                 bool             `json:"use-mailservers?"`
@@ -372,6 +380,8 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		update, err = db.db.Prepare("UPDATE settings SET wallet_visible_tokens = ? WHERE synthetic_id = 'id'")
 	case "appearance":
 		update, err = db.db.Prepare("UPDATE settings SET appearance = ? WHERE synthetic_id = 'id'")
+	case "profile_pictures_show_to":
+		update, err = db.db.Prepare("UPDATE settings SET profile_pictures_show_to = ? WHERE synthetic_id = 'id'")
 	case "profile-pictures-visibility":
 		update, err = db.db.Prepare("UPDATE settings SET profile_pictures_visibility = ? WHERE synthetic_id = 'id'")
 	case "waku-bloom-filter-mode":
@@ -429,7 +439,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, default_sync_period, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_show_to, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests, current_user_status, send_status_updates, gif_recents, gif_favorites, opensea_enabled FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -476,6 +486,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.MessagesFromContactsOnly,
 		&s.Usernames,
 		&s.Appearance,
+		&s.ProfilePicturesShowTo,
 		&s.ProfilePicturesVisibility,
 		&s.WalletRootAddress,
 		&s.WalletSetUpPassed,
