@@ -777,9 +777,8 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return err
 	}
 
-	// TODO remove the use of ProfilePicturesVisibility and create a new settings field,
-	if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityNone {
-		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesVisibility is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesVisibility))
+	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToNone {
+		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil
 	}
 
@@ -820,7 +819,7 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return fmt.Errorf("unknown ChatIdentity context '%s'", context)
 	}
 
-	if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly {
+	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToContactsOnly {
 		err := m.encryptIdentityImagesWithContactPubKeys(ci.Images)
 		if err != nil {
 			return err
