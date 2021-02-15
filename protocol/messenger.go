@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	crand "crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
@@ -820,104 +819,9 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 	}
 
 	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToContactsOnly {
-		err := m.encryptIdentityImagesWithContactPubKeys(ci.Images)
+		err := EncryptIdentityImagesWithContactPubKeys(ci.Images, m)
 		if err != nil {
 			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *Messenger) encryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityImage) (err error) {
-	// Make AES key
-	AESKey := make([]byte, 32)
-	_, err = crand.Read(AESKey)
-	if err != nil {
-		return err
-	}
-
-	for _, ii := range iis {
-		// Encrypt image payload with the AES key
-		encryptedPayload, err := common.Encrypt(ii.Payload, AESKey, crand.Reader)
-		if err != nil {
-			return err
-		}
-
-		// Overwrite the unencrypted payload with the newly encrypted payload
-		ii.Payload = encryptedPayload
-		ii.Encrypted = true
-		m.allContacts.Range(func(contactID string, c *Contact) (shouldContinue bool) {
-			if !c.IsAdded() {
-				return false
-			}
-
-			pubK, err := c.PublicKey()
-			if err != nil {
-				return false
-			}
-			// Generate a Diffie-Helman (DH) between the sender private key and the recipient's public key
-			sharedKey, err := common.MakeECDHSharedKey(m.identity, pubK)
-			if err != nil {
-				return false
-			}
-
-			// Encrypt the main AES key with AES encryption using the DH key
-			eAESKey, err := common.Encrypt(AESKey, sharedKey, crand.Reader)
-			if err != nil {
-				return false
-			}
-
-			// Append the the encrypted main AES key to the IdentityImage's EncryptionKeys slice.
-			ii.EncryptionKeys = append(ii.EncryptionKeys, eAESKey)
-
-			return true
-		})
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *Messenger) decryptIdentityImagesWithIdentityPrivateKey(iis map[string]*protobuf.IdentityImage, senderPubKey *ecdsa.PublicKey) error {
-image:
-	for _, ii := range iis {
-		for _, empk := range ii.EncryptionKeys {
-			// Generate a Diffie-Helman (DH) between the recipient's private key and the sender's public key
-			sharedKey, err := common.MakeECDHSharedKey(m.identity, senderPubKey)
-			if err != nil {
-				return err
-			}
-
-			// Decrypt the main encryption AES key with AES encryption using the DH key
-			dAESKey, err := common.Decrypt(empk, sharedKey)
-			if err != nil {
-				if err.Error() == "cipher: message authentication failed" {
-					continue
-				}
-				return err
-			}
-			if dAESKey == nil{
-				return errors.New("decrypting the payload encryption key resulted in no error and a nil key")
-			}
-
-			// Decrypt the payload with the newly decrypted main encryption AES key
-			payload, err := common.Decrypt(ii.Payload, dAESKey)
-			if err != nil {
-				return err
-			}
-			if payload == nil {
-				// TODO should this be a logger warn? A payload could theoretically be validly empty
-				return errors.New("decrypting the payload resulted in no error and a nil payload")
-			}
-
-			// Overwrite the payload with the decrypted data
-			ii.Payload = payload
-			ii.Encrypted = false // TODO handle the encryption state in the consuming code
-			continue image
 		}
 	}
 
