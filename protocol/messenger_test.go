@@ -2595,8 +2595,8 @@ func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
 		s.m.allContacts.Store(contact.ID, contact)
 	}
 
-	// Test encryptIdentityImagesWithContactPubKeys
-	err := s.m.encryptIdentityImagesWithContactPubKeys(ci.Images)
+	// Test EncryptIdentityImagesWithContactPubKeys
+	err := EncryptIdentityImagesWithContactPubKeys(ci.Images, s.m)
 	s.Require().NoError(err)
 
 	for _, ii := range ci.Images {
@@ -2607,12 +2607,8 @@ func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
 	s.Require().True(ci.Images["small"].Encrypted)
 	s.Require().True(ci.Images["large"].Encrypted)
 
-	// Switch messenger identities
-	sender := s.m.identity
-	s.m.identity = contactKeys[2]
-
-	// Test decryptIdentityImagesWithIdentityPrivateKey
-	err = s.m.decryptIdentityImagesWithIdentityPrivateKey(ci.Images, &sender.PublicKey)
+	// Test DecryptIdentityImagesWithIdentityPrivateKey
+	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, contactKeys[2], &s.m.identity.PublicKey)
 	s.Require().NoError(err)
 
 	s.Require().Equal(smPayload, string(ci.Images["small"].Payload))
@@ -2621,13 +2617,12 @@ func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
 	s.Require().False(ci.Images["large"].Encrypted)
 
 	// RESET Messenger identity, Contacts and IdentityImage.EncryptionKeys
-	s.m.identity = sender
 	s.m.allContacts = nil
 	ci.Images["small"].EncryptionKeys = nil
 	ci.Images["large"].EncryptionKeys = nil
 
-	// Test encryptIdentityImagesWithContactPubKeys with no contacts
-	err = s.m.encryptIdentityImagesWithContactPubKeys(ci.Images)
+	// Test EncryptIdentityImagesWithContactPubKeys with no contacts
+	err = EncryptIdentityImagesWithContactPubKeys(ci.Images, s.m)
 	s.Require().NoError(err)
 
 	for _, ii := range ci.Images {
@@ -2638,18 +2633,12 @@ func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
 	s.Require().True(ci.Images["small"].Encrypted)
 	s.Require().True(ci.Images["large"].Encrypted)
 
-	// Switch messenger identities
-	s.m.identity = contactKeys[2]
-
-	// Test decryptIdentityImagesWithIdentityPrivateKey with no valid identity
-	err = s.m.decryptIdentityImagesWithIdentityPrivateKey(ci.Images, &sender.PublicKey)
+	// Test DecryptIdentityImagesWithIdentityPrivateKey with no valid identity
+	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, contactKeys[2], &s.m.identity.PublicKey)
 	s.Require().NoError(err)
 
 	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
 	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
 	s.Require().True(ci.Images["small"].Encrypted)
 	s.Require().True(ci.Images["large"].Encrypted)
-
-	// RESET Messenger identity
-	s.m.identity = sender
 }
