@@ -423,6 +423,10 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
+	if chat.Public() && receivedMessage.ContentType == protobuf.ChatMessage_IMAGE {
+		return errors.New("images are not allowed in public chats")
+	}
+
 	// If profile updates check if author is the same as chat profile public key
 	if chat.ProfileUpdates() && receivedMessage.From != chat.Profile {
 		return nil
