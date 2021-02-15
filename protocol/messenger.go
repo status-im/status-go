@@ -201,6 +201,14 @@ func NewMessenger(
 		}
 	}
 
+	// Apply any post database creation changes to the database
+	c.db = database
+	for _, opt := range c.afterDbCreatedHooks {
+		if err := opt(&c); err != nil {
+			return nil, err
+		}
+	}
+
 	// Apply migrations for all components.
 	err := sqlite.Migrate(database)
 	if err != nil {
@@ -776,6 +784,12 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return err
 	}
 
+	if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly {
+		m.logger.Info("settings.ProfilePicturesVisibility is there")
+	}
+
+	// TODO check that all the migration code is in place use ProfilePicturesVisibility as a guide
+	//  getting an error of no such column: profile_pictures_show_to
 	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToNone {
 		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil

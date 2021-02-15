@@ -380,7 +380,7 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 		update, err = db.db.Prepare("UPDATE settings SET wallet_visible_tokens = ? WHERE synthetic_id = 'id'")
 	case "appearance":
 		update, err = db.db.Prepare("UPDATE settings SET appearance = ? WHERE synthetic_id = 'id'")
-	case "profile_pictures_show_to":
+	case "profile-pictures-show-to":
 		update, err = db.db.Prepare("UPDATE settings SET profile_pictures_show_to = ? WHERE synthetic_id = 'id'")
 	case "profile-pictures-visibility":
 		update, err = db.db.Prepare("UPDATE settings SET profile_pictures_visibility = ? WHERE synthetic_id = 'id'")
