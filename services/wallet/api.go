@@ -50,7 +50,8 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 			return nil, err
 		}
 
-		if block == nil {
+		// if zero block was already checked there is nothing to find more
+		if block == nil || big.NewInt(0).Cmp(block) == 0 {
 			return castToTransferViews(rst), nil
 		}
 

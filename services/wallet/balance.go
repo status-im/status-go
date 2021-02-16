@@ -24,13 +24,6 @@ func GetTokensBalances(parent context.Context, client *ethclient.Client, account
 		mu       sync.Mutex
 		response = map[common.Address]map[common.Address]*hexutil.Big{}
 	)
-	// requested current head to request balance on the same block number
-	ctx, cancel := context.WithTimeout(parent, requestTimeout)
-	header, err := client.HeaderByNumber(ctx, nil)
-	cancel()
-	if err != nil {
-		return nil, err
-	}
 	for _, token := range tokens {
 		caller, err := ierc20.NewIERC20Caller(token, client)
 		token := token
@@ -43,8 +36,7 @@ func GetTokensBalances(parent context.Context, client *ethclient.Client, account
 			group.Add(func(parent context.Context) error {
 				ctx, cancel := context.WithTimeout(parent, requestTimeout)
 				balance, err := caller.BalanceOf(&bind.CallOpts{
-					BlockNumber: header.Number,
-					Context:     ctx,
+					Context: ctx,
 				}, account)
 				cancel()
 				// We don't want to return an error here and prevent

@@ -41,7 +41,7 @@ func (c *ethHistoricalCommand) Command() Command {
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	start := time.Now()
 	totalRequests, cacheHits := c.balanceCache.getStats(c.address)
-	log.Info("balance cache before checking range", "total", totalRequests, "cached", totalRequests-cacheHits)
+	log.Info("balance cache before checking range", "total", totalRequests, "cached", totalRequests-cacheHits, "from", c.from, "to", c.to)
 	from, headers, err := findBlocksWithEthTransfers(ctx, c.client, c.balanceCache, c.eth, c.address, c.from, c.to, c.noLimit)
 
 	if err != nil {
@@ -647,6 +647,10 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	from := big.NewInt(0)
 	to := initialTo
 	goal := uint64(20)
+
+	if from.Cmp(to) == 0 {
+		return to, nil
+	}
 
 	firstNonce, err := client.NonceAt(c, account, to)
 	log.Info("find range with 20 <= len(tx) <= 25", "account", account, "firstNonce", firstNonce, "from", from, "to", to)
