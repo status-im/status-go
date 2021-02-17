@@ -35,7 +35,6 @@
 // 0019_blocks_ranges_extra_data.up.sql (89B)
 // 0020_metrics.up.sql (235B)
 // 0021_add_session_id_to_metrics.up.sql (55B)
-// 0021_profile_pictures_show_to_up.sql (81B)
 // 0022_pending_transfers.up.sql (706B)
 // 1618237885_settings_anon_metrics_should_send.up.sql (80B)
 // 1618395756_contacts_only.up.sql (136B)
@@ -49,6 +48,7 @@
 // 1630464455_create-saved_addresses-table.up.sql (187B)
 // 1630485153_networks.down.sql (21B)
 // 1630485153_networks.up.sql (394B)
+// 1632262444_profile_pictures_show_to.up.sql (81B)
 // doc.go (74B)
 
 package migrations
@@ -818,26 +818,6 @@ func _0021_add_session_id_to_metricsUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __0021_profile_pictures_show_to_upSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x28\xca\x4f\xcb\xcc\x49\x8d\x2f\xc8\x4c\x2e\x29\x2d\x4a\x2d\x8e\x2f\xce\xc8\x2f\x8f\x2f\xc9\x57\xf0\xf4\x0b\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xb4\xe6\x02\x04\x00\x00\xff\xff\x2f\x7a\xa3\xb9\x51\x00\x00\x00")
-
-func _0021_profile_pictures_show_to_upSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__0021_profile_pictures_show_to_upSql,
-		"0021_profile_pictures_show_to_up.sql",
-	)
-}
-
-func _0021_profile_pictures_show_to_upSql() (*asset, error) {
-	bytes, err := _0021_profile_pictures_show_to_upSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "0021_profile_pictures_show_to_up.sql", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1628512648, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc3, 0xa2, 0x5a, 0x94, 0xde, 0x86, 0x2a, 0x29, 0xf5, 0xb3, 0x36, 0xe7, 0x53, 0x81, 0x55, 0xc9, 0xb5, 0xc3, 0xf4, 0x8c, 0x65, 0x2c, 0x4c, 0x48, 0xfd, 0x3c, 0xb7, 0x14, 0xb4, 0xea, 0x7a, 0x13}}
-	return a, nil
-}
-
 var __0022_pending_transfersUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x8c\x92\x4f\x6f\xe2\x30\x10\xc5\xef\xfe\x14\x73\x04\xc9\x87\xbd\x73\x72\xc0\x80\xb5\xc1\x46\xce\xb0\xc0\xc9\xf2\xe2\x14\xac\xe6\x9f\x62\xb7\x15\xdf\xbe\x22\xb4\x25\x50\x8a\x7a\x7d\xcf\xf3\x7b\xa3\xe7\x61\x29\x72\x0d\xc8\x92\x94\x43\x93\x57\xce\x57\x7b\x13\x5b\x5b\x05\xbb\x8b\xbe\xae\x02\x68\x2e\xd9\x82\x03\xaa\xbb\xb6\xa9\x0b\x37\x22\x64\xac\x39\x43\xfe\x81\x11\x53\x90\x0a\x81\x6f\x44\x86\xd9\x7d\xe8\x80\x00\x54\x79\x7c\xab\xdb\x67\xe3\x1d\xac\x64\x26\x66\x92\x4f\x20\x11\x33\x21\xb1\x1b\x97\xab\x34\xa5\x04\xe0\x60\xc3\x01\xfe\x31\x3d\x9e\x33\x7d\x65\x44\x5f\xe6\x21\xda\xb2\x79\x38\xfe\xd4\xd6\xa5\xb1\xce\xb5\x79\x08\xf7\x31\xf5\xad\x7d\x52\xc3\xb1\xfc\x5f\x17\x7d\x65\x6f\x83\x69\x5a\xbf\xcb\x21\x49\x55\xf2\xa9\x14\xbe\xf4\xf1\x4b\x79\xb5\xc5\xcb\xc5\x77\x36\x5a\x40\xbe\xc1\x2e\xe6\xd8\xe4\x7d\x9c\x75\xce\x9f\xba\xb0\x85\xb9\x7a\xb7\xd4\x62\xc1\xf4\x16\xfe\xf2\x2d\x0c\x2e\x15\xd1\xae\x87\x21\x19\xc2\x5a\xe0\x5c\xad\x10\xb4\x5a\x8b\xc9\x88\x10\x21\x33\xae\x11\x84\xfc\xe1\x87\xbe\x41\xe8\x55\x27\xb4\x57\x00\xed\xb6\xa4\xb7\xbb\xd1\x4b\xd5\x43\x92\xf1\x94\x8f\x11\xfa\xd0\x5e\x9a\xf9\x5d\xc0\x99\xfa\x07\xa6\x5a\x2d\x1e\x9d\xd5\x44\xab\xe5\x83\xdb\x3c\xbf\x7a\x0f\x00\x00\xff\xff\x05\xa2\xfe\xa8\xc2\x02\x00\x00")
 
 func _0022_pending_transfersUpSqlBytes() ([]byte, error) {
@@ -1098,6 +1078,26 @@ func _1630485153_networksUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __1632262444_profile_pictures_show_toUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x28\xca\x4f\xcb\xcc\x49\x8d\x2f\xc8\x4c\x2e\x29\x2d\x4a\x2d\x8e\x2f\xce\xc8\x2f\x8f\x2f\xc9\x57\xf0\xf4\x0b\x51\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x30\xb4\xe6\x02\x04\x00\x00\xff\xff\x2f\x7a\xa3\xb9\x51\x00\x00\x00")
+
+func _1632262444_profile_pictures_show_toUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1632262444_profile_pictures_show_toUpSql,
+		"1632262444_profile_pictures_show_to.up.sql",
+	)
+}
+
+func _1632262444_profile_pictures_show_toUpSql() (*asset, error) {
+	bytes, err := _1632262444_profile_pictures_show_toUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1632262444_profile_pictures_show_to.up.sql", size: 81, mode: os.FileMode(0644), modTime: time.Unix(1632518530, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xc3, 0xa2, 0x5a, 0x94, 0xde, 0x86, 0x2a, 0x29, 0xf5, 0xb3, 0x36, 0xe7, 0x53, 0x81, 0x55, 0xc9, 0xb5, 0xc3, 0xf4, 0x8c, 0x65, 0x2c, 0x4c, 0x48, 0xfd, 0x3c, 0xb7, 0x14, 0xb4, 0xea, 0x7a, 0x13}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -1279,8 +1279,6 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0021_add_session_id_to_metrics.up.sql": _0021_add_session_id_to_metricsUpSql,
 
-	"0021_profile_pictures_show_to_up.sql": _0021_profile_pictures_show_to_upSql,
-
 	"0022_pending_transfers.up.sql": _0022_pending_transfersUpSql,
 
 	"1618237885_settings_anon_metrics_should_send.up.sql": _1618237885_settings_anon_metrics_should_sendUpSql,
@@ -1306,6 +1304,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1630485153_networks.down.sql": _1630485153_networksDownSql,
 
 	"1630485153_networks.up.sql": _1630485153_networksUpSql,
+
+	"1632262444_profile_pictures_show_to.up.sql": _1632262444_profile_pictures_show_toUpSql,
 
 	"doc.go": docGo,
 }
@@ -1386,7 +1386,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0019_blocks_ranges_extra_data.up.sql":                &bintree{_0019_blocks_ranges_extra_dataUpSql, map[string]*bintree{}},
 	"0020_metrics.up.sql":                                 &bintree{_0020_metricsUpSql, map[string]*bintree{}},
 	"0021_add_session_id_to_metrics.up.sql":               &bintree{_0021_add_session_id_to_metricsUpSql, map[string]*bintree{}},
-	"0021_profile_pictures_show_to_up.sql":                &bintree{_0021_profile_pictures_show_to_upSql, map[string]*bintree{}},
 	"0022_pending_transfers.up.sql":                       &bintree{_0022_pending_transfersUpSql, map[string]*bintree{}},
 	"1618237885_settings_anon_metrics_should_send.up.sql": &bintree{_1618237885_settings_anon_metrics_should_sendUpSql, map[string]*bintree{}},
 	"1618395756_contacts_only.up.sql":                     &bintree{_1618395756_contacts_onlyUpSql, map[string]*bintree{}},
@@ -1400,7 +1399,8 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1630464455_create-saved_addresses-table.up.sql":      &bintree{_1630464455_createSaved_addressesTableUpSql, map[string]*bintree{}},
 	"1630485153_networks.down.sql":                        &bintree{_1630485153_networksDownSql, map[string]*bintree{}},
 	"1630485153_networks.up.sql":                          &bintree{_1630485153_networksUpSql, map[string]*bintree{}},
-	"doc.go":                                              &bintree{docGo, map[string]*bintree{}},
+	"1632262444_profile_pictures_show_to.up.sql":          &bintree{_1632262444_profile_pictures_show_toUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.

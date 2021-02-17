@@ -12,6 +12,7 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/images"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
@@ -1309,18 +1310,41 @@ func (m *Messenger) HandleGroupChatInvitation(state *ReceivedMessageState, pbGHI
 // HandleChatIdentity handles an incoming protobuf.ChatIdentity
 // extracts contact information stored in the protobuf and adds it to the user's contact for update.
 func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.ChatIdentity) error {
-	logger := m.logger.With(zap.String("site", "HandleChatIdentity"))
-	allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
+	s, err := m.settings.GetSettings()
 	if err != nil {
 		return err
 	}
 
-	if !allowed {
-		return ErrMessageNotAllowed
+	viewFromContacts := s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly
+	viewFromNoOne := s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityNone
+
+	m.logger.Debug("settings found",
+		zap.Bool("viewFromContacts", viewFromContacts),
+		zap.Bool("viewFromNoOne", viewFromNoOne),
+	)
+
+	// If we don't want to view profile images from anyone, don't process identity images.
+	// We don't want to store the profile images of other users, even if we don't display images.
+	if viewFromNoOne {
+		return nil
+	}
+
+	// If there are no images attached to a ChatIdentity, check if message is allowed
+	// Or if there are images and visibility is set to from contacts only, check if message is allowed
+	// otherwise process the images without checking if the message is allowed
+	if len(ci.Images) == 0 || (len(ci.Images) > 0 && (viewFromContacts)) {
+		allowed, err := m.isMessageAllowedFrom(state.CurrentMessageState.Contact.ID, nil)
+		if err != nil {
+			return err
+		}
+
+		if !allowed {
+			return ErrMessageNotAllowed
+		}
 	}
 	contact := state.CurrentMessageState.Contact
 
-	err := DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, m.identity, state.CurrentMessageState.PublicKey)
+	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, m.identity, state.CurrentMessageState.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -1332,7 +1356,6 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 		}
 	}
 
-	logger.Info("Handling contact update")
 	newImages, err := m.persistence.SaveContactChatIdentity(contact.ID, &ci)
 	if err != nil {
 		return err
