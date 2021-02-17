@@ -52,7 +52,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system)")
+	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system) VVALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
