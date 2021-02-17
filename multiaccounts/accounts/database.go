@@ -15,14 +15,18 @@ const (
 	uniqueWalletConstraint = "UNIQUE constraint failed: accounts.wallet"
 )
 
+type ProfilePicturesVisibilityType int
+
 const (
-	ProfilePicturesVisibilityContactsOnly = iota + 1
+	ProfilePicturesVisibilityContactsOnly ProfilePicturesVisibilityType = iota + 1
 	ProfilePicturesVisibilityEveryone
 	ProfilePicturesVisibilityNone
 )
 
+type ProfilePicturesShowToType int
+
 const (
-	ProfilePicturesShowToContactsOnly = iota + 1
+	ProfilePicturesShowToContactsOnly ProfilePicturesShowToType = iota + 1
 	ProfilePicturesShowToEveryone
 	ProfilePicturesShowToNone
 )
@@ -117,21 +121,21 @@ type Settings struct {
 	SendPushNotifications bool `json:"send-push-notifications?,omitempty"`
 	Appearance            uint `json:"appearance"`
 	// ProfilePicturesShowTo indicates to whom the user shows their profile picture to (contacts, everyone)
-	ProfilePicturesShowTo          uint             `json:"profile-pictures-show-to"`
+	ProfilePicturesShowTo ProfilePicturesShowToType `json:"profile-pictures-show-to"`
 	// ProfilePicturesVisibility indicates who we want to see profile pictures of (contacts, everyone or none)
-	ProfilePicturesVisibility      uint             `json:"profile-pictures-visibility"`
-	UseMailservers                 bool             `json:"use-mailservers?"`
-	Usernames                      *json.RawMessage `json:"usernames,omitempty"`
-	WalletRootAddress              types.Address    `json:"wallet-root-address,omitempty"`
-	WalletSetUpPassed              bool             `json:"wallet-set-up-passed?,omitempty"`
-	WalletVisibleTokens            *json.RawMessage `json:"wallet/visible-tokens,omitempty"`
-	WakuBloomFilterMode            bool             `json:"waku-bloom-filter-mode,omitempty"`
-	WebViewAllowPermissionRequests bool             `json:"webview-allow-permission-requests?,omitempty"`
-	SendStatusUpdates              bool             `json:"send-status-updates?,omitempty"`
-	CurrentUserStatus              *json.RawMessage `json:"current-user-status"`
-	GifRecents                     *json.RawMessage `json:"gifs/recent-gifs"`
-	GifFavorites                   *json.RawMessage `json:"gifs/favorite-gifs"`
-	OpenseaEnabled                 bool             `json:"opensea-enabled?,omitempty"`
+	ProfilePicturesVisibility      ProfilePicturesVisibilityType `json:"profile-pictures-visibility"`
+	UseMailservers                 bool                          `json:"use-mailservers?"`
+	Usernames                      *json.RawMessage              `json:"usernames,omitempty"`
+	WalletRootAddress              types.Address                 `json:"wallet-root-address,omitempty"`
+	WalletSetUpPassed              bool                          `json:"wallet-set-up-passed?,omitempty"`
+	WalletVisibleTokens            *json.RawMessage              `json:"wallet/visible-tokens,omitempty"`
+	WakuBloomFilterMode            bool                          `json:"waku-bloom-filter-mode,omitempty"`
+	WebViewAllowPermissionRequests bool                          `json:"webview-allow-permission-requests?,omitempty"`
+	SendStatusUpdates              bool                          `json:"send-status-updates?,omitempty"`
+	CurrentUserStatus              *json.RawMessage              `json:"current-user-status"`
+	GifRecents                     *json.RawMessage              `json:"gifs/recent-gifs"`
+	GifFavorites                   *json.RawMessage              `json:"gifs/favorite-gifs"`
+	OpenseaEnabled                 bool                          `json:"opensea-enabled?,omitempty"`
 }
 
 func NewDB(db *sql.DB) *Database {

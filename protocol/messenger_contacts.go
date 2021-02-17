@@ -5,9 +5,11 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 func (m *Messenger) SaveContact(contact *Contact) error {
@@ -45,6 +47,15 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	// And we re-register for push notications
 	err = m.reregisterForPushNotifications()
 	if err != nil {
+		return nil, err
+	}
+
+	// Reset last published time for ChatIdentity so new contact can receive data
+	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+	m.logger.Debug("contact state changed ResetWhenChatIdentityLastPublished")
+	err = m.persistence.ResetWhenChatIdentityLastPublished(contactCodeTopic)
+	if err != nil {
+		m.logger.Error("ResetWhenChatIdentityLastPublished error", zap.Error(err))
 		return nil, err
 	}
 

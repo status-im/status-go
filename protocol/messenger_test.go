@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
 	"github.com/stretchr/testify/suite"
@@ -24,11 +23,11 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	enstypes "github.com/status-im/status-go/eth-node/types/ens"
-	"github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/waku"
@@ -133,6 +132,7 @@ func newMessengerWithKey(shh types.Waku, privateKey *ecdsa.PrivateKey, logger *z
 		WithAccount(iai.ToMultiAccount()),
 		WithDatasync(),
 		WithToplevelDatabaseMigrations(),
+		WithAppSettings(accounts.Settings{}, params.NodeConfig{}),
 	}
 
 	options = append(options, extraOptions...)
@@ -2488,158 +2488,4 @@ func WaitOnMessengerResponse(m *Messenger, condition func(*MessengerResponse) bo
 		}
 		return err
 	})
-}
-
-func (s *MessengerSuite) TestChatIdentity() {
-	keyUID := "0xdeadbeef"
-	s.m.account = &multiaccounts.Account{KeyUID: keyUID}
-
-	err := s.m.multiAccounts.SaveAccount(multiaccounts.Account{Name: "string", KeyUID: keyUID})
-	s.Require().NoError(err)
-
-	iis := images.SampleIdentityImages()
-	s.Require().NoError(s.m.multiAccounts.StoreIdentityImages(keyUID, iis))
-
-	ci, err := s.m.createChatIdentity("private-chat")
-	s.Require().NoError(err)
-
-	s.Require().Exactly(len(iis), len(ci.Images))
-
-	spew.Dump(ci, len(ci.Images))
-}
-
-func (s *MessengerSuite) TestPublicMessageOnCommunityChat() {
-	alice := s.newMessenger(s.shh)
-	bob := s.newMessenger(s.shh)
-
-	// Create a community
-	description := &requests.CreateCommunity{
-		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		Name:        "status",
-		Color:       "#ffffff",
-		Description: "status community description",
-	}
-
-	response, err := bob.CreateCommunity(description)
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Communities(), 1)
-	community := response.Communities()[0]
-
-	// Create a community chat
-	response, err = bob.CreateCommunityChat(community.ID(), &protobuf.CommunityChat{
-		Permissions: &protobuf.CommunityPermissions{
-			Access: protobuf.CommunityPermissions_NO_MEMBERSHIP,
-		},
-		Identity: &protobuf.ChatIdentity{
-			DisplayName: "community-name",
-		},
-	})
-	s.Require().NoError(err)
-	s.Require().NotNil(response)
-	s.Require().Len(response.Chats(), 1)
-	chat := response.Chats()[0]
-
-	inputMessage := buildTestMessage(*chat)
-	inputMessage.ID = "1"
-	inputMessage.Seen = false
-	inputMessage.Text = "hey @" + common.PubkeyToHex(&s.m.identity.PublicKey)
-	inputMessage.Mentioned = true
-	inputMessage.MessageType = protobuf.MessageType_PUBLIC_GROUP
-
-	contact, err := BuildContactFromPublicKey(&alice.identity.PublicKey)
-	s.Require().NoError(err)
-
-	// send a public chat message to a community on_request chat
-	state := &ReceivedMessageState{
-		Response: &MessengerResponse{},
-		CurrentMessageState: &CurrentMessageState{
-			Message:          inputMessage.ChatMessage,
-			MessageID:        "0xabc",
-			WhisperTimestamp: s.m.getTimesource().GetCurrentTime(),
-			Contact:          contact,
-			PublicKey:        &alice.identity.PublicKey,
-		},
-	}
-	err = bob.HandleChatMessage(state)
-	s.Require().Error(err)
-	s.Require().Equal(ErrMessageForWrongChatType, err)
-}
-
-func (s *MessengerSuite) TestEncryptDecryptIdentityImagesWithContactPubKeys() {
-	smPayload := "hello small image"
-	lgPayload := "hello large image"
-
-	ci := protobuf.ChatIdentity{
-		Clock:  uint64(time.Now().Unix()),
-		Images: map[string]*protobuf.IdentityImage{
-			"small": {
-				Payload: []byte(smPayload),
-			},
-			"large": {
-				Payload: []byte(lgPayload),
-			},
-		},
-	}
-
-	// Make contact keys and Contacts, set the Contacts to added
-	contactKeys := make([]*ecdsa.PrivateKey, 10)
-	for i := range contactKeys {
-		contactKey, err := crypto.GenerateKey()
-		s.Require().NoError(err)
-		contactKeys[i] = contactKey
-
-		contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
-		s.Require().NoError(err)
-
-		contact.SystemTags = append(contact.SystemTags, contactAdded)
-		s.m.allContacts.Store(contact.ID, contact)
-	}
-
-	// Test EncryptIdentityImagesWithContactPubKeys
-	err := EncryptIdentityImagesWithContactPubKeys(ci.Images, s.m)
-	s.Require().NoError(err)
-
-	for _, ii := range ci.Images {
-		s.Require().Equal(s.m.allContacts.Len, len(ii.EncryptionKeys))
-	}
-	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
-	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
-	s.Require().True(ci.Images["small"].Encrypted)
-	s.Require().True(ci.Images["large"].Encrypted)
-
-	// Test DecryptIdentityImagesWithIdentityPrivateKey
-	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, contactKeys[2], &s.m.identity.PublicKey)
-	s.Require().NoError(err)
-
-	s.Require().Equal(smPayload, string(ci.Images["small"].Payload))
-	s.Require().Equal(lgPayload, string(ci.Images["large"].Payload))
-	s.Require().False(ci.Images["small"].Encrypted)
-	s.Require().False(ci.Images["large"].Encrypted)
-
-	// RESET Messenger identity, Contacts and IdentityImage.EncryptionKeys
-	s.m.allContacts = nil
-	ci.Images["small"].EncryptionKeys = nil
-	ci.Images["large"].EncryptionKeys = nil
-
-	// Test EncryptIdentityImagesWithContactPubKeys with no contacts
-	err = EncryptIdentityImagesWithContactPubKeys(ci.Images, s.m)
-	s.Require().NoError(err)
-
-	for _, ii := range ci.Images {
-		s.Require().Equal(0, len(ii.EncryptionKeys))
-	}
-	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
-	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
-	s.Require().True(ci.Images["small"].Encrypted)
-	s.Require().True(ci.Images["large"].Encrypted)
-
-	// Test DecryptIdentityImagesWithIdentityPrivateKey with no valid identity
-	err = DecryptIdentityImagesWithIdentityPrivateKey(ci.Images, contactKeys[2], &s.m.identity.PublicKey)
-	s.Require().NoError(err)
-
-	s.Require().NotEqual([]byte(smPayload), ci.Images["small"].Payload)
-	s.Require().NotEqual([]byte(lgPayload), ci.Images["large"].Payload)
-	s.Require().True(ci.Images["small"].Encrypted)
-	s.Require().True(ci.Images["large"].Encrypted)
 }

@@ -590,6 +590,7 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 			continue
 		}
 
+		// TODO implement something that doesn't reject all images if a single image fails validation
 		// Validate image URI to make sure it's serializable
 		_, err = images.GetPayloadDataURI(image.Payload)
 		if err != nil {
@@ -837,6 +838,34 @@ func (db sqlitePersistence) SaveWhenChatIdentityLastPublished(chatID string, has
 	defer stmt.Close()
 
 	_, err = stmt.Exec(chatID, time.Now().Unix(), hash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db sqlitePersistence) ResetWhenChatIdentityLastPublished(chatID string) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	stmt, err := tx.Prepare("INSERT INTO chat_identity_last_published (chat_id, clock_value, hash) VALUES (?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(chatID, 0, []byte("."))
 	if err != nil {
 		return err
 	}

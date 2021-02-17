@@ -9,17 +9,18 @@ import (
 	"github.com/status-im/status-go/protocol/protobuf"
 )
 
-func EncryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityImage, m *Messenger) error {
+func EncryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityImage, m *Messenger) (err error) {
 	// Make AES key
 	AESKey := make([]byte, 32)
-	_, err := crand.Read(AESKey)
+	_, err = crand.Read(AESKey)
 	if err != nil {
 		return err
 	}
 
 	for _, ii := range iis {
 		// Encrypt image payload with the AES key
-		encryptedPayload, err := common.Encrypt(ii.Payload, AESKey, crand.Reader)
+		var encryptedPayload []byte
+		encryptedPayload, err = common.Encrypt(ii.Payload, AESKey, crand.Reader)
 		if err != nil {
 			return err
 		}
@@ -27,29 +28,36 @@ func EncryptIdentityImagesWithContactPubKeys(iis map[string]*protobuf.IdentityIm
 		// Overwrite the unencrypted payload with the newly encrypted payload
 		ii.Payload = encryptedPayload
 		ii.Encrypted = true
-		for _, c := range m.allContacts {
-			if !c.IsAdded() {
-				continue
+		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
+			if !contact.IsAdded() {
+				return true
 			}
+			var pubK *ecdsa.PublicKey
+			var sharedKey []byte
+			var eAESKey []byte
 
-			pubK, err := c.PublicKey()
+			pubK, err = contact.PublicKey()
 			if err != nil {
-				return err
+				return false
 			}
 			// Generate a Diffie-Helman (DH) between the sender private key and the recipient's public key
-			sharedKey, err := common.MakeECDHSharedKey(m.identity, pubK)
+			sharedKey, err = common.MakeECDHSharedKey(m.identity, pubK)
 			if err != nil {
-				return err
+				return false
 			}
 
 			// Encrypt the main AES key with AES encryption using the DH key
-			eAESKey, err := common.Encrypt(AESKey, sharedKey, crand.Reader)
+			eAESKey, err = common.Encrypt(AESKey, sharedKey, crand.Reader)
 			if err != nil {
-				return err
+				return false
 			}
 
 			// Append the the encrypted main AES key to the IdentityImage's EncryptionKeys slice.
 			ii.EncryptionKeys = append(ii.EncryptionKeys, eAESKey)
+			return true
+		})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -74,7 +82,7 @@ image:
 				}
 				return err
 			}
-			if dAESKey == nil{
+			if dAESKey == nil {
 				return errors.New("decrypting the payload encryption key resulted in no error and a nil key")
 			}
 
@@ -97,4 +105,3 @@ image:
 
 	return nil
 }
-

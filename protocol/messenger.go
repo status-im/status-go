@@ -612,9 +612,16 @@ func (m *Messenger) publishContactCode() error {
 	if contactCodeAdvertisement == nil {
 		contactCodeAdvertisement = &protobuf.ContactCodeAdvertisement{}
 	}
+
 	err = m.attachChatIdentity(contactCodeAdvertisement)
 	if err != nil {
 		return err
+	}
+
+	if contactCodeAdvertisement.ChatIdentity != nil {
+		m.logger.Debug("attached chat identity", zap.Int("images len", len(contactCodeAdvertisement.ChatIdentity.Images)))
+	} else {
+		m.logger.Debug("no attached chat identity")
 	}
 
 	payload, err = proto.Marshal(contactCodeAdvertisement)
@@ -634,6 +641,7 @@ func (m *Messenger) publishContactCode() error {
 	if err != nil {
 		m.logger.Warn("failed to send a contact code", zap.Error(err))
 	}
+	m.logger.Debug("contact code sent")
 	return err
 }
 
@@ -641,7 +649,9 @@ func (m *Messenger) publishContactCode() error {
 // if the `shouldPublish` conditions are met
 func (m *Messenger) attachChatIdentity(cca *protobuf.ContactCodeAdvertisement) error {
 	contactCodeTopic := transport.ContactCodeTopic(&m.identity.PublicKey)
+
 	shouldPublish, err := m.shouldPublishChatIdentity(contactCodeTopic)
+
 	if err != nil {
 		return err
 	}
@@ -747,6 +757,7 @@ func (m *Messenger) shouldPublishChatIdentity(chatID string) (bool, error) {
 		return true, nil
 	}
 
+	// Note: If Alice does not add bob as a contact she will not update her contact code with images
 	return lp == 0 || time.Now().Unix()-lp > 24*60*60, nil
 }
 
@@ -784,12 +795,6 @@ func (m *Messenger) attachIdentityImagesToChatIdentity(context chatContext, ci *
 		return err
 	}
 
-	if s.ProfilePicturesVisibility == accounts.ProfilePicturesVisibilityContactsOnly {
-		m.logger.Info("settings.ProfilePicturesVisibility is there")
-	}
-
-	// TODO check that all the migration code is in place use ProfilePicturesVisibility as a guide
-	//  getting an error of no such column: profile_pictures_show_to
 	if s.ProfilePicturesShowTo == accounts.ProfilePicturesShowToNone {
 		m.logger.Info(fmt.Sprintf("settings.ProfilePicturesShowTo is set to '%d', skipping attaching IdentityImages", s.ProfilePicturesShowTo))
 		return nil
@@ -2907,6 +2912,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						logger.Debug("Received ContactCodeAdvertisement")
 
 						cca := msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)
+						logger.Debug("protobuf.ContactCodeAdvertisement received", zap.Any("cca", cca))
 						if cca.ChatIdentity != nil {
 
 							logger.Debug("Received ContactCodeAdvertisement ChatIdentity")

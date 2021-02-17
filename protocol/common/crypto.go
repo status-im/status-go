@@ -15,10 +15,10 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 )
 
-const(
-	nonceLength = 12
+const (
+	nonceLength                = 12
 	defaultECHDSharedKeyLength = 16
-	defaultECHDMACLength = 16
+	defaultECHDMACLength       = 16
 )
 
 var ErrInvalidCiphertextLength = errors.New("invalid cyphertext length")
