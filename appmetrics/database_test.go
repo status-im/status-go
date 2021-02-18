@@ -37,9 +37,10 @@ func TestSaveAppMetrics(t *testing.T) {
 		{Event: TestEvent2, Value: "2", OS: "ios", AppVersion: "1.10"},
 	}
 
-	db.SaveAppMetrics(appMetrics)
+	err := db.SaveAppMetrics(appMetrics)
+	require.NoError(t, err)
 
-	res, err := db.GetAppMetrics(10, 10)
+	res, err := db.GetAppMetrics(10, 0)
 	require.NoError(t, err)
 	t.Log(res)
 }
