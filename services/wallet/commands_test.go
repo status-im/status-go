@@ -185,6 +185,14 @@ func (s *NewBlocksSuite) downloadHistorical() {
 	s.Require().NoError(err)
 
 	client := &walletClient{client: s.backend.Client}
+
+	nonce := int64(0)
+	lastBlock := &LastKnownBlock{
+		Number:  big.NewInt(1),
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+
 	eth := &ethHistoricalCommand{
 		db:           s.db,
 		balanceCache: newBalanceCache(),
@@ -196,7 +204,7 @@ func (s *NewBlocksSuite) downloadHistorical() {
 		feed:    s.feed,
 		address: s.address,
 		client:  client,
-		from:    big.NewInt(0),
+		from:    lastBlock,
 		to:      s.backend.Ethereum.BlockChain().CurrentBlock().Number(),
 	}
 	s.Require().NoError(eth.Run(context.Background()), "eth historical command failed to sync transfers")

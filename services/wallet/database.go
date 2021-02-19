@@ -45,29 +45,6 @@ func toHead(header *types.Header) *DBHeader {
 // SyncOption is used to specify that application processed transfers for that block.
 type SyncOption uint
 
-// SQLBigInt type for storing uint256 in the databse.
-// FIXME(dshulyak) SQL big int is max 64 bits. Maybe store as bytes in big endian and hope
-// that lexographical sorting will work.
-type SQLBigInt big.Int
-
-// Scan implements interface.
-func (i *SQLBigInt) Scan(value interface{}) error {
-	val, ok := value.(int64)
-	if !ok {
-		return errors.New("not an integer")
-	}
-	(*big.Int)(i).SetInt64(val)
-	return nil
-}
-
-// Value implements interface.
-func (i *SQLBigInt) Value() (driver.Value, error) {
-	if !(*big.Int)(i).IsInt64() {
-		return nil, errors.New("not an int64")
-	}
-	return (*big.Int)(i).Int64(), nil
-}
-
 // JSONBlob type for marshaling/unmarshaling inner type to json.
 type JSONBlob struct {
 	data interface{}
@@ -112,7 +89,7 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
-func (db Database) ProcessBlocks(account common.Address, from *big.Int, to *big.Int, headers []*DBHeader) (err error) {
+func (db Database) ProcessBlocks(account common.Address, from *big.Int, to *LastKnownBlock, headers []*DBHeader) (err error) {
 	var (
 		tx *sql.Tx
 	)
@@ -424,8 +401,14 @@ func (db *Database) GetFirstKnownBlock(address common.Address) (rst *big.Int, er
 	return nil, nil
 }
 
-func (db *Database) GetLastKnownBlockByAddress(address common.Address) (rst *big.Int, err error) {
-	query := `SELECT blk_to FROM blocks_ranges
+type LastKnownBlock struct {
+	Number  *big.Int
+	Balance *big.Int
+	Nonce   *int64
+}
+
+func (db *Database) GetLastKnownBlockByAddress(address common.Address) (block *LastKnownBlock, err error) {
+	query := `SELECT blk_to, balance, nonce FROM blocks_ranges
 	WHERE address = ?
 	AND network_id = ?
 	ORDER BY blk_to DESC
@@ -438,20 +421,24 @@ func (db *Database) GetLastKnownBlockByAddress(address common.Address) (rst *big
 	defer rows.Close()
 
 	if rows.Next() {
-		block := &big.Int{}
-		err = rows.Scan((*SQLBigInt)(block))
+		var nonce sql.NullInt64
+		block = &LastKnownBlock{Number: &big.Int{}, Balance: &big.Int{}}
+		err = rows.Scan((*SQLBigInt)(block.Number), (*SQLBigIntBytes)(block.Balance), &nonce)
 		if err != nil {
 			return nil, err
 		}
 
+		if nonce.Valid {
+			block.Nonce = &nonce.Int64
+		}
 		return block, nil
 	}
 
 	return nil, nil
 }
 
-func (db *Database) GetLastKnownBlockByAddresses(addresses []common.Address) (map[common.Address]*big.Int, []common.Address, error) {
-	res := map[common.Address]*big.Int{}
+func (db *Database) GetLastKnownBlockByAddresses(addresses []common.Address) (map[common.Address]*LastKnownBlock, []common.Address, error) {
+	res := map[common.Address]*LastKnownBlock{}
 	accountsWithoutHistory := []common.Address{}
 	for _, address := range addresses {
 		block, err := db.GetLastKnownBlockByAddress(address)
@@ -789,19 +776,20 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 	return nil
 }
 
-func (db *Database) UpsertRange(account common.Address, network uint64, from *big.Int, to *big.Int) error {
-	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to)
-	insert, err := db.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to) VALUES (?, ?, ?, ?)")
+func (db *Database) UpsertRange(account common.Address, network uint64, from, to, balance *big.Int, nonce uint64) error {
+	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to, "balance", balance, "nonce", nonce)
+	insert, err := db.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
-	_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to))
+	_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to), (*SQLBigIntBytes)(balance), &nonce)
 	return err
 }
 
-func upsertRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *big.Int) (err error) {
+func upsertRange(creator statementCreator, account common.Address, network uint64, from *big.Int, to *LastKnownBlock) (err error) {
+	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to.Number, "balance", to.Balance)
 	update, err := creator.Prepare(`UPDATE blocks_ranges
-                SET blk_to = ?
+                SET blk_to = ?, balance = ?, nonce = ?
                 WHERE address = ?
                 AND network_id = ?
                 AND blk_to = ?`)
@@ -810,7 +798,7 @@ func upsertRange(creator statementCreator, account common.Address, network uint6
 		return err
 	}
 
-	res, err := update.Exec((*SQLBigInt)(to), account, network, (*SQLBigInt)(from))
+	res, err := update.Exec((*SQLBigInt)(to.Number), (*SQLBigIntBytes)(to.Balance), to.Nonce, account, network, (*SQLBigInt)(from))
 
 	if err != nil {
 		return err
@@ -820,12 +808,12 @@ func upsertRange(creator statementCreator, account common.Address, network uint6
 		return err
 	}
 	if affected == 0 {
-		insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to) VALUES (?, ?, ?, ?)")
+		insert, err := creator.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
 		if err != nil {
 			return err
 		}
 
-		_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to))
+		_, err = insert.Exec(network, account, (*SQLBigInt)(from), (*SQLBigInt)(to.Number), (*SQLBigIntBytes)(to.Balance), to.Nonce)
 		if err != nil {
 			return err
 		}

@@ -72,7 +72,9 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 				return nil, err
 			}
 		}
-		fromByAddress := map[common.Address]*big.Int{address: from}
+		fromByAddress := map[common.Address]*LastKnownBlock{address: &LastKnownBlock{
+			Number: from,
+		}}
 		toByAddress := map[common.Address]*big.Int{address: block}
 
 		balanceCache := newBalanceCache()

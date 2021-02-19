@@ -111,21 +111,21 @@ func checkRanges(parent context.Context, client BalanceReader, cache BalanceCach
 			if lb.Cmp(hb) == 0 {
 				log.Debug("balances are equal", "from", from, "to", to)
 
-				hn, err := client.NonceAt(ctx, account, to)
+				hn, err := cache.NonceAt(ctx, client, account, to)
 				if err != nil {
 					return err
 				}
 				// if nonce is zero in a newer block then there is no need to check an older one
-				if hn == 0 {
+				if *hn == 0 {
 					log.Debug("zero nonce", "to", to)
 					return nil
 				}
 
-				ln, err := client.NonceAt(ctx, account, from)
+				ln, err := cache.NonceAt(ctx, client, account, from)
 				if err != nil {
 					return err
 				}
-				if ln == hn {
+				if *ln == *hn {
 					log.Debug("transaction count is also equal", "from", from, "to", to)
 					return nil
 				}

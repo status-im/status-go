@@ -63,7 +63,13 @@ func TestDBProcessBlocks(t *testing.T) {
 			Hash:   common.Hash{2},
 		}}
 	t.Log(blocks)
-	require.NoError(t, db.ProcessBlocks(common.Address{1}, from, to, blocks))
+	nonce := int64(0)
+	lastBlock := &LastKnownBlock{
+		Number:  to,
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+	require.NoError(t, db.ProcessBlocks(common.Address{1}, from, lastBlock, blocks))
 	t.Log(db.GetLastBlockByAddress(common.Address{1}, 40))
 	transfers := []Transfer{
 		{
@@ -99,7 +105,13 @@ func TestDBProcessTransfer(t *testing.T) {
 			Address:     common.Address{1},
 		},
 	}
-	require.NoError(t, db.ProcessBlocks(common.Address{1}, big.NewInt(1), big.NewInt(1), []*DBHeader{header}))
+	nonce := int64(0)
+	lastBlock := &LastKnownBlock{
+		Number:  big.NewInt(0),
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+	require.NoError(t, db.ProcessBlocks(common.Address{1}, big.NewInt(1), lastBlock, []*DBHeader{header}))
 	require.NoError(t, db.ProcessTranfers(transfers, []*DBHeader{}))
 }
 
@@ -120,11 +132,23 @@ func TestDBReorgTransfers(t *testing.T) {
 	}
 	originalTX := types.NewTransaction(1, common.Address{1}, nil, 10, big.NewInt(10), nil)
 	replacedTX := types.NewTransaction(2, common.Address{1}, nil, 10, big.NewInt(10), nil)
-	require.NoError(t, db.ProcessBlocks(original.Address, original.Number, original.Number, []*DBHeader{original}))
+	nonce := int64(0)
+	lastBlock := &LastKnownBlock{
+		Number:  original.Number,
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+	require.NoError(t, db.ProcessBlocks(original.Address, original.Number, lastBlock, []*DBHeader{original}))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
 		{ethTransfer, common.Hash{1}, *originalTX.To(), original.Number, original.Hash, 100, originalTX, true, 1777, common.Address{1}, rcpt, nil},
 	}, []*DBHeader{}))
-	require.NoError(t, db.ProcessBlocks(replaced.Address, replaced.Number, replaced.Number, []*DBHeader{replaced}))
+	nonce = int64(0)
+	lastBlock = &LastKnownBlock{
+		Number:  replaced.Number,
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+	require.NoError(t, db.ProcessBlocks(replaced.Address, replaced.Number, lastBlock, []*DBHeader{replaced}))
 	require.NoError(t, db.ProcessTranfers([]Transfer{
 		{ethTransfer, common.Hash{2}, *replacedTX.To(), replaced.Number, replaced.Hash, 100, replacedTX, true, 1777, common.Address{1}, rcpt, nil},
 	}, []*DBHeader{original}))
@@ -161,7 +185,13 @@ func TestDBGetTransfersFromBlock(t *testing.T) {
 		}
 		transfers = append(transfers, transfer)
 	}
-	require.NoError(t, db.ProcessBlocks(headers[0].Address, headers[0].Number, headers[len(headers)-1].Number, headers))
+	nonce := int64(0)
+	lastBlock := &LastKnownBlock{
+		Number:  headers[len(headers)-1].Number,
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+	require.NoError(t, db.ProcessBlocks(headers[0].Address, headers[0].Number, lastBlock, headers))
 	require.NoError(t, db.ProcessTranfers(transfers, []*DBHeader{}))
 	rst, err := db.GetTransfers(big.NewInt(7), nil)
 	require.NoError(t, err)

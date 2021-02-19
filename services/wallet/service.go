@@ -201,7 +201,7 @@ func (s *Service) SetInitialBlocksRange(network uint64) error {
 		return err
 	}
 
-	err = s.db.UpsertRange(common.Address(watchAddress), network, from, header.Number)
+	err = s.db.UpsertRange(common.Address(watchAddress), network, from, header.Number, big.NewInt(0), 0)
 	if err != nil {
 		return err
 	}

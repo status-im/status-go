@@ -103,7 +103,13 @@ func TestTransactionNotification(t *testing.T) {
 			Address:     header.Address,
 		},
 	}
-	require.NoError(t, walletDb.ProcessBlocks(header.Address, big.NewInt(1), big.NewInt(1), []*wallet.DBHeader{header}))
+	nonce := int64(0)
+	lastBlock := &wallet.LastKnownBlock{
+		Number:  big.NewInt(1),
+		Balance: big.NewInt(0),
+		Nonce:   &nonce,
+	}
+	require.NoError(t, walletDb.ProcessBlocks(header.Address, big.NewInt(1), lastBlock, []*wallet.DBHeader{header}))
 	require.NoError(t, walletDb.ProcessTranfers(transfers, []*wallet.DBHeader{}))
 
 	feed.Send(wallet.Event{

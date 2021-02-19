@@ -27,7 +27,8 @@ type ethHistoricalCommand struct {
 	error        error
 	noLimit      bool
 
-	from, to, resultingFrom *big.Int
+	from              *LastKnownBlock
+	to, resultingFrom *big.Int
 }
 
 func (c *ethHistoricalCommand) Command() Command {
@@ -39,9 +40,13 @@ func (c *ethHistoricalCommand) Command() Command {
 
 func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	start := time.Now()
-	totalRequests, cacheHits := c.balanceCache.getStats(c.address)
-	log.Info("balance cache before checking range", "total", totalRequests, "cached", totalRequests-cacheHits, "from", c.from, "to", c.to)
-	from, headers, err := findBlocksWithEthTransfers(ctx, c.client, c.balanceCache, c.eth, c.address, c.from, c.to, c.noLimit)
+	if c.from.Number != nil && c.from.Balance != nil {
+		c.balanceCache.addBalanceToCache(c.address, c.from.Number, c.from.Balance)
+	}
+	if c.from.Number != nil && c.from.Nonce != nil {
+		c.balanceCache.addNonceToCache(c.address, c.from.Number, c.from.Nonce)
+	}
+	from, headers, err := findBlocksWithEthTransfers(ctx, c.client, c.balanceCache, c.eth, c.address, c.from.Number, c.to, c.noLimit)
 
 	if err != nil {
 		c.error = err
@@ -52,8 +57,6 @@ func (c *ethHistoricalCommand) Run(ctx context.Context) (err error) {
 	c.resultingFrom = from
 
 	log.Info("eth historical downloader finished successfully", "address", c.address, "from", from, "to", c.to, "total blocks", len(headers), "time", time.Since(start))
-	totalRequests, cacheHits = c.balanceCache.getStats(c.address)
-	log.Info("balance cache after checking range", "total", totalRequests, "cached", totalRequests-cacheHits)
 
 	//err = c.db.ProcessBlocks(c.address, from, c.to, headers, ethTransfer)
 	if err != nil {
@@ -158,10 +161,10 @@ func (c *newBlocksTransfersCommand) Verify(parent context.Context) (err error) {
 func (c *newBlocksTransfersCommand) getAllTransfers(parent context.Context, from, to uint64) (map[common.Address][]Transfer, error) {
 	transfersByAddress := map[common.Address][]Transfer{}
 	if to-from > reorgSafetyDepth(c.chain).Uint64() {
-		fromByAddress := map[common.Address]*big.Int{}
+		fromByAddress := map[common.Address]*LastKnownBlock{}
 		toByAddress := map[common.Address]*big.Int{}
 		for _, account := range c.accounts {
-			fromByAddress[account] = new(big.Int).SetUint64(from)
+			fromByAddress[account] = &LastKnownBlock{Number: new(big.Int).SetUint64(from)}
 			toByAddress[account] = new(big.Int).SetUint64(to)
 		}
 
@@ -459,7 +462,7 @@ type controlCommand struct {
 
 // run fast indexing for every accont up to canonical chain head minus safety depth.
 // every account will run it from last synced header.
-func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *balanceCache, fromByAddress map[common.Address]*big.Int, toByAddress map[common.Address]*big.Int) (map[common.Address]*big.Int, map[common.Address][]*DBHeader, error) {
+func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *balanceCache, fromByAddress map[common.Address]*LastKnownBlock, toByAddress map[common.Address]*big.Int) (map[common.Address]*big.Int, map[common.Address][]*DBHeader, error) {
 	start := time.Now()
 	group := NewGroup(ctx)
 
@@ -757,16 +760,16 @@ func (c *controlCommand) Run(parent context.Context) error {
 		target = zero
 	}
 
-	fromByAddress := map[common.Address]*big.Int{}
+	fromByAddress := map[common.Address]*LastKnownBlock{}
 	toByAddress := map[common.Address]*big.Int{}
 
 	for _, address := range c.accounts {
 		from, ok := lastKnownEthBlocks[address]
 		if !ok {
-			from = fromMap[address]
+			from = &LastKnownBlock{Number: fromMap[address]}
 		}
 		if c.nonArchivalRPCNode {
-			from = big.NewInt(0).Sub(target, big.NewInt(100))
+			from = &LastKnownBlock{Number: big.NewInt(0).Sub(target, big.NewInt(100))}
 		}
 
 		fromByAddress[address] = from
@@ -1026,7 +1029,7 @@ type findAndCheckBlockRangeCommand struct {
 	client        *walletClient
 	balanceCache  *balanceCache
 	feed          *event.Feed
-	fromByAddress map[common.Address]*big.Int
+	fromByAddress map[common.Address]*LastKnownBlock
 	toByAddress   map[common.Address]*big.Int
 	foundHeaders  map[common.Address][]*DBHeader
 	noLimit       bool
@@ -1050,7 +1053,7 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 	if c.noLimit {
 		newFromByAddress = map[common.Address]*big.Int{}
 		for _, address := range c.accounts {
-			newFromByAddress[address] = c.fromByAddress[address]
+			newFromByAddress[address] = c.fromByAddress[address].Number
 		}
 	}
 	erc20HeadersByAddress, err := c.fastIndexErc20(parent, newFromByAddress, c.toByAddress)
@@ -1091,8 +1094,14 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 			}
 		}
 
-		log.Debug("saving headers", "len", len(uniqHeaders), "address")
-		err = c.db.ProcessBlocks(address, newFromByAddress[address], c.toByAddress[address], uniqHeaders)
+		lastBlockNumber := c.toByAddress[address]
+		log.Debug("saving headers", "len", len(uniqHeaders), "lastBlockNumber", lastBlockNumber, "balance", c.balanceCache.ReadCachedBalance(address, lastBlockNumber), "nonce", c.balanceCache.ReadCachedNonce(address, lastBlockNumber))
+		to := &LastKnownBlock{
+			Number:  lastBlockNumber,
+			Balance: c.balanceCache.ReadCachedBalance(address, lastBlockNumber),
+			Nonce:   c.balanceCache.ReadCachedNonce(address, lastBlockNumber),
+		}
+		err = c.db.ProcessBlocks(address, newFromByAddress[address], to, uniqHeaders)
 		if err != nil {
 			return err
 		}
