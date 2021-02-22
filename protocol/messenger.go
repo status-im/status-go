@@ -2796,7 +2796,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 
 // addNewMessageNotification takes a common.Message and generates a new MessageNotificationBody and appends it to the
 // []Response.Notifications if the message is m.New
-func (r *ReceivedMessageState) addNewMessageNotification(m *common.Message) error {
+func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicKey, m *common.Message, responseTo *common.Message) error {
 	if !m.New {
 		return nil
 	}
@@ -2807,14 +2807,19 @@ func (r *ReceivedMessageState) addNewMessageNotification(m *common.Message) erro
 	}
 	contactID := contactIDFromPublicKey(pubKey)
 
-	r.Response.Notifications = append(
-		r.Response.Notifications,
-		MessageNotificationBody{
-			Message: m,
-			Contact: r.AllContacts[contactID],
-			Chat:    r.AllChats[m.ChatId],
-		},
-	)
+	chat := r.AllChats[m.LocalChatID]
+	notification := MessageNotificationBody{
+		Message: m,
+		Contact: r.AllContacts[contactID],
+		Chat:    chat,
+	}
+
+	if showNotification(publicKey, notification, responseTo) {
+		r.Response.Notifications = append(
+			r.Response.Notifications,
+			notification,
+		)
+	}
 
 	return nil
 }
@@ -3299,6 +3304,10 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	if err != nil {
 		return nil, err
 	}
+	messagesByID := map[string]*common.Message{}
+	for _, message := range messagesWithResponses {
+		messagesByID[message.ID] = message
+	}
 	messageState.Response.Messages = messagesWithResponses
 
 	for _, message := range messageState.Response.Messages {
@@ -3306,7 +3315,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			message.New = true
 
 			// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
-			if err = messageState.addNewMessageNotification(message); err != nil {
+			if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo]); err != nil {
 				return nil, err
 			}
 		}
@@ -3316,6 +3325,30 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	m.modifiedInstallations = make(map[string]bool)
 
 	return messageState.Response, nil
+}
+
+func showNotification(publicKey ecdsa.PublicKey, n MessageNotificationBody, responseTo *common.Message) bool {
+	if n.Chat != nil && n.Chat.ChatType == ChatTypeOneToOne {
+		return true
+	}
+
+	publicKeyString := common.PubkeyToHex(&publicKey)
+	mentioned := false
+	for _, mention := range n.Message.Mentions {
+		if publicKeyString == mention {
+			mentioned = true
+		}
+	}
+
+	if mentioned {
+		return true
+	}
+
+	if responseTo != nil {
+		return responseTo.From == publicKeyString
+	}
+
+	return false
 }
 
 // SetMailserver sets the currently used mailserver
