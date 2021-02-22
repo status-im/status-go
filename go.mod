@@ -69,6 +69,7 @@ require (
 	github.com/tsenart/tb v0.0.0-20181025101425-0d2499c8b6e9
 	github.com/vacp2p/mvds v0.0.24-0.20201124060106-26d8e94130d8
 	github.com/wealdtech/go-ens/v3 v3.3.0
+	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/multierr v1.4.0 // indirect
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c

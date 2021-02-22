@@ -2,6 +2,9 @@ package appmetrics
 
 import (
 	"database/sql"
+	"errors"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type AppMetricEventType string
@@ -14,9 +17,9 @@ type AppMetric struct {
 }
 
 const (
-	TestEvent1 AppMetricEventType = "go/test1"
-	TestEvent2 AppMetricEventType = "go/test2"
-	AppRouter  AppMetricEventType = "app/router"
+	TestEvent1               AppMetricEventType = "go/test1"
+	TestEvent2               AppMetricEventType = "go/test2"
+	NavigationNavigateToCofx AppMetricEventType = "navigation/navigate-to"
 )
 
 func NewDB(db *sql.DB) *Database {
@@ -33,12 +36,47 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
+var EventSchemaMap = map[AppMetricEventType]interface{}{
+	TestEvent1               : StringSchema,
+	TestEvent2               : StringSchema,
+	NavigationNavigateToCofx : NavigationNavigateToCofxSchema,
+}
+
+func ValidateAppMetrics(appMetrics []AppMetric) (err error) {
+	for _, metric := range appMetrics {
+		schema := EventSchemaMap[metric.Event]
+		schemaLoader := gojsonschema.NewGoLoader(schema)
+		valLoader := gojsonschema.NewStringLoader(metric.Value)
+		res, err := gojsonschema.Validate(schemaLoader, valLoader)
+
+		if err != nil {
+			return err
+		}
+
+		if !res.Valid() {
+			var errorDesc string = "Error in event: " + string(metric.Event) + "\n"
+			for _, e := range res.Errors() {
+				errorDesc = errorDesc + "value." + e.Context().String() + ":" + e.Description() + ", "
+			}
+			return errors.New(errorDesc)
+		}
+	}
+	return
+}
+
 func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
 	)
 
+	// make sure that the shape of the metric is same as expected
+	err = ValidateAppMetrics(appMetrics)
+	if err != nil {
+		return err
+	}
+
+	// start txn
 	tx, err = db.db.Begin()
 	if err != nil {
 		return err

@@ -21,20 +21,15 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	}
 }
 
-func TestOneIsOne(t *testing.T) {
-	_, stop := setupTestDB(t)
-	defer stop()
-
-	require.Equal(t, 1, 1)
-}
-
 func TestSaveAppMetrics(t *testing.T) {
 	db, stop := setupTestDB(t)
 	defer stop()
 
+	// we need backticks (``) for value because it is expected by gojsonschema
+	// it considers text inside tics to be stringified json
 	appMetrics := []AppMetric{
-		{Event: TestEvent1, Value: "1", OS: "android", AppVersion: "1.11"},
-		{Event: TestEvent2, Value: "2", OS: "ios", AppVersion: "1.10"},
+		{Event: TestEvent1, Value: `"str"`, OS: "android", AppVersion: "1.11"},
+		{Event: TestEvent2, Value: `"str"`, OS: "ios", AppVersion: "1.10"},
 	}
 
 	err := db.SaveAppMetrics(appMetrics)
@@ -42,5 +37,5 @@ func TestSaveAppMetrics(t *testing.T) {
 
 	res, err := db.GetAppMetrics(10, 0)
 	require.NoError(t, err)
-	t.Log(res)
+	require.Equal(t, appMetrics, res)
 }
