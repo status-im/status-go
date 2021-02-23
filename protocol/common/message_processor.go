@@ -130,7 +130,7 @@ func (p *MessageProcessor) SetHandleSharedSecrets(handler func([]*sharedsecret.S
 func (p *MessageProcessor) SendPrivate(
 	ctx context.Context,
 	recipient *ecdsa.PublicKey,
-	rawMessage RawMessage,
+	rawMessage *RawMessage,
 ) ([]byte, error) {
 	p.logger.Debug(
 		"sending a private message",
@@ -149,7 +149,7 @@ func (p *MessageProcessor) SendPrivate(
 		rawMessage.Sender = p.identity
 	}
 
-	return p.sendPrivate(ctx, recipient, &rawMessage)
+	return p.sendPrivate(ctx, recipient, rawMessage)
 }
 
 // SendGroup takes encoded data, encrypts it and sends through the wire,
@@ -209,10 +209,11 @@ func (p *MessageProcessor) sendPrivate(
 	if p.featureFlags.Datasync && rawMessage.ResendAutomatically {
 		// No need to call transport tracking.
 		// It is done in a data sync dispatch step.
-		if err := p.addToDataSync(recipient, wrappedMessage); err != nil {
+		datasyncID, err := p.addToDataSync(recipient, wrappedMessage)
+		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
-
+		rawMessage.DataSyncID = datasyncID
 	} else if rawMessage.SkipEncryption {
 		// When SkipEncryption is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
@@ -396,20 +397,45 @@ func (p *MessageProcessor) SendPublic(
 	return messageID, nil
 }
 
+// unwrapDatasyncMessage tries to unwrap message as datasync one and in case of success
+// returns cloned messages with replaced payloads
+func unwrapDatasyncMessage(m *v1protocol.StatusMessage, datasync *datasync.DataSync) ([]*v1protocol.StatusMessage, [][]byte, error) {
+	var statusMessages []*v1protocol.StatusMessage
+
+	payloads, acks, err := datasync.UnwrapPayloadsAndAcks(
+		m.SigPubKey(),
+		m.DecryptedPayload,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, payload := range payloads {
+		message, err := m.Clone()
+		if err != nil {
+			return nil, nil, err
+		}
+		message.DecryptedPayload = payload
+		statusMessages = append(statusMessages, message)
+	}
+	return statusMessages, acks, nil
+}
+
 // HandleMessages expects a whisper message as input, and it will go through
 // a series of transformations until the message is parsed into an application
 // layer message, or in case of Raw methods, the processing stops at the layer
 // before.
 // It returns an error only if the processing of required steps failed.
-func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, error) {
+func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, applicationLayer bool) ([]*v1protocol.StatusMessage, [][]byte, error) {
 	logger := p.logger.With(zap.String("site", "handleMessages"))
 	hlogger := logger.With(zap.ByteString("hash", shhMessage.Hash))
 	var statusMessage v1protocol.StatusMessage
+	var statusMessages []*v1protocol.StatusMessage
 
 	err := statusMessage.HandleTransport(shhMessage)
 	if err != nil {
 		hlogger.Error("failed to handle transport layer message", zap.Error(err))
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = p.handleEncryptionLayer(context.Background(), &statusMessage)
@@ -417,9 +443,11 @@ func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, application
 		hlogger.Debug("failed to handle an encryption message", zap.Error(err))
 	}
 
-	statusMessages, err := statusMessage.HandleDatasync(p.datasync)
+	statusMessages, acks, err := unwrapDatasyncMessage(&statusMessage, p.datasync)
 	if err != nil {
 		hlogger.Debug("failed to handle datasync message", zap.Error(err))
+		//that wasn't a datasync message, so use the original payload
+		statusMessages = append(statusMessages, &statusMessage)
 	}
 
 	for _, statusMessage := range statusMessages {
@@ -436,7 +464,7 @@ func (p *MessageProcessor) HandleMessages(shhMessage *types.Message, application
 		}
 	}
 
-	return statusMessages, nil
+	return statusMessages, acks, nil
 }
 
 // fetchDecryptionKey returns the private key associated with this public key, and returns true if it's an ephemeral key
@@ -513,24 +541,24 @@ func (p *MessageProcessor) wrapMessageV1(rawMessage *RawMessage) ([]byte, error)
 	return wrappedMessage, nil
 }
 
-func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) error {
+func (p *MessageProcessor) addToDataSync(publicKey *ecdsa.PublicKey, message []byte) ([]byte, error) {
 	groupID := datasync.ToOneToOneGroupID(&p.identity.PublicKey, publicKey)
 	peerID := datasyncpeer.PublicKeyToPeerID(*publicKey)
 	exist, err := p.datasync.IsPeerInGroup(groupID, peerID)
 	if err != nil {
-		return errors.Wrap(err, "failed to check if peer is in group")
+		return nil, errors.Wrap(err, "failed to check if peer is in group")
 	}
 	if !exist {
 		if err := p.datasync.AddPeer(groupID, peerID); err != nil {
-			return errors.Wrap(err, "failed to add peer")
+			return nil, errors.Wrap(err, "failed to add peer")
 		}
 	}
-	_, err = p.datasync.AppendMessage(groupID, message)
+	id, err := p.datasync.AppendMessage(groupID, message)
 	if err != nil {
-		return errors.Wrap(err, "failed to append message to datasync")
+		return nil, errors.Wrap(err, "failed to append message to datasync")
 	}
 
-	return nil
+	return id[:], nil
 }
 
 // sendDataSync sends a message scheduled by the data sync layer.

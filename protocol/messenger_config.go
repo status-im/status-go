@@ -14,6 +14,8 @@ import (
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+type MessageDeliveredHandler func(string, string)
+
 type config struct {
 	// This needs to be exposed until we move here mailserver logic
 	// as otherwise the client is not notified of a new filter and
@@ -41,6 +43,8 @@ type config struct {
 	pushNotificationClientConfig *pushnotificationclient.Config
 
 	logger *zap.Logger
+
+	messageDeliveredHandler MessageDeliveredHandler
 }
 
 type Option func(*config) error
@@ -141,6 +145,13 @@ func WithPushNotifications() func(c *config) error {
 func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 	return func(c *config) error {
 		c.envelopesMonitorConfig = emc
+		return nil
+	}
+}
+
+func WithDeliveredHandler(h MessageDeliveredHandler) Option {
+	return func(c *config) error {
+		c.messageDeliveredHandler = h
 		return nil
 	}
 }

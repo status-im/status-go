@@ -110,7 +110,7 @@ func (s *Server) HandlePushNotificationRegistration(publicKey *ecdsa.PublicKey, 
 		SkipEncryption: true,
 	}
 
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -133,7 +133,7 @@ func (s *Server) HandlePushNotificationQuery(publicKey *ecdsa.PublicKey, message
 		SkipEncryption: true,
 	}
 
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 
@@ -176,7 +176,7 @@ func (s *Server) HandlePushNotificationRequest(publicKey *ecdsa.PublicKey,
 		SkipEncryption: true,
 	}
 
-	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, rawMessage)
+	_, err = s.messageProcessor.SendPrivate(context.Background(), publicKey, &rawMessage)
 	return err
 }
 

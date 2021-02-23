@@ -593,9 +593,10 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 	           send_push_notification,
 		   skip_group_message_wrap,
 		   send_on_personal_topic,
-		   payload
+			 payload,
+			 datasync_id
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		message.ID,
 		message.LocalChatID,
 		message.LastSent,
@@ -608,7 +609,8 @@ func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
 		message.SendPushNotification,
 		message.SkipGroupMessageWrap,
 		message.SendOnPersonalTopic,
-		message.Payload)
+		message.Payload,
+		message.DataSyncID)
 	return err
 }
 
@@ -633,7 +635,8 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 		          send_push_notification,
 			  skip_group_message_wrap,
 			  send_on_personal_topic,
-			  payload
+				payload,
+				datasync_id
 			FROM
 				raw_messages
 			WHERE
@@ -653,6 +656,7 @@ func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error
 		&skipGroupMessageWrap,
 		&sendOnPersonalTopic,
 		&message.Payload,
+		&message.DataSyncID,
 	)
 	if err != nil {
 		return nil, err
@@ -737,6 +741,28 @@ func (db sqlitePersistence) ExpiredEmojiReactionsIDs(maxSendCount int) ([]string
 	}
 
 	return ids, nil
+}
+
+func (db sqlitePersistence) RawMessageIDFromDatasyncID(datasyncID []byte) (id string, err error) {
+	row := db.db.QueryRow(
+		`SELECT
+			    id
+			FROM
+				raw_messages
+			WHERE
+				datasync_id = ?
+		`, datasyncID)
+
+	err = row.Scan(&id)
+
+	switch err {
+	case sql.ErrNoRows:
+		return "", common.ErrRecordNotFound
+	case nil:
+		return id, nil
+	default:
+		return "", err
+	}
 }
 
 func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error) {

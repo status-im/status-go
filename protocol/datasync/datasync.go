@@ -2,6 +2,7 @@ package datasync
 
 import (
 	"crypto/ecdsa"
+	"errors"
 
 	"github.com/golang/protobuf/proto"
 	datasyncnode "github.com/vacp2p/mvds/node"
@@ -24,28 +25,35 @@ func New(node *datasyncnode.Node, transport *NodeTransport, sendingEnabled bool,
 	return &DataSync{Node: node, NodeTransport: transport, sendingEnabled: sendingEnabled, logger: logger}
 }
 
-func (d *DataSync) Handle(sender *ecdsa.PublicKey, payload []byte) [][]byte {
+// UnwrapPayloadsAndAcks tries to unwrap datasync message and return messages payloads
+// and acknowledgements for previously sent messages
+func (d *DataSync) UnwrapPayloadsAndAcks(sender *ecdsa.PublicKey, payload []byte) ([][]byte, [][]byte, error) {
 	var payloads [][]byte
+	var acks [][]byte
 	logger := d.logger.With(zap.String("site", "Handle"))
 
 	datasyncMessage, err := unwrap(payload)
 	// If it failed to decode is not a protobuf message, if it successfully decoded but body is empty, is likedly a protobuf wrapped message
-	if err != nil || !datasyncMessage.IsValid() {
-		logger.Debug("handling non-datasync message", zap.Error(err), zap.Bool("datasyncMessage.IsValid()", datasyncMessage.IsValid()), zap.Any("message", datasyncMessage))
-		// Not a datasync message, return unchanged
-		payloads = append(payloads, payload)
+	if err != nil {
+		logger.Debug("Unwrapping datasync message failed", zap.Error(err))
+		return nil, nil, err
+	} else if !datasyncMessage.IsValid() {
+		return nil, nil, errors.New("handling non-datasync message")
 	} else {
 		logger.Debug("handling datasync message")
 		// datasync message
 		for _, message := range datasyncMessage.Messages {
 			payloads = append(payloads, message.Body)
 		}
+
+		acks = append(acks, datasyncMessage.Acks...)
+
 		if d.sendingEnabled {
 			d.add(sender, datasyncMessage)
 		}
 	}
 
-	return payloads
+	return payloads, acks, nil
 }
 
 func (d *DataSync) Stop() {

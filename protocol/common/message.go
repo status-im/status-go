@@ -74,8 +74,9 @@ func (c *CommandParameters) IsTokenTransfer() bool {
 }
 
 const (
-	OutgoingStatusSending = "sending"
-	OutgoingStatusSent    = "sent"
+	OutgoingStatusSending   = "sending"
+	OutgoingStatusSent      = "sent"
+	OutgoingStatusDelivered = "delivered"
 )
 
 // Message represents a message record in the database,
@@ -95,7 +96,7 @@ type Message struct {
 	Identicon string `json:"identicon"`
 	// The chat id to be stored locally
 	LocalChatID string `json:"localChatId"`
-
+	// Seen set to true when user have read this message already
 	Seen           bool   `json:"seen"`
 	OutgoingStatus string `json:"outgoingStatus,omitempty"`
 

@@ -777,6 +777,28 @@ func TestHideMessage(t *testing.T) {
 	require.True(t, actualSeen)
 }
 
+func TestDatasyncIdSaved(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+
+	messageID := "message-id"
+	messageDataSyncID := []byte("message-datasync-id")
+
+	_, err = p.RawMessageIDFromDatasyncID(messageDataSyncID)
+	require.Error(t, err)
+
+	//save message with datasync id
+	rawChatMessage := minimalRawMessage(messageID, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
+	rawChatMessage.DataSyncID = messageDataSyncID
+	err = p.SaveRawMessage(rawChatMessage)
+	require.NoError(t, err)
+
+	id, err := p.RawMessageIDFromDatasyncID(messageDataSyncID)
+	require.NoError(t, err)
+	require.Equal(t, messageID, id)
+}
+
 func TestDeactivatePublicChat(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
