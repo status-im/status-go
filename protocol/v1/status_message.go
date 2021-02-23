@@ -12,7 +12,6 @@ import (
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/protocol/datasync"
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/encryption/sharedsecret"
@@ -141,28 +140,6 @@ func (m *StatusMessage) HandleEncryption(myKey *ecdsa.PrivateKey, senderKey *ecd
 	m.Installations = response.Installations
 	m.SharedSecrets = response.SharedSecrets
 	return nil
-}
-
-// HandleDatasync processes StatusMessage through data sync layer.
-// This is optional and DataSync might be nil. In such a case,
-// only one payload will be returned equal to DecryptedPayload.
-func (m *StatusMessage) HandleDatasync(datasync *datasync.DataSync) ([]*StatusMessage, error) {
-	var statusMessages []*StatusMessage
-
-	payloads := datasync.Handle(
-		m.SigPubKey(),
-		m.DecryptedPayload,
-	)
-
-	for _, payload := range payloads {
-		message, err := m.Clone()
-		if err != nil {
-			return nil, err
-		}
-		message.DecryptedPayload = payload
-		statusMessages = append(statusMessages, message)
-	}
-	return statusMessages, nil
 }
 
 func (m *StatusMessage) HandleApplicationMetadata() error {

@@ -115,7 +115,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesWrapped() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = wrappedPayload
 
-	decodedMessages, err := s.processor.HandleMessages(message, true)
+	decodedMessages, _, err := s.processor.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	s.Require().Equal(1, len(decodedMessages))
@@ -151,7 +151,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasync() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = marshalledDataSyncMessage
 
-	decodedMessages, err := s.processor.HandleMessages(message, true)
+	decodedMessages, _, err := s.processor.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	// We send two messages, the unwrapped one will be attributed to the relayer, while the wrapped one will be attributed to the author
@@ -215,7 +215,7 @@ func (s *MessageProcessorSuite) TestHandleDecodedMessagesDatasyncEncrypted() {
 	message.Sig = crypto.FromECDSAPub(&relayerKey.PublicKey)
 	message.Payload = encryptedPayload
 
-	decodedMessages, err := s.processor.HandleMessages(message, true)
+	decodedMessages, _, err := s.processor.HandleMessages(message, true)
 	s.Require().NoError(err)
 
 	// We send two messages, the unwrapped one will be attributed to the relayer,

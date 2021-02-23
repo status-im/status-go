@@ -1272,7 +1272,7 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 		SkipEncryption:      true,
 	}
 
-	_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, rawMessage)
+	_, err = c.messageProcessor.SendPrivate(context.Background(), server.PublicKey, &rawMessage)
 
 	if err != nil {
 		return err
@@ -1374,7 +1374,7 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 			MessageType:    protobuf.ApplicationMetadataMessage_PUSH_NOTIFICATION_REQUEST,
 		}
 
-		_, err = c.messageProcessor.SendPrivate(context.Background(), serverPublicKey, rawMessage)
+		_, err = c.messageProcessor.SendPrivate(context.Background(), serverPublicKey, &rawMessage)
 
 		if err != nil {
 			return nil, err
