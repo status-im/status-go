@@ -2753,6 +2753,31 @@ type ReceivedMessageState struct {
 	Timesource common.TimeSource
 }
 
+// addNewMessageNotification takes a common.Message and generates a new MessageNotificationBody and appends it to the
+// []Response.Notifications if the message is m.New
+func (r *ReceivedMessageState) addNewMessageNotification(m *common.Message) error {
+	if !m.New {
+		return nil
+	}
+
+	pubKey, err := m.GetSenderPubKey()
+	if err != nil {
+		return err
+	}
+	contactID := contactIDFromPublicKey(pubKey)
+
+	r.Response.Notifications = append(
+		r.Response.Notifications,
+		MessageNotificationBody{
+			Message: m,
+			Contact: r.AllContacts[contactID],
+			Chat:    r.AllChats[m.ChatId],
+		},
+	)
+
+	return nil
+}
+
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -3234,6 +3259,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	for _, message := range messageState.Response.Messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
+
+			// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
+			if err = messageState.addNewMessageNotification(message); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -4197,6 +4227,16 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		m.allChats[chat.ID] = chat
 		modifiedChats[chat.ID] = true
 
+		contact, err := m.getOrBuildContactFromMessage(message)
+		if err != nil {
+			return nil, err
+		}
+		response.Notifications = append(response.Notifications, MessageNotificationBody{
+			Message: message,
+			Contact: contact,
+			Chat:    m.allChats[message.ChatId],
+		})
+
 	}
 	for id := range modifiedChats {
 		response.Chats = append(response.Chats, m.allChats[id])
@@ -4606,4 +4646,23 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 	}
 
 	return encodedMessage, nil
+}
+
+func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact, error) {
+	if c, ok := m.allContacts[msg.From]; ok {
+		return c, nil
+	}
+
+	senderPubKey, err := msg.GetSenderPubKey()
+	if err != nil {
+		return nil, err
+	}
+	senderID := contactIDFromPublicKey(senderPubKey)
+	c, err := buildContact(senderID, senderPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	m.allContacts[msg.From] = c
+	return c, nil
 }
