@@ -1,18 +1,20 @@
 package appmetrics
 
 import (
+	"database/sql"
+
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/appmetrics/database"
+	"github.com/status-im/status-go/appmetrics"
 )
 
-func NewService(db *Database) *Service {
+func NewService(db *sql.DB) *Service {
 	return &Service{db: db}
 }
 
 type Service struct {
-	db *Database
+	db *sql.DB
 }
 
 func (s *Service) Start(*p2p.Server) error {
@@ -28,7 +30,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "appmetrics",
 			Version:   "0.1.0",
-			Service:   NewAPI(s.db),
+			Service:   appmetrics.NewDB(s.db),
 			Public:    true,
 		},
 	}
