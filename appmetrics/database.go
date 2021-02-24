@@ -17,10 +17,20 @@ type AppMetric struct {
 }
 
 const (
-	TestEvent1               AppMetricEventType = "go/test1"
-	TestEvent2               AppMetricEventType = "go/test2"
+	// Events for testing the system
+	TestEvent1 AppMetricEventType = "go/test1"
+	TestEvent2 AppMetricEventType = "go/test2"
+
+	// status-react navigation events
 	NavigationNavigateToCofx AppMetricEventType = "navigation/navigate-to"
 )
+
+// EventSchemaMap Every event should have a schema attached
+var EventSchemaMap = map[AppMetricEventType]interface{}{
+	TestEvent1:               StringSchema,
+	TestEvent2:               StringSchema,
+	NavigationNavigateToCofx: NavigationNavigateToCofxSchema,
+}
 
 func NewDB(db *sql.DB) *Database {
 	return &Database{db: db}
@@ -36,15 +46,14 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
-var EventSchemaMap = map[AppMetricEventType]interface{}{
-	TestEvent1               : StringSchema,
-	TestEvent2               : StringSchema,
-	NavigationNavigateToCofx : NavigationNavigateToCofxSchema,
-}
-
 func ValidateAppMetrics(appMetrics []AppMetric) (err error) {
 	for _, metric := range appMetrics {
 		schema := EventSchemaMap[metric.Event]
+
+		if schema == nil {
+			return errors.New("No schema defined for: " + string(metric.Event))
+		}
+
 		schemaLoader := gojsonschema.NewGoLoader(schema)
 		valLoader := gojsonschema.NewStringLoader(metric.Value)
 		res, err := gojsonschema.Validate(schemaLoader, valLoader)

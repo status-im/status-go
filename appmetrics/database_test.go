@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/appdatabase"
+
 	"github.com/stretchr/testify/require"
 )
 
