@@ -3,6 +3,7 @@ package appmetrics
 import (
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -14,6 +15,11 @@ type AppMetric struct {
 	Value      string             `json:"value"`
 	AppVersion string             `json:"app_version"`
 	OS         string             `json:"os"`
+}
+
+type AppMetricValidationError struct {
+	Metric AppMetric
+	Errors []gojsonschema.ResultError
 }
 
 const (
@@ -46,7 +52,24 @@ func (db Database) Close() error {
 	return db.db.Close()
 }
 
+func jsonschemaErrorsToError(validationErrors []AppMetricValidationError) error {
+	var fieldErrors []string
+
+	for _, appMetricValidationError := range validationErrors {
+		metric := appMetricValidationError.Metric
+		errors := appMetricValidationError.Errors
+
+		var errorDesc string = "Error in event: " + string(metric.Event) + "\nx----x----x\n"
+		for _, e := range errors {
+			errorDesc = errorDesc + "value." + e.Context().String() + ":" + e.Description() + ", "
+		}
+	}
+
+	return errors.New(strings.Join(fieldErrors[:], "\n"))
+}
+
 func ValidateAppMetrics(appMetrics []AppMetric) (err error) {
+	var calculatedErrors []AppMetricValidationError
 	for _, metric := range appMetrics {
 		schema := EventSchemaMap[metric.Event]
 
@@ -62,13 +85,14 @@ func ValidateAppMetrics(appMetrics []AppMetric) (err error) {
 			return err
 		}
 
+		// validate all metrics and save errors
 		if !res.Valid() {
-			var errorDesc string = "Error in event: " + string(metric.Event) + "\n"
-			for _, e := range res.Errors() {
-				errorDesc = errorDesc + "value." + e.Context().String() + ":" + e.Description() + ", "
-			}
-			return errors.New(errorDesc)
+			calculatedErrors = append(calculatedErrors, AppMetricValidationError{metric, res.Errors()})
 		}
+	}
+
+	if len(calculatedErrors) > 0 {
+		return jsonschemaErrorsToError(calculatedErrors)
 	}
 	return
 }
