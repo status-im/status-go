@@ -2,10 +2,9 @@ package signal
 
 import (
 	"encoding/hex"
+	"encoding/json"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	statusproto "github.com/status-im/status-go/protocol"
 
 	"github.com/status-im/status-go/eth-node/types"
 )
@@ -158,6 +157,6 @@ func SendWhisperFilterAdded(filters []*Filter) {
 	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
 }
 
-func SendNewMessages(response *statusproto.MessengerResponse) {
-	send(EventNewMessages, response)
+func SendNewMessages(obj json.Marshaler) {
+	send(EventNewMessages, obj)
 }

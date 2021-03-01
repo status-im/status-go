@@ -2,9 +2,9 @@ package localnotifications
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -128,19 +128,8 @@ func TestTransactionNotification(t *testing.T) {
 		if signalEvent == nil {
 			return fmt.Errorf("signal was not handled")
 		}
-		notification := struct {
-			Type  string
-			Event Notification
-		}{}
-
-		require.NoError(t, json.Unmarshal(signalEvent, &notification))
-
-		if notification.Type != "local-notifications" {
-			return fmt.Errorf("wrong signal was sent")
-		}
-		if notification.Event.Body.(*notificationBody).To != header.Address {
-			return fmt.Errorf("transaction to address is wrong")
-		}
+		require.True(t, strings.Contains(string(signalEvent), `"type":"local-notifications"`))
+		require.True(t, strings.Contains(string(signalEvent), `"to":"`+header.Address.Hex()))
 		return nil
 	}, 2*time.Second, 100*time.Millisecond))
 

@@ -530,6 +530,15 @@ func (db *Database) DeleteAccount(address types.Address) error {
 	return err
 }
 
+func (db *Database) GetNotificationsEnabled() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT notifications_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
 func (db *Database) GetWalletAddress() (rst types.Address, err error) {
 	err = db.db.QueryRow("SELECT address FROM accounts WHERE wallet = 1").Scan(&rst)
 	return

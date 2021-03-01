@@ -16,7 +16,8 @@ const (
 	// https://notes.status.im/i8Y_l7ccTiOYq09HVgoFwA
 	kdfIterationsNumber = 3200
 	// WALMode for sqlite.
-	WALMode = "wal"
+	WALMode      = "wal"
+	inMemoryPath = ":memory:"
 )
 
 // DecryptDB completely removes the encryption from the db
@@ -97,7 +98,7 @@ func openDB(path, key string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	if mode != WALMode {
+	if mode != WALMode && path != inMemoryPath {
 		return nil, fmt.Errorf("unable to set journal_mode to WAL. actual mode %s", mode)
 	}
 

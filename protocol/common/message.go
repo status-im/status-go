@@ -110,6 +110,8 @@ type Message struct {
 	RTL bool `json:"rtl"`
 	// ParsedText is the parsed markdown for displaying
 	ParsedText []byte `json:"parsedText,omitempty"`
+	// ParsedTextAst is the ast of the parsed text
+	ParsedTextAst *ast.Node `json:"-"`
 	// LineCount is the count of newlines in the message
 	LineCount int `json:"lineCount"`
 	// Base64Image is the converted base64 image
@@ -323,12 +325,52 @@ func (m *Message) parseAudio() error {
 }
 
 // implement interface of https://github.com/status-im/markdown/blob/b9fe921681227b1dace4b56364e15edb3b698308/ast/node.go#L701
-type NodeVisitor struct {
+type SimplifiedTextVisitor struct {
+	text           string
+	canonicalNames map[string]string
+}
+
+func (v *SimplifiedTextVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
+	// only on entering we fetch, otherwise we go on
+	if !entering {
+		return ast.GoToNext
+	}
+
+	switch n := node.(type) {
+	case *ast.Mention:
+		literal := string(n.Literal)
+		canonicalName, ok := v.canonicalNames[literal]
+		if ok {
+			v.text += canonicalName
+		} else {
+			v.text += literal
+		}
+	case *ast.Link:
+		destination := string(n.Destination)
+		v.text += destination
+	default:
+		var literal string
+
+		leaf := node.AsLeaf()
+		container := node.AsContainer()
+		if leaf != nil {
+			literal = string(leaf.Literal)
+		} else if container != nil {
+			literal = string(container.Literal)
+		}
+		v.text += literal
+	}
+
+	return ast.GoToNext
+}
+
+// implement interface of https://github.com/status-im/markdown/blob/b9fe921681227b1dace4b56364e15edb3b698308/ast/node.go#L701
+type MentionsAndLinksVisitor struct {
 	mentions []string
 	links    []string
 }
 
-func (v *NodeVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
+func (v *MentionsAndLinksVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
 	// only on entering we fetch, otherwise we go on
 	if !entering {
 		return ast.GoToNext
@@ -344,7 +386,7 @@ func (v *NodeVisitor) Visit(node ast.Node, entering bool) ast.WalkStatus {
 }
 
 func extractMentionsAndLinks(parsedText ast.Node) ([]string, []string) {
-	visitor := &NodeVisitor{}
+	visitor := &MentionsAndLinksVisitor{}
 	ast.Walk(parsedText, visitor)
 	return visitor.mentions, visitor.links
 }
@@ -358,6 +400,7 @@ func (m *Message) PrepareContent() error {
 	if err != nil {
 		return err
 	}
+	m.ParsedTextAst = &parsedText
 	m.ParsedText = jsonParsedText
 	m.LineCount = strings.Count(m.Text, "\n")
 	m.RTL = isRTL(m.Text)
@@ -365,6 +408,34 @@ func (m *Message) PrepareContent() error {
 		return err
 	}
 	return m.parseAudio()
+}
+
+// GetSimplifiedText returns a the text stripped of all the markdown and with mentions
+// replaced by canonical names
+func (m *Message) GetSimplifiedText(canonicalNames map[string]string) (string, error) {
+
+	if m.ContentType == protobuf.ChatMessage_AUDIO {
+		return "Audio", nil
+	}
+	if m.ContentType == protobuf.ChatMessage_STICKER {
+		return "Sticker", nil
+	}
+	if m.ContentType == protobuf.ChatMessage_IMAGE {
+		return "Image", nil
+	}
+	if m.ContentType == protobuf.ChatMessage_COMMUNITY {
+		return "Community", nil
+	}
+
+	if m.ParsedTextAst == nil {
+		err := m.PrepareContent()
+		if err != nil {
+			return "", err
+		}
+	}
+	visitor := &SimplifiedTextVisitor{canonicalNames: canonicalNames}
+	ast.Walk(*m.ParsedTextAst, visitor)
+	return visitor.text, nil
 }
 
 func getAudioMessageMIME(i *protobuf.AudioMessage) (string, error) {

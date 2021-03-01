@@ -76,6 +76,7 @@ message PushNotification {
     UNKNOWN_PUSH_NOTIFICATION_TYPE = 0;
     MESSAGE = 1;
     MENTION = 2;
+    REQUEST_TO_JOIN_COMMUNITY = 3;
   }
   bytes author = 7;
 }

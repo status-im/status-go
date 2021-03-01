@@ -7,6 +7,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/transport"
+	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 )
 
@@ -23,12 +24,13 @@ type MessengerResponse struct {
 	Mailservers             []mailservers.Mailserver
 	MailserverTopics        []mailservers.MailserverTopic
 	MailserverRanges        []mailservers.ChatRequestRange
-	// Notifications a list of MessageNotificationBody derived from received messages that are useful to notify the user about
-	Notifications []MessageNotificationBody
 
-	chats        map[string]*Chat
-	removedChats map[string]bool
-	communities  map[string]*communities.Community
+	// notifications a list of notifications derived from messenger events
+	// that are useful to notify the user about
+	notifications map[string]*localnotifications.Notification
+	chats         map[string]*Chat
+	removedChats  map[string]bool
+	communities   map[string]*communities.Community
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -47,9 +49,10 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Mailservers             []mailservers.Mailserver        `json:"mailservers,omitempty"`
 		MailserverTopics        []mailservers.MailserverTopic   `json:"mailserverTopics,omitempty"`
 		MailserverRanges        []mailservers.ChatRequestRange  `json:"mailserverRanges,omitempty"`
-		// Notifications a list of MessageNotificationBody derived from received messages that are useful to notify the user about
-		Notifications []MessageNotificationBody `json:"notifications"`
-		Communities   []*communities.Community  `json:"communities,omitempty"`
+		// Notifications a list of notifications derived from messenger events
+		// that are useful to notify the user about
+		Notifications []*localnotifications.Notification `json:"notifications"`
+		Communities   []*communities.Community           `json:"communities,omitempty"`
 	}{
 		Messages:                r.Messages,
 		Contacts:                r.Contacts,
@@ -63,9 +66,9 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Mailservers:             r.Mailservers,
 		MailserverTopics:        r.MailserverTopics,
 		MailserverRanges:        r.MailserverRanges,
-		Notifications:           r.Notifications,
 	}
 
+	responseItem.Notifications = r.Notifications()
 	responseItem.Chats = r.Chats()
 	responseItem.Communities = r.Communities()
 	responseItem.RemovedChats = r.RemovedChats()
@@ -97,6 +100,14 @@ func (r *MessengerResponse) Communities() []*communities.Community {
 	return communities
 }
 
+func (r *MessengerResponse) Notifications() []*localnotifications.Notification {
+	var notifications []*localnotifications.Notification
+	for _, n := range r.notifications {
+		notifications = append(notifications, n)
+	}
+	return notifications
+}
+
 func (r *MessengerResponse) IsEmpty() bool {
 	return len(r.chats)+
 		len(r.Messages)+
@@ -112,7 +123,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.MailserverTopics)+
 		len(r.Mailservers)+
 		len(r.MailserverRanges)+
-		len(r.Notifications)+
+		len(r.notifications)+
 		len(r.RequestsToJoinCommunity) == 0
 }
 
@@ -127,7 +138,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.Mailservers)+
 		len(response.MailserverTopics)+
 		len(response.MailserverRanges)+
-		len(response.Notifications)+
 		len(response.EmojiReactions)+
 		len(response.CommunityChanges) != 0 {
 		return ErrNotImplemented
@@ -135,6 +145,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 
 	r.AddChats(response.Chats())
 	r.AddRemovedChats(response.RemovedChats())
+	r.AddNotifications(response.Notifications())
 	r.overrideMessages(response.Messages)
 	r.overrideFilters(response.Filters)
 	r.overrideRemovedFilters(response.Filters)
@@ -216,6 +227,24 @@ func (r *MessengerResponse) AddChat(c *Chat) {
 func (r *MessengerResponse) AddChats(chats []*Chat) {
 	for _, c := range chats {
 		r.AddChat(c)
+	}
+}
+
+func (r *MessengerResponse) AddNotification(n *localnotifications.Notification) {
+	if r.notifications == nil {
+		r.notifications = make(map[string]*localnotifications.Notification)
+	}
+
+	r.notifications[n.ID.String()] = n
+}
+
+func (r *MessengerResponse) ClearNotifications() {
+	r.notifications = nil
+}
+
+func (r *MessengerResponse) AddNotifications(notifications []*localnotifications.Notification) {
+	for _, c := range notifications {
+		r.AddNotification(c)
 	}
 }
 

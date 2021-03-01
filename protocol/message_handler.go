@@ -415,6 +415,17 @@ func (m *MessageHandler) HandleCommunityRequestToJoin(state *ReceivedMessageStat
 
 	state.Response.RequestsToJoinCommunity = append(state.Response.RequestsToJoinCommunity, requestToJoin)
 
+	community, err := m.communitiesManager.GetByID(requestToJoinProto.CommunityId)
+	if err != nil {
+		return err
+	}
+
+	contactID := contactIDFromPublicKey(signer)
+
+	contact := state.AllContacts[contactID]
+
+	state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
+
 	return nil
 }
 

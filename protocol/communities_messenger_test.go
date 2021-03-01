@@ -309,6 +309,8 @@ func (s *MessengerCommunitiesSuite) TestInviteUsersToCommunity() {
 	s.Require().NoError(err)
 	s.Require().NotNil(response)
 	s.Require().Len(response.Communities(), 1)
+	s.Require().True(response.Communities()[0].HasMember(&s.bob.identity.PublicKey))
+	s.Require().True(response.Communities()[0].IsMemberAdmin(&s.bob.identity.PublicKey))
 
 	community := response.Communities()[0]
 
@@ -786,6 +788,12 @@ func (s *MessengerCommunitiesSuite) TestRequestAccessAgain() {
 	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin2.State)
 
 	s.Require().Equal(requestToJoin1.ID, requestToJoin2.ID)
+
+	// Check that a notification is been added to messenger
+
+	notifications := response.Notifications()
+	s.Require().Len(notifications, 1)
+	s.Require().NotEqual(notifications[0].ID.Hex(), "0x0000000000000000000000000000000000000000000000000000000000000000")
 
 	// Accept request
 

@@ -14,6 +14,7 @@ import (
 
 const defaultNewMessageNotificationText = "You have a new message"
 const defaultMentionNotificationText = "Someone mentioned you"
+const defaultRequestToJoinCommunityNotificationText = "Someone requested to join a community you are an admin of"
 
 type GoRushRequestData struct {
 	EncryptedMessage string `json:"encryptedMessage"`
@@ -56,6 +57,8 @@ func PushNotificationRegistrationToGoRushRequest(requestAndRegistrations []*Requ
 		var text string
 		if request.Type == protobuf.PushNotification_MESSAGE {
 			text = defaultNewMessageNotificationText
+		} else if request.Type == protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY {
+			text = defaultRequestToJoinCommunityNotificationText
 		} else {
 			text = defaultMentionNotificationText
 		}

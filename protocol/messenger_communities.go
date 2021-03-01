@@ -201,6 +201,25 @@ func (m *Messenger) RequestToJoinCommunity(request *requests.RequestToJoinCommun
 	response := &MessengerResponse{RequestsToJoinCommunity: []*communities.RequestToJoin{requestToJoin}}
 	response.AddCommunity(community)
 
+	// We send a push notification in the background
+	go func() {
+		if m.pushNotificationClient != nil {
+			pks, err := community.CanManageUsersPublicKeys()
+			if err != nil {
+				m.logger.Error("failed to get pks", zap.Error(err))
+				return
+			}
+			for _, publicKey := range pks {
+				pkString := common.PubkeyToHex(publicKey)
+				_, err = m.pushNotificationClient.SendNotification(publicKey, nil, requestToJoin.ID, pkString, protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY)
+				if err != nil {
+					m.logger.Error("error sending notification", zap.Error(err))
+					return
+				}
+			}
+		}
+	}()
+
 	return response, nil
 }
 
@@ -314,7 +333,7 @@ func (m *Messenger) CreateCommunity(request *requests.CreateCommunity) (*Messeng
 	}
 
 	description.Members = make(map[string]*protobuf.CommunityMember)
-	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{}
+	description.Members[common.PubkeyToHex(&m.identity.PublicKey)] = &protobuf.CommunityMember{Roles: []protobuf.CommunityMember_Roles{protobuf.CommunityMember_ROLE_ALL}}
 
 	community, err := m.communitiesManager.CreateCommunity(description)
 	if err != nil {
