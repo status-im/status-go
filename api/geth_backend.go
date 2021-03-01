@@ -23,6 +23,7 @@ import (
 
 	"github.com/status-im/status-go/account"
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/logutils"
@@ -33,6 +34,7 @@ import (
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/rpc"
 	accountssvc "github.com/status-im/status-go/services/accounts"
+	appmetricsservice "github.com/status-im/status-go/services/appmetrics"
 	"github.com/status-im/status-go/services/browsers"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
@@ -578,6 +580,12 @@ func (b *GethStatusBackend) mailserversService() gethnode.ServiceConstructor {
 	}
 }
 
+func (b *GethStatusBackend) appmetricsService() gethnode.ServiceConstructor {
+	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
+		return appmetricsservice.NewService(appmetrics.NewDB(b.appDB)), nil
+	}
+}
+
 func (b *GethStatusBackend) walletService(network uint64, accountsFeed *event.Feed) gethnode.ServiceConstructor {
 	return func(*gethnode.ServiceContext) (gethnode.Service, error) {
 		return wallet.NewService(wallet.NewDB(b.appDB, network), accountsFeed), nil
@@ -614,6 +622,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
 	services = append(services, b.subscriptionService())
 	services = append(services, b.rpcStatsService())
+	services = append(services, b.appmetricsService())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())

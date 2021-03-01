@@ -1,20 +1,17 @@
 package appmetrics
 
 import (
-	"database/sql"
-
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/appmetrics"
 )
 
-func NewService(db *sql.DB) *Service {
+func NewService(db *appmetrics.Database) *Service {
 	return &Service{db: db}
 }
-
 type Service struct {
-	db *sql.DB
+	db *appmetrics.Database
 }
 
 func (s *Service) Start(*p2p.Server) error {
