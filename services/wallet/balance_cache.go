@@ -3,16 +3,25 @@ package wallet
 import (
 	"context"
 	"math/big"
+	"sort"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
+type nonceRange struct {
+	nonce int64
+	max   *big.Int
+	min   *big.Int
+}
+
 type balanceCache struct {
 	// balances maps an address to a map of a block number and the balance of this particular address
-	balances map[common.Address]map[*big.Int]*big.Int
-	nonces   map[common.Address]map[*big.Int]*int64
-	rw       sync.RWMutex
+	balances     map[common.Address]map[*big.Int]*big.Int
+	nonces       map[common.Address]map[*big.Int]*int64
+	nonceRanges  map[common.Address]map[int64]nonceRange
+	sortedRanges map[common.Address][]nonceRange
+	rw           sync.RWMutex
 }
 
 type BalanceCache interface {
@@ -59,6 +68,69 @@ func (b *balanceCache) ReadCachedNonce(account common.Address, blockNumber *big.
 	return b.nonces[account][blockNumber]
 }
 
+func (b *balanceCache) sortRanges(account common.Address) {
+	keys := make([]int, 0, len(b.nonceRanges[account]))
+	for k := range b.nonceRanges[account] {
+		keys = append(keys, int(k))
+	}
+
+	sort.Ints(keys)
+
+	ranges := []nonceRange{}
+	for _, k := range keys {
+		r := b.nonceRanges[account][int64(k)]
+		ranges = append(ranges, r)
+	}
+
+	b.sortedRanges[account] = ranges
+}
+
+func (b *balanceCache) findNonceInRange(account common.Address, block *big.Int) *int64 {
+	for k := range b.sortedRanges[account] {
+		nr := b.sortedRanges[account][k]
+		cmpMin := nr.min.Cmp(block)
+		if cmpMin == 1 {
+			return nil
+		} else if cmpMin == 0 {
+			return &nr.nonce
+		} else {
+			cmpMax := nr.max.Cmp(block)
+			if cmpMax >= 0 {
+				return &nr.nonce
+			}
+		}
+	}
+
+	return nil
+}
+
+func (b *balanceCache) updateNonceRange(account common.Address, blockNumber *big.Int, nonce *int64) {
+	_, exists := b.nonceRanges[account]
+	if !exists {
+		b.nonceRanges[account] = make(map[int64]nonceRange)
+	}
+	nr, exists := b.nonceRanges[account][*nonce]
+	if !exists {
+		r := nonceRange{
+			max:   big.NewInt(0).Set(blockNumber),
+			min:   big.NewInt(0).Set(blockNumber),
+			nonce: *nonce,
+		}
+		b.nonceRanges[account][*nonce] = r
+	} else {
+		if nr.max.Cmp(blockNumber) == -1 {
+			nr.max.Set(blockNumber)
+		}
+
+		if nr.min.Cmp(blockNumber) == 1 {
+			nr.min.Set(blockNumber)
+		}
+
+		b.nonceRanges[account][*nonce] = nr
+		b.sortRanges(account)
+	}
+}
+
 func (b *balanceCache) addNonceToCache(account common.Address, blockNumber *big.Int, nonce *int64) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
@@ -68,6 +140,7 @@ func (b *balanceCache) addNonceToCache(account common.Address, blockNumber *big.
 		b.nonces[account] = make(map[*big.Int]*int64)
 	}
 	b.nonces[account][blockNumber] = nonce
+	b.updateNonceRange(account, blockNumber, nonce)
 }
 
 func (b *balanceCache) NonceAt(ctx context.Context, client BalanceReader, account common.Address, blockNumber *big.Int) (*int64, error) {
@@ -75,6 +148,12 @@ func (b *balanceCache) NonceAt(ctx context.Context, client BalanceReader, accoun
 	if cachedNonce != nil {
 		return cachedNonce, nil
 	}
+
+	rangeNonce := b.findNonceInRange(account, blockNumber)
+	if rangeNonce != nil {
+		return rangeNonce, nil
+	}
+
 	nonce, err := client.NonceAt(ctx, account, blockNumber)
 	if err != nil {
 		return nil, err
@@ -87,7 +166,9 @@ func (b *balanceCache) NonceAt(ctx context.Context, client BalanceReader, accoun
 
 func newBalanceCache() *balanceCache {
 	return &balanceCache{
-		balances: make(map[common.Address]map[*big.Int]*big.Int),
-		nonces:   make(map[common.Address]map[*big.Int]*int64),
+		balances:     make(map[common.Address]map[*big.Int]*big.Int),
+		nonces:       make(map[common.Address]map[*big.Int]*int64),
+		nonceRanges:  make(map[common.Address]map[int64]nonceRange),
+		sortedRanges: make(map[common.Address][]nonceRange),
 	}
 }
