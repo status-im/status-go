@@ -27,7 +27,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "appmetrics",
 			Version:   "0.1.0",
-			Service:   appmetrics.NewDB(s.db),
+			Service:   NewAppMetricsAPI(s.db),
 			Public:    true,
 		},
 	}

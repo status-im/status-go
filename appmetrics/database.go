@@ -68,7 +68,7 @@ func jsonschemaErrorsToError(validationErrors []AppMetricValidationError) error 
 	return errors.New(strings.Join(fieldErrors[:], "\n"))
 }
 
-func ValidateAppMetrics(appMetrics []AppMetric) (err error) {
+func (db *Database) ValidateAppMetrics(appMetrics []AppMetric) (err error) {
 	var calculatedErrors []AppMetricValidationError
 	for _, metric := range appMetrics {
 		schema := EventSchemaMap[metric.Event]
@@ -104,7 +104,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 	)
 
 	// make sure that the shape of the metric is same as expected
-	err = ValidateAppMetrics(appMetrics)
+	err = db.ValidateAppMetrics(appMetrics)
 	if err != nil {
 		return err
 	}
