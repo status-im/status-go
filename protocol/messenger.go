@@ -3940,7 +3940,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		response.Notifications = append(response.Notifications, MessageNotificationBody{
 			Message: message,
 			Contact: contact,
-			Chat:    m.allChats[message.ChatId],
+			Chat:    chat,
 		})
 
 	}
