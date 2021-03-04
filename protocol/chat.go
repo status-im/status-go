@@ -97,7 +97,7 @@ func (c *Chat) Public() bool {
 }
 
 func (c *Chat) ProfileUpdates() bool {
-	return c.ChatType == ChatTypeProfile
+	return c.ChatType == ChatTypeProfile || len(c.Profile) > 0
 }
 
 func (c *Chat) Timeline() bool {
