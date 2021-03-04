@@ -2210,7 +2210,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 	}
 
 	for _, chat := range m.allChats {
-		if !chat.Timeline() && chat.Public() && chat.Active {
+		if !chat.Timeline() && !chat.ProfileUpdates() && chat.Public() && chat.Active {
 			if err := m.syncPublicChat(ctx, chat); err != nil {
 				return err
 			}
