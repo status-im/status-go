@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math/rand"
-	"strings"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -101,10 +100,8 @@ func (c *Chat) ProfileUpdates() bool {
 	return c.ChatType == ChatTypeProfile
 }
 
-// It looks like status-react created profile chats as public chats
-// so for now we need to check for the presence of "@" in their chatID
 func (c *Chat) Timeline() bool {
-	return c.ChatType == ChatTypeTimeline || (c.Public() && strings.HasPrefix(c.ID, "@"))
+	return c.ChatType == ChatTypeTimeline
 }
 
 func (c *Chat) OneToOne() bool {
