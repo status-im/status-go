@@ -20,7 +20,7 @@ pipeline {
     checkoutToSubdirectory('src/github.com/status-im/status-go')
     /* manage how many builds we keep */
     buildDiscarder(logRotator(
-      numToKeepStr: '30',
+      numToKeepStr: '5',
       daysToKeepStr: '30',
     ))
   }
