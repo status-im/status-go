@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"errors"
+
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/transport"
