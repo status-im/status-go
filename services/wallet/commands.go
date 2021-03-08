@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -21,7 +20,7 @@ type ethHistoricalCommand struct {
 	db           *Database
 	eth          TransferDownloader
 	address      common.Address
-	client       reactorClient
+	client       *walletClient
 	balanceCache *balanceCache
 	feed         *event.Feed
 	foundHeaders []*DBHeader
@@ -69,7 +68,7 @@ type erc20HistoricalCommand struct {
 	db      *Database
 	erc20   BatchDownloader
 	address common.Address
-	client  reactorClient
+	client  *walletClient
 	feed    *event.Feed
 
 	iterator     *IterativeDownloader
@@ -121,7 +120,7 @@ type newBlocksTransfersCommand struct {
 	chain                *big.Int
 	erc20                *ERC20TransfersDownloader
 	eth                  *ETHTransferDownloader
-	client               reactorClient
+	client               *walletClient
 	feed                 *event.Feed
 	lastFetchedBlockTime time.Time
 
@@ -171,7 +170,7 @@ func (c *newBlocksTransfersCommand) getAllTransfers(parent context.Context, from
 			accounts:      c.accounts,
 			db:            c.db,
 			chain:         c.chain,
-			client:        c.eth.client,
+			client:        c.client,
 			balanceCache:  balanceCache,
 			feed:          c.feed,
 			fromByAddress: fromByAddress,
@@ -450,7 +449,7 @@ type controlCommand struct {
 	eth                *ETHTransferDownloader
 	erc20              *ERC20TransfersDownloader
 	chain              *big.Int
-	client             *ethclient.Client
+	client             *walletClient
 	feed               *event.Feed
 	safetyDepth        *big.Int
 	watchNewBlocks     bool
@@ -554,7 +553,7 @@ func getTransfersByBlocks(ctx context.Context, db *Database, downloader *ETHTran
 	return allTransfers, nil
 }
 
-func loadTransfers(ctx context.Context, accounts []common.Address, db *Database, client *ethclient.Client, chain *big.Int, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
+func loadTransfers(ctx context.Context, accounts []common.Address, db *Database, client *walletClient, chain *big.Int, limit int, blocksByAddress map[common.Address][]*big.Int) (map[common.Address][]Transfer, error) {
 	start := time.Now()
 	group := NewGroup(ctx)
 
@@ -643,7 +642,7 @@ func (c *controlCommand) verifyLastSynced(parent context.Context, last *DBHeader
 	return cmd.Command()(parent)
 }
 */
-func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *ethclient.Client) (*big.Int, error) {
+func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *walletClient) (*big.Int, error) {
 	from := big.NewInt(0)
 	to := initialTo
 	goal := uint64(20)
@@ -699,7 +698,7 @@ func findFirstRange(c context.Context, account common.Address, initialTo *big.In
 	return from, nil
 }
 
-func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *ethclient.Client) (map[common.Address]*big.Int, error) {
+func findFirstRanges(c context.Context, accounts []common.Address, initialTo *big.Int, client *walletClient) (map[common.Address]*big.Int, error) {
 	res := map[common.Address]*big.Int{}
 
 	for _, address := range accounts {
@@ -955,7 +954,7 @@ type transfersCommand struct {
 	eth              *ETHTransferDownloader
 	block            *big.Int
 	address          common.Address
-	client           reactorClient
+	client           *walletClient
 	fetchedTransfers []Transfer
 }
 
@@ -988,7 +987,7 @@ type loadTransfersCommand struct {
 	accounts                []common.Address
 	db                      *Database
 	chain                   *big.Int
-	client                  *ethclient.Client
+	client                  *walletClient
 	blocksByAddress         map[common.Address][]*big.Int
 	foundTransfersByAddress map[common.Address][]Transfer
 }
@@ -1024,7 +1023,7 @@ type findAndCheckBlockRangeCommand struct {
 	accounts      []common.Address
 	db            *Database
 	chain         *big.Int
-	client        *ethclient.Client
+	client        *walletClient
 	balanceCache  *balanceCache
 	feed          *event.Feed
 	fromByAddress map[common.Address]*big.Int

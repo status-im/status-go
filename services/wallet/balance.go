@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/status-im/status-go/services/wallet/ierc20"
@@ -18,7 +17,7 @@ import (
 var requestTimeout = 20 * time.Second
 
 // GetTokensBalances takes list of accounts and tokens and returns mapping of token balances for each account.
-func GetTokensBalances(parent context.Context, client *ethclient.Client, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
+func GetTokensBalances(parent context.Context, client *walletClient, accounts, tokens []common.Address) (map[common.Address]map[common.Address]*hexutil.Big, error) {
 	var (
 		group    = NewAtomicGroup(parent)
 		mu       sync.Mutex

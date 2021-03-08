@@ -56,7 +56,7 @@ func (s *ETHTransferSuite) SetupTest() {
 	s.dbStop = stop
 	s.downloader = &ETHTransferDownloader{
 		signer: s.signer,
-		client: s.ethclient,
+		client: &walletClient{client: s.ethclient},
 		db:     db,
 		accounts: []common.Address{
 			crypto.PubkeyToAddress(s.identity.PublicKey),
@@ -188,7 +188,7 @@ func (s *ERC20TransferSuite) SetupTest() {
 	client, err := node.Attach()
 	s.Require().NoError(err)
 	s.ethclient = ethclient.NewClient(client)
-	s.downloader = NewERC20TransfersDownloader(s.ethclient, []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)}, s.signer)
+	s.downloader = NewERC20TransfersDownloader(&walletClient{client: s.ethclient}, []common.Address{crypto.PubkeyToAddress(s.identity.PublicKey)}, s.signer)
 
 	var (
 		tx       *types.Transaction

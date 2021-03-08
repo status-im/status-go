@@ -42,18 +42,19 @@ func (s *NewBlocksSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.address = crypto.PubkeyToAddress(account.PublicKey)
 	s.feed = &event.Feed{}
+	client := &walletClient{client: s.backend.Client}
 	s.cmd = &newBlocksTransfersCommand{
 		db:       s.db,
 		accounts: []common.Address{s.address},
-		erc20:    NewERC20TransfersDownloader(s.backend.Client, []common.Address{s.address}, s.backend.Signer),
+		erc20:    NewERC20TransfersDownloader(client, []common.Address{s.address}, s.backend.Signer),
 		eth: &ETHTransferDownloader{
-			client:   s.backend.Client,
+			client:   client,
 			signer:   s.backend.Signer,
 			db:       s.db,
 			accounts: []common.Address{s.address},
 		},
 		feed:   s.feed,
-		client: s.backend.Client,
+		client: client,
 		chain:  big.NewInt(1777),
 	}
 }
@@ -183,17 +184,18 @@ func (s *NewBlocksSuite) downloadHistorical() {
 	s.Require().Equal(40, n)
 	s.Require().NoError(err)
 
+	client := &walletClient{client: s.backend.Client}
 	eth := &ethHistoricalCommand{
 		db:           s.db,
 		balanceCache: newBalanceCache(),
 		eth: &ETHTransferDownloader{
-			client:   s.backend.Client,
+			client:   client,
 			signer:   s.backend.Signer,
 			accounts: []common.Address{s.address},
 		},
 		feed:    s.feed,
 		address: s.address,
-		client:  s.backend.Client,
+		client:  client,
 		from:    big.NewInt(0),
 		to:      s.backend.Ethereum.BlockChain().CurrentBlock().Number(),
 	}

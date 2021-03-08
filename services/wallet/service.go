@@ -34,7 +34,7 @@ type Service struct {
 	db                  *Database
 	reactor             *Reactor
 	signals             *SignalsTransmitter
-	client              *ethclient.Client
+	client              *walletClient
 	cryptoOnRampManager *CryptoOnRampManager
 	started             bool
 
@@ -55,7 +55,7 @@ func (s *Service) GetFeed() *event.Feed {
 
 // SetClient sets ethclient
 func (s *Service) SetClient(client *ethclient.Client) {
-	s.client = client
+	s.client = &walletClient{client: client}
 }
 
 // MergeBlocksRanges merge old blocks ranges if possible
@@ -78,7 +78,7 @@ func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Addre
 		return err
 	}
 	s.reactor = reactor
-	s.client = client
+	s.SetClient(client)
 	s.group.Add(func(ctx context.Context) error {
 		return WatchAccountsChanges(ctx, s.accountsFeed, accounts, reactor)
 	})

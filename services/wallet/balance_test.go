@@ -29,7 +29,7 @@ type BalancesSuite struct {
 	tokens   []common.Address
 	accounts []common.Address
 
-	client *ethclient.Client
+	client *walletClient
 
 	faucet *ecdsa.PrivateKey
 }
@@ -45,7 +45,7 @@ func (s *BalancesSuite) SetupTest() {
 
 	client, err := node.Attach()
 	s.Require().NoError(err)
-	s.client = ethclient.NewClient(client)
+	s.client = &walletClient{ethclient.NewClient(client)}
 
 	s.tokens = make([]common.Address, 3)
 	s.accounts = make([]common.Address, 5)
@@ -55,7 +55,7 @@ func (s *BalancesSuite) SetupTest() {
 		s.accounts[i] = crypto.PubkeyToAddress(key.PublicKey)
 	}
 	for i := range s.tokens {
-		token, tx, _, err := erc20.DeployERC20Transfer(bind.NewKeyedTransactor(s.faucet), s.client)
+		token, tx, _, err := erc20.DeployERC20Transfer(bind.NewKeyedTransactor(s.faucet), s.client.client)
 		s.Require().NoError(err)
 		_, err = bind.WaitMined(context.Background(), s.client, tx)
 		s.Require().NoError(err)
@@ -70,7 +70,7 @@ func (s *BalancesSuite) TestBalanceEqualPerToken() {
 		expected[account] = map[common.Address]*hexutil.Big{}
 		for i, token := range s.tokens {
 			balance := new(big.Int).Add(base, big.NewInt(int64(i)))
-			transactor, err := erc20.NewERC20Transfer(token, s.client)
+			transactor, err := erc20.NewERC20Transfer(token, s.client.client)
 			s.Require().NoError(err)
 			tx, err := transactor.Transfer(bind.NewKeyedTransactor(s.faucet), account, balance)
 			s.Require().NoError(err)
@@ -91,7 +91,7 @@ func (s *BalancesSuite) TestBalanceEqualPerAccount() {
 		expected[account] = map[common.Address]*hexutil.Big{}
 		for _, token := range s.tokens {
 			balance := new(big.Int).Add(base, big.NewInt(int64(i)))
-			transactor, err := erc20.NewERC20Transfer(token, s.client)
+			transactor, err := erc20.NewERC20Transfer(token, s.client.client)
 			s.Require().NoError(err)
 			tx, err := transactor.Transfer(bind.NewKeyedTransactor(s.faucet), account, balance)
 			s.Require().NoError(err)

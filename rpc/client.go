@@ -14,6 +14,7 @@ import (
 	gethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/status-im/status-go/params"
+	"github.com/status-im/status-go/services/rpcstats"
 )
 
 const (
@@ -124,6 +125,7 @@ func (c *Client) Call(result interface{}, method string, args ...interface{}) er
 // It uses custom routing scheme for calls.
 // If there are any local handlers registered for this call, they will handle it.
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+	rpcstats.CountCall(method)
 	if c.router.routeBlocked(method) {
 		return ErrMethodNotFound
 	}

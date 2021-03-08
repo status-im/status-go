@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -51,7 +50,7 @@ type Transfer struct {
 
 // ETHTransferDownloader downloads regular eth transfers.
 type ETHTransferDownloader struct {
-	client   *ethclient.Client
+	client   *walletClient
 	accounts []common.Address
 	signer   types.Signer
 	db       *Database
@@ -143,7 +142,7 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 }
 
 // NewERC20TransfersDownloader returns new instance.
-func NewERC20TransfersDownloader(client *ethclient.Client, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
+func NewERC20TransfersDownloader(client *walletClient, accounts []common.Address, signer types.Signer) *ERC20TransfersDownloader {
 	signature := crypto.Keccak256Hash([]byte(erc20TransferEventSignature))
 	return &ERC20TransfersDownloader{
 		client:    client,
@@ -155,7 +154,7 @@ func NewERC20TransfersDownloader(client *ethclient.Client, accounts []common.Add
 
 // ERC20TransfersDownloader is a downloader for erc20 tokens transfers.
 type ERC20TransfersDownloader struct {
-	client   *ethclient.Client
+	client   *walletClient
 	accounts []common.Address
 
 	// hash of the Transfer event signature

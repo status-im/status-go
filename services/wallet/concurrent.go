@@ -85,7 +85,7 @@ type TransferDownloader interface {
 	GetTransfersByNumber(context.Context, *big.Int) ([]Transfer, error)
 }
 
-func checkRanges(parent context.Context, client reactorClient, cache BalanceCache, downloader TransferDownloader, account common.Address, ranges [][]*big.Int) ([][]*big.Int, []*DBHeader, error) {
+func checkRanges(parent context.Context, client BalanceReader, cache BalanceCache, downloader TransferDownloader, account common.Address, ranges [][]*big.Int) ([][]*big.Int, []*DBHeader, error) {
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
 
@@ -166,7 +166,7 @@ func checkRanges(parent context.Context, client reactorClient, cache BalanceCach
 	return c.GetRanges(), c.GetHeaders(), nil
 }
 
-func findBlocksWithEthTransfers(parent context.Context, client reactorClient, cache BalanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int, noLimit bool) (from *big.Int, headers []*DBHeader, err error) {
+func findBlocksWithEthTransfers(parent context.Context, client BalanceReader, cache BalanceCache, downloader TransferDownloader, account common.Address, low, high *big.Int, noLimit bool) (from *big.Int, headers []*DBHeader, err error) {
 	ranges := [][]*big.Int{{low, high}}
 	minBlock := big.NewInt(low.Int64())
 	headers = []*DBHeader{}
