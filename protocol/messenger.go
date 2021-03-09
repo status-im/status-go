@@ -265,12 +265,13 @@ func NewMessenger(
 		pushNotificationClientConfig = &pushnotificationclient.Config{}
 	}
 
+	sqlitePersistence := NewSQLitePersistence(database)
 	// Overriding until we handle different identities
 	pushNotificationClientConfig.Identity = identity
 	pushNotificationClientConfig.Logger = logger
 	pushNotificationClientConfig.InstallationID = installationID
 
-	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor, &sqlitePersistence{db: database})
+	pushNotificationClient := pushnotificationclient.New(pushNotificationClientPersistence, pushNotificationClientConfig, processor, sqlitePersistence)
 
 	ensVerifier := ens.New(node, logger, transp, database, c.verifyENSURL, c.verifyENSContractAddress)
 
@@ -278,13 +279,13 @@ func NewMessenger(
 	if err != nil {
 		return nil, err
 	}
-	handler := newMessageHandler(identity, logger, &sqlitePersistence{db: database}, communitiesManager, transp, ensVerifier)
+	handler := newMessageHandler(identity, logger, sqlitePersistence, communitiesManager, transp, ensVerifier)
 
 	messenger = &Messenger{
 		config:                     &c,
 		node:                       node,
 		identity:                   identity,
-		persistence:                &sqlitePersistence{db: database},
+		persistence:                sqlitePersistence,
 		transport:                  transp,
 		encryptor:                  encryptionProtocol,
 		processor:                  processor,
@@ -2003,6 +2004,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 		hasPairedDevices := m.hasPairedDevices()
 
 		if !hasPairedDevices {
+
 			// Filter out my key from the recipients
 			n := 0
 			for _, recipient := range spec.Recipients {
@@ -2426,13 +2428,15 @@ type ReceivedMessageState struct {
 
 func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 	for _, ack := range acks {
-		//get message ID from database by datasync ID
-		messageID, err := m.persistence.RawMessageIDFromDatasyncID(ack)
+		//get message ID from database by datasync ID, with at-least-one
+		// semantic
+		messageIDBytes, err := m.persistence.MarkAsConfirmed(ack, true)
 		if err != nil {
 			m.logger.Info("got datasync acknowledge for message we don't have in db", zap.String("ack", hex.EncodeToString(ack)))
 			continue
 		}
 
+		messageID := messageIDBytes.String()
 		//mark messages as delivered
 		err = m.UpdateMessageOutgoingStatus(messageID, common.OutgoingStatusDelivered)
 		if err != nil {

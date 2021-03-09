@@ -23,7 +23,12 @@ var (
 
 // sqlitePersistence wrapper around sql db with operations common for a client.
 type sqlitePersistence struct {
+	*common.RawMessagesPersistence
 	db *sql.DB
+}
+
+func NewSQLitePersistence(db *sql.DB) *sqlitePersistence {
+	return &sqlitePersistence{common.NewRawMessagesPersistence(db), db}
 }
 
 func (db sqlitePersistence) SaveChat(chat Chat) error {
@@ -570,158 +575,6 @@ func (db sqlitePersistence) SaveContactChatIdentity(contactID string, chatIdenti
 	return
 }
 
-func (db sqlitePersistence) SaveRawMessage(message *common.RawMessage) error {
-	var pubKeys [][]byte
-	for _, pk := range message.Recipients {
-		pubKeys = append(pubKeys, crypto.CompressPubkey(pk))
-	}
-	// Encode recipients
-	var encodedRecipients bytes.Buffer
-	encoder := gob.NewEncoder(&encodedRecipients)
-
-	if err := encoder.Encode(pubKeys); err != nil {
-		return err
-	}
-
-	_, err := db.db.Exec(`
-		 INSERT INTO
-		 raw_messages
-		 (
-		   id,
-		   local_chat_id,
-		   last_sent,
-		   send_count,
-		   sent,
-		   message_type,
-		   resend_automatically,
-		   recipients,
-		   skip_encryption,
-	           send_push_notification,
-		   skip_group_message_wrap,
-		   send_on_personal_topic,
-			 payload,
-			 datasync_id
-		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		message.ID,
-		message.LocalChatID,
-		message.LastSent,
-		message.SendCount,
-		message.Sent,
-		message.MessageType,
-		message.ResendAutomatically,
-		encodedRecipients.Bytes(),
-		message.SkipEncryption,
-		message.SendPushNotification,
-		message.SkipGroupMessageWrap,
-		message.SendOnPersonalTopic,
-		message.Payload,
-		message.DataSyncID)
-	return err
-}
-
-func (db sqlitePersistence) RawMessageByID(id string) (*common.RawMessage, error) {
-	var rawPubKeys [][]byte
-	var encodedRecipients []byte
-	var skipGroupMessageWrap sql.NullBool
-	var sendOnPersonalTopic sql.NullBool
-	message := &common.RawMessage{}
-
-	err := db.db.QueryRow(`
-			SELECT
-			  id,
-			  local_chat_id,
-			  last_sent,
-			  send_count,
-			  sent,
-			  message_type,
-			  resend_automatically,
-			  recipients,
-			  skip_encryption,
-		          send_push_notification,
-			  skip_group_message_wrap,
-			  send_on_personal_topic,
-				payload,
-				datasync_id
-			FROM
-				raw_messages
-			WHERE
-				id = ?`,
-		id,
-	).Scan(
-		&message.ID,
-		&message.LocalChatID,
-		&message.LastSent,
-		&message.SendCount,
-		&message.Sent,
-		&message.MessageType,
-		&message.ResendAutomatically,
-		&encodedRecipients,
-		&message.SkipEncryption,
-		&message.SendPushNotification,
-		&skipGroupMessageWrap,
-		&sendOnPersonalTopic,
-		&message.Payload,
-		&message.DataSyncID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if rawPubKeys != nil {
-		// Restore recipients
-		decoder := gob.NewDecoder(bytes.NewBuffer(encodedRecipients))
-		err = decoder.Decode(&rawPubKeys)
-		if err != nil {
-			return nil, err
-		}
-		for _, pkBytes := range rawPubKeys {
-			pubkey, err := crypto.UnmarshalPubkey(pkBytes)
-			if err != nil {
-				return nil, err
-			}
-			message.Recipients = append(message.Recipients, pubkey)
-		}
-	}
-
-	if skipGroupMessageWrap.Valid {
-		message.SkipGroupMessageWrap = skipGroupMessageWrap.Bool
-	}
-
-	if sendOnPersonalTopic.Valid {
-		message.SendOnPersonalTopic = sendOnPersonalTopic.Bool
-	}
-
-	return message, nil
-}
-
-func (db sqlitePersistence) RawMessagesIDsByType(t protobuf.ApplicationMetadataMessage_Type) ([]string, error) {
-	ids := []string{}
-
-	rows, err := db.db.Query(`
-			SELECT
-			  id
-			FROM
-				raw_messages
-			WHERE
-			message_type = ?`,
-		t)
-	if err != nil {
-		return ids, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return ids, err
-		}
-		ids = append(ids, id)
-	}
-
-	return ids, nil
-}
-
 func (db sqlitePersistence) ExpiredEmojiReactionsIDs(maxSendCount int) ([]string, error) {
 	ids := []string{}
 
@@ -747,28 +600,6 @@ func (db sqlitePersistence) ExpiredEmojiReactionsIDs(maxSendCount int) ([]string
 	}
 
 	return ids, nil
-}
-
-func (db sqlitePersistence) RawMessageIDFromDatasyncID(datasyncID []byte) (id string, err error) {
-	row := db.db.QueryRow(
-		`SELECT
-			    id
-			FROM
-				raw_messages
-			WHERE
-				datasync_id = ?
-		`, datasyncID)
-
-	err = row.Scan(&id)
-
-	switch err {
-	case sql.ErrNoRows:
-		return "", common.ErrRecordNotFound
-	case nil:
-		return id, nil
-	default:
-		return "", err
-	}
 }
 
 func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error) {

@@ -44,11 +44,12 @@ type SentMessage struct {
 }
 
 type MessageProcessor struct {
-	identity  *ecdsa.PrivateKey
-	datasync  *datasync.DataSync
-	protocol  *encryption.Protocol
-	transport transport.Transport
-	logger    *zap.Logger
+	identity    *ecdsa.PrivateKey
+	datasync    *datasync.DataSync
+	protocol    *encryption.Protocol
+	transport   transport.Transport
+	logger      *zap.Logger
+	persistence *RawMessagesPersistence
 
 	// ephemeralKeys is a map that contains the ephemeral keys of the client, used
 	// to decrypt messages
@@ -92,6 +93,7 @@ func NewMessageProcessor(
 		identity:      identity,
 		datasync:      ds,
 		protocol:      enc,
+		persistence:   NewRawMessagesPersistence(database),
 		transport:     transport,
 		logger:        logger,
 		ephemeralKeys: make(map[string]*ecdsa.PrivateKey),
@@ -262,7 +264,19 @@ func (p *MessageProcessor) sendPrivate(
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to send message with datasync")
 		}
-		rawMessage.DataSyncID = datasyncID
+		// We don't need to receive confirmations from our own devices
+		if !IsPubKeyEqual(recipient, &p.identity.PublicKey) {
+			confirmation := &RawMessageConfirmation{
+				DataSyncID: datasyncID,
+				MessageID:  messageID,
+				PublicKey:  crypto.CompressPubkey(recipient),
+			}
+
+			err = p.persistence.InsertPendingConfirmation(confirmation)
+			if err != nil {
+				return nil, err
+			}
+		}
 	} else if rawMessage.SkipEncryption {
 		// When SkipEncryption is set we don't pass the message to the encryption layer
 		messageIDs := [][]byte{messageID}
