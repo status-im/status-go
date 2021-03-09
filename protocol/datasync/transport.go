@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"math"
+	"math/rand"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -165,6 +166,8 @@ func splitPayloadInBatches(payload *protobuf.Payload, maxSizeBytes int) []*proto
 
 // CalculateSendTime calculates the next epoch
 // at which a message should be sent.
+// We randomize it a bit so that not all messages are sent on the same epoch
 func CalculateSendTime(count uint64, time int64) int64 {
-	return time + int64(uint64(math.Exp2(float64(count-1)))*backoffInterval*offsetToSecond)
+	return time + int64(uint64(math.Exp2(float64(count-1)))*backoffInterval*offsetToSecond) + int64(rand.Intn(30)) // nolint: gosec
+
 }

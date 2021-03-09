@@ -29,7 +29,7 @@ func TestTableUserMessagesAllFieldsCount(t *testing.T) {
 func TestSaveMessages(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	for i := 0; i < 10; i++ {
 		id := strconv.Itoa(i)
@@ -45,7 +45,7 @@ func TestSaveMessages(t *testing.T) {
 func TestMessagesByIDs(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	var ids []string
 	for i := 0; i < 10; i++ {
@@ -63,7 +63,7 @@ func TestMessagesByIDs(t *testing.T) {
 func TestMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -77,7 +77,7 @@ func TestMessageByID(t *testing.T) {
 func TestMessagesExist(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	err = insertMinimalMessage(p, "1")
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestMessagesExist(t *testing.T) {
 func TestMessageByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	chatID := testPublicChatID
 	count := 1000
 	pageSize := 50
@@ -184,7 +184,7 @@ func TestMessageByChatID(t *testing.T) {
 func TestMessageReplies(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	chatID := testPublicChatID
 	message1 := &common.Message{
 		ID:          "id-1",
@@ -239,7 +239,7 @@ func TestMessageReplies(t *testing.T) {
 func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	chatID := testPublicChatID
 	clockValues := []uint64{10, 10, 9, 9, 9, 11, 12, 11, 100000, 6, 4, 5, 5, 5, 5}
 	count := len(clockValues)
@@ -299,7 +299,7 @@ func TestMessageByChatIDWithTheSameClocks(t *testing.T) {
 func TestDeleteMessageByID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -319,7 +319,7 @@ func TestDeleteMessageByID(t *testing.T) {
 func TestDeleteMessagesByChatID(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	err = insertMinimalMessage(p, "1")
 	require.NoError(t, err)
@@ -344,7 +344,7 @@ func TestMarkMessageSeen(t *testing.T) {
 	chatID := "test-chat"
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -366,7 +366,7 @@ func TestMarkMessageSeen(t *testing.T) {
 func TestUpdateMessageOutgoingStatus(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	id := "1"
 
 	err = insertMinimalMessage(p, id)
@@ -383,7 +383,7 @@ func TestUpdateMessageOutgoingStatus(t *testing.T) {
 func TestMessagesIDsByType(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	ids, err := p.RawMessagesIDsByType(protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
 	require.NoError(t, err)
@@ -411,7 +411,7 @@ func TestMessagesIDsByType(t *testing.T) {
 func TestExpiredEmojiReactionsIDs(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	ids, err := p.ExpiredEmojiReactionsIDs(emojiResendMaxCount)
 	require.NoError(t, err)
@@ -454,7 +454,7 @@ func TestExpiredEmojiReactionsIDs(t *testing.T) {
 func TestPersistenceEmojiReactions(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	// reverse order as we use DESC
 	id1 := "1"
 	id2 := "2"
@@ -560,7 +560,7 @@ func openTestDB() (*sql.DB, error) {
 	return sqlite.Open(dbPath.Name(), "")
 }
 
-func insertMinimalMessage(p sqlitePersistence, id string) error {
+func insertMinimalMessage(p *sqlitePersistence, id string) error {
 	return p.SaveMessages([]*common.Message{{
 		ID:          id,
 		LocalChatID: testPublicChatID,
@@ -581,7 +581,7 @@ func minimalRawMessage(id string, messageType protobuf.ApplicationMetadataMessag
 func TestMessagesAudioDurationMsNull(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	id := "message-id-1"
 
 	err = insertMinimalMessage(p, id)
@@ -602,7 +602,7 @@ func TestMessagesAudioDurationMsNull(t *testing.T) {
 func TestSaveChat(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	chat := CreatePublicChat("test-chat", &testTimeSource{})
 	chat.LastMessage = &common.Message{}
@@ -618,7 +618,7 @@ func TestSaveMentions(t *testing.T) {
 	chatID := testPublicChatID
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -646,7 +646,7 @@ func TestSaveMentions(t *testing.T) {
 func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	chatID := "0xabcd1234"
 	hash := []byte{0x1}
@@ -674,7 +674,7 @@ func TestSqlitePersistence_GetWhenChatIdentityLastPublished(t *testing.T) {
 func TestSaveContactIdentityImage(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	key, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -723,7 +723,7 @@ func TestSaveLinks(t *testing.T) {
 	chatID := testPublicChatID
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 
 	require.NoError(t, err)
 
@@ -749,7 +749,7 @@ func TestSaveLinks(t *testing.T) {
 func TestHideMessage(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	chatID := testPublicChatID
 	message := &common.Message{
 		ID:          "id-1",
@@ -777,32 +777,10 @@ func TestHideMessage(t *testing.T) {
 	require.True(t, actualSeen)
 }
 
-func TestDatasyncIdSaved(t *testing.T) {
-	db, err := openTestDB()
-	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
-
-	messageID := "message-id"
-	messageDataSyncID := []byte("message-datasync-id")
-
-	_, err = p.RawMessageIDFromDatasyncID(messageDataSyncID)
-	require.Error(t, err)
-
-	//save message with datasync id
-	rawChatMessage := minimalRawMessage(messageID, protobuf.ApplicationMetadataMessage_CHAT_MESSAGE)
-	rawChatMessage.DataSyncID = messageDataSyncID
-	err = p.SaveRawMessage(rawChatMessage)
-	require.NoError(t, err)
-
-	id, err := p.RawMessageIDFromDatasyncID(messageDataSyncID)
-	require.NoError(t, err)
-	require.Equal(t, messageID, id)
-}
-
 func TestDeactivatePublicChat(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	publicChatID := "public-chat-id"
 	var currentClockValue uint64 = 10
 
@@ -870,7 +848,7 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 
 	db, err := openTestDB()
 	require.NoError(t, err)
-	p := sqlitePersistence{db: db}
+	p := NewSQLitePersistence(db)
 	var currentClockValue uint64 = 10
 
 	timesource := &testTimeSource{}
@@ -929,4 +907,115 @@ func TestDeactivateOneToOneChat(t *testing.T) {
 
 	// It sets active as false
 	require.False(t, dbChat.Active)
+}
+
+func TestConfirmations(t *testing.T) {
+	dataSyncID1 := []byte("datsync-id-1")
+	dataSyncID2 := []byte("datsync-id-2")
+	dataSyncID3 := []byte("datsync-id-3")
+	dataSyncID4 := []byte("datsync-id-3")
+
+	messageID1 := []byte("message-id-1")
+	messageID2 := []byte("message-id-2")
+
+	publicKey1 := []byte("pk-1")
+	publicKey2 := []byte("pk-2")
+	publicKey3 := []byte("pk-3")
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+
+	confirmation1 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID1,
+		MessageID:  messageID1,
+		PublicKey:  publicKey1,
+	}
+
+	// Same datasyncID and same messageID, different pubkey
+	confirmation2 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID2,
+		MessageID:  messageID1,
+		PublicKey:  publicKey2,
+	}
+
+	// Different datasyncID and same messageID, different pubkey
+	confirmation3 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID3,
+		MessageID:  messageID1,
+		PublicKey:  publicKey3,
+	}
+
+	// Same dataSyncID, different messageID
+	confirmation4 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID4,
+		MessageID:  messageID2,
+		PublicKey:  publicKey1,
+	}
+
+	require.NoError(t, p.InsertPendingConfirmation(confirmation1))
+	require.NoError(t, p.InsertPendingConfirmation(confirmation2))
+	require.NoError(t, p.InsertPendingConfirmation(confirmation3))
+	require.NoError(t, p.InsertPendingConfirmation(confirmation4))
+
+	// We confirm the first datasync message, no confirmations
+	messageID, err := p.MarkAsConfirmed(dataSyncID1, false)
+	require.NoError(t, err)
+	require.Nil(t, messageID)
+
+	// We confirm the second datasync message, no confirmations
+	messageID, err = p.MarkAsConfirmed(dataSyncID2, false)
+	require.NoError(t, err)
+	require.Nil(t, messageID)
+
+	// We confirm the third datasync message, messageID1 should be confirmed
+	messageID, err = p.MarkAsConfirmed(dataSyncID3, false)
+	require.NoError(t, err)
+	require.Equal(t, messageID, types.HexBytes(messageID1))
+}
+
+func TestConfirmationsAtLeastOne(t *testing.T) {
+	dataSyncID1 := []byte("datsync-id-1")
+	dataSyncID2 := []byte("datsync-id-2")
+	dataSyncID3 := []byte("datsync-id-3")
+
+	messageID1 := []byte("message-id-1")
+
+	publicKey1 := []byte("pk-1")
+	publicKey2 := []byte("pk-2")
+	publicKey3 := []byte("pk-3")
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+
+	confirmation1 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID1,
+		MessageID:  messageID1,
+		PublicKey:  publicKey1,
+	}
+
+	// Same datasyncID and same messageID, different pubkey
+	confirmation2 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID2,
+		MessageID:  messageID1,
+		PublicKey:  publicKey2,
+	}
+
+	// Different datasyncID and same messageID, different pubkey
+	confirmation3 := &common.RawMessageConfirmation{
+		DataSyncID: dataSyncID3,
+		MessageID:  messageID1,
+		PublicKey:  publicKey3,
+	}
+
+	require.NoError(t, p.InsertPendingConfirmation(confirmation1))
+	require.NoError(t, p.InsertPendingConfirmation(confirmation2))
+	require.NoError(t, p.InsertPendingConfirmation(confirmation3))
+
+	// We confirm the first datasync message, messageID1 and 3 should be confirmed
+	messageID, err := p.MarkAsConfirmed(dataSyncID1, true)
+	require.NoError(t, err)
+	require.NotNil(t, messageID)
+	require.Equal(t, types.HexBytes(messageID1), messageID)
 }
