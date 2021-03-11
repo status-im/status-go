@@ -2,7 +2,9 @@ package appmetrics
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
+
 	"strings"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -12,7 +14,7 @@ type AppMetricEventType string
 
 type AppMetric struct {
 	Event      AppMetricEventType `json:"event"`
-	Value      string             `json:"value"`
+	Value      json.RawMessage    `json:"value"`
 	AppVersion string             `json:"app_version"`
 	OS         string             `json:"os"`
 }
@@ -78,7 +80,7 @@ func (db *Database) ValidateAppMetrics(appMetrics []AppMetric) (err error) {
 		}
 
 		schemaLoader := gojsonschema.NewGoLoader(schema)
-		valLoader := gojsonschema.NewStringLoader(metric.Value)
+		valLoader := gojsonschema.NewStringLoader(string(metric.Value))
 		res, err := gojsonschema.Validate(schemaLoader, valLoader)
 
 		if err != nil {
