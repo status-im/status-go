@@ -9,6 +9,7 @@ import (
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/appmetrics"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,10 +37,9 @@ func TestValidateAppMetrics(t *testing.T) {
 
 	invalidMetrics := []appmetrics.AppMetric{appmetrics.AppMetric{
 		Event:      "go/test1",
-		Value:       json.RawMessage("{}"),
+		Value:      json.RawMessage("{}"),
 		AppVersion: "1.12",
 		OS:         "android"}}
-
 
 	err := api.ValidateAppMetrics(context.Background(), validMetrics)
 	require.NoError(t, err)

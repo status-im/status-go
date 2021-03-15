@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/status-im/status-go/appmetrics"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,6 +35,6 @@ func TestSaveAppMetrics(t *testing.T) {
 	require.NoError(t, service.Stop())
 
 	// limit greater than numMetricsToWrite, offset 0
-	writtenMetrics, _ := api.db.GetAppMetrics(numMetricsToWrite + 10, 0)
+	writtenMetrics, _ := api.db.GetAppMetrics(numMetricsToWrite+10, 0)
 	require.Equal(t, len(writtenMetrics), numMetricsToWrite)
 }

@@ -7,12 +7,12 @@ import (
 	"github.com/status-im/status-go/appmetrics"
 )
 
-func NewAPI (db *appmetrics.Database, metricsBufferedChan chan appmetrics.AppMetric) *API {
+func NewAPI(db *appmetrics.Database, metricsBufferedChan chan appmetrics.AppMetric) *API {
 	return &API{db: db, metricsBufferedChan: metricsBufferedChan}
 }
 
 type API struct {
-	db *appmetrics.Database
+	db                  *appmetrics.Database
 	metricsBufferedChan chan appmetrics.AppMetric
 }
 
@@ -27,15 +27,16 @@ func (api *API) SaveAppMetrics(ctx context.Context, appMetrics []appmetrics.AppM
 	if chanFull {
 		// channel is full, write all items to db, including the newly sent metrics
 		for len(api.metricsBufferedChan) > 0 {
-			appMetrics= append(appMetrics, <-api.metricsBufferedChan)
+			appMetrics = append(appMetrics, <-api.metricsBufferedChan)
 		}
 		return api.db.SaveAppMetrics(appMetrics)
-	} else {
-		// there is space on the channel, write here, not in db
-		for _, m := range(appMetrics) {
-			api.metricsBufferedChan <- m
-		}
 	}
+
+	// there is space on the channel, write here, not in db
+	for _, m := range appMetrics {
+		api.metricsBufferedChan <- m
+	}
+
 	return nil
 }
 
@@ -43,4 +44,3 @@ func (api *API) GetAppMetrics(ctx context.Context, limit int, offset int) ([]app
 	log.Info("[AppMetricsAPI::GetAppMetrics]")
 	return api.db.GetAppMetrics(limit, offset)
 }
-

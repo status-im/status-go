@@ -25,7 +25,6 @@ require (
 	github.com/go-stack/stack v1.5.4
 	github.com/golang/protobuf v1.2.0
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049
-	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/golang-lru v0.0.0-20160813221303-0a025b7e63ad
 	github.com/huin/goupnp v0.0.0-20161224104101-679507af18f3
 	github.com/influxdata/influxdb v0.0.0-20180221223340-01288bdb0883

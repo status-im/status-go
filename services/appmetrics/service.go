@@ -12,7 +12,7 @@ func NewService(db *appmetrics.Database) *Service {
 }
 
 type Service struct {
-	db *appmetrics.Database
+	db                  *appmetrics.Database
 	metricsBufferedChan chan appmetrics.AppMetric
 }
 
@@ -24,7 +24,7 @@ func (s *Service) Stop() error {
 	// flush pending metrics before stopping the service
 	var pendingAppMetrics []appmetrics.AppMetric
 	for len(s.metricsBufferedChan) > 0 {
-		pendingAppMetrics = append(pendingAppMetrics, <- s.metricsBufferedChan)
+		pendingAppMetrics = append(pendingAppMetrics, <-s.metricsBufferedChan)
 	}
 	return s.db.SaveAppMetrics(pendingAppMetrics)
 }
