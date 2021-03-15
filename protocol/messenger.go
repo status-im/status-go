@@ -3023,7 +3023,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 }
 
 func showNotification(publicKey ecdsa.PublicKey, n MessageNotificationBody, responseTo *common.Message) bool {
-	if n.Chat != nil && n.Chat.ChatType == ChatTypeOneToOne {
+	if n.Chat != nil && (n.Chat.OneToOne() || n.Chat.PrivateGroupChat()) {
 		return true
 	}
 

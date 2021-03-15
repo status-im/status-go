@@ -108,6 +108,10 @@ func (c *Chat) OneToOne() bool {
 	return c.ChatType == ChatTypeOneToOne
 }
 
+func (c *Chat) PrivateGroupChat() bool {
+	return c.ChatType == ChatTypePrivateGroupChat
+}
+
 func (c *Chat) CommunityChatID() string {
 	if c.ChatType != ChatTypeCommunityChat {
 		return c.ID
