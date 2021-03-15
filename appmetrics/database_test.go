@@ -1,6 +1,7 @@
 package appmetrics
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -29,8 +30,8 @@ func TestSaveAppMetrics(t *testing.T) {
 	// we need backticks (``) for value because it is expected by gojsonschema
 	// it considers text inside tics to be stringified json
 	appMetrics := []AppMetric{
-		{Event: TestEvent1, Value: `"str"`, OS: "android", AppVersion: "1.11"},
-		{Event: TestEvent2, Value: `"str"`, OS: "ios", AppVersion: "1.10"},
+		{Event: TestEvent1, Value: json.RawMessage(`"str"`), OS: "android", AppVersion: "1.11"},
+		{Event: TestEvent2, Value: json.RawMessage(`"str"`), OS: "ios", AppVersion: "1.10"},
 	}
 
 	err := db.SaveAppMetrics(appMetrics)

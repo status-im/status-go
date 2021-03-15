@@ -61,13 +61,14 @@ func jsonschemaErrorsToError(validationErrors []AppMetricValidationError) error 
 		metric := appMetricValidationError.Metric
 		errors := appMetricValidationError.Errors
 
-		var errorDesc string = "Error in event: " + string(metric.Event) + "\nx----x----x\n"
+		var errorDesc string = "Error in event: " + string(metric.Event) + " - "
 		for _, e := range errors {
-			errorDesc = errorDesc + "value." + e.Context().String() + ":" + e.Description() + ", "
+			errorDesc = errorDesc + "value." + e.Context().String() + ":" + e.Description()
 		}
+		fieldErrors = append(fieldErrors, errorDesc)
 	}
 
-	return errors.New(strings.Join(fieldErrors[:], "\n"))
+	return errors.New(strings.Join(fieldErrors[:], "/ "))
 }
 
 func (db *Database) ValidateAppMetrics(appMetrics []AppMetric) (err error) {
