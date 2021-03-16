@@ -8,12 +8,11 @@ import (
 )
 
 func NewService(db *appmetrics.Database) *Service {
-	return &Service{db: db, metricsBufferedChan: make(chan appmetrics.AppMetric, 8)}
+	return &Service{db: db}
 }
 
 type Service struct {
-	db                  *appmetrics.Database
-	metricsBufferedChan chan appmetrics.AppMetric
+	db *appmetrics.Database
 }
 
 func (s *Service) Start(*p2p.Server) error {
@@ -21,12 +20,7 @@ func (s *Service) Start(*p2p.Server) error {
 }
 
 func (s *Service) Stop() error {
-	// flush pending metrics before stopping the service
-	var pendingAppMetrics []appmetrics.AppMetric
-	for len(s.metricsBufferedChan) > 0 {
-		pendingAppMetrics = append(pendingAppMetrics, <-s.metricsBufferedChan)
-	}
-	return s.db.SaveAppMetrics(pendingAppMetrics)
+	return nil
 }
 
 func (s *Service) APIs() []rpc.API {
@@ -34,7 +28,7 @@ func (s *Service) APIs() []rpc.API {
 		{
 			Namespace: "appmetrics",
 			Version:   "0.1.0",
-			Service:   NewAPI(s.db, s.metricsBufferedChan),
+			Service:   NewAPI(s.db),
 			Public:    true,
 		},
 	}

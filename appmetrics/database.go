@@ -132,11 +132,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 	}
 
 	for _, metric := range appMetrics {
-		_, err := insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS)
-
-		if err != nil {
-			return err
-		}
+		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS)
 	}
 	return
 }
@@ -145,7 +141,7 @@ func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric
 	rows, err := db.db.Query("SELECT event, value, app_version, operating_system FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
 
 	if err != nil {
-		return appMetrics, err
+		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -153,7 +149,7 @@ func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric
 		err := rows.Scan(&metric.Event, &metric.Value, &metric.AppVersion, &metric.OS)
 
 		if err != nil {
-			return appMetrics, err
+			return nil, err
 		}
 		appMetrics = append(appMetrics, metric)
 	}

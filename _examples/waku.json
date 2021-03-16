@@ -1,5 +1,5 @@
 {
-	"APIModules": "waku,appmetrics",
+	"APIModules": "waku",
 	"HTTPEnabled": true,
 	"HTTPHost": "localhost",
 	"HTTPPort": 8545,
