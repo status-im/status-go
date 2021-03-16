@@ -27,7 +27,7 @@ func setupTestDB(t *testing.T) (*appmetrics.Database, func()) {
 func TestValidateAppMetrics(t *testing.T) {
 	db, close := setupTestDB(t)
 	defer close()
-	api := NewAPI(db, make(chan appmetrics.AppMetric, 8))
+	api := NewAPI(db)
 
 	validMetrics := []appmetrics.AppMetric{appmetrics.AppMetric{
 		Event:      "go/test1",
