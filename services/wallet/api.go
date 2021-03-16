@@ -30,7 +30,7 @@ func (api *API) SetInitialBlocksRange(ctx context.Context) error {
 }
 
 // GetTransfersByAddress returns transfers for a single address
-func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big) ([]TransferView, error) {
+func (api *API) GetTransfersByAddress(ctx context.Context, address common.Address, toBlock, limit *hexutil.Big, fetchMore bool) ([]TransferView, error) {
 	log.Debug("[WalletAPI:: GetTransfersByAddress] get transfers for an address", "address", address, "block", toBlock, "limit", limit)
 	if api.s.db == nil {
 		log.Error("[WalletAPI:: GetTransfersByAddress] db is not initialized")
@@ -49,7 +49,7 @@ func (api *API) GetTransfersByAddress(ctx context.Context, address common.Addres
 	}
 
 	transfersCount := big.NewInt(int64(len(rst)))
-	if limit.ToInt().Cmp(transfersCount) == 1 {
+	if fetchMore && limit.ToInt().Cmp(transfersCount) == 1 {
 		block, err := api.s.db.GetFirstKnownBlock(address)
 		if err != nil {
 			return nil, err
