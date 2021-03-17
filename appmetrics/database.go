@@ -12,6 +12,8 @@ import (
 
 type AppMetricEventType string
 
+// Value is `json.RawMessage` so we can send any json shape, including strings
+// Validation is handled using JSON schemas defined in validators.go, instead of Golang structs
 type AppMetric struct {
 	Event      AppMetricEventType `json:"event"`
 	Value      json.RawMessage    `json:"value"`
