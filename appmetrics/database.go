@@ -27,18 +27,12 @@ type AppMetricValidationError struct {
 }
 
 const (
-	// Events for testing the system
-	TestEvent1 AppMetricEventType = "go/test1"
-	TestEvent2 AppMetricEventType = "go/test2"
-
 	// status-react navigation events
 	NavigationNavigateToCofx AppMetricEventType = "navigation/navigate-to"
 )
 
 // EventSchemaMap Every event should have a schema attached
 var EventSchemaMap = map[AppMetricEventType]interface{}{
-	TestEvent1:               StringSchema,
-	TestEvent2:               StringSchema,
 	NavigationNavigateToCofx: NavigationNavigateToCofxSchema,
 }
 
@@ -135,6 +129,9 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 
 	for _, metric := range appMetrics {
 		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS)
+		if err != nil {
+			return
+		}
 	}
 	return
 }

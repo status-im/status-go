@@ -1,5 +1,4 @@
 CREATE TABLE IF NOT EXISTS app_metrics (
-       id INTEGER PRIMARY KEY,
        event VARCHAR NOT NULL,
        value TEXT NOT NULL,
        app_version VARCHAR NOT NULL,

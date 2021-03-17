@@ -1,9 +1,5 @@
 package appmetrics
 
-var StringSchema = map[string]interface{}{
-	"type": "string",
-}
-
 var NavigationNavigateToCofxSchema = map[string]interface{}{
 	"type": "object",
 	"properties": map[string]interface{}{

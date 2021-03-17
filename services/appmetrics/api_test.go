@@ -30,13 +30,13 @@ func TestValidateAppMetrics(t *testing.T) {
 	api := NewAPI(db)
 
 	validMetrics := []appmetrics.AppMetric{appmetrics.AppMetric{
-		Event:      "go/test1",
-		Value:      json.RawMessage(`"some-string"`),
+		Event:      "navigation/navigate-to",
+		Value:      json.RawMessage(`{"view_id": "some-view-oid", "params": {"screen": "allowed-screen-name"}}`),
 		AppVersion: "1.12",
 		OS:         "android"}}
 
 	invalidMetrics := []appmetrics.AppMetric{appmetrics.AppMetric{
-		Event:      "go/test1",
+		Event:      "navigation/navigate-to",
 		Value:      json.RawMessage("{}"),
 		AppVersion: "1.12",
 		OS:         "android"}}

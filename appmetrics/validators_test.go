@@ -7,23 +7,6 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func TestStringSchema(t *testing.T) {
-	StringLoader := gojsonschema.NewGoLoader(StringSchema)
-	schema, _ := gojsonschema.NewSchema(StringLoader)
-
-	// test loading valid strings
-	doc := gojsonschema.NewStringLoader(`"valid-string"`)
-	result, err := schema.Validate(doc)
-	require.NoError(t, err)
-	require.True(t, result.Valid())
-
-	// invalid strings
-	doc = gojsonschema.NewStringLoader("1")
-	result, err = schema.Validate(doc)
-	require.NoError(t, err)
-	require.False(t, result.Valid())
-}
-
 func TestNavigationNavigateToCofxSchema(t *testing.T) {
 	NavigationNavigateToCofxLoader := gojsonschema.NewGoLoader(NavigationNavigateToCofxSchema)
 	schema, _ := gojsonschema.NewSchema(NavigationNavigateToCofxLoader)

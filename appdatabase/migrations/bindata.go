@@ -33,7 +33,7 @@
 // 0017_bookmarks.up.sql (147B)
 // 0018_profile_pictures_visibility.up.sql (84B)
 // 0019_blocks_ranges_extra_data.up.sql (89B)
-// 0019_metrics.up.sql (280B)
+// 0020_metrics.up.sql (235B)
 // doc.go (74B)
 
 package migrations
@@ -763,23 +763,23 @@ func _0019_blocks_ranges_extra_dataUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __0019_metricsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x74\x8d\xc1\x4a\xc3\x40\x14\x45\xf7\xf9\x8a\xbb\x54\xf0\x27\x9e\xf1\x55\x07\x93\x69\x79\x79\x91\x76\x35\x0c\xed\x43\x06\x6c\x1a\x66\xc6\x80\x7f\x2f\x2a\x76\x53\x72\xb7\xe7\x70\x6e\x2b\x4c\xca\x50\x7a\xec\x18\x6e\x03\xbf\x55\xf0\xde\x0d\x3a\x20\xce\x73\x38\x5b\xcd\xe9\x58\x70\xd7\xe0\x6f\xe9\x04\xe7\x95\x9f\x59\xb0\x13\xd7\x93\x1c\xf0\xca\x07\xd0\xa8\x5b\xe7\x5b\xe1\x9e\xbd\x3e\xfc\xcb\xb6\xd8\x54\xf1\x46\xd2\xbe\x90\xfc\xa6\xfd\xd8\x75\x57\xbc\xc4\x8f\x4f\x83\xf2\x5e\x6f\xd9\xcf\xf9\x62\xb9\xa4\xcb\xb4\x1e\xb8\xcc\x96\x63\x4d\xd3\x7b\x28\x5f\xa5\xda\x79\xdd\x3c\x66\x8b\xd5\x4e\x21\x56\xa8\xeb\x79\x50\xea\x77\x78\xe2\x0d\x8d\x9d\xa2\x1d\x45\xd8\x6b\xb8\x92\xe6\xbe\xf9\x0e\x00\x00\xff\xff\x0f\x75\xe1\x0b\x18\x01\x00\x00")
+var __0020_metricsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x74\xcc\x4d\xaa\xc2\x30\x14\xc5\xf1\x79\x57\x71\x86\xef\x81\x9b\x88\xf5\x16\x0b\x69\x95\xf4\x56\x3a\x0b\xa1\x5e\xa4\x60\x3f\x48\x62\xc0\xdd\x8b\x8a\x4e\xa4\x67\xfa\x3b\xfc\x73\x43\x8a\x09\xac\xb6\x9a\x50\x16\xa8\x0f\x0c\xea\xca\x86\x1b\xb8\x65\xb1\xa3\x44\x3f\xf4\x01\x7f\x19\xde\x93\x24\x53\xc4\x49\x99\x7c\xaf\xcc\xeb\x5d\xb7\x5a\x6f\x3e\x9c\xdc\xf5\x26\x60\xea\xf8\xd7\x9e\xbd\x24\x3e\x0c\xf3\xb4\x1e\x98\x17\xf1\x2e\x0e\xd3\xc5\x86\x7b\x88\x32\xae\x3f\x7b\x2f\x2e\xca\xd9\xba\x08\x2e\x2b\x6a\x58\x55\x47\xec\xa8\x50\xad\x66\xe4\xad\x31\x54\xb3\xfd\x4a\xf6\x9f\x3d\x02\x00\x00\xff\xff\x95\xc5\x25\x15\xeb\x00\x00\x00")
 
-func _0019_metricsUpSqlBytes() ([]byte, error) {
+func _0020_metricsUpSqlBytes() ([]byte, error) {
 	return bindataRead(
-		__0019_metricsUpSql,
-		"0019_metrics.up.sql",
+		__0020_metricsUpSql,
+		"0020_metrics.up.sql",
 	)
 }
 
-func _0019_metricsUpSql() (*asset, error) {
-	bytes, err := _0019_metricsUpSqlBytes()
+func _0020_metricsUpSql() (*asset, error) {
+	bytes, err := _0020_metricsUpSqlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0019_metrics.up.sql", size: 280, mode: os.FileMode(0644), modTime: time.Unix(1615901672, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x2c, 0x16, 0x24, 0x64, 0x62, 0x2c, 0xa3, 0xe4, 0x76, 0x9e, 0x11, 0x93, 0x8a, 0xb2, 0x3, 0x53, 0x73, 0x9c, 0x22, 0x5c, 0xd6, 0xc9, 0x7e, 0xe6, 0xad, 0x69, 0xce, 0x18, 0xff, 0xea, 0x4e, 0x31}}
+	info := bindataFileInfo{name: "0020_metrics.up.sql", size: 235, mode: os.FileMode(0644), modTime: time.Unix(1615973409, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xe8, 0x32, 0xbc, 0xb6, 0x9b, 0x5a, 0x8f, 0x9f, 0x4c, 0x90, 0x81, 0x3e, 0x2e, 0xd1, 0x23, 0xcd, 0xf1, 0x83, 0x35, 0xca, 0x66, 0x87, 0x52, 0x4e, 0x30, 0x3e, 0x4f, 0xa8, 0xfd, 0x30, 0x16, 0xbd}}
 	return a, nil
 }
 
@@ -960,7 +960,7 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0019_blocks_ranges_extra_data.up.sql": _0019_blocks_ranges_extra_dataUpSql,
 
-	"0019_metrics.up.sql": _0019_metricsUpSql,
+	"0020_metrics.up.sql": _0020_metricsUpSql,
 
 	"doc.go": docGo,
 }
@@ -1039,7 +1039,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0017_bookmarks.up.sql":                           &bintree{_0017_bookmarksUpSql, map[string]*bintree{}},
 	"0018_profile_pictures_visibility.up.sql":         &bintree{_0018_profile_pictures_visibilityUpSql, map[string]*bintree{}},
 	"0019_blocks_ranges_extra_data.up.sql":            &bintree{_0019_blocks_ranges_extra_dataUpSql, map[string]*bintree{}},
-	"0019_metrics.up.sql":                             &bintree{_0019_metricsUpSql, map[string]*bintree{}},
+	"0020_metrics.up.sql":                             &bintree{_0020_metricsUpSql, map[string]*bintree{}},
 	"doc.go":                                          &bintree{docGo, map[string]*bintree{}},
 }}
 
