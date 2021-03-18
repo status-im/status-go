@@ -23,10 +23,10 @@ type Field struct {
 
 // Validate checks that both name and type are not empty.
 func (f Field) Validate() error {
-	if len(f.Name) == 0 {
+	if f.Name == "" {
 		return errors.New("`name` is required")
 	}
-	if len(f.Type) == 0 {
+	if f.Type == "" {
 		return errors.New("`type` is required")
 	}
 	return nil

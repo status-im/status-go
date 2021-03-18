@@ -165,7 +165,7 @@ func TestMessageByChatID(t *testing.T) {
 		result = append(result, items...)
 
 		iter++
-		if len(cursor) == 0 || iter > count {
+		if cursor == "" || iter > count {
 			break
 		}
 	}

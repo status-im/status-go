@@ -652,7 +652,7 @@ func TestWatchers(t *testing.T) {
 			t.Fatalf("failed to install filter with seed %d: %s.", seed, err)
 		}
 		tst[i].id = x
-		if len(firstID) == 0 {
+		if firstID == "" {
 			firstID = x
 		}
 	}

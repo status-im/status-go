@@ -620,9 +620,7 @@ func (b *GethStatusBackend) startNode(config *params.NodeConfig) (err error) {
 	accountsFeed := &event.Feed{}
 	services := []gethnode.ServiceConstructor{}
 	services = appendIf(config.UpstreamConfig.Enabled, services, b.rpcFiltersService())
-	services = append(services, b.subscriptionService())
-	services = append(services, b.rpcStatsService())
-	services = append(services, b.appmetricsService())
+	services = append(services, b.subscriptionService(), b.rpcStatsService(), b.appmetricsService())
 	services = appendIf(b.appDB != nil && b.multiaccountsDB != nil, services, b.accountsService(accountsFeed))
 	services = appendIf(config.BrowsersConfig.Enabled, services, b.browsersService())
 	services = appendIf(config.PermissionsConfig.Enabled, services, b.permissionsService())

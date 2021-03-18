@@ -44,15 +44,15 @@ func ValidateReceivedPairInstallation(message *protobuf.PairInstallation, whispe
 		return err
 	}
 
-	if len(strings.TrimSpace(message.Name)) == 0 {
+	if strings.TrimSpace(message.Name) == "" {
 		return errors.New("name can't be empty")
 	}
 
-	if len(strings.TrimSpace(message.DeviceType)) == 0 {
+	if strings.TrimSpace(message.DeviceType) == "" {
 		return errors.New("device type can't be empty")
 	}
 
-	if len(strings.TrimSpace(message.InstallationId)) == 0 {
+	if strings.TrimSpace(message.InstallationId) == "" {
 		return errors.New("installationId can't be empty")
 	}
 
@@ -64,7 +64,7 @@ func ValidateReceivedSendTransaction(message *protobuf.SendTransaction, whisperT
 		return err
 	}
 
-	if len(strings.TrimSpace(message.TransactionHash)) == 0 {
+	if strings.TrimSpace(message.TransactionHash) == "" {
 		return errors.New("transaction hash can't be empty")
 	}
 
@@ -80,7 +80,7 @@ func ValidateReceivedRequestAddressForTransaction(message *protobuf.RequestAddre
 		return err
 	}
 
-	if len(strings.TrimSpace(message.Value)) == 0 {
+	if strings.TrimSpace(message.Value) == "" {
 		return errors.New("value can't be empty")
 	}
 
@@ -97,11 +97,11 @@ func ValidateReceivedRequestTransaction(message *protobuf.RequestTransaction, wh
 		return err
 	}
 
-	if len(strings.TrimSpace(message.Value)) == 0 {
+	if strings.TrimSpace(message.Value) == "" {
 		return errors.New("value can't be empty")
 	}
 
-	if len(strings.TrimSpace(message.Address)) == 0 {
+	if strings.TrimSpace(message.Address) == "" {
 		return errors.New("address can't be empty")
 	}
 
@@ -118,11 +118,11 @@ func ValidateReceivedAcceptRequestAddressForTransaction(message *protobuf.Accept
 		return err
 	}
 
-	if len(message.Id) == 0 {
+	if message.Id == "" {
 		return errors.New("messageID can't be empty")
 	}
 
-	if len(strings.TrimSpace(message.Address)) == 0 {
+	if strings.TrimSpace(message.Address) == "" {
 		return errors.New("address can't be empty")
 	}
 
@@ -134,7 +134,7 @@ func ValidateReceivedDeclineRequestAddressForTransaction(message *protobuf.Decli
 		return err
 	}
 
-	if len(message.Id) == 0 {
+	if message.Id == "" {
 		return errors.New("messageID can't be empty")
 	}
 
@@ -146,7 +146,7 @@ func ValidateReceivedDeclineRequestTransaction(message *protobuf.DeclineRequestT
 		return err
 	}
 
-	if len(message.Id) == 0 {
+	if message.Id == "" {
 		return errors.New("messageID can't be empty")
 	}
 
@@ -162,7 +162,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return errors.New("timestamp can't be 0")
 	}
 
-	if len(strings.TrimSpace(message.Text)) == 0 {
+	if strings.TrimSpace(message.Text) == "" {
 		return errors.New("text can't be empty")
 	}
 
@@ -170,7 +170,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		return fmt.Errorf("text shouldn't be longer than %d", maxChatMessageTextLength)
 	}
 
-	if len(message.ChatId) == 0 {
+	if message.ChatId == "" {
 		return errors.New("chatId can't be empty")
 	}
 
@@ -193,7 +193,7 @@ func ValidateReceivedChatMessage(message *protobuf.ChatMessage, whisperTimestamp
 		if sticker == nil {
 			return errors.New("no sticker content")
 		}
-		if len(sticker.Hash) == 0 {
+		if sticker.Hash == "" {
 			return errors.New("sticker hash not set")
 		}
 
@@ -238,11 +238,11 @@ func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimesta
 		return err
 	}
 
-	if len(emoji.MessageId) == 0 {
+	if emoji.MessageId == "" {
 		return errors.New("message-id can't be empty")
 	}
 
-	if len(emoji.ChatId) == 0 {
+	if emoji.ChatId == "" {
 		return errors.New("chat-id can't be empty")
 	}
 
@@ -259,7 +259,7 @@ func ValidateReceivedEmojiReaction(emoji *protobuf.EmojiReaction, whisperTimesta
 
 func ValidateReceivedGroupChatInvitation(invitation *protobuf.GroupChatInvitation) error {
 
-	if len(invitation.ChatId) == 0 {
+	if invitation.ChatId == "" {
 		return errors.New("chat-id can't be empty")
 	}
 

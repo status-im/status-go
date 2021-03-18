@@ -751,12 +751,12 @@ func topicsToBloom(topics ...types.TopicType) []byte {
 	i := new(big.Int)
 	for _, topic := range topics {
 		bloom := types.TopicToBloom(topic)
-		i.Or(i, new(big.Int).SetBytes(bloom[:]))
+		i.Or(i, new(big.Int).SetBytes(bloom))
 	}
 
 	combined := make([]byte, types.BloomFilterSize)
 	data := i.Bytes()
-	copy(combined[types.BloomFilterSize-len(data):], data[:])
+	copy(combined[types.BloomFilterSize-len(data):], data)
 
 	return combined
 }

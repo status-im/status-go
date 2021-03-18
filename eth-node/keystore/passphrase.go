@@ -199,7 +199,7 @@ func decryptKeyV1(keyProtected *encryptedKeyJSONV1, auth string) (keyBytes []byt
 }
 
 func decryptExtendedKey(keyProtected *encryptedKeyJSONV3, auth string) (plainText []byte, err error) {
-	if len(keyProtected.ExtendedKey.CipherText) == 0 {
+	if keyProtected.ExtendedKey.CipherText == "" {
 		return []byte(extkeys.EmptyExtendedKeyString), nil
 	}
 

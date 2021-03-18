@@ -10,7 +10,7 @@ import (
 
 func ToGroupID(data []byte) state.GroupID {
 	g := state.GroupID{}
-	copy(g[:], data[:])
+	copy(g[:], data)
 	return g
 }
 

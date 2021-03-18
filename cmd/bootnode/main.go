@@ -54,7 +54,7 @@ func main() {
 	}
 	log.Root().SetHandler(glogger)
 
-	if len(*genKeyFile) != 0 {
+	if *genKeyFile != "" {
 		log.Info("Generating key file", "path", *genKeyFile)
 		key, err := crypto.GenerateKey()
 		if err != nil {
@@ -65,15 +65,15 @@ func main() {
 		}
 		os.Exit(0)
 	}
-	if len(*nodeKeyFile) == 0 && len(*keydata) == 0 {
+	if *nodeKeyFile == "" && *keydata == "" {
 		log.Crit("either `nodekey` or `keydata` must be provided")
 	}
-	if len(*nodeKeyFile) != 0 {
+	if *nodeKeyFile != "" {
 		nodeKey, err = crypto.LoadECDSA(*nodeKeyFile)
 		if err != nil {
 			log.Crit("Failed to load ecdsa key from", "file", *nodeKeyFile, "error", err)
 		}
-	} else if len(*keydata) != 0 {
+	} else if *keydata != "" {
 		log.Warn("key will be visible in process list. should be used only for tests")
 		key, err := hex.DecodeString(*keydata)
 		if err != nil {

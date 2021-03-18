@@ -2075,7 +2075,7 @@ func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Mes
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
-	if len(message.ImagePath) != 0 {
+	if message.ImagePath != "" {
 		file, err := os.Open(message.ImagePath)
 		if err != nil {
 			return nil, err
@@ -2093,7 +2093,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 		}
 		message.Payload = &protobuf.ChatMessage_Image{Image: &image}
 
-	} else if len(message.CommunityID) != 0 {
+	} else if message.CommunityID != "" {
 		community, err := m.communitiesManager.GetByIDString(message.CommunityID)
 		if err != nil {
 			return nil, err
@@ -2111,7 +2111,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 		message.ContentType = protobuf.ChatMessage_COMMUNITY
 
-	} else if len(message.AudioPath) != 0 {
+	} else if message.AudioPath != "" {
 		file, err := os.Open(message.AudioPath)
 		if err != nil {
 			return nil, err
@@ -3917,7 +3917,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 			return nil, err
 		}
 
-		if len(message.CommandParameters.ID) != 0 {
+		if message.CommandParameters.ID != "" {
 			// Hide previous message
 			previousMessage, err := m.persistence.MessageByCommandID(chatID, message.CommandParameters.ID)
 			if err != nil && err != common.ErrRecordNotFound {
@@ -3964,7 +3964,7 @@ func (m *Messenger) pullMessagesAndResponsesFromDB(messages []*common.Message) (
 	var messageIDs []string
 	for _, message := range messages {
 		messageIDs = append(messageIDs, message.ID)
-		if len(message.ResponseTo) != 0 {
+		if message.ResponseTo != "" {
 			messageIDs = append(messageIDs, message.ResponseTo)
 		}
 

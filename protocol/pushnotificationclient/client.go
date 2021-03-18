@@ -317,7 +317,7 @@ func (c *Client) GetServers() ([]*PushNotificationServer, error) {
 
 func (c *Client) Reregister(options *RegistrationOptions) error {
 	c.config.Logger.Debug("re-registering")
-	if len(c.deviceToken) == 0 {
+	if c.deviceToken == "" {
 		c.config.Logger.Info("no device token, not registering")
 		return nil
 	}
@@ -438,13 +438,13 @@ func (c *Client) processQueryInfo(clientPublicKey *ecdsa.PublicKey, serverPublic
 	accessToken := info.AccessToken
 
 	// the user wants notification from contacts only, try to decrypt the access token to see if we are in their contacts
-	if len(accessToken) == 0 && len(info.AllowedKeyList) != 0 {
+	if accessToken == "" && len(info.AllowedKeyList) != 0 {
 		accessToken = c.handleAllowedKeyList(clientPublicKey, info.AllowedKeyList)
 
 	}
 
 	// no luck
-	if len(accessToken) == 0 {
+	if accessToken == "" {
 		c.config.Logger.Debug("not in the allowed key list")
 		return nil
 	}
@@ -1032,7 +1032,7 @@ func (c *Client) handleMessageScheduled(message *common.RawMessage) error {
 
 // shouldNotifyOn check whether we should notify a particular public-key/installation-id/message-id combination
 func (c *Client) shouldNotifyOn(publicKey *ecdsa.PublicKey, installationID string, messageID []byte) (bool, error) {
-	if len(installationID) == 0 {
+	if installationID == "" {
 		return c.persistence.ShouldSendNotificationToAllInstallationIDs(publicKey, messageID)
 	}
 	return c.persistence.ShouldSendNotificationFor(publicKey, installationID, messageID)
@@ -1115,7 +1115,7 @@ func (c *Client) allowedKeyList(token []byte, contactIDs []*ecdsa.PublicKey) ([]
 // and return a new one in that case. A token is refreshed only if it's not set
 // or if a contact has been removed
 func (c *Client) getToken(contactIDs []*ecdsa.PublicKey) string {
-	if c.lastPushNotificationRegistration == nil || len(c.lastPushNotificationRegistration.AccessToken) == 0 || c.shouldRefreshToken(c.lastContactIDs, contactIDs, c.lastPushNotificationRegistration.AllowFromContactsOnly, c.config.AllowFromContactsOnly) {
+	if c.lastPushNotificationRegistration == nil || c.lastPushNotificationRegistration.AccessToken == "" || c.shouldRefreshToken(c.lastContactIDs, contactIDs, c.lastPushNotificationRegistration.AllowFromContactsOnly, c.config.AllowFromContactsOnly) {
 		c.config.Logger.Info("refreshing access token")
 		return uuid.New().String()
 	}

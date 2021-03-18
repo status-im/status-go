@@ -64,7 +64,7 @@ func jsonschemaErrorsToError(validationErrors []AppMetricValidationError) error 
 		fieldErrors = append(fieldErrors, errorDesc)
 	}
 
-	return errors.New(strings.Join(fieldErrors[:], "/ "))
+	return errors.New(strings.Join(fieldErrors, "/ "))
 }
 
 func (db *Database) ValidateAppMetrics(appMetrics []AppMetric) (err error) {

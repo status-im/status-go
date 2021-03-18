@@ -560,7 +560,7 @@ func (c *ShhextConfig) Validate(validate *validator.Validate) error {
 	if err := validate.Struct(c); err != nil {
 		return err
 	}
-	if c.PFSEnabled && len(c.BackupDisabledDataDir) == 0 {
+	if c.PFSEnabled && c.BackupDisabledDataDir == "" {
 		return errors.New("field BackupDisabledDataDir is required if PFSEnabled is true")
 	}
 	return nil
@@ -890,7 +890,7 @@ func (c *NodeConfig) Validate() error {
 		return fmt.Errorf("NoDiscovery is false, but ClusterConfig.BootNodes is empty")
 	}
 
-	if c.ShhextConfig.PFSEnabled && len(c.ShhextConfig.InstallationID) == 0 {
+	if c.ShhextConfig.PFSEnabled && c.ShhextConfig.InstallationID == "" {
 		return fmt.Errorf("PFSEnabled is true, but InstallationID is empty")
 	}
 
@@ -1051,7 +1051,7 @@ func (c *NodeConfig) String() string {
 
 // FormatAPIModules returns a slice of APIModules.
 func (c *NodeConfig) FormatAPIModules() []string {
-	if len(c.APIModules) == 0 {
+	if c.APIModules == "" {
 		return nil
 	}
 
