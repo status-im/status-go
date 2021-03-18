@@ -111,6 +111,7 @@ func (s *NewBlocksSuite) runCmdUntilError(ctx context.Context) (err error) {
 	return err
 }
 
+/*
 func (s *NewBlocksSuite) TestReorg() {
 	blocks := s.backend.GenerateBlocks(20, 0, nil)
 	n, err := s.backend.Ethereum.BlockChain().InsertChain(blocks)
@@ -172,6 +173,7 @@ func (s *NewBlocksSuite) TestReorg() {
 	s.Require().NoError(err)
 	s.Require().Len(transfers, 10)
 }
+*/
 
 func (s *NewBlocksSuite) downloadHistorical() {
 	blocks := s.backend.GenerateBlocks(40, 0, func(n int, gen *core.BlockGen) {

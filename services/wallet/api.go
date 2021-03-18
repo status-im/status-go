@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -207,4 +208,17 @@ func (api *API) GetCryptoOnRamps(ctx context.Context) ([]CryptoOnRamp, error) {
 	}
 
 	return rs, nil
+}
+
+func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Hash) error {
+	watchTxCommand := &watchTransactionCommand{
+		hash:   transactionHash,
+		client: api.s.client,
+		feed:   api.s.feed,
+	}
+
+	commandContext, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	return watchTxCommand.Command()(commandContext)
 }

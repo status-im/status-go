@@ -32,14 +32,7 @@ func pollingPeriodByChain(chain *big.Int) time.Duration {
 }
 
 func reorgSafetyDepth(chain *big.Int) *big.Int {
-	switch chain.Int64() {
-	case int64(params.MainNetworkID):
-		return big.NewInt(2)
-	case int64(params.RopstenNetworkID):
-		return big.NewInt(15)
-	default:
-		return big.NewInt(15)
-	}
+	return big.NewInt(0)
 }
 
 var (
