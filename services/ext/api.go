@@ -384,6 +384,11 @@ func (api *PublicAPI) RemoveUserFromCommunity(communityID types.HexBytes, userPu
 	return api.service.messenger.RemoveUserFromCommunity(communityID, userPublicKey)
 }
 
+// BanUserFromCommunity removes the user with pk from the community with ID
+func (api *PublicAPI) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.BanUserFromCommunity(request)
+}
+
 // MyPendingRequestsToJoin returns the pending requests for the logged in user
 func (api *PublicAPI) MyPendingRequestsToJoin() ([]*communities.RequestToJoin, error) {
 	return api.service.messenger.MyPendingRequestsToJoin()
