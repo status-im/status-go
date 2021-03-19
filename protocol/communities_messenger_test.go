@@ -964,3 +964,48 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	s.Require().Len(response.Messages, 1)
 
 }
+
+func (s *MessengerCommunitiesSuite) TestBanUser() {
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_NO_MEMBERSHIP,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	// Create an community chat
+	response, err := s.bob.CreateCommunity(description)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community := response.Communities()[0]
+
+	response, err = s.bob.InviteUsersToCommunity(
+		&requests.InviteUsersToCommunity{
+			CommunityID: community.ID(),
+			Users:       []types.HexBytes{common.PubkeyToHexBytes(&s.alice.identity.PublicKey)},
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().True(community.HasMember(&s.alice.identity.PublicKey))
+
+	response, err = s.bob.BanUserFromCommunity(
+		&requests.BanUserFromCommunity{
+			CommunityID: community.ID(),
+			User:        common.PubkeyToHexBytes(&s.alice.identity.PublicKey),
+		},
+	)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+
+	community = response.Communities()[0]
+	s.Require().False(community.HasMember(&s.alice.identity.PublicKey))
+	s.Require().True(community.IsBanned(&s.alice.identity.PublicKey))
+
+}

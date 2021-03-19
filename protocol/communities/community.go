@@ -322,6 +322,23 @@ func (o *Community) hasMember(pk *ecdsa.PublicKey) bool {
 	return member != nil
 }
 
+func (o *Community) IsBanned(pk *ecdsa.PublicKey) bool {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+	return o.isBanned(pk)
+}
+
+func (o *Community) isBanned(pk *ecdsa.PublicKey) bool {
+	key := common.PubkeyToHex(pk)
+
+	for _, k := range o.config.CommunityDescription.BanList {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
 func (o *Community) hasPermission(pk *ecdsa.PublicKey, role protobuf.CommunityMember_Roles) bool {
 	member := o.getMember(pk)
 	if member == nil {
@@ -401,6 +418,39 @@ func (o *Community) RemoveUserFromOrg(pk *ecdsa.PublicKey) (*protobuf.CommunityD
 	// Remove from chats
 	for _, chat := range o.config.CommunityDescription.Chats {
 		delete(chat.Members, key)
+	}
+
+	o.increaseClock()
+
+	return o.config.CommunityDescription, nil
+}
+
+func (o *Community) BanUserFromCommunity(pk *ecdsa.PublicKey) (*protobuf.CommunityDescription, error) {
+	o.mutex.Lock()
+	defer o.mutex.Unlock()
+
+	if o.config.PrivateKey == nil {
+		return nil, ErrNotAdmin
+	}
+	key := common.PubkeyToHex(pk)
+	if o.hasMember(pk) {
+		// Remove from org
+		delete(o.config.CommunityDescription.Members, key)
+
+		// Remove from chats
+		for _, chat := range o.config.CommunityDescription.Chats {
+			delete(chat.Members, key)
+		}
+	}
+
+	found := false
+	for _, u := range o.config.CommunityDescription.BanList {
+		if u == key {
+			found = true
+		}
+	}
+	if !found {
+		o.config.CommunityDescription.BanList = append(o.config.CommunityDescription.BanList, key)
 	}
 
 	o.increaseClock()
@@ -708,6 +758,11 @@ func (o *Community) CanPost(pk *ecdsa.PublicKey, chatID string, grantBytes []byt
 	// creator can always post
 	if common.IsPubKeyEqual(pk, o.config.ID) {
 		return true, nil
+	}
+
+	// if banned cannot post
+	if o.isBanned(pk) {
+		return false, nil
 	}
 
 	// If both the chat & the org have no permissions, the user is allowed to post

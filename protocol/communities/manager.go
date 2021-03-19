@@ -520,6 +520,37 @@ func (m *Manager) RemoveUserFromCommunity(id types.HexBytes, pk *ecdsa.PublicKey
 	return community, nil
 }
 
+func (m *Manager) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*Community, error) {
+	id := request.CommunityID
+
+	publicKey, err := common.HexToPubkey(request.User.String())
+	if err != nil {
+		return nil, err
+	}
+
+	community, err := m.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if community == nil {
+		return nil, ErrOrgNotFound
+	}
+
+	_, err = community.BanUserFromCommunity(publicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.persistence.SaveCommunity(community)
+	if err != nil {
+		return nil, err
+	}
+
+	m.publish(&Subscription{Community: community})
+
+	return community, nil
+}
+
 func (m *Manager) GetByID(id []byte) (*Community, error) {
 	return m.persistence.GetByID(m.identity, id)
 }

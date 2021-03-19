@@ -463,3 +463,14 @@ func (m *Messenger) RemoveUserFromCommunity(id types.HexBytes, pkString string) 
 	response.AddCommunity(community)
 	return response, nil
 }
+
+func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity) (*MessengerResponse, error) {
+	community, err := m.communitiesManager.BanUserFromCommunity(request)
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MessengerResponse{}
+	response.AddCommunity(community)
+	return response, nil
+}

@@ -40,6 +40,7 @@ message CommunityDescription {
   CommunityPermissions permissions = 3;
   ChatIdentity identity = 5;
   map<string,CommunityChat> chats = 6;
+  repeated string ban_list = 7;
 }
 
 message CommunityChat {
