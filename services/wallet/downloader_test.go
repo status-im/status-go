@@ -55,6 +55,7 @@ func (s *ETHTransferSuite) SetupTest() {
 	db, stop := setupTestDB(s.Suite.T())
 	s.dbStop = stop
 	s.downloader = &ETHTransferDownloader{
+		chain:  big.NewInt(1337),
 		signer: s.signer,
 		client: &walletClient{client: s.ethclient},
 		db:     db,

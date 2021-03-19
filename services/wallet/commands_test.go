@@ -48,6 +48,7 @@ func (s *NewBlocksSuite) SetupTest() {
 		accounts: []common.Address{s.address},
 		erc20:    NewERC20TransfersDownloader(client, []common.Address{s.address}, s.backend.Signer),
 		eth: &ETHTransferDownloader{
+			chain:    s.backend.Chain,
 			client:   client,
 			signer:   s.backend.Signer,
 			db:       s.db,
@@ -197,6 +198,7 @@ func (s *NewBlocksSuite) downloadHistorical() {
 		db:           s.db,
 		balanceCache: newBalanceCache(),
 		eth: &ETHTransferDownloader{
+			chain:    s.backend.Chain,
 			client:   client,
 			signer:   s.backend.Signer,
 			accounts: []common.Address{s.address},

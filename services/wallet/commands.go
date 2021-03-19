@@ -474,6 +474,7 @@ func (c *findAndCheckBlockRangeCommand) fastIndex(ctx context.Context, bCache *b
 			balanceCache: bCache,
 			address:      address,
 			eth: &ETHTransferDownloader{
+				chain:    c.chain,
 				client:   c.client,
 				accounts: []common.Address{address},
 				signer:   types.NewEIP155Signer(c.chain),
@@ -567,13 +568,13 @@ func loadTransfers(ctx context.Context, accounts []common.Address, db *Database,
 		if !ok {
 			blocks, _ = db.GetBlocksByAddress(address, numberOfBlocksCheckedPerIteration)
 		}
-
 		for _, block := range blocks {
 			transfers := &transfersCommand{
 				db:      db,
 				client:  client,
 				address: address,
 				eth: &ETHTransferDownloader{
+					chain:    chain,
 					client:   client,
 					accounts: []common.Address{address},
 					signer:   types.NewEIP155Signer(chain),
@@ -804,6 +805,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 	}
 
 	downloader := &ETHTransferDownloader{
+		chain:    c.chain,
 		client:   c.client,
 		accounts: c.accounts,
 		signer:   types.NewEIP155Signer(c.chain),
@@ -1008,6 +1010,7 @@ func (c *loadTransfersCommand) LoadTransfers(ctx context.Context, downloader *ET
 
 func (c *loadTransfersCommand) Run(parent context.Context) (err error) {
 	downloader := &ETHTransferDownloader{
+		chain:    c.chain,
 		client:   c.client,
 		accounts: c.accounts,
 		signer:   types.NewEIP155Signer(c.chain),

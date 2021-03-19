@@ -151,6 +151,7 @@ func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 		client:   client,
 		accounts: accounts,
 		eth: &ETHTransferDownloader{
+			chain:    r.chain,
 			client:   client,
 			accounts: accounts,
 			signer:   signer,

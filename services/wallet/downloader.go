@@ -54,6 +54,7 @@ type ETHTransferDownloader struct {
 	accounts []common.Address
 	signer   types.Signer
 	db       *Database
+	chain    *big.Int
 }
 
 var errLogsDownloaderStuck = errors.New("logs downloader stuck")
@@ -95,7 +96,6 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 		if err != nil {
 			return nil, err
 		}
-
 		for _, t := range preloadedTransfers {
 			transfer, err := d.transferFromLog(ctx, *t.Log, address, t.ID)
 			if err != nil {
@@ -106,8 +106,11 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 		}
 
 		for _, tx := range blk.Transactions() {
-
+			if tx.ChainId().Cmp(d.chain) != 0 {
+				continue
+			}
 			from, err := types.Sender(d.signer, tx)
+
 			if err != nil {
 				return nil, err
 			}

@@ -21,6 +21,7 @@ type Backend struct {
 	Ethereum *eth.Ethereum
 	Faucet   *ecdsa.PrivateKey
 	Signer   types.Signer
+	Chain    *big.Int
 }
 
 func NewBackend() (*Backend, error) {
@@ -64,6 +65,7 @@ func NewBackend() (*Backend, error) {
 		Faucet:   faucet,
 		Signer:   types.NewEIP155Signer(config.ChainID),
 		genesis:  genesis,
+		Chain:    config.ChainID,
 	}, nil
 }
 
