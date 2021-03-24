@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"net"
@@ -22,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
+	"github.com/status-im/status-go/eth-node/crypto"
 
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
@@ -61,6 +63,7 @@ type StatusNode struct {
 	gethNode         *node.Node         // reference to Geth P2P stack/node
 	rpcClient        *rpc.Client        // reference to public RPC client
 	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
+	wakuNode         *wakunode.WakuNode // reference to a libp2p waku node
 
 	discovery discovery.Discovery
 	register  *peers.Register
@@ -357,6 +360,9 @@ func (n *StatusNode) stop() error {
 		return err
 	}
 
+	n.wakuNode.Stop()
+	n.wakuNode = nil
+
 	n.rpcClient = nil
 	n.rpcPrivateClient = nil
 	// We need to clear `gethNode` because config is passed to `Start()`
@@ -414,7 +420,7 @@ func (n *StatusNode) IsRunning() bool {
 }
 
 func (n *StatusNode) isRunning() bool {
-	return n.gethNode != nil && n.gethNode.Server() != nil
+	return n.gethNode != nil && n.gethNode.Server() != nil && n.wakuNode != nil
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
