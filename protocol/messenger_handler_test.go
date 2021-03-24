@@ -158,7 +158,7 @@ func (s *EventToSystemMessageSuite) TestHandleMembershipUpdate() {
 	contact, err := BuildContactFromPublicKey(&adminPrivateKey.PublicKey)
 	s.Require().NoError(err)
 
-	contact.SystemTags = []string{contactAdded}
+	contact.Added = true
 
 	currentMessageState := &CurrentMessageState{
 		Contact: contact,

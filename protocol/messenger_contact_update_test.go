@@ -77,7 +77,7 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().False(contact.IsAdded())
 
 	// add contact
-	contact.SystemTags = []string{contactAdded}
+	contact.Added = true
 	s.Require().NoError(theirMessenger.SaveContact(contact))
 
 	s.Require().Len(response.Chats(), 1)
@@ -95,7 +95,6 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	receivedContact := response.Contacts[0]
 	s.Require().Equal(theirName, receivedContact.Name)
 	s.Require().False(receivedContact.ENSVerified)
-	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 
 	newPicture := "new-picture"
@@ -117,7 +116,6 @@ func (s *MessengerContactUpdateSuite) TestReceiveContactUpdate() {
 	s.Require().Equal(theirContactID, receivedContact.ID)
 	s.Require().Equal(newName, receivedContact.Name)
 	s.Require().False(receivedContact.ENSVerified)
-	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
@@ -151,6 +149,5 @@ func (s *MessengerContactUpdateSuite) TestAddContact() {
 	s.Require().NoError(err)
 
 	receivedContact := response.Contacts[0]
-	s.Require().True(receivedContact.HasBeenAdded())
 	s.Require().NotEmpty(receivedContact.LastUpdated)
 }

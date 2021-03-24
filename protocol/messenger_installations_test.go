@@ -102,7 +102,7 @@ func (s *MessengerInstallationSuite) TestReceiveInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	contact.SystemTags = append(contact.SystemTags, contactAdded)
+	contact.Added = true
 	err = s.m.SaveContact(contact)
 	s.Require().NoError(err)
 
@@ -144,7 +144,7 @@ func (s *MessengerInstallationSuite) TestSyncInstallation() {
 
 	contact, err := BuildContactFromPublicKey(&contactKey.PublicKey)
 	s.Require().NoError(err)
-	contact.SystemTags = append(contact.SystemTags, contactAdded)
+	contact.Added = true
 	contact.LocalNickname = "Test Nickname"
 	err = s.m.SaveContact(contact)
 	s.Require().NoError(err)

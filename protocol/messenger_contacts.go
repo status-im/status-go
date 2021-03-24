@@ -27,7 +27,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 	}
 
 	if !contact.IsAdded() {
-		contact.SystemTags = append(contact.SystemTags, contactAdded)
+		contact.Added = true
 	}
 
 	// We sync the contact with the other devices
@@ -155,9 +155,7 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 func (m *Messenger) Contacts() []*Contact {
 	var contacts []*Contact
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
-		if contact.HasCustomFields() {
-			contacts = append(contacts, contact)
-		}
+		contacts = append(contacts, contact)
 		return true
 	})
 	return contacts

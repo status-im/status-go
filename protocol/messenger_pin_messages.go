@@ -73,24 +73,6 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 }
 
 func (m *Messenger) PinnedMessageByChatID(chatID, cursor string, limit int) ([]*common.PinnedMessage, string, error) {
-	chat, err := m.persistence.Chat(chatID)
-	if err != nil {
-		return nil, "", err
-	}
-
-	if chat.Timeline() {
-		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		contacts, err := m.persistence.Contacts()
-		if err != nil {
-			return nil, "", err
-		}
-		for _, contact := range contacts {
-			if contact.IsAdded() {
-				chatIDs = append(chatIDs, "@"+contact.ID)
-			}
-		}
-		return m.persistence.PinnedMessageByChatIDs(chatIDs, cursor, limit)
-	}
 	return m.persistence.PinnedMessageByChatID(chatID, cursor, limit)
 }
 

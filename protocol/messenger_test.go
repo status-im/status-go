@@ -256,9 +256,9 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				contact := Contact{
-					ID:         types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
-					Name:       "Some Contact",
-					SystemTags: []string{contactAdded},
+					ID:    types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					Name:  "Some Contact",
+					Added: true,
 				}
 				err = s.m.SaveContact(&contact)
 				s.Require().NoError(err)
@@ -271,14 +271,14 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				contact := Contact{
-					ID:         types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
-					Name:       "Some Contact",
-					SystemTags: []string{contactAdded, contactBlocked},
+					ID:      types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					Name:    "Some Contact",
+					Blocked: true,
 				}
 				err = s.m.SaveContact(&contact)
 				s.Require().NoError(err)
 			},
-			AddedFilters: 1,
+			AddedFilters: 0,
 		},
 		{
 			Name: "added by them contact",
@@ -286,9 +286,8 @@ func (s *MessengerSuite) TestInit() {
 				key, err := crypto.GenerateKey()
 				s.Require().NoError(err)
 				contact := Contact{
-					ID:         types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
-					Name:       "Some Contact",
-					SystemTags: []string{contactRequestReceived},
+					ID:   types.EncodeHex(crypto.FromECDSAPub(&key.PublicKey)),
+					Name: "Some Contact",
 				}
 				err = s.m.SaveContact(&contact)
 				s.Require().NoError(err)
@@ -740,7 +739,7 @@ func (s *MessengerSuite) TestRetrieveBlockedContact() {
 		ID:          publicKeyHex,
 		Name:        "contact-name",
 		LastUpdated: 20,
-		SystemTags:  []string{contactBlocked},
+		Blocked:     true,
 	}
 
 	s.Require().NoError(s.m.SaveContact(&blockedContact))
@@ -1327,19 +1326,7 @@ func (s *MessengerSuite) TestBlockContact() {
 		ID:          testPK,
 		Name:        "contact-name",
 		LastUpdated: 20,
-		SystemTags:  []string{contactAdded, contactRequestReceived},
-		DeviceInfo: []ContactDeviceInfo{
-			{
-				InstallationID: "1",
-				Timestamp:      2,
-				FCMToken:       "token",
-			},
-			{
-				InstallationID: "2",
-				Timestamp:      3,
-				FCMToken:       "token-2",
-			},
-		},
+		Added:       true,
 	}
 
 	chat1 := &Chat{
@@ -1516,19 +1503,7 @@ func (s *MessengerSuite) TestContactPersistence() {
 
 		Name:        "contact-name",
 		LastUpdated: 20,
-		SystemTags:  []string{contactAdded, contactRequestReceived},
-		DeviceInfo: []ContactDeviceInfo{
-			{
-				InstallationID: "1",
-				Timestamp:      2,
-				FCMToken:       "token",
-			},
-			{
-				InstallationID: "2",
-				Timestamp:      3,
-				FCMToken:       "token-2",
-			},
-		},
+		Added:       true,
 	}
 
 	s.Require().NoError(s.m.SaveContact(&contact))
@@ -1549,19 +1524,7 @@ func (s *MessengerSuite) TestContactPersistenceUpdate() {
 		ID:          contactID,
 		Name:        "contact-name",
 		LastUpdated: 20,
-		SystemTags:  []string{contactAdded, contactRequestReceived},
-		DeviceInfo: []ContactDeviceInfo{
-			{
-				InstallationID: "1",
-				Timestamp:      2,
-				FCMToken:       "token",
-			},
-			{
-				InstallationID: "2",
-				Timestamp:      3,
-				FCMToken:       "token-2",
-			},
-		},
+		Added:       true,
 	}
 
 	s.Require().NoError(s.m.SaveContact(&contact))

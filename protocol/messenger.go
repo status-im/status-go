@@ -2654,7 +2654,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					}
 					contact = c
 					messageState.AllContacts.Store(senderID, contact)
-					messageState.ModifiedContacts.Store(contact.ID, true)
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
@@ -3119,13 +3118,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool) {
 		contact, ok := messageState.AllContacts.Load(id)
 		if ok {
-			// We save all contacts so we can pull back name/image,
-			// but we only send to client those
-			// that have some custom fields
 			contactsToSave = append(contactsToSave, contact)
-			if contact.HasCustomFields() {
-				messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
-			}
+			messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
 		}
 		return true
 	})
@@ -3277,15 +3271,12 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		contacts, err := m.persistence.Contacts()
-		if err != nil {
-			return nil, "", err
-		}
-		for _, contact := range contacts {
+		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 			if contact.IsAdded() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
-		}
+			return true
+		})
 		return m.persistence.MessageByChatIDs(chatIDs, cursor, limit)
 	}
 	return m.persistence.MessageByChatID(chatID, cursor, limit)

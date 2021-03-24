@@ -304,7 +304,7 @@ func (m *Messenger) HandleSyncInstallationContact(state *ReceivedMessageState, m
 		}()
 
 		if message.Added {
-			contact.SystemTags = append(contact.SystemTags, contactAdded)
+			contact.Added = true
 		}
 		if message.EnsName != "" && contact.Name != message.EnsName {
 			contact.Name = message.EnsName
@@ -458,9 +458,6 @@ func (m *Messenger) HandleContactUpdate(state *ReceivedMessageState, message pro
 
 	if contact.LastUpdated < message.Clock {
 		logger.Info("Updating contact")
-		if !contact.HasBeenAdded() && contact.ID != contactIDFromPublicKey(&m.identity.PublicKey) {
-			contact.SystemTags = append(contact.SystemTags, contactRequestReceived)
-		}
 		if contact.Name != message.EnsName {
 			contact.Name = message.EnsName
 			contact.ENSVerified = false
