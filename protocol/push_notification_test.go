@@ -295,9 +295,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationFromContactO
 
 	// Add alice has a contact
 	aliceContact := &Contact{
-		ID:         types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
-		Name:       "Some Contact",
-		SystemTags: []string{contactAdded},
+		ID:    types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
+		Name:  "Some Contact",
+		Added: true,
 	}
 
 	err = bob.SaveContact(aliceContact)
@@ -441,9 +441,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Add alice has a contact
 	aliceContact := &Contact{
-		ID:         types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
-		Name:       "Some Contact",
-		SystemTags: []string{contactAdded},
+		ID:    types.EncodeHex(crypto.FromECDSAPub(&alice.identity.PublicKey)),
+		Name:  "Some Contact",
+		Added: true,
 	}
 
 	err = bob.SaveContact(aliceContact)
@@ -451,9 +451,9 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// Add frank has a contact
 	frankContact := &Contact{
-		ID:         types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
-		Name:       "Some Contact",
-		SystemTags: []string{contactAdded},
+		ID:    types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
+		Name:  "Some Contact",
+		Added: true,
 	}
 
 	err = bob.SaveContact(frankContact)
@@ -539,9 +539,8 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationRetries() {
 
 	// The message has been sent, but not received, now we remove a contact so that the token is invalidated
 	frankContact = &Contact{
-		ID:         types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
-		Name:       "Some Contact",
-		SystemTags: []string{},
+		ID:   types.EncodeHex(crypto.FromECDSAPub(&frank.identity.PublicKey)),
+		Name: "Some Contact",
 	}
 	err = bob.SaveContact(frankContact)
 	s.Require().NoError(err)

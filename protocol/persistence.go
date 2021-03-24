@@ -250,7 +250,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chats.synced_from,
 			chats.synced_to,
 		    chats.description,
-			contacts.identicon,
 			contacts.alias
 		FROM chats LEFT JOIN contacts ON chats.id = contacts.id
 		ORDER BY chats.timestamp DESC
@@ -263,7 +262,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 	for rows.Next() {
 		var (
 			alias                    sql.NullString
-			identicon                sql.NullString
 			invitationAdmin          sql.NullString
 			profile                  sql.NullString
 			syncedFrom               sql.NullInt64
@@ -295,7 +293,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			&syncedFrom,
 			&syncedTo,
 			&chat.Description,
-			&identicon,
 			&alias,
 		)
 
@@ -342,7 +339,6 @@ func (db sqlitePersistence) chats(tx *sql.Tx) (chats []*Chat, err error) {
 			chat.LastMessage = message
 		}
 		chat.Alias = alias.String
-		chat.Identicon = identicon.String
 
 		chats = append(chats, &chat)
 	}
@@ -455,12 +451,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			c.alias,
 			c.identicon,
 			c.last_updated,
-			c.system_tags,
-			c.device_info,
+			c.added,
+			c.blocked,
 			c.local_nickname,
 			i.image_type,
 			i.payload
-		FROM contacts c LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id LEFT JOIN ens_verification_records v ON c.id = v.public_key
+		FROM contacts c 
+		LEFT JOIN chat_identity_contacts i ON c.id = i.contact_id 
+		LEFT JOIN ens_verification_records v ON c.id = v.public_key;
 	`)
 	if err != nil {
 		return nil, err
@@ -470,14 +468,14 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 	for rows.Next() {
 
 		var (
-			contact           Contact
-			encodedDeviceInfo []byte
-			encodedSystemTags []byte
-			nickname          sql.NullString
-			imageType         sql.NullString
-			ensName           sql.NullString
-			ensVerified       sql.NullBool
-			imagePayload      []byte
+			contact      Contact
+			nickname     sql.NullString
+			imageType    sql.NullString
+			ensName      sql.NullString
+			ensVerified  sql.NullBool
+			added        sql.NullBool
+			blocked      sql.NullBool
+			imagePayload []byte
 		)
 
 		contact.Images = make(map[string]images.IdentityImage)
@@ -490,8 +488,8 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			&contact.Alias,
 			&contact.Identicon,
 			&contact.LastUpdated,
-			&encodedSystemTags,
-			&encodedDeviceInfo,
+			&added,
+			&blocked,
 			&nickname,
 			&imageType,
 			&imagePayload,
@@ -512,25 +510,16 @@ func (db sqlitePersistence) Contacts() ([]*Contact, error) {
 			contact.ENSVerified = ensVerified.Bool
 		}
 
-		if encodedDeviceInfo != nil {
-			// Restore device info
-			deviceInfoDecoder := gob.NewDecoder(bytes.NewBuffer(encodedDeviceInfo))
-			if err := deviceInfoDecoder.Decode(&contact.DeviceInfo); err != nil {
-				return nil, err
-			}
+		if added.Valid {
+			contact.Added = added.Bool
 		}
 
-		if encodedSystemTags != nil {
-			// Restore system tags
-			systemTagsDecoder := gob.NewDecoder(bytes.NewBuffer(encodedSystemTags))
-			if err := systemTagsDecoder.Decode(&contact.SystemTags); err != nil {
-				return nil, err
-			}
+		if blocked.Valid {
+			contact.Blocked = blocked.Bool
 		}
 
 		previousContact, ok := allContacts[contact.ID]
 		if !ok {
-
 			if imageType.Valid {
 				contact.Images[imageType.String] = images.IdentityImage{Name: imageType.String, Payload: imagePayload}
 			}
@@ -655,40 +644,24 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 		}()
 	}
 
-	// Encode device info
-	var encodedDeviceInfo bytes.Buffer
-	deviceInfoEncoder := gob.NewEncoder(&encodedDeviceInfo)
-	err = deviceInfoEncoder.Encode(contact.DeviceInfo)
-	if err != nil {
-		return
-	}
-
-	// Encoded system tags
-	var encodedSystemTags bytes.Buffer
-	systemTagsEncoder := gob.NewEncoder(&encodedSystemTags)
-	err = systemTagsEncoder.Encode(contact.SystemTags)
-	if err != nil {
-		return
-	}
-
 	// Insert record
-	// NOTE: tribute_to_talk is not used anymore, but it's not nullable
+	// NOTE: name, photo and tribute_to_talk are not used anymore, but it's not nullable
 	// Removing it requires copying over the table which might be expensive
 	// when there are many contacts, so best avoiding it
 	stmt, err := tx.Prepare(`
 		INSERT INTO contacts(
 			id,
 			address,
-			name,
 			alias,
 			identicon,
 			last_updated,
-			system_tags,
-			device_info,
 			local_nickname,
+			added,
+			blocked,
+			name,
 			photo,
 			tribute_to_talk
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?, ?, "")
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return
@@ -698,15 +671,15 @@ func (db sqlitePersistence) SaveContact(contact *Contact, tx *sql.Tx) (err error
 	_, err = stmt.Exec(
 		contact.ID,
 		contact.Address,
-		contact.Name,
 		contact.Alias,
 		contact.Identicon,
 		contact.LastUpdated,
-		encodedSystemTags.Bytes(),
-		encodedDeviceInfo.Bytes(),
 		contact.LocalNickname,
-		// Photo is not used anymore but constrained to be NOT NULL
-		// we set it to blank for now to avoid a migration of the table
+		contact.Added,
+		contact.Blocked,
+		//TODO we need to drop these columns
+		"",
+		"",
 		"",
 	)
 	return
@@ -717,7 +690,7 @@ func (db sqlitePersistence) SaveTransactionToValidate(transaction *TransactionTo
 
 	_, err := db.db.Exec(`INSERT INTO messenger_transactions_to_validate(
 		command_id,
-                message_id,
+		message_id,
 		transaction_hash,
 		retry_count,
 		first_seen,
