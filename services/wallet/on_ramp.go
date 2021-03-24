@@ -161,11 +161,11 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
   },
   {
     "name": "Latamex",
-    "description": "TODO",
-    "fees": "TODO",
+    "description": "Easily buy crypto in Argentina, Mexico, and Brazil",
+    "fees": "1%% - 1.7%%",
     "logoUrl": "%s",
-    "siteUrl": "TODO",
-    "hostname": "TODO"
+    "siteUrl": "https://latamex.com/",
+    "hostname": "latamex.com"
   }
 ]`, logoWyre, logoMoonPay, logoTransak, logoRamp, logoLocalCryptos, logoLatamex)
 
