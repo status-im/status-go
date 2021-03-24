@@ -20,7 +20,6 @@ type CryptoOnRamp struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Fees        string `json:"fees"`
-	Region      string `json:"region"`
 	LogoURL     string `json:"logoUrl"`
 	SiteURL     string `json:"siteUrl"`
 	Hostname    string `json:"hostname"`
@@ -123,7 +122,6 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "name": "Wyre",
     "description": "A secure bridge for fiat and crypto",
     "fees": "from 2.9%%",
-    "region": "US & Europe",
     "logoUrl": "%s",
     "siteUrl": "https://pay.sendwyre.com/purchase",
     "hostname": "sendwyre.com"
@@ -132,7 +130,6 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "name": "MoonPay",
     "description": "The new standard for fiat to crypto",
     "fees": "1%%-4.5%%",
-    "region": "US & Europe",
     "logoUrl": "%s",
     "siteUrl": "https://buy.moonpay.com",
     "hostname": "moonpay.com"
@@ -141,7 +138,6 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "name": "Transak",
     "description": "Global fiat <-> crypto payment gateway",
     "fees": "1%%-4.5%%",
-    "region": "Global",
     "logoUrl": "%s",
     "siteUrl": "https://global.transak.com",
     "hostname": "transak.com"
@@ -150,7 +146,6 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "name": "Ramp",
     "description": "Global crypto to fiat flow",
     "fees": "1.5%%",
-    "region": "Global",
     "logoUrl": "%s",
     "siteUrl": "https://ramp.network/buy/",
     "hostname": "ramp.network"
@@ -159,7 +154,6 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "name": "LocalCryptos",
     "description": "Non-custodial crypto marketplace",
     "fees": "1.5%%",
-    "region": "Global",
     "logoUrl": "%s",
     "siteUrl": "https://localcryptos.com",
     "hostname": "localcryptos.com"
