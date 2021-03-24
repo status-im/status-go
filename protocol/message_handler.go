@@ -323,6 +323,59 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 	return true
 }
 
+func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
+	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
+	// TODO
+	// ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
+
+	logger.Info("Handling pin message")
+
+	pinMessage := &common.PinMessage{
+		PinMessage:       message,
+		ID:               state.CurrentMessageState.MessageID,
+		MessageID:        message.MessageId,
+		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
+		From:             state.CurrentMessageState.Contact.ID,
+		SigPubKey:        state.CurrentMessageState.PublicKey,
+		Identicon:        state.CurrentMessageState.Contact.Identicon,
+		Alias:            state.CurrentMessageState.Contact.Alias,
+	}
+	pinMessage.Pinned = message.Pinned
+
+	chat, err := m.matchChatEntity(pinMessage, state.AllChats, state.Timesource)
+	if err != nil {
+		return err // matchChatEntity returns a descriptive error message
+	}
+
+	// If deleted-at is greater, ignore message
+	if chat.DeletedAtClockValue >= pinMessage.Clock {
+		return nil
+	}
+
+	// Set the LocalChatID for the message
+	pinMessage.LocalChatID = chat.ID
+
+	if c, ok := state.AllChats[chat.ID]; ok {
+		chat = c
+	}
+
+	// Set the LocalChatID for the message
+	pinMessage.LocalChatID = chat.ID
+
+	if chat.LastClockValue < message.Clock {
+		chat.LastClockValue = message.Clock
+	}
+
+	state.Response.PinMessages = append(state.Response.PinMessages, pinMessage)
+
+	chat.Active = false
+	// Set in the modified maps chat
+	state.Response.AddChat(chat)
+	state.AllChats[chat.ID] = chat
+
+	return nil
+}
+
 func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
 	contact := state.CurrentMessageState.Contact

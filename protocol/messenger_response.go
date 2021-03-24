@@ -13,6 +13,7 @@ import (
 
 type MessengerResponse struct {
 	Messages                []*common.Message
+	PinMessages             []*common.PinMessage
 	Contacts                []*Contact
 	Installations           []*multidevice.Installation
 	EmojiReactions          []*EmojiReaction
@@ -114,6 +115,7 @@ func (r *MessengerResponse) Notifications() []*localnotifications.Notification {
 func (r *MessengerResponse) IsEmpty() bool {
 	return len(r.chats)+
 		len(r.Messages)+
+		len(r.PinMessages)+
 		len(r.Contacts)+
 		len(r.Installations)+
 		len(r.Invitations)+
@@ -154,6 +156,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.overrideFilters(response.Filters)
 	r.overrideRemovedFilters(response.Filters)
 	r.AddCommunities(response.Communities())
+	r.overridePinMessages(response.PinMessages)
 
 	return nil
 }
@@ -202,6 +205,21 @@ func (r *MessengerResponse) overrideRemovedFilters(filters []*transport.Filter) 
 		}
 		if !found {
 			r.RemovedFilters = append(r.RemovedFilters, overrideFilter)
+		}
+	}
+}
+
+func (r *MessengerResponse) overridePinMessages(messages []*common.PinMessage) {
+	for _, overrideMessage := range messages {
+		var found = false
+		for idx, chat := range r.Messages {
+			if chat.ID == overrideMessage.ID {
+				r.PinMessages[idx] = overrideMessage
+				found = true
+			}
+		}
+		if !found {
+			r.PinMessages = append(r.PinMessages, overrideMessage)
 		}
 	}
 }

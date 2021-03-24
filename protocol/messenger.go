@@ -2351,6 +2351,7 @@ type CurrentMessageState struct {
 	Message protobuf.ChatMessage
 	// MessageID is the ID of the message
 	MessageID string
+	Pinned    bool
 	// WhisperTimestamp is the whisper timestamp of the message
 	WhisperTimestamp uint64
 	// Contact is the contact associated with the author of the message
@@ -2551,6 +2552,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.handler.HandleChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
+					case protobuf.PinMessage:
+						pinMessage := msg.ParsedMessage.Interface().(protobuf.PinMessage)
+						err = m.handler.HandlePinMessage(messageState, pinMessage)
+						if err != nil {
+							logger.Warn("failed to handle PinMessage", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
@@ -2951,6 +2961,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	if len(messageState.Response.Messages) > 0 {
 		err = m.SaveMessages(messageState.Response.Messages)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(messageState.Response.PinMessages) > 0 {
+		err = m.SavePinMessages(messageState.Response.PinMessages)
 		if err != nil {
 			return nil, err
 		}
