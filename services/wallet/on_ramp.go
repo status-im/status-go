@@ -146,7 +146,7 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
   {
     "name": "Ramp",
     "description": "Global crypto to fiat flow",
-    "fees": "1.5%%",
+    "fees": "0.49%% - 2.9%%",
     "logoUrl": "%s",
     "siteUrl": "https://ramp.network/buy/",
     "hostname": "ramp.network"
