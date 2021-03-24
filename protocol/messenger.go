@@ -2539,6 +2539,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
+					case protobuf.PinMessage:
+						pinMessage := msg.ParsedMessage.Interface().(protobuf.PinMessage)
+						err = m.handler.HandlePinMessage(messageState, pinMessage)
+						if err != nil {
+							logger.Warn("failed to handle PinMessage", zap.Error(err))
+							allMessagesProcessed = false
+							continue
+						}
+
 					case protobuf.PairInstallation:
 						if !common.IsPubKeyEqual(messageState.CurrentMessageState.PublicKey, &m.identity.PublicKey) {
 							logger.Warn("not coming from us, ignoring")
@@ -2935,6 +2944,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	if len(messageState.Response.Messages) > 0 {
 		err = m.SaveMessages(messageState.Response.Messages)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(messageState.Response.pinMessages) > 0 {
+		err = m.SavePinMessages(messageState.Response.PinMessages())
 		if err != nil {
 			return nil, err
 		}

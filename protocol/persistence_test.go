@@ -181,6 +181,119 @@ func TestMessageByChatID(t *testing.T) {
 	)
 }
 
+func TestPinMessageByChatID(t *testing.T) {
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := sqlitePersistence{db: db}
+	chatID := "chat-with-pinned-messages"
+	messagesCount := 1000
+	pageSize := 5
+	pinnedMessagesCount := 0
+
+	var messages []*common.Message
+	var pinMessages []*common.PinMessage
+	for i := 0; i < messagesCount; i++ {
+		messages = append(messages, &common.Message{
+			ID:          strconv.Itoa(i),
+			LocalChatID: chatID,
+			ChatMessage: protobuf.ChatMessage{
+				Clock: uint64(i),
+			},
+			From: "me",
+		})
+
+		// Pin this message
+		if i%100 == 0 {
+			pinMessage := &common.PinMessage{
+				ID:          strconv.Itoa(i),
+				LocalChatID: chatID,
+				From:        "me",
+			}
+
+			pinMessage.MessageId = strconv.Itoa(i)
+			pinMessage.Clock = 111
+			pinMessage.Pinned = true
+			pinMessages = append(pinMessages, pinMessage)
+			pinnedMessagesCount++
+
+			if i%200 == 0 {
+				// unpin a message
+				unpinMessage := &common.PinMessage{
+					ID:          strconv.Itoa(i),
+					LocalChatID: chatID,
+					From:        "me",
+				}
+				pinMessage.MessageId = strconv.Itoa(i)
+				unpinMessage.Clock = 333
+				unpinMessage.Pinned = false
+				pinMessages = append(pinMessages, unpinMessage)
+				pinnedMessagesCount--
+
+				// pinned before the unpin
+				pinMessage2 := &common.PinMessage{
+					ID:          strconv.Itoa(i),
+					LocalChatID: chatID,
+					From:        "me",
+				}
+				pinMessage2.MessageId = strconv.Itoa(i)
+				pinMessage2.Clock = 222
+				pinMessage2.Pinned = true
+				pinMessages = append(pinMessages, pinMessage2)
+			}
+		}
+
+		// Add some other chats.
+		if i%5 == 0 {
+			messages = append(messages, &common.Message{
+				ID:          strconv.Itoa(messagesCount + i),
+				LocalChatID: "chat-without-pinned-messages",
+				ChatMessage: protobuf.ChatMessage{
+					Clock: uint64(i),
+				},
+
+				From: "me",
+			})
+		}
+	}
+
+	err = p.SaveMessages(messages)
+	require.NoError(t, err)
+
+	err = p.SavePinMessages(pinMessages)
+	require.NoError(t, err)
+
+	var (
+		result []*common.PinnedMessage
+		cursor string
+		iter   int
+	)
+	for {
+		var (
+			items []*common.PinnedMessage
+			err   error
+		)
+
+		items, cursor, err = p.PinnedMessageByChatID(chatID, cursor, pageSize)
+		require.NoError(t, err)
+		result = append(result, items...)
+
+		iter++
+		if len(cursor) == 0 || iter > messagesCount {
+			break
+		}
+	}
+	require.Equal(t, "", cursor) // for loop should exit because of cursor being empty
+	require.EqualValues(t, pinnedMessagesCount, len(result))
+	require.EqualValues(t, math.Ceil(float64(pinnedMessagesCount)/float64(pageSize)), iter)
+	require.True(
+		t,
+		// Verify descending order.
+		sort.SliceIsSorted(result, func(i, j int) bool {
+			return result[i].Clock > result[j].Clock
+		}),
+	)
+}
+
 func TestMessageReplies(t *testing.T) {
 	db, err := openTestDB()
 	require.NoError(t, err)

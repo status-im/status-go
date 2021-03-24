@@ -543,6 +543,91 @@ func (db sqlitePersistence) MessageByChatID(chatID string, currCursor string, li
 	return result, newCursor, nil
 }
 
+// PinnedMessageByChatID returns all pinned messages for a given chatID in descending order.
+// Ordering is accomplished using two concatenated values: ClockValue and ID.
+// These two values are also used to compose a cursor which is returned to the result.
+func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor string, limit int) ([]*common.PinnedMessage, string, error) {
+	cursorWhere := ""
+	if currCursor != "" {
+		cursorWhere = "AND cursor <= ?" //nolint: goconst
+	}
+	allFields := db.tableUserMessagesAllFieldsJoin()
+	args := make([]interface{}, len(chatIDs))
+	for i, v := range chatIDs {
+		args[i] = v
+	}
+	if currCursor != "" {
+		args = append(args, currCursor)
+	}
+	// Build a new column `cursor` at the query time by having a fixed-sized clock value at the beginning
+	// concatenated with message ID. Results are sorted using this new column.
+	// This new column values can also be returned as a cursor for subsequent requests.
+	rows, err := db.db.Query(
+		fmt.Sprintf(`
+			SELECT
+				%s,
+				pm.clock_value as pinnedAt,
+				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
+			FROM
+				pin_messages pm
+			JOIN
+				user_messages m1
+			ON
+				pm.message_id = m1.id
+			LEFT JOIN
+				user_messages m2
+			ON
+				m1.response_to = m2.id
+			LEFT JOIN
+				contacts c
+			ON
+				m1.source = c.id
+			WHERE
+				pm.pinned = 1
+				AND NOT(m1.hide) AND m1.local_chat_id IN %s %s
+			ORDER BY cursor DESC
+			LIMIT ?
+		`, allFields, "(?"+strings.Repeat(",?", len(chatIDs)-1)+")", cursorWhere),
+		append(args, limit+1)..., // take one more to figure our whether a cursor should be returned
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+
+	var (
+		result  []*common.PinnedMessage
+		cursors []string
+	)
+	for rows.Next() {
+		var (
+			message  common.Message
+			pinnedAt uint64
+			cursor   string
+		)
+		if err := db.tableUserMessagesScanAllFields(rows, &message, &pinnedAt, &cursor); err != nil {
+			return nil, "", err
+		}
+		pinnedMessage := &common.PinnedMessage{
+			Message:  message,
+			PinnedAt: pinnedAt,
+		}
+		result = append(result, pinnedMessage)
+		cursors = append(cursors, cursor)
+	}
+
+	var newCursor string
+	if len(result) > limit && cursors != nil {
+		newCursor = cursors[limit]
+		result = result[:limit]
+	}
+	return result, newCursor, nil
+}
+
+func (db sqlitePersistence) PinnedMessageByChatID(chatID string, currCursor string, limit int) ([]*common.PinnedMessage, string, error) {
+	return db.PinnedMessageByChatIDs([]string{chatID}, currCursor, limit)
+}
+
 // MessageByChatIDs returns all messages for a given chatIDs in descending order.
 // Ordering is accomplished using two concatenated values: ClockValue and ID.
 // These two values are also used to compose a cursor which is returned to the result.
@@ -807,6 +892,76 @@ func (db sqlitePersistence) SaveMessages(messages []*common.Message) (err error)
 	return
 }
 
+func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err error) {
+	tx, err := db.db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	// select
+	selectQuery := "SELECT clock_value FROM pin_messages WHERE id = ?"
+
+	// insert
+	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned`
+	insertValues := strings.Repeat("?, ", strings.Count(allInsertFields, ",")) + "?"
+	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
+	insertStmt, err := tx.Prepare(insertQuery)
+	if err != nil {
+		return
+	}
+
+	// update
+	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ? WHERE id = ?"
+	updateStmt, err := tx.Prepare(updateQuery)
+	if err != nil {
+		return
+	}
+
+	for _, message := range messages {
+		row := tx.QueryRow(selectQuery, message.ID)
+		var existingClock uint64
+		switch err = row.Scan(&existingClock); err {
+		case sql.ErrNoRows:
+			// not found, insert new record
+			allValues := []interface{}{
+				message.ID,
+				message.MessageId,
+				message.WhisperTimestamp,
+				message.ChatId,
+				message.LocalChatID,
+				message.Clock,
+				message.Pinned,
+			}
+			_, err = insertStmt.Exec(allValues...)
+			if err != nil {
+				return
+			}
+		case nil:
+			// found, update if current message is more recent, otherwise skip
+			if existingClock < message.Clock {
+				// update
+				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.ID)
+				if err != nil {
+					return
+				}
+			}
+
+		default:
+			return
+		}
+	}
+
+	return
+}
+
 func (db sqlitePersistence) DeleteMessage(id string) error {
 	_, err := db.db.Exec(`DELETE FROM user_messages WHERE id = ?`, id)
 	return err
@@ -838,6 +993,12 @@ func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err e
 	}
 
 	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pin_messages WHERE local_chat_id = ?`, id)
+
 	return
 }
 
