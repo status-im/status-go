@@ -34,7 +34,6 @@ import (
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	mailserversDB "github.com/status-im/status-go/services/mailservers"
 	"github.com/status-im/status-go/services/wallet"
-	"github.com/status-im/status-go/signal"
 
 	"go.uber.org/zap"
 )
@@ -315,10 +314,6 @@ func (s *Service) verifyTransactionLoop(tick time.Duration, cancel <-chan struct
 	}
 }
 
-func (s *Service) ConfirmMessagesProcessed(messageIDs [][]byte) error {
-	return s.messenger.ConfirmMessagesProcessed(messageIDs)
-}
-
 func (s *Service) EnableInstallation(installationID string) error {
 	return s.messenger.EnableInstallation(installationID)
 }
@@ -330,7 +325,9 @@ func (s *Service) DisableInstallation(installationID string) error {
 
 // UpdateMailservers updates information about selected mail servers.
 func (s *Service) UpdateMailservers(nodes []*enode.Node) error {
+	log.Info("updating nodes", "nodes", nodes, "messenger", s.messenger)
 	if len(nodes) > 0 && s.messenger != nil {
+		log.Info("Setting messenger")
 		s.messenger.SetMailserver(nodes[0].ID().Bytes())
 	}
 	if err := s.peerStore.Update(nodes); err != nil {
@@ -412,27 +409,6 @@ func (s *Service) Stop() error {
 	return nil
 }
 
-func onNegotiatedFilters(filters []*transport.Filter) {
-	var signalFilters []*signal.Filter
-	for _, filter := range filters {
-
-		signalFilter := &signal.Filter{
-			ChatID:   filter.ChatID,
-			SymKeyID: filter.SymKeyID,
-			Listen:   filter.Listen,
-			FilterID: filter.FilterID,
-			Identity: filter.Identity,
-			Topic:    filter.Topic,
-		}
-
-		signalFilters = append(signalFilters, signalFilter)
-	}
-	if len(filters) != 0 {
-		handler := PublisherSignalHandler{}
-		handler.FilterAdded(signalFilters)
-	}
-}
-
 func buildMessengerOptions(
 	config params.ShhextConfig,
 	identity *ecdsa.PrivateKey,
@@ -452,7 +428,6 @@ func buildMessengerOptions(
 		protocol.WithMailserversDatabase(mailserversDB.NewDB(db)),
 		protocol.WithAccount(account),
 		protocol.WithEnvelopesMonitorConfig(envelopesMonitorConfig),
-		protocol.WithOnNegotiatedFilters(onNegotiatedFilters),
 		protocol.WithSignalsHandler(messengerSignalsHandler),
 		protocol.WithENSVerificationConfig(publishMessengerResponse, config.VerifyENSURL, config.VerifyENSContractAddress),
 	}

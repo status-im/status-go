@@ -70,5 +70,7 @@ message ChatMessage {
     IMAGE = 7;
     AUDIO = 8;
     COMMUNITY = 9;
+    // Only local
+    SYSTEM_MESSAGE_GAP = 10;
   }
 }

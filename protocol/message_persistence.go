@@ -49,7 +49,9 @@ func (db sqlitePersistence) tableUserMessagesAllFields() string {
 		replace_message,
 		rtl,
 		line_count,
-		response_to`
+		response_to,
+		gap_from,
+		gap_to`
 }
 
 func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
@@ -87,6 +89,8 @@ func (db sqlitePersistence) tableUserMessagesAllFieldsJoin() string {
 		m1.rtl,
 		m1.line_count,
 		m1.response_to,
+		m1.gap_from,
+		m1.gap_to,
 		m2.source,
 		m2.text,
 		m2.parsed_text,
@@ -119,6 +123,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	var alias sql.NullString
 	var identicon sql.NullString
 	var communityID sql.NullString
+	var gapFrom sql.NullInt64
+	var gapTo sql.NullInt64
 
 	sticker := &protobuf.StickerMessage{}
 	command := &common.CommandParameters{}
@@ -159,6 +165,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 		&message.RTL,
 		&message.LineCount,
 		&message.ResponseTo,
+		&gapFrom,
+		&gapTo,
 		&quotedFrom,
 		&quotedText,
 		&quotedParsedText,
@@ -188,6 +196,12 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 	message.Alias = alias.String
 	message.Identicon = identicon.String
 
+	if gapFrom.Valid && gapTo.Valid {
+		message.GapParameters = &common.GapParameters{
+			From: uint32(gapFrom.Int64),
+			To:   uint32(gapTo.Int64),
+		}
+	}
 	if communityID.Valid {
 		message.CommunityID = communityID.String
 	}
@@ -221,6 +235,8 @@ func (db sqlitePersistence) tableUserMessagesScanAllFields(row scanner, message 
 }
 
 func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) ([]interface{}, error) {
+	var gapFrom, gapTo uint32
+
 	sticker := message.GetSticker()
 	if sticker == nil {
 		sticker = &protobuf.StickerMessage{}
@@ -239,6 +255,11 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 	command := message.CommandParameters
 	if command == nil {
 		command = &common.CommandParameters{}
+	}
+
+	if message.GapParameters != nil {
+		gapFrom = message.GapParameters.From
+		gapTo = message.GapParameters.To
 	}
 
 	var serializedMentions []byte
@@ -297,6 +318,8 @@ func (db sqlitePersistence) tableUserMessagesAllValues(message *common.Message) 
 		message.RTL,
 		message.LineCount,
 		message.ResponseTo,
+		gapFrom,
+		gapTo,
 	}, nil
 }
 
@@ -967,6 +990,18 @@ func (db sqlitePersistence) DeleteMessage(id string) error {
 	return err
 }
 
+func (db sqlitePersistence) DeleteMessages(ids []string) error {
+	idsArgs := make([]interface{}, 0, len(ids))
+	for _, id := range ids {
+		idsArgs = append(idsArgs, id)
+	}
+	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+
+	_, err := db.db.Exec("DELETE FROM user_messages WHERE id IN ("+inVector+")", idsArgs...) // nolint: gosec
+
+	return err
+}
+
 func (db sqlitePersistence) HideMessage(id string) error {
 	_, err := db.db.Exec(`UPDATE user_messages SET hide = 1, seen = 1 WHERE id = ?`, id)
 	return err
@@ -1380,6 +1415,11 @@ func (db sqlitePersistence) clearHistory(chat *Chat, currentClockValue uint64, t
 		}
 		chat.DeletedAtClockValue = currentClockValue
 	}
+
+	// Reset synced-to/from
+	syncedTo := uint32(currentClockValue / 1000)
+	chat.SyncedTo = syncedTo
+	chat.SyncedFrom = syncedTo
 
 	chat.LastMessage = nil
 	chat.UnviewedMessagesCount = 0

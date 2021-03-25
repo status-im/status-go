@@ -69,6 +69,12 @@ type CommandParameters struct {
 	Signature []byte `json:"signature"`
 }
 
+// GapParameters is the From and To indicating the missing period in chat history
+type GapParameters struct {
+	From uint32 `json:"from,omitempty"`
+	To   uint32 `json:"to,omitempty"`
+}
+
 func (c *CommandParameters) IsTokenTransfer() bool {
 	return len(c.Contract) != 0
 }
@@ -104,6 +110,9 @@ type Message struct {
 
 	// CommandParameters is the parameters sent with the message
 	CommandParameters *CommandParameters `json:"commandParameters"`
+
+	// GapParameters is the value from/to related to the gap
+	GapParameters *GapParameters `json:"gapParameters,omitempty"`
 
 	// Computed fields
 	// RTL is whether this is a right-to-left message (arabic/hebrew script etc)
@@ -169,8 +178,9 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Audio             string                           `json:"audio,omitempty"`
 		AudioDurationMs   uint64                           `json:"audioDurationMs,omitempty"`
 		CommunityID       string                           `json:"communityId,omitempty"`
-		Sticker           *StickerAlias                    `json:"sticker"`
-		CommandParameters *CommandParameters               `json:"commandParameters"`
+		Sticker           *StickerAlias                    `json:"sticker,omitempty"`
+		CommandParameters *CommandParameters               `json:"commandParameters,omitempty"`
+		GapParameters     *GapParameters                   `json:"gapParameters,omitempty"`
 		Timestamp         uint64                           `json:"timestamp"`
 		ContentType       protobuf.ChatMessage_ContentType `json:"contentType"`
 		MessageType       protobuf.MessageType             `json:"messageType"`
@@ -205,6 +215,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 		Links:             m.Links,
 		MessageType:       m.MessageType,
 		CommandParameters: m.CommandParameters,
+		GapParameters:     m.GapParameters,
 	}
 	if sticker := m.GetSticker(); sticker != nil {
 		item.Sticker = &StickerAlias{

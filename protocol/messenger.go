@@ -445,21 +445,9 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 	if err := m.cleanTopics(); err != nil {
 		return nil, err
 	}
-	response := &MessengerResponse{Filters: m.transport.Filters()}
+	response := &MessengerResponse{}
 
 	if m.mailserversDatabase != nil {
-		mailserverTopics, err := m.mailserversDatabase.Topics()
-		if err != nil {
-			return nil, err
-		}
-		response.MailserverTopics = mailserverTopics
-
-		mailserverRanges, err := m.mailserversDatabase.ChatRequestRanges()
-		if err != nil {
-			return nil, err
-		}
-		response.MailserverRanges = mailserverRanges
-
 		mailservers, err := m.mailserversDatabase.Mailservers()
 		if err != nil {
 			return nil, err
@@ -757,10 +745,6 @@ func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
 		}
 		result = append(result, filter)
 	}
-	if m.config.onNegotiatedFilters != nil {
-		m.config.onNegotiatedFilters(result)
-	}
-
 	return nil
 }
 
@@ -938,8 +922,6 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 // Init analyzes chats and contacts in order to setup filters
 // which are responsible for retrieving messages.
 func (m *Messenger) Init() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
@@ -951,6 +933,7 @@ func (m *Messenger) Init() error {
 		publicKeys    []*ecdsa.PublicKey
 	)
 
+	logger.Info("1")
 	joinedCommunities, err := m.communitiesManager.Joined()
 	if err != nil {
 		return err
@@ -975,6 +958,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	logger.Info("2")
 
 	// Get chat IDs and public keys from the existing chats.
 	// TODO: Get only active chats by the query.
@@ -982,6 +966,7 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
+	logger.Info("3")
 	for _, chat := range chats {
 		if err := chat.Validate(); err != nil {
 			logger.Warn("failed to validate chat", zap.Error(err))
@@ -1016,12 +1001,24 @@ func (m *Messenger) Init() error {
 			return errors.New("invalid chat type")
 		}
 	}
+	// upsert timeline chat
+	err = m.ensureTimelineChat()
+	if err != nil {
+		return err
+	}
+	err = m.ensureMyOwnProfileChat()
+	if err != nil {
+		return err
+	}
+	// uspert profile chat
+	logger.Info("4")
 
 	// Get chat IDs and public keys from the contacts.
 	contacts, err := m.persistence.Contacts()
 	if err != nil {
 		return err
 	}
+	logger.Info("5")
 	for idx, contact := range contacts {
 		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
@@ -1035,6 +1032,7 @@ func (m *Messenger) Init() error {
 		}
 		publicKeys = append(publicKeys, publicKey)
 	}
+	logger.Info("6")
 
 	installations, err := m.encryptor.GetOurInstallations(&m.identity.PublicKey)
 	if err != nil {
@@ -1044,8 +1042,10 @@ func (m *Messenger) Init() error {
 	for _, installation := range installations {
 		m.allInstallations.Store(installation.ID, installation)
 	}
+	logger.Info("7")
 
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
+	logger.Info("8")
 	return err
 }
 
@@ -1148,29 +1148,6 @@ func (m *Messenger) Mailservers() ([]string, error) {
 	return nil, ErrNotImplemented
 }
 
-// This is not accurate, it should not leave transport on removal of chat/group
-// only once there is no more: Group chat with that member, one-to-one chat, contact added by us
-func (m *Messenger) Leave(chat Chat) error {
-	switch chat.ChatType {
-	case ChatTypeOneToOne:
-		pk, err := chat.PublicKey()
-		if err != nil {
-			return err
-		}
-		return m.transport.LeavePrivate(pk)
-	case ChatTypePrivateGroupChat:
-		members, err := chat.MembersAsPublicKeys()
-		if err != nil {
-			return err
-		}
-		return m.transport.LeaveGroup(members)
-	case ChatTypePublic, ChatTypeProfile, ChatTypeTimeline:
-		return m.transport.LeavePublic(chat.Name)
-	default:
-		return errors.New("chat is neither public nor private")
-	}
-}
-
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
@@ -1214,6 +1191,11 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	if err != nil {
 		return nil, err
 	}
+
+	timestamp := uint32(chat.Timestamp / 1000)
+
+	chat.SyncedTo = timestamp
+	chat.SyncedFrom = timestamp
 
 	m.allChats.Store(chat.ID, &chat)
 
@@ -2900,10 +2882,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		return true
 	})
 
-	for _, filter := range messageState.AllFilters {
-		messageState.Response.Filters = append(messageState.Response.Filters, filter)
-	}
-
 	// Hydrate chat alias and identicon
 	for id := range messageState.Response.chats {
 		chat, _ := messageState.AllChats.Load(id)
@@ -3025,37 +3003,6 @@ func (m *Messenger) RequestHistoricMessages(
 	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, waitForResponse)
 }
 
-func (m *Messenger) RequestHistoricMessagesForFilter(
-	ctx context.Context,
-	from, to uint32,
-	cursor []byte,
-	filter *transport.Filter,
-	waitForResponse bool,
-) ([]byte, error) {
-	if m.mailserver == nil {
-		return nil, errors.New("no mailserver selected")
-	}
-
-	return m.transport.SendMessagesRequestForFilter(ctx, m.mailserver, from, to, cursor, filter, waitForResponse)
-}
-
-func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
-	return m.transport.LoadFilters(filters)
-}
-
-func (m *Messenger) RemoveFilters(filters []*transport.Filter) error {
-	return m.transport.RemoveFilters(filters)
-}
-
-func (m *Messenger) ConfirmMessagesProcessed(messageIDs [][]byte) error {
-	for _, id := range messageIDs {
-		if err := m.encryptor.ConfirmMessageProcessed(id); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (m *Messenger) MessageByID(id string) (*common.Message, error) {
 	return m.persistence.MessageByID(id)
 }
@@ -3096,30 +3043,6 @@ func (m *Messenger) DeleteMessage(id string) error {
 
 func (m *Messenger) DeleteMessagesByChatID(id string) error {
 	return m.persistence.DeleteMessagesByChatID(id)
-}
-
-func (m *Messenger) ClearHistory(id string) (*MessengerResponse, error) {
-	return m.clearHistory(id)
-}
-
-func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
-	chat, ok := m.allChats.Load(id)
-	if !ok {
-		return nil, ErrChatNotFound
-	}
-
-	clock, _ := chat.NextClockAndTimestamp(m.transport)
-
-	err := m.persistence.ClearHistory(chat, clock)
-	if err != nil {
-		return nil, err
-	}
-
-	m.allChats.Store(id, chat)
-
-	response := &MessengerResponse{}
-	response.AddChat(chat)
-	return response, nil
 }
 
 // MarkMessagesSeen marks messages with `ids` as seen in the chat `chatID`.

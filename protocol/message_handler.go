@@ -128,6 +128,9 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		// unless is coming from us or a contact
 		isActive := messageState.CurrentMessageState.Contact.IsAdded() || messageState.CurrentMessageState.Contact.ID == ourKey
 		newChat.Active = isActive
+		timestamp := uint32(newChat.Timestamp / 1000)
+		newChat.SyncedTo = timestamp
+		newChat.SyncedFrom = timestamp
 		chat = &newChat
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)

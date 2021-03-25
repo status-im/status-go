@@ -6,7 +6,6 @@ import (
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
-	"github.com/status-im/status-go/protocol/transport"
 	localnotifications "github.com/status-im/status-go/services/local-notifications"
 	"github.com/status-im/status-go/services/mailservers"
 )
@@ -19,11 +18,7 @@ type MessengerResponse struct {
 	Invitations             []*GroupChatInvitation
 	CommunityChanges        []*communities.CommunityChanges
 	RequestsToJoinCommunity []*communities.RequestToJoin
-	Filters                 []*transport.Filter
-	RemovedFilters          []*transport.Filter
 	Mailservers             []mailservers.Mailserver
-	MailserverTopics        []mailservers.MailserverTopic
-	MailserverRanges        []mailservers.ChatRequestRange
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
@@ -40,18 +35,14 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Chats                   []*Chat                         `json:"chats,omitempty"`
 		RemovedChats            []string                        `json:"removedChats,omitempty"`
 		Messages                []*common.Message               `json:"messages,omitempty"`
-		PinMessages             []*common.PinMessage            `json:"pinMessages,omitempty"`
 		Contacts                []*Contact                      `json:"contacts,omitempty"`
 		Installations           []*multidevice.Installation     `json:"installations,omitempty"`
+		PinMessages             []*common.PinMessage            `json:"pinMessages,omitempty"`
 		EmojiReactions          []*EmojiReaction                `json:"emojiReactions,omitempty"`
 		Invitations             []*GroupChatInvitation          `json:"invitations,omitempty"`
 		CommunityChanges        []*communities.CommunityChanges `json:"communityChanges,omitempty"`
 		RequestsToJoinCommunity []*communities.RequestToJoin    `json:"requestsToJoinCommunity,omitempty"`
-		Filters                 []*transport.Filter             `json:"filters,omitempty"`
-		RemovedFilters          []*transport.Filter             `json:"removedFilters,omitempty"`
 		Mailservers             []mailservers.Mailserver        `json:"mailservers,omitempty"`
-		MailserverTopics        []mailservers.MailserverTopic   `json:"mailserverTopics,omitempty"`
-		MailserverRanges        []mailservers.ChatRequestRange  `json:"mailserverRanges,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
 		Notifications               []*localnotifications.Notification `json:"notifications"`
@@ -65,11 +56,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Invitations:             r.Invitations,
 		CommunityChanges:        r.CommunityChanges,
 		RequestsToJoinCommunity: r.RequestsToJoinCommunity,
-		Filters:                 r.Filters,
-		RemovedFilters:          r.RemovedFilters,
 		Mailservers:             r.Mailservers,
-		MailserverTopics:        r.MailserverTopics,
-		MailserverRanges:        r.MailserverRanges,
 	}
 
 	responseItem.Notifications = r.Notifications()
@@ -132,12 +119,8 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.EmojiReactions)+
 		len(r.communities)+
 		len(r.CommunityChanges)+
-		len(r.Filters)+
-		len(r.RemovedFilters)+
 		len(r.removedChats)+
-		len(r.MailserverTopics)+
 		len(r.Mailservers)+
-		len(r.MailserverRanges)+
 		len(r.notifications)+
 		len(r.activityCenterNotifications)+
 		len(r.RequestsToJoinCommunity) == 0
@@ -152,8 +135,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 		len(response.Invitations)+
 		len(response.RequestsToJoinCommunity)+
 		len(response.Mailservers)+
-		len(response.MailserverTopics)+
-		len(response.MailserverRanges)+
 		len(response.EmojiReactions)+
 		len(response.CommunityChanges) != 0 {
 		return ErrNotImplemented
@@ -163,8 +144,6 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.AddRemovedChats(response.RemovedChats())
 	r.AddNotifications(response.Notifications())
 	r.overrideMessages(response.Messages)
-	r.overrideFilters(response.Filters)
-	r.overrideRemovedFilters(response.Filters)
 	r.AddCommunities(response.Communities())
 	r.AddPinMessages(response.PinMessages())
 
@@ -183,38 +162,6 @@ func (r *MessengerResponse) overrideMessages(messages []*common.Message) {
 		}
 		if !found {
 			r.Messages = append(r.Messages, overrideMessage)
-		}
-	}
-}
-
-// overrideFilters append new filters and override existing ones in response.Filters
-func (r *MessengerResponse) overrideFilters(filters []*transport.Filter) {
-	for _, overrideFilter := range filters {
-		var found = false
-		for idx, filter := range r.Filters {
-			if filter.FilterID == overrideFilter.FilterID {
-				r.Filters[idx] = overrideFilter
-				found = true
-			}
-		}
-		if !found {
-			r.Filters = append(r.Filters, overrideFilter)
-		}
-	}
-}
-
-// overrideRemovedFilters append removed filters and override existing ones in response.Filters
-func (r *MessengerResponse) overrideRemovedFilters(filters []*transport.Filter) {
-	for _, overrideFilter := range filters {
-		var found = false
-		for idx, filter := range r.RemovedFilters {
-			if filter.FilterID == overrideFilter.FilterID {
-				r.RemovedFilters[idx] = overrideFilter
-				found = true
-			}
-		}
-		if !found {
-			r.RemovedFilters = append(r.RemovedFilters, overrideFilter)
 		}
 	}
 }
@@ -313,4 +260,8 @@ func (r *MessengerResponse) AddPinMessages(pms []*common.PinMessage) {
 	for _, pm := range pms {
 		r.AddPinMessage(pm)
 	}
+}
+
+func (r *MessengerResponse) AddMessage(message *common.Message) {
+	r.Messages = append(r.Messages, message)
 }
