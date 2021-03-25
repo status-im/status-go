@@ -419,7 +419,7 @@ func activateWakuV2Service(stack *node.Node, config *params.NodeConfig, db *leve
 	}
 
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return createWakuV2Service(ctx, &config.WakuConfig, &config.ClusterConfig)
+		return createWakuV2Service(ctx, config.NodeKey, &config.WakuConfig, &config.ClusterConfig)
 	})
 	if err != nil {
 		return
@@ -523,7 +523,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 	return w, nil
 }
 
-func createWakuV2Service(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
 		FullNode:               wakuCfg.FullNode, // TODO: is this needed?
@@ -535,7 +535,7 @@ func createWakuV2Service(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, c
 		cfg.MaxMessageSize = wakuCfg.MaxMessageSize
 	}
 
-	w, err := wakuv2.New(cfg, logutils.ZapLogger())
+	w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger())
 
 	if err != nil {
 		return nil, err
