@@ -413,13 +413,13 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 
 // activateWakuV2Service configures WakuV2 and adds it to the given node.
 func activateWakuV2Service(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
-	if !config.WakuConfig.Enabled {
+	if !config.WakuV2Config.Enabled {
 		logger.Info("WakuV2 protocol is disabled")
 		return nil
 	}
 
 	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return createWakuV2Service(ctx, config.NodeKey, &config.WakuConfig, &config.ClusterConfig)
+		return createWakuV2Service(ctx, config.NodeKey, &config.WakuV2Config, &config.ClusterConfig)
 	})
 	if err != nil {
 		return
@@ -523,7 +523,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 	return w, nil
 }
 
-func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuV2Config, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
 		FullNode:               wakuCfg.FullNode, // TODO: is this needed?
