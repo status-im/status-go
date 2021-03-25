@@ -48,15 +48,10 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		return nil, err
 	}
 
-	// Create the corresponding profile chat
-	profileChatID := buildProfileChatID(contact.ID)
-	profileChat, ok := m.allChats.Load(profileChatID)
+	// Create the corresponding chat
+	profileChat := m.buildProfileChat(contact.ID)
 
-	if !ok {
-		profileChat = CreateProfileChat(profileChatID, contact.ID, m.getTimesource())
-	}
-
-	filters, err := m.Join(profileChat)
+	_, err = m.Join(profileChat)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +63,6 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		return nil, err
 	}
 
-	response.Filters = filters
 	response.AddChat(profileChat)
 
 	publicKey, err := contact.PublicKey()
@@ -176,6 +170,17 @@ func (m *Messenger) saveContact(contact *Contact) error {
 	contact.Alias = name
 
 	if m.isNewContact(contact) || m.hasNicknameChanged(contact) {
+		if m.isNewContact(contact) {
+			publicKey, err := contact.PublicKey()
+			if err != nil {
+				return err
+			}
+			filter, err := m.transport.JoinPrivate(publicKey)
+			if err != nil {
+				return err
+			}
+			m.scheduleSyncFilter(filter)
+		}
 		err := m.syncContact(context.Background(), contact)
 		if err != nil {
 			return err

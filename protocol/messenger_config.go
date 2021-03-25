@@ -20,13 +20,13 @@ type MessageDeliveredHandler func(string, string)
 type MessengerSignalsHandler interface {
 	MessageDelivered(chatID string, messageID string)
 	CommunityInfoFound(community *communities.Community)
+	MessengerResponse(response *MessengerResponse)
 }
 
 type config struct {
 	// This needs to be exposed until we move here mailserver logic
 	// as otherwise the client is not notified of a new filter and
 	// won't be pulling messages from mailservers until it reloads the chats/filters
-	onNegotiatedFilters  func([]*transport.Filter)
 	onContactENSVerified func(*MessengerResponse)
 
 	// systemMessagesTranslations holds translations for system-messages
@@ -63,13 +63,6 @@ type Option func(*config) error
 func WithSystemMessagesTranslations(t map[protobuf.MembershipUpdateEvent_EventType]string) Option {
 	return func(c *config) error {
 		c.systemMessagesTranslations.Init(t)
-		return nil
-	}
-}
-
-func WithOnNegotiatedFilters(h func([]*transport.Filter)) Option {
-	return func(c *config) error {
-		c.onNegotiatedFilters = h
 		return nil
 	}
 }

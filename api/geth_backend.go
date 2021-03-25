@@ -45,6 +45,7 @@ import (
 	"github.com/status-im/status-go/services/rpcstats"
 	"github.com/status-im/status-go/services/subscriptions"
 	"github.com/status-im/status-go/services/typeddata"
+	"github.com/status-im/status-go/services/wakuext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/signal"
 	"github.com/status-im/status-go/transactions"
@@ -1157,6 +1158,9 @@ func (b *GethStatusBackend) GetActiveAccount() (*multiaccounts.Account, error) {
 	}
 
 	return b.account, nil
+}
+func (b *GethStatusBackend) WakuExtService() (*wakuext.Service, error) {
+	return b.statusNode.WakuExtService()
 }
 
 func (b *GethStatusBackend) injectAccountsIntoServices() error {

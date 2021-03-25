@@ -10,6 +10,8 @@ enum MessageType {
   // Only local
   SYSTEM_MESSAGE_PRIVATE_GROUP = 4;
   COMMUNITY_CHAT = 5;
+  // Only local
+  SYSTEM_MESSAGE_GAP = 6;
 }
 
 enum ImageType {

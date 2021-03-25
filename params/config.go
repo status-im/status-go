@@ -806,6 +806,16 @@ func NewConfigFromJSON(configJSON string) (*NodeConfig, error) {
 	return config, nil
 }
 
+func LoadClusterConfigFromFleet(fleet string) (*ClusterConfig, error) {
+	nodeConfig := &NodeConfig{}
+	err := loadConfigFromAsset(fmt.Sprintf("../config/cli/fleet-%s.json", fleet), nodeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &nodeConfig.ClusterConfig, nil
+}
+
 func loadConfigFromJSON(configJSON string, nodeConfig *NodeConfig) error {
 	decoder := json.NewDecoder(strings.NewReader(configJSON))
 	// override default configuration with values by JSON input

@@ -14,6 +14,11 @@ func NewProcessedMessageIDsCache(db *sql.DB) *ProcessedMessageIDsCache {
 	return &ProcessedMessageIDsCache{db: db}
 }
 
+func (c *ProcessedMessageIDsCache) Clear() error {
+	_, err := c.db.Exec("DELETE FROM transport_message_cache")
+	return err
+}
+
 func (c *ProcessedMessageIDsCache) Hits(ids []string) (map[string]bool, error) {
 	hits := make(map[string]bool)
 	idsArgs := make([]interface{}, 0, len(ids))

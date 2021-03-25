@@ -555,6 +555,15 @@ func (db *Database) GetNotificationsEnabled() (bool, error) {
 	return result, err
 }
 
+func (db *Database) GetUseMailservers() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT use_mailservers FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
 func (db *Database) GetMessagesFromContactsOnly() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT messages_from_contacts_only FROM settings WHERE synthetic_id = 'id'").Scan(&result)

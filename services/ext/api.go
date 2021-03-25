@@ -187,24 +187,6 @@ type Metadata struct {
 	Author       Author         `json:"author"`
 }
 
-// ConfirmMessagesProcessedByID is a method to confirm that messages was consumed by
-// the client side.
-// TODO: this is broken now as it requires dedup ID while a message hash should be used.
-func (api *PublicAPI) ConfirmMessagesProcessedByID(messageConfirmations []*Metadata) error {
-	confirmationCount := len(messageConfirmations)
-	dedupIDs := make([][]byte, confirmationCount)
-	encryptionIDs := make([][]byte, confirmationCount)
-	for i, confirmation := range messageConfirmations {
-		dedupIDs[i] = confirmation.DedupID
-		encryptionIDs[i] = confirmation.EncryptionID
-	}
-	return api.service.ConfirmMessagesProcessed(encryptionIDs)
-}
-
-func (api *PublicAPI) Leave(chat protocol.Chat) error {
-	return api.service.messenger.Leave(chat)
-}
-
 func (api *PublicAPI) LeaveGroupChat(ctx Context, chatID string, remove bool) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.LeaveGroupChat(ctx, chatID, remove)
 }
@@ -259,6 +241,14 @@ func (api *PublicAPI) SaveChat(parent context.Context, chat *protocol.Chat) erro
 
 func (api *PublicAPI) CreateOneToOneChat(parent context.Context, request *requests.CreateOneToOneChat) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.CreateOneToOneChat(request)
+}
+
+func (api *PublicAPI) CreatePublicChat(parent context.Context, request *requests.CreatePublicChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreatePublicChat(request)
+}
+
+func (api *PublicAPI) CreateProfileChat(parent context.Context, request *requests.CreateProfileChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.CreateProfileChat(request)
 }
 
 func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
@@ -484,12 +474,12 @@ func (api *PublicAPI) RemoveContact(ctx context.Context, pubKey string) (*protoc
 	return api.service.messenger.RemoveContact(ctx, pubKey)
 }
 
-func (api *PublicAPI) ClearHistory(chatID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.ClearHistory(chatID)
+func (api *PublicAPI) ClearHistory(request *requests.ClearHistory) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.ClearHistory(request)
 }
 
-func (api *PublicAPI) DeactivateChat(chatID string) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.DeactivateChat(chatID)
+func (api *PublicAPI) DeactivateChat(request *requests.DeactivateChat) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.DeactivateChat(request)
 }
 
 func (api *PublicAPI) UpdateMessageOutgoingStatus(id, newOutgoingStatus string) error {
@@ -757,9 +747,21 @@ func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (
 	return api.service.messenger.ActivityCenterNotifications(cursor, limit)
 }
 
+func (api *PublicAPI) RequestAllHistoricMessages() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.RequestAllHistoricMessages()
+}
+
 // Echo is a method for testing purposes.
 func (api *PublicAPI) Echo(ctx context.Context, message string) (string, error) {
 	return message, nil
+}
+
+func (api *PublicAPI) FillGaps(chatID string, messageIDs []string) error {
+	return api.service.messenger.FillGaps(chatID, messageIDs)
+}
+
+func (api *PublicAPI) SyncChatFromSyncedFrom(chatID string) (uint32, error) {
+	return api.service.messenger.SyncChatFromSyncedFrom(chatID)
 }
 
 // -----

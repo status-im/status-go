@@ -225,26 +225,33 @@ func (f *FiltersManager) FilterByFilterID(filterID string) *Filter {
 	return nil
 }
 
+// FiltersByIdentities returns an array of filters for given list of public keys
+func (f *FiltersManager) FiltersByIdentities(identities []string) []*Filter {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	identitiesMap := make(map[string]bool)
+
+	for _, identity := range identities {
+		identitiesMap[identity] = true
+	}
+
+	var filters []*Filter
+
+	for _, filter := range f.filters {
+		if identitiesMap[filter.Identity] {
+			filters = append(filters, filter)
+		}
+	}
+	return filters
+}
+
 // FilterByChatID returns a Filter for given chat id
 func (f *FiltersManager) FilterByChatID(chatID string) *Filter {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
 	return f.filters[chatID]
-}
-
-func (f *FiltersManager) FiltersByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-	identityStr := PublicKeyToStr(publicKey)
-
-	for _, f := range f.filters {
-		if f.Identity == identityStr {
-			result = append(result, f)
-		}
-	}
-
-	return
 }
 
 // Remove remove all the filters associated with a chat/identity

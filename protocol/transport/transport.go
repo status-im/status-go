@@ -147,6 +147,10 @@ func (t *Transport) FilterByChatID(chatID string) *Filter {
 	return t.filters.FilterByChatID(chatID)
 }
 
+func (t *Transport) FiltersByIdentities(identities []string) []*Filter {
+	return t.filters.FiltersByIdentities(identities)
+}
+
 func (t *Transport) LoadFilters(filters []*Filter) ([]*Filter, error) {
 	return t.filters.InitWithFilters(filters)
 }
@@ -191,11 +195,6 @@ func (t *Transport) JoinPrivate(publicKey *ecdsa.PublicKey) (*Filter, error) {
 	return t.filters.LoadContactCode(publicKey)
 }
 
-func (t *Transport) LeavePrivate(publicKey *ecdsa.PublicKey) error {
-	filters := t.filters.FiltersByPublicKey(publicKey)
-	return t.filters.Remove(filters...)
-}
-
 func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) {
 	var filters []*Filter
 	for _, pk := range publicKeys {
@@ -207,16 +206,6 @@ func (t *Transport) JoinGroup(publicKeys []*ecdsa.PublicKey) ([]*Filter, error) 
 
 	}
 	return filters, nil
-}
-
-func (t *Transport) LeaveGroup(publicKeys []*ecdsa.PublicKey) error {
-	for _, publicKey := range publicKeys {
-		filters := t.filters.FiltersByPublicKey(publicKey)
-		if err := t.filters.Remove(filters...); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (t *Transport) RetrieveRawAll() (map[Filter][]*types.Message, error) {
@@ -416,7 +405,7 @@ func (t *Transport) cleanFiltersLoop() {
 	}()
 }
 
-func (t *Transport) sendMessagesRequestForTopics(
+func (t *Transport) SendMessagesRequestForTopics(
 	ctx context.Context,
 	peerID []byte,
 	from, to uint32,
@@ -464,7 +453,7 @@ func (t *Transport) SendMessagesRequest(
 		topics = append(topics, f.Topic)
 	}
 
-	return t.sendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
 }
 
 func (t *Transport) SendMessagesRequestForFilter(
@@ -479,7 +468,7 @@ func (t *Transport) SendMessagesRequestForFilter(
 	topics := make([]types.TopicType, len(t.Filters()))
 	topics = append(topics, filter.Topic)
 
-	return t.sendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+	return t.SendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
 }
 
 func createMessagesRequest(from, to uint32, cursor []byte, topics []types.TopicType) types.MessagesRequest {
@@ -547,6 +536,10 @@ func (t *Transport) SetEnvelopeEventsHandler(handler EnvelopeEventsHandler) erro
 	}
 	t.envelopesMonitor.handler = handler
 	return nil
+}
+
+func (t *Transport) ClearProcessedMessageIDsCache() error {
+	return t.cache.Clear()
 }
 
 func PubkeyToHex(key *ecdsa.PublicKey) string {

@@ -126,7 +126,7 @@ func buildContactFromPkString(pkString string) (*Contact, error) {
 	return buildContact(pkString, publicKey)
 }
 
-func buildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
+func BuildContactFromPublicKey(publicKey *ecdsa.PublicKey) (*Contact, error) {
 	id := types.EncodeHex(crypto.FromECDSAPub(publicKey))
 	return buildContact(id, publicKey)
 }

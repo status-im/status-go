@@ -32,9 +32,6 @@ const (
 	// EventBundleAdded is triggered when we receive a bundle
 	EventBundleAdded = "bundles.added"
 
-	// EventWhisperFilterAdded is triggered when we setup a new filter or restore existing ones
-	EventWhisperFilterAdded = "whisper.filter.added"
-
 	// EventNewMessages is triggered when we receive new messages
 	EventNewMessages = "messages.new"
 )
@@ -78,10 +75,6 @@ type Filter struct {
 	Identity string `json:"identity"`
 	// Topic is the whisper topic
 	Topic types.TopicType `json:"topic"`
-}
-
-type WhisperFilterAddedSignal struct {
-	Filters []*Filter `json:"filters"`
 }
 
 // SendEnvelopeSent triggered when envelope delivered at least to 1 peer.
@@ -151,10 +144,6 @@ func SendDecryptMessageFailed(sender string) {
 
 func SendBundleAdded(identity string, installationID string) {
 	send(EventBundleAdded, BundleAddedSignal{Identity: identity, InstallationID: installationID})
-}
-
-func SendWhisperFilterAdded(filters []*Filter) {
-	send(EventWhisperFilterAdded, WhisperFilterAddedSignal{Filters: filters})
 }
 
 func SendNewMessages(obj json.Marshaler) {

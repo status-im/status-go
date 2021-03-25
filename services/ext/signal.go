@@ -41,11 +41,6 @@ func (h PublisherSignalHandler) BundleAdded(identity string, installationID stri
 	signal.SendBundleAdded(identity, installationID)
 }
 
-func (h PublisherSignalHandler) FilterAdded(filters []*signal.Filter) {
-	// TODO(waku): change the name of the filter to generic one.
-	signal.SendWhisperFilterAdded(filters)
-}
-
 func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
 	signal.SendNewMessages(response)
 }
@@ -61,4 +56,8 @@ func (m MessengerSignalsHandler) MessageDelivered(chatID string, messageID strin
 // MessageDelivered passes info about community that was requested before
 func (m MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
 	signal.SendCommunityInfoFound(community)
+}
+
+func (m *MessengerSignalsHandler) MessengerResponse(response *protocol.MessengerResponse) {
+	PublisherSignalHandler{}.NewMessages(response)
 }
