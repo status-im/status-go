@@ -373,7 +373,7 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 	return w, nil
 }
 
-func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuV2Config, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
 		FullNode:               wakuCfg.FullNode, // TODO: is this needed?
