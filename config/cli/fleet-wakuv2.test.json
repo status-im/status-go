@@ -1,0 +1,13 @@
+{
+  "Rendezvous": true,
+  "NoDiscovery": false,
+  "ClusterConfig": {
+    "Enabled": true,
+    "Fleet": "wakuv2.test",
+    "BootNodes": [],
+    "TrustedMailServers": [],
+    "PushNotificationsServers": [],
+    "StaticNodes": [ ],
+    "RendezvousNodes": []
+  }
+}
