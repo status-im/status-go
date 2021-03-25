@@ -4,7 +4,6 @@ package node
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"net"
@@ -25,9 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/enr"
-	"github.com/status-im/status-go/eth-node/crypto"
 
-	wakunode "github.com/status-im/go-waku/waku/v2/node"
 	"github.com/status-im/status-go/bridge"
 	"github.com/status-im/status-go/db"
 	"github.com/status-im/status-go/discovery"
@@ -42,8 +39,10 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wakuext"
+	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/services/wallet"
 	"github.com/status-im/status-go/waku"
+	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/whisper"
 )
 
@@ -69,7 +68,6 @@ type StatusNode struct {
 	gethNode         *node.Node         // reference to Geth P2P stack/node
 	rpcClient        *rpc.Client        // reference to public RPC client
 	rpcPrivateClient *rpc.Client        // reference to private RPC client (can call private APIs)
-	wakuNode         *wakunode.WakuNode // reference to a libp2p waku node
 
 	discovery discovery.Discovery
 	register  *peers.Register
@@ -189,10 +187,6 @@ func (n *StatusNode) startWithDB(config *params.NodeConfig, accs *accounts.Manag
 		return err
 	}
 
-	if err := n.setupWakuNode(config); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -252,33 +246,6 @@ func (n *StatusNode) setupBridge() error {
 
 	log.Info("setup a Whisper-Waku bridge successfully")
 
-	return nil
-}
-
-func (n *StatusNode) setupWakuNode(config *params.NodeConfig) error {
-	var privateKey *ecdsa.PrivateKey
-	var err error
-	if config.NodeKey != "" {
-		privateKey, err = crypto.HexToECDSA(config.NodeKey)
-	} else {
-		// If no nodekey is provided, create an ephemeral key
-		privateKey, err = crypto.GenerateKey()
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to setup the go-waku private key: %v", err)
-	}
-
-	// TODO obtain this from config
-	hostAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprint("127.0.0.1:", 11111))
-	extAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprint("0.0.0.0:", 11111))
-
-	n.wakuNode, err = wakunode.New(context.Background(), privateKey, hostAddr, extAddr)
-	if err != nil {
-		return fmt.Errorf("failed to start the go-waku node: %v", err)
-	}
-
-	log.Info("setup the go-waku node successfully")
 	return nil
 }
 
@@ -430,9 +397,6 @@ func (n *StatusNode) stop() error {
 		return err
 	}
 
-	n.wakuNode.Stop()
-	n.wakuNode = nil
-
 	n.rpcClient = nil
 	n.rpcPrivateClient = nil
 	// We need to clear `gethNode` because config is passed to `Start()`
@@ -490,7 +454,7 @@ func (n *StatusNode) IsRunning() bool {
 }
 
 func (n *StatusNode) isRunning() bool {
-	return n.gethNode != nil && n.gethNode.Server() != nil && n.wakuNode != nil
+	return n.gethNode != nil && n.gethNode.Server() != nil
 }
 
 // populateStaticPeers connects current node with our publicly available LES/SHH/Swarm cluster
@@ -673,6 +637,19 @@ func (n *StatusNode) WakuService() (w *waku.Waku, err error) {
 	return
 }
 
+// WakuService exposes reference to Whisper service running on top of the node
+func (n *StatusNode) WakuV2Service() (w *wakuv2.Waku, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&w)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
 // ShhExtService exposes reference to shh extension service running on top of the node
 func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
 	n.mu.RLock()
@@ -688,6 +665,19 @@ func (n *StatusNode) ShhExtService() (s *shhext.Service, err error) {
 
 // WakuExtService exposes reference to shh extension service running on top of the node
 func (n *StatusNode) WakuExtService() (s *wakuext.Service, err error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	err = n.gethService(&s)
+	if err == node.ErrServiceUnknown {
+		err = ErrServiceUnknown
+	}
+
+	return
+}
+
+// WakuExtService exposes reference to waku v2 extension service running on top of the node
+func (n *StatusNode) WakuV2ExtService() (s *wakuv2ext.Service, err error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 

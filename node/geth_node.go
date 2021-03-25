@@ -36,10 +36,12 @@ import (
 	"github.com/status-im/status-go/services/shhext"
 	"github.com/status-im/status-go/services/status"
 	"github.com/status-im/status-go/services/wakuext"
+	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv2"
 	"github.com/status-im/status-go/whisper"
 )
 
@@ -48,6 +50,7 @@ var (
 	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
 	ErrWhisperServiceRegistrationFailure          = errors.New("failed to register the Whisper service")
 	ErrWakuServiceRegistrationFailure             = errors.New("failed to register the Waku service")
+	ErrWakuV2ServiceRegistrationFailure           = errors.New("failed to register the WakuV2 service")
 	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
 	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
@@ -147,6 +150,10 @@ func activateNodeServices(stack *node.Node, config *params.NodeConfig, db *level
 	// start Waku service
 	if err := activateWakuService(stack, config, db); err != nil {
 		return fmt.Errorf("%v: %v", ErrWakuServiceRegistrationFailure, err)
+	}
+
+	if err := activateWakuV2Service(stack, config, db); err != nil {
+		return fmt.Errorf("%v: %v", ErrWakuV2ServiceRegistrationFailure, err)
 	}
 
 	// start status service.
@@ -404,6 +411,32 @@ func activateWakuService(stack *node.Node, config *params.NodeConfig, db *leveld
 	})
 }
 
+// activateWakuV2Service configures WakuV2 and adds it to the given node.
+func activateWakuV2Service(stack *node.Node, config *params.NodeConfig, db *leveldb.DB) (err error) {
+	if !config.WakuConfig.Enabled {
+		logger.Info("WakuV2 protocol is disabled")
+		return nil
+	}
+
+	err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return createWakuV2Service(ctx, &config.WakuConfig, &config.ClusterConfig)
+	})
+	if err != nil {
+		return
+	}
+
+	// TODO: Register WakuV1-WakuV2 bridge once it is implemented
+
+	// TODO add a config option to enable it by default, but disable if app is started from statusd
+	return stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		var ethnode *nodebridge.NodeService
+		if err := ctx.Service(&ethnode); err != nil {
+			return nil, err
+		}
+		return wakuv2ext.New(config.ShhextConfig, ethnode.Node, ctx, ext.EnvelopeSignalHandler{}, db), nil
+	})
+}
+
 func createShhService(ctx *node.ServiceContext, whisperConfig *params.WhisperConfig, clusterConfig *params.ClusterConfig) (*whisper.Whisper, error) {
 	whisperServiceConfig := &whisper.Config{
 		MaxMessageSize:     whisper.DefaultMaxMessageSize,
@@ -486,6 +519,50 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 			return nil, err
 		}
 	}
+
+	return w, nil
+}
+
+func createWakuV2Service(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+	cfg := &wakuv2.Config{
+		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
+		FullNode:               wakuCfg.FullNode, // TODO: is this needed?
+		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
+		EnableConfirmations:    wakuCfg.EnableConfirmations,
+	}
+
+	if wakuCfg.MaxMessageSize > 0 {
+		cfg.MaxMessageSize = wakuCfg.MaxMessageSize
+	}
+
+	w, err := wakuv2.New(cfg, logutils.ZapLogger())
+
+	if err != nil {
+		return nil, err
+	}
+
+	/* TODO:
+	if wakuCfg.EnableRateLimiter {
+		r := wakuRateLimiter(wakuCfg, clusterCfg)
+		w.RegisterRateLimiter(r)
+	}
+
+	if timesource, err := timeSource(ctx); err == nil {
+		w.SetTimeSource(timesource)
+	}
+
+	// enable mail service
+	if wakuCfg.EnableMailServer {
+		if err := registerWakuMailServer(w, wakuCfg); err != nil {
+			return nil, fmt.Errorf("failed to register WakuMailServer: %v", err)
+		}
+	}
+	*/
+
+	/* TODO: use waku filter
+	if wakuCfg.LightClient {
+
+	}*/
 
 	return w, nil
 }
