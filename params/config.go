@@ -24,6 +24,7 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/static"
 	wakucommon "github.com/status-im/status-go/waku/common"
+	wakuv2common "github.com/status-im/status-go/wakuv2/common"
 )
 
 // ----------
@@ -138,6 +139,82 @@ type WakuConfig struct {
 	// BloomFilterMode tells us whether we should be sending a bloom
 	// filter rather than TopicInterest
 	BloomFilterMode bool
+
+	// SoftBlacklistedPeerIDs is a list of peer ids that should be soft-blacklisted (messages should be dropped but connection kept)
+	SoftBlacklistedPeerIDs []string
+
+	// EnableConfirmations when true, instructs that confirmation should be sent for received messages
+	EnableConfirmations bool
+}
+
+// ----------
+// WakuV2Config
+// ----------
+
+// WakuConfig provides a configuration for Waku service.
+type WakuV2Config struct {
+	// Enabled set to true enables Waku subprotocol.
+	Enabled bool
+
+	// Host interface in which to start libp2p protocol
+	Host string
+
+	// Port number in which to start libp2p protocol (0 for random)
+	Port int
+
+	// LightClient should be true if the node should start with an empty bloom filter and not forward messages from other nodes
+	LightClient bool
+
+	// FullNode should be true if waku should always acta as a full node
+	FullNode bool
+
+	// EnableMailServer is mode when node is capable of delivering expired messages on demand
+	EnableMailServer bool
+
+	// DataDir is the file system folder Waku should use for any data storage needs.
+	// For instance, MailServer will use this directory to store its data.
+	DataDir string
+
+	// MailServerPassword for symmetric encryption of waku message history requests.
+	// (if no account file selected, then this password is used for symmetric encryption).
+	MailServerPassword string
+
+	// MailServerRateLimit minimum time between queries to mail server per peer.
+	MailServerRateLimit int
+
+	// MailServerDataRetention is a number of days data should be stored by MailServer.
+	MailServerDataRetention int
+
+	// MaxMessageSize is a maximum size of a devp2p packet handled by the Waku protocol,
+	// not only the size of envelopes sent in that packet.
+	MaxMessageSize uint32
+
+	// DatabaseConfig is configuration for which data store we use.
+	DatabaseConfig DatabaseConfig
+
+	// EnableRateLimiter set to true enables IP and peer ID rate limiting.
+	EnableRateLimiter bool
+
+	// PacketRateLimitIP sets the limit on the number of packets per second
+	// from a given IP.
+	PacketRateLimitIP int64
+
+	// PacketRateLimitPeerID sets the limit on the number of packets per second
+	// from a given peer ID.
+	PacketRateLimitPeerID int64
+
+	// BytesRateLimitIP sets the limit on the number of bytes per second
+	// from a given IP.
+	BytesRateLimitIP int64
+
+	// BytesRateLimitPeerID sets the limit on the number of bytes per second
+	// from a given peer ID.
+	BytesRateLimitPeerID int64
+
+	// RateLimitTolerance is a number of how many a limit must be exceeded
+	// in order to drop a peer.
+	// If equal to 0, the peers are never dropped.
+	RateLimitTolerance int64
 
 	// SoftBlacklistedPeerIDs is a list of peer ids that should be soft-blacklisted (messages should be dropped but connection kept)
 	SoftBlacklistedPeerIDs []string
@@ -356,6 +433,9 @@ type NodeConfig struct {
 
 	// WakuConfig provides a configuration for Waku subprotocol.
 	WakuConfig WakuConfig `json:"WakuConfig" validate:"structonly"`
+
+	// WakuV2Config provides a configuration for WakuV2 protocol.
+	WakuV2Config WakuV2Config `json:"WakuV2Config" validate:"structonly"`
 
 	// BridgeConfig provides a configuration for Whisper-Waku bridge.
 	BridgeConfig BridgeConfig `json:"BridgeConfig" validate:"structonly"`
@@ -652,11 +732,12 @@ func (c *NodeConfig) updatePeerLimits() {
 // NewNodeConfig creates new node configuration object with bare-minimum defaults.
 // Important: the returned config is not validated.
 func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
-	var keyStoreDir, wakuDir string
+	var keyStoreDir, wakuDir, wakuV2Dir string
 
 	if dataDir != "" {
 		keyStoreDir = filepath.Join(dataDir, "keystore")
 		wakuDir = filepath.Join(dataDir, "waku")
+		wakuV2Dir = filepath.Join(dataDir, "wakuv2")
 	}
 
 	config := &NodeConfig{
@@ -688,6 +769,12 @@ func NewNodeConfig(dataDir string, networkID uint64) (*NodeConfig, error) {
 			MinimumPoW:     WakuMinimumPoW,
 			TTL:            WakuTTL,
 			MaxMessageSize: wakucommon.DefaultMaxMessageSize,
+		},
+		WakuV2Config: WakuV2Config{
+			Host:           "0.0.0.0",
+			Port:           60000,
+			DataDir:        wakuV2Dir,
+			MaxMessageSize: wakuv2common.DefaultMaxMessageSize,
 		},
 		ShhextConfig: ShhextConfig{
 			BackupDisabledDataDir: dataDir,
@@ -786,11 +873,23 @@ func (c *NodeConfig) Validate() error {
 		return err
 	}
 
+	if c.WakuConfig.Enabled && c.WakuV2Config.Enabled && c.WakuConfig.DataDir == c.WakuV2Config.DataDir {
+		return fmt.Errorf("both Waku and WakuV2 are enabled and use the same data dir")
+	}
+
 	// Waku's data directory must be relative to the main data directory
 	// if EnableMailServer is true.
 	if c.WakuConfig.Enabled && c.WakuConfig.EnableMailServer {
 		if !strings.HasPrefix(c.WakuConfig.DataDir, c.DataDir) {
 			return fmt.Errorf("WakuConfig.DataDir must start with DataDir fragment")
+		}
+	}
+
+	// WakuV2's data directory must be relative to the main data directory
+	// if EnableMailServer is true.
+	if c.WakuV2Config.Enabled && c.WakuV2Config.EnableMailServer {
+		if !strings.HasPrefix(c.WakuV2Config.DataDir, c.DataDir) {
+			return fmt.Errorf("WakuV2Config.DataDir must start with DataDir fragment")
 		}
 	}
 
