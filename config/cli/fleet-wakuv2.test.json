@@ -4,10 +4,14 @@
   "ClusterConfig": {
     "Enabled": true,
     "Fleet": "wakuv2.test",
-    "BootNodes": [],
+    "BootNodes": [
+      "unknown",
+      "unknown",
+      "unknown"
+    ],
     "TrustedMailServers": [],
     "PushNotificationsServers": [],
-    "StaticNodes": [ ],
+    "StaticNodes": [],
     "RendezvousNodes": []
   }
 }
