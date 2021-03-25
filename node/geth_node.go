@@ -32,16 +32,19 @@ import (
 	"github.com/status-im/status-go/services/peer"
 	"github.com/status-im/status-go/services/personal"
 	"github.com/status-im/status-go/services/wakuext"
+	"github.com/status-im/status-go/services/wakuv2ext"
 	"github.com/status-im/status-go/static"
 	"github.com/status-im/status-go/timesource"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv2"
 )
 
 // Errors related to node and services creation.
 var (
 	ErrNodeMakeFailureFormat                      = "error creating p2p node: %s"
 	ErrWakuServiceRegistrationFailure             = errors.New("failed to register the Waku service")
+	ErrWakuV2ServiceRegistrationFailure           = errors.New("failed to register the WakuV2 service")
 	ErrLightEthRegistrationFailure                = errors.New("failed to register the LES service")
 	ErrLightEthRegistrationFailureUpstreamEnabled = errors.New("failed to register the LES service, upstream is also configured")
 	ErrPersonalServiceRegistrationFailure         = errors.New("failed to register the personal api service")
@@ -366,6 +369,50 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 			return nil, err
 		}
 	}
+
+	return w, nil
+}
+
+func createWakuV2Service(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
+	cfg := &wakuv2.Config{
+		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
+		FullNode:               wakuCfg.FullNode, // TODO: is this needed?
+		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
+		EnableConfirmations:    wakuCfg.EnableConfirmations,
+	}
+
+	if wakuCfg.MaxMessageSize > 0 {
+		cfg.MaxMessageSize = wakuCfg.MaxMessageSize
+	}
+
+	w, err := wakuv2.New(cfg, logutils.ZapLogger())
+
+	if err != nil {
+		return nil, err
+	}
+
+	/* TODO:
+	if wakuCfg.EnableRateLimiter {
+		r := wakuRateLimiter(wakuCfg, clusterCfg)
+		w.RegisterRateLimiter(r)
+	}
+
+	if timesource, err := timeSource(ctx); err == nil {
+		w.SetTimeSource(timesource)
+	}
+
+	// enable mail service
+	if wakuCfg.EnableMailServer {
+		if err := registerWakuMailServer(w, wakuCfg); err != nil {
+			return nil, fmt.Errorf("failed to register WakuMailServer: %v", err)
+		}
+	}
+	*/
+
+	/* TODO: use waku filter
+	if wakuCfg.LightClient {
+
+	}*/
 
 	return w, nil
 }
