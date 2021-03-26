@@ -26,8 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -41,9 +39,6 @@ func GenerateMessageParams() (*MessageParams, error) {
 	sz := mrand.Intn(400) // nolint: gosec
 
 	var p MessageParams
-	p.PoW = 0.01
-	p.WorkTime = 1
-	p.TTL = uint32(mrand.Intn(1024)) // nolint: gosec
 	p.Payload = make([]byte, sz)
 	p.KeySym = make([]byte, AESKeyLength)
 	mrand.Read(p.Payload) // nolint: gosec
@@ -140,9 +135,7 @@ func TestMessageWrap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	params.TTL = 1
-	params.WorkTime = 12
-	params.PoW = target
+
 	env, err := msg.Wrap(params, time.Now())
 	if err != nil {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
@@ -158,9 +151,6 @@ func TestMessageWrap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	params.TTL = 1000000
-	params.WorkTime = 1
-	params.PoW = 10000000.0
 	_, err = msg2.Wrap(params, time.Now())
 	if err == nil {
 		t.Fatalf("unexpectedly reached the PoW target with seed %d.", seed)
@@ -181,35 +171,15 @@ func TestMessageSeal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	params.TTL = 1
 
 	env := NewEnvelope(params.TTL, params.Topic, msg, time.Now())
 
 	env.Expiry = uint32(seed) // make it deterministic
-	target := 32.0
-	params.WorkTime = 4
-	params.PoW = target
 	err = env.Seal(params)
 	if err != nil {
 		t.Logf("failed to seal envelope: %s", err)
 	}
 
-	env.CalculatePoW(0)
-	pow := env.PoW()
-	if pow < target {
-		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
-	}
-
-	// Seal should fail as WorkTime is significantly lower than PoW would require
-	params.WorkTime = 1
-	params.PoW = 1000000000.0
-	err = env.Seal(params)
-	require.EqualError(t, err, "failed to reach the PoW target, specified pow time (1 seconds) was insufficient")
-	env.CalculatePoW(0)
-	pow = env.PoW()
-	if pow < 2*target {
-		t.Fatalf("failed Wrap with seed %d: pow too small %f.", seed, pow)
-	}
 }
 
 func TestEnvelopeOpen(t *testing.T) {
@@ -376,7 +346,6 @@ func singlePaddingTest(t *testing.T, padSize int) {
 		t.Fatalf("failed GenerateMessageParams with seed %d and sz=%d: %s.", seed, padSize, err)
 	}
 	params.Padding = make([]byte, padSize)
-	params.PoW = 0.0000000001
 	pad := make([]byte, padSize)
 	_, err = mrand.Read(pad) // nolint: gosec
 	if err != nil {
