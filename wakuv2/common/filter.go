@@ -34,8 +34,6 @@ type Filter struct {
 	KeyAsym    *ecdsa.PrivateKey // Private Key of recipient
 	KeySym     []byte            // Key associated with the Topic
 	Topics     [][]byte          // Topics to filter messages with
-	PoW        float64           // Proof of work as described in the Waku spec
-	AllowP2P   bool              // Indicates whether this filter is interested in direct peer-to-peer messages
 	SymKeyHash common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
 	id         string            // unique identifier
 
@@ -160,37 +158,26 @@ func (fs *Filters) Get(id string) *Filter {
 
 // NotifyWatchers notifies any filter that has declared interest
 // for the envelope's topic.
-func (fs *Filters) NotifyWatchers(env *Envelope, p2pMessage bool) {
+func (fs *Filters) NotifyWatchers(message *ReceivedMessage, p2pMessage bool) {
 	var msg *ReceivedMessage
 
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	candidates := fs.GetWatchersByTopic(env.Topic)
+	candidates := fs.GetWatchersByTopic(TopicType(*message.Msg.ContentTopic))
 	for _, watcher := range candidates {
-		if p2pMessage && !watcher.AllowP2P {
-			log.Trace(fmt.Sprintf("msg [%x], filter [%s]: p2p messages are not allowed", env.Hash(), watcher.id))
-			continue
-		}
-
 		var match bool
-		if msg != nil {
+		if msg == nil {
 			match = watcher.MatchMessage(msg)
-		} else {
-			match = watcher.MatchEnvelope(env)
-			if match {
-				msg = env.Open(watcher)
-				if msg == nil {
-					log.Trace("processing message: failed to open", "message", env.Hash().Hex(), "filter", watcher.id)
-				}
-			} else {
-				log.Trace("processing message: does not match", "message", env.Hash().Hex(), "filter", watcher.id)
+			msg = message.Open(watcher) // TODO: decrypt message
+			if msg == nil {
+				log.Trace("processing message: failed to open", "message", message.Hash().Hex(), "filter", watcher.id)
 			}
 		}
 
 		if match && msg != nil {
 			msg.P2P = p2pMessage
-			log.Trace("processing message: decrypted", "hash", env.Hash().Hex())
+			log.Trace("processing message: decrypted", "hash", message.Hash().Hex())
 			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
 				watcher.Trigger(msg)
 			}
@@ -211,7 +198,7 @@ func (f *Filter) expectsSymmetricEncryption() bool {
 func (f *Filter) Trigger(msg *ReceivedMessage) {
 	err := f.Messages.Add(msg)
 	if err != nil {
-		log.Error("failed to add msg into the filters store", "hash", msg.EnvelopeHash, "error", err)
+		log.Error("failed to add msg into the filters store", "hash", msg.Hash(), "error", err)
 	}
 }
 
@@ -231,22 +218,10 @@ func (f *Filter) Retrieve() []*ReceivedMessage {
 // MatchEnvelope when checked by a previous filter).
 // Topics are not checked here, since this is done by topic matchers.
 func (f *Filter) MatchMessage(msg *ReceivedMessage) bool {
-	if f.PoW > 0 && msg.PoW < f.PoW {
-		return false
-	}
-
 	if f.expectsAsymmetricEncryption() && msg.isAsymmetricEncryption() {
 		return IsPubKeyEqual(&f.KeyAsym.PublicKey, msg.Dst)
 	} else if f.expectsSymmetricEncryption() && msg.isSymmetricEncryption() {
 		return f.SymKeyHash == msg.SymKeyHash
 	}
 	return false
-}
-
-// MatchEnvelope checks if it's worth decrypting the message. If
-// it returns `true`, client code is expected to attempt decrypting
-// the message and subsequently call MatchMessage.
-// Topics are not checked here, since this is done by topic matchers.
-func (f *Filter) MatchEnvelope(envelope *Envelope) bool {
-	return f.PoW <= 0 || envelope.pow >= f.PoW
 }

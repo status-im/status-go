@@ -122,9 +122,6 @@ func TestInstallFilters(t *testing.T) {
 		if exist != testCase.alive {
 			t.Fatalf("seed %d: failed alive: %d, %v, %v", seed, i, exist, testCase.alive)
 		}
-		if exist && fil.PoW != testCase.f.PoW {
-			t.Fatalf("seed %d: failed Get: %d, %v, %v", seed, i, exist, testCase.alive)
-		}
 	}
 }
 
@@ -165,8 +162,6 @@ func TestInstallIdenticalFilters(t *testing.T) {
 	filter2 := &Filter{
 		KeySym:   filter1.KeySym,
 		Topics:   filter1.Topics,
-		PoW:      filter1.PoW,
-		AllowP2P: filter1.AllowP2P,
 		Messages: NewMemoryMessageStore(),
 	}
 
@@ -206,14 +201,6 @@ func TestInstallIdenticalFilters(t *testing.T) {
 		t.Fatalf("failed to Open with filter1")
 	}
 
-	if !filter1.MatchEnvelope(env) {
-		t.Fatalf("failed matching with the first filter")
-	}
-
-	if !filter2.MatchEnvelope(env) {
-		t.Fatalf("failed matching with the first filter")
-	}
-
 	if !filter1.MatchMessage(msg) {
 		t.Fatalf("failed matching with the second filter")
 	}
@@ -240,8 +227,6 @@ func TestInstallFilterWithSymAndAsymKeys(t *testing.T) {
 		KeySym:   filter1.KeySym,
 		KeyAsym:  asymKey,
 		Topics:   filter1.Topics,
-		PoW:      filter1.PoW,
-		AllowP2P: filter1.AllowP2P,
 		Messages: NewMemoryMessageStore(),
 	}
 
@@ -315,39 +300,10 @@ func TestMatchEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err := msg.Wrap(params, time.Now())
+	_, err = msg.Wrap(params, time.Now())
 	if err != nil {
 		t.Fatalf("failed Wrap() with seed %d: %s.", seed, err)
 	}
-
-	// symmetric + matching topic: match
-	match := fsym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope() symmetric with seed %d.", seed)
-	}
-
-	// symmetric + matching topic + insufficient PoW: mismatch
-	fsym.PoW = env.PoW() + 1.0
-	match = fsym.MatchEnvelope(env)
-	if match {
-		t.Fatalf("failed MatchEnvelope(symmetric + matching topic + insufficient PoW) asymmetric with seed %d.", seed)
-	}
-
-	// symmetric + matching topic + sufficient PoW: match
-	fsym.PoW = env.PoW() / 2
-	match = fsym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(symmetric + matching topic + sufficient PoW) with seed %d.", seed)
-	}
-
-	// symmetric + topics are nil (wildcard): match
-	prevTopics := fsym.Topics
-	fsym.Topics = nil
-	match = fsym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(symmetric + topics are nil) with seed %d.", seed)
-	}
-	fsym.Topics = prevTopics
 
 	// encrypt asymmetrically
 	key, err := crypto.GenerateKey()
@@ -360,64 +316,9 @@ func TestMatchEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err = msg.Wrap(params, time.Now())
+	_, err = msg.Wrap(params, time.Now())
 	if err != nil {
 		t.Fatalf("failed Wrap() with seed %d: %s.", seed, err)
-	}
-
-	// encryption method mismatch
-	match = fsym.MatchEnvelope(env)
-	if match {
-		t.Fatalf("failed MatchEnvelope(encryption method mismatch) with seed %d.", seed)
-	}
-
-	// asymmetric + mismatching topic: mismatch
-	match = fasym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(asymmetric + mismatching topic) with seed %d.", seed)
-	}
-
-	// asymmetric + matching topic: match
-	fasym.Topics[i] = fasym.Topics[i+1]
-	match = fasym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(asymmetric + matching topic) with seed %d.", seed)
-	}
-
-	// asymmetric + filter without topic (wildcard): match
-	fasym.Topics = nil
-	match = fasym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(asymmetric + filter without topic) with seed %d.", seed)
-	}
-
-	// asymmetric + insufficient PoW: mismatch
-	fasym.PoW = env.PoW() + 1.0
-	match = fasym.MatchEnvelope(env)
-	if match {
-		t.Fatalf("failed MatchEnvelope(asymmetric + insufficient PoW) with seed %d.", seed)
-	}
-
-	// asymmetric + sufficient PoW: match
-	fasym.PoW = env.PoW() / 2
-	match = fasym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(asymmetric + sufficient PoW) with seed %d.", seed)
-	}
-
-	// filter without topic + envelope without topic: match
-	env.Topic = TopicType{}
-	match = fasym.MatchEnvelope(env)
-	if !match {
-		t.Fatalf("failed MatchEnvelope(filter without topic + envelope without topic) with seed %d.", seed)
-	}
-
-	// filter with topic + envelope without topic: mismatch
-	fasym.Topics = fsym.Topics
-	match = fasym.MatchEnvelope(env)
-	if !match {
-		// topic mismatch should have no affect, as topics are handled by topic matchers
-		t.Fatalf("failed MatchEnvelope(filter without topic + envelope without topic) with seed %d.", seed)
 	}
 }
 
@@ -456,18 +357,6 @@ func TestMatchMessageSym(t *testing.T) {
 	*f.Src.Y = *params.Src.PublicKey.Y
 	if !f.MatchMessage(msg) {
 		t.Fatalf("failed MatchEnvelope(src match) with seed %d.", seed)
-	}
-
-	// insufficient PoW: mismatch
-	f.PoW = msg.PoW + 1.0
-	if f.MatchMessage(msg) {
-		t.Fatalf("failed MatchEnvelope(insufficient PoW) with seed %d.", seed)
-	}
-
-	// sufficient PoW: match
-	f.PoW = msg.PoW / 2
-	if !f.MatchMessage(msg) {
-		t.Fatalf("failed MatchEnvelope(sufficient PoW) with seed %d.", seed)
 	}
 
 	// topic mismatch
@@ -552,18 +441,6 @@ func TestMatchMessageAsym(t *testing.T) {
 		t.Fatalf("failed MatchMessage(src match) with seed %d.", seed)
 	}
 
-	// insufficient PoW: mismatch
-	f.PoW = msg.PoW + 1.0
-	if f.MatchMessage(msg) {
-		t.Fatalf("failed MatchEnvelope(insufficient PoW) with seed %d.", seed)
-	}
-
-	// sufficient PoW: match
-	f.PoW = msg.PoW / 2
-	if !f.MatchMessage(msg) {
-		t.Fatalf("failed MatchEnvelope(sufficient PoW) with seed %d.", seed)
-	}
-
 	// topic mismatch
 	f.Topics[index][0]++
 	if !f.MatchMessage(msg) {
@@ -602,8 +479,6 @@ func cloneFilter(orig *Filter) *Filter {
 	clone.KeyAsym = orig.KeyAsym
 	clone.KeySym = orig.KeySym
 	clone.Topics = orig.Topics
-	clone.PoW = orig.PoW
-	clone.AllowP2P = orig.AllowP2P
 	clone.SymKeyHash = orig.SymKeyHash
 	return &clone
 }
@@ -772,7 +647,6 @@ func TestWatchers(t *testing.T) {
 	if f == nil {
 		t.Fatalf("failed to get the filter with seed %d.", seed)
 	}
-	f.AllowP2P = true
 	total = 0
 	filters.NotifyWatchers(envelopes[0], true)
 
@@ -790,7 +664,6 @@ func TestVariableTopics(t *testing.T) {
 	InitSingleTest()
 
 	const lastTopicByte = 3
-	var match bool
 	params, err := GenerateMessageParams()
 	if err != nil {
 		t.Fatalf("failed GenerateMessageParams with seed %d: %s.", seed, err)
@@ -799,28 +672,13 @@ func TestVariableTopics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new message with seed %d: %s.", seed, err)
 	}
-	env, err := msg.Wrap(params, time.Now())
+	_, err = msg.Wrap(params, time.Now())
 	if err != nil {
 		t.Fatalf("failed Wrap with seed %d: %s.", seed, err)
 	}
 
-	f, err := generateFilter(t, true)
+	_, err = generateFilter(t, true)
 	if err != nil {
 		t.Fatalf("failed generateFilter with seed %d: %s.", seed, err)
-	}
-
-	for i := 0; i < 4; i++ {
-		env.Topic = BytesToTopic(f.Topics[i])
-		match = f.MatchEnvelope(env)
-		if !match {
-			t.Fatalf("failed MatchEnvelope symmetric with seed %d, step %d.", seed, i)
-		}
-
-		f.Topics[i][lastTopicByte]++
-		match = f.MatchEnvelope(env)
-		if !match {
-			// topic mismatch should have no affect, as topics are handled by topic matchers
-			t.Fatalf("MatchEnvelope symmetric with seed %d, step %d.", seed, i)
-		}
 	}
 }

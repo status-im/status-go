@@ -24,48 +24,48 @@ import (
 
 var (
 	EnvelopesReceivedCounter = prom.NewCounter(prom.CounterOpts{
-		Name: "waku_envelopes_received_total",
+		Name: "waku2_envelopes_received_total",
 		Help: "Number of envelopes received.",
 	})
 	EnvelopesValidatedCounter = prom.NewCounter(prom.CounterOpts{
-		Name: "waku_envelopes_validated_total",
+		Name: "waku2_envelopes_validated_total",
 		Help: "Number of envelopes processed successfully.",
 	})
 	EnvelopesRejectedCounter = prom.NewCounterVec(prom.CounterOpts{
-		Name: "waku_envelopes_rejected_total",
+		Name: "waku2_envelopes_rejected_total",
 		Help: "Number of envelopes rejected.",
 	}, []string{"reason"})
 	EnvelopesCacheFailedCounter = prom.NewCounterVec(prom.CounterOpts{
-		Name: "waku_envelopes_cache_failures_total",
+		Name: "waku2_envelopes_cache_failures_total",
 		Help: "Number of envelopes which failed to be cached.",
 	}, []string{"type"})
 	EnvelopesCachedCounter = prom.NewCounterVec(prom.CounterOpts{
-		Name: "waku_envelopes_cached_total",
+		Name: "waku2_envelopes_cached_total",
 		Help: "Number of envelopes cached.",
 	}, []string{"cache"})
 	EnvelopesSizeMeter = prom.NewHistogram(prom.HistogramOpts{
-		Name:    "waku_envelopes_size_bytes",
+		Name:    "waku2_envelopes_size_bytes",
 		Help:    "Size of processed Waku envelopes in bytes.",
 		Buckets: prom.ExponentialBuckets(256, 4, 10),
 	})
 	RateLimitsProcessed = prom.NewCounter(prom.CounterOpts{
-		Name: "waku_rate_limits_processed_total",
+		Name: "waku2_rate_limits_processed_total",
 		Help: "Number of packets Waku rate limiter processed.",
 	})
 	RateLimitsExceeded = prom.NewCounterVec(prom.CounterOpts{
-		Name: "waku_rate_limits_exceeded_total",
+		Name: "waku2_rate_limits_exceeded_total",
 		Help: "Number of times the Waku rate limits were exceeded",
 	}, []string{"type"})
 	BridgeSent = prom.NewCounter(prom.CounterOpts{
-		Name: "waku_bridge_sent_total",
+		Name: "waku2_bridge_sent_total",
 		Help: "Number of envelopes bridged from Waku",
 	})
 	BridgeReceivedSucceed = prom.NewCounter(prom.CounterOpts{
-		Name: "waku_bridge_received_success_total",
+		Name: "waku2_bridge_received_success_total",
 		Help: "Number of envelopes bridged to Waku and successfully added",
 	})
 	BridgeReceivedFailed = prom.NewCounter(prom.CounterOpts{
-		Name: "waku_bridge_received_failure_total",
+		Name: "waku2_bridge_received_failure_total",
 		Help: "Number of envelopes bridged to Waku and failed to be added",
 	})
 )
