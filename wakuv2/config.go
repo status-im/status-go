@@ -30,9 +30,13 @@ type Config struct {
 	RestrictLightClientsConn bool     `toml:",omitempty"` // when true, do not accept light client as peers if it is a light client itself
 	EnableConfirmations      bool     `toml:",omitempty"` // when true, sends message confirmations
 	SoftBlacklistedPeerIDs   []string `toml:",omitempty"`
+	Host                     string   `toml:",omitempty"`
+	Port                     int      `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
 	MaxMessageSize:           common.DefaultMaxMessageSize,
 	RestrictLightClientsConn: true,
+	Host:                     "0.0.0.0",
+	Port:                     60000,
 }

@@ -49,7 +49,6 @@ import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku/common"
 	v0 "github.com/status-im/status-go/waku/v0"
-	v1 "github.com/status-im/status-go/wakuv2/v1"
 
 	node "github.com/status-im/go-waku/waku/v2/node"
 )
@@ -170,8 +169,7 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	// TODO obtain this from config
-	hostAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprint("127.0.0.1:", 11111))
-	extAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprint("0.0.0.0:", 11111))
+	hostAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, cfg.Port))
 
 	waku.node, err = node.New(context.Background(), privateKey, hostAddr, extAddr)
 	if err != nil {
@@ -275,7 +273,7 @@ func (w *Waku) APIs() []rpc.API {
 
 // Protocols returns the waku sub-protocols ran by this particular client.
 func (w *Waku) Protocols() []p2p.Protocol {
-	return w.protocols
+	return []p2p.Protocol{}
 }
 
 // RegisterMailServer registers MailServer interface.
@@ -348,18 +346,6 @@ func (w *Waku) FullNode() bool {
 	fullNode := w.settings.FullNode
 	w.settingsMu.RUnlock()
 	return fullNode
-}
-
-func (w *Waku) getPeers() []common.Peer {
-	w.peerMu.Lock()
-	arr := make([]common.Peer, len(w.peers))
-	i := 0
-	for p := range w.peers {
-		arr[i] = p
-		i++
-	}
-	w.peerMu.Unlock()
-	return arr
 }
 
 // getPeer retrieves peer by ID
@@ -792,10 +778,6 @@ func (w *Waku) Stop() error {
 	w.node.Stop()
 	close(w.quit)
 	return nil
-}
-
-func (w *Waku) handlePeerV1(p2pPeer *p2p.Peer, rw p2p.MsgReadWriter) error {
-	return w.HandlePeer(v1.NewPeer(w, p2pPeer, rw, w.logger.Named("waku/peerv1")), rw)
 }
 
 // HandlePeer is called by the underlying P2P layer when the waku sub-protocol
