@@ -47,7 +47,7 @@ func (n NotificationBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(item)
 }
 
-func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, contacts map[string]*Contact) (*localnotifications.Notification, error) {
+func NewMessageNotification(id string, message *common.Message, chat *Chat, contact *Contact, contacts *contactMap) (*localnotifications.Notification, error) {
 	body := &NotificationBody{
 		Message: message,
 		Chat:    chat,
@@ -66,7 +66,7 @@ func NewCommunityRequestToJoinNotification(id string, community *communities.Com
 	return body.toCommunityRequestToJoinNotification(id)
 }
 
-func (n NotificationBody) toMessageNotification(id string, contacts map[string]*Contact) (*localnotifications.Notification, error) {
+func (n NotificationBody) toMessageNotification(id string, contacts *contactMap) (*localnotifications.Notification, error) {
 	var title string
 	if n.Chat.PrivateGroupChat() || n.Chat.Public() || n.Chat.CommunityChat() {
 		title = n.Chat.Name
@@ -76,16 +76,16 @@ func (n NotificationBody) toMessageNotification(id string, contacts map[string]*
 	}
 
 	canonicalNames := make(map[string]string)
-	for _, id := range n.Message.Mentions {
-		contact, ok := contacts[id]
+	for _, mentionID := range n.Message.Mentions {
+		contact, ok := contacts.Load(mentionID)
 		if !ok {
 			var err error
-			contact, err = buildContactFromPkString(id)
+			contact, err = buildContactFromPkString(mentionID)
 			if err != nil {
 				return nil, err
 			}
 		}
-		canonicalNames[id] = contact.CanonicalName()
+		canonicalNames[mentionID] = contact.CanonicalName()
 	}
 
 	simplifiedText, err := n.Message.GetSimplifiedText(canonicalNames)
