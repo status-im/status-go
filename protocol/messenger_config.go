@@ -24,7 +24,7 @@ type config struct {
 	onContactENSVerified func(*MessengerResponse)
 
 	// systemMessagesTranslations holds translations for system-messages
-	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
+	systemMessagesTranslations *systemMessageTranslationsMap
 	// Config for the envelopes monitor
 	envelopesMonitorConfig *transport.EnvelopesMonitorConfig
 
@@ -56,7 +56,7 @@ type Option func(*config) error
 // nolint: unused
 func WithSystemMessagesTranslations(t map[protobuf.MembershipUpdateEvent_EventType]string) Option {
 	return func(c *config) error {
-		c.systemMessagesTranslations = t
+		c.systemMessagesTranslations.Init(t)
 		return nil
 	}
 }
