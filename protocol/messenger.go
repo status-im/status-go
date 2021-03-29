@@ -74,6 +74,7 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // because installations are managed by the user.
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
+// TODO we may want to change the maps into sync.Maps if we start getting unexpected locks or weird collision bugs
 type Messenger struct {
 	node                       types.Node
 	config                     *config
@@ -92,11 +93,11 @@ type Messenger struct {
 	featureFlags               common.FeatureFlags
 	shutdownTasks              []func() error
 	shouldPublishContactCode   bool
-	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
-	allChats                   map[string]*Chat
-	allContacts                map[string]*Contact
-	allInstallations           map[string]*multidevice.Installation
-	modifiedInstallations      map[string]bool
+	systemMessagesTranslations *systemMessageTranslationsMap
+	allChats                   *chatMap
+	allContacts                *contactMap
+	allInstallations           *installationMap
+	modifiedInstallations      *stringBoolMap
 	installationID             string
 	mailserver                 []byte
 	database                   *sql.DB
@@ -106,6 +107,7 @@ type Messenger struct {
 	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
 
+	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex sync.Mutex
 }
 
@@ -299,11 +301,11 @@ func NewMessenger(
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
-		allChats:                   make(map[string]*Chat),
-		allContacts:                make(map[string]*Contact),
-		allInstallations:           make(map[string]*multidevice.Installation),
+		allChats:                   new(chatMap),
+		allContacts:                new(contactMap),
+		allInstallations:           new(installationMap),
 		installationID:             installationID,
-		modifiedInstallations:      make(map[string]bool),
+		modifiedInstallations:      new(stringBoolMap),
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
@@ -780,9 +782,9 @@ func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
 func (m *Messenger) handleInstallations(installations []*multidevice.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
-			if _, ok := m.allInstallations[installation.ID]; !ok {
-				m.allInstallations[installation.ID] = installation
-				m.modifiedInstallations[installation.ID] = true
+			if _, ok := m.allInstallations.Load(installation.ID); !ok {
+				m.allInstallations.Store(installation.ID, installation)
+				m.modifiedInstallations.Store(installation.ID, true)
 			}
 		}
 	}
@@ -811,13 +813,10 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 }
 
 func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var contacts []*Contact
 	for _, record := range records {
 		m.logger.Info("handling record", zap.Any("record", record))
-		contact, ok := m.allContacts[record.PublicKey]
+		contact, ok := m.allContacts.Load(record.PublicKey)
 		if !ok {
 			m.logger.Info("contact not found")
 			continue
@@ -1003,7 +1002,7 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 		if !chat.Active || chat.Timeline() {
 			continue
 		}
@@ -1038,7 +1037,7 @@ func (m *Messenger) Init() error {
 		return err
 	}
 	for _, contact := range contacts {
-		m.allContacts[contact.ID] = contact
+		m.allContacts.Store(contact.ID, contact)
 		// We only need filters for contacts added by us and not blocked.
 		if !contact.IsAdded() || contact.IsBlocked() {
 			continue
@@ -1057,7 +1056,7 @@ func (m *Messenger) Init() error {
 	}
 
 	for _, installation := range installations {
-		m.allInstallations[installation.ID] = installation
+		m.allInstallations.Store(installation.ID, installation)
 	}
 
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
@@ -1086,10 +1085,7 @@ func (m *Messenger) Shutdown() (err error) {
 }
 
 func (m *Messenger) EnableInstallation(id string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	installation, ok := m.allInstallations[id]
+	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
@@ -1099,15 +1095,13 @@ func (m *Messenger) EnableInstallation(id string) error {
 		return err
 	}
 	installation.Enabled = true
-	m.allInstallations[id] = installation
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allInstallations.Store(id, installation)
 	return nil
 }
 
 func (m *Messenger) DisableInstallation(id string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	installation, ok := m.allInstallations[id]
+	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
@@ -1117,25 +1111,25 @@ func (m *Messenger) DisableInstallation(id string) error {
 		return err
 	}
 	installation.Enabled = false
-	m.allInstallations[id] = installation
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allInstallations.Store(id, installation)
 	return nil
 }
 
 func (m *Messenger) Installations() []*multidevice.Installation {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	installations := make([]*multidevice.Installation, len(m.allInstallations))
+	installations := make([]*multidevice.Installation, m.allInstallations.Len())
 
 	var i = 0
-	for _, installation := range m.allInstallations {
+	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		installations[i] = installation
 		i++
-	}
+		return true
+	})
 	return installations
 }
 
 func (m *Messenger) setInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
-	installation, ok := m.allInstallations[id]
+	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
@@ -1145,8 +1139,6 @@ func (m *Messenger) setInstallationMetadata(id string, data *multidevice.Install
 }
 
 func (m *Messenger) SetInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	return m.setInstallationMetadata(id, data)
 }
 
@@ -1194,9 +1186,6 @@ func (m *Messenger) Leave(chat Chat) error {
 }
 
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
 	logger.Info("Creating group chat", zap.String("name", name), zap.Any("members", members))
@@ -1239,7 +1228,8 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	if err != nil {
 		return nil, err
 	}
-	m.allChats[chat.ID] = &chat
+
+	m.allChats.Store(chat.ID, &chat)
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
@@ -1265,9 +1255,6 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 }
 
 func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatFromInvitation"))
 	logger.Info("Creating group chat from invitation", zap.String("name", name))
@@ -1282,13 +1269,10 @@ func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, ad
 }
 
 func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "RemoveMemberFromGroupChat"))
 	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1346,13 +1330,10 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 }
 
 func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddMembersFromGroupChat"))
 	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1438,10 +1419,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	logger := m.logger.With(zap.String("site", "ChangeGroupChatName"))
 	logger.Info("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1505,13 +1483,10 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 	logger.Info("Sending group chat invitation request", zap.String("chatID", chatID),
 		zap.String("adminPK", adminPK), zap.String("message", message))
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	// Get chat and clock
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1579,9 +1554,6 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRejection"))
 	logger.Info("Sending group chat invitation reject", zap.String("invitationRequestID", invitationRequestID))
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	invitationR, err := m.persistence.InvitationByID(invitationRequestID)
 	if err != nil {
 		return nil, err
@@ -1590,7 +1562,7 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 	invitationR.State = protobuf.GroupChatInvitation_REJECTED
 
 	// Get chat and clock
-	chat, ok := m.allChats[invitationR.ChatId]
+	chat, ok := m.allChats.Load(invitationR.ChatId)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1645,14 +1617,11 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 }
 
 func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddAdminsToGroupChat"))
 	logger.Info("Add admins to group chat", zap.String("chatID", chatID), zap.Any("members", members))
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1709,12 +1678,9 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 }
 
 func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1775,12 +1741,9 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 }
 
 func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1861,7 +1824,7 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 		return err
 	}
 
-	chat, ok := m.allChats[message.LocalChatID]
+	chat, ok := m.allChats.Load(message.LocalChatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -1879,19 +1842,17 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 
 // ReSendChatMessage pulls a message from the database and sends it again
 func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.reSendRawMessage(ctx, messageID)
 }
 
 func (m *Messenger) hasPairedDevices() bool {
 	var count int
-	for _, i := range m.allInstallations {
-		if i.Enabled {
+	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
+		if installation.Enabled {
 			count++
 		}
-	}
+		return true
+	})
 	return count > 1
 }
 
@@ -1931,7 +1892,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 	var err error
 	var id []byte
 	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", spec.LocalChatID))
-	chat, ok := m.allChats[spec.LocalChatID]
+	chat, ok := m.allChats.Load(spec.LocalChatID)
 	if !ok {
 		return spec, errors.New("no chat found")
 	}
@@ -2051,20 +2012,15 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	return m.sendChatMessage(ctx, message)
 }
 
 // SendChatMessages takes a array of messages and sends it based on the corresponding chats
 func (m *Messenger) SendChatMessages(ctx context.Context, messages []*common.Message) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	for _, message := range messages {
-		messageResponse, err := m.sendChatMessage(ctx, message)
+		messageResponse, err := m.SendChatMessage(ctx, message)
 		if err != nil {
 			return nil, err
 		}
@@ -2143,7 +2099,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[message.ChatId]
+	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -2205,44 +2161,45 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
-func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
+func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	if _, err := m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
 		return err
 	}
 
-	for _, chat := range m.allChats {
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		if !chat.Timeline() && !chat.ProfileUpdates() && chat.Public() && chat.Active {
-			if err := m.syncPublicChat(ctx, chat); err != nil {
-				return err
+			err = m.syncPublicChat(ctx, chat)
+			if err != nil {
+				return false
 			}
 		}
+
+		return true
+	})
+	if err != nil {
+		return err
 	}
 
-	for _, contact := range m.allContacts {
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.IsAdded() && contact.ID != myID {
-			if err := m.syncContact(ctx, contact); err != nil {
-				return err
+			if err = m.syncContact(ctx, contact); err != nil {
+				return false
 			}
 		}
-	}
+		return true
+	})
 
-	return nil
+	return err
 }
 
 // SendPairInstallation sends a pair installation message
 func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var err error
 	var response MessengerResponse
 
-	installation, ok := m.allInstallations[m.installationID]
+	installation, ok := m.allInstallations.Load(m.installationID)
 	if !ok {
 		return nil, errors.New("no installation found")
 	}
@@ -2253,14 +2210,14 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	pairMessage := &protobuf.PairInstallation{
@@ -2301,14 +2258,14 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	}
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationPublicChat{
@@ -2342,14 +2299,14 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	}
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationContact{
@@ -2405,16 +2362,15 @@ type ReceivedMessageState struct {
 	// State on the message being processed
 	CurrentMessageState *CurrentMessageState
 	// AllChats in memory
-	AllChats map[string]*Chat
-
+	AllChats *chatMap
 	// All contacts in memory
-	AllContacts map[string]*Contact
+	AllContacts *contactMap
 	// List of contacts modified
-	ModifiedContacts map[string]bool
+	ModifiedContacts *stringBoolMap
 	// All installations in memory
-	AllInstallations map[string]*multidevice.Installation
+	AllInstallations *installationMap
 	// List of communities modified
-	ModifiedInstallations map[string]bool
+	ModifiedInstallations *stringBoolMap
 	// List of filters
 	AllFilters map[string]*transport.Filter
 	// Map of existing messages
@@ -2472,8 +2428,15 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	}
 	contactID := contactIDFromPublicKey(pubKey)
 
-	chat := r.AllChats[m.LocalChatID]
-	contact := r.AllContacts[contactID]
+	chat, ok := r.AllChats.Load(m.LocalChatID)
+	if !ok {
+		return fmt.Errorf("chat ID '%s' not present", m.LocalChatID)
+	}
+
+	contact, ok := r.AllContacts.Load(contactID)
+	if !ok {
+		return fmt.Errorf("contact ID '%s' not present", contactID)
+	}
 
 	if showMessageNotification(publicKey, m, chat, responseTo) {
 		notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts)
@@ -2487,12 +2450,10 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
 		AllContacts:           m.allContacts,
-		ModifiedContacts:      make(map[string]bool),
+		ModifiedContacts:      new(stringBoolMap),
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
@@ -2531,7 +2492,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)
-				if _, ok := messageState.AllContacts[senderID]; ok && messageState.AllContacts[senderID].IsBlocked() {
+				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.IsBlocked() {
 					continue
 				}
 
@@ -2547,7 +2508,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 
 				var contact *Contact
-				if c, ok := messageState.AllContacts[senderID]; ok {
+				if c, ok := messageState.AllContacts.Load(senderID); ok {
 					contact = c
 				} else {
 					c, err := buildContact(senderID, publicKey)
@@ -2557,8 +2518,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					}
 					contact = c
-					messageState.AllContacts[senderID] = c
-					messageState.ModifiedContacts[contact.ID] = true
+					messageState.AllContacts.Store(senderID, contact)
+					messageState.ModifiedContacts.Store(contact.ID, true)
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
@@ -2576,7 +2537,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
 
-						err = m.handler.HandleMembershipUpdate(messageState, messageState.AllChats[rawMembershipUpdate.ChatId], rawMembershipUpdate, m.systemMessagesTranslations)
+						chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
+						err = m.handler.HandleMembershipUpdate(messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
 						if err != nil {
 							logger.Warn("failed to handle MembershipUpdate", zap.Error(err))
 							allMessagesProcessed = false
@@ -2923,9 +2885,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	var contactsToSave []*Contact
-	for id := range messageState.ModifiedContacts {
-		contact := messageState.AllContacts[id]
-		if contact != nil {
+	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool) {
+		contact, ok := messageState.AllContacts.Load(id)
+		if ok {
 			// We save all contacts so we can pull back name/image,
 			// but we only send to client those
 			// that have some custom fields
@@ -2934,7 +2896,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
 			}
 		}
-	}
+		return true
+	})
 
 	for _, filter := range messageState.AllFilters {
 		messageState.Response.Filters = append(messageState.Response.Filters, filter)
@@ -2942,9 +2905,9 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	// Hydrate chat alias and identicon
 	for id := range messageState.Response.chats {
-		chat := messageState.AllChats[id]
+		chat, _ := messageState.AllChats.Load(id)
 		if chat.OneToOne() {
-			contact, ok := m.allContacts[chat.ID]
+			contact, ok := m.allContacts.Load(chat.ID)
 			if ok {
 				chat.Alias = contact.Alias
 				chat.Identicon = contact.Identicon
@@ -2954,18 +2917,23 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.AddChat(chat)
 	}
 
-	for id := range messageState.ModifiedInstallations {
-		installation := messageState.AllInstallations[id]
+	var err error
+	messageState.ModifiedInstallations.Range(func(id string, value bool) (shouldContinue bool) {
+		installation, _ := messageState.AllInstallations.Load(id)
 		messageState.Response.Installations = append(messageState.Response.Installations, installation)
 		if installation.InstallationMetadata != nil {
-			err := m.setInstallationMetadata(id, installation.InstallationMetadata)
+			err = m.setInstallationMetadata(id, installation.InstallationMetadata)
 			if err != nil {
-				return nil, err
+				return false
 			}
 		}
+
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	var err error
 	if len(messageState.Response.chats) > 0 {
 		err = m.saveChats(messageState.Response.Chats())
 		if err != nil {
@@ -3028,7 +2996,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	// Reset installations
-	m.modifiedInstallations = make(map[string]bool)
+	m.modifiedInstallations = new(stringBoolMap)
 
 	return messageState.Response, nil
 }
@@ -3109,14 +3077,11 @@ func (m *Messenger) DeleteMessagesByChatID(id string) error {
 }
 
 func (m *Messenger) ClearHistory(id string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	return m.clearHistory(id)
-
 }
 
 func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
-	chat, ok := m.allChats[id]
+	chat, ok := m.allChats.Load(id)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -3128,7 +3093,7 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.allChats[id] = chat
+	m.allChats.Store(id, chat)
 
 	response := &MessengerResponse{}
 	response.AddChat(chat)
@@ -3139,9 +3104,6 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	count, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
 		return 0, err
@@ -3150,14 +3112,12 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error
 	if err != nil {
 		return 0, err
 	}
-	m.allChats[chatID] = chat
+	m.allChats.Store(chatID, chat)
 	return count, nil
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -3168,16 +3128,15 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	}
 
 	chat.UnviewedMessagesCount = 0
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 	return nil
 }
 
 // MuteChat signals to the messenger that we don't want to be notified
 // on new messages from this chat
 func (m *Messenger) MuteChat(chatID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -3188,7 +3147,8 @@ func (m *Messenger) MuteChat(chatID string) error {
 	}
 
 	chat.Muted = true
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 
 	return m.reregisterForPushNotifications()
 }
@@ -3196,9 +3156,7 @@ func (m *Messenger) MuteChat(chatID string) error {
 // UnmuteChat signals to the messenger that we want to be notified
 // on new messages from this chat
 func (m *Messenger) UnmuteChat(chatID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -3209,7 +3167,8 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 	}
 
 	chat.Muted = false
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 	return m.reregisterForPushNotifications()
 }
 
@@ -3228,13 +3187,10 @@ func GenerateAlias(id string) (string, error) {
 }
 
 func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contract, address string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3306,13 +3262,10 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 }
 
 func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, from, value, contract string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3383,9 +3336,6 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 }
 
 func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, messageID, address string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	message, err := m.MessageByID(messageID)
@@ -3400,7 +3350,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	chatID := message.LocalChatID
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3479,9 +3429,6 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 }
 
 func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	message, err := m.MessageByID(messageID)
@@ -3496,7 +3443,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	chatID := message.LocalChatID
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3562,9 +3509,6 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 }
 
 func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, messageID string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	message, err := m.MessageByID(messageID)
@@ -3579,7 +3523,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	chatID := message.LocalChatID
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3645,9 +3589,6 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 }
 
 func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHash, messageID string, signature []byte) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	message, err := m.MessageByID(messageID)
@@ -3662,7 +3603,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	chatID := message.LocalChatID
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3745,13 +3686,10 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 }
 
 func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract, transactionHash string, signature []byte) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3830,8 +3768,6 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	if m.verifyTransactionClient == nil {
 		return nil, nil
 	}
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 
 	logger := m.logger.With(zap.String("site", "ValidateTransactions"))
 	logger.Debug("Validating transactions")
@@ -3851,7 +3787,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	for _, validationResult := range responses {
 		var message *common.Message
 		chatID := contactIDFromPublicKey(validationResult.Transaction.From)
-		chat, ok := m.allChats[chatID]
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			chat = OneToOneFromPublicKey(validationResult.Transaction.From, m.transport)
 		}
@@ -3917,7 +3853,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		}
 
 		response.Messages = append(response.Messages, message)
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 		response.AddChat(chat)
 
 		contact, err := m.getOrBuildContactFromMessage(message)
@@ -4017,19 +3953,21 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var mutedChatIDs []string
 	var publicChatIDs []string
 
-	for _, contact := range m.allContacts {
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.IsAdded() && !contact.IsBlocked() {
 			pk, err := contact.PublicKey()
 			if err != nil {
 				m.logger.Warn("could not parse contact public key")
-				continue
+				return true
 			}
 			contactIDs = append(contactIDs, pk)
 		} else if contact.IsBlocked() {
 			mutedChatIDs = append(mutedChatIDs, contact.ID)
 		}
-	}
-	for _, chat := range m.allChats {
+		return true
+	})
+
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		if chat.Muted {
 			mutedChatIDs = append(mutedChatIDs, chat.ID)
 		}
@@ -4037,7 +3975,8 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		}
 
-	}
+		return true
+	})
 	return &pushnotificationclient.RegistrationOptions{
 		ContactIDs:    contactIDs,
 		MutedChatIDs:  mutedChatIDs,
@@ -4157,12 +4096,9 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 }
 
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	var response MessengerResponse
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -4215,20 +4151,18 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		for _, contact := range m.allContacts {
+		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 			if contact.IsAdded() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
-		}
+			return true
+		})
 		return m.persistence.EmojiReactionsByChatIDs(chatIDs, cursor, limit)
 	}
 	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
 }
 
 func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReactionID string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	emojiR, err := m.persistence.EmojiReactionByID(emojiReactionID)
 	if err != nil {
 		return nil, err
@@ -4245,7 +4179,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	}
 
 	// Get chat and clock
-	chat, ok := m.allChats[emojiR.GetChatId()]
+	chat, ok := m.allChats.Load(emojiR.GetChatId())
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -4346,7 +4280,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 }
 
 func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact, error) {
-	if c, ok := m.allContacts[msg.From]; ok {
+	if c, ok := m.allContacts.Load(msg.From); ok {
 		return c, nil
 	}
 
@@ -4360,6 +4294,7 @@ func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact,
 		return nil, err
 	}
 
-	m.allContacts[msg.From] = c
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allContacts.Store(msg.From, c)
 	return c, nil
 }

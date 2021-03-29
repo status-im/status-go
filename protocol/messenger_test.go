@@ -2508,9 +2508,9 @@ func (s *MessageHandlerSuite) TestRun() {
 
 	for idx, tc := range testCases {
 		s.Run(tc.Name, func() {
-			chatsMap := make(map[string]*Chat)
+			chatsMap := new(chatMap)
 			if tc.Chat != nil && tc.Chat.ID != "" {
-				chatsMap[tc.Chat.ID] = tc.Chat
+				chatsMap.Store(tc.Chat.ID, tc.Chat)
 			}
 
 			message := tc.Message

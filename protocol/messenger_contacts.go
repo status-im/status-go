@@ -11,15 +11,11 @@ import (
 )
 
 func (m *Messenger) SaveContact(contact *Contact) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	return m.saveContact(contact)
 }
 
 func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	contact, ok := m.allContacts[pubKey]
+	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		var err error
 		contact, err = buildContactFromPkString(pubKey)
@@ -43,7 +39,8 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 		return nil, err
 	}
 
-	m.allContacts[contact.ID] = contact
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allContacts.Store(contact.ID, contact)
 
 	// And we re-register for push notications
 	err = m.reregisterForPushNotifications()
@@ -53,7 +50,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 
 	// Create the corresponding profile chat
 	profileChatID := buildProfileChatID(contact.ID)
-	profileChat, ok := m.allChats[profileChatID]
+	profileChat, ok := m.allChats.Load(profileChatID)
 
 	if !ok {
 		profileChat = CreateProfileChat(profileChatID, contact.ID, m.getTimesource())
@@ -89,11 +86,9 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 }
 
 func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	var response *MessengerResponse
+	response := new(MessengerResponse)
 
-	contact, ok := m.allContacts[pubKey]
+	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		return nil, ErrContactNotFound
 	}
@@ -105,7 +100,8 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 		return nil, err
 	}
 
-	m.allContacts[contact.ID] = contact
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allContacts.Store(contact.ID, contact)
 
 	// And we re-register for push notications
 	err = m.reregisterForPushNotifications()
@@ -115,7 +111,7 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 
 	// Create the corresponding profile chat
 	profileChatID := buildProfileChatID(contact.ID)
-	_, ok = m.allChats[profileChatID]
+	_, ok = m.allChats.Load(profileChatID)
 
 	if ok {
 		chatResponse, err := m.deactivateChat(profileChatID)
@@ -133,38 +129,33 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 }
 
 func (m *Messenger) Contacts() []*Contact {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	var contacts []*Contact
-	for _, contact := range m.allContacts {
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.HasCustomFields() {
 			contacts = append(contacts, contact)
 		}
-	}
+		return true
+	})
 	return contacts
 }
 
 // GetContactByID assumes pubKey includes 0x prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	return m.allContacts[pubKey]
+	contact, _ := m.allContacts.Load(pubKey)
+	return contact
 }
 
 func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	chats, err := m.persistence.BlockContact(contact)
 	if err != nil {
 		return nil, err
 	}
 
-	m.allContacts[contact.ID] = contact
+	m.allContacts.Store(contact.ID, contact)
 	for _, chat := range chats {
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 	}
-	delete(m.allChats, contact.ID)
+	m.allChats.Delete(contact.ID)
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
@@ -199,7 +190,7 @@ func (m *Messenger) saveContact(contact *Contact) error {
 		return err
 	}
 
-	m.allContacts[contact.ID] = contact
+	m.allContacts.Store(contact.ID, contact)
 
 	// Reregister only when data has changed
 	if shouldReregisterForPushNotifications {
@@ -210,25 +201,23 @@ func (m *Messenger) saveContact(contact *Contact) error {
 }
 
 // Send contact updates to all contacts added by us
-func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
+func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	if _, err := m.sendContactUpdate(ctx, myID, ensName, profileImage); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, ensName, profileImage); err != nil {
 		return err
 	}
 
 	// TODO: This should not be sending paired messages, as we do it above
-	for _, contact := range m.allContacts {
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.IsAdded() {
-			if _, err := m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
-				return err
+			if _, err = m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
+				return false
 			}
 		}
-	}
-	return nil
+		return true
+	})
+	return err
 }
 
 // NOTE: this endpoint does not add the contact, the reason being is that currently
@@ -239,15 +228,13 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
 func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	return m.sendContactUpdate(ctx, chatID, ensName, profileImage)
 }
 
 func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
-	contact, ok := m.allContacts[chatID]
+	contact, ok := m.allContacts.Load(chatID)
 	if !ok {
 		var err error
 		contact, err = buildContactFromPkString(chatID)
@@ -256,7 +243,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		}
 	}
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		publicKey, err := contact.PublicKey()
 		if err != nil {
@@ -267,7 +254,8 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	contactUpdate := &protobuf.ContactUpdate{
@@ -301,12 +289,12 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 }
 
 func (m *Messenger) isNewContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts[contact.ID]
+	previousContact, ok := m.allContacts.Load(contact.ID)
 	return contact.IsAdded() && (!ok || !previousContact.IsAdded())
 }
 
 func (m *Messenger) hasNicknameChanged(contact *Contact) bool {
-	previousContact, ok := m.allContacts[contact.ID]
+	previousContact, ok := m.allContacts.Load(contact.ID)
 	if !ok {
 		return false
 	}
@@ -314,7 +302,7 @@ func (m *Messenger) hasNicknameChanged(contact *Contact) bool {
 }
 
 func (m *Messenger) removedContact(contact *Contact) bool {
-	previousContact, ok := m.allContacts[contact.ID]
+	previousContact, ok := m.allContacts.Load(contact.ID)
 	if !ok {
 		return false
 	}
