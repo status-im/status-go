@@ -19,7 +19,6 @@
 package wakuv2
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
@@ -42,32 +41,22 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	"github.com/status-im/status-go/eth-node/types"
-	"github.com/status-im/status-go/waku/common"
+	wakucommon "github.com/status-im/go-waku/waku/common"
 	v0 "github.com/status-im/status-go/waku/v0"
+	"github.com/status-im/status-go/wakuv2/common"
 
 	node "github.com/status-im/go-waku/waku/v2/node"
+	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
 
 const messageQueueLimit = 1024
 
-type Bridge interface {
-	Pipe() (<-chan *common.Envelope, chan<- *common.Envelope)
-}
-
 type settings struct {
-	MaxMsgSize               uint32          // Maximal message length allowed by the waku node
-	EnableConfirmations      bool            // Enable sending message confirmations
-	SoftBlacklistedPeerIDs   map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
-	BloomFilterMode          bool            // Whether we should match against bloom-filter only
-	LightClient              bool            // Light client mode enabled does not forward messages
-	RestrictLightClientsConn bool            // Restrict connection between two light clients
-	SyncAllowance            int             // Maximum time in seconds allowed to process the waku-related messages
-	FullNode                 bool            // Whether this is to be run in FullNode settings
+	MaxMsgSize             uint32          // Maximal message length allowed by the waku node
+	EnableConfirmations    bool            // Enable sending message confirmations
+	SoftBlacklistedPeerIDs map[string]bool // SoftBlacklistedPeerIDs is a list of peer ids that we want to keep connected but silently drop any envelope from
 }
 
 // Waku represents a dark communication interface through the Ethereum
@@ -81,31 +70,19 @@ type Waku struct {
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key stores
 
-	envelopes   map[gethcommon.Hash]*common.Envelope // Pool of envelopes currently tracked by this node
-	expirations map[uint32]mapset.Set                // Message expiration pool
-	poolMu      sync.RWMutex                         // Mutex to sync the message and expiration pools
+	envelopes   map[gethcommon.Hash]*common.ReceivedMessage // Pool of envelopes currently tracked by this node
+	expirations map[uint32]mapset.Set                       // Message expiration pool
+	poolMu      sync.RWMutex                                // Mutex to sync the message and expiration pools
 
-	peers  map[common.Peer]struct{} // Set of currently active peers
-	peerMu sync.RWMutex             // Mutex to sync the active peer set
-
-	msgQueue    chan *common.Envelope // Message queue for normal waku messages
-	p2pMsgQueue chan interface{}      // Message queue for peer-to-peer messages (not to be forwarded any further) and history delivery confirmations.
-	quit        chan struct{}         // Channel used for graceful exit
+	msgQueue chan *common.ReceivedMessage // Message queue for waku messages that havent been decoded
+	quit     chan struct{}                // Channel used for graceful exit
 
 	settings   settings     // Holds configuration settings that can be dynamically changed
 	settingsMu sync.RWMutex // Mutex to sync the settings access
 
-	mailServer MailServer
-
-	rateLimiter *common.PeerRateLimiter
-
 	envelopeFeed event.Feed
 
 	timeSource func() time.Time // source of time for waku
-
-	bridge       Bridge
-	bridgeWg     sync.WaitGroup
-	cancelBridge chan struct{}
 
 	logger *zap.Logger
 }
@@ -125,33 +102,25 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	waku := &Waku{
 		privateKeys: make(map[string]*ecdsa.PrivateKey),
 		symKeys:     make(map[string][]byte),
-		envelopes:   make(map[gethcommon.Hash]*common.Envelope),
+		envelopes:   make(map[gethcommon.Hash]*common.ReceivedMessage),
 		expirations: make(map[uint32]mapset.Set),
-		peers:       make(map[common.Peer]struct{}),
-		msgQueue:    make(chan *common.Envelope, messageQueueLimit),
-		p2pMsgQueue: make(chan interface{}, messageQueueLimit),
+		msgQueue:    make(chan *common.ReceivedMessage, messageQueueLimit),
 		quit:        make(chan struct{}),
 		timeSource:  time.Now,
 		logger:      logger,
 	}
 
 	waku.settings = settings{
-		MaxMsgSize:               cfg.MaxMessageSize,
-		EnableConfirmations:      cfg.EnableConfirmations,
-		LightClient:              cfg.LightClient,
-		FullNode:                 cfg.FullNode,
-		SoftBlacklistedPeerIDs:   make(map[string]bool),
-		RestrictLightClientsConn: cfg.RestrictLightClientsConn,
-		SyncAllowance:            common.DefaultSyncAllowance,
+		MaxMsgSize:             cfg.MaxMessageSize,
+		SoftBlacklistedPeerIDs: make(map[string]bool),
 	}
 
-	for _, peerID := range cfg.SoftBlacklistedPeerIDs {
-		waku.settings.SoftBlacklistedPeerIDs[peerID] = true
-	}
-
-	if cfg.FullNode {
-		// TODO: ?
-	}
+	/*
+		// TODO:
+		for _, peerID := range cfg.SoftBlacklistedPeerIDs {
+			waku.settings.SoftBlacklistedPeerIDs[peerID] = true
+		}
+	*/
 
 	waku.filters = common.NewFilters()
 
@@ -168,17 +137,44 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to setup the go-waku private key: %v", err)
 	}
 
-	// TODO obtain this from config
-	hostAddr, _ := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, cfg.Port))
-
-	waku.node, err = node.New(context.Background(), privateKey, hostAddr, extAddr)
+	hostAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, ":", cfg.Port))
+	waku.node, err = node.New(context.Background(), privateKey, []net.Addr{hostAddr})
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
+	}
+	err = waku.node.MountRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
 	}
 
+	for _, bootnode := range cfg.BootNodes {
+		err := waku.node.DialPeer(bootnode)
+		if err != nil {
+			log.Warn("Could not dial peer", err)
+		} else {
+			log.Info("Bootnode dialed successfully", bootnode)
+		}
+	}
+
+	go waku.runMsgLoop()
+
 	log.Info("setup the go-waku node successfully")
 
 	return waku, nil
+}
+
+func (w *Waku) runMsgLoop() {
+	sub, err := w.node.Subscribe(nil)
+	if err != nil {
+		fmt.Println("Could not subscribe:", err)
+		return
+	}
+
+	for env := range sub.C {
+		fmt.Println("TODO: delete this. Received an envelope:", env.Hash())
+		w.OnNewEnvelopes(env)
+	}
 }
 
 // MaxMessageSize returns the maximum accepted message size.
@@ -186,60 +182,6 @@ func (w *Waku) MaxMessageSize() uint32 {
 	w.settingsMu.RLock()
 	defer w.settingsMu.RUnlock()
 	return w.settings.MaxMsgSize
-}
-
-// SetMaxMessageSize sets the maximal message size allowed by this node
-func (w *Waku) SetMaxMessageSize(size uint32) error {
-	if size > common.MaxMessageSize {
-		return fmt.Errorf("message size too large [%d>%d]", size, common.MaxMessageSize)
-	}
-	w.settingsMu.Lock()
-	w.settings.MaxMsgSize = size
-	w.settingsMu.Unlock()
-	return nil
-}
-
-// LightClientMode indicates is this node is light client (does not forward any messages)
-func (w *Waku) LightClientMode() bool {
-	w.settingsMu.RLock()
-	defer w.settingsMu.RUnlock()
-	return w.settings.LightClient
-}
-
-// SetLightClientMode makes node light client (does not forward any messages)
-func (w *Waku) SetLightClientMode(v bool) {
-	w.settingsMu.Lock()
-	w.settings.LightClient = v
-	w.settingsMu.Unlock()
-}
-
-// LightClientModeConnectionRestricted indicates that connection to light client in light client mode not allowed
-func (w *Waku) LightClientModeConnectionRestricted() bool {
-	w.settingsMu.RLock()
-	defer w.settingsMu.RUnlock()
-	return w.settings.RestrictLightClientsConn
-}
-
-// PacketRateLimiting returns RateLimits information for packets
-func (w *Waku) PacketRateLimits() common.RateLimits {
-	if w.rateLimiter == nil {
-		return common.RateLimits{}
-	}
-	return common.RateLimits{
-		IPLimits:     uint64(w.rateLimiter.PacketLimitPerSecIP),
-		PeerIDLimits: uint64(w.rateLimiter.PacketLimitPerSecPeerID),
-	}
-}
-
-// BytesRateLimiting returns RateLimits information for bytes
-func (w *Waku) BytesRateLimits() common.RateLimits {
-	if w.rateLimiter == nil {
-		return common.RateLimits{}
-	}
-	return common.RateLimits{
-		IPLimits:     uint64(w.rateLimiter.BytesLimitPerSecIP),
-		PeerIDLimits: uint64(w.rateLimiter.BytesLimitPerSecPeerID),
-	}
 }
 
 // ConfirmationsEnabled returns true if message confirmations are enabled.
@@ -276,60 +218,6 @@ func (w *Waku) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{}
 }
 
-// RegisterMailServer registers MailServer interface.
-// MailServer will process all the incoming messages with p2pRequestCode.
-func (w *Waku) RegisterMailServer(server MailServer) {
-	w.mailServer = server
-}
-
-// SetRateLimiter registers a rate limiter.
-func (w *Waku) RegisterRateLimiter(r *common.PeerRateLimiter) {
-	w.rateLimiter = r
-}
-
-// RegisterBridge registers a new Bridge that moves envelopes
-// between different subprotocols.
-// It's important that a bridge is registered before the service
-// is started, otherwise, it won't read and propagate envelopes.
-func (w *Waku) RegisterBridge(b Bridge) {
-	if w.cancelBridge != nil {
-		close(w.cancelBridge)
-	}
-	w.bridge = b
-	w.cancelBridge = make(chan struct{})
-	w.bridgeWg.Add(1)
-	go w.readBridgeLoop()
-}
-
-func (w *Waku) readBridgeLoop() {
-	defer w.bridgeWg.Done()
-	out, _ := w.bridge.Pipe()
-	for {
-		select {
-		case <-w.cancelBridge:
-			return
-		case env := <-out:
-			_, err := w.addAndBridge(env, false, true)
-			if err != nil {
-				common.BridgeReceivedFailed.Inc()
-				w.logger.Warn(
-					"failed to add a bridged envelope",
-					zap.Binary("ID", env.Hash().Bytes()),
-					zap.Error(err),
-				)
-			} else {
-				common.BridgeReceivedSucceed.Inc()
-				w.logger.Debug("bridged envelope successfully", zap.Binary("ID", env.Hash().Bytes()))
-				w.envelopeFeed.Send(common.EnvelopeEvent{
-					Event: common.EventEnvelopeReceived,
-					Topic: env.Topic,
-					Hash:  env.Hash(),
-				})
-			}
-		}
-	}
-}
-
 func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 	return w.envelopeFeed.Send(event)
 }
@@ -338,132 +226,6 @@ func (w *Waku) SendEnvelopeEvent(event common.EnvelopeEvent) int {
 // In order to prevent blocking waku producers events must be amply buffered.
 func (w *Waku) SubscribeEnvelopeEvents(events chan<- common.EnvelopeEvent) event.Subscription {
 	return w.envelopeFeed.Subscribe(events)
-}
-
-func (w *Waku) FullNode() bool {
-	w.settingsMu.RLock()
-	// If full node, nothing to do
-	fullNode := w.settings.FullNode
-	w.settingsMu.RUnlock()
-	return fullNode
-}
-
-// getPeer retrieves peer by ID
-func (w *Waku) getPeer(peerID []byte) (common.Peer, error) {
-	w.peerMu.Lock()
-	defer w.peerMu.Unlock()
-	for p := range w.peers {
-		if bytes.Equal(peerID, p.ID()) {
-			return p, nil
-		}
-	}
-	return nil, fmt.Errorf("could not find peer with ID: %x", peerID)
-}
-
-// AllowP2PMessagesFromPeer marks specific peer trusted,
-// which will allow it to send historic (expired) messages.
-func (w *Waku) AllowP2PMessagesFromPeer(peerID []byte) error {
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	p.SetPeerTrusted(true)
-	return nil
-}
-
-// RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
-// which is known to implement MailServer interface, and is supposed to process this
-// request and respond with a number of peer-to-peer messages (possibly expired),
-// which are not supposed to be forwarded any further.
-// The waku protocol is agnostic of the format and contents of envelope.
-func (w *Waku) RequestHistoricMessages(peerID []byte, envelope *common.Envelope) error {
-	return w.RequestHistoricMessagesWithTimeout(peerID, envelope, 0)
-}
-
-// RequestHistoricMessagesWithTimeout acts as RequestHistoricMessages but requires to pass a timeout.
-// It sends an event EventMailServerRequestExpired after the timeout.
-func (w *Waku) RequestHistoricMessagesWithTimeout(peerID []byte, envelope *common.Envelope, timeout time.Duration) error {
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	p.SetPeerTrusted(true)
-
-	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Peer:  p.EnodeID(),
-		Topic: envelope.Topic,
-		Hash:  envelope.Hash(),
-		Event: common.EventMailServerRequestSent,
-	})
-
-	err = p.RequestHistoricMessages(envelope)
-	if timeout != 0 {
-		go w.expireRequestHistoricMessages(p.EnodeID(), envelope.Hash(), timeout)
-	}
-	return err
-}
-
-func (w *Waku) SendMessagesRequest(peerID []byte, request common.MessagesRequest) error {
-	if err := request.Validate(); err != nil {
-		return err
-	}
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	p.SetPeerTrusted(true)
-	if err := p.SendMessagesRequest(request); err != nil {
-		return err
-	}
-	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Peer:  p.EnodeID(),
-		Hash:  gethcommon.BytesToHash(request.ID),
-		Event: common.EventMailServerRequestSent,
-	})
-	return nil
-}
-
-func (w *Waku) expireRequestHistoricMessages(peer enode.ID, hash gethcommon.Hash, timeout time.Duration) {
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-	select {
-	case <-w.quit:
-		return
-	case <-timer.C:
-		w.envelopeFeed.Send(common.EnvelopeEvent{
-			Peer:  peer,
-			Hash:  hash,
-			Event: common.EventMailServerRequestExpired,
-		})
-	}
-}
-
-func (w *Waku) SendHistoricMessageResponse(peerID []byte, payload []byte) error {
-	peer, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	return peer.SendHistoricMessageResponse(payload)
-}
-
-// SendP2PMessage sends a peer-to-peer message to a specific peer.
-// It sends one or more envelopes in a single batch.
-func (w *Waku) SendP2PMessages(peerID []byte, envelopes ...*common.Envelope) error {
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	return p.SendP2PMessages(envelopes)
-}
-
-// SendRawP2PDirect sends a peer-to-peer message to a specific peer.
-// It sends one or more envelopes in a single batch.
-func (w *Waku) SendRawP2PDirect(peerID []byte, envelopes ...rlp.RawValue) error {
-	p, err := w.getPeer(peerID)
-	if err != nil {
-		return err
-	}
-	return p.SendRawP2PDirect(envelopes)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -745,24 +507,23 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(envelope *common.Envelope) error {
-	ok, err := w.add(envelope, false)
+func (w *Waku) Send(envelope *common.ReceivedMessage) error {
+	// TODO:
+	/*ok, err := w.add(envelope)
 	if err == nil && !ok {
 		return fmt.Errorf("failed to add envelope")
 	}
-	return err
+	return err*/
+	return nil
 }
 
 // Start implements node.Service, starting the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Start(*p2p.Server) error {
-	go w.update()
-
 	numCPU := runtime.NumCPU()
 	for i := 0; i < numCPU; i++ {
 		go w.processQueue()
 	}
-	go w.processP2P()
 
 	return nil
 }
@@ -770,49 +531,9 @@ func (w *Waku) Start(*p2p.Server) error {
 // Stop implements node.Service, stopping the background data propagation thread
 // of the Waku protocol.
 func (w *Waku) Stop() error {
-	if w.cancelBridge != nil {
-		close(w.cancelBridge)
-		w.cancelBridge = nil
-		w.bridgeWg.Wait()
-	}
 	w.node.Stop()
 	close(w.quit)
 	return nil
-}
-
-// HandlePeer is called by the underlying P2P layer when the waku sub-protocol
-// connection is negotiated.
-func (w *Waku) HandlePeer(peer common.Peer, rw p2p.MsgReadWriter) error {
-	w.peerMu.Lock()
-	w.peers[peer] = struct{}{}
-	w.peerMu.Unlock()
-
-	w.logger.Info("handling peer", zap.String("peerID", types.EncodeHex(peer.ID())))
-
-	defer func() {
-		w.peerMu.Lock()
-		delete(w.peers, peer)
-		w.peerMu.Unlock()
-	}()
-
-	if err := peer.Start(); err != nil {
-		return err
-	}
-	defer peer.Stop()
-
-	if w.rateLimiter != nil {
-		runLoop := func(out p2p.MsgReadWriter) error {
-			peer.SetRWWriter(out)
-			err := peer.Run()
-			w.logger.Info("handled peer", zap.String("peerID", types.EncodeHex(peer.ID())), zap.Error(err))
-			return err
-		}
-		return w.rateLimiter.Decorate(peer, rw, runLoop)
-	}
-
-	err := peer.Run()
-	w.logger.Info("handled peer", zap.String("peerID", types.EncodeHex(peer.ID())), zap.Error(err))
-	return err
 }
 
 func (w *Waku) softBlacklisted(peerID string) bool {
@@ -821,207 +542,64 @@ func (w *Waku) softBlacklisted(peerID string) bool {
 	return w.settings.SoftBlacklistedPeerIDs[peerID]
 }
 
-func (w *Waku) OnNewEnvelopes(envelopes []*common.Envelope, peer common.Peer) ([]common.EnvelopeError, error) {
+func (w *Waku) OnNewEnvelopes(envelope *wakucommon.Envelope) ([]common.EnvelopeError, error) {
+	recvMessage := common.NewReceivedMessage(envelope)
 	envelopeErrors := make([]common.EnvelopeError, 0)
-	peerID := types.EncodeHex(peer.ID())
-	w.logger.Debug("received new envelopes", zap.Int("count", len(envelopes)), zap.String("peer", peerID))
+
+	w.logger.Debug("received new envelope")
+
 	trouble := false
 
-	if w.softBlacklisted(peerID) {
-		w.logger.Debug("peer is soft blacklisted", zap.String("peer", peerID))
-		return nil, nil
+	_, err := w.add(recvMessage)
+	if err != nil {
+		w.logger.Info("invalid envelope received", zap.Error(err))
 	}
 
-	for _, env := range envelopes {
-		w.logger.Debug("received new envelope", zap.String("peer", peerID), zap.String("hash", env.Hash().Hex()))
-		cached, err := w.add(env, w.LightClientMode())
-		if err != nil {
-			_, isTimeSyncError := err.(common.TimeSyncError)
-			if !isTimeSyncError {
-				trouble = true
-				w.logger.Info("invalid envelope received", zap.String("peer", types.EncodeHex(peer.ID())), zap.Error(err))
-			}
-			envelopeErrors = append(envelopeErrors, common.ErrorToEnvelopeError(env.Hash(), err))
-		} else if cached {
-			peer.Mark(env)
-		}
-
-		w.envelopeFeed.Send(common.EnvelopeEvent{
-			Event: common.EventEnvelopeReceived,
-			Topic: env.Topic,
-			Hash:  env.Hash(),
-			Peer:  peer.EnodeID(),
-		})
-		common.EnvelopesValidatedCounter.Inc()
-	}
+	common.EnvelopesValidatedCounter.Inc()
 
 	if trouble {
 		return envelopeErrors, errors.New("received invalid envelope")
 	}
+
 	return envelopeErrors, nil
 }
 
-func (w *Waku) OnNewP2PEnvelopes(envelopes []*common.Envelope) error {
-	for _, envelope := range envelopes {
-		w.postP2P(envelope)
-	}
-	return nil
-}
-
-func (w *Waku) Mailserver() bool {
-	return w.mailServer != nil
-}
-
-func (w *Waku) OnMessagesRequest(request common.MessagesRequest, p common.Peer) error {
-	w.mailServer.Deliver(p.ID(), request)
-	return nil
-}
-
-func (w *Waku) OnDeprecatedMessagesRequest(request *common.Envelope, p common.Peer) error {
-	w.mailServer.DeliverMail(p.ID(), request)
-	return nil
-}
-
-func (w *Waku) OnP2PRequestCompleted(payload []byte, p common.Peer) error {
-	msEvent, err := CreateMailServerEvent(p.EnodeID(), payload)
-	if err != nil {
-		return fmt.Errorf("invalid p2p request complete payload: %v", err)
-	}
-
-	w.postP2P(*msEvent)
-	return nil
-}
-
-func (w *Waku) OnMessagesResponse(response common.MessagesResponse, p common.Peer) error {
-	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Batch: response.Hash,
-		Event: common.EventBatchAcknowledged,
-		Peer:  p.EnodeID(),
-		Data:  response.Errors,
-	})
-
-	return nil
-}
-
-func (w *Waku) OnBatchAcknowledged(batchHash gethcommon.Hash, p common.Peer) error {
-	w.envelopeFeed.Send(common.EnvelopeEvent{
-		Batch: batchHash,
-		Event: common.EventBatchAcknowledged,
-		Peer:  p.EnodeID(),
-	})
-	return nil
-}
-
-func (w *Waku) add(envelope *common.Envelope, isP2P bool) (bool, error) {
-	return w.addAndBridge(envelope, isP2P, false)
-}
-
-func (w *Waku) SetFullNode(set bool) {
-	w.settingsMu.Lock()
-	w.settings.FullNode = set
-	w.settingsMu.Unlock()
-}
-
 // addEnvelope adds an envelope to the envelope map, used for sending
-func (w *Waku) addEnvelope(envelope *common.Envelope) {
-
+func (w *Waku) addEnvelope(envelope *common.ReceivedMessage) {
 	hash := envelope.Hash()
 
 	w.poolMu.Lock()
 	w.envelopes[hash] = envelope
-	if w.expirations[envelope.Expiry] == nil {
-		w.expirations[envelope.Expiry] = mapset.NewThreadUnsafeSet()
-	}
-	if !w.expirations[envelope.Expiry].Contains(hash) {
-		w.expirations[envelope.Expiry].Add(hash)
-	}
 	w.poolMu.Unlock()
 }
 
-// addAndBridge inserts a new envelope into the message pool to be distributed within the
-// waku network. It also inserts the envelope into the expiration pool at the
-// appropriate time-stamp. In case of error, connection should be dropped.
-// param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
-func (w *Waku) addAndBridge(envelope *common.Envelope, isP2P bool, bridged bool) (bool, error) {
-	now := uint32(w.timeSource().Unix())
-	sent := envelope.Expiry - envelope.TTL
-
+func (w *Waku) add(recvMessage *common.ReceivedMessage) (bool, error) {
 	common.EnvelopesReceivedCounter.Inc()
-	if sent > now {
-		if sent-common.DefaultSyncAllowance > now {
-			common.EnvelopesCacheFailedCounter.WithLabelValues("in_future").Inc()
-			log.Warn("envelope created in the future", "hash", envelope.Hash())
-			return false, common.TimeSyncError(errors.New("envelope from future"))
-		}
-		// recalculate PoW, adjusted for the time difference, plus one second for latency
-		envelope.CalculatePoW(sent - now + 1)
-	}
 
-	if envelope.Expiry < now {
-		if envelope.Expiry+common.DefaultSyncAllowance*2 < now {
-			common.EnvelopesCacheFailedCounter.WithLabelValues("very_old").Inc()
-			log.Warn("very old envelope", "hash", envelope.Hash())
-			return false, common.TimeSyncError(errors.New("very old envelope"))
-		}
-		log.Debug("expired envelope dropped", "hash", envelope.Hash().Hex())
-		common.EnvelopesCacheFailedCounter.WithLabelValues("expired").Inc()
-		return false, nil // drop envelope without error
-	}
-
-	if uint32(envelope.Size()) > w.MaxMessageSize() {
-		common.EnvelopesCacheFailedCounter.WithLabelValues("oversized").Inc()
-		return false, fmt.Errorf("huge messages are not allowed [%x][%d][%d]", envelope.Hash(), envelope.Size(), w.MaxMessageSize())
-	}
-
-	hash := envelope.Hash()
+	hash := recvMessage.Hash()
 
 	w.poolMu.Lock()
 	_, alreadyCached := w.envelopes[hash]
 	w.poolMu.Unlock()
 	if !alreadyCached {
-		w.addEnvelope(envelope)
+		w.addEnvelope(recvMessage)
 	}
 
 	if alreadyCached {
-		log.Trace("w envelope already cached", "hash", envelope.Hash().Hex())
+		log.Trace("w envelope already cached", "hash", recvMessage.Hash().Hex())
 		common.EnvelopesCachedCounter.WithLabelValues("hit").Inc()
 	} else {
-		log.Trace("cached w envelope", "hash", envelope.Hash().Hex())
+		log.Trace("cached w envelope", "hash", recvMessage.Hash().Hex())
 		common.EnvelopesCachedCounter.WithLabelValues("miss").Inc()
-		common.EnvelopesSizeMeter.Observe(float64(envelope.Size()))
-		w.postEvent(envelope, isP2P) // notify the local node about the new message
-		if w.mailServer != nil {
-			w.mailServer.Archive(envelope)
-			w.envelopeFeed.Send(common.EnvelopeEvent{
-				Topic: envelope.Topic,
-				Hash:  envelope.Hash(),
-				Event: common.EventMailServerEnvelopeArchived,
-			})
-		}
-		// Bridge only envelopes that are not p2p messages.
-		// In particular, if a node is a lightweight node,
-		// it should not bridge any envelopes.
-		if !isP2P && !bridged && w.bridge != nil {
-			log.Debug("bridging envelope from Waku", "hash", envelope.Hash().Hex())
-			_, in := w.bridge.Pipe()
-			in <- envelope
-			common.BridgeSent.Inc()
-		}
+		common.EnvelopesSizeMeter.Observe(float64(recvMessage.Envelope.Size()))
+		w.postEvent(recvMessage) // notify the local node about the new message
 	}
 	return true, nil
 }
 
-func (w *Waku) postP2P(event interface{}) {
-	w.p2pMsgQueue <- event
-}
-
 // postEvent queues the message for further processing.
-func (w *Waku) postEvent(envelope *common.Envelope, isP2P bool) {
-	if isP2P {
-		w.postP2P(envelope)
-	} else {
-		w.msgQueue <- envelope
-	}
+func (w *Waku) postEvent(envelope *common.ReceivedMessage) {
+	w.msgQueue <- envelope
 }
 
 // processQueue delivers the messages to the watchers during the lifetime of the waku node.
@@ -1031,7 +609,7 @@ func (w *Waku) processQueue() {
 		case <-w.quit:
 			return
 		case e := <-w.msgQueue:
-			w.filters.NotifyWatchers(e, false)
+			w.filters.NotifyWatchers(e)
 			w.envelopeFeed.Send(common.EnvelopeEvent{
 				Topic: e.Topic,
 				Hash:  e.Hash(),
@@ -1041,76 +619,12 @@ func (w *Waku) processQueue() {
 	}
 }
 
-func (w *Waku) processP2P() {
-	for {
-		select {
-		case <-w.quit:
-			return
-		case e := <-w.p2pMsgQueue:
-			switch evn := e.(type) {
-			case *common.Envelope:
-				w.filters.NotifyWatchers(evn, true)
-				w.envelopeFeed.Send(common.EnvelopeEvent{
-					Topic: evn.Topic,
-					Hash:  evn.Hash(),
-					Event: common.EventEnvelopeAvailable,
-				})
-			case common.EnvelopeEvent:
-				w.envelopeFeed.Send(evn)
-			}
-		}
-	}
-}
-
-// update loops until the lifetime of the waku node, updating its internal
-// state by expiring stale messages from the pool.
-func (w *Waku) update() {
-	// Start a ticker to check for expirations
-	expire := time.NewTicker(common.ExpirationCycle)
-
-	// Repeat updates until termination is requested
-	for {
-		select {
-		case <-expire.C:
-			w.expire()
-
-		case <-w.quit:
-			return
-		}
-	}
-}
-
-// expire iterates over all the expiration timestamps, removing all stale
-// messages from the pools.
-func (w *Waku) expire() {
-	w.poolMu.Lock()
-	defer w.poolMu.Unlock()
-
-	now := uint32(w.timeSource().Unix())
-	for expiry, hashSet := range w.expirations {
-		if expiry < now {
-			// Dump all expired messages and remove timestamp
-			hashSet.Each(func(v interface{}) bool {
-				delete(w.envelopes, v.(gethcommon.Hash))
-				common.EnvelopesCachedCounter.WithLabelValues("clear").Inc()
-				w.envelopeFeed.Send(common.EnvelopeEvent{
-					Hash:  v.(gethcommon.Hash),
-					Event: common.EventEnvelopeExpired,
-				})
-				return false
-			})
-			w.expirations[expiry].Clear()
-			delete(w.expirations, expiry)
-		}
-	}
-}
-
 // Envelopes retrieves all the messages currently pooled by the node.
-func (w *Waku) Envelopes() []*common.Envelope {
+func (w *Waku) Envelopes() []*common.ReceivedMessage {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 
-	all := make([]*common.Envelope, 0, len(w.envelopes))
+	all := make([]*common.ReceivedMessage, 0, len(w.envelopes))
 	for _, envelope := range w.envelopes {
 		all = append(all, envelope)
 	}
@@ -1119,7 +633,7 @@ func (w *Waku) Envelopes() []*common.Envelope {
 
 // GetEnvelope retrieves an envelope from the message queue by its hash.
 // It returns nil if the envelope can not be found.
-func (w *Waku) GetEnvelope(hash gethcommon.Hash) *common.Envelope {
+func (w *Waku) GetEnvelope(hash gethcommon.Hash) *common.ReceivedMessage {
 	w.poolMu.RLock()
 	defer w.poolMu.RUnlock()
 	return w.envelopes[hash]

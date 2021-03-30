@@ -12,6 +12,8 @@ replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164
 
 replace github.com/status-im/rendezvous => /home/richard/status/rendezvous
 
+replace github.com/status-im/go-waku => /home/richard/status/go-waku
+
 require (
 	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/beevik/ntp v0.2.0
@@ -56,6 +58,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/go-waku v0.0.0-20210324155343-c1b3b9285b56
+	github.com/status-im/go-wakurelay-pubsub v0.4.2
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
 	github.com/status-im/migrate/v4 v4.6.2-status.2

@@ -26,12 +26,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv2/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -74,25 +73,9 @@ type Info struct {
 // Info returns diagnostic information about the waku node.
 func (api *PublicWakuAPI) Info(ctx context.Context) Info {
 	return Info{
-		Messages:       len(api.w.msgQueue) + len(api.w.p2pMsgQueue),
+		Messages:       len(api.w.msgQueue),
 		MaxMessageSize: api.w.MaxMessageSize(),
 	}
-}
-
-// SetMaxMessageSize sets the maximum message size that is accepted.
-// Upper limit is defined by MaxMessageSize.
-func (api *PublicWakuAPI) SetMaxMessageSize(ctx context.Context, size uint32) (bool, error) {
-	return true, api.w.SetMaxMessageSize(size)
-}
-
-// MarkTrustedPeer marks a peer trusted, which will allow it to send historic (expired) messages.
-// Note: This function is not adding new nodes, the node needs to exists as a peer.
-func (api *PublicWakuAPI) MarkTrustedPeer(ctx context.Context, url string) (bool, error) {
-	n, err := enode.Parse(enode.ValidSchemes, url)
-	if err != nil {
-		return false, err
-	}
-	return true, api.w.AllowP2PMessagesFromPeer(n.ID().Bytes())
 }
 
 // NewKeyPair generates a new public and private key pair for message decryption and encryption.
@@ -177,19 +160,6 @@ func (api *PublicWakuAPI) DeleteSymKey(ctx context.Context, id string) bool {
 	return api.w.DeleteSymKey(id)
 }
 
-// MakeLightClient turns the node into light client, which does not forward
-// any incoming messages, and sends only messages originated in this node.
-func (api *PublicWakuAPI) MakeLightClient(ctx context.Context) bool {
-	api.w.SetLightClientMode(true)
-	return api.w.LightClientMode()
-}
-
-// CancelLightClient cancels light client mode.
-func (api *PublicWakuAPI) CancelLightClient(ctx context.Context) bool {
-	api.w.SetLightClientMode(false)
-	return !api.w.LightClientMode()
-}
-
 //go:generate gencodec -type NewMessage -field-override newMessageOverride -out gen_newmessage_json.go
 
 // NewMessage represents a new waku message that is posted through the RPC.
@@ -197,19 +167,16 @@ type NewMessage struct {
 	SymKeyID   string           `json:"symKeyID"`
 	PublicKey  []byte           `json:"pubKey"`
 	Sig        string           `json:"sig"`
-	TTL        uint32           `json:"ttl"`
 	Topic      common.TopicType `json:"topic"`
 	Payload    []byte           `json:"payload"`
-	Padding    []byte           `json:"padding"`
-	PowTime    uint32           `json:"powTime"`
-	PowTarget  float64          `json:"powTarget"`
 	TargetPeer string           `json:"targetPeer"`
 }
 
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
-	var (
+	// TODO:
+	/*var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
 		err         error
@@ -221,12 +188,8 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 	}
 
 	params := &common.MessageParams{
-		TTL:      req.TTL,
-		Payload:  req.Payload,
-		Padding:  req.Padding,
-		WorkTime: req.PowTime,
-		PoW:      req.PowTarget,
-		Topic:    req.Topic,
+		Payload: req.Payload,
+		Topic:   req.Topic,
 	}
 
 	// Set key that is used to sign the message
@@ -288,6 +251,8 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		result = hash[:]
 	}
 	return result, err
+	*/
+	return nil, nil
 }
 
 // UninstallFilter is alias for Unsubscribe
@@ -305,9 +270,7 @@ type Criteria struct {
 	SymKeyID     string             `json:"symKeyID"`
 	PrivateKeyID string             `json:"privateKeyID"`
 	Sig          []byte             `json:"sig"`
-	MinPow       float64            `json:"minPow"`
 	Topics       []common.TopicType `json:"topics"`
-	AllowP2P     bool               `json:"allowP2P"`
 }
 
 // Messages set up a subscription that fires events when messages arrive that match
@@ -331,9 +294,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	}
 
 	filter := common.Filter{
-		PoW:      crit.MinPow,
 		Messages: common.NewMemoryMessageStore(),
-		AllowP2P: crit.AllowP2P,
 	}
 
 	if len(crit.Sig) > 0 {
@@ -343,7 +304,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	}
 
 	for _, bt := range crit.Topics {
-		filter.Topics = append(filter.Topics, bt[:])
+		filter.Topics = append(filter.Topics, bt)
 	}
 
 	// listen for message that are encrypted with the given symmetric key
@@ -410,25 +371,15 @@ type Message struct {
 	TTL       uint32           `json:"ttl"`
 	Timestamp uint32           `json:"timestamp"`
 	Topic     common.TopicType `json:"topic"`
-	Payload   []byte           `json:"payload"`
-	Padding   []byte           `json:"padding"`
-	PoW       float64          `json:"pow"`
 	Hash      []byte           `json:"hash"`
 	Dst       []byte           `json:"recipientPublicKey,omitempty"`
-	P2P       bool             `json:"bool,omitempty"`
 }
 
 // ToWakuMessage converts an internal message into an API version.
 func ToWakuMessage(message *common.ReceivedMessage) *Message {
 	msg := Message{
-		Payload:   message.Payload,
-		Padding:   message.Padding,
-		Timestamp: message.Sent,
-		TTL:       message.TTL,
-		PoW:       message.PoW,
-		Hash:      message.EnvelopeHash.Bytes(),
-		Topic:     message.Topic,
-		P2P:       message.P2P,
+		Hash:  message.Hash().Bytes(),
+		Topic: message.Topic,
 	}
 
 	if message.Dst != nil {
@@ -438,12 +389,14 @@ func ToWakuMessage(message *common.ReceivedMessage) *Message {
 		}
 	}
 
+	/* TODO:
 	if common.IsMessageSigned(message.Raw[0]) {
 		b := crypto.FromECDSAPub(message.SigToPubKey())
 		if b != nil {
 			msg.Sig = b
 		}
 	}
+	*/
 
 	return &msg
 }
@@ -494,7 +447,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		src     *ecdsa.PublicKey
 		keySym  []byte
 		keyAsym *ecdsa.PrivateKey
-		topics  [][]byte
+		topics  []common.TopicType
 
 		symKeyGiven  = len(req.SymKeyID) > 0
 		asymKeyGiven = len(req.PrivateKeyID) > 0
@@ -529,10 +482,9 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	}
 
 	if len(req.Topics) > 0 {
-		topics = make([][]byte, len(req.Topics))
+		topics = make([]common.TopicType, len(req.Topics))
 		for i, topic := range req.Topics {
-			topics[i] = make([]byte, common.TopicLength)
-			copy(topics[i], topic[:])
+			topics[i] = topic
 		}
 	}
 
@@ -540,8 +492,6 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		Src:      src,
 		KeySym:   keySym,
 		KeyAsym:  keyAsym,
-		PoW:      req.MinPow,
-		AllowP2P: req.AllowP2P,
 		Topics:   topics,
 		Messages: common.NewMemoryMessageStore(),
 	}

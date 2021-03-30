@@ -1,5 +1,5 @@
 {
-  "Rendezvous": true,
+  "Rendezvous": false,
   "NoDiscovery": false,
   "ClusterConfig": {
     "Enabled": true,
@@ -13,5 +13,8 @@
     "PushNotificationsServers": [],
     "StaticNodes": [],
     "RendezvousNodes": []
-  }
+  },
+  "WakuV2Config": {
+		"Enabled": true
+	}
 }

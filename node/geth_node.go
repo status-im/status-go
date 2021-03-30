@@ -376,11 +376,10 @@ func createWakuService(ctx *node.ServiceContext, wakuCfg *params.WakuConfig, clu
 func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *params.WakuV2Config, clusterCfg *params.ClusterConfig) (*wakuv2.Waku, error) {
 	cfg := &wakuv2.Config{
 		MaxMessageSize:         wakucommon.DefaultMaxMessageSize,
-		FullNode:               wakuCfg.FullNode, // TODO: is this needed?
 		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
-		EnableConfirmations:    wakuCfg.EnableConfirmations,
 		Host:                   wakuCfg.Host,
 		Port:                   wakuCfg.Port,
+		BootNodes:              clusterCfg.BootNodes,
 	}
 
 	if wakuCfg.MaxMessageSize > 0 {
@@ -392,29 +391,6 @@ func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *para
 	if err != nil {
 		return nil, err
 	}
-
-	/* TODO:
-	if wakuCfg.EnableRateLimiter {
-		r := wakuRateLimiter(wakuCfg, clusterCfg)
-		w.RegisterRateLimiter(r)
-	}
-
-	if timesource, err := timeSource(ctx); err == nil {
-		w.SetTimeSource(timesource)
-	}
-
-	// enable mail service
-	if wakuCfg.EnableMailServer {
-		if err := registerWakuMailServer(w, wakuCfg); err != nil {
-			return nil, fmt.Errorf("failed to register WakuMailServer: %v", err)
-		}
-	}
-	*/
-
-	/* TODO: use waku filter
-	if wakuCfg.LightClient {
-
-	}*/
 
 	return w, nil
 }
