@@ -132,8 +132,8 @@ func (m *Messenger) JoinedCommunities() ([]*communities.Community, error) {
 }
 
 func (m *Messenger) JoinCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 
 	return m.joinCommunity(communityID)
 }
@@ -248,8 +248,8 @@ func (m *Messenger) DeclineRequestToJoinCommunity(request *requests.DeclineReque
 }
 
 func (m *Messenger) LeaveCommunity(communityID types.HexBytes) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 
 	return m.leaveCommunity(communityID)
 }

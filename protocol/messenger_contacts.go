@@ -11,14 +11,14 @@ import (
 )
 
 func (m *Messenger) SaveContact(contact *Contact) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 	return m.saveContact(contact)
 }
 
 func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 	contact, ok := m.allContacts[pubKey]
 	if !ok {
 		var err error
@@ -89,8 +89,8 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 }
 
 func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 	var response *MessengerResponse
 
 	contact, ok := m.allContacts[pubKey]
@@ -133,8 +133,8 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 }
 
 func (m *Messenger) Contacts() []*Contact {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 	var contacts []*Contact
 	for _, contact := range m.allContacts {
 		if contact.HasCustomFields() {
@@ -146,15 +146,15 @@ func (m *Messenger) Contacts() []*Contact {
 
 // GetContactByID assumes pubKey includes 0x prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 
 	return m.allContacts[pubKey]
 }
 
 func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 	chats, err := m.persistence.BlockContact(contact)
 	if err != nil {
 		return nil, err
@@ -211,8 +211,8 @@ func (m *Messenger) saveContact(contact *Contact) error {
 
 // Send contact updates to all contacts added by us
 func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
@@ -239,8 +239,8 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
 func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 	return m.sendContactUpdate(ctx, chatID, ensName, profileImage)
 }
 
