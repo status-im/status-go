@@ -19,24 +19,20 @@
 package wakuv2
 
 import (
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 // Config represents the configuration state of a waku node.
 type Config struct {
-	MaxMessageSize           uint32   `toml:",omitempty"`
-	LightClient              bool     `toml:",omitempty"` // when true, it does not forward messages
-	FullNode                 bool     `toml:",omitempty"` // when true, it forwards all messages
-	RestrictLightClientsConn bool     `toml:",omitempty"` // when true, do not accept light client as peers if it is a light client itself
-	EnableConfirmations      bool     `toml:",omitempty"` // when true, sends message confirmations
-	SoftBlacklistedPeerIDs   []string `toml:",omitempty"`
-	Host                     string   `toml:",omitempty"`
-	Port                     int      `toml:",omitempty"`
+	MaxMessageSize         uint32   `toml:",omitempty"`
+	SoftBlacklistedPeerIDs []string `toml:",omitempty"`
+	Host                   string   `toml:",omitempty"`
+	Port                   int      `toml:",omitempty"`
+	BootNodes              []string `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{
-	MaxMessageSize:           common.DefaultMaxMessageSize,
-	RestrictLightClientsConn: true,
-	Host:                     "0.0.0.0",
-	Port:                     60000,
+	MaxMessageSize: common.DefaultMaxMessageSize,
+	Host:           "0.0.0.0",
+	Port:           60000,
 }

@@ -9,15 +9,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	wakucommon "github.com/status-im/go-waku/waku/common"
 	"github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol"
 )
 
 // ReceivedMessage represents a data packet to be received through the
-// Waku protocol and successfully decrypted.
+// WakuV2 protocol and successfully decrypted.
 type ReceivedMessage struct {
-	Msg *protocol.WakuMessage // Waku Message
-	Raw []byte
+	Envelope *wakucommon.Envelope // Wrapped Waku Message
+	Raw      []byte
 
 	Src   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
 	Dst   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
@@ -26,7 +26,6 @@ type ReceivedMessage struct {
 	SymKeyHash common.Hash // The Keccak256Hash of the key
 
 	hash common.Hash
-	P2P  bool // is set to true if this message was received from mail server.
 }
 
 // MessagesRequest contains details of a request for historic messages.
@@ -125,13 +124,17 @@ type MemoryMessageStore struct {
 	messages map[common.Hash]*ReceivedMessage
 }
 
+func NewReceivedMessage(env *wakucommon.Envelope) *ReceivedMessage {
+	return &ReceivedMessage{
+		Envelope: env,
+	}
+}
+
 // Hash returns the SHA3 hash of the envelope, calculating it if not yet done.
 func (e *ReceivedMessage) Hash() common.Hash {
 	if (e.hash == common.Hash{}) {
-		data := e.Msg.Payload
-		data = append(data, uint32ToByte(*e.Msg.ContentTopic)...)
-		data = append(data, uint32ToByte(*e.Msg.Version)...)
-		e.hash = crypto.Keccak256Hash(data)
+		envelopeHash := e.Envelope.Hash()
+		e.hash = crypto.Keccak256Hash(envelopeHash[:])
 	}
 	return e.hash
 }
@@ -180,7 +183,7 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
-	raw, err := node.DecodePayload(e.Msg, keyInfo)
+	raw, err := node.DecodePayload(e.Envelope.Message(), keyInfo)
 
 	if err != nil {
 		log.Error("failed to decode message", "err", err)
@@ -188,6 +191,6 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 	}
 
 	msg.Raw = raw
-	msg.Topic = TopicType(*e.Msg.ContentTopic)
+	msg.Topic = TopicType(*e.Envelope.Message().ContentTopic)
 	return msg
 }

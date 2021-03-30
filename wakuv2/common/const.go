@@ -41,10 +41,8 @@ const (
 	EnvelopeHeaderLength = 20
 
 	MaxMessageSize        = uint32(10 * 1024 * 1024) // maximum accepted size of a message.
-	DefaultMaxMessageSize = uint32(1024 * 1024)
-	DefaultMinimumPoW     = 0.2
-
-	padSizeLimit = 256 // just an arbitrary number, could be changed without breaking the protocol
+	DefaultMaxMessageSize = uint32(1 << 20)          // DefaultMaximumMessageSize is 1mb.
+	padSizeLimit          = 256                      // just an arbitrary number, could be changed without breaking the protocol
 
 	ExpirationCycle   = time.Second
 	TransmissionCycle = 300 * time.Millisecond

@@ -33,7 +33,7 @@ type Filter struct {
 	Src        *ecdsa.PublicKey  // Sender of the message
 	KeyAsym    *ecdsa.PrivateKey // Private Key of recipient
 	KeySym     []byte            // Key associated with the Topic
-	Topics     [][]byte          // Topics to filter messages with
+	Topics     []TopicType       // Topics to filter messages with
 	SymKeyHash common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
 	id         string            // unique identifier
 
@@ -118,8 +118,7 @@ func (fs *Filters) addTopicMatcher(watcher *Filter) {
 	if len(watcher.Topics) == 0 {
 		fs.allTopicsMatcher[watcher] = struct{}{}
 	} else {
-		for _, t := range watcher.Topics {
-			topic := BytesToTopic(t)
+		for _, topic := range watcher.Topics {
 			if fs.topicMatcher[topic] == nil {
 				fs.topicMatcher[topic] = make(map[*Filter]struct{})
 			}
@@ -132,7 +131,7 @@ func (fs *Filters) addTopicMatcher(watcher *Filter) {
 func (fs *Filters) removeFromTopicMatchers(watcher *Filter) {
 	delete(fs.allTopicsMatcher, watcher)
 	for _, topic := range watcher.Topics {
-		delete(fs.topicMatcher[BytesToTopic(topic)], watcher)
+		delete(fs.topicMatcher[topic], watcher)
 	}
 }
 
@@ -158,28 +157,27 @@ func (fs *Filters) Get(id string) *Filter {
 
 // NotifyWatchers notifies any filter that has declared interest
 // for the envelope's topic.
-func (fs *Filters) NotifyWatchers(message *ReceivedMessage, p2pMessage bool) {
-	var msg *ReceivedMessage
+func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) {
+	var decodedMsg *ReceivedMessage
 
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	candidates := fs.GetWatchersByTopic(TopicType(*message.Msg.ContentTopic))
+	candidates := fs.GetWatchersByTopic(TopicType(*recvMessage.Envelope.Message().ContentTopic))
 	for _, watcher := range candidates {
 		var match bool
-		if msg == nil {
-			match = watcher.MatchMessage(msg)
-			msg = message.Open(watcher) // TODO: decrypt message
-			if msg == nil {
-				log.Trace("processing message: failed to open", "message", message.Hash().Hex(), "filter", watcher.id)
+		if decodedMsg == nil {
+			match = watcher.MatchMessage(decodedMsg)
+			decodedMsg = recvMessage.Open(watcher) // TODO: decrypt message
+			if decodedMsg == nil {
+				log.Trace("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
 			}
 		}
 
-		if match && msg != nil {
-			msg.P2P = p2pMessage
-			log.Trace("processing message: decrypted", "hash", message.Hash().Hex())
-			if watcher.Src == nil || IsPubKeyEqual(msg.Src, watcher.Src) {
-				watcher.Trigger(msg)
+		if match && decodedMsg != nil {
+			log.Trace("processing message: decrypted", "hash", recvMessage.Hash().Hex())
+			if watcher.Src == nil || IsPubKeyEqual(decodedMsg.Src, watcher.Src) {
+				watcher.Trigger(decodedMsg)
 			}
 		}
 	}
