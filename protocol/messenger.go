@@ -73,6 +73,7 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // because installations are managed by the user.
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
+// TODO we may want to change the maps into sync.Maps if we start getting unexpected locks or weird collision bugs
 type Messenger struct {
 	node                       types.Node
 	config                     *config

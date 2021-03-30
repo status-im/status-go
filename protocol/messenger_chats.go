@@ -10,8 +10,8 @@ import (
 )
 
 func (m *Messenger) Chats() []*Chat {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.locker.Lock()
+	defer m.locker.Unlock()
 
 	var chats []*Chat
 
@@ -23,9 +23,6 @@ func (m *Messenger) Chats() []*Chat {
 }
 
 func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
@@ -35,6 +32,10 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 	if err != nil {
 		return nil, err
 	}
+
+	lock := m.locker.Get(chatID)
+	lock.Lock()
+	defer lock.Unlock()
 
 	chat, ok := m.allChats[chatID]
 	if !ok {
@@ -64,8 +65,9 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 }
 
 func (m *Messenger) DeleteChat(chatID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	lock := m.locker.Get(chatID)
+	lock.Lock()
+	defer lock.Unlock()
 
 	return m.deleteChat(chatID)
 }
@@ -86,14 +88,16 @@ func (m *Messenger) deleteChat(chatID string) error {
 }
 
 func (m *Messenger) SaveChat(chat *Chat) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	lock := m.locker.Get(chat.ID)
+	lock.Lock()
+	defer lock.Unlock()
 	return m.saveChat(chat)
 }
 
 func (m *Messenger) DeactivateChat(chatID string) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	lock := m.locker.Get(chatID)
+	lock.Lock()
+	defer lock.Unlock()
 	return m.deactivateChat(chatID)
 }
 
