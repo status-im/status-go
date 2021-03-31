@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	logging "github.com/ipfs/go-log"
+
 	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -385,6 +387,12 @@ func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *para
 	if wakuCfg.MaxMessageSize > 0 {
 		cfg.MaxMessageSize = wakuCfg.MaxMessageSize
 	}
+
+	lvl, err := logging.LevelFromString("info")
+	if err != nil {
+		panic(err)
+	}
+	logging.SetAllLoggers(lvl)
 
 	w, err := wakuv2.New(nodeKey, cfg, logutils.ZapLogger())
 
