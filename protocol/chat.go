@@ -108,6 +108,14 @@ func (c *Chat) OneToOne() bool {
 	return c.ChatType == ChatTypeOneToOne
 }
 
+func (c *Chat) CommunityChat() bool {
+	return c.ChatType == ChatTypeCommunityChat
+}
+
+func (c *Chat) PrivateGroupChat() bool {
+	return c.ChatType == ChatTypePrivateGroupChat
+}
+
 func (c *Chat) CommunityChatID() string {
 	if c.ChatType != ChatTypeCommunityChat {
 		return c.ID
@@ -289,6 +297,25 @@ func CreateCommunityChat(orgID, chatID string, orgChat *protobuf.CommunityChat, 
 		Timestamp:   int64(timesource.GetCurrentTime()),
 		ChatType:    ChatTypeCommunityChat,
 	}
+}
+
+func (c *Chat) DeepLink() string {
+	if c.OneToOne() {
+		return "status-im://p/" + c.ID
+	}
+	if c.PrivateGroupChat() {
+		return "status-im://g/args?a2=" + c.ID
+	}
+
+	if c.CommunityChat() {
+		return "status-im://cc/" + c.ID
+	}
+
+	if c.Public() {
+		return "status-im://" + c.ID
+	}
+
+	return ""
 }
 
 func CreateCommunityChats(org *communities.Community, timesource common.TimeSource) []*Chat {

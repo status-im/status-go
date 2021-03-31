@@ -21,10 +21,12 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
+	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -99,6 +101,7 @@ type Messenger struct {
 	mailserver                 []byte
 	database                   *sql.DB
 	multiAccounts              *multiaccounts.Database
+	settings                   *accounts.Database
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
@@ -186,7 +189,7 @@ func NewMessenger(
 	if c.db == nil {
 		logger.Info("opening a database", zap.String("dbPath", c.dbConfig.dbPath))
 		var err error
-		database, err = sqlite.Open(c.dbConfig.dbPath, c.dbConfig.dbKey)
+		database, err = appdatabase.InitializeDB(c.dbConfig.dbPath, c.dbConfig.dbKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to initialize database from the db config")
 		}
@@ -304,6 +307,7 @@ func NewMessenger(
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
+		settings:                   accounts.NewDB(database),
 		mailserversDatabase:        c.mailserversDatabase,
 		account:                    c.account,
 		quit:                       make(chan struct{}),
@@ -2455,7 +2459,7 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 	}
 }
 
-// addNewMessageNotification takes a common.Message and generates a new MessageNotificationBody and appends it to the
+// addNewMessageNotification takes a common.Message and generates a new NotificationBody and appends it to the
 // []Response.Notifications if the message is m.New
 func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicKey, m *common.Message, responseTo *common.Message) error {
 	if !m.New {
@@ -2469,17 +2473,14 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	contactID := contactIDFromPublicKey(pubKey)
 
 	chat := r.AllChats[m.LocalChatID]
-	notification := MessageNotificationBody{
-		Message: m,
-		Contact: r.AllContacts[contactID],
-		Chat:    chat,
-	}
+	contact := r.AllContacts[contactID]
 
-	if showNotification(publicKey, notification, responseTo) {
-		r.Response.Notifications = append(
-			r.Response.Notifications,
-			notification,
-		)
+	if showMessageNotification(publicKey, m, chat, responseTo) {
+		notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts)
+		if err != nil {
+			return err
+		}
+		r.Response.AddNotification(notification)
 	}
 
 	return nil
@@ -3009,13 +3010,19 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 	messageState.Response.Messages = messagesWithResponses
 
+	notificationsEnabled, err := m.settings.GetNotificationsEnabled()
+	if err != nil {
+		return nil, err
+	}
 	for _, message := range messageState.Response.Messages {
 		if _, ok := newMessagesIds[message.ID]; ok {
 			message.New = true
 
-			// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
-			if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo]); err != nil {
-				return nil, err
+			if notificationsEnabled {
+				// Create notification body to be eventually passed to `localnotifications.SendMessageNotifications()`
+				if err = messageState.addNewMessageNotification(m.identity.PublicKey, message, messagesByID[message.ResponseTo]); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -3024,30 +3031,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	m.modifiedInstallations = make(map[string]bool)
 
 	return messageState.Response, nil
-}
-
-func showNotification(publicKey ecdsa.PublicKey, n MessageNotificationBody, responseTo *common.Message) bool {
-	if n.Chat != nil && n.Chat.ChatType == ChatTypeOneToOne {
-		return true
-	}
-
-	publicKeyString := common.PubkeyToHex(&publicKey)
-	mentioned := false
-	for _, mention := range n.Message.Mentions {
-		if publicKeyString == mention {
-			mentioned = true
-		}
-	}
-
-	if mentioned {
-		return true
-	}
-
-	if responseTo != nil {
-		return responseTo.From == publicKeyString
-	}
-
-	return false
 }
 
 // SetMailserver sets the currently used mailserver
@@ -3941,11 +3924,18 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		if err != nil {
 			return nil, err
 		}
-		response.Notifications = append(response.Notifications, MessageNotificationBody{
-			Message: message,
-			Contact: contact,
-			Chat:    chat,
-		})
+
+		notificationsEnabled, err := m.settings.GetNotificationsEnabled()
+		if err != nil {
+			return nil, err
+		}
+		if notificationsEnabled {
+			notification, err := NewMessageNotification(message.ID, message, chat, contact, m.allContacts)
+			if err != nil {
+				return nil, err
+			}
+			response.AddNotification(notification)
+		}
 
 	}
 

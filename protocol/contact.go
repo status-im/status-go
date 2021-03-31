@@ -26,6 +26,22 @@ type ContactDeviceInfo struct {
 	FCMToken string `json:"fcmToken"`
 }
 
+func (c *Contact) CanonicalName() string {
+	if c.LocalNickname != "" {
+		return c.LocalNickname
+	}
+
+	if c.ENSVerified {
+		return c.Name
+	}
+
+	return c.Alias
+}
+
+func (c *Contact) CanonicalImage() string {
+	return c.Identicon
+}
+
 // Contact has information about a "Contact". A contact is not necessarily one
 // that we added or added us, that's based on SystemTags.
 type Contact struct {

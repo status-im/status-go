@@ -98,3 +98,32 @@ func TestPrepareContentLinks(t *testing.T) {
 	require.Equal(t, message.Links[0], link1)
 	require.Equal(t, message.Links[1], link2)
 }
+
+func TestPrepareSimplifiedText(t *testing.T) {
+	canonicalName1 := "canonical-name-1"
+	canonicalName2 := "canonical-name-2"
+
+	message := &Message{}
+	pk1, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pk1String := types.EncodeHex(crypto.FromECDSAPub(&pk1.PublicKey))
+
+	pk2, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	pk2String := types.EncodeHex(crypto.FromECDSAPub(&pk2.PublicKey))
+
+	message.Text = "hey @" + pk1String + " @" + pk2String
+
+	require.NoError(t, message.PrepareContent())
+	require.Len(t, message.Mentions, 2)
+	require.Equal(t, message.Mentions[0], pk1String)
+	require.Equal(t, message.Mentions[1], pk2String)
+
+	canonicalNames := make(map[string]string)
+	canonicalNames[pk1String] = canonicalName1
+	canonicalNames[pk2String] = canonicalName2
+
+	simplifiedText, err := message.GetSimplifiedText(canonicalNames)
+	require.NoError(t, err)
+	require.Equal(t, "hey "+canonicalName1+" "+canonicalName2, simplifiedText)
+}

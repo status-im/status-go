@@ -484,6 +484,7 @@ func (c *Client) HandlePushNotificationQueryResponse(serverPublicKey *ecdsa.Publ
 	// get the public key associated with this query
 	clientPublicKey, err := c.persistence.GetQueryPublicKey(response.MessageId)
 	if err != nil {
+		c.config.Logger.Error("failed to query client publicKey", zap.Error(err))
 		return err
 	}
 	if clientPublicKey == nil {
@@ -900,7 +901,7 @@ func (c *Client) handlePublicMessageSent(sentMessage *common.SentMessage) error 
 
 		c.config.Logger.Debug("should no mention", zap.Any("publickey", shouldNotify))
 		// we send the notifications and return the info of the devices notified
-		infos, err := c.sendNotification(publicKey, nil, messageID, message.LocalChatID, protobuf.PushNotification_MENTION)
+		infos, err := c.SendNotification(publicKey, nil, messageID, message.LocalChatID, protobuf.PushNotification_MENTION)
 		if err != nil {
 			return err
 		}
@@ -998,7 +999,7 @@ func (c *Client) handleDirectMessageSent(sentMessage *common.SentMessage) error 
 	}
 
 	// we send the notifications and return the info of the devices notified
-	infos, err := c.sendNotification(publicKey, installationIDs, trackedMessageIDs[0], chatID, protobuf.PushNotification_MESSAGE)
+	infos, err := c.SendNotification(publicKey, installationIDs, trackedMessageIDs[0], chatID, protobuf.PushNotification_MESSAGE)
 	if err != nil {
 		return err
 	}
@@ -1280,9 +1281,9 @@ func (c *Client) registerWithServer(registration *protobuf.PushNotificationRegis
 	return nil
 }
 
-// sendNotification sends an actual notification to the push notification server.
+// SendNotification sends an actual notification to the push notification server.
 // the notification is sent using an ephemeral key to shield the real identity of the sender
-func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte, chatID string, notificationType protobuf.PushNotification_PushNotificationType) ([]*PushNotificationInfo, error) {
+func (c *Client) SendNotification(publicKey *ecdsa.PublicKey, installationIDs []string, messageID []byte, chatID string, notificationType protobuf.PushNotification_PushNotificationType) ([]*PushNotificationInfo, error) {
 
 	// get latest push notification infos
 	err := c.queryNotificationInfo(publicKey, false)
@@ -1316,6 +1317,8 @@ func (c *Client) sendNotification(publicKey *ecdsa.PublicKey, installationIDs []
 
 	// one info per installation id, grouped by server
 	actionableInfos := make(map[string][]*PushNotificationInfo)
+
+	c.config.Logger.Info("INFOS", zap.Any("info", info))
 	for _, i := range info {
 
 		if !installationIDsMap[i.InstallationID] {
@@ -1406,7 +1409,7 @@ func (c *Client) resendNotification(pn *SentNotification) error {
 		return err
 	}
 
-	_, err = c.sendNotification(pn.PublicKey, []string{pn.InstallationID}, pn.MessageID, pn.ChatID, pn.NotificationType)
+	_, err = c.SendNotification(pn.PublicKey, []string{pn.InstallationID}, pn.MessageID, pn.ChatID, pn.NotificationType)
 	return err
 }
 

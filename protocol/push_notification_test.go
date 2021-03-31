@@ -14,9 +14,11 @@ import (
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
+	"github.com/status-im/status-go/protocol/requests"
 	"github.com/status-im/status-go/protocol/tt"
 	"github.com/status-im/status-go/waku"
 )
@@ -840,6 +842,139 @@ func (s *MessengerPushNotificationSuite) TestReceivePushNotificationMention() {
 		return nil
 	})
 	s.Require().NoError(err)
+	s.Require().NoError(alice.Shutdown())
+	s.Require().NoError(server.Shutdown())
+}
+
+func (s *MessengerPushNotificationSuite) TestReceivePushNotificationCommunityRequest() {
+
+	bob := s.m
+
+	serverKey, err := crypto.GenerateKey()
+	s.Require().NoError(err)
+	server := s.newPushNotificationServer(s.shh, serverKey)
+
+	alice := s.newMessenger(s.shh)
+	// start alice and enable sending push notifications
+	_, err = alice.Start()
+	s.Require().NoError(err)
+	s.Require().NoError(alice.EnableSendingPushNotifications())
+
+	// Register bob
+	err = bob.AddPushNotificationsServer(context.Background(), &server.identity.PublicKey, pushnotificationclient.ServerTypeCustom)
+	s.Require().NoError(err)
+
+	err = bob.RegisterForPushNotifications(context.Background(), bob1DeviceToken, testAPNTopic, protobuf.PushNotificationRegistration_APN_TOKEN)
+
+	// Pull servers  and check we registered
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = bob.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		registered, err := bob.RegisteredForPushNotifications()
+		if err != nil {
+			return err
+		}
+		if !registered {
+			return errors.New("not registered")
+		}
+
+		bobServers, err := bob.GetPushNotificationsServers()
+		if err != nil {
+			return err
+		}
+
+		if len(bobServers) == 0 {
+			return errors.New("not registered")
+		}
+
+		return nil
+	})
+	// Make sure we receive it
+	s.Require().NoError(err)
+	_, err = bob.GetPushNotificationsServers()
+	s.Require().NoError(err)
+
+	description := &requests.CreateCommunity{
+		Membership:  protobuf.CommunityPermissions_ON_REQUEST,
+		Name:        "status",
+		Color:       "#ffffff",
+		Description: "status community description",
+	}
+
+	response, err := bob.CreateCommunity(description)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.Communities(), 1)
+	community := response.Communities()[0]
+
+	// Send an community message
+	chat := CreateOneToOneChat(common.PubkeyToHex(&alice.identity.PublicKey), &alice.identity.PublicKey, alice.transport)
+
+	inputMessage := &common.Message{}
+	inputMessage.ChatId = chat.ID
+	inputMessage.Text = "some text"
+	inputMessage.CommunityID = community.IDString()
+
+	err = bob.SaveChat(chat)
+	s.NoError(err)
+	_, err = bob.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	// Pull message and make sure org is received
+	err = tt.RetryWithBackOff(func() error {
+		response, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		if len(response.Communities()) == 0 {
+			return errors.New("community not received")
+		}
+		return nil
+	})
+
+	request := &requests.RequestToJoinCommunity{CommunityID: community.ID()}
+
+	// We try to join the org
+	response, err = alice.RequestToJoinCommunity(request)
+	s.Require().NoError(err)
+	s.Require().NotNil(response)
+	s.Require().Len(response.RequestsToJoinCommunity, 1)
+
+	requestToJoin1 := response.RequestsToJoinCommunity[0]
+	s.Require().NotNil(requestToJoin1)
+	s.Require().Equal(community.ID(), requestToJoin1.CommunityID)
+	s.Require().True(requestToJoin1.Our)
+	s.Require().NotEmpty(requestToJoin1.ID)
+	s.Require().NotEmpty(requestToJoin1.Clock)
+	s.Require().Equal(requestToJoin1.PublicKey, common.PubkeyToHex(&alice.identity.PublicKey))
+	s.Require().Equal(communities.RequestToJoinStatePending, requestToJoin1.State)
+
+	err = tt.RetryWithBackOff(func() error {
+		_, err = server.RetrieveAll()
+		if err != nil {
+			return err
+		}
+		_, err = alice.RetrieveAll()
+		if err != nil {
+			return err
+		}
+
+		if server.pushNotificationServer.SentRequests != 1 {
+			return errors.New("request not sent")
+		}
+
+		return nil
+
+	})
+
+	s.Require().NoError(err)
+
 	s.Require().NoError(alice.Shutdown())
 	s.Require().NoError(server.Shutdown())
 }

@@ -37,6 +37,8 @@ type Server struct {
 	persistence      Persistence
 	config           *Config
 	messageProcessor *common.MessageProcessor
+	// SentRequests keeps track of the requests sent to gorush, for testing only
+	SentRequests int64
 }
 
 func New(config *Config, persistence Persistence, messageProcessor *common.MessageProcessor) *Server {
@@ -376,7 +378,7 @@ func (s *Server) buildPushNotificationReport(pn *protobuf.PushNotification, regi
 	} else if registration.AccessToken != pn.AccessToken {
 		s.config.Logger.Debug("invalid token")
 		report.Error = protobuf.PushNotificationReport_WRONG_TOKEN
-	} else if (s.isMessageNotification(pn) && !s.isValidMessageNotification(pn, registration)) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) {
+	} else if (s.isMessageNotification(pn) && !s.isValidMessageNotification(pn, registration)) || (s.isMentionNotification(pn) && !s.isValidMentionNotification(pn, registration)) || (s.isRequestToJoinCommunityNotification(pn) && !s.isValidRequestToJoinCommunityNotification(pn, registration)) {
 		s.config.Logger.Debug("filtered notification")
 		// We report as successful but don't send the notification
 		// for privacy reasons, as otherwise we would disclose that
@@ -450,6 +452,7 @@ func (s *Server) sendPushNotification(requestAndRegistrations []*RequestAndRegis
 	if len(requestAndRegistrations) == 0 {
 		return nil
 	}
+	s.SentRequests++
 	goRushRequest := PushNotificationRegistrationToGoRushRequest(requestAndRegistrations)
 	return sendGoRushNotification(goRushRequest, s.config.GorushURL, s.config.Logger)
 }
@@ -529,10 +532,21 @@ func (s *Server) isMessageNotification(pn *protobuf.PushNotification) bool {
 	return pn.Type == protobuf.PushNotification_MESSAGE
 }
 
-// isValidMentionNotification checks:
+// isValidMessageNotification checks:
 // this is a message
 // the chat is not muted
 // the author is not blocked
 func (s *Server) isValidMessageNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
 	return s.isMessageNotification(pn) && !s.contains(registration.BlockedChatList, pn.ChatId) && !s.contains(registration.BlockedChatList, pn.Author)
+}
+
+func (s *Server) isRequestToJoinCommunityNotification(pn *protobuf.PushNotification) bool {
+	return pn.Type == protobuf.PushNotification_REQUEST_TO_JOIN_COMMUNITY
+}
+
+// isValidRequestToJoinCommunityNotification checks:
+// this is a request to join a community
+// the author is not blocked
+func (s *Server) isValidRequestToJoinCommunityNotification(pn *protobuf.PushNotification, registration *protobuf.PushNotificationRegistration) bool {
+	return s.isRequestToJoinCommunityNotification(pn) && !s.contains(registration.BlockedChatList, pn.Author)
 }
