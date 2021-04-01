@@ -36,12 +36,6 @@ func toDBHeader(header *types.Header) *DBHeader {
 	}
 }
 
-func toHead(header *types.Header) *DBHeader {
-	dbheader := toDBHeader(header)
-	dbheader.Head = true
-	return dbheader
-}
-
 // SyncOption is used to specify that application processed transfers for that block.
 type SyncOption uint
 

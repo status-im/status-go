@@ -89,7 +89,6 @@ type GethStatusBackend struct {
 	selectedAccountKeyID string
 	log                  log.Logger
 	allowAllRPC          bool // used only for tests, disables api method restrictions
-	forceStopWallet      bool
 }
 
 // NewGethStatusBackend create a new GethStatusBackend instance
@@ -968,50 +967,6 @@ func (b *GethStatusBackend) AppStateChange(state string) {
 	// and normal mode if the app is in foreground.
 }
 
-func (b *GethStatusBackend) StopWallet() error {
-	wallet, err := b.statusNode.WalletService()
-	if err != nil {
-		b.log.Error("Retrieving of wallet service failed on StopWallet", "error", err)
-		return nil
-	}
-	if wallet.IsStarted() {
-		err = wallet.Stop()
-		if err != nil {
-			b.log.Error("Wallet service stop failed on StopWallet", "error", err)
-			return nil
-		}
-	}
-
-	b.forceStopWallet = true
-
-	return nil
-}
-
-func (b *GethStatusBackend) StartWallet(watchNewBlocks bool) error {
-	wallet, err := b.statusNode.WalletService()
-	if err != nil {
-		b.log.Error("Retrieving of wallet service failed on StartWallet", "error", err)
-		return nil
-	}
-	if !wallet.IsStarted() {
-		err = wallet.Start(b.statusNode.Server())
-		if err != nil {
-			b.log.Error("Wallet service start failed on StartWallet", "error", err)
-			return nil
-		}
-
-		err = b.startWallet(watchNewBlocks)
-		if err != nil {
-			b.log.Error("Wallet reactor start failed on StartWallet", "error", err)
-			return nil
-		}
-	}
-
-	b.forceStopWallet = false
-
-	return nil
-}
-
 func (b *GethStatusBackend) StopLocalNotifications() error {
 	localPN, err := b.statusNode.LocalNotificationsService()
 	if err != nil {
@@ -1041,11 +996,6 @@ func (b *GethStatusBackend) StartLocalNotifications() error {
 	wallet, err := b.statusNode.WalletService()
 	if err != nil {
 		b.log.Error("Retrieving of wallet service failed on StartLocalNotifications", "error", err)
-		return nil
-	}
-
-	if !wallet.IsStarted() {
-		b.log.Error("Can't start local notifications service without wallet service")
 		return nil
 	}
 
@@ -1242,52 +1192,6 @@ func (b *GethStatusBackend) injectAccountsIntoServices() error {
 		}
 	}
 	return nil
-}
-
-func (b *GethStatusBackend) startWallet(watchNewBlocks bool) error {
-	if !b.statusNode.Config().WalletConfig.Enabled {
-		return nil
-	}
-
-	wallet, err := b.statusNode.WalletService()
-	if err != nil {
-		return err
-	}
-
-	accountsDB := accounts.NewDB(b.appDB)
-	watchAddresses, err := accountsDB.GetWalletAddresses()
-	if err != nil {
-		return err
-	}
-
-	mainAccountAddress, err := b.accountManager.MainAccountAddress()
-	if err != nil {
-		return err
-	}
-
-	uniqAddressesMap := map[common.Address]struct{}{}
-	allAddresses := []common.Address{}
-	mainAddress := common.Address(mainAccountAddress)
-	uniqAddressesMap[mainAddress] = struct{}{}
-	allAddresses = append(allAddresses, mainAddress)
-	for _, addr := range watchAddresses {
-		address := common.Address(addr)
-		if _, ok := uniqAddressesMap[address]; !ok {
-			uniqAddressesMap[address] = struct{}{}
-			allAddresses = append(allAddresses, address)
-		}
-	}
-
-	err = wallet.MergeBlocksRanges(allAddresses, b.statusNode.Config().NetworkID)
-	if err != nil {
-		return err
-	}
-
-	return wallet.StartReactor(
-		b.statusNode.RPCClient().Ethclient(),
-		allAddresses,
-		new(big.Int).SetUint64(b.statusNode.Config().NetworkID),
-		watchNewBlocks)
 }
 
 func appendIf(condition bool, services []gethnode.ServiceConstructor, service gethnode.ServiceConstructor) []gethnode.ServiceConstructor {

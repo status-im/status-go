@@ -511,18 +511,6 @@ func AppStateChange(state string) {
 	statusBackend.AppStateChange(state)
 }
 
-// StopWallet
-func StopWallet() string {
-	err := statusBackend.StopWallet()
-	return makeJSONResponse(err)
-}
-
-// StartWallet
-func StartWallet(watchNewBlocks bool) string {
-	err := statusBackend.StartWallet(watchNewBlocks)
-	return makeJSONResponse(err)
-}
-
 // StartLocalNotifications
 func StartLocalNotifications() string {
 	err := statusBackend.StartLocalNotifications()

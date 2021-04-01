@@ -26,12 +26,10 @@ const (
 
 // TransactionEvent - structure used to pass messages from wallet to bus
 type TransactionEvent struct {
-	Type                      string                      `json:"type"`
-	BlockNumber               *big.Int                    `json:"block-number"`
-	Accounts                  []common.Address            `json:"accounts"`
-	NewTransactionsPerAccount map[common.Address]int      `json:"new-transactions"`
-	ERC20                     bool                        `json:"erc20"`
-	MaxKnownBlocks            map[common.Address]*big.Int `json:"max-known-blocks"`
+	Type           string                      `json:"type"`
+	BlockNumber    *big.Int                    `json:"block-number"`
+	Accounts       []common.Address            `json:"accounts"`
+	MaxKnownBlocks map[common.Address]*big.Int `json:"max-known-blocks"`
 }
 
 type transactionBody struct {
@@ -181,7 +179,7 @@ func (s *Service) StartWalletWatcher() {
 				}
 				return
 			case event := <-events:
-				if event.Type == wallet.EventNewBlock && len(maxKnownBlocks) > 0 {
+				if event.Type == wallet.EventNewTransfers && len(maxKnownBlocks) > 0 {
 					newBlocks := false
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {
@@ -194,15 +192,13 @@ func (s *Service) StartWalletWatcher() {
 					}
 					if newBlocks && s.WatchingEnabled {
 						s.transmitter.publisher.Send(TransactionEvent{
-							Type:                      string(event.Type),
-							BlockNumber:               event.BlockNumber,
-							Accounts:                  event.Accounts,
-							NewTransactionsPerAccount: event.NewTransactionsPerAccount,
-							ERC20:                     event.ERC20,
-							MaxKnownBlocks:            maxKnownBlocks,
+							Type:           string(event.Type),
+							BlockNumber:    event.BlockNumber,
+							Accounts:       event.Accounts,
+							MaxKnownBlocks: maxKnownBlocks,
 						})
 					}
-				} else if event.Type == wallet.EventMaxKnownBlock {
+				} else if event.Type == wallet.EventRecentHistoryReady {
 					for _, address := range event.Accounts {
 						if _, ok := maxKnownBlocks[address]; !ok {
 							maxKnownBlocks[address] = event.BlockNumber

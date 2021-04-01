@@ -10,18 +10,13 @@ import (
 type EventType string
 
 const (
-	// EventNewBlock emitted when new block was added to the same canonical chan.
-	EventNewBlock      EventType = "newblock"
-	EventMaxKnownBlock EventType = "maxKnownBlock"
-	// EventReorg emitted when canonical chain was changed. In this case, BlockNumber will be an earliest added block.
-	EventReorg EventType = "reorg"
-	// EventNewHistory emitted if transfer from older block was added.
-	EventNewHistory EventType = "history"
+	// EventNewTransfers emitted when new block was added to the same canonical chan.
+	EventNewTransfers EventType = "new-transfers"
 	// EventFetchingRecentHistory emitted when fetching of lastest tx history is started
 	EventFetchingRecentHistory EventType = "recent-history-fetching"
-	// EventRecentHistoryFetched emitted when fetching of lastest tx history is started
+	// EventRecentHistoryReady emitted when fetching of lastest tx history is started
 	EventRecentHistoryReady EventType = "recent-history-ready"
-	// EventRecentHistoryError emitted when fetching of tx history failed
+	// EventFetchingHistoryError emitted when fetching of tx history failed
 	EventFetchingHistoryError EventType = "fetching-history-error"
 	// EventNonArchivalNodeDetected emitted when a connection to a non archival node is detected
 	EventNonArchivalNodeDetected EventType = "non-archival-node-detected"
@@ -29,10 +24,8 @@ const (
 
 // Event is a type for wallet events.
 type Event struct {
-	Type                      EventType              `json:"type"`
-	BlockNumber               *big.Int               `json:"blockNumber"`
-	Accounts                  []common.Address       `json:"accounts"`
-	NewTransactionsPerAccount map[common.Address]int `json:"newTransactions"`
-	ERC20                     bool                   `json:"erc20"`
-	Message                   string                 `json:"message"`
+	Type        EventType        `json:"type"`
+	BlockNumber *big.Int         `json:"blockNumber"`
+	Accounts    []common.Address `json:"accounts"`
+	Message     string           `json:"message"`
 }

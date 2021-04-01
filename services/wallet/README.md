@@ -1,8 +1,6 @@
-Wallet
-==========
+# Wallet service API
 
-Wallet service starts a loop that watches for new transfers (eth and erc20).
-To correctly start the service two values need to be changed in the config:
+Wallet service provides RPC API for checking transfers history and other methods related to wallet functionality. To enable service two values need to be changed in the config:
 
 1. Set Enable to true in WalletConfig
 
@@ -22,34 +20,120 @@ To correctly start the service two values need to be changed in the config:
 }
 ```
 
-API
-----------
+## API
 
-#### wallet_getTransfersByAddress
+### wallet_getTransfersByAddress
 
 Returns avaiable transfers in a given range.
 
-##### Parameters
+#### Parameters
 
 - `address`: `HEX` - ethereum address encoded in hex
 - `toBlock`: `BIGINT` - end of the range. if nil query will return last transfers.
 - `limit`: `BIGINT` - limit of returned transfers.
+- `fetchMore`: `BOOLEAN` - if `true`, there are less than `limit` fetched transfers in the database, and zero block is not reached yet, history will be scanned for more transfers. If `false` only transfers which are already fetched to the app's database will be returned.
 
-##### Examples
+#### Examples
 
 ```json
-{"jsonrpc":"2.0","id":7,"method":"wallet_getTransfersByAddress","params":["0xb81a6845649fa8c042dfaceb3f7a684873406993","0x0","0x5"]}
+{
+  "jsonrpc":"2.0",
+  "id":7,
+  "method":"wallet_getTransfersByAddress",
+  "params":[
+    "0xb81a6845649fa8c042dfaceb3f7a684873406993",
+    "0x0",
+    "0x5",
+    true
+  ]
+}
 ```
 
-##### Returns
+#### Returns
 
-Objects in the same format.
+```json
+[
+  {
+    "id":"0xb1a8adeaa0e6727bf01d6d8431b6238bdefa915e19ae7e8ceb16886c9f5e",
+    "type":"eth",
+    "address":"0xd65f3cb52605a54a833ae118fb13",
+    "blockNumber":"0xb7190",
+    "blockhash":"0x8d98aa2297fe322d0093b24372e2ead98414959093b479baf670",
+    "timestamp":"0x6048ec6",
+    "gasPrice":"0x346308a00",
+    "gasLimit":"0x508",
+    "gasUsed":"0x520",
+    "nonce":"0x13",
+    "txStatus":"0x1",
+    "input":"0x",
+    "txHash":"0x1adeaa0e672d7e67bf01d8431b6238bdef15e19ae7e8ceb16886c",
+    "value":"0x1",
+    "from":"0x2f865fb5dfdf0dfdf54a833ae118fb1363aaasd",
+    "to":"0xaaaaaaf3cb52605a54a833ae118fb1363a123123",
+    "contract":"0x0000000000000000000000000000000000000000",
+    "NetworkID":1
+  },...
+]
+```
 
-#### wallet_getTokensBalances
+### wallet_setInitialBlocksRange
+
+Sets `zero block - latest block` range as scanned for an account. It is used when a new multiaccount is generated to avoid scanning transfers history.
+
+#### Example 
+
+```json
+{"jsonrpc":"2.0","id":7,"method":"wallet_setInitialBlocksRange","params":[]}
+```
+
+### wallet_watchTransaction
+
+Starts watching for transaction confirmation/rejection. If transaction was not confirmed/rejected in 10 minutes the call is timed out with error.
+
+#### Parameters
+
+- `tx-id`: `HEX` - transaction hash
+
+#### Example
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":7,
+  "method":"wallet_watchTransaction",
+  "params":[
+    "0xaaaaaaaa11111112222233333333"
+  ]
+}
+```
+
+### wallet_checkRecentHistory
+
+#### Parameters
+
+- `addresses`: `[]HEX` - array of addresses to be checked
+
+#### Example
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"wallet_checkRecentHistory",
+  "params":[
+    [
+      "0x23458d65f3cB52605a54AaA833ae118fb1111aaa",
+      "0x24568B4166D11aaa1194097C60Cdc714F7e11111"
+    ]
+  ]
+}
+```
+
+### wallet_getTokensBalances
 
 Returns tokens balances mapping for every account. See section below for the response example.
 
-##### Parameters
+#### Parameters
 
 - `accounts` `HEX` - list of ethereum addresses encoded in hex
 - `tokens` `HEX` - list of ethereum addresses encoded in hex
@@ -75,62 +159,65 @@ First level keys accounts, second level keys are tokens.
 }
 ```
 
-Signals
+
+## Signals
 -------
 
-Two signals can be emitted:
-
-1. `newblock` signal
-
-Emitted when transfers from new block were added to the database. In this case block number if the number of this new block.
-Client expected to request transfers starting from received block.
+All events are of the same format:
 
 ```json
 {
   "type": "wallet",
   "event": {
-    "type": "newblock",
+    "type": "event-type",
     "blockNumber": 0,
     "accounts": [
       "0x42c8f505b4006d417dd4e0ba0e880692986adbd8",
       "0x3129mdasmeo132128391fml1130410k312312mll"
-    ]
+    ],
+    "message": "something might be here"
   }
 }
 ```
 
-2. `reorg` signal.
+1. `new-transfers`
 
-Emitted when part of blocks were removed. Starting from a given block number all transfers were removed.
-Client expected to request new transfers from received block and replace transfers that were received previously.
+Emitted when transfers are detected. In this case block number is a block number of the latest found transfer.
+Client expected to request transfers starting from received block.
 
-```json
-{
-  "type": "wallet",
-  "event": {
-    "type": "reorg",
-    "blockNumber": 0,
-    "accounts": [
-      "0x42c8f505b4006d417dd4e0ba0e880692986adbd8"
-    ]
-  }
-}
-```
+2. `recent-history-fetching`
 
-3. `history` signal
+Emitted when history scanning is started.
 
-Emmited when historical transfers were downloaded. Block number will refer the first block where historical transfers
-were found.
+3. `recent-history-ready`
 
-```json
-{
-  "type": "wallet",
-  "event": {
-    "type": "history",
-    "blockNumber": 0,
-    "accounts": [
-      "0x42c8f505b4006d417dd4e0ba0e880692986adbd8"
-    ]
-  }
-}
-```
+Emitted when history scanning is ended.
+
+4. `fetching-history-error` 
+
+Emitted when when history can't be fetched because some error. Error's decritption can be found in `message` field.
+
+5. `non-archival-node-detected`
+
+Emitted when the application is connected to a non-archival node.
+
+## Flows
+
+### Account creation
+
+When a new multiaccount is created corresponding address will not contain any transaction. Thus no point in checking history, it will be empty.
+
+1. Call `wallet_setInitialRange` 
+2. Call `wallet_checkRecentHistory`
+3. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`
+4. Repeat `wallet_checkRecentHistory` in N minutes (currently 20 minutes in `status-react` for upstream RPC node. If a custom node is used interval can be arbitrary)
+
+### Logging into application 
+1. Call `wallet_checkRecentHistory`
+2. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`
+3. Repeat `wallet_checkRecentHistory` in N minutes (currently 20 minutes in `status-react` for upstream RPC node. If a custom node is used interval can be arbitrary)
+
+### Watching transaction
+1. Call `wallet_watchTransaction`
+2. On success call `wallet_checkRecentHistory`
+3. On `recent-history-ready` request transactions via `wallet_getTransfersByAddress`

@@ -2,7 +2,6 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"math/big"
 	"strings"
 	"time"
@@ -14,7 +13,6 @@ import (
 )
 
 var numberOfBlocksCheckedPerIteration = 40
-var blocksDelayThreshhold = 40 * time.Second
 
 type ethHistoricalCommand struct {
 	db           *Database
@@ -117,331 +115,6 @@ func (c *erc20HistoricalCommand) Run(ctx context.Context) (err error) {
 	return nil
 }
 
-type newBlocksTransfersCommand struct {
-	db                   *Database
-	accounts             []common.Address
-	chain                *big.Int
-	erc20                *ERC20TransfersDownloader
-	eth                  *ETHTransferDownloader
-	client               *walletClient
-	feed                 *event.Feed
-	lastFetchedBlockTime time.Time
-
-	initialFrom, from, to *DBHeader
-}
-
-func (c *newBlocksTransfersCommand) Command() Command {
-	// if both blocks are specified we will use this command to verify that lastly synced blocks are still
-	// in canonical chain
-	if c.to != nil && c.from != nil {
-		return FiniteCommand{
-			Interval: 5 * time.Second,
-			Runable:  c.Verify,
-		}.Run
-	}
-	return InfiniteCommand{
-		Interval: pollingPeriodByChain(c.chain),
-		Runable:  c.Run,
-	}.Run
-}
-
-func (c *newBlocksTransfersCommand) Verify(parent context.Context) (err error) {
-	if c.to == nil || c.from == nil {
-		return errors.New("`from` and `to` blocks must be specified")
-	}
-	for c.from.Number.Cmp(c.to.Number) != 0 {
-		err = c.Run(parent)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *newBlocksTransfersCommand) getAllTransfers(parent context.Context, from, to uint64) (map[common.Address][]Transfer, error) {
-	transfersByAddress := map[common.Address][]Transfer{}
-	if to-from > reorgSafetyDepth(c.chain).Uint64() {
-		fromByAddress := map[common.Address]*LastKnownBlock{}
-		toByAddress := map[common.Address]*big.Int{}
-		for _, account := range c.accounts {
-			fromByAddress[account] = &LastKnownBlock{Number: new(big.Int).SetUint64(from)}
-			toByAddress[account] = new(big.Int).SetUint64(to)
-		}
-
-		balanceCache := newBalanceCache()
-		blocksCommand := &findAndCheckBlockRangeCommand{
-			accounts:      c.accounts,
-			db:            c.db,
-			chain:         c.chain,
-			client:        c.client,
-			balanceCache:  balanceCache,
-			feed:          c.feed,
-			fromByAddress: fromByAddress,
-			toByAddress:   toByAddress,
-			noLimit:       true,
-		}
-
-		if err := blocksCommand.Command()(parent); err != nil {
-			return nil, err
-		}
-
-		for address, headers := range blocksCommand.foundHeaders {
-			blocks := make([]*big.Int, len(headers))
-			for i, header := range headers {
-				blocks[i] = header.Number
-			}
-			txCommand := &loadTransfersCommand{
-				accounts:        []common.Address{address},
-				db:              c.db,
-				chain:           c.chain,
-				client:          c.erc20.client,
-				blocksByAddress: map[common.Address][]*big.Int{address: blocks},
-			}
-
-			err := txCommand.Command()(parent)
-			if err != nil {
-				return nil, err
-			}
-
-			transfersByAddress[address] = txCommand.foundTransfersByAddress[address]
-		}
-	} else {
-		all := []Transfer{}
-		newHeadersByAddress := map[common.Address][]*DBHeader{}
-		for n := from; n <= to; n++ {
-			ctx, cancel := context.WithTimeout(parent, 10*time.Second)
-			header, err := c.client.HeaderByNumber(ctx, big.NewInt(int64(n)))
-			cancel()
-			if err != nil {
-				return nil, err
-			}
-			dbHeader := toDBHeader(header)
-			log.Info("reactor get transfers", "block", dbHeader.Hash, "number", dbHeader.Number)
-			transfers, err := c.getTransfers(parent, dbHeader)
-			if err != nil {
-				log.Error("failed to get transfers", "header", dbHeader.Hash, "error", err)
-				return nil, err
-			}
-			if len(transfers) > 0 {
-				for _, transfer := range transfers {
-					headers, ok := newHeadersByAddress[transfer.Address]
-					if !ok {
-						headers = []*DBHeader{}
-					}
-
-					transfers, ok := transfersByAddress[transfer.Address]
-					if !ok {
-						transfers = []Transfer{}
-					}
-					transfersByAddress[transfer.Address] = append(transfers, transfer)
-					newHeadersByAddress[transfer.Address] = append(headers, dbHeader)
-				}
-			}
-			all = append(all, transfers...)
-		}
-
-		err := c.saveHeaders(parent, newHeadersByAddress)
-		if err != nil {
-			return nil, err
-		}
-
-		err = c.db.ProcessTranfers(all, nil)
-		if err != nil {
-			log.Error("failed to persist transfers", "error", err)
-			return nil, err
-		}
-	}
-
-	return transfersByAddress, nil
-}
-
-func (c *newBlocksTransfersCommand) saveHeaders(parent context.Context, newHeadersByAddress map[common.Address][]*DBHeader) (err error) {
-	for _, address := range c.accounts {
-		headers, ok := newHeadersByAddress[address]
-		if ok {
-			err = c.db.SaveBlocks(address, headers)
-			if err != nil {
-				log.Error("failed to persist blocks", "error", err)
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (c *newBlocksTransfersCommand) checkDelay(parent context.Context, nextHeader *types.Header) (*types.Header, error) {
-	if time.Since(c.lastFetchedBlockTime) > blocksDelayThreshhold {
-		log.Info("There was a delay before loading next block", "time since previous successful fetching", time.Since(c.lastFetchedBlockTime))
-		ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-		latestHeader, err := c.client.HeaderByNumber(ctx, nil)
-		cancel()
-		if err != nil {
-			log.Warn("failed to get latest block", "number", nextHeader.Number, "error", err)
-			return nil, err
-		}
-		diff := new(big.Int).Sub(latestHeader.Number, nextHeader.Number)
-		if diff.Cmp(reorgSafetyDepth(c.chain)) >= 0 {
-			num := new(big.Int).Sub(latestHeader.Number, reorgSafetyDepth(c.chain))
-			ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-			nextHeader, err = c.client.HeaderByNumber(ctx, num)
-			cancel()
-			if err != nil {
-				log.Warn("failed to get next block", "number", num, "error", err)
-				return nil, err
-			}
-		}
-	}
-
-	return nextHeader, nil
-}
-
-func (c *newBlocksTransfersCommand) Run(parent context.Context) (err error) {
-	if c.from == nil {
-		ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-		from, err := c.client.HeaderByNumber(ctx, nil)
-		cancel()
-		if err != nil {
-			log.Error("failed to get last known header", "error", err)
-			return err
-		}
-		c.from = toDBHeader(from)
-	}
-	num := new(big.Int).Add(c.from.Number, one)
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	nextHeader, err := c.client.HeaderByNumber(ctx, num)
-	cancel()
-	if err != nil {
-		log.Warn("failed to get next block", "number", num, "error", err)
-		return err
-	}
-	log.Info("reactor received new block", "header", num)
-
-	nextHeader, err = c.checkDelay(parent, nextHeader)
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel = context.WithTimeout(parent, 10*time.Second)
-	latestHeader, removed, latestValidSavedBlock, reorgSpotted, err := c.onNewBlock(ctx, c.from, nextHeader)
-	cancel()
-	if err != nil || latestHeader == nil {
-		log.Error("failed to process new header", "header", nextHeader, "error", err)
-		return err
-	}
-
-	err = c.db.ProcessTranfers(nil, removed)
-	if err != nil {
-		return err
-	}
-
-	latestHeader.Loaded = true
-
-	fromN := nextHeader.Number.Uint64()
-
-	if reorgSpotted {
-		if latestValidSavedBlock != nil {
-			fromN = latestValidSavedBlock.Number.Uint64()
-		}
-		if c.initialFrom != nil {
-			fromN = c.initialFrom.Number.Uint64()
-		}
-	}
-	toN := latestHeader.Number.Uint64()
-	all, err := c.getAllTransfers(parent, fromN, toN)
-	if err != nil {
-		return err
-	}
-
-	c.from = toDBHeader(nextHeader)
-	c.lastFetchedBlockTime = time.Now()
-	if len(removed) != 0 {
-		lth := len(removed)
-		c.feed.Send(Event{
-			Type:        EventReorg,
-			BlockNumber: removed[lth-1].Number,
-			Accounts:    uniqueAccountsFromHeaders(removed),
-		})
-	}
-	log.Info("before sending new block event", "removed", len(removed), "len", len(uniqueAccountsFromTransfers(all)))
-
-	c.feed.Send(Event{
-		Type:                      EventNewBlock,
-		BlockNumber:               latestHeader.Number,
-		Accounts:                  uniqueAccountsFromTransfers(all),
-		NewTransactionsPerAccount: transfersPerAccount(all),
-	})
-
-	return nil
-}
-
-func (c *newBlocksTransfersCommand) onNewBlock(ctx context.Context, from *DBHeader, latest *types.Header) (lastestHeader *DBHeader, removed []*DBHeader, lastSavedValidHeader *DBHeader, reorgSpotted bool, err error) {
-	if from.Hash == latest.ParentHash {
-		// parent matching from node in the cache. on the same chain.
-		return toHead(latest), nil, nil, false, nil
-	}
-
-	lastSavedBlock, err := c.db.GetLastSavedBlock()
-	if err != nil {
-		return nil, nil, nil, false, err
-	}
-
-	if lastSavedBlock == nil {
-		return toHead(latest), nil, nil, true, nil
-	}
-
-	header, err := c.client.HeaderByNumber(ctx, lastSavedBlock.Number)
-	if err != nil {
-		return nil, nil, nil, false, err
-	}
-
-	if header.Hash() == lastSavedBlock.Hash {
-		return toHead(latest), nil, lastSavedBlock, true, nil
-	}
-
-	log.Debug("wallet reactor spotted reorg", "last header in db", from.Hash, "new parent", latest.ParentHash)
-	for lastSavedBlock != nil {
-		removed = append(removed, lastSavedBlock)
-		lastSavedBlock, err = c.db.GetLastSavedBlockBefore(lastSavedBlock.Number)
-
-		if err != nil {
-			return nil, nil, nil, false, err
-		}
-
-		if lastSavedBlock == nil {
-			continue
-		}
-
-		header, err := c.client.HeaderByNumber(ctx, lastSavedBlock.Number)
-		if err != nil {
-			return nil, nil, nil, false, err
-		}
-
-		// the last saved block is still valid
-		if header.Hash() == lastSavedBlock.Hash {
-			return toHead(latest), nil, lastSavedBlock, true, nil
-		}
-	}
-
-	return toHead(latest), removed, lastSavedBlock, true, nil
-}
-
-func (c *newBlocksTransfersCommand) getTransfers(parent context.Context, header *DBHeader) ([]Transfer, error) {
-	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
-	ethT, err := c.eth.GetTransfers(ctx, header)
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-	ctx, cancel = context.WithTimeout(parent, 5*time.Second)
-	erc20T, err := c.erc20.GetTransfers(ctx, header)
-	cancel()
-	if err != nil {
-		return nil, err
-	}
-	return append(ethT, erc20T...), nil
-}
-
 // controlCommand implements following procedure (following parts are executed sequeantially):
 // - verifies that the last header that was synced is still in the canonical chain
 // - runs fast indexing for each account separately
@@ -454,8 +127,6 @@ type controlCommand struct {
 	chain              *big.Int
 	client             *walletClient
 	feed               *event.Feed
-	safetyDepth        *big.Int
-	watchNewBlocks     bool
 	errorsCount        int
 	nonArchivalRPCNode bool
 }
@@ -614,38 +285,6 @@ func (c *controlCommand) LoadTransfers(ctx context.Context, downloader *ETHTrans
 	return loadTransfers(ctx, c.accounts, c.db, c.client, c.chain, limit, make(map[common.Address][]*big.Int))
 }
 
-/*
-// verifyLastSynced verifies that last header that was added to the database is still in the canonical chain.
-// it is done by downloading configured number of parents for the last header in the db.
-func (c *controlCommand) verifyLastSynced(parent context.Context, last *DBHeader, head *types.Header) error {
-	log.Debug("verifying that previous header is still in canonical chan", "from", last.Number, "chain head", head.Number)
-	if new(big.Int).Sub(head.Number, last.Number).Cmp(c.safetyDepth) <= 0 {
-		log.Debug("no need to verify. last block is close enough to chain head")
-		return nil
-	}
-	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
-	header, err := c.client.HeaderByNumber(ctx, new(big.Int).Add(last.Number, c.safetyDepth))
-	cancel()
-	if err != nil {
-		return err
-	}
-	log.Info("spawn reorg verifier", "from", last.Number, "to", header.Number)
-	// TODO(dshulyak) make a standalone command that
-	// doesn't manage transfers and has an upper limit
-	cmd := &newBlocksTransfersCommand{
-		db:     c.db,
-		chain:  c.chain,
-		client: c.client,
-		eth:    c.eth,
-		erc20:  c.erc20,
-		feed:   c.feed,
-
-		from: last,
-		to:   toDBHeader(header),
-	}
-	return cmd.Command()(parent)
-}
-*/
 func findFirstRange(c context.Context, account common.Address, initialTo *big.Int, client *walletClient) (*big.Int, error) {
 	from := big.NewInt(0)
 	to := initialTo
@@ -756,11 +395,7 @@ func (c *controlCommand) Run(parent context.Context) error {
 		}
 	}
 
-	target := new(big.Int).Sub(head.Number, c.safetyDepth)
-	if target.Cmp(zero) <= 0 {
-		target = zero
-	}
-
+	target := head.Number
 	fromByAddress := map[common.Address]*LastKnownBlock{}
 	toByAddress := map[common.Address]*big.Int{}
 
@@ -819,15 +454,24 @@ func (c *controlCommand) Run(parent context.Context) error {
 		return err
 	}
 
+	events := map[common.Address]Event{}
 	for _, address := range c.accounts {
-		for _, header := range cmnd.foundHeaders[address] {
-			c.feed.Send(Event{
-				Type:                      EventNewBlock,
-				BlockNumber:               header.Number,
-				Accounts:                  []common.Address{address},
-				NewTransactionsPerAccount: map[common.Address]int{address: 20},
-			})
+		event := Event{
+			Type:     EventNewTransfers,
+			Accounts: []common.Address{address},
 		}
+		for _, header := range cmnd.foundHeaders[address] {
+			if event.BlockNumber == nil || header.Number.Cmp(event.BlockNumber) == 1 {
+				event.BlockNumber = header.Number
+			}
+		}
+		if event.BlockNumber != nil {
+			events[address] = event
+		}
+	}
+
+	for _, event := range events {
+		c.feed.Send(event)
 	}
 
 	c.feed.Send(Event{
@@ -835,47 +479,6 @@ func (c *controlCommand) Run(parent context.Context) error {
 		Accounts:    c.accounts,
 		BlockNumber: target,
 	})
-
-	if c.watchNewBlocks {
-		ctx, cancel = context.WithTimeout(parent, 3*time.Second)
-		head, err = c.client.HeaderByNumber(ctx, target)
-		cancel()
-		if err != nil {
-			if c.NewError(err) {
-				return nil
-			}
-			return err
-		}
-
-		log.Info("watching new blocks", "start from", target)
-		cmd := &newBlocksTransfersCommand{
-			db:                   c.db,
-			chain:                c.chain,
-			client:               c.client,
-			accounts:             c.accounts,
-			eth:                  c.eth,
-			erc20:                c.erc20,
-			feed:                 c.feed,
-			initialFrom:          toDBHeader(head),
-			from:                 toDBHeader(head),
-			lastFetchedBlockTime: time.Now(),
-		}
-
-		err = cmd.Command()(parent)
-		if err != nil {
-			if c.NewError(err) {
-				return nil
-			}
-			log.Warn("error on running newBlocksTransfersCommand", "err", err)
-			return err
-		}
-	} else {
-		c.feed.Send(Event{
-			Type:        EventNewBlock,
-			BlockNumber: target,
-			Accounts:    []common.Address{},
-		})
-	}
 
 	log.Info("end control command")
 	return err
@@ -911,47 +514,6 @@ func (c *controlCommand) Command() Command {
 		Interval: 5 * time.Second,
 		Runable:  c.Run,
 	}.Run
-}
-
-func uniqueAccountsFromTransfers(allTransfers map[common.Address][]Transfer) []common.Address {
-	accounts := []common.Address{}
-	unique := map[common.Address]struct{}{}
-	for address, transfers := range allTransfers {
-		if len(transfers) == 0 {
-			continue
-		}
-
-		_, exist := unique[address]
-		if exist {
-			continue
-		}
-		unique[address] = struct{}{}
-		accounts = append(accounts, address)
-	}
-	return accounts
-}
-
-func transfersPerAccount(allTransfers map[common.Address][]Transfer) map[common.Address]int {
-	res := map[common.Address]int{}
-	for address, transfers := range allTransfers {
-		res[address] = len(transfers)
-	}
-
-	return res
-}
-
-func uniqueAccountsFromHeaders(headers []*DBHeader) []common.Address {
-	accounts := []common.Address{}
-	unique := map[common.Address]struct{}{}
-	for i := range headers {
-		_, exist := unique[headers[i].Address]
-		if exist {
-			continue
-		}
-		unique[headers[i].Address] = struct{}{}
-		accounts = append(accounts, headers[i].Address)
-	}
-	return accounts
 }
 
 type transfersCommand struct {
@@ -1109,12 +671,6 @@ func (c *findAndCheckBlockRangeCommand) Run(parent context.Context) (err error) 
 			return err
 		}
 	}
-
-	c.feed.Send(Event{
-		Type:        EventMaxKnownBlock,
-		BlockNumber: maxBlockNumber,
-		Accounts:    c.accounts,
-	})
 
 	c.foundHeaders = foundHeaders
 

@@ -222,3 +222,19 @@ func (api *API) WatchTransaction(ctx context.Context, transactionHash common.Has
 
 	return watchTxCommand.Command()(commandContext)
 }
+
+func (api *API) CheckRecentHistory(ctx context.Context, addresses []common.Address) error {
+	if len(addresses) == 0 {
+		log.Info("no addresses provided")
+		return nil
+	}
+	err := api.s.MergeBlocksRanges(addresses, api.s.db.network)
+	if err != nil {
+		return err
+	}
+
+	return api.s.StartReactor(
+		api.s.client.client,
+		addresses,
+		new(big.Int).SetUint64(api.s.db.network))
+}

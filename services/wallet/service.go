@@ -71,8 +71,8 @@ func (s *Service) MergeBlocksRanges(accounts []common.Address, chain uint64) err
 }
 
 // StartReactor separately because it requires known ethereum address, which will become available only after login.
-func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int, watchNewBlocks bool) error {
-	reactor := NewReactor(s.db, s.feed, client, chain, watchNewBlocks)
+func (s *Service) StartReactor(client *ethclient.Client, accounts []common.Address, chain *big.Int) error {
+	reactor := NewReactor(s.db, s.feed, client, chain)
 	err := reactor.Start(accounts)
 	if err != nil {
 		return err

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,27 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
 
-	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/services/rpcstats"
 )
-
-// pow block on main chain is mined once per ~14 seconds
-// but for tests we are using clique chain with immediate block signer
-// hence we can use different polling periods for methods that depend on mining time.
-func pollingPeriodByChain(chain *big.Int) time.Duration {
-	switch chain.Int64() {
-	case int64(params.MainNetworkID):
-		return 10 * time.Second
-	case int64(params.RopstenNetworkID):
-		return 4 * time.Second
-	default:
-		return 500 * time.Millisecond
-	}
-}
-
-func reorgSafetyDepth(chain *big.Int) *big.Int {
-	return big.NewInt(0)
-}
 
 var (
 	erc20BatchSize    = big.NewInt(100000)
@@ -113,23 +93,21 @@ func (rc *walletClient) CallContract(ctx context.Context, call ethereum.CallMsg,
 }
 
 // NewReactor creates instance of the Reactor.
-func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, chain *big.Int, watchNewBlocks bool) *Reactor {
+func NewReactor(db *Database, feed *event.Feed, client *ethclient.Client, chain *big.Int) *Reactor {
 	return &Reactor{
-		db:             db,
-		client:         client,
-		feed:           feed,
-		chain:          chain,
-		watchNewBlocks: watchNewBlocks,
+		db:     db,
+		client: client,
+		feed:   feed,
+		chain:  chain,
 	}
 }
 
 // Reactor listens to new blocks and stores transfers into the database.
 type Reactor struct {
-	client         *ethclient.Client
-	db             *Database
-	feed           *event.Feed
-	chain          *big.Int
-	watchNewBlocks bool
+	client *ethclient.Client
+	db     *Database
+	feed   *event.Feed
+	chain  *big.Int
 
 	mu    sync.Mutex
 	group *Group
@@ -150,11 +128,9 @@ func (r *Reactor) newControlCommand(accounts []common.Address) *controlCommand {
 			signer:   signer,
 			db:       r.db,
 		},
-		erc20:          NewERC20TransfersDownloader(client, accounts, signer),
-		feed:           r.feed,
-		safetyDepth:    reorgSafetyDepth(r.chain),
-		watchNewBlocks: r.watchNewBlocks,
-		errorsCount:    0,
+		erc20:       NewERC20TransfersDownloader(client, accounts, signer),
+		feed:        r.feed,
+		errorsCount: 0,
 	}
 
 	return ctl

@@ -113,13 +113,13 @@ func TestTransactionNotification(t *testing.T) {
 	require.NoError(t, walletDb.ProcessTranfers(transfers, []*wallet.DBHeader{}))
 
 	feed.Send(wallet.Event{
-		Type:        wallet.EventMaxKnownBlock,
+		Type:        wallet.EventRecentHistoryReady,
 		BlockNumber: big.NewInt(0),
 		Accounts:    []common.Address{header.Address},
 	})
 
 	feed.Send(wallet.Event{
-		Type:        wallet.EventNewBlock,
+		Type:        wallet.EventNewTransfers,
 		BlockNumber: header.Number,
 		Accounts:    []common.Address{header.Address},
 	})

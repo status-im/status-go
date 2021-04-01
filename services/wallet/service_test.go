@@ -54,7 +54,7 @@ func (s *ReactorChangesSuite) SetupTest() {
 	s.backend, err = testchain.NewBackend()
 	s.Require().NoError(err)
 	s.feed = &event.Feed{}
-	s.reactor = NewReactor(s.db, &event.Feed{}, s.backend.Client, big.NewInt(1337), true)
+	s.reactor = NewReactor(s.db, &event.Feed{}, s.backend.Client, big.NewInt(1337))
 	account, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 	s.first = crypto.PubkeyToAddress(account.PublicKey)
@@ -123,13 +123,13 @@ func TestServiceStartStop(t *testing.T) {
 	account, err := crypto.GenerateKey()
 	require.NoError(t, err)
 
-	err = s.StartReactor(backend.Client, []common.Address{crypto.PubkeyToAddress(account.PublicKey)}, big.NewInt(1337), true)
+	err = s.StartReactor(backend.Client, []common.Address{crypto.PubkeyToAddress(account.PublicKey)}, big.NewInt(1337))
 	require.NoError(t, err)
 
 	require.NoError(t, s.Stop())
 	require.NoError(t, s.Start(nil))
 
-	err = s.StartReactor(backend.Client, []common.Address{crypto.PubkeyToAddress(account.PublicKey)}, big.NewInt(1337), true)
+	err = s.StartReactor(backend.Client, []common.Address{crypto.PubkeyToAddress(account.PublicKey)}, big.NewInt(1337))
 	require.NoError(t, err)
 	require.NoError(t, s.Stop())
 }
