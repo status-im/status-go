@@ -98,7 +98,7 @@ func (db *Database) ValidateAppMetrics(appMetrics []AppMetric) (err error) {
 	return
 }
 
-func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionId string) (err error) {
+func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
@@ -130,7 +130,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionId string) (er
 	}
 
 	for _, metric := range appMetrics {
-		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionId)
+		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID)
 		if err != nil {
 			return
 		}
