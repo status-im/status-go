@@ -59,7 +59,7 @@ require (
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
-	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
+	github.com/status-im/markdown v0.0.0-20210405121740-32e5a5055fb6
 	github.com/status-im/migrate/v4 v4.6.2-status.2
 	github.com/status-im/rendezvous v1.3.0
 	github.com/status-im/status-go/extkeys v1.1.2
@@ -74,7 +74,6 @@ require (
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20191122220453-ac88ee75c92c
 	golang.org/x/image v0.0.0-20200927104501-e162460cd6b5
-	golang.org/x/mobile v0.0.0-20210220033013-bdb1ca9a1e08 // indirect
 	golang.org/x/mod v0.1.1-0.20191209134235-331c550502dd // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/text v0.3.3 // indirect
