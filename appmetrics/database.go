@@ -28,12 +28,14 @@ type AppMetricValidationError struct {
 
 const (
 	// status-react navigation events
-	NavigationNavigateToCofx AppMetricEventType = "navigation/navigate-to"
+	NavigateTo     AppMetricEventType = "navigate-to"
+	NavigateToCofx AppMetricEventType = "navigate-to-cofx"
 )
 
 // EventSchemaMap Every event should have a schema attached
 var EventSchemaMap = map[AppMetricEventType]interface{}{
-	NavigationNavigateToCofx: NavigationNavigateToCofxSchema,
+	NavigateTo:     NavigateToCofxSchema,
+	NavigateToCofx: NavigateToCofxSchema,
 }
 
 func NewDB(db *sql.DB) *Database {

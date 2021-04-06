@@ -7,9 +7,9 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-func TestNavigationNavigateToCofxSchema(t *testing.T) {
-	NavigationNavigateToCofxLoader := gojsonschema.NewGoLoader(NavigationNavigateToCofxSchema)
-	schema, _ := gojsonschema.NewSchema(NavigationNavigateToCofxLoader)
+func TestNavigateToCofxSchema(t *testing.T) {
+	NavigateToCofxLoader := gojsonschema.NewGoLoader(NavigateToCofxSchema)
+	schema, _ := gojsonschema.NewSchema(NavigateToCofxLoader)
 
 	// test correct json
 	validSampleVal := `{"view_id": "less-than-16", "params": {"screen": "allowed-screen-name"}}`

@@ -1,6 +1,6 @@
 package appmetrics
 
-var NavigationNavigateToCofxSchema = map[string]interface{}{
+var NavigateToCofxSchema = map[string]interface{}{
 	"type": "object",
 	"properties": map[string]interface{}{
 		"view_id": map[string]interface{}{
@@ -11,7 +11,7 @@ var NavigationNavigateToCofxSchema = map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"screen": map[string]interface{}{
-					"enum": []string{"allowed-screen-name"},
+					"enum": []string{"", "allowed-screen-name"},
 				},
 			},
 			"additionalProperties": false,
