@@ -5,7 +5,7 @@ var NavigateToCofxSchema = map[string]interface{}{
 	"properties": map[string]interface{}{
 		"view_id": map[string]interface{}{
 			"type":      "string",
-			"maxLength": 16,
+			"maxLength": 32,
 		},
 		"params": map[string]interface{}{
 			"type": "object",
