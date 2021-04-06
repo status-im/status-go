@@ -551,7 +551,6 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	if currCursor != "" {
 		cursorWhere = "AND cursor <= ?" //nolint: goconst
 	}
-	// allFields := `message_id, whisper_timestamp, timestamp, chat_id, local_chat_id, clock_value, pinned`
 	allFields := db.tableUserMessagesAllFieldsJoin()
 	args := make([]interface{}, len(chatIDs))
 	for i, v := range chatIDs {
@@ -567,7 +566,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 		fmt.Sprintf(`
 			SELECT
 				%s,
-				pm.timestamp as pinnedAt,
+				pm.clock_value as pinnedAt,
 				substr('0000000000000000000000000000000000000000000000000000000000000000' || m1.clock_value, -64, 64) || m1.id as cursor
 			FROM
 				pin_messages pm
@@ -908,10 +907,10 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	}()
 
 	// select
-	selectQuery := "SELECT timestamp FROM pin_messages WHERE message_id = ?"
+	selectQuery := "SELECT clock_value FROM pin_messages WHERE message_id = ?"
 
 	// insert
-	allInsertFields := `message_id, whisper_timestamp, timestamp, chat_id, local_chat_id, clock_value, pinned`
+	allInsertFields := `message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned`
 	insertValues := strings.Repeat("?, ", strings.Count(allInsertFields, ",")) + "?"
 	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
 	insertStmt, err := tx.Prepare(insertQuery)
@@ -920,7 +919,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	}
 
 	// update
-	updateQuery := "UPDATE pin_messages SET pinned = ?, timestamp = ? WHERE message_id = ?"
+	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ? WHERE message_id = ?"
 	updateStmt, err := tx.Prepare(updateQuery)
 	if err != nil {
 		return
@@ -928,14 +927,13 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 
 	for _, message := range messages {
 		row := tx.QueryRow(selectQuery, message.MessageID)
-		var existingTimestamp uint64
-		switch err = row.Scan(&existingTimestamp); err {
+		var existingClock uint64
+		switch err = row.Scan(&existingClock); err {
 		case sql.ErrNoRows:
 			// not found, insert new record
 			allValues := []interface{}{
 				message.MessageID,
 				message.WhisperTimestamp,
-				message.Timestamp,
 				message.ChatId,
 				message.LocalChatID,
 				message.Clock,
@@ -947,9 +945,9 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 			}
 		case nil:
 			// found, update if current message is more recent, otherwise skip
-			if existingTimestamp < message.Timestamp {
+			if existingClock < message.Clock {
 				// update
-				_, err = updateStmt.Exec(message.Pinned, message.Timestamp, message.MessageID)
+				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.MessageID)
 				if err != nil {
 					return
 				}

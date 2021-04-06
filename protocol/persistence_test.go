@@ -209,7 +209,7 @@ func TestPinMessageByChatID(t *testing.T) {
 				LocalChatID: chatID,
 				From:        "me",
 			}
-			pinMessage.Timestamp = 111
+			pinMessage.Clock = 111
 			pinMessage.Pinned = true
 			pinMessages = append(pinMessages, pinMessage)
 			pinnedMessagesCount++
@@ -221,7 +221,7 @@ func TestPinMessageByChatID(t *testing.T) {
 					LocalChatID: chatID,
 					From:        "me",
 				}
-				unpinMessage.Timestamp = 333
+				unpinMessage.Clock = 333
 				unpinMessage.Pinned = false
 				pinMessages = append(pinMessages, unpinMessage)
 				pinnedMessagesCount--
@@ -232,7 +232,7 @@ func TestPinMessageByChatID(t *testing.T) {
 					LocalChatID: chatID,
 					From:        "me",
 				}
-				pinMessage2.Timestamp = 222
+				pinMessage2.Clock = 222
 				pinMessage2.Pinned = true
 				pinMessages = append(pinMessages, pinMessage2)
 			}

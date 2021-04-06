@@ -6,10 +6,9 @@ import "enums.proto";
 
 message PinMessage {
   uint64 clock = 1;
-  uint64 timestamp = 2;
-  string message_id = 3;
-  string chat_id = 4;
-  bool pinned = 5;
+  string message_id = 2;
+  string chat_id = 3;
+  bool pinned = 4;
   // The type of message (public/one-to-one/private-group-chat)
-  MessageType message_type = 6;
+  MessageType message_type = 5;
 }

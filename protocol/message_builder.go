@@ -44,7 +44,6 @@ func extendPinMessageFromChat(message *common.PinMessage, chat *Chat, key *ecdsa
 
 	message.LocalChatID = chat.ID
 	message.Clock = clock
-	message.Timestamp = timestamp
 	message.From = types.EncodeHex(crypto.FromECDSAPub(key))
 	message.SigPubKey = key
 	message.WhisperTimestamp = timestamp
