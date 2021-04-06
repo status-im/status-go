@@ -366,7 +366,7 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 		chat.LastClockValue = message.Clock
 	}
 
-	state.Response.PinMessages = append(state.Response.PinMessages, pinMessage)
+	state.Response.AddPinMessage(pinMessage)
 
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)

@@ -13,7 +13,6 @@ import (
 
 type MessengerResponse struct {
 	Messages                []*common.Message
-	PinMessages             []*common.PinMessage
 	Contacts                []*Contact
 	Installations           []*multidevice.Installation
 	EmojiReactions          []*EmojiReaction
@@ -33,6 +32,7 @@ type MessengerResponse struct {
 	removedChats                map[string]bool
 	communities                 map[string]*communities.Community
 	activityCenterNotifications map[string]*ActivityCenterNotification
+	pinMessages                 map[string]*common.PinMessage
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -112,10 +112,18 @@ func (r *MessengerResponse) Notifications() []*localnotifications.Notification {
 	return notifications
 }
 
+func (r *MessengerResponse) PinMessages() []*common.PinMessage {
+	var pinMessages []*common.PinMessage
+	for _, pm := range r.pinMessages {
+		pinMessages = append(pinMessages, pm)
+	}
+	return pinMessages
+}
+
 func (r *MessengerResponse) IsEmpty() bool {
 	return len(r.chats)+
 		len(r.Messages)+
-		len(r.PinMessages)+
+		len(r.pinMessages)+
 		len(r.Contacts)+
 		len(r.Installations)+
 		len(r.Invitations)+
@@ -156,7 +164,7 @@ func (r *MessengerResponse) Merge(response *MessengerResponse) error {
 	r.overrideFilters(response.Filters)
 	r.overrideRemovedFilters(response.Filters)
 	r.AddCommunities(response.Communities())
-	r.overridePinMessages(response.PinMessages)
+	r.AddPinMessages(response.PinMessages())
 
 	return nil
 }
@@ -205,21 +213,6 @@ func (r *MessengerResponse) overrideRemovedFilters(filters []*transport.Filter) 
 		}
 		if !found {
 			r.RemovedFilters = append(r.RemovedFilters, overrideFilter)
-		}
-	}
-}
-
-func (r *MessengerResponse) overridePinMessages(messages []*common.PinMessage) {
-	for _, overrideMessage := range messages {
-		var found = false
-		for idx, chat := range r.Messages {
-			if chat.ID == overrideMessage.ID {
-				r.PinMessages[idx] = overrideMessage
-				found = true
-			}
-		}
-		if !found {
-			r.PinMessages = append(r.PinMessages, overrideMessage)
 		}
 	}
 }
@@ -304,4 +297,18 @@ func (r *MessengerResponse) ActivityCenterNotifications() []*ActivityCenterNotif
 		ns = append(ns, n)
 	}
 	return ns
+}
+
+func (r *MessengerResponse) AddPinMessage(pm *common.PinMessage) {
+	if r.pinMessages == nil {
+		r.pinMessages = make(map[string]*common.PinMessage)
+	}
+
+	r.pinMessages[pm.ID] = pm
+}
+
+func (r *MessengerResponse) AddPinMessages(pms []*common.PinMessage) {
+	for _, pm := range pms {
+		r.AddPinMessage(pm)
+	}
 }

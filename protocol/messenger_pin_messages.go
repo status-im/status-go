@@ -57,13 +57,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, err
 	}
 
-	response.PinMessages = []*common.PinMessage{message}
-	// TODO: needed?
-	// response.Messages, err = m.pullMessagesAndResponsesFromDB([]*common.Message{message})
-	// if err != nil {
-	// 	return nil, err
-	// }
-
+	response.AddPinMessage(message)
 	response.AddChat(chat)
 	return &response, m.saveChat(chat)
 }

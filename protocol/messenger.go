@@ -2965,8 +2965,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 			return nil, err
 		}
 	}
-	if len(messageState.Response.PinMessages) > 0 {
-		err = m.SavePinMessages(messageState.Response.PinMessages)
+	if len(messageState.Response.pinMessages) > 0 {
+		err = m.SavePinMessages(messageState.Response.PinMessages())
 		if err != nil {
 			return nil, err
 		}

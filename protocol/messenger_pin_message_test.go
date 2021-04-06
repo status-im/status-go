@@ -92,18 +92,18 @@ func (s *MessengerPinMessageSuite) TestPinMessage() {
 	pinMessage.ChatId = theirChat.ID
 	sendResponse, err = theirMessenger.SendPinMessage(context.Background(), pinMessage)
 	s.NoError(err)
-	s.Require().Len(sendResponse.PinMessages, 1)
+	s.Require().Len(sendResponse.PinMessages(), 1)
 
 	// Wait for the message to reach its destination
 	response, err = WaitOnMessengerResponse(
 		s.m,
 		func(r *MessengerResponse) bool {
-			return len(r.PinMessages) > 0
+			return len(r.PinMessages()) > 0
 		},
 		"pin message not received",
 	)
 	s.Require().NoError(err)
 
-	receivedPinMessage := response.PinMessages[0]
+	receivedPinMessage := response.PinMessages()[0]
 	s.Require().True(receivedPinMessage.Pinned)
 }
