@@ -368,7 +368,6 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 
 	state.Response.PinMessages = append(state.Response.PinMessages, pinMessage)
 
-	chat.Active = false
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
