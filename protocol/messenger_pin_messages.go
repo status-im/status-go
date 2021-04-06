@@ -15,27 +15,6 @@ func (m *Messenger) SendPinMessage(ctx context.Context, message *common.PinMessa
 	return m.sendPinMessage(ctx, message)
 }
 
-// SendPinMessages takes a array of pin messages and sends it based on the corresponding chats
-func (m *Messenger) SendPinMessages(ctx context.Context, messages []*common.PinMessage) (*MessengerResponse, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	var response MessengerResponse
-
-	for _, message := range messages {
-		messageResponse, err := m.sendPinMessage(ctx, message)
-		if err != nil {
-			return nil, err
-		}
-		err = response.Merge(messageResponse)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &response, nil
-}
-
 func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessage) (*MessengerResponse, error) {
 	var response MessengerResponse
 
