@@ -498,8 +498,22 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		return err
 	}
 
-	// Set chat active
-	chat.Active = true
+	// If the chat is not active, create a notification in the center
+	if chat.OneToOne() && !chat.Active {
+		notification := &ActivityCenterNotification{
+			ID:        types.FromHex(chat.ID),
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			Timestamp: state.CurrentMessageState.WhisperTimestamp,
+			ChatID:    chat.ID,
+		}
+		err := m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Warn("failed to save notification", zap.Error(err))
+		} else {
+			state.Response.AddActivityCenterNotification(notification)
+		}
+
+	}
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat

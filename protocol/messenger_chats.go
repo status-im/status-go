@@ -22,6 +22,21 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
+func (m *Messenger) ActiveChats() []*Chat {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	var chats []*Chat
+
+	for _, c := range m.allChats {
+		if c.Active {
+			chats = append(chats, c)
+		}
+	}
+
+	return chats
+}
+
 func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*MessengerResponse, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
