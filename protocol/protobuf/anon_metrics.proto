@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package protobuf;
+
+// AnonymousMetric represents a single metric data point
+message AnonymousMetric {
+  // event is the app metric event type
+  string event=1;
+
+  // value is a filtered and validated raw json payload attached to the event
+  bytes value=2;
+
+  // app_version is the version of the `status-react` app that the metric came from
+  string app_version=3;
+
+  // os is the operating system of the device the application is installed on
+  string os=4;
+}
+
+// AnonymousMetricBatch represents a batch of AnonymousMetrics allowing broadcast of AnonymousMetrics with fewer messages
+message AnonymousMetricBatch {
+  // metrics is an array of AnonymousMetric metrics
+  repeated AnonymousMetric metrics=1;
+}
