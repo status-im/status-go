@@ -1019,3 +1019,133 @@ func TestConfirmationsAtLeastOne(t *testing.T) {
 	require.NotNil(t, messageID)
 	require.Equal(t, types.HexBytes(messageID1), messageID)
 }
+
+func TestActivityCenterPersistence(t *testing.T) {
+	nID1 := types.HexBytes([]byte("1"))
+	nID2 := types.HexBytes([]byte("2"))
+	nID3 := types.HexBytes([]byte("3"))
+	nID4 := types.HexBytes([]byte("4"))
+
+	db, err := openTestDB()
+	require.NoError(t, err)
+	p := NewSQLitePersistence(db)
+
+	chat := CreatePublicChat("test-chat", &testTimeSource{})
+	message := &common.Message{}
+	message.Text = "sample text"
+	chat.LastMessage = message
+	err = p.SaveChat(*chat)
+	require.NoError(t, err)
+
+	notification := &ActivityCenterNotification{
+		ID:        nID1,
+		Type:      ActivityCenterNotificationTypeNewOneToOne,
+		ChatID:    chat.ID,
+		Timestamp: 1,
+	}
+	err = p.SaveActivityCenterNotification(notification)
+	require.NoError(t, err)
+
+	cursor, notifications, err := p.ActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	require.Empty(t, cursor)
+	require.Len(t, notifications, 1)
+	require.Equal(t, chat.ID, notifications[0].ChatID)
+	require.Equal(t, message, notifications[0].LastMessage)
+
+	// Add another notification
+
+	notification = &ActivityCenterNotification{
+		ID:        nID2,
+		Type:      ActivityCenterNotificationTypeNewOneToOne,
+		Timestamp: 2,
+	}
+	err = p.SaveActivityCenterNotification(notification)
+	require.NoError(t, err)
+
+	cursor, notifications, err = p.ActivityCenterNotifications("", 1)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.NotEmpty(t, cursor)
+	require.Equal(t, nID2, notifications[0].ID)
+
+	// fetch next pagination
+
+	cursor, notifications, err = p.ActivityCenterNotifications(cursor, 1)
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	require.Empty(t, cursor)
+	require.False(t, notifications[0].Read)
+	require.Equal(t, nID1, notifications[0].ID)
+
+	// Check count
+	count, err := p.UnreadActivityCenterNotificationsCount()
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), count)
+
+	// Mark the all read
+	require.NoError(t, p.MarkAllActivityCenterNotificationsRead())
+	_, notifications, err = p.ActivityCenterNotifications(cursor, 2)
+	require.NoError(t, err)
+	require.Len(t, notifications, 2)
+	require.Empty(t, cursor)
+	require.True(t, notifications[0].Read)
+	require.True(t, notifications[1].Read)
+
+	// Check count
+	count, err = p.UnreadActivityCenterNotificationsCount()
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), count)
+
+	// Mark first one as accepted
+
+	notifications, err = p.AcceptActivityCenterNotifications([]types.HexBytes{nID1})
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	// It should not be returned anymore
+	require.Len(t, notifications, 1)
+
+	// Mark last one as dismissed
+	require.NoError(t, p.DismissActivityCenterNotifications([]types.HexBytes{nID2}))
+	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	// Dismissed notifications should not be returned
+	require.Len(t, notifications, 0)
+
+	// Insert new notification
+	notification = &ActivityCenterNotification{
+		ID:        nID3,
+		Type:      ActivityCenterNotificationTypeNewOneToOne,
+		Timestamp: 3,
+	}
+	err = p.SaveActivityCenterNotification(notification)
+	require.NoError(t, err)
+
+	// Mark all as accepted
+	notifications, err = p.AcceptAllActivityCenterNotifications()
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+
+	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	// It should not return those
+	require.Len(t, notifications, 0)
+
+	// Insert new notification
+	notification = &ActivityCenterNotification{
+		ID:        nID4,
+		Type:      ActivityCenterNotificationTypeNewOneToOne,
+		Timestamp: 4,
+	}
+	err = p.SaveActivityCenterNotification(notification)
+	require.NoError(t, err)
+
+	// Mark all as dismissed
+	require.NoError(t, p.DismissAllActivityCenterNotifications())
+	_, notifications, err = p.ActivityCenterNotifications("", 2)
+	require.NoError(t, err)
+	// It should not return those
+	require.Len(t, notifications, 0)
+}
