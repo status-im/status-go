@@ -269,6 +269,9 @@ type ClusterConfig struct {
 
 	// RendezvousNodes is a list rendezvous discovery nodes.
 	RendezvousNodes []string
+
+	// WakuNodes is a list of wakuv2 libp2p nodes
+	WakuNodes []string
 }
 
 // String dumps config object as nicely indented JSON
