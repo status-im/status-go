@@ -47,7 +47,7 @@ for fleet in ${wakufleets[@]}; do
 
     git checkout $DIR/fleet-$fleet.json \
         && jq \
-              ".ClusterConfig.BootNodes = $waku" \
+              ".ClusterConfig.WakuNodes = $waku" \
              $DIR/fleet-$fleet.json \
         | tee "$DIR/tmp.json" >/dev/null \
         && mv $DIR/tmp.json $DIR/fleet-$fleet.json

@@ -175,7 +175,7 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 	keyInfo := new(node.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
 		keyInfo.Kind = node.Asymmetric
-		keyInfo.PrivKey = *watcher.KeyAsym
+		keyInfo.PrivKey = watcher.KeyAsym
 		msg.Dst = &watcher.KeyAsym.PublicKey
 	} else if watcher.expectsSymmetricEncryption() {
 		keyInfo.Kind = node.Symmetric
@@ -190,7 +190,7 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 		return nil
 	}
 
-	msg.Raw = raw
-	msg.Topic = TopicType(*e.Envelope.Message().ContentTopic)
+	msg.Raw = raw.Data
+	msg.Topic = TopicType(e.Envelope.Message().ContentTopic)
 	return msg
 }
