@@ -757,7 +757,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	)
 	s.Require().NoError(err)
 
-	s.Require().Equal(len(response.Chats()), 1)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(2), actualChat.UnviewedMessagesCount)
@@ -765,7 +766,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatExisting() {
 	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message
 	s.Require().NotNil(actualChat.LastMessage)
-	s.Require().True(actualChat.Active)
+	s.Require().False(actualChat.Active)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
@@ -796,6 +797,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
@@ -803,8 +805,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message
 	s.Require().NotNil(actualChat.LastMessage)
-	// It sets the chat as active
-	s.Require().True(actualChat.Active)
+	// It does not set the chat as active
+	s.Require().False(actualChat.Active)
 }
 
 // Test receiving a message on an non-existing public chat
@@ -852,12 +854,15 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	_, err = WaitOnMessengerResponse(
+	response, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
@@ -970,12 +975,14 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	_, err = WaitOnMessengerResponse(
+	response, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)
@@ -1017,7 +1024,7 @@ func (s *MessengerSuite) TestReInvitedToGroupChat() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
-	s.Require().True(response.Chats()[0].Active)
+	s.Require().False(response.Chats()[0].Active)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
@@ -2509,6 +2516,7 @@ func (s *MessageHandlerSuite) TestRun() {
 	for idx, tc := range testCases {
 		s.Run(tc.Name, func() {
 			chatsMap := new(chatMap)
+			contactsMap := new(contactMap)
 			if tc.Chat != nil && tc.Chat.ID != "" {
 				chatsMap.Store(tc.Chat.ID, tc.Chat)
 			}
@@ -2519,7 +2527,7 @@ func (s *MessageHandlerSuite) TestRun() {
 			s.Empty(message.LocalChatID)
 
 			message.ID = strconv.Itoa(idx) // manually set the ID because messages does not go through messageProcessor
-			chat, err := s.messageHandler.matchChatEntity(&message, chatsMap, &testTimeSource{})
+			chat, err := s.messageHandler.matchChatEntity(&message, chatsMap, contactsMap, &testTimeSource{})
 			if tc.Error {
 				s.Require().Error(err)
 			} else {

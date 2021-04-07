@@ -265,6 +265,10 @@ func (api *PublicAPI) Chats(parent context.Context) []*protocol.Chat {
 	return api.service.messenger.Chats()
 }
 
+func (api *PublicAPI) ActiveChats(parent context.Context) []*protocol.Chat {
+	return api.service.messenger.ActiveChats()
+}
+
 func (api *PublicAPI) DeleteChat(parent context.Context, chatID string) error {
 	return api.service.messenger.DeleteChat(chatID)
 }
@@ -694,6 +698,34 @@ func (api *PublicAPI) GetLinkPreviewData(link string) (previewData urls.LinkPrev
 
 func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
+}
+
+func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
+	return api.service.messenger.UnreadActivityCenterNotificationsCount()
+}
+
+func (api *PublicAPI) MarkAllActivityCenterNotificationsRead() error {
+	return api.service.messenger.MarkAllActivityCenterNotificationsRead()
+}
+
+func (api *PublicAPI) AcceptAllActivityCenterNotifications() (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptAllActivityCenterNotifications()
+}
+
+func (api *PublicAPI) AcceptActivityCenterNotifications(ids []types.HexBytes) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.AcceptActivityCenterNotifications(ids)
+}
+
+func (api *PublicAPI) DismissAllActivityCenterNotifications() error {
+	return api.service.messenger.DismissAllActivityCenterNotifications()
+}
+
+func (api *PublicAPI) DismissActivityCenterNotifications(ids []types.HexBytes) error {
+	return api.service.messenger.DismissActivityCenterNotifications(ids)
+}
+
+func (api *PublicAPI) ActivityCenterNotifications(cursor string, limit uint64) (*protocol.ActivityCenterPaginationResponse, error) {
+	return api.service.messenger.ActivityCenterNotifications(cursor, limit)
 }
 
 // Echo is a method for testing purposes.

@@ -20,6 +20,22 @@ func (m *Messenger) Chats() []*Chat {
 	return chats
 }
 
+func (m *Messenger) ActiveChats() []*Chat {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	var chats []*Chat
+
+	m.allChats.Range(func(chatID string, c *Chat) bool {
+		if c.Active {
+			chats = append(chats, c)
+		}
+		return true
+	})
+
+	return chats
+}
+
 func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*MessengerResponse, error) {
 	if err := request.Validate(); err != nil {
 		return nil, err
