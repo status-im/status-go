@@ -10,10 +10,6 @@ replace github.com/docker/docker => github.com/docker/engine v1.4.2-0.2019071716
 
 replace github.com/nfnt/resize => github.com/status-im/resize v0.0.0-20201215164250-7c6d9f0d3088
 
-replace github.com/status-im/rendezvous => /home/richard/status/rendezvous
-
-replace github.com/status-im/go-waku => /home/richard/status/go-waku
-
 require (
 	github.com/PuerkitoBio/goquery v1.6.0 // indirect
 	github.com/beevik/ntp v0.2.0
@@ -29,6 +25,7 @@ require (
 	github.com/golang/protobuf v1.4.1
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/mux v1.7.3 // indirect
+	github.com/ipfs/go-log v1.0.4
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a
 	github.com/karalabe/usb v0.0.0-20191104083709-911d15fe12a9 // indirect
 	github.com/keighl/metabolize v0.0.0-20150915210303-97ab655d4034
@@ -57,12 +54,12 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20210324155343-c1b3b9285b56
+	github.com/status-im/go-waku v0.0.0-20210407211939-ffe2f80a9071
 	github.com/status-im/go-wakurelay-pubsub v0.4.2
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
 	github.com/status-im/migrate/v4 v4.6.2-status.2
-	github.com/status-im/rendezvous v1.3.0
+	github.com/status-im/rendezvous v1.3.1
 	github.com/status-im/status-go/extkeys v1.1.2
 	github.com/status-im/tcp-shaker v0.0.0-20191114194237-215893130501
 	github.com/stretchr/testify v1.6.1
