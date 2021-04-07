@@ -30,7 +30,7 @@ func TestSaveAppMetrics(t *testing.T) {
 	// we need backticks (``) for value because it is expected by gojsonschema
 	// it considers text inside tics to be stringified json
 	appMetrics := []AppMetric{
-		{Event: NavigateToCofx, Value: json.RawMessage(`{"view_id": "some-view-id", "params": {"screen": "allowed-screen-name"}}`), OS: "android", AppVersion: "1.11"},
+		{Event: NavigateTo, Value: json.RawMessage(`{"view_id": "some-view-id", "params": {"screen": "login"}}`), OS: "android", AppVersion: "1.11"},
 	}
 
 	err := db.SaveAppMetrics(appMetrics)

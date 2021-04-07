@@ -31,7 +31,7 @@ func TestValidateAppMetrics(t *testing.T) {
 
 	validMetrics := []appmetrics.AppMetric{appmetrics.AppMetric{
 		Event:      "navigation/navigate-to",
-		Value:      json.RawMessage(`{"view_id": "some-view-oid", "params": {"screen": "allowed-screen-name"}}`),
+		Value:      json.RawMessage(`{"view_id": "some-view-oid", "params": {"screen": "login"}}`),
 		AppVersion: "1.12",
 		OS:         "android"}}
 

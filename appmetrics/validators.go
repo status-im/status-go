@@ -11,7 +11,8 @@ var NavigateToCofxSchema = map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
 				"screen": map[string]interface{}{
-					"enum": []string{"", "allowed-screen-name"},
+					"type":      "string",
+					"maxLength": 32,
 				},
 			},
 			"additionalProperties": false,

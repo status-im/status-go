@@ -29,14 +29,12 @@ type AppMetricValidationError struct {
 const (
 	// status-react navigation events
 	NavigateTo         AppMetricEventType = "navigate-to"
-	NavigateToCofx     AppMetricEventType = "navigate-to-cofx"
 	ScreensOnWillFocus AppMetricEventType = "screens/on-will-focus"
 )
 
 // EventSchemaMap Every event should have a schema attached
 var EventSchemaMap = map[AppMetricEventType]interface{}{
 	NavigateTo:         NavigateToCofxSchema,
-	NavigateToCofx:     NavigateToCofxSchema,
 	ScreensOnWillFocus: NavigateToCofxSchema,
 }
 

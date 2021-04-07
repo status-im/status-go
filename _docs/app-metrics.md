@@ -20,3 +20,11 @@ The interesting bit is the validation process, which serves two purposes:
 
 ### Transmission and deletion
 Transmission happens over Waku, and as of now, all data will be deleted locally after transmission, however (in future) we might want to keep a copy of the data locally.
+
+
+## Events
+| Event                 | Value                                | Description                                                                                                         |
+|-----------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| navigate-to           | {:view_id: "", :params {:screen ""}} | The user navigated to one of the screens. If the `view_id` has a `_stack` suffix, it could signify a top level tab. |
+| screens/on-will-focus | {:view_id: "", :params {:screen ""}} | The user navigated to a top level tab.                                                                              |
+
