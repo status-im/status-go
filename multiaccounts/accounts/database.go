@@ -79,6 +79,7 @@ type Settings struct {
 	LinkPreviewRequestEnabled bool             `json:"link-preview-request-enabled,omitempty"`
 	LinkPreviewsEnabledSites  *json.RawMessage `json:"link-previews-enabled-sites,omitempty"`
 	LogLevel                  *string          `json:"log-level,omitempty"`
+	MessagesFromContactsOnly  bool             `json:"messages-from-contacts-only"`
 	Mnemonic                  *string          `json:"mnemonic,omitempty"`
 	Name                      string           `json:"name,omitempty"`
 	Networks                  *json.RawMessage `json:"networks/networks"`
@@ -230,6 +231,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET hide_home_tooltip = ? WHERE synthetic_id = 'id'")
+	case "messages-from-contacts-only":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET messages_from_contacts_only = ? WHERE synthetic_id = 'id'")
 	case "keycard-instance_uid":
 		update, err = db.db.Prepare("UPDATE settings SET keycard_instance_uid = ? WHERE synthetic_id = 'id'")
 	case "keycard-paired_on":
@@ -385,7 +392,7 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT address, anon_metrics_should_send, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, messages_from_contacts_only, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
 		&s.Address,
 		&s.AnonMetricsShouldSend,
 		&s.ChaosMode,
@@ -428,6 +435,7 @@ func (db *Database) GetSettings() (Settings, error) {
 		&s.StickersRecentStickers,
 		&s.SyncingOnMobileNetwork,
 		&s.UseMailservers,
+		&s.MessagesFromContactsOnly,
 		&s.Usernames,
 		&s.Appearance,
 		&s.ProfilePicturesVisibility,
@@ -535,6 +543,15 @@ func (db *Database) DeleteAccount(address types.Address) error {
 func (db *Database) GetNotificationsEnabled() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT notifications_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) GetMessagesFromContactsOnly() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT messages_from_contacts_only FROM settings WHERE synthetic_id = 'id'").Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}

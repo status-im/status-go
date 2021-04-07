@@ -27,10 +27,11 @@ type MessengerResponse struct {
 
 	// notifications a list of notifications derived from messenger events
 	// that are useful to notify the user about
-	notifications map[string]*localnotifications.Notification
-	chats         map[string]*Chat
-	removedChats  map[string]bool
-	communities   map[string]*communities.Community
+	notifications               map[string]*localnotifications.Notification
+	chats                       map[string]*Chat
+	removedChats                map[string]bool
+	communities                 map[string]*communities.Community
+	activityCenterNotifications map[string]*ActivityCenterNotification
 }
 
 func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
@@ -51,8 +52,9 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		MailserverRanges        []mailservers.ChatRequestRange  `json:"mailserverRanges,omitempty"`
 		// Notifications a list of notifications derived from messenger events
 		// that are useful to notify the user about
-		Notifications []*localnotifications.Notification `json:"notifications"`
-		Communities   []*communities.Community           `json:"communities,omitempty"`
+		Notifications               []*localnotifications.Notification `json:"notifications"`
+		Communities                 []*communities.Community           `json:"communities,omitempty"`
+		ActivityCenterNotifications []*ActivityCenterNotification      `json:"activityCenterNotifications,omitempty"`
 	}{
 		Messages:                r.Messages,
 		Contacts:                r.Contacts,
@@ -72,6 +74,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem.Chats = r.Chats()
 	responseItem.Communities = r.Communities()
 	responseItem.RemovedChats = r.RemovedChats()
+	responseItem.ActivityCenterNotifications = r.ActivityCenterNotifications()
 
 	return json.Marshal(responseItem)
 }
@@ -124,6 +127,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Mailservers)+
 		len(r.MailserverRanges)+
 		len(r.notifications)+
+		len(r.activityCenterNotifications)+
 		len(r.RequestsToJoinCommunity) == 0
 }
 
@@ -260,4 +264,26 @@ func (r *MessengerResponse) AddRemovedChat(chatID string) {
 	}
 
 	r.removedChats[chatID] = true
+}
+
+func (r *MessengerResponse) AddActivityCenterNotifications(ns []*ActivityCenterNotification) {
+	for _, n := range ns {
+		r.AddActivityCenterNotification(n)
+	}
+}
+
+func (r *MessengerResponse) AddActivityCenterNotification(n *ActivityCenterNotification) {
+	if r.activityCenterNotifications == nil {
+		r.activityCenterNotifications = make(map[string]*ActivityCenterNotification)
+	}
+
+	r.activityCenterNotifications[n.ID.String()] = n
+}
+
+func (r *MessengerResponse) ActivityCenterNotifications() []*ActivityCenterNotification {
+	var ns []*ActivityCenterNotification
+	for _, n := range r.activityCenterNotifications {
+		ns = append(ns, n)
+	}
+	return ns
 }

@@ -74,7 +74,6 @@ var messageCacheIntervalMs uint64 = 1000 * 60 * 60 * 48
 // because installations are managed by the user.
 // Similarly, it needs to expose an interface to manage
 // mailservers because they can also be managed by the user.
-// TODO we may want to change the maps into sync.Maps if we start getting unexpected locks or weird collision bugs
 type Messenger struct {
 	node                       types.Node
 	config                     *config
@@ -284,7 +283,8 @@ func NewMessenger(
 	if err != nil {
 		return nil, err
 	}
-	handler := newMessageHandler(identity, logger, sqlitePersistence, communitiesManager, transp, ensVerifier)
+	settings := accounts.NewDB(database)
+	handler := newMessageHandler(identity, logger, sqlitePersistence, communitiesManager, transp, ensVerifier, settings)
 
 	messenger = &Messenger{
 		config:                     &c,
@@ -309,7 +309,7 @@ func NewMessenger(
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
-		settings:                   accounts.NewDB(database),
+		settings:                   settings,
 		mailserversDatabase:        c.mailserversDatabase,
 		account:                    c.account,
 		quit:                       make(chan struct{}),
@@ -1036,8 +1036,8 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-	for _, contact := range contacts {
-		m.allContacts.Store(contact.ID, contact)
+	for idx, contact := range contacts {
+		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
 		if !contact.IsAdded() || contact.IsBlocked() {
 			continue
@@ -1199,7 +1199,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	}
 	chat.LastClockValue = clock
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	clock, _ = chat.NextClockAndTimestamp(m.getTimesource())
 
@@ -1242,7 +1242,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(&chat)
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
@@ -1317,7 +1317,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
 	response.Messages = buildSystemMessages(chat.MembershipUpdates, m.systemMessagesTranslations)
@@ -1403,7 +1403,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -1464,7 +1464,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	var response MessengerResponse
 	response.AddChat(chat)
@@ -1665,7 +1665,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -1728,7 +1728,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 		return nil, err
 	}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+	chat.updateChatFromGroupMembershipChanges(group)
 
 	response.AddChat(chat)
 	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
@@ -1748,62 +1748,61 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 		return nil, ErrChatNotFound
 	}
 
-	err := m.Leave(*chat)
-	if err != nil {
-		return nil, err
-	}
+	joined := chat.HasJoinedMember(common.PubkeyToHex(&m.identity.PublicKey))
 
-	group, err := newProtocolGroupFromChat(chat)
-	if err != nil {
-		return nil, err
-	}
-	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
-	event := v1protocol.NewMemberRemovedEvent(
-		contactIDFromPublicKey(&m.identity.PublicKey),
-		clock,
-	)
-	event.ChatID = chat.ID
-	err = event.Sign(m.identity)
-	if err != nil {
-		return nil, err
-	}
+	if joined {
+		group, err := newProtocolGroupFromChat(chat)
+		if err != nil {
+			return nil, err
+		}
+		clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
+		event := v1protocol.NewMemberRemovedEvent(
+			contactIDFromPublicKey(&m.identity.PublicKey),
+			clock,
+		)
+		event.ChatID = chat.ID
+		err = event.Sign(m.identity)
+		if err != nil {
+			return nil, err
+		}
 
-	err = group.ProcessEvent(event)
-	if err != nil {
-		return nil, err
-	}
+		err = group.ProcessEvent(event)
+		if err != nil {
+			return nil, err
+		}
 
-	recipients, err := stringSliceToPublicKeys(group.Members())
-	if err != nil {
-		return nil, err
-	}
+		recipients, err := stringSliceToPublicKeys(group.Members())
+		if err != nil {
+			return nil, err
+		}
 
-	encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
-	if err != nil {
-		return nil, err
-	}
-	_, err = m.dispatchMessage(ctx, common.RawMessage{
-		LocalChatID: chat.ID,
-		Payload:     encodedMessage,
-		MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
-		Recipients:  recipients,
-	})
-	if err != nil {
-		return nil, err
-	}
+		encodedMessage, err := m.processor.EncodeMembershipUpdate(group, nil)
+		if err != nil {
+			return nil, err
+		}
+		_, err = m.dispatchMessage(ctx, common.RawMessage{
+			LocalChatID: chat.ID,
+			Payload:     encodedMessage,
+			MessageType: protobuf.ApplicationMetadataMessage_MEMBERSHIP_UPDATE_MESSAGE,
+			Recipients:  recipients,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+		chat.updateChatFromGroupMembershipChanges(group)
+		response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
+		err = m.persistence.SaveMessages(response.Messages)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if remove {
 		chat.Active = false
 	}
 
 	response.AddChat(chat)
-	response.Messages = buildSystemMessages([]v1protocol.MembershipUpdateEvent{event}, m.systemMessagesTranslations)
-	err = m.persistence.SaveMessages(response.Messages)
-	if err != nil {
-		return nil, err
-	}
 
 	return &response, m.saveChat(chat)
 }
@@ -2534,7 +2533,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
 						logger.Debug("Handling MembershipUpdateMessage")
-
 						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
 
 						chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
@@ -2658,6 +2656,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.RequestTransaction:
 						command := msg.ParsedMessage.Interface().(protobuf.RequestTransaction)
+
 						logger.Debug("Handling RequestTransaction")
 						err = m.handler.HandleRequestTransaction(messageState, command)
 						if err != nil {
@@ -2781,7 +2780,6 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.ChatIdentity:
-						logger.Debug("Received ChatIdentity")
 						err = m.handler.HandleChatIdentity(messageState, msg.ParsedMessage.Interface().(protobuf.ChatIdentity))
 						if err != nil {
 							logger.Warn("failed to handle ChatIdentity", zap.Error(err))

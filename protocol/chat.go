@@ -165,10 +165,17 @@ func (c *Chat) HasMember(memberID string) bool {
 	return false
 }
 
-func (c *Chat) updateChatFromGroupMembershipChanges(myID string, g *v1protocol.Group) {
+func (c *Chat) HasJoinedMember(memberID string) bool {
+	for _, member := range c.Members {
+		if member.Joined && memberID == member.ID {
+			return true
+		}
+	}
 
-	// Check if we were already in the chat
-	hadJoined := c.HasMember(myID)
+	return false
+}
+
+func (c *Chat) updateChatFromGroupMembershipChanges(g *v1protocol.Group) {
 
 	// ID
 	c.ID = g.ChatID()
@@ -182,10 +189,6 @@ func (c *Chat) updateChatFromGroupMembershipChanges(myID string, g *v1protocol.G
 	joined := g.Joined()
 	chatMembers := make([]ChatMember, 0, len(members))
 	for _, m := range members {
-		// Check if we joined thanks to these changes, if so, make chat active
-		if m == myID && !hadJoined {
-			c.Active = true
-		}
 
 		chatMember := ChatMember{
 			ID: m,

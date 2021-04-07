@@ -956,6 +956,11 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 	s.Require().NotNil(response)
 	s.Require().Len(response.Messages, 1)
 
+	// Add bob to contacts so it does not go on activity center
+	bobPk := common.PubkeyToHex(&s.alice.identity.PublicKey)
+	_, err = s.alice.AddContact(context.Background(), bobPk)
+	s.Require().NoError(err)
+
 	// Pull message and make sure org is received
 	err = tt.RetryWithBackOff(func() error {
 		response, err = s.alice.RetrieveAll()
@@ -970,7 +975,6 @@ func (s *MessengerCommunitiesSuite) TestShareCommunity() {
 
 	s.Require().NoError(err)
 	s.Require().Len(response.Messages, 1)
-
 }
 
 func (s *MessengerCommunitiesSuite) TestBanUser() {
