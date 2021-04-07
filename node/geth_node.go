@@ -531,7 +531,7 @@ func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *para
 		SoftBlacklistedPeerIDs: wakuCfg.SoftBlacklistedPeerIDs,
 		Host:                   wakuCfg.Host,
 		Port:                   wakuCfg.Port,
-		BootNodes:              clusterCfg.BootNodes,
+		BootNodes:              clusterCfg.WakuNodes,
 	}
 
 	if wakuCfg.MaxMessageSize > 0 {
