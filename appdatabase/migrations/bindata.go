@@ -38,11 +38,11 @@
 // 0022_pending_transfers.up.sql (706B)
 // 1618237885_settings_anon_metrics_should_send.up.sql (80B)
 // 1618395756_contacts_only.up.sql (136B)
-// 1618571271_add_id_to_app_metrics.up.sql (589B)
 // 1622184614_add_default_sync_period.up.sql (125B)
 // 1625872445_user_status.up.sql (351B)
 // 1627983977_add_gif_to_settings.up.sql (102B)
 // 1628580203_add_hidden_account.up.sql (67B)
+// 1629123384_add_id_to_app_metrics.up.sql (589B)
 // doc.go (74B)
 
 package migrations
@@ -872,26 +872,6 @@ func _1618395756_contacts_onlyUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1618571271_add_id_to_app_metricsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xac\x51\xcb\x6e\xc2\x40\x0c\xbc\xe7\x2b\x7c\x04\x29\x7f\xc0\xc9\x04\xd3\x46\xdd\x07\x72\x9c\xaa\x9c\x56\x11\xb1\xaa\x48\x05\xa2\xec\x16\xa9\x7f\x5f\x41\x5a\x14\x15\xb8\xf5\xea\xf1\xcc\x78\xc6\x68\x84\x18\x04\x97\x86\xa0\xe9\xfb\xb0\xd7\x34\x74\xbb\x08\x4c\x0e\x2d\x81\x78\x48\xba\xef\xc3\x04\x5a\x64\x05\x13\x0a\xdd\x21\xcd\x32\x00\x80\xae\x85\xd2\x09\x3d\x11\xc3\x86\x4b\x8b\xbc\x85\x17\xda\x02\xd6\xe2\x4b\x57\x30\x59\x72\x92\x5f\x36\xf5\xa4\x87\x04\xaf\xc8\xc5\x33\x32\x38\x2f\xe0\x6a\x63\x46\xec\xd4\x7c\x7c\x2a\x08\xbd\xc9\x1f\xe0\x6c\x78\xd2\x21\x76\xc7\xc3\x03\xea\xb1\xd7\xa1\x49\xdd\xe1\x3d\xc4\xaf\x98\x74\xff\x60\x6d\x37\x68\x93\xb4\x0d\x4d\x02\x29\x2d\x55\x82\x76\x03\x2b\x5a\x63\x6d\x04\x8a\x9a\x99\x9c\x84\x2b\x32\x72\xa2\xc6\xb3\x71\xe8\xda\x5f\xd1\x71\xde\x0f\xc7\x9d\xc6\xa8\x2d\x2c\xbd\x37\x84\xee\xea\x75\x55\x5c\xa3\xa9\x68\xbe\xc8\x4a\x57\x11\xcb\xb9\x22\x3f\x2d\x6f\x76\x29\x23\x1f\x73\xe7\xd3\x94\xf9\x4d\xa0\x7c\x72\x7b\x3e\xb9\x69\x9e\x55\x64\xa8\x10\xf8\x07\xad\x6c\xcd\xde\xde\x79\xfe\x8a\xfd\xe6\xe7\xf5\x37\xe0\x77\x00\x00\x00\xff\xff\x7c\x73\x3b\xdc\x4d\x02\x00\x00")
-
-func _1618571271_add_id_to_app_metricsUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1618571271_add_id_to_app_metricsUpSql,
-		"1618571271_add_id_to_app_metrics.up.sql",
-	)
-}
-
-func _1618571271_add_id_to_app_metricsUpSql() (*asset, error) {
-	bytes, err := _1618571271_add_id_to_app_metricsUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1618571271_add_id_to_app_metrics.up.sql", size: 589, mode: os.FileMode(0644), modTime: time.Unix(1630492879, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdf, 0x66, 0xc0, 0x69, 0xb, 0xad, 0x49, 0x7c, 0x8c, 0x67, 0xb8, 0xd6, 0x8d, 0x5d, 0x86, 0x1f, 0xa4, 0x53, 0xf5, 0x8, 0x1, 0xfd, 0x38, 0x49, 0xee, 0x84, 0xc0, 0xd8, 0x17, 0x72, 0x3, 0xb3}}
-	return a, nil
-}
-
 var __1622184614_add_default_sync_periodUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x49\x4d\x4b\x2c\xcd\x29\x89\x2f\xae\xcc\x4b\x8e\x2f\x48\x2d\xca\xcc\x4f\x51\xf0\xf4\x0b\x71\x75\x77\x0d\x52\x70\x71\x75\x73\x0c\xf5\x09\x51\xb0\x30\x33\x31\x30\xb0\xe6\x0a\x0d\x70\x71\x0c\x41\x32\x25\xd8\x35\x04\xab\x76\x5b\x98\x06\x2e\x40\x00\x00\x00\xff\xff\xdd\x46\xb2\xc4\x7d\x00\x00\x00")
 
 func _1622184614_add_default_sync_periodUpSqlBytes() ([]byte, error) {
@@ -969,6 +949,26 @@ func _1628580203_add_hidden_accountUpSql() (*asset, error) {
 
 	info := bindataFileInfo{name: "1628580203_add_hidden_account.up.sql", size: 67, mode: os.FileMode(0644), modTime: time.Unix(1630492724, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xcb, 0x30, 0xf1, 0xd4, 0x60, 0xe2, 0x28, 0x14, 0xcb, 0x16, 0xb, 0x9, 0xea, 0x17, 0xa, 0x9e, 0x89, 0xa8, 0x32, 0x32, 0xf8, 0x4d, 0xa0, 0xe1, 0xe5, 0x79, 0xbd, 0x7d, 0x79, 0xe9, 0x4c, 0x9e}}
+	return a, nil
+}
+
+var __1629123384_add_id_to_app_metricsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xac\x51\xcb\x6e\xc2\x40\x0c\xbc\xe7\x2b\x7c\x04\x29\x7f\xc0\xc9\x04\xd3\x46\xdd\x07\x72\x9c\xaa\x9c\x56\x11\xb1\xaa\x48\x05\xa2\xec\x16\xa9\x7f\x5f\x41\x5a\x14\x15\xb8\xf5\xea\xf1\xcc\x78\xc6\x68\x84\x18\x04\x97\x86\xa0\xe9\xfb\xb0\xd7\x34\x74\xbb\x08\x4c\x0e\x2d\x81\x78\x48\xba\xef\xc3\x04\x5a\x64\x05\x13\x0a\xdd\x21\xcd\x32\x00\x80\xae\x85\xd2\x09\x3d\x11\xc3\x86\x4b\x8b\xbc\x85\x17\xda\x02\xd6\xe2\x4b\x57\x30\x59\x72\x92\x5f\x36\xf5\xa4\x87\x04\xaf\xc8\xc5\x33\x32\x38\x2f\xe0\x6a\x63\x46\xec\xd4\x7c\x7c\x2a\x08\xbd\xc9\x1f\xe0\x6c\x78\xd2\x21\x76\xc7\xc3\x03\xea\xb1\xd7\xa1\x49\xdd\xe1\x3d\xc4\xaf\x98\x74\xff\x60\x6d\x37\x68\x93\xb4\x0d\x4d\x02\x29\x2d\x55\x82\x76\x03\x2b\x5a\x63\x6d\x04\x8a\x9a\x99\x9c\x84\x2b\x32\x72\xa2\xc6\xb3\x71\xe8\xda\x5f\xd1\x71\xde\x0f\xc7\x9d\xc6\xa8\x2d\x2c\xbd\x37\x84\xee\xea\x75\x55\x5c\xa3\xa9\x68\xbe\xc8\x4a\x57\x11\xcb\xb9\x22\x3f\x2d\x6f\x76\x29\x23\x1f\x73\xe7\xd3\x94\xf9\x4d\xa0\x7c\x72\x7b\x3e\xb9\x69\x9e\x55\x64\xa8\x10\xf8\x07\xad\x6c\xcd\xde\xde\x79\xfe\x8a\xfd\xe6\xe7\xf5\x37\xe0\x77\x00\x00\x00\xff\xff\x7c\x73\x3b\xdc\x4d\x02\x00\x00")
+
+func _1629123384_add_id_to_app_metricsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__1629123384_add_id_to_app_metricsUpSql,
+		"1629123384_add_id_to_app_metrics.up.sql",
+	)
+}
+
+func _1629123384_add_id_to_app_metricsUpSql() (*asset, error) {
+	bytes, err := _1629123384_add_id_to_app_metricsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "1629123384_add_id_to_app_metrics.up.sql", size: 589, mode: os.FileMode(0644), modTime: time.Unix(1630493124, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xdf, 0x66, 0xc0, 0x69, 0xb, 0xad, 0x49, 0x7c, 0x8c, 0x67, 0xb8, 0xd6, 0x8d, 0x5d, 0x86, 0x1f, 0xa4, 0x53, 0xf5, 0x8, 0x1, 0xfd, 0x38, 0x49, 0xee, 0x84, 0xc0, 0xd8, 0x17, 0x72, 0x3, 0xb3}}
 	return a, nil
 }
 
@@ -1159,8 +1159,6 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1618395756_contacts_only.up.sql": _1618395756_contacts_onlyUpSql,
 
-	"1618571271_add_id_to_app_metrics.up.sql": _1618571271_add_id_to_app_metricsUpSql,
-
 	"1622184614_add_default_sync_period.up.sql": _1622184614_add_default_sync_periodUpSql,
 
 	"1625872445_user_status.up.sql": _1625872445_user_statusUpSql,
@@ -1168,6 +1166,8 @@ var _bindata = map[string]func() (*asset, error){
 	"1627983977_add_gif_to_settings.up.sql": _1627983977_add_gif_to_settingsUpSql,
 
 	"1628580203_add_hidden_account.up.sql": _1628580203_add_hidden_accountUpSql,
+
+	"1629123384_add_id_to_app_metrics.up.sql": _1629123384_add_id_to_app_metricsUpSql,
 
 	"doc.go": docGo,
 }
@@ -1251,12 +1251,12 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0022_pending_transfers.up.sql":                       &bintree{_0022_pending_transfersUpSql, map[string]*bintree{}},
 	"1618237885_settings_anon_metrics_should_send.up.sql": &bintree{_1618237885_settings_anon_metrics_should_sendUpSql, map[string]*bintree{}},
 	"1618395756_contacts_only.up.sql":                     &bintree{_1618395756_contacts_onlyUpSql, map[string]*bintree{}},
-	"1618571271_add_id_to_app_metrics.up.sql":             &bintree{_1618571271_add_id_to_app_metricsUpSql, map[string]*bintree{}},
 	"1622184614_add_default_sync_period.up.sql":           &bintree{_1622184614_add_default_sync_periodUpSql, map[string]*bintree{}},
 	"1625872445_user_status.up.sql":                       &bintree{_1625872445_user_statusUpSql, map[string]*bintree{}},
 	"1627983977_add_gif_to_settings.up.sql":               &bintree{_1627983977_add_gif_to_settingsUpSql, map[string]*bintree{}},
 	"1628580203_add_hidden_account.up.sql":                &bintree{_1628580203_add_hidden_accountUpSql, map[string]*bintree{}},
-	"doc.go":                                              &bintree{docGo, map[string]*bintree{}},
+	"1629123384_add_id_to_app_metrics.up.sql":             &bintree{_1629123384_add_id_to_app_metricsUpSql, map[string]*bintree{}},
+	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
 // RestoreAsset restores an asset under the given directory.
