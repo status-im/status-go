@@ -85,3 +85,28 @@ func (cm *chatMap) Range(f func(chatID string, chat *Chat) (shouldContinue bool)
 func (cm *chatMap) Delete(chatID string) {
 	cm.sm.Delete(chatID)
 }
+
+type contactMap struct {
+	sm sync.Map
+}
+
+func (cm *contactMap) Load(contactID string) (*Contact, bool) {
+	chat, ok := cm.sm.Load(contactID)
+	return chat.(*Contact), ok
+}
+
+func (cm *contactMap) Store(contactID string, contact *Contact) {
+	cm.sm.Store(contactID, contact)
+}
+
+func (cm *contactMap) Range(f func(contactID string, contact *Contact) (shouldContinue bool)) {
+	nf := func(key, value interface{}) (shouldContinue bool){
+		return f(key.(string), value.(*Contact))
+	}
+	cm.sm.Range(nf)
+}
+
+func (cm *contactMap) Delete(contactID string) {
+	cm.sm.Delete(contactID)
+}
+

@@ -94,7 +94,7 @@ type Messenger struct {
 	shouldPublishContactCode   bool
 	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
 	allChats                   *chatMap
-	allContacts                map[string]*Contact
+	allContacts                *contactMap
 	allInstallations           map[string]*multidevice.Installation
 	modifiedInstallations      map[string]bool
 	installationID             string
@@ -299,7 +299,6 @@ func NewMessenger(
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
-		allContacts:                make(map[string]*Contact),
 		allInstallations:           make(map[string]*multidevice.Installation),
 		installationID:             installationID,
 		modifiedInstallations:      make(map[string]bool),
@@ -818,7 +817,7 @@ func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
 	var contacts []*Contact
 	for _, record := range records {
 		m.logger.Info("handling record", zap.Any("record", record))
-		contact, ok := m.allContacts[record.PublicKey]
+		contact, ok := m.allContacts.Load(record.PublicKey)
 		if !ok {
 			m.logger.Info("contact not found")
 			continue
@@ -1039,7 +1038,7 @@ func (m *Messenger) Init() error {
 		return err
 	}
 	for _, contact := range contacts {
-		m.allContacts[contact.ID] = contact
+		m.allContacts.Store(contact.ID, contact)
 		// We only need filters for contacts added by us and not blocked.
 		if !contact.IsAdded() || contact.IsBlocked() {
 			continue
@@ -2245,15 +2244,16 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 
-	for _, contact := range m.allContacts {
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
 		if contact.IsAdded() && contact.ID != myID {
-			if err := m.syncContact(ctx, contact); err != nil {
-				return err
+			if err = m.syncContact(ctx, contact); err != nil {
+				return false
 			}
 		}
-	}
+		return true
+	})
 
-	return nil
+	return err
 }
 
 // SendPairInstallation sends a pair installation message
@@ -2431,7 +2431,7 @@ type ReceivedMessageState struct {
 	// AllChats in memory
 	AllChats *chatMap
 	// All contacts in memory
-	AllContacts map[string]*Contact
+	AllContacts *contactMap
 	// List of contacts modified
 	ModifiedContacts map[string]bool
 	// All installations in memory
@@ -2495,11 +2495,14 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	}
 	contactID := contactIDFromPublicKey(pubKey)
 
-	contact := r.AllContacts[contactID]
-
 	chat, ok := r.AllChats.Load(m.LocalChatID)
 	if !ok {
 		return fmt.Errorf("chat ID '%s' not present", m.LocalChatID)
+	}
+
+	contact, ok := r.AllContacts.Load(contactID)
+	if !ok {
+		return fmt.Errorf("contact ID '%s' not present", contactID)
 	}
 
 	if showMessageNotification(publicKey, m, chat, responseTo) {
@@ -2558,7 +2561,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 				// Check for messages from blocked users
 				senderID := contactIDFromPublicKey(publicKey)
-				if _, ok := messageState.AllContacts[senderID]; ok && messageState.AllContacts[senderID].IsBlocked() {
+				if contact, ok := messageState.AllContacts.Load(senderID); ok && contact.IsBlocked() {
 					continue
 				}
 
@@ -2574,17 +2577,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				}
 
 				var contact *Contact
-				if c, ok := messageState.AllContacts[senderID]; ok {
+				if c, ok := messageState.AllContacts.Load(senderID); ok {
 					contact = c
 				} else {
-					c, err := buildContact(senderID, publicKey)
+					contact, err := buildContact(senderID, publicKey)
 					if err != nil {
 						logger.Info("failed to build contact", zap.Error(err))
 						allMessagesProcessed = false
 						continue
 					}
-					contact = c
-					messageState.AllContacts[senderID] = c
+					messageState.AllContacts.Store(senderID, contact)
 					messageState.ModifiedContacts[contact.ID] = true
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
@@ -2952,8 +2954,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	var contactsToSave []*Contact
 	for id := range messageState.ModifiedContacts {
-		contact := messageState.AllContacts[id]
-		if contact != nil {
+		contact, ok := messageState.AllContacts.Load(id)
+		if ok {
 			// We save all contacts so we can pull back name/image,
 			// but we only send to client those
 			// that have some custom fields
@@ -2972,7 +2974,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	for id := range messageState.Response.chats {
 		chat, _ := messageState.AllChats.Load(id)
 		if chat.OneToOne() {
-			contact, ok := m.allContacts[chat.ID]
+			contact, ok := m.allContacts.Load(chat.ID)
 			if ok {
 				chat.Alias = contact.Alias
 				chat.Identicon = contact.Identicon
@@ -4073,18 +4075,19 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var mutedChatIDs []string
 	var publicChatIDs []string
 
-	for _, contact := range m.allContacts {
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
 		if contact.IsAdded() && !contact.IsBlocked() {
 			pk, err := contact.PublicKey()
 			if err != nil {
 				m.logger.Warn("could not parse contact public key")
-				continue
+				return true
 			}
 			contactIDs = append(contactIDs, pk)
 		} else if contact.IsBlocked() {
 			mutedChatIDs = append(mutedChatIDs, contact.ID)
 		}
-	}
+		return true
+	})
 
 	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool){
 		if chat.Muted {
@@ -4279,11 +4282,12 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		for _, contact := range m.allContacts {
+		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
 			if contact.IsAdded() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}
-		}
+			return true
+		})
 		return m.persistence.EmojiReactionsByChatIDs(chatIDs, cursor, limit)
 	}
 	return m.persistence.EmojiReactionsByChatID(chatID, cursor, limit)
@@ -4411,7 +4415,7 @@ func (m *Messenger) encodeChatEntity(chat *Chat, message common.ChatEntity) ([]b
 }
 
 func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact, error) {
-	if c, ok := m.allContacts[msg.From]; ok {
+	if c, ok := m.allContacts.Load(msg.From); ok {
 		return c, nil
 	}
 
@@ -4425,6 +4429,7 @@ func (m *Messenger) getOrBuildContactFromMessage(msg *common.Message) (*Contact,
 		return nil, err
 	}
 
-	m.allContacts[msg.From] = c
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allContacts.Store(msg.From, c)
 	return c, nil
 }

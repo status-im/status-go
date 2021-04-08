@@ -222,7 +222,7 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 		chat.Active = false
 	}
 
-	contact, ok := state.AllContacts[message.Id]
+	contact, ok := state.AllContacts.Load(message.Id)
 	if !ok {
 		var err error
 		contact, err = buildContactFromPkString(message.Id)
@@ -243,7 +243,7 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 		contact.LocalNickname = message.LocalNickname
 
 		state.ModifiedContacts[contact.ID] = true
-		state.AllContacts[contact.ID] = contact
+		state.AllContacts.Store(contact.ID, contact)
 	}
 
 	// TODO(samyoul) remove storing of an updated reference pointer?
@@ -290,7 +290,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 		}
 		contact.LastUpdated = message.Clock
 		state.ModifiedContacts[contact.ID] = true
-		state.AllContacts[contact.ID] = contact
+		state.AllContacts.Store(contact.ID, contact)
 	}
 
 	if chat.LastClockValue < message.Clock {
@@ -520,7 +520,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 			// so we reset the record
 			contact.ENSVerified = false
 			state.ModifiedContacts[contact.ID] = true
-			state.AllContacts[contact.ID] = contact
+			state.AllContacts.Store(contact.ID, contact)
 		}
 	}
 
@@ -988,7 +988,7 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 
 		}
 		state.ModifiedContacts[contact.ID] = true
-		state.AllContacts[contact.ID] = contact
+		state.AllContacts.Store(contact.ID, contact)
 	}
 
 	return nil
