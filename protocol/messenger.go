@@ -95,8 +95,8 @@ type Messenger struct {
 	systemMessagesTranslations *systemMessageTranslationsMap
 	allChats                   *chatMap
 	allContacts                *contactMap
-	allInstallations           map[string]*multidevice.Installation
-	modifiedInstallations      map[string]bool
+	allInstallations           *installationMap
+	modifiedInstallations      *stringBoolMap
 	installationID             string
 	mailserver                 []byte
 	database                   *sql.DB
@@ -301,9 +301,9 @@ func NewMessenger(
 		systemMessagesTranslations: c.systemMessagesTranslations,
 		allChats:                   new(chatMap),
 		allContacts:                new(contactMap),
-		allInstallations:           make(map[string]*multidevice.Installation),
+		allInstallations:           new(installationMap),
 		installationID:             installationID,
-		modifiedInstallations:      make(map[string]bool),
+		modifiedInstallations:      new(stringBoolMap),
 		verifyTransactionClient:    c.verifyTransactionClient,
 		database:                   database,
 		multiAccounts:              c.multiAccount,
@@ -781,9 +781,9 @@ func (m *Messenger) handleSharedSecrets(secrets []*sharedsecret.Secret) error {
 func (m *Messenger) handleInstallations(installations []*multidevice.Installation) {
 	for _, installation := range installations {
 		if installation.Identity == contactIDFromPublicKey(&m.identity.PublicKey) {
-			if _, ok := m.allInstallations[installation.ID]; !ok {
-				m.allInstallations[installation.ID] = installation
-				m.modifiedInstallations[installation.ID] = true
+			if _, ok := m.allInstallations.Load(installation.ID); !ok {
+				m.allInstallations.Store(installation.ID, installation)
+				m.modifiedInstallations.Store(installation.ID, true)
 			}
 		}
 	}
@@ -1059,7 +1059,7 @@ func (m *Messenger) Init() error {
 	}
 
 	for _, installation := range installations {
-		m.allInstallations[installation.ID] = installation
+		m.allInstallations.Store(installation.ID, installation)
 	}
 
 	_, err = m.transport.InitFilters(publicChatIDs, publicKeys)
@@ -1092,7 +1092,7 @@ func (m *Messenger) EnableInstallation(id string) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	installation, ok := m.allInstallations[id]
+	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
@@ -1102,7 +1102,8 @@ func (m *Messenger) EnableInstallation(id string) error {
 		return err
 	}
 	installation.Enabled = true
-	m.allInstallations[id] = installation
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allInstallations.Store(id, installation)
 	return nil
 }
 
@@ -1111,7 +1112,7 @@ func (m *Messenger) DisableInstallation(id string) error {
 	lock.Lock()
 	defer lock.Unlock()
 
-	installation, ok := m.allInstallations[id]
+	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
@@ -1121,7 +1122,8 @@ func (m *Messenger) DisableInstallation(id string) error {
 		return err
 	}
 	installation.Enabled = false
-	m.allInstallations[id] = installation
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allInstallations.Store(id, installation)
 	return nil
 }
 
@@ -1129,18 +1131,19 @@ func (m *Messenger) Installations() []*multidevice.Installation {
 	lock := m.locker.Get(MessengerInstallations)
 	lock.Lock()
 	defer lock.Unlock()
-	installations := make([]*multidevice.Installation, len(m.allInstallations))
+	installations := make([]*multidevice.Installation, m.allInstallations.Len())
 
 	var i = 0
-	for _, installation := range m.allInstallations {
+	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool){
 		installations[i] = installation
 		i++
-	}
+		return true
+	})
 	return installations
 }
 
 func (m *Messenger) setInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
-	installation, ok := m.allInstallations[id]
+	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
 	}
@@ -1905,11 +1908,12 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 
 func (m *Messenger) hasPairedDevices() bool {
 	var count int
-	for _, i := range m.allInstallations {
-		if i.Enabled {
+	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool){
+		if installation.Enabled {
 			count++
 		}
-	}
+		return true
+	})
 	return count > 1
 }
 
@@ -2268,7 +2272,7 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 	var err error
 	var response MessengerResponse
 
-	installation, ok := m.allInstallations[m.installationID]
+	installation, ok := m.allInstallations.Load(m.installationID)
 	if !ok {
 		return nil, errors.New("no installation found")
 	}
@@ -2435,11 +2439,11 @@ type ReceivedMessageState struct {
 	// All contacts in memory
 	AllContacts *contactMap
 	// List of contacts modified
-	ModifiedContacts map[string]bool
+	ModifiedContacts *stringBoolMap
 	// All installations in memory
-	AllInstallations map[string]*multidevice.Installation
+	AllInstallations *installationMap
 	// List of communities modified
-	ModifiedInstallations map[string]bool
+	ModifiedInstallations *stringBoolMap
 	// List of filters
 	AllFilters map[string]*transport.Filter
 	// Map of existing messages
@@ -2524,7 +2528,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
 		AllContacts:           m.allContacts,
-		ModifiedContacts:      make(map[string]bool),
+		ModifiedContacts:      new(stringBoolMap),
 		AllInstallations:      m.allInstallations,
 		ModifiedInstallations: m.modifiedInstallations,
 		ExistingMessagesMap:   make(map[string]bool),
@@ -2589,7 +2593,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					}
 					messageState.AllContacts.Store(senderID, contact)
-					messageState.ModifiedContacts[contact.ID] = true
+					messageState.ModifiedContacts.Store(contact.ID, true)
 				}
 				messageState.CurrentMessageState = &CurrentMessageState{
 					MessageID:        messageID,
@@ -2955,7 +2959,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	var contactsToSave []*Contact
-	for id := range messageState.ModifiedContacts {
+	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool){
 		contact, ok := messageState.AllContacts.Load(id)
 		if ok {
 			// We save all contacts so we can pull back name/image,
@@ -2966,7 +2970,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				messageState.Response.Contacts = append(messageState.Response.Contacts, contact)
 			}
 		}
-	}
+		return true
+	})
 
 	for _, filter := range messageState.AllFilters {
 		messageState.Response.Filters = append(messageState.Response.Filters, filter)
@@ -2986,18 +2991,23 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 		messageState.Response.AddChat(chat)
 	}
 
-	for id := range messageState.ModifiedInstallations {
-		installation := messageState.AllInstallations[id]
+	var err error
+	messageState.ModifiedInstallations.Range(func(id string, value bool) (shouldContinue bool){
+		installation, _ := messageState.AllInstallations.Load(id)
 		messageState.Response.Installations = append(messageState.Response.Installations, installation)
 		if installation.InstallationMetadata != nil {
-			err := m.setInstallationMetadata(id, installation.InstallationMetadata)
+			err = m.setInstallationMetadata(id, installation.InstallationMetadata)
 			if err != nil {
-				return nil, err
+				return false
 			}
 		}
+
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	var err error
 	if len(messageState.Response.chats) > 0 {
 		err = m.saveChats(messageState.Response.Chats())
 		if err != nil {
@@ -3060,7 +3070,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	// Reset installations
-	m.modifiedInstallations = make(map[string]bool)
+	m.modifiedInstallations = new(stringBoolMap)
 
 	return messageState.Response, nil
 }

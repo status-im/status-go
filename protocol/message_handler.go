@@ -242,7 +242,7 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 		contact.LastUpdated = message.Clock
 		contact.LocalNickname = message.LocalNickname
 
-		state.ModifiedContacts[contact.ID] = true
+		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
 
@@ -289,7 +289,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 			contact.ENSVerified = false
 		}
 		contact.LastUpdated = message.Clock
-		state.ModifiedContacts[contact.ID] = true
+		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
 
@@ -311,7 +311,7 @@ func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, mes
 		return err
 	}
 
-	installation, ok := state.AllInstallations[message.InstallationId]
+	installation, ok := state.AllInstallations.Load(message.InstallationId)
 	if !ok {
 		return errors.New("installation not found")
 	}
@@ -322,8 +322,9 @@ func (m *MessageHandler) HandlePairInstallation(state *ReceivedMessageState, mes
 	}
 
 	installation.InstallationMetadata = metadata
-	state.AllInstallations[message.InstallationId] = installation
-	state.ModifiedInstallations[message.InstallationId] = true
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	state.AllInstallations.Store(message.InstallationId, installation)
+	state.ModifiedInstallations.Store(message.InstallationId, true)
 
 	return nil
 }
@@ -519,7 +520,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 			// If oldRecord is nil, a new verification process will take place
 			// so we reset the record
 			contact.ENSVerified = false
-			state.ModifiedContacts[contact.ID] = true
+			state.ModifiedContacts.Store(contact.ID, true)
 			state.AllContacts.Store(contact.ID, contact)
 		}
 	}
@@ -987,7 +988,7 @@ func (m *MessageHandler) HandleChatIdentity(state *ReceivedMessageState, ci prot
 			contact.Images[imageType] = images.IdentityImage{Name: imageType, Payload: image.Payload}
 
 		}
-		state.ModifiedContacts[contact.ID] = true
+		state.ModifiedContacts.Store(contact.ID, true)
 		state.AllContacts.Store(contact.ID, contact)
 	}
 
