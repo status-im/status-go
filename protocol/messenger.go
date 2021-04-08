@@ -108,7 +108,7 @@ type Messenger struct {
 	quit                       chan struct{}
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
-	lock sync.Mutex
+	mutex sync.Mutex
 }
 
 type dbConfig struct {
@@ -952,8 +952,8 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 // Init analyzes chats and contacts in order to setup filters
 // which are responsible for retrieving messages.
 func (m *Messenger) Init() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
@@ -1185,7 +1185,6 @@ func (m *Messenger) Leave(chat Chat) error {
 	}
 }
 
-// Uses MessengerLocker
 func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string, members []string) (*MessengerResponse, error) {
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatWithMembers"))
@@ -3336,7 +3335,6 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	return &response, m.saveChat(chat)
 }
 
-// Uses MessengerLocker
 func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, messageID, address string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -3430,7 +3428,6 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	return &response, m.saveChat(chat)
 }
 
-// Uses MessengerLocker
 func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -3511,7 +3508,6 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	return &response, m.saveChat(chat)
 }
 
-// Uses MessengerLocker
 func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, messageID string) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -3592,7 +3588,6 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	return &response, m.saveChat(chat)
 }
 
-// Uses MessengerLocker
 func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHash, messageID string, signature []byte) (*MessengerResponse, error) {
 	var response MessengerResponse
 
@@ -3994,8 +3989,8 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	err := m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, m.pushNotificationOptions())
 	if err != nil {
@@ -4018,8 +4013,8 @@ func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
@@ -4029,8 +4024,8 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
@@ -4040,8 +4035,8 @@ func (m *Messenger) EnablePushNotificationsBlockMentions() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	return m.pushNotificationClient.EnablePushNotificationsBlockMentions(m.pushNotificationOptions())
 }
@@ -4051,8 +4046,8 @@ func (m *Messenger) DisablePushNotificationsBlockMentions() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	return m.pushNotificationClient.DisablePushNotificationsBlockMentions(m.pushNotificationOptions())
 }
