@@ -93,7 +93,7 @@ type Messenger struct {
 	shutdownTasks              []func() error
 	shouldPublishContactCode   bool
 	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
-	allChats                   map[string]*Chat
+	allChats                   *chatMap
 	allContacts                map[string]*Contact
 	allInstallations           map[string]*multidevice.Installation
 	modifiedInstallations      map[string]bool
@@ -299,7 +299,6 @@ func NewMessenger(
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
-		allChats:                   make(map[string]*Chat),
 		allContacts:                make(map[string]*Contact),
 		allInstallations:           make(map[string]*multidevice.Installation),
 		installationID:             installationID,
@@ -1005,7 +1004,7 @@ func (m *Messenger) Init() error {
 			continue
 		}
 
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 		if !chat.Active || chat.Timeline() {
 			continue
 		}
@@ -1248,7 +1247,7 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 	lock.Lock()
 	defer lock.Unlock()
 
-	m.allChats[chat.ID] = &chat
+	m.allChats.Store(chat.ID, &chat)
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
 		LocalChatID: chat.ID,
@@ -1299,7 +1298,7 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "RemoveMemberFromGroupChat"))
 	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1364,7 +1363,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddMembersFromGroupChat"))
 	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1454,7 +1453,7 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	lock.Lock()
 	defer lock.Unlock()
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1525,7 +1524,7 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 	var response MessengerResponse
 
 	// Get chat and clock
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1605,7 +1604,7 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 	invitationR.State = protobuf.GroupChatInvitation_REJECTED
 
 	// Get chat and clock
-	chat, ok := m.allChats[invitationR.ChatId]
+	chat, ok := m.allChats.Load(invitationR.ChatId)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1668,7 +1667,7 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 	logger := m.logger.With(zap.String("site", "AddAdminsToGroupChat"))
 	logger.Info("Add admins to group chat", zap.String("chatID", chatID), zap.Any("members", members))
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1731,7 +1730,7 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 
 	var response MessengerResponse
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1798,7 +1797,7 @@ func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bo
 
 	var response MessengerResponse
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -1879,7 +1878,7 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 		return err
 	}
 
-	chat, ok := m.allChats[message.LocalChatID]
+	chat, ok := m.allChats.Load(message.LocalChatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -1949,7 +1948,7 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 	var err error
 	var id []byte
 	logger := m.logger.With(zap.String("site", "dispatchMessage"), zap.String("chatID", spec.LocalChatID))
-	chat, ok := m.allChats[spec.LocalChatID]
+	chat, ok := m.allChats.Load(spec.LocalChatID)
 	if !ok {
 		return spec, errors.New("no chat found")
 	}
@@ -2159,7 +2158,7 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[message.ChatId]
+	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -2221,23 +2220,29 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 
 // SyncDevices sends all public chats and contacts to paired devices
 // TODO remove use of photoPath in contacts
-func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) error {
+func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	lock := m.locker.Get(myID)
 	lock.Lock()
 	defer lock.Unlock()
 
-	if _, err := m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
+	if _, err = m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
 		return err
 	}
 
-	for _, chat := range m.allChats {
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool){
 		if !chat.Timeline() && !chat.ProfileUpdates() && chat.Public() && chat.Active {
-			if err := m.syncPublicChat(ctx, chat); err != nil {
-				return err
+			err = m.syncPublicChat(ctx, chat)
+			if err != nil {
+				return false
 			}
 		}
+
+		return true
+	})
+	if err != nil {
+		return err
 	}
 
 	for _, contact := range m.allContacts {
@@ -2272,14 +2277,14 @@ func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerRespons
 
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	pairMessage := &protobuf.PairInstallation{
@@ -2320,14 +2325,14 @@ func (m *Messenger) syncPublicChat(ctx context.Context, publicChat *Chat) error 
 	}
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationPublicChat{
@@ -2361,14 +2366,14 @@ func (m *Messenger) syncContact(ctx context.Context, contact *Contact) error {
 	}
 	chatID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = OneToOneFromPublicKey(&m.identity.PublicKey, m.getTimesource())
 		// We don't want to show the chat to the user
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	syncMessage := &protobuf.SyncInstallationContact{
@@ -2424,8 +2429,7 @@ type ReceivedMessageState struct {
 	// State on the message being processed
 	CurrentMessageState *CurrentMessageState
 	// AllChats in memory
-	AllChats map[string]*Chat
-
+	AllChats *chatMap
 	// All contacts in memory
 	AllContacts map[string]*Contact
 	// List of contacts modified
@@ -2491,8 +2495,12 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 	}
 	contactID := contactIDFromPublicKey(pubKey)
 
-	chat := r.AllChats[m.LocalChatID]
 	contact := r.AllContacts[contactID]
+
+	chat, ok := r.AllChats.Load(m.LocalChatID)
+	if !ok {
+		return fmt.Errorf("chat ID '%s' not present", m.LocalChatID)
+	}
 
 	if showMessageNotification(publicKey, m, chat, responseTo) {
 		notification, err := NewMessageNotification(m.ID, m, chat, contact, r.AllContacts)
@@ -2595,7 +2603,8 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
 
-						err = m.handler.HandleMembershipUpdate(messageState, messageState.AllChats[rawMembershipUpdate.ChatId], rawMembershipUpdate, m.systemMessagesTranslations)
+						chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
+						err = m.handler.HandleMembershipUpdate(messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
 						if err != nil {
 							logger.Warn("failed to handle MembershipUpdate", zap.Error(err))
 							allMessagesProcessed = false
@@ -2961,7 +2970,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 	// Hydrate chat alias and identicon
 	for id := range messageState.Response.chats {
-		chat := messageState.AllChats[id]
+		chat, _ := messageState.AllChats.Load(id)
 		if chat.OneToOne() {
 			contact, ok := m.allContacts[chat.ID]
 			if ok {
@@ -3145,7 +3154,7 @@ func (m *Messenger) ClearHistory(id string) (*MessengerResponse, error) {
 }
 
 func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
-	chat, ok := m.allChats[id]
+	chat, ok := m.allChats.Load(id)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -3157,7 +3166,7 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 		return nil, err
 	}
 
-	m.allChats[id] = chat
+	m.allChats.Store(id, chat)
 
 	response := &MessengerResponse{}
 	response.AddChat(chat)
@@ -3180,7 +3189,7 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error
 	if err != nil {
 		return 0, err
 	}
-	m.allChats[chatID] = chat
+	m.allChats.Store(chatID, chat)
 	return count, nil
 }
 
@@ -3188,7 +3197,7 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	lock := m.locker.Get(chatID)
 	lock.Lock()
 	defer lock.Unlock()
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -3199,7 +3208,8 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 	}
 
 	chat.UnviewedMessagesCount = 0
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 	return nil
 }
 
@@ -3209,7 +3219,7 @@ func (m *Messenger) MuteChat(chatID string) error {
 	lock := m.locker.Get(chatID)
 	lock.Lock()
 	defer lock.Unlock()
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -3220,7 +3230,8 @@ func (m *Messenger) MuteChat(chatID string) error {
 	}
 
 	chat.Muted = true
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 
 	return m.reregisterForPushNotifications()
 }
@@ -3231,7 +3242,7 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 	lock := m.locker.Get(chatID)
 	lock.Lock()
 	defer lock.Unlock()
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
 	}
@@ -3242,7 +3253,8 @@ func (m *Messenger) UnmuteChat(chatID string) error {
 	}
 
 	chat.Muted = false
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 	return m.reregisterForPushNotifications()
 }
 
@@ -3268,7 +3280,7 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3347,7 +3359,7 @@ func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, fr
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3437,7 +3449,7 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	defer lock.Unlock()
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3535,7 +3547,7 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 	defer lock.Unlock()
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3620,7 +3632,7 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 	defer lock.Unlock()
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3704,7 +3716,7 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	defer lock.Unlock()
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3794,7 +3806,7 @@ func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, errors.New("Chat not found")
 	}
@@ -3895,7 +3907,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	for _, validationResult := range responses {
 		var message *common.Message
 		chatID := contactIDFromPublicKey(validationResult.Transaction.From)
-		chat, ok := m.allChats[chatID]
+		chat, ok := m.allChats.Load(chatID)
 		if !ok {
 			chat = OneToOneFromPublicKey(validationResult.Transaction.From, m.transport)
 		}
@@ -3961,7 +3973,7 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 		}
 
 		response.Messages = append(response.Messages, message)
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 		response.AddChat(chat)
 
 		contact, err := m.getOrBuildContactFromMessage(message)
@@ -4073,7 +4085,8 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 			mutedChatIDs = append(mutedChatIDs, contact.ID)
 		}
 	}
-	for _, chat := range m.allChats {
+
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool){
 		if chat.Muted {
 			mutedChatIDs = append(mutedChatIDs, chat.ID)
 		}
@@ -4081,7 +4094,8 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 			publicChatIDs = append(publicChatIDs, chat.ID)
 		}
 
-	}
+		return true
+	})
 	return &pushnotificationclient.RegistrationOptions{
 		ContactIDs:    contactIDs,
 		MutedChatIDs:  mutedChatIDs,
@@ -4212,7 +4226,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 
 	var response MessengerResponse
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -4296,7 +4310,7 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	}
 
 	// Get chat and clock
-	chat, ok := m.allChats[emojiR.GetChatId()]
+	chat, ok := m.allChats.Load(emojiR.GetChatId())
 	if !ok {
 		return nil, ErrChatNotFound
 	}

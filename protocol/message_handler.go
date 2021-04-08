@@ -142,7 +142,7 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	}
 
 	// Store in chats map as it might be a new one
-	messageState.AllChats[chat.ID] = chat
+	messageState.AllChats.Store(chat.ID, chat)
 	messageState.Response.AddChat(chat)
 
 	if message.Message != nil {
@@ -179,7 +179,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	// Set the LocalChatID for the message
 	message.LocalChatID = chat.ID
 
-	if c, ok := state.AllChats[chat.ID]; ok {
+	if c, ok := state.AllChats.Load(chat.ID); ok {
 		chat = c
 	}
 
@@ -204,7 +204,8 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	chat.Active = true
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
-	state.AllChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	state.AllChats.Store(chat.ID, chat)
 
 	// Add to response
 	if message != nil {
@@ -214,7 +215,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 }
 
 func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageState, message protobuf.SyncInstallationContact) error {
-	chat, ok := state.AllChats[state.CurrentMessageState.Contact.ID]
+	chat, ok := state.AllChats.Load(state.CurrentMessageState.Contact.ID)
 	if !ok {
 		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
 		// We don't want to show the chat to the user
@@ -245,21 +246,22 @@ func (m *MessageHandler) HandleSyncInstallationContact(state *ReceivedMessageSta
 		state.AllContacts[contact.ID] = contact
 	}
 
-	state.AllChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	state.AllChats.Store(chat.ID, chat)
 
 	return nil
 }
 
 func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessageState, message protobuf.SyncInstallationPublicChat) bool {
 	chatID := message.Id
-	_, ok := state.AllChats[chatID]
+	_, ok := state.AllChats.Load(chatID)
 	if ok {
 		return false
 	}
 
 	chat := CreatePublicChat(chatID, state.Timesource)
 
-	state.AllChats[chat.ID] = chat
+	state.AllChats.Store(chat.ID, chat)
 	state.Response.AddChat(chat)
 
 	return true
@@ -268,7 +270,7 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, message protobuf.ContactUpdate) error {
 	logger := m.logger.With(zap.String("site", "HandleContactUpdate"))
 	contact := state.CurrentMessageState.Contact
-	chat, ok := state.AllChats[contact.ID]
+	chat, ok := state.AllChats.Load(contact.ID)
 	if !ok {
 		chat = OneToOneFromPublicKey(state.CurrentMessageState.PublicKey, state.Timesource)
 		// We don't want to show the chat to the user
@@ -296,7 +298,8 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 	}
 
 	state.Response.AddChat(chat)
-	state.AllChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	state.AllChats.Store(chat.ID, chat)
 
 	return nil
 }
@@ -348,16 +351,18 @@ func (m *MessageHandler) HandleCommunityDescription(state *ReceivedMessageState,
 	var chatIDs []string
 	for i, chat := range chats {
 
-		oldChat, ok := state.AllChats[chat.ID]
+		oldChat, ok := state.AllChats.Load(chat.ID)
 		if !ok {
 			// Beware, don't use the reference in the range (i.e chat) as it's a shallow copy
-			state.AllChats[chat.ID] = chats[i]
+			state.AllChats.Store(chat.ID, chats[i])
 
 			state.Response.AddChat(chat)
 			chatIDs = append(chatIDs, chat.ID)
 			// Update name, currently is the only field is mutable
 		} else if oldChat.Name != chat.Name {
-			state.AllChats[chat.ID].Name = chat.Name
+			oldChat.Name = chat.Name
+			// TODO(samyoul) remove storing of an updated reference pointer?
+			state.AllChats.Store(chat.ID, oldChat)
 			state.Response.AddChat(chat)
 		}
 	}
@@ -478,7 +483,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	// Set the LocalChatID for the message
 	receivedMessage.LocalChatID = chat.ID
 
-	if c, ok := state.AllChats[chat.ID]; ok {
+	if c, ok := state.AllChats.Load(chat.ID); ok {
 		chat = c
 	}
 
@@ -502,7 +507,8 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	chat.Active = true
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
-	state.AllChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	state.AllChats.Store(chat.ID, chat)
 
 	contact := state.CurrentMessageState.Contact
 	if receivedMessage.EnsName != "" {
@@ -738,7 +744,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, timesource common.TimeSource) (*Chat, error) {
+func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats *chatMap, timesource common.TimeSource) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
@@ -749,8 +755,8 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 		// For public messages, all outgoing and incoming messages have the same chatID
 		// equal to a public chat name.
 		chatID := chatEntity.GetChatId()
-		chat := chats[chatID]
-		if chat == nil {
+		chat, ok := chats.Load(chatID)
+		if !ok {
 			return nil, errors.New("received a public chatEntity from non-existing chat")
 		}
 		return chat, nil
@@ -758,8 +764,8 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 		// It's a private message coming from us so we rely on Message.ChatID
 		// If chat does not exist, it should be created to support multidevice synchronization.
 		chatID := chatEntity.GetChatId()
-		chat := chats[chatID]
-		if chat == nil {
+		chat, ok := chats.Load(chatID)
+		if !ok {
 			if len(chatID) != PubKeyStringLength {
 				return nil, errors.New("invalid pubkey length")
 			}
@@ -780,16 +786,16 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 		// It's an incoming private chatEntity. ChatID is calculated from the signature.
 		// If a chat does not exist, a new one is created and saved.
 		chatID := contactIDFromPublicKey(chatEntity.GetSigPubKey())
-		chat := chats[chatID]
-		if chat == nil {
+		chat, ok := chats.Load(chatID)
+		if !ok {
 			// TODO: this should be a three-word name used in the mobile client
 			chat = CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
 		chatID := chatEntity.GetChatId()
-		chat := chats[chatID]
-		if chat == nil {
+		chat, ok := chats.Load(chatID)
+		if !ok {
 			return nil, errors.New("received community chat chatEntity for non-existing chat")
 		}
 
@@ -817,8 +823,8 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 		// In the case of a group chatEntity, ChatID is the same for all messages belonging to a group.
 		// It needs to be verified if the signature public key belongs to the chat.
 		chatID := chatEntity.GetChatId()
-		chat := chats[chatID]
-		if chat == nil {
+		chat, ok := chats.Load(chatID)
+		if !ok {
 			return nil, errors.New("received group chat chatEntity for non-existing chat")
 		}
 
@@ -906,7 +912,8 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 	}
 
 	state.Response.AddChat(chat)
-	state.AllChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	state.AllChats.Store(chat.ID, chat)
 
 	// save emoji reaction
 	err = m.persistence.SaveEmojiReaction(emojiReaction)

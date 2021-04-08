@@ -61,3 +61,27 @@ func (ml *MessengerLocker) Unlock() {
 	ml.globalLock.Unlock()
 	ml.globalWait.Done()
 }
+
+type chatMap struct {
+	sm sync.Map
+}
+
+func (cm *chatMap) Load(chatID string) (*Chat, bool) {
+	chat, ok := cm.sm.Load(chatID)
+	return chat.(*Chat), ok
+}
+
+func (cm *chatMap) Store(chatID string, chat *Chat) {
+	cm.sm.Store(chatID, chat)
+}
+
+func (cm *chatMap) Range(f func(chatID string, chat *Chat) (shouldContinue bool)) {
+	nf := func(key, value interface{}) (shouldContinue bool){
+		return f(key.(string), value.(*Chat))
+	}
+	cm.sm.Range(nf)
+}
+
+func (cm *chatMap) Delete(chatID string) {
+	cm.sm.Delete(chatID)
+}

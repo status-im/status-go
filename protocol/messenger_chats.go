@@ -15,9 +15,10 @@ func (m *Messenger) Chats() []*Chat {
 
 	var chats []*Chat
 
-	for _, c := range m.allChats {
-		chats = append(chats, c)
-	}
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
+		chats = append(chats, chat)
+		return true
+	})
 
 	return chats
 }
@@ -37,7 +38,7 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 	lock.Lock()
 	defer lock.Unlock()
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		chat = CreateOneToOneChat(chatID, pk, m.getTimesource())
 	}
@@ -53,7 +54,8 @@ func (m *Messenger) CreateOneToOneChat(request *requests.CreateOneToOneChat) (*M
 		return nil, err
 	}
 
-	m.allChats[chatID] = chat
+	// TODO(Samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chatID, chat)
 
 	response := &MessengerResponse{
 		Filters: filters,
@@ -77,10 +79,10 @@ func (m *Messenger) deleteChat(chatID string) error {
 	if err != nil {
 		return err
 	}
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 
 	if ok && chat.Active && chat.Public() {
-		delete(m.allChats, chatID)
+		m.allChats.Delete(chatID)
 		return m.reregisterForPushNotifications()
 	}
 
@@ -103,7 +105,7 @@ func (m *Messenger) DeactivateChat(chatID string) (*MessengerResponse, error) {
 
 func (m *Messenger) deactivateChat(chatID string) (*MessengerResponse, error) {
 	var response MessengerResponse
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
 	}
@@ -125,7 +127,8 @@ func (m *Messenger) deactivateChat(chatID string) (*MessengerResponse, error) {
 		}
 	}
 
-	m.allChats[chatID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chatID, chat)
 
 	response.AddChat(chat)
 	// TODO: Remove filters
@@ -139,7 +142,7 @@ func (m *Messenger) saveChats(chats []*Chat) error {
 		return err
 	}
 	for _, chat := range chats {
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 	}
 
 	return nil
@@ -147,7 +150,7 @@ func (m *Messenger) saveChats(chats []*Chat) error {
 }
 
 func (m *Messenger) saveChat(chat *Chat) error {
-	previousChat, ok := m.allChats[chat.ID]
+	previousChat, ok := m.allChats.Load(chat.ID)
 	if chat.OneToOne() {
 		name, identicon, err := generateAliasAndIdenticon(chat.ID)
 		if err != nil {
@@ -174,7 +177,8 @@ func (m *Messenger) saveChat(chat *Chat) error {
 	if err != nil {
 		return err
 	}
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 
 	if shouldRegisterForPushNotifications {
 		// Re-register for push notifications, as we want to receive mentions

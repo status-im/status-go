@@ -53,7 +53,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 
 	// Create the corresponding profile chat
 	profileChatID := buildProfileChatID(contact.ID)
-	profileChat, ok := m.allChats[profileChatID]
+	profileChat, ok := m.allChats.Load(profileChatID)
 
 	if !ok {
 		profileChat = CreateProfileChat(profileChatID, contact.ID, m.getTimesource())
@@ -91,7 +91,7 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
 	m.locker.Lock()
 	defer m.locker.Unlock()
-	var response *MessengerResponse
+	response := new(MessengerResponse)
 
 	contact, ok := m.allContacts[pubKey]
 	if !ok {
@@ -115,7 +115,7 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 
 	// Create the corresponding profile chat
 	profileChatID := buildProfileChatID(contact.ID)
-	_, ok = m.allChats[profileChatID]
+	_, ok = m.allChats.Load(profileChatID)
 
 	if ok {
 		chatResponse, err := m.deactivateChat(profileChatID)
@@ -162,9 +162,9 @@ func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
 
 	m.allContacts[contact.ID] = contact
 	for _, chat := range chats {
-		m.allChats[chat.ID] = chat
+		m.allChats.Store(chat.ID, chat)
 	}
-	delete(m.allChats, contact.ID)
+	m.allChats.Delete(contact.ID)
 
 	// re-register for push notifications
 	err = m.reregisterForPushNotifications()
@@ -256,7 +256,7 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		}
 	}
 
-	chat, ok := m.allChats[chatID]
+	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		publicKey, err := contact.PublicKey()
 		if err != nil {
@@ -267,7 +267,8 @@ func (m *Messenger) sendContactUpdate(ctx context.Context, chatID, ensName, prof
 		chat.Active = false
 	}
 
-	m.allChats[chat.ID] = chat
+	// TODO(samyoul) remove storing of an updated reference pointer?
+	m.allChats.Store(chat.ID, chat)
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	contactUpdate := &protobuf.ContactUpdate{
