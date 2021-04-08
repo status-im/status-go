@@ -108,6 +108,21 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 			return errors.New("can't create a new group chat without us being a member")
 		}
 		newChat := CreateGroupChat(messageState.Timesource)
+		// We set group chat inactive and create a notification instead
+		newChat.Active = false
+		notification := &ActivityCenterNotification{
+			ID:        types.FromHex(newChat.ID),
+			Type:      ActivityCenterNotificationTypeNewPrivateGroupChat,
+			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
+			ChatID:    newChat.ID,
+		}
+		err := m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Warn("failed to save notification", zap.Error(err))
+		} else {
+			messageState.Response.AddActivityCenterNotification(notification)
+		}
+
 		chat = &newChat
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)

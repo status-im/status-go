@@ -12,12 +12,44 @@ func (m *Messenger) MarkAllActivityCenterNotificationsRead() error {
 	return m.persistence.MarkAllActivityCenterNotificationsRead()
 }
 
-func (m *Messenger) AcceptAllActivityCenterNotifications() error {
-	return m.persistence.AcceptAllActivityCenterNotifications()
+func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*ActivityCenterNotification) (*MessengerResponse, error) {
+	var response *MessengerResponse
+	m.mutex.Lock()
+	var chats []*Chat
+	for _, notification := range notifications {
+		if notification.ChatID != "" {
+			chat, ok := m.allChats[notification.ChatID]
+			if !ok {
+				// This should not really happen, but ignore just in case it was deleted in the meantime
+				m.logger.Warn("chat not found")
+				continue
+			}
+			chat.Active = true
+
+			chats = append(chats, chat)
+			response.AddChat(chat)
+		}
+	}
+	if len(chats) != 0 {
+		m.saveChats(chats)
+	}
+	m.mutex.Unlock()
+	return response, nil
+}
+func (m *Messenger) AcceptAllActivityCenterNotifications() (*MessengerResponse, error) {
+	notifications, err := m.persistence.AcceptAllActivityCenterNotifications()
+	if err != nil {
+		return nil, err
+	}
+	return m.processAcceptedActivityCenterNotifications(notifications)
 }
 
-func (m *Messenger) AcceptActivityCenterNotifications(ids []types.HexBytes) error {
-	return m.persistence.AcceptActivityCenterNotifications(ids)
+func (m *Messenger) AcceptActivityCenterNotifications(ids []types.HexBytes) (*MessengerResponse, error) {
+	notifications, err := m.persistence.AcceptActivityCenterNotifications(ids)
+	if err != nil {
+		return nil, err
+	}
+	return m.processAcceptedActivityCenterNotifications(notifications)
 }
 
 func (m *Messenger) DismissAllActivityCenterNotifications() error {

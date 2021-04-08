@@ -708,11 +708,11 @@ func (api *PublicAPI) MarkAllActivityCenterNotificationsRead() error {
 	return api.service.messenger.MarkAllActivityCenterNotificationsRead()
 }
 
-func (api *PublicAPI) AcceptAllActivityCenterNotifications() error {
+func (api *PublicAPI) AcceptAllActivityCenterNotifications() (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptAllActivityCenterNotifications()
 }
 
-func (api *PublicAPI) AcceptActivityCenterNotifications(ids []types.HexBytes) error {
+func (api *PublicAPI) AcceptActivityCenterNotifications(ids []types.HexBytes) (*protocol.MessengerResponse, error) {
 	return api.service.messenger.AcceptActivityCenterNotifications(ids)
 }
 

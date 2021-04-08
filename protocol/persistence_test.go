@@ -1099,7 +1099,9 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	// Mark first one as accepted
 
-	require.NoError(t, p.AcceptActivityCenterNotifications([]types.HexBytes{nID1}))
+	notifications, err = p.AcceptActivityCenterNotifications([]types.HexBytes{nID1})
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
 	_, notifications, err = p.ActivityCenterNotifications("", 2)
 	require.NoError(t, err)
 	// It should not be returned anymore
@@ -1122,7 +1124,10 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	// Mark all as accepted
-	require.NoError(t, p.AcceptAllActivityCenterNotifications())
+	notifications, err = p.AcceptAllActivityCenterNotifications()
+	require.NoError(t, err)
+	require.Len(t, notifications, 1)
+
 	_, notifications, err = p.ActivityCenterNotifications("", 2)
 	require.NoError(t, err)
 	// It should not return those

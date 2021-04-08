@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -27,46 +28,9 @@ func (db sqlitePersistence) SaveActivityCenterNotification(notification *Activit
 	return err
 }
 
-func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
-	// We fetch limit + 1 to check for pagination
-	incrementedLimit := int(limit) + 1
-	cursorWhere := ""
-	if currCursor != "" {
-		cursorWhere = "AND cursor <= ?" //nolint: goconst
-	}
-
-	query := fmt.Sprintf(`
-  SELECT
-  a.id,
-  a.timestamp,
-  a.notification_type,
-  a.chat_id,
-  a.read,
-  a.accepted,
-  a.dismissed,
-  c.last_message,
-  substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
-  FROM activity_center_notifications a
-  LEFT JOIN chats c
-  ON
-  c.id = a.chat_id
-  WHERE NOT a.dismissed AND NOT a.accepted
-  %s
-  ORDER BY cursor DESC
-  LIMIT ?`, cursorWhere)
-	args := []interface{}{}
-	if currCursor != "" {
-		args = append(args, currCursor)
-	}
-	args = append(args, incrementedLimit)
-	rows, err := db.db.Query(query, args...)
-	if err != nil {
-		return "", nil, err
-	}
-
-	latestCursor := ""
-
+func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Rows) (string, []*ActivityCenterNotification, error) {
 	var notifications []*ActivityCenterNotification
+	latestCursor := ""
 	for rows.Next() {
 		var chatID sql.NullString
 		var lastMessageBytes []byte
@@ -101,6 +65,82 @@ func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit
 		notifications = append(notifications, notification)
 	}
 
+	return latestCursor, notifications, nil
+
+}
+func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, limit int, ids []types.HexBytes) (string, []*ActivityCenterNotification, error) {
+	args := []interface{}{}
+	cursorWhere := ""
+	inQueryWhere := ""
+	if cursor != "" {
+		cursorWhere = "AND cursor <= ?" //nolint: goconst
+		args = append(args, cursor)
+	}
+
+	if len(ids) != 0 {
+
+		inVector := strings.Repeat("?, ", len(ids)-1) + "?"
+		inQueryWhere = fmt.Sprintf(" AND a.id IN (%s)", inVector)
+		for _, id := range ids {
+			args = append(args, id)
+		}
+
+	}
+
+	query := fmt.Sprintf(`
+  SELECT
+  a.id,
+  a.timestamp,
+  a.notification_type,
+  a.chat_id,
+  a.read,
+  a.accepted,
+  a.dismissed,
+  c.last_message,
+  substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
+  FROM activity_center_notifications a
+  LEFT JOIN chats c
+  ON
+  c.id = a.chat_id
+  WHERE NOT a.dismissed AND NOT a.accepted
+  %s
+  %s
+  ORDER BY cursor DESC`, cursorWhere, inQueryWhere)
+	if limit != 0 {
+		args = append(args, limit)
+		query += ` LIMIT ?`
+	}
+
+	rows, err := tx.Query(query, args...)
+	if err != nil {
+		return "", nil, err
+	}
+	return db.unmarshalActivityCenterNotificationRows(rows)
+}
+
+func (db sqlitePersistence) ActivityCenterNotifications(currCursor string, limit uint64) (string, []*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+	// We fetch limit + 1 to check for pagination
+	incrementedLimit := int(limit) + 1
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return "", nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	latestCursor, notifications, err := db.buildActivityCenterQuery(tx, currCursor, incrementedLimit, nil)
+	if err != nil {
+		return "", nil, err
+	}
+
 	if len(notifications) == incrementedLimit {
 		notifications = notifications[0:limit]
 	} else {
@@ -129,12 +169,55 @@ func (db sqlitePersistence) DismissActivityCenterNotifications(ids []types.HexBy
 
 }
 
-func (db sqlitePersistence) AcceptAllActivityCenterNotifications() error {
-	_, err := db.db.Exec(`UPDATE activity_center_notifications SET accepted = 1 WHERE NOT accepted AND NOT dismissed`)
-	return err
+func (db sqlitePersistence) AcceptAllActivityCenterNotifications() ([]*ActivityCenterNotification, error) {
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, nil)
+
+	_, err = tx.Exec(`UPDATE activity_center_notifications SET accepted = 1 WHERE NOT accepted AND NOT dismissed`)
+	if err != nil {
+		return nil, err
+	}
+	return notifications, nil
 }
 
-func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexBytes) error {
+func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexBytes) ([]*ActivityCenterNotification, error) {
+
+	var tx *sql.Tx
+	var err error
+
+	tx, err = db.db.BeginTx(context.Background(), &sql.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		// don't shadow original error
+		_ = tx.Rollback()
+	}()
+
+	_, notifications, err := db.buildActivityCenterQuery(tx, "", 0, ids)
+
+	if err != nil {
+		return nil, err
+	}
 
 	idsArgs := make([]interface{}, 0, len(ids))
 	for _, id := range ids {
@@ -143,8 +226,8 @@ func (db sqlitePersistence) AcceptActivityCenterNotifications(ids []types.HexByt
 
 	inVector := strings.Repeat("?, ", len(ids)-1) + "?"
 	query := "UPDATE activity_center_notifications SET accepted = 1 WHERE id IN (" + inVector + ")" // nolint: gosec
-	_, err := db.db.Exec(query, idsArgs...)
-	return err
+	_, err = tx.Exec(query, idsArgs...)
+	return notifications, err
 }
 
 func (db sqlitePersistence) MarkAllActivityCenterNotificationsRead() error {
