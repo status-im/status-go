@@ -2586,12 +2586,13 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 				if c, ok := messageState.AllContacts.Load(senderID); ok {
 					contact = c
 				} else {
-					contact, err := buildContact(senderID, publicKey)
+					c, err := buildContact(senderID, publicKey)
 					if err != nil {
 						logger.Info("failed to build contact", zap.Error(err))
 						allMessagesProcessed = false
 						continue
 					}
+					contact = c
 					messageState.AllContacts.Store(senderID, contact)
 					messageState.ModifiedContacts.Store(contact.ID, true)
 				}

@@ -80,6 +80,9 @@ type chatMap struct {
 
 func (cm *chatMap) Load(chatID string) (*Chat, bool) {
 	chat, ok := cm.sm.Load(chatID)
+	if chat == nil {
+		return nil, ok
+	}
 	return chat.(*Chat), ok
 }
 
@@ -114,6 +117,9 @@ type contactMap struct {
 
 func (cm *contactMap) Load(contactID string) (*Contact, bool) {
 	contact, ok := cm.sm.Load(contactID)
+	if contact == nil {
+		return nil, ok
+	}
 	return contact.(*Contact), ok
 }
 
@@ -154,6 +160,9 @@ func (smtm *systemMessageTranslationsMap) Init(set map[protobuf.MembershipUpdate
 
 func (smtm *systemMessageTranslationsMap) Load(eventType protobuf.MembershipUpdateEvent_EventType) (string, bool) {
 	message, ok := smtm.sm.Load(eventType)
+	if message == nil {
+		return "", ok
+	}
 	return message.(string), ok
 }
 
@@ -188,6 +197,9 @@ type installationMap struct {
 
 func (im *installationMap) Load(installationID string) (*multidevice.Installation, bool) {
 	installation, ok := im.sm.Load(installationID)
+	if installation == nil {
+		return nil, ok
+	}
 	return installation.(*multidevice.Installation), ok
 }
 
@@ -242,6 +254,9 @@ type stringBoolMap struct {
 
 func (sbm *stringBoolMap) Load(key string) (bool, bool) {
 	state, ok := sbm.sm.Load(key)
+	if state == nil {
+		return false, ok
+	}
 	return state.(bool), ok
 }
 
