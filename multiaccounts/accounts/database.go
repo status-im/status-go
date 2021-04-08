@@ -58,6 +58,7 @@ func (a *Account) IsOwnAccount() bool {
 
 type Settings struct {
 	// required
+	AcceptChatsContactsOnly   bool             `json:"accept-chats-contacts-only?"`
 	Address                   types.Address    `json:"address"`
 	ChaosMode                 bool             `json:"chaos-mode?,omitempty"`
 	Currency                  string           `json:"currency,omitempty"`
@@ -191,6 +192,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 	)
 
 	switch setting {
+	case "accept-chats-contacts-only?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET accept_chats_contacts_only = ? WHERE synthetic_id = 'id'")
 	case "chaos-mode?":
 		_, ok := value.(bool)
 		if !ok {
@@ -384,7 +391,8 @@ func (db *Database) GetNodeConfig(nodecfg interface{}) error {
 
 func (db *Database) GetSettings() (Settings, error) {
 	var s Settings
-	err := db.db.QueryRow("SELECT address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+	err := db.db.QueryRow("SELECT accept_chats_contacts_only, address, chaos_mode, currency, current_network, custom_bootnodes, custom_bootnodes_enabled, dapps_address, eip1581_address, fleet, hide_home_tooltip, installation_id, key_uid, keycard_instance_uid, keycard_paired_on, keycard_pairing, last_updated, latest_derived_path, link_preview_request_enabled, link_previews_enabled_sites, log_level, mnemonic, name, networks, notifications_enabled, push_notifications_server_enabled, push_notifications_from_contacts_only, remote_push_notifications_enabled, send_push_notifications, push_notifications_block_mentions, photo_path, pinned_mailservers, preferred_name, preview_privacy, public_key, remember_syncing_choice, signing_phrase, stickers_packs_installed, stickers_packs_pending, stickers_recent_stickers, syncing_on_mobile_network, use_mailservers, usernames, appearance, profile_pictures_visibility, wallet_root_address, wallet_set_up_passed, wallet_visible_tokens, waku_bloom_filter_mode, webview_allow_permission_requests FROM settings WHERE synthetic_id = 'id'").Scan(
+		&s.AcceptChatsContactsOnly,
 		&s.Address,
 		&s.ChaosMode,
 		&s.Currency,
