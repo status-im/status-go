@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -106,7 +107,8 @@ type Messenger struct {
 	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
 
-	locker *MessengerLocker
+	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
+	lock sync.Mutex
 }
 
 type dbConfig struct {
@@ -325,7 +327,6 @@ func NewMessenger(
 			database.Close,
 		},
 		logger: logger,
-		locker: NewMessengerLocker(),
 	}
 
 	if c.envelopesMonitorConfig != nil {
@@ -812,10 +813,6 @@ func (m *Messenger) handleEncryptionLayerSubscriptions(subscriptions *encryption
 }
 
 func (m *Messenger) handleENSVerified(records []*ens.VerificationRecord) {
-	lock := m.locker.Get(DatabaseContacts)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var contacts []*Contact
 	for _, record := range records {
 		m.logger.Info("handling record", zap.Any("record", record))
@@ -955,8 +952,8 @@ func (m *Messenger) handlePushNotificationClientRegistrations(c chan struct{}) {
 // Init analyzes chats and contacts in order to setup filters
 // which are responsible for retrieving messages.
 func (m *Messenger) Init() error {
-	m.locker.Lock()
-	defer m.locker.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	// Seed the for color generation
 	rand.Seed(time.Now().Unix())
@@ -1088,10 +1085,6 @@ func (m *Messenger) Shutdown() (err error) {
 }
 
 func (m *Messenger) EnableInstallation(id string) error {
-	lock := m.locker.Get(MessengerInstallations)
-	lock.Lock()
-	defer lock.Unlock()
-
 	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
@@ -1108,10 +1101,6 @@ func (m *Messenger) EnableInstallation(id string) error {
 }
 
 func (m *Messenger) DisableInstallation(id string) error {
-	lock := m.locker.Get(MessengerInstallations)
-	lock.Lock()
-	defer lock.Unlock()
-
 	installation, ok := m.allInstallations.Load(id)
 	if !ok {
 		return errors.New("no installation found")
@@ -1128,9 +1117,6 @@ func (m *Messenger) DisableInstallation(id string) error {
 }
 
 func (m *Messenger) Installations() []*multidevice.Installation {
-	lock := m.locker.Get(MessengerInstallations)
-	lock.Lock()
-	defer lock.Unlock()
 	installations := make([]*multidevice.Installation, m.allInstallations.Len())
 
 	var i = 0
@@ -1153,9 +1139,6 @@ func (m *Messenger) setInstallationMetadata(id string, data *multidevice.Install
 }
 
 func (m *Messenger) SetInstallationMetadata(id string, data *multidevice.InstallationMetadata) error {
-	lock := m.locker.Get(MessengerInstallations)
-	lock.Lock()
-	defer lock.Unlock()
 	return m.setInstallationMetadata(id, data)
 }
 
@@ -1247,10 +1230,6 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 		return nil, err
 	}
 
-	lock := m.locker.Get(chat.ID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	m.allChats.Store(chat.ID, &chat)
 
 	_, err = m.dispatchMessage(ctx, common.RawMessage{
@@ -1277,10 +1256,6 @@ func (m *Messenger) CreateGroupChatWithMembers(ctx context.Context, name string,
 }
 
 func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, adminPK string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "CreateGroupChatFromInvitation"))
 	logger.Info("Creating group chat from invitation", zap.String("name", name))
@@ -1295,10 +1270,6 @@ func (m *Messenger) CreateGroupChatFromInvitation(name string, chatID string, ad
 }
 
 func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string, member string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "RemoveMemberFromGroupChat"))
 	logger.Info("Removing member form group chat", zap.String("chatID", chatID), zap.String("member", member))
@@ -1360,10 +1331,6 @@ func (m *Messenger) RemoveMemberFromGroupChat(ctx context.Context, chatID string
 }
 
 func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddMembersFromGroupChat"))
 	logger.Info("Adding members form group chat", zap.String("chatID", chatID), zap.Any("members", members))
@@ -1453,10 +1420,6 @@ func (m *Messenger) ChangeGroupChatName(ctx context.Context, chatID string, name
 	logger := m.logger.With(zap.String("site", "ChangeGroupChatName"))
 	logger.Info("Changing group chat name", zap.String("chatID", chatID), zap.String("name", name))
 
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return nil, ErrChatNotFound
@@ -1520,10 +1483,6 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 	logger := m.logger.With(zap.String("site", "SendGroupChatInvitationRequest"))
 	logger.Info("Sending group chat invitation request", zap.String("chatID", chatID),
 		zap.String("adminPK", adminPK), zap.String("message", message))
-
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
 
 	var response MessengerResponse
 
@@ -1601,10 +1560,6 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 		return nil, err
 	}
 
-	lock := m.locker.Get(invitationR.ChatId)
-	lock.Lock()
-	defer lock.Unlock()
-
 	invitationR.State = protobuf.GroupChatInvitation_REJECTED
 
 	// Get chat and clock
@@ -1663,10 +1618,6 @@ func (m *Messenger) SendGroupChatInvitationRejection(ctx context.Context, invita
 }
 
 func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, members []string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 	logger := m.logger.With(zap.String("site", "AddAdminsToGroupChat"))
 	logger.Info("Add admins to group chat", zap.String("chatID", chatID), zap.Any("members", members))
@@ -1728,10 +1679,6 @@ func (m *Messenger) AddAdminsToGroupChat(ctx context.Context, chatID string, mem
 }
 
 func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -1795,10 +1742,6 @@ func (m *Messenger) ConfirmJoiningGroup(ctx context.Context, chatID string) (*Me
 }
 
 func (m *Messenger) LeaveGroupChat(ctx context.Context, chatID string, remove bool) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -1900,9 +1843,6 @@ func (m *Messenger) reSendRawMessage(ctx context.Context, messageID string) erro
 
 // ReSendChatMessage pulls a message from the database and sends it again
 func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) error {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-
 	return m.reSendRawMessage(ctx, messageID)
 }
 
@@ -2073,9 +2013,6 @@ func (m *Messenger) dispatchMessage(ctx context.Context, spec common.RawMessage)
 
 // SendChatMessage takes a minimal message and sends it based on the corresponding chat
 func (m *Messenger) SendChatMessage(ctx context.Context, message *common.Message) (*MessengerResponse, error) {
-	lock := m.locker.Get(message.ChatId)
-	lock.Lock()
-	defer lock.Unlock()
 	return m.sendChatMessage(ctx, message)
 }
 
@@ -2228,10 +2165,6 @@ func (m *Messenger) sendChatMessage(ctx context.Context, message *common.Message
 func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) (err error) {
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
-	lock := m.locker.Get(myID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	if _, err = m.sendContactUpdate(ctx, myID, ensName, photoPath); err != nil {
 		return err
 	}
@@ -2264,11 +2197,6 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 
 // SendPairInstallation sends a pair installation message
 func (m *Messenger) SendPairInstallation(ctx context.Context) (*MessengerResponse, error) {
-	// TODO not sure if this lock should be on the installations or on the ChatID
-	lock := m.locker.Get(MessengerInstallations)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var err error
 	var response MessengerResponse
 
@@ -2523,8 +2451,6 @@ func (r *ReceivedMessageState) addNewMessageNotification(publicKey ecdsa.PublicK
 }
 
 func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filter][]*types.Message) (*MessengerResponse, error) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	messageState := &ReceivedMessageState{
 		AllChats:              m.allChats,
 		AllContacts:           m.allContacts,
@@ -3118,11 +3044,6 @@ func (m *Messenger) MessagesExist(ids []string) (map[string]bool, error) {
 }
 
 func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common.Message, string, error) {
-	// TODO should this have a chat level lock?
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	chat, err := m.persistence.Chat(chatID)
 	if err != nil {
 		return nil, "", err
@@ -3153,18 +3074,10 @@ func (m *Messenger) DeleteMessage(id string) error {
 }
 
 func (m *Messenger) DeleteMessagesByChatID(id string) error {
-	// TODO should this have a chat level lock?
-	lock := m.locker.Get(id)
-	lock.Lock()
-	defer lock.Unlock()
-
 	return m.persistence.DeleteMessagesByChatID(id)
 }
 
 func (m *Messenger) ClearHistory(id string) (*MessengerResponse, error) {
-	lock := m.locker.Get(id)
-	lock.Lock()
-	defer lock.Unlock()
 	return m.clearHistory(id)
 }
 
@@ -3192,10 +3105,6 @@ func (m *Messenger) clearHistory(id string) (*MessengerResponse, error) {
 // It returns the number of affected messages or error. If there is an error,
 // the number of affected messages is always zero.
 func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	count, err := m.persistence.MarkMessagesSeen(chatID, ids)
 	if err != nil {
 		return 0, err
@@ -3209,9 +3118,6 @@ func (m *Messenger) MarkMessagesSeen(chatID string, ids []string) (uint64, error
 }
 
 func (m *Messenger) MarkAllRead(chatID string) error {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
@@ -3231,9 +3137,6 @@ func (m *Messenger) MarkAllRead(chatID string) error {
 // MuteChat signals to the messenger that we don't want to be notified
 // on new messages from this chat
 func (m *Messenger) MuteChat(chatID string) error {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
@@ -3254,9 +3157,6 @@ func (m *Messenger) MuteChat(chatID string) error {
 // UnmuteChat signals to the messenger that we want to be notified
 // on new messages from this chat
 func (m *Messenger) UnmuteChat(chatID string) error {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
 		return errors.New("chat not found")
@@ -3288,10 +3188,6 @@ func GenerateAlias(id string) (string, error) {
 }
 
 func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contract, address string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -3367,10 +3263,6 @@ func (m *Messenger) RequestTransaction(ctx context.Context, chatID, value, contr
 }
 
 func (m *Messenger) RequestAddressForTransaction(ctx context.Context, chatID, from, value, contract string) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -3458,10 +3350,6 @@ func (m *Messenger) AcceptRequestAddressForTransaction(ctx context.Context, mess
 	}
 
 	chatID := message.LocalChatID
-
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
 
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
@@ -3557,10 +3445,6 @@ func (m *Messenger) DeclineRequestTransaction(ctx context.Context, messageID str
 
 	chatID := message.LocalChatID
 
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -3642,10 +3526,6 @@ func (m *Messenger) DeclineRequestAddressForTransaction(ctx context.Context, mes
 
 	chatID := message.LocalChatID
 
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
 	if !ok {
@@ -3726,9 +3606,6 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 	}
 
 	chatID := message.LocalChatID
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
 
 	// A valid added chat is required.
 	chat, ok := m.allChats.Load(chatID)
@@ -3814,10 +3691,6 @@ func (m *Messenger) AcceptRequestTransaction(ctx context.Context, transactionHas
 }
 
 func (m *Messenger) SendTransaction(ctx context.Context, chatID, value, contract, transactionHash string, signature []byte) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 
 	// A valid added chat is required.
@@ -3900,9 +3773,6 @@ func (m *Messenger) ValidateTransactions(ctx context.Context, addresses []types.
 	if m.verifyTransactionClient == nil {
 		return nil, nil
 	}
-
-	m.locker.Lock()
-	defer m.locker.Unlock()
 
 	logger := m.logger.With(zap.String("site", "ValidateTransactions"))
 	logger.Debug("Validating transactions")
@@ -4124,9 +3994,8 @@ func (m *Messenger) RegisterForPushNotifications(ctx context.Context, deviceToke
 	if m.pushNotificationClient == nil {
 		return errors.New("push notification client not enabled")
 	}
-	lock := m.locker.Get(MessengerPushNotifications)
-	lock.Lock()
-	defer lock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	err := m.pushNotificationClient.Register(deviceToken, apnTopic, tokenType, m.pushNotificationOptions())
 	if err != nil {
@@ -4149,9 +4018,8 @@ func (m *Messenger) EnablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	lock := m.locker.Get(MessengerPushNotifications)
-	lock.Lock()
-	defer lock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	return m.pushNotificationClient.EnablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
@@ -4161,9 +4029,8 @@ func (m *Messenger) DisablePushNotificationsFromContactsOnly() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	lock := m.locker.Get(MessengerPushNotifications)
-	lock.Lock()
-	defer lock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	return m.pushNotificationClient.DisablePushNotificationsFromContactsOnly(m.pushNotificationOptions())
 }
@@ -4173,9 +4040,8 @@ func (m *Messenger) EnablePushNotificationsBlockMentions() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	lock := m.locker.Get(MessengerPushNotifications)
-	lock.Lock()
-	defer lock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	return m.pushNotificationClient.EnablePushNotificationsBlockMentions(m.pushNotificationOptions())
 }
@@ -4185,9 +4051,8 @@ func (m *Messenger) DisablePushNotificationsBlockMentions() error {
 	if m.pushNotificationClient == nil {
 		return errors.New("no push notification client")
 	}
-	lock := m.locker.Get(MessengerPushNotifications)
-	lock.Lock()
-	defer lock.Unlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	return m.pushNotificationClient.DisablePushNotificationsBlockMentions(m.pushNotificationOptions())
 }
@@ -4236,10 +4101,6 @@ func generateAliasAndIdenticon(pk string) (string, string, error) {
 }
 
 func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID string, emojiID protobuf.EmojiReaction_Type) (*MessengerResponse, error) {
-	lock := m.locker.Get(chatID)
-	lock.Lock()
-	defer lock.Unlock()
-
 	var response MessengerResponse
 
 	chat, ok := m.allChats.Load(chatID)
@@ -4311,10 +4172,6 @@ func (m *Messenger) SendEmojiReactionRetraction(ctx context.Context, emojiReacti
 	if err != nil {
 		return nil, err
 	}
-
-	lock := m.locker.Get(emojiR.GetChatId())
-	lock.Lock()
-	defer lock.Unlock()
 
 	// Check that the sender is the key owner
 	pk := types.EncodeHex(crypto.FromECDSAPub(&m.identity.PublicKey))

@@ -11,14 +11,10 @@ import (
 )
 
 func (m *Messenger) SaveContact(contact *Contact) error {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	return m.saveContact(contact)
 }
 
 func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	contact, ok := m.allContacts.Load(pubKey)
 	if !ok {
 		var err error
@@ -90,8 +86,6 @@ func (m *Messenger) AddContact(ctx context.Context, pubKey string) (*MessengerRe
 }
 
 func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*MessengerResponse, error) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	response := new(MessengerResponse)
 
 	contact, ok := m.allContacts.Load(pubKey)
@@ -135,8 +129,6 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 }
 
 func (m *Messenger) Contacts() []*Contact {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	var contacts []*Contact
 	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
 		if contact.HasCustomFields() {
@@ -149,16 +141,11 @@ func (m *Messenger) Contacts() []*Contact {
 
 // GetContactByID assumes pubKey includes 0x prefix
 func (m *Messenger) GetContactByID(pubKey string) *Contact {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-
 	contact, _ := m.allContacts.Load(pubKey)
 	return contact
 }
 
 func (m *Messenger) BlockContact(contact *Contact) ([]*Chat, error) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	chats, err := m.persistence.BlockContact(contact)
 	if err != nil {
 		return nil, err
@@ -215,9 +202,6 @@ func (m *Messenger) saveContact(contact *Contact) error {
 
 // Send contact updates to all contacts added by us
 func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImage string) (err error) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
-
 	myID := contactIDFromPublicKey(&m.identity.PublicKey)
 
 	if _, err = m.sendContactUpdate(ctx, myID, ensName, profileImage); err != nil {
@@ -244,8 +228,6 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 
 // SendContactUpdate sends a contact update to a user and adds the user to contacts
 func (m *Messenger) SendContactUpdate(ctx context.Context, chatID, ensName, profileImage string) (*MessengerResponse, error) {
-	m.locker.Lock()
-	defer m.locker.Unlock()
 	return m.sendContactUpdate(ctx, chatID, ensName, profileImage)
 }
 
