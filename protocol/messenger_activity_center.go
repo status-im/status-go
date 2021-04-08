@@ -31,7 +31,10 @@ func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*
 		}
 	}
 	if len(chats) != 0 {
-		m.saveChats(chats)
+		err := m.saveChats(chats)
+		if err != nil {
+			return nil, err
+		}
 	}
 	m.mutex.Unlock()
 	return response, nil

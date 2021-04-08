@@ -87,7 +87,8 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
 
 	}
 
-	query := fmt.Sprintf(`
+	query := fmt.Sprintf( // nolint: gosec
+		`
   SELECT
   a.id,
   a.timestamp,

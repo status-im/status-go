@@ -1038,7 +1038,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	require.NoError(t, err)
 
 	notification := &ActivityCenterNotification{
-		ID:        types.HexBytes(nID1),
+		ID:        nID1,
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		ChatID:    chat.ID,
 		Timestamp: 1,
@@ -1056,7 +1056,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 	// Add another notification
 
 	notification = &ActivityCenterNotification{
-		ID:        types.HexBytes(nID2),
+		ID:        nID2,
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		Timestamp: 2,
 	}
@@ -1116,7 +1116,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	// Insert new notification
 	notification = &ActivityCenterNotification{
-		ID:        types.HexBytes(nID3),
+		ID:        nID3,
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		Timestamp: 3,
 	}
@@ -1135,7 +1135,7 @@ func TestActivityCenterPersistence(t *testing.T) {
 
 	// Insert new notification
 	notification = &ActivityCenterNotification{
-		ID:        types.HexBytes(nID4),
+		ID:        nID4,
 		Type:      ActivityCenterNotificationTypeNewOneToOne,
 		Timestamp: 4,
 	}
