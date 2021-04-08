@@ -796,6 +796,7 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	s.Require().NoError(err)
 
 	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
 	actualChat := response.Chats()[0]
 	// It updates the unviewed messages count
 	s.Require().Equal(uint(1), actualChat.UnviewedMessagesCount)
@@ -803,8 +804,8 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateChatNonExisting() {
 	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message
 	s.Require().NotNil(actualChat.LastMessage)
-	// It sets the chat as active
-	s.Require().True(actualChat.Active)
+	// It does not set the chat as active
+	s.Require().False(actualChat.Active)
 }
 
 // Test receiving a message on an non-existing public chat
@@ -852,12 +853,15 @@ func (s *MessengerSuite) TestRetrieveTheirPrivateGroupChat() {
 	s.NoError(err)
 
 	// Retrieve their messages so that the chat is created
-	_, err = WaitOnMessengerResponse(
+	response, err = WaitOnMessengerResponse(
 		theirMessenger,
 		func(r *MessengerResponse) bool { return len(r.Chats()) > 0 },
 		"chat invitation not received",
 	)
 	s.Require().NoError(err)
+	s.Require().Len(response.Chats(), 1)
+	s.Require().Len(response.ActivityCenterNotifications(), 1)
+	s.Require().False(response.Chats()[0].Active)
 
 	_, err = theirMessenger.ConfirmJoiningGroup(context.Background(), ourChat.ID)
 	s.NoError(err)

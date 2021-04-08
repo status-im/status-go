@@ -66,9 +66,11 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		return err
 	}
 
+	m.logger.Info("CHHHHAT", zap.Any("chat", chat))
 	//if chat.InvitationAdmin exists means we are waiting for invitation request approvement, and in that case
 	//we need to create a new chat instance like we don't have a chat and just use a regular invitation flow
 	if chat == nil || len(chat.InvitationAdmin) > 0 {
+		m.logger.Info("EMPTY CHAT")
 		if len(message.Events) == 0 {
 			return errors.New("can't create new group chat without events")
 		}
@@ -109,20 +111,8 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		}
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
+		// unless is coming from us the message(TODO)
 		newChat.Active = false
-		notification := &ActivityCenterNotification{
-			ID:        types.FromHex(newChat.ID),
-			Type:      ActivityCenterNotificationTypeNewPrivateGroupChat,
-			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
-			ChatID:    newChat.ID,
-		}
-		err := m.persistence.SaveActivityCenterNotification(notification)
-		if err != nil {
-			m.logger.Warn("failed to save notification", zap.Error(err))
-		} else {
-			messageState.Response.AddActivityCenterNotification(notification)
-		}
-
 		chat = &newChat
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
@@ -141,6 +131,21 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 	}
 
 	chat.updateChatFromGroupMembershipChanges(contactIDFromPublicKey(&m.identity.PublicKey), group)
+
+	if !chat.Active {
+		notification := &ActivityCenterNotification{
+			ID:        types.FromHex(chat.ID),
+			Type:      ActivityCenterNotificationTypeNewPrivateGroupChat,
+			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
+			ChatID:    chat.ID,
+		}
+		err := m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Warn("failed to save notification", zap.Error(err))
+		} else {
+			messageState.Response.AddActivityCenterNotification(notification)
+		}
+	}
 
 	systemMessages := buildSystemMessages(message.Events, translations)
 
@@ -813,6 +818,8 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 		if chat == nil {
 			// TODO: this should be a three-word name used in the mobile client
 			chat = CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
+			// We set the chat as inactive and will create a notification
+			chat.Active = false
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:

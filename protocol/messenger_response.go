@@ -127,6 +127,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.Mailservers)+
 		len(r.MailserverRanges)+
 		len(r.notifications)+
+		len(r.activityCenterNotifications)+
 		len(r.RequestsToJoinCommunity) == 0
 }
 
