@@ -6,6 +6,7 @@ package protocol
 //  much depends on what we are trying to protect.
 
 import (
+	"github.com/status-im/status-go/protocol/protobuf"
 	"sync"
 )
 
@@ -91,8 +92,8 @@ type contactMap struct {
 }
 
 func (cm *contactMap) Load(contactID string) (*Contact, bool) {
-	chat, ok := cm.sm.Load(contactID)
-	return chat.(*Contact), ok
+	contact, ok := cm.sm.Load(contactID)
+	return contact.(*Contact), ok
 }
 
 func (cm *contactMap) Store(contactID string, contact *Contact) {
@@ -110,3 +111,32 @@ func (cm *contactMap) Delete(contactID string) {
 	cm.sm.Delete(contactID)
 }
 
+type systemMessageTranslationsMap struct {
+	sm sync.Map
+}
+
+func (smtm *systemMessageTranslationsMap) Init(set map[protobuf.MembershipUpdateEvent_EventType]string) {
+	for eventType, message := range set {
+		smtm.Store(eventType, message)
+	}
+}
+
+func (smtm *systemMessageTranslationsMap) Load(eventType protobuf.MembershipUpdateEvent_EventType) (string, bool) {
+	message, ok := smtm.sm.Load(eventType)
+	return message.(string), ok
+}
+
+func (smtm *systemMessageTranslationsMap) Store(eventType protobuf.MembershipUpdateEvent_EventType, message string) {
+	smtm.sm.Store(eventType, message)
+}
+
+func (smtm *systemMessageTranslationsMap) Range(f func(eventType protobuf.MembershipUpdateEvent_EventType, message string) (shouldContinue bool)) {
+	nf := func(key, value interface{}) (shouldContinue bool){
+		return f(key.(protobuf.MembershipUpdateEvent_EventType), value.(string))
+	}
+	smtm.sm.Range(nf)
+}
+
+func (smtm *systemMessageTranslationsMap) Delete(eventType protobuf.MembershipUpdateEvent_EventType) {
+	smtm.sm.Delete(eventType)
+}

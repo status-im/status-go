@@ -92,7 +92,7 @@ type Messenger struct {
 	featureFlags               common.FeatureFlags
 	shutdownTasks              []func() error
 	shouldPublishContactCode   bool
-	systemMessagesTranslations map[protobuf.MembershipUpdateEvent_EventType]string
+	systemMessagesTranslations *systemMessageTranslationsMap
 	allChats                   *chatMap
 	allContacts                *contactMap
 	allInstallations           map[string]*multidevice.Installation
@@ -299,6 +299,8 @@ func NewMessenger(
 		ensVerifier:                ensVerifier,
 		featureFlags:               c.featureFlags,
 		systemMessagesTranslations: c.systemMessagesTranslations,
+		allChats:                   new(chatMap),
+		allContacts:                new(contactMap),
 		allInstallations:           make(map[string]*multidevice.Installation),
 		installationID:             installationID,
 		modifiedInstallations:      make(map[string]bool),
@@ -2230,7 +2232,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 
-	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool){
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		if !chat.Timeline() && !chat.ProfileUpdates() && chat.Public() && chat.Active {
 			err = m.syncPublicChat(ctx, chat)
 			if err != nil {
@@ -2244,7 +2246,7 @@ func (m *Messenger) SyncDevices(ctx context.Context, ensName, photoPath string) 
 		return err
 	}
 
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.IsAdded() && contact.ID != myID {
 			if err = m.syncContact(ctx, contact); err != nil {
 				return false
@@ -4075,7 +4077,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 	var mutedChatIDs []string
 	var publicChatIDs []string
 
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.IsAdded() && !contact.IsBlocked() {
 			pk, err := contact.PublicKey()
 			if err != nil {
@@ -4089,7 +4091,7 @@ func (m *Messenger) pushNotificationOptions() *pushnotificationclient.Registrati
 		return true
 	})
 
-	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool){
+	m.allChats.Range(func(chatID string, chat *Chat) (shouldContinue bool) {
 		if chat.Muted {
 			mutedChatIDs = append(mutedChatIDs, chat.ID)
 		}
@@ -4282,7 +4284,7 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 
 	if chat.Timeline() {
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
-		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
+		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 			if contact.IsAdded() {
 				chatIDs = append(chatIDs, "@"+contact.ID)
 			}

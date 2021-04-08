@@ -11,14 +11,19 @@ import (
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 )
 
-var defaultSystemMessagesTranslations = map[protobuf.MembershipUpdateEvent_EventType]string{
-	protobuf.MembershipUpdateEvent_CHAT_CREATED:   "{{from}} created the group {{name}}",
-	protobuf.MembershipUpdateEvent_NAME_CHANGED:   "{{from}} changed the group's name to {{name}}",
-	protobuf.MembershipUpdateEvent_MEMBERS_ADDED:  "{{from}} has invited {{members}}",
-	protobuf.MembershipUpdateEvent_MEMBER_JOINED:  "{{from}} joined the group",
-	protobuf.MembershipUpdateEvent_ADMINS_ADDED:   "{{from}} has made {{members}} admin",
-	protobuf.MembershipUpdateEvent_MEMBER_REMOVED: "{{member}} left the group",
-	protobuf.MembershipUpdateEvent_ADMIN_REMOVED:  "{{member}} is not admin anymore",
+var defaultSystemMessagesTranslations = new(systemMessageTranslationsMap)
+
+func init() {
+	defaultSystemMessagesTranslationSet := map[protobuf.MembershipUpdateEvent_EventType]string{
+		protobuf.MembershipUpdateEvent_CHAT_CREATED:   "{{from}} created the group {{name}}",
+		protobuf.MembershipUpdateEvent_NAME_CHANGED:   "{{from}} changed the group's name to {{name}}",
+		protobuf.MembershipUpdateEvent_MEMBERS_ADDED:  "{{from}} has invited {{members}}",
+		protobuf.MembershipUpdateEvent_MEMBER_JOINED:  "{{from}} joined the group",
+		protobuf.MembershipUpdateEvent_ADMINS_ADDED:   "{{from}} has made {{members}} admin",
+		protobuf.MembershipUpdateEvent_MEMBER_REMOVED: "{{member}} left the group",
+		protobuf.MembershipUpdateEvent_ADMIN_REMOVED:  "{{member}} is not admin anymore",
+	}
+	defaultSystemMessagesTranslations.Init(defaultSystemMessagesTranslationSet)
 }
 
 func tsprintf(format string, params map[string]string) string {
@@ -28,32 +33,39 @@ func tsprintf(format string, params map[string]string) string {
 	return format
 }
 
-func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) *common.Message {
+func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations *systemMessageTranslationsMap) *common.Message {
 	var text string
 	switch e.Type {
 	case protobuf.MembershipUpdateEvent_CHAT_CREATED:
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_CHAT_CREATED], map[string]string{"from": "@" + e.From, "name": e.Name})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_CHAT_CREATED)
+		text = tsprintf(message, map[string]string{"from": "@" + e.From, "name": e.Name})
 	case protobuf.MembershipUpdateEvent_NAME_CHANGED:
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_NAME_CHANGED], map[string]string{"from": "@" + e.From, "name": e.Name})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_NAME_CHANGED)
+		text = tsprintf(message, map[string]string{"from": "@" + e.From, "name": e.Name})
 	case protobuf.MembershipUpdateEvent_MEMBERS_ADDED:
 
 		var memberMentions []string
 		for _, s := range e.Members {
 			memberMentions = append(memberMentions, "@"+s)
 		}
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_MEMBERS_ADDED], map[string]string{"from": "@" + e.From, "members": strings.Join(memberMentions, ", ")})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_MEMBERS_ADDED)
+		text = tsprintf(message, map[string]string{"from": "@" + e.From, "members": strings.Join(memberMentions, ", ")})
 	case protobuf.MembershipUpdateEvent_MEMBER_JOINED:
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_MEMBER_JOINED], map[string]string{"from": "@" + e.From})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_MEMBER_JOINED)
+		text = tsprintf(message, map[string]string{"from": "@" + e.From})
 	case protobuf.MembershipUpdateEvent_ADMINS_ADDED:
 		var memberMentions []string
 		for _, s := range e.Members {
 			memberMentions = append(memberMentions, "@"+s)
 		}
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_ADMINS_ADDED], map[string]string{"from": "@" + e.From, "members": strings.Join(memberMentions, ", ")})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_ADMINS_ADDED)
+		text = tsprintf(message, map[string]string{"from": "@" + e.From, "members": strings.Join(memberMentions, ", ")})
 	case protobuf.MembershipUpdateEvent_MEMBER_REMOVED:
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_MEMBER_REMOVED], map[string]string{"member": "@" + e.Members[0]})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_MEMBER_REMOVED)
+		text = tsprintf(message, map[string]string{"member": "@" + e.Members[0]})
 	case protobuf.MembershipUpdateEvent_ADMIN_REMOVED:
-		text = tsprintf(translations[protobuf.MembershipUpdateEvent_ADMIN_REMOVED], map[string]string{"member": "@" + e.Members[0]})
+		message, _ := translations.Load(protobuf.MembershipUpdateEvent_ADMIN_REMOVED)
+		text = tsprintf(message, map[string]string{"member": "@" + e.Members[0]})
 
 	}
 	timestamp := v1protocol.TimestampInMsFromTime(time.Now())
@@ -76,7 +88,7 @@ func eventToSystemMessage(e v1protocol.MembershipUpdateEvent, translations map[p
 	return message
 }
 
-func buildSystemMessages(events []v1protocol.MembershipUpdateEvent, translations map[protobuf.MembershipUpdateEvent_EventType]string) []*common.Message {
+func buildSystemMessages(events []v1protocol.MembershipUpdateEvent, translations *systemMessageTranslationsMap) []*common.Message {
 	var messages []*common.Message
 
 	for _, e := range events {

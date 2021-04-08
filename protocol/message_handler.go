@@ -49,7 +49,7 @@ func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persisten
 // HandleMembershipUpdate updates a Chat instance according to the membership updates.
 // It retrieves chat, if exists, and merges membership updates from the message.
 // Finally, the Chat is updated with the new group events.
-func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageState, chat *Chat, rawMembershipUpdate protobuf.MembershipUpdateMessage, translations map[protobuf.MembershipUpdateEvent_EventType]string) error {
+func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageState, chat *Chat, rawMembershipUpdate protobuf.MembershipUpdateMessage, translations *systemMessageTranslationsMap) error {
 	var group *v1protocol.Group
 	var err error
 
