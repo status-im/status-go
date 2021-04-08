@@ -163,7 +163,9 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 
 	// Store in chats map as it might be a new one
 	messageState.AllChats[chat.ID] = chat
-	messageState.Response.AddChat(chat)
+	if chat.Active {
+		messageState.Response.AddChat(chat)
+	}
 
 	if message.Message != nil {
 		messageState.CurrentMessageState.Message = *message.Message
@@ -221,7 +223,20 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	}
 
 	// Set chat active
-	chat.Active = true
+	if !chat.Active {
+		notification := &ActivityCenterNotification{
+			ID:        types.FromHex(chat.ID),
+			Type:      ActivityCenterNotificationTypeNewOneToOne,
+			Timestamp: state.CurrentMessageState.WhisperTimestamp,
+			ChatID:    chat.ID,
+		}
+		err := m.persistence.SaveActivityCenterNotification(notification)
+		if err != nil {
+			m.logger.Warn("failed to save notification", zap.Error(err))
+		} else {
+			state.Response.AddActivityCenterNotification(notification)
+		}
+	}
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
@@ -315,7 +330,9 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 		chat.LastClockValue = message.Clock
 	}
 
-	state.Response.AddChat(chat)
+	if chat.Active {
+		state.Response.AddChat(chat)
+	}
 	state.AllChats[chat.ID] = chat
 
 	return nil
@@ -535,7 +552,9 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 
 	}
 	// Set in the modified maps chat
-	state.Response.AddChat(chat)
+	if chat.Active {
+		state.Response.AddChat(chat)
+	}
 	state.AllChats[chat.ID] = chat
 
 	contact := state.CurrentMessageState.Contact
@@ -941,7 +960,9 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 		chat.LastClockValue = pbEmojiR.Clock
 	}
 
-	state.Response.AddChat(chat)
+	if chat.Active {
+		state.Response.AddChat(chat)
+	}
 	state.AllChats[chat.ID] = chat
 
 	// save emoji reaction

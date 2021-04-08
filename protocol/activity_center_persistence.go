@@ -34,6 +34,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 	for rows.Next() {
 		var chatID sql.NullString
 		var lastMessageBytes []byte
+		var name sql.NullString
 		notification := &ActivityCenterNotification{}
 		err := rows.Scan(
 			&notification.ID,
@@ -44,6 +45,7 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 			&notification.Accepted,
 			&notification.Dismissed,
 			&lastMessageBytes,
+			&name,
 			&latestCursor)
 		if err != nil {
 			return "", nil, err
@@ -51,6 +53,10 @@ func (db sqlitePersistence) unmarshalActivityCenterNotificationRows(rows *sql.Ro
 		if chatID.Valid {
 			notification.ChatID = chatID.String
 
+		}
+
+		if name.Valid {
+			notification.Name = name.String
 		}
 
 		// Restore last message
@@ -98,6 +104,7 @@ func (db sqlitePersistence) buildActivityCenterQuery(tx *sql.Tx, cursor string, 
   a.accepted,
   a.dismissed,
   c.last_message,
+  c.name,
   substr('0000000000000000000000000000000000000000000000000000000000000000' || a.timestamp, -64, 64) || a.id as cursor
   FROM activity_center_notifications a
   LEFT JOIN chats c

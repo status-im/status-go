@@ -34,6 +34,7 @@
 // 0018_profile_pictures_visibility.up.sql (84B)
 // 0019_blocks_ranges_extra_data.up.sql (89B)
 // 0020_metrics.up.sql (235B)
+// 0021_contacts_only.up.sql (136B)
 // doc.go (74B)
 
 package migrations
@@ -783,6 +784,26 @@ func _0020_metricsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __0021_contacts_onlyUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x7c\xcc\x31\x0e\xc2\x30\x0c\x05\xd0\xbd\xa7\xf8\x47\x60\xaf\x18\x5c\xe2\x4e\xa6\x41\xd4\x99\xa3\xaa\x0a\x15\x12\x49\x24\xec\x85\xdb\xb3\x32\x71\x81\x47\xa2\x7c\x87\xd2\x24\x0c\x2b\xee\xcf\x76\x18\x28\x04\x5c\xa2\xa4\xeb\x82\x5a\xcc\xb6\xa3\x58\x7e\xbc\x7b\xcd\x7b\x6f\xbe\xed\x6e\xb9\xb7\xd7\x07\x53\x8c\xc2\xb4\x20\xf0\x4c\x49\x14\x33\xc9\xca\xe3\x90\x6e\x81\xf4\x47\x5b\x59\xff\x32\x67\x9c\xc6\xe1\x1b\x00\x00\xff\xff\x99\x20\xa4\x1d\x88\x00\x00\x00")
+
+func _0021_contacts_onlyUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0021_contacts_onlyUpSql,
+		"0021_contacts_only.up.sql",
+	)
+}
+
+func _0021_contacts_onlyUpSql() (*asset, error) {
+	bytes, err := _0021_contacts_onlyUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0021_contacts_only.up.sql", size: 136, mode: os.FileMode(0644), modTime: time.Unix(1617889397, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x1, 0xe3, 0xd0, 0xe7, 0xf2, 0x6e, 0xbf, 0x27, 0xf6, 0xe2, 0x2e, 0x16, 0x4b, 0x52, 0x3b, 0xcf, 0x63, 0x52, 0xfc, 0x1d, 0x43, 0xba, 0x42, 0xf9, 0x1e, 0x1e, 0x39, 0x40, 0xed, 0x0, 0x20, 0xa8}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -962,6 +983,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0020_metrics.up.sql": _0020_metricsUpSql,
 
+	"0021_contacts_only.up.sql": _0021_contacts_onlyUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1040,6 +1063,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0018_profile_pictures_visibility.up.sql":         &bintree{_0018_profile_pictures_visibilityUpSql, map[string]*bintree{}},
 	"0019_blocks_ranges_extra_data.up.sql":            &bintree{_0019_blocks_ranges_extra_dataUpSql, map[string]*bintree{}},
 	"0020_metrics.up.sql":                             &bintree{_0020_metricsUpSql, map[string]*bintree{}},
+	"0021_contacts_only.up.sql":                       &bintree{_0021_contacts_onlyUpSql, map[string]*bintree{}},
 	"doc.go":                                          &bintree{docGo, map[string]*bintree{}},
 }}
 

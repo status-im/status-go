@@ -632,7 +632,7 @@ func _1617694931_add_notification_centerUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1617694931_add_notification_center.up.sql", size: 394, mode: os.FileMode(0644), modTime: time.Unix(1617792521, 0)}
+	info := bindataFileInfo{name: "1617694931_add_notification_center.up.sql", size: 394, mode: os.FileMode(0644), modTime: time.Unix(1617871671, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x9c, 0xc8, 0xa7, 0xde, 0xa6, 0xfb, 0x78, 0x42, 0x6f, 0x83, 0xba, 0x89, 0x7, 0x68, 0xcd, 0x13, 0x93, 0x8, 0x97, 0xc8, 0xd7, 0x5c, 0xf0, 0xd1, 0x3f, 0x24, 0x8d, 0x25, 0x79, 0xa8, 0xb6, 0x75}}
 	return a, nil
 }

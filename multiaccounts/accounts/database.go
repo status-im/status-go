@@ -78,6 +78,7 @@ type Settings struct {
 	LinkPreviewRequestEnabled bool             `json:"link-preview-request-enabled,omitempty"`
 	LinkPreviewsEnabledSites  *json.RawMessage `json:"link-previews-enabled-sites,omitempty"`
 	LogLevel                  *string          `json:"log-level,omitempty"`
+	MessagesFromContactsOnly  bool             `json:"messages-from-contacts-only"`
 	Mnemonic                  *string          `json:"mnemonic,omitempty"`
 	Name                      string           `json:"name,omitempty"`
 	Networks                  *json.RawMessage `json:"networks/networks"`
@@ -229,6 +230,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET hide_home_tooltip = ? WHERE synthetic_id = 'id'")
+	case "messages-from-contacts-only":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET messages_from_contacts_only = ? WHERE synthetic_id = 'id'")
 	case "keycard-instance_uid":
 		update, err = db.db.Prepare("UPDATE settings SET keycard_instance_uid = ? WHERE synthetic_id = 'id'")
 	case "keycard-paired_on":
@@ -533,6 +540,15 @@ func (db *Database) DeleteAccount(address types.Address) error {
 func (db *Database) GetNotificationsEnabled() (bool, error) {
 	var result bool
 	err := db.db.QueryRow("SELECT notifications_enabled FROM settings WHERE synthetic_id = 'id'").Scan(&result)
+	if err == sql.ErrNoRows {
+		return result, nil
+	}
+	return result, err
+}
+
+func (db *Database) GetMessagesFromContactsOnly() (bool, error) {
+	var result bool
+	err := db.db.QueryRow("SELECT messages_from_contacts_only FROM settings WHERE synthetic_id = 'id'").Scan(&result)
 	if err == sql.ErrNoRows {
 		return result, nil
 	}

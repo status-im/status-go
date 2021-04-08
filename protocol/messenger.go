@@ -2573,6 +2573,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
 						logger.Debug("Handling MembershipUpdateMessage")
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
 
 						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
 
@@ -2585,6 +2594,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.ChatMessage:
 						logger.Debug("Handling ChatMessage")
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
 						err = m.handler.HandleChatMessage(messageState)
 						if err != nil {
@@ -2645,6 +2664,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.RequestAddressForTransaction:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)
 						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))
 						err = m.handler.HandleRequestAddressForTransaction(messageState, command)
@@ -2655,6 +2684,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.SendTransaction:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						command := msg.ParsedMessage.Interface().(protobuf.SendTransaction)
 						logger.Debug("Handling SendTransaction", zap.Any("message", command))
 						err = m.handler.HandleSendTransaction(messageState, command)
@@ -2665,6 +2704,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.AcceptRequestAddressForTransaction:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						command := msg.ParsedMessage.Interface().(protobuf.AcceptRequestAddressForTransaction)
 						logger.Debug("Handling AcceptRequestAddressForTransaction")
 						err = m.handler.HandleAcceptRequestAddressForTransaction(messageState, command)
@@ -2675,6 +2724,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeclineRequestAddressForTransaction:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestAddressForTransaction)
 						logger.Debug("Handling DeclineRequestAddressForTransaction")
 						err = m.handler.HandleDeclineRequestAddressForTransaction(messageState, command)
@@ -2685,6 +2744,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeclineRequestTransaction:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestTransaction)
 						logger.Debug("Handling DeclineRequestTransaction")
 						err = m.handler.HandleDeclineRequestTransaction(messageState, command)
@@ -2695,7 +2764,18 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.RequestTransaction:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						command := msg.ParsedMessage.Interface().(protobuf.RequestTransaction)
+
 						logger.Debug("Handling RequestTransaction")
 						err = m.handler.HandleRequestTransaction(messageState, command)
 						if err != nil {
@@ -2705,6 +2785,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.ContactUpdate:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						logger.Debug("Handling ContactUpdate")
 						contactUpdate := msg.ParsedMessage.Interface().(protobuf.ContactUpdate)
 						err = m.handler.HandleContactUpdate(messageState, contactUpdate)
@@ -2811,6 +2901,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.GroupChatInvitation:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						logger.Debug("Handling GroupChatInvitation")
 						err = m.handler.HandleGroupChatInvitation(messageState, msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation))
 						if err != nil {
@@ -2819,7 +2919,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.ChatIdentity:
-						logger.Debug("Received ChatIdentity")
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						err = m.handler.HandleChatIdentity(messageState, msg.ParsedMessage.Interface().(protobuf.ChatIdentity))
 						if err != nil {
 							logger.Warn("failed to handle ChatIdentity", zap.Error(err))
@@ -2836,6 +2945,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.CommunityInvitation:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						logger.Debug("Handling CommunityInvitation")
 						invitation := msg.ParsedMessage.Interface().(protobuf.CommunityInvitation)
 						err = m.handler.HandleCommunityInvitation(messageState, publicKey, invitation, invitation.CommunityDescription)
@@ -2845,6 +2964,16 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 					case protobuf.CommunityRequestToJoin:
+						allowed, err := m.allowMessageFrom(contact.ID)
+						if err != nil {
+							logger.Warn("failed to check if message is allowed", zap.Error(err))
+							continue
+						}
+						if !allowed {
+							logger.Debug("message not allowed")
+							continue
+						}
+
 						logger.Debug("Handling CommunityRequestToJoin")
 						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoin)
 						err = m.handler.HandleCommunityRequestToJoin(messageState, publicKey, request)
@@ -3036,6 +3165,29 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 // SetMailserver sets the currently used mailserver
 func (m *Messenger) SetMailserver(peer []byte) {
 	m.mailserver = peer
+}
+
+func (m *Messenger) allowMessageFrom(publicKey string) (bool, error) {
+	onlyFromContacts, err := m.settings.GetMessagesFromContactsOnly()
+	if err != nil {
+		return false, err
+	}
+
+	if !onlyFromContacts {
+		return true, nil
+	}
+
+	// if it's from us, it's allowed
+	if contactIDFromPublicKey(&m.identity.PublicKey) == publicKey {
+		return true, nil
+	}
+
+	contact, ok := m.allContacts[publicKey]
+	if !ok {
+		return false, nil
+	}
+
+	return contact.IsAdded(), nil
 }
 
 func (m *Messenger) RequestHistoricMessages(
