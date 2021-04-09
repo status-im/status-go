@@ -13,7 +13,7 @@ func (m *Messenger) MarkAllActivityCenterNotificationsRead() error {
 }
 
 func (m *Messenger) processAcceptedActivityCenterNotifications(notifications []*ActivityCenterNotification) (*MessengerResponse, error) {
-	var response *MessengerResponse
+	response := &MessengerResponse{}
 	m.mutex.Lock()
 	var chats []*Chat
 	for _, notification := range notifications {
