@@ -164,10 +164,9 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 			}
 			messageState.Response.Messages = append(messageState.Response.Messages, message)
 		}
-		messageState.Response.AddChat(chat)
-
 	}
 
+	messageState.Response.AddChat(chat)
 	// Store in chats map as it might be a new one
 	messageState.AllChats[chat.ID] = chat
 
@@ -242,14 +241,14 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 		} else {
 			state.Response.AddActivityCenterNotification(notification)
 		}
-	} else {
-		// Add to response
-		state.Response.AddChat(chat)
-		if message != nil {
-			state.Response.Messages = append(state.Response.Messages, message)
-		}
-
 	}
+
+	// Add to response
+	state.Response.AddChat(chat)
+	if message != nil {
+		state.Response.Messages = append(state.Response.Messages, message)
+	}
+
 	// Set in the modified maps chat
 	state.AllChats[chat.ID] = chat
 
@@ -338,9 +337,7 @@ func (m *MessageHandler) HandleContactUpdate(state *ReceivedMessageState, messag
 		chat.LastClockValue = message.Clock
 	}
 
-	if chat.Active {
-		state.Response.AddChat(chat)
-	}
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	return nil
@@ -562,9 +559,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 
 	}
 	// Set in the modified maps chat
-	if chat.Active {
-		state.Response.AddChat(chat)
-	}
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	contact := state.CurrentMessageState.Contact
@@ -974,9 +969,7 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 		chat.LastClockValue = pbEmojiR.Clock
 	}
 
-	if chat.Active {
-		state.Response.AddChat(chat)
-	}
+	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
 	// save emoji reaction
