@@ -29,7 +29,7 @@ type MessengerResponse struct {
 	// that are useful to notify the user about
 	notifications map[string]*localnotifications.Notification
 	chats         map[string]*Chat
-	removedChats  *stringBoolMap
+	removedChats  map[string]bool
 	communities   map[string]*communities.Community
 }
 
@@ -86,10 +86,9 @@ func (r *MessengerResponse) Chats() []*Chat {
 
 func (r *MessengerResponse) RemovedChats() []string {
 	var chats []string
-	r.removedChats.Range(func(chatID string, value bool) (shouldContinue bool) {
+	for chatID := range r.removedChats {
 		chats = append(chats, chatID)
-		return true
-	})
+	}
 	return chats
 }
 
@@ -120,7 +119,7 @@ func (r *MessengerResponse) IsEmpty() bool {
 		len(r.CommunityChanges)+
 		len(r.Filters)+
 		len(r.RemovedFilters)+
-		r.removedChats.Len()+
+		len(r.removedChats)+
 		len(r.MailserverTopics)+
 		len(r.Mailservers)+
 		len(r.MailserverRanges)+
@@ -257,8 +256,8 @@ func (r *MessengerResponse) AddRemovedChats(chats []string) {
 
 func (r *MessengerResponse) AddRemovedChat(chatID string) {
 	if r.removedChats == nil {
-		r.removedChats = new(stringBoolMap)
+		r.removedChats = make(map[string]bool)
 	}
 
-	r.removedChats.Store(chatID, true)
+	r.removedChats[chatID] = true
 }
