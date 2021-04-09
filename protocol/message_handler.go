@@ -428,7 +428,7 @@ func (m *MessageHandler) HandleCommunityRequestToJoin(state *ReceivedMessageStat
 
 	contactID := contactIDFromPublicKey(signer)
 
-	contact := state.AllContacts[contactID]
+	contact, _ := state.AllContacts.Load(contactID)
 
 	state.Response.AddNotification(NewCommunityRequestToJoinNotification(requestToJoin.ID.String(), community, contact))
 
