@@ -105,14 +105,16 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 			return err
 		}
 
+		ourKey := contactIDFromPublicKey(&m.identity.PublicKey)
 		// A new chat must contain us
-		if !group.IsMember(contactIDFromPublicKey(&m.identity.PublicKey)) {
+		if !group.IsMember(ourKey) {
 			return errors.New("can't create a new group chat without us being a member")
 		}
 		newChat := CreateGroupChat(messageState.Timesource)
 		// We set group chat inactive and create a notification instead
-		// unless is coming from us the message(TODO)
-		newChat.Active = false
+		// unless is coming from us or a contact
+		isActive := messageState.CurrentMessageState.Contact.IsAdded() || messageState.CurrentMessageState.Contact.ID == ourKey
+		newChat.Active = isActive
 		chat = &newChat
 	} else {
 		existingGroup, err := newProtocolGroupFromChat(chat)
@@ -145,27 +147,27 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 		} else {
 			messageState.Response.AddActivityCenterNotification(notification)
 		}
-	}
+	} else {
 
-	systemMessages := buildSystemMessages(message.Events, translations)
+		systemMessages := buildSystemMessages(message.Events, translations)
 
-	for _, message := range systemMessages {
-		messageID := message.ID
-		exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
-		if err != nil {
-			m.logger.Warn("failed to check message exists", zap.Error(err))
+		for _, message := range systemMessages {
+			messageID := message.ID
+			exists, err := m.messageExists(messageID, messageState.ExistingMessagesMap)
+			if err != nil {
+				m.logger.Warn("failed to check message exists", zap.Error(err))
+			}
+			if exists {
+				continue
+			}
+			messageState.Response.Messages = append(messageState.Response.Messages, message)
 		}
-		if exists {
-			continue
-		}
-		messageState.Response.Messages = append(messageState.Response.Messages, message)
+		messageState.Response.AddChat(chat)
+
 	}
 
 	// Store in chats map as it might be a new one
 	messageState.AllChats[chat.ID] = chat
-	if chat.Active {
-		messageState.Response.AddChat(chat)
-	}
 
 	if message.Message != nil {
 		messageState.CurrentMessageState.Message = *message.Message
@@ -188,7 +190,7 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	if err := message.PrepareContent(); err != nil {
 		return fmt.Errorf("failed to prepare content: %v", err)
 	}
-	chat, err := m.matchChatEntity(message, state.AllChats, state.Timesource)
+	chat, err := m.matchChatEntity(message, state.AllChats, state.AllContacts, state.Timesource)
 	if err != nil {
 		return err
 	}
@@ -236,15 +238,17 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 		} else {
 			state.Response.AddActivityCenterNotification(notification)
 		}
+	} else {
+		// Add to response
+		state.Response.AddChat(chat)
+		if message != nil {
+			state.Response.Messages = append(state.Response.Messages, message)
+		}
+
 	}
 	// Set in the modified maps chat
-	state.Response.AddChat(chat)
 	state.AllChats[chat.ID] = chat
 
-	// Add to response
-	if message != nil {
-		state.Response.Messages = append(state.Response.Messages, message)
-	}
 	return nil
 }
 
@@ -491,7 +495,7 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	if err != nil {
 		return fmt.Errorf("failed to prepare message content: %v", err)
 	}
-	chat, err := m.matchChatEntity(receivedMessage, state.AllChats, state.Timesource)
+	chat, err := m.matchChatEntity(receivedMessage, state.AllChats, state.AllContacts, state.Timesource)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
@@ -584,8 +588,10 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 		state.Response.AddCommunity(community)
 		state.Response.CommunityChanges = append(state.Response.CommunityChanges, communityResponse.Changes)
 	}
-	// Add to response
-	state.Response.Messages = append(state.Response.Messages, receivedMessage)
+	if chat.Active {
+		// Add to response
+		state.Response.Messages = append(state.Response.Messages, receivedMessage)
+	}
 
 	return nil
 }
@@ -791,7 +797,7 @@ func (m *MessageHandler) HandleDeclineRequestTransaction(messageState *ReceivedM
 	return m.handleCommandMessage(messageState, oldMessage)
 }
 
-func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, timesource common.TimeSource) (*Chat, error) {
+func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map[string]*Chat, contacts map[string]*Contact, timesource common.TimeSource) (*Chat, error) {
 	if chatEntity.GetSigPubKey() == nil {
 		m.logger.Error("public key can't be empty")
 		return nil, errors.New("received a chatEntity with empty public key")
@@ -838,7 +844,9 @@ func (m *MessageHandler) matchChatEntity(chatEntity common.ChatEntity, chats map
 			// TODO: this should be a three-word name used in the mobile client
 			chat = CreateOneToOneChat(chatID[:8], chatEntity.GetSigPubKey(), timesource)
 			// We set the chat as inactive and will create a notification
-			chat.Active = false
+			// if it's not coming from a contact
+			contact, ok := contacts[chatID]
+			chat.Active = ok && contact.IsAdded()
 		}
 		return chat, nil
 	case chatEntity.GetMessageType() == protobuf.MessageType_COMMUNITY_CHAT:
@@ -946,7 +954,7 @@ func (m *MessageHandler) HandleEmojiReaction(state *ReceivedMessageState, pbEmoj
 		return nil
 	}
 
-	chat, err := m.matchChatEntity(emojiReaction, state.AllChats, state.Timesource)
+	chat, err := m.matchChatEntity(emojiReaction, state.AllChats, state.AllContacts, state.Timesource)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
