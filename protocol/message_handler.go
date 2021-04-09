@@ -136,10 +136,12 @@ func (m *MessageHandler) HandleMembershipUpdate(messageState *ReceivedMessageSta
 
 	if !chat.Active {
 		notification := &ActivityCenterNotification{
-			ID:        types.FromHex(chat.ID),
-			Type:      ActivityCenterNotificationTypeNewPrivateGroupChat,
-			Timestamp: messageState.CurrentMessageState.WhisperTimestamp,
-			ChatID:    chat.ID,
+			ID:          types.FromHex(chat.ID),
+			Name:        chat.Name,
+			LastMessage: chat.LastMessage,
+			Type:        ActivityCenterNotificationTypeNewPrivateGroupChat,
+			Timestamp:   messageState.CurrentMessageState.WhisperTimestamp,
+			ChatID:      chat.ID,
 		}
 		err := m.persistence.SaveActivityCenterNotification(notification)
 		if err != nil {
@@ -227,10 +229,12 @@ func (m *MessageHandler) handleCommandMessage(state *ReceivedMessageState, messa
 	// Set chat active
 	if !chat.Active {
 		notification := &ActivityCenterNotification{
-			ID:        types.FromHex(chat.ID),
-			Type:      ActivityCenterNotificationTypeNewOneToOne,
-			Timestamp: state.CurrentMessageState.WhisperTimestamp,
-			ChatID:    chat.ID,
+			ID:          types.FromHex(chat.ID),
+			Type:        ActivityCenterNotificationTypeNewOneToOne,
+			Name:        chat.Name,
+			LastMessage: chat.LastMessage,
+			Timestamp:   state.CurrentMessageState.WhisperTimestamp,
+			ChatID:      chat.ID,
 		}
 		err := m.persistence.SaveActivityCenterNotification(notification)
 		if err != nil {
@@ -542,10 +546,12 @@ func (m *MessageHandler) HandleChatMessage(state *ReceivedMessageState) error {
 	// If the chat is not active, create a notification in the center
 	if chat.OneToOne() && !chat.Active {
 		notification := &ActivityCenterNotification{
-			ID:        types.FromHex(chat.ID),
-			Type:      ActivityCenterNotificationTypeNewOneToOne,
-			Timestamp: state.CurrentMessageState.WhisperTimestamp,
-			ChatID:    chat.ID,
+			ID:          types.FromHex(chat.ID),
+			Name:        chat.Name,
+			LastMessage: chat.LastMessage,
+			Type:        ActivityCenterNotificationTypeNewOneToOne,
+			Timestamp:   state.CurrentMessageState.WhisperTimestamp,
+			ChatID:      chat.ID,
 		}
 		err := m.persistence.SaveActivityCenterNotification(notification)
 		if err != nil {
