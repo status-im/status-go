@@ -86,7 +86,7 @@ func (r *MessengerResponse) Chats() []*Chat {
 
 func (r *MessengerResponse) RemovedChats() []string {
 	var chats []string
-	r.removedChats.Range(func(chatID string, value bool) (shouldContinue bool){
+	r.removedChats.Range(func(chatID string, value bool) (shouldContinue bool) {
 		chats = append(chats, chatID)
 		return true
 	})

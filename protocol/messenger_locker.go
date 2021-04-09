@@ -33,7 +33,7 @@ func (cm *chatMap) Store(chatID string, chat *Chat) {
 }
 
 func (cm *chatMap) Range(f func(chatID string, chat *Chat) (shouldContinue bool)) {
-	nf := func(key, value interface{}) (shouldContinue bool){
+	nf := func(key, value interface{}) (shouldContinue bool) {
 		return f(key.(string), value.(*Chat))
 	}
 	cm.sm.Range(nf)
@@ -42,7 +42,6 @@ func (cm *chatMap) Range(f func(chatID string, chat *Chat) (shouldContinue bool)
 func (cm *chatMap) Delete(chatID string) {
 	cm.sm.Delete(chatID)
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -70,7 +69,7 @@ func (cm *contactMap) Store(contactID string, contact *Contact) {
 }
 
 func (cm *contactMap) Range(f func(contactID string, contact *Contact) (shouldContinue bool)) {
-	nf := func(key, value interface{}) (shouldContinue bool){
+	nf := func(key, value interface{}) (shouldContinue bool) {
 		return f(key.(string), value.(*Contact))
 	}
 	cm.sm.Range(nf)
@@ -79,7 +78,6 @@ func (cm *contactMap) Range(f func(contactID string, contact *Contact) (shouldCo
 func (cm *contactMap) Delete(contactID string) {
 	cm.sm.Delete(contactID)
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -113,7 +111,7 @@ func (smtm *systemMessageTranslationsMap) Store(eventType protobuf.MembershipUpd
 }
 
 func (smtm *systemMessageTranslationsMap) Range(f func(eventType protobuf.MembershipUpdateEvent_EventType, message string) (shouldContinue bool)) {
-	nf := func(key, value interface{}) (shouldContinue bool){
+	nf := func(key, value interface{}) (shouldContinue bool) {
 		return f(key.(protobuf.MembershipUpdateEvent_EventType), value.(string))
 	}
 	smtm.sm.Range(nf)
@@ -122,7 +120,6 @@ func (smtm *systemMessageTranslationsMap) Range(f func(eventType protobuf.Member
 func (smtm *systemMessageTranslationsMap) Delete(eventType protobuf.MembershipUpdateEvent_EventType) {
 	smtm.sm.Delete(eventType)
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -150,7 +147,7 @@ func (im *installationMap) Store(installationID string, installation *multidevic
 }
 
 func (im *installationMap) Range(f func(installationID string, installation *multidevice.Installation) (shouldContinue bool)) {
-	nf := func(key, value interface{}) (shouldContinue bool){
+	nf := func(key, value interface{}) (shouldContinue bool) {
 		return f(key.(string), value.(*multidevice.Installation))
 	}
 	im.sm.Range(nf)
@@ -162,7 +159,7 @@ func (im *installationMap) Delete(installationID string) {
 
 func (im *installationMap) Empty() bool {
 	count := 0
-	im.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool){
+	im.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		count++
 		return false
 	})
@@ -172,14 +169,13 @@ func (im *installationMap) Empty() bool {
 
 func (im *installationMap) Len() int {
 	count := 0
-	im.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool){
+	im.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		count++
 		return true
 	})
 
 	return count
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -207,7 +203,7 @@ func (sbm *stringBoolMap) Store(key string, value bool) {
 }
 
 func (sbm *stringBoolMap) Range(f func(key string, value bool) (shouldContinue bool)) {
-	nf := func(key, value interface{}) (shouldContinue bool){
+	nf := func(key, value interface{}) (shouldContinue bool) {
 		return f(key.(string), value.(bool))
 	}
 	sbm.sm.Range(nf)
@@ -219,7 +215,7 @@ func (sbm *stringBoolMap) Delete(key string) {
 
 func (sbm *stringBoolMap) Len() int {
 	count := 0
-	sbm.Range(func(key string, value bool) (shouldContinue bool){
+	sbm.Range(func(key string, value bool) (shouldContinue bool) {
 		count++
 		return true
 	})

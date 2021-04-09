@@ -130,7 +130,7 @@ func (m *Messenger) RemoveContact(ctx context.Context, pubKey string) (*Messenge
 
 func (m *Messenger) Contacts() []*Contact {
 	var contacts []*Contact
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.HasCustomFields() {
 			contacts = append(contacts, contact)
 		}
@@ -209,7 +209,7 @@ func (m *Messenger) SendContactUpdates(ctx context.Context, ensName, profileImag
 	}
 
 	// TODO: This should not be sending paired messages, as we do it above
-	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool){
+	m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 		if contact.IsAdded() {
 			if _, err = m.sendContactUpdate(ctx, contact.ID, ensName, profileImage); err != nil {
 				return false

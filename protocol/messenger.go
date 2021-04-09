@@ -1120,7 +1120,7 @@ func (m *Messenger) Installations() []*multidevice.Installation {
 	installations := make([]*multidevice.Installation, m.allInstallations.Len())
 
 	var i = 0
-	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool){
+	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		installations[i] = installation
 		i++
 		return true
@@ -1847,7 +1847,7 @@ func (m *Messenger) ReSendChatMessage(ctx context.Context, messageID string) err
 
 func (m *Messenger) hasPairedDevices() bool {
 	var count int
-	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool){
+	m.allInstallations.Range(func(installationID string, installation *multidevice.Installation) (shouldContinue bool) {
 		if installation.Enabled {
 			count++
 		}
@@ -2885,7 +2885,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	var contactsToSave []*Contact
-	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool){
+	messageState.ModifiedContacts.Range(func(id string, value bool) (shouldContinue bool) {
 		contact, ok := messageState.AllContacts.Load(id)
 		if ok {
 			// We save all contacts so we can pull back name/image,
@@ -2918,7 +2918,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 	}
 
 	var err error
-	messageState.ModifiedInstallations.Range(func(id string, value bool) (shouldContinue bool){
+	messageState.ModifiedInstallations.Range(func(id string, value bool) (shouldContinue bool) {
 		installation, _ := messageState.AllInstallations.Load(id)
 		messageState.Response.Installations = append(messageState.Response.Installations, installation)
 		if installation.InstallationMetadata != nil {
