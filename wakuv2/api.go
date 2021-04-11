@@ -250,15 +250,13 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Timestamp:    float64(api.w.CurrentTime().UnixNano()),
 	}
 
-	err = api.w.node.Publish(wakuMsg, nil)
+	hash, err := api.w.node.Publish(wakuMsg, nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: GENERATE A HASH
-
-	return []byte{1, 2, 3, 4, 5, 6, 7, 8}, nil
+	return hash, nil
 }
 
 // UninstallFilter is alias for Unsubscribe
