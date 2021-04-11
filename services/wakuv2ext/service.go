@@ -16,7 +16,7 @@ type Service struct {
 }
 
 func New(config params.ShhextConfig, n types.Node, ctx interface{}, handler ext.EnvelopeEventsHandler, ldb *leveldb.DB) *Service {
-	w, err := n.GetWaku(ctx)
+	w, err := n.GetWakuV2(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +40,7 @@ func (s *Service) PublicWakuAPI() types.PublicWakuAPI {
 func (s *Service) APIs() []rpc.API {
 	apis := []rpc.API{
 		{
-			Namespace: "wakuv2ext",
+			Namespace: "wakuext",
 			Version:   "1.0",
 			Service:   NewPublicAPI(s),
 			Public:    false,

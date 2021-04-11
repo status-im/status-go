@@ -19,6 +19,7 @@ func (n EnodeID) String() string {
 type Node interface {
 	NewENSVerifier(logger *zap.Logger) enstypes.ENSVerifier
 	GetWaku(ctx interface{}) (Waku, error)
+	GetWakuV2(ctx interface{}) (Waku, error)
 	AddPeer(url string) error
 	RemovePeer(url string) error
 	PeersCount() int

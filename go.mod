@@ -54,7 +54,7 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20210407211939-ffe2f80a9071
+	github.com/status-im/go-waku v0.0.0-20210408230123-c7550f29ce73
 	github.com/status-im/go-wakurelay-pubsub v0.4.2
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf

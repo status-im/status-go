@@ -928,8 +928,8 @@ github.com/status-im/go-ethereum v1.9.5-status.12 h1:+QZE2x5zF1CvNo3V+WaCzeOoar8
 github.com/status-im/go-ethereum v1.9.5-status.12/go.mod h1:YyH5DKB6+z+Vaya7eIm67pnuPZ1oiUMbbsZW41ktN0g=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
-github.com/status-im/go-waku v0.0.0-20210407211939-ffe2f80a9071 h1:ka1dGGL/vczcvUBtY49FW/u1JMYviKBJ8PmYkQW3Q3s=
-github.com/status-im/go-waku v0.0.0-20210407211939-ffe2f80a9071/go.mod h1:2fHIqaNF8M8W/DQL5J3R9dXbrTLpOefvD5tbKSvoxBg=
+github.com/status-im/go-waku v0.0.0-20210408230123-c7550f29ce73 h1:1P+qk5o765VxsaDPDR6NO2Qm7fiIAOuRyR9CYuGhvMw=
+github.com/status-im/go-waku v0.0.0-20210408230123-c7550f29ce73/go.mod h1:2fHIqaNF8M8W/DQL5J3R9dXbrTLpOefvD5tbKSvoxBg=
 github.com/status-im/go-wakurelay-pubsub v0.4.2 h1:F4UGcP80H0PGaeJ0mRMzA1Ux3DKYiyv/qu3bOR/efTg=
 github.com/status-im/go-wakurelay-pubsub v0.4.2/go.mod h1:LSCVYR7mnBBsxVJghrGpQ3yJAAATEe6XeQQqGCZhwrE=
 github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 h1:ju5UTwk5Odtm4trrY+4Ca4RMj5OyXbmVeDAVad2T0Jw=
@@ -1256,6 +1256,7 @@ google.golang.org/protobuf v1.22.0/go.mod h1:EGpADcykh3NcUnDUJcl1+ZksZNG86OlYog2
 google.golang.org/protobuf v1.23.0/go.mod h1:EGpADcykh3NcUnDUJcl1+ZksZNG86OlYog2l/sGQquU=
 google.golang.org/protobuf v1.23.1-0.20200526195155-81db48ad09cc/go.mod h1:EGpADcykh3NcUnDUJcl1+ZksZNG86OlYog2l/sGQquU=
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
+google.golang.org/protobuf v1.26.0-rc.1 h1:7QnIQpGRHE5RnLKnESfDoxm2dTapTZua5a0kS0A+VXQ=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

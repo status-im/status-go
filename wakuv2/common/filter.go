@@ -33,7 +33,7 @@ type Filter struct {
 	Src        *ecdsa.PublicKey  // Sender of the message
 	KeyAsym    *ecdsa.PrivateKey // Private Key of recipient
 	KeySym     []byte            // Key associated with the Topic
-	Topics     []TopicType       // Topics to filter messages with
+	Topics     [][]byte          // Topics to filter messages with
 	SymKeyHash common.Hash       // The Keccak256Hash of the symmetric key, needed for optimization
 	id         string            // unique identifier
 
@@ -118,7 +118,8 @@ func (fs *Filters) addTopicMatcher(watcher *Filter) {
 	if len(watcher.Topics) == 0 {
 		fs.allTopicsMatcher[watcher] = struct{}{}
 	} else {
-		for _, topic := range watcher.Topics {
+		for _, t := range watcher.Topics {
+			topic := BytesToTopic(t)
 			if fs.topicMatcher[topic] == nil {
 				fs.topicMatcher[topic] = make(map[*Filter]struct{})
 			}
@@ -130,7 +131,8 @@ func (fs *Filters) addTopicMatcher(watcher *Filter) {
 // removeFromTopicMatchers removes a filter from the topic matchers
 func (fs *Filters) removeFromTopicMatchers(watcher *Filter) {
 	delete(fs.allTopicsMatcher, watcher)
-	for _, topic := range watcher.Topics {
+	for _, t := range watcher.Topics {
+		topic := BytesToTopic(t)
 		delete(fs.topicMatcher[topic], watcher)
 	}
 }
@@ -163,15 +165,16 @@ func (fs *Filters) NotifyWatchers(recvMessage *ReceivedMessage) {
 	fs.mutex.RLock()
 	defer fs.mutex.RUnlock()
 
-	candidates := fs.GetWatchersByTopic(TopicType(recvMessage.Envelope.Message().ContentTopic))
+	candidates := fs.GetWatchersByTopic(StringToTopic(recvMessage.Envelope.Message().ContentTopic))
 	for _, watcher := range candidates {
-		var match bool
+		match := true
 		if decodedMsg == nil {
-			match = watcher.MatchMessage(decodedMsg)
-			decodedMsg = recvMessage.Open(watcher) // TODO: decrypt message
+			decodedMsg = recvMessage.Open(watcher)
 			if decodedMsg == nil {
 				log.Trace("processing message: failed to open", "message", recvMessage.Hash().Hex(), "filter", watcher.id)
 			}
+		} else {
+			match = watcher.MatchMessage(decodedMsg)
 		}
 
 		if match && decodedMsg != nil {
