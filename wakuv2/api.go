@@ -26,6 +26,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/status-im/go-waku/waku/v2/node"
+	"github.com/status-im/go-waku/waku/v2/protocol"
+
 	"github.com/status-im/status-go/wakuv2/common"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -169,14 +172,14 @@ type NewMessage struct {
 	Sig        string           `json:"sig"`
 	Topic      common.TopicType `json:"topic"`
 	Payload    []byte           `json:"payload"`
+	Padding    []byte           `json:"padding"`
 	TargetPeer string           `json:"targetPeer"`
 }
 
 // Post posts a message on the Waku network.
 // returns the hash of the message in case of success.
 func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Bytes, error) {
-	// TODO:
-	/*var (
+	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
 		err         error
@@ -189,70 +192,73 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 
 	params := &common.MessageParams{
 		Payload: req.Payload,
+		Padding: req.Padding,
 		Topic:   req.Topic,
 	}
+
+	var keyInfo *node.KeyInfo = new(node.KeyInfo)
 
 	// Set key that is used to sign the message
 	if len(req.Sig) > 0 {
 		if params.Src, err = api.w.GetPrivateKey(req.Sig); err != nil {
 			return nil, err
 		}
+		keyInfo.PrivKey = params.Src
 	}
 
 	// Set symmetric key that is used to encrypt the message
 	if symKeyGiven {
+		keyInfo.Kind = node.Symmetric
+
 		if params.Topic == (common.TopicType{}) { // topics are mandatory with symmetric encryption
 			return nil, ErrNoTopics
 		}
-		if params.KeySym, err = api.w.GetSymKey(req.SymKeyID); err != nil {
+		if keyInfo.SymKey, err = api.w.GetSymKey(req.SymKeyID); err != nil {
 			return nil, err
 		}
-		if !common.ValidateDataIntegrity(params.KeySym, common.AESKeyLength) {
+		if !common.ValidateDataIntegrity(keyInfo.SymKey, common.AESKeyLength) {
 			return nil, ErrInvalidSymmetricKey
 		}
 	}
 
 	// Set asymmetric key that is used to encrypt the message
 	if pubKeyGiven {
-		if params.Dst, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
+		keyInfo.Kind = node.Asymmetric
+
+		var pubK *ecdsa.PublicKey
+		if pubK, err = crypto.UnmarshalPubkey(req.PublicKey); err != nil {
 			return nil, ErrInvalidPublicKey
 		}
+		keyInfo.PubKey = *pubK
 	}
 
-	// encrypt and sent message
-	msg, err := common.NewSentMessage(params)
+	var version uint32 = 1 // Use wakuv1 encryption
+
+	p := new(node.Payload)
+	p.Data = req.Payload
+	p.Key = keyInfo
+
+	payload, err := p.Encode(version)
 	if err != nil {
 		return nil, err
 	}
 
-	var result []byte
-	env, err := msg.Wrap(params, api.w.CurrentTime())
+	wakuMsg := &protocol.WakuMessage{
+		Payload:      payload,
+		Version:      version,
+		ContentTopic: req.Topic.String(),
+		Timestamp:    float64(api.w.CurrentTime().UnixNano()),
+	}
+
+	err = api.w.node.Publish(wakuMsg, nil)
+
 	if err != nil {
 		return nil, err
 	}
 
-	// send to specific node (skip PoW check)
-	if len(req.TargetPeer) > 0 {
-		n, err := enode.Parse(enode.ValidSchemes, req.TargetPeer)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse target peer: %s", err)
-		}
-		err = api.w.SendP2PMessages(n.ID().Bytes(), env)
-		if err == nil {
-			hash := env.Hash()
-			result = hash[:]
-		}
-		return result, err
-	}
+	// TODO: GENERATE A HASH
 
-	err = api.w.Send(env)
-	if err == nil {
-		hash := env.Hash()
-		result = hash[:]
-	}
-	return result, err
-	*/
-	return nil, nil
+	return []byte{1, 2, 3, 4, 5, 6, 7, 8}, nil
 }
 
 // UninstallFilter is alias for Unsubscribe
@@ -304,7 +310,7 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 	}
 
 	for _, bt := range crit.Topics {
-		filter.Topics = append(filter.Topics, bt)
+		filter.Topics = append(filter.Topics, bt[:])
 	}
 
 	// listen for message that are encrypted with the given symmetric key
@@ -368,9 +374,10 @@ func (api *PublicWakuAPI) Messages(ctx context.Context, crit Criteria) (*rpc.Sub
 // Message is the RPC representation of a waku message.
 type Message struct {
 	Sig       []byte           `json:"sig,omitempty"`
-	TTL       uint32           `json:"ttl"`
 	Timestamp uint32           `json:"timestamp"`
 	Topic     common.TopicType `json:"topic"`
+	Payload   []byte           `json:"payload"`
+	Padding   []byte           `json:"padding"`
 	Hash      []byte           `json:"hash"`
 	Dst       []byte           `json:"recipientPublicKey,omitempty"`
 }
@@ -378,8 +385,11 @@ type Message struct {
 // ToWakuMessage converts an internal message into an API version.
 func ToWakuMessage(message *common.ReceivedMessage) *Message {
 	msg := Message{
-		Hash:  message.Hash().Bytes(),
-		Topic: message.Topic,
+		Payload:   message.Data,
+		Padding:   message.Padding,
+		Timestamp: message.Sent,
+		Hash:      message.Hash().Bytes(),
+		Topic:     message.Topic,
 	}
 
 	if message.Dst != nil {
@@ -389,14 +399,12 @@ func ToWakuMessage(message *common.ReceivedMessage) *Message {
 		}
 	}
 
-	/* TODO:
-	if common.IsMessageSigned(message.Raw[0]) {
-		b := crypto.FromECDSAPub(message.SigToPubKey())
+	if message.Src != nil {
+		b := crypto.FromECDSAPub(message.Src)
 		if b != nil {
 			msg.Sig = b
 		}
 	}
-	*/
 
 	return &msg
 }
@@ -447,7 +455,7 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 		src     *ecdsa.PublicKey
 		keySym  []byte
 		keyAsym *ecdsa.PrivateKey
-		topics  []common.TopicType
+		topics  [][]byte
 
 		symKeyGiven  = len(req.SymKeyID) > 0
 		asymKeyGiven = len(req.PrivateKeyID) > 0
@@ -482,9 +490,10 @@ func (api *PublicWakuAPI) NewMessageFilter(req Criteria) (string, error) {
 	}
 
 	if len(req.Topics) > 0 {
-		topics = make([]common.TopicType, len(req.Topics))
+		topics = make([][]byte, len(req.Topics))
 		for i, topic := range req.Topics {
-			topics[i] = topic
+			topics[i] = make([]byte, common.TopicLength)
+			copy(topics[i], topic[:])
 		}
 	}
 

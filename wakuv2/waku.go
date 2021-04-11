@@ -44,7 +44,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	wakucommon "github.com/status-im/go-waku/waku/common"
-	v0 "github.com/status-im/status-go/waku/v0"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	node "github.com/status-im/go-waku/waku/v2/node"
@@ -115,13 +114,6 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		SoftBlacklistedPeerIDs: make(map[string]bool),
 	}
 
-	/*
-		// TODO:
-		for _, peerID := range cfg.SoftBlacklistedPeerIDs {
-			waku.settings.SoftBlacklistedPeerIDs[peerID] = true
-		}
-	*/
-
 	waku.filters = common.NewFilters()
 
 	var privateKey *ecdsa.PrivateKey
@@ -172,7 +164,6 @@ func (w *Waku) runMsgLoop() {
 	}
 
 	for env := range sub.C {
-		fmt.Println("TODO: delete this. Received an envelope:", env.Hash())
 		w.OnNewEnvelopes(env)
 	}
 }
@@ -205,8 +196,8 @@ func (w *Waku) SetTimeSource(timesource func() time.Time) {
 func (w *Waku) APIs() []rpc.API {
 	return []rpc.API{
 		{
-			Namespace: v0.Name,
-			Version:   v0.VersionStr,
+			Namespace: Name,
+			Version:   VersionStr,
 			Service:   NewPublicWakuAPI(w),
 			Public:    false,
 		},

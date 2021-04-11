@@ -1,5 +1,5 @@
 {
-	"APIModules": "wakuv2",
+	"APIModules": "waku,wakuext,wakuv2,permissions,eth",
 	"HTTPEnabled": true,
 	"HTTPHost": "localhost",
 	"HTTPPort": 8545,

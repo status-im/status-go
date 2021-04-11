@@ -19,55 +19,44 @@
 package common
 
 import (
-	"encoding/binary"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 // TopicType represents a cryptographically secure, probabilistic partial
 // classifications of a message, determined as the first (leftmost) 4 bytes of the
 // SHA3 hash of some arbitrary data given by the original author of the message.
-type TopicType uint32
+type TopicType [TopicLength]byte
 
 // BytesToTopic converts from the byte array representation of a topic
 // into the TopicType type.
 func BytesToTopic(b []byte) (t TopicType) {
-	return TopicType(binary.LittleEndian.Uint32(b))
+	sz := TopicLength
+	if x := len(b); x < TopicLength {
+		sz = x
+	}
+	for i := 0; i < sz; i++ {
+		t[i] = b[i]
+	}
+	return t
 }
 
-func uint32ToByte(input uint32) []byte {
-	result := make([]byte, 4)
-	for i := uint32(0); i < 4; i++ {
-		result[i] = byte((input >> (8 * i)) & 0xff)
-	}
-	return result
-}
+func StringToTopic(s string) (t TopicType) {
+	str, _ := hexutil.Decode(s)
+	return BytesToTopic(str)
 
-func byteToUint32(input []byte) uint32 {
-	var result uint32
-	for i := 0; i < 4; i++ {
-		result |= uint32(input[i]) << (8 * i)
-	}
-	return result
 }
 
 // String converts a topic byte array to a string representation.
 func (t *TopicType) String() string {
-	return hexutil.Encode(uint32ToByte(uint32(*t)))
+	return hexutil.Encode(t[:])
 }
 
 // MarshalText returns the hex representation of t.
 func (t TopicType) MarshalText() ([]byte, error) {
-	return hexutil.Bytes(uint32ToByte(uint32(t))).MarshalText()
+	return hexutil.Bytes(t[:]).MarshalText()
 }
 
 // UnmarshalText parses a hex representation to a topic.
 func (t *TopicType) UnmarshalText(input []byte) error {
-	var r []byte
-	var result TopicType
-	err := hexutil.UnmarshalFixedText("Topic", input, r)
-	result = TopicType(byteToUint32(r))
-	t = &result
-	return err
-
+	return hexutil.UnmarshalFixedText("Topic", input, t[:])
 }

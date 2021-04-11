@@ -13,12 +13,27 @@ import (
 	"github.com/status-im/go-waku/waku/v2/node"
 )
 
+// MessageParams specifies the exact way a message should be wrapped
+// into an Envelope.
+type MessageParams struct {
+	Src     *ecdsa.PrivateKey
+	Dst     *ecdsa.PublicKey
+	KeySym  []byte
+	Topic   TopicType
+	Payload []byte
+	Padding []byte
+}
+
 // ReceivedMessage represents a data packet to be received through the
 // WakuV2 protocol and successfully decrypted.
 type ReceivedMessage struct {
 	Envelope *wakucommon.Envelope // Wrapped Waku Message
-	Raw      []byte
 
+	Data      []byte
+	Padding   []byte
+	Signature []byte
+
+	Sent  uint32           // Time when the message was posted into the network
 	Src   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
 	Dst   *ecdsa.PublicKey // Message recipient (identity used to decode the message)
 	Topic TopicType
@@ -172,6 +187,9 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 		return nil
 	}
 
+	// TODO: should we update `e` instead of creating a new received message?
+	msg = new(ReceivedMessage)
+
 	keyInfo := new(node.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
 		keyInfo.Kind = node.Asymmetric
@@ -190,7 +208,13 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 		return nil
 	}
 
-	msg.Raw = raw.Data
-	msg.Topic = TopicType(e.Envelope.Message().ContentTopic)
+	msg.Envelope = e.Envelope
+	msg.Data = raw.Data
+	msg.Padding = raw.Padding
+	msg.Signature = raw.Signature
+	msg.Src = raw.PubKey
+	msg.Sent = uint32(e.Envelope.Message().Timestamp / 1000000000)
+	msg.Topic = StringToTopic(e.Envelope.Message().ContentTopic)
+
 	return msg
 }
