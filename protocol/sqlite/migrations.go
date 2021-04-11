@@ -10,6 +10,7 @@ import (
 	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
 	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
 	wakumigrations "github.com/status-im/status-go/protocol/transport/waku/migrations"
+	wakuv2migrations "github.com/status-im/status-go/protocol/transport/wakuv2/migrations"
 	whispermigrations "github.com/status-im/status-go/protocol/transport/whisper/migrations"
 )
 
@@ -28,6 +29,10 @@ var defaultMigrations = []migrationsWithGetter{
 	{
 		Names:  wakumigrations.AssetNames(),
 		Getter: wakumigrations.Asset,
+	},
+	{
+		Names:  wakuv2migrations.AssetNames(),
+		Getter: wakuv2migrations.Asset,
 	},
 	{
 		Names:  encryptmigrations.AssetNames(),

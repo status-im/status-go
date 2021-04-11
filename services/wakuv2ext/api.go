@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/log"
-	gethbridge "github.com/status-im/status-go/eth-node/bridge/geth"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext"
-	waku "github.com/status-im/status-go/waku/common"
 )
 
 const (
@@ -49,7 +47,8 @@ func makeEnvelop(
 	pow float64,
 	now time.Time,
 ) (types.Envelope, error) {
-	params := waku.MessageParams{
+	// TODO:
+	/*params := waku.MessageParams{
 		PoW:      pow,
 		Payload:  payload,
 		WorkTime: defaultWorkTime,
@@ -70,72 +69,77 @@ func makeEnvelop(
 	if err != nil {
 		return nil, err
 	}
-	return gethbridge.NewWakuEnvelope(envelope), nil
+	return gethbridge.NewWakuEnvelope(envelope), nil*/
+	return nil, nil
 }
 
 // RequestMessages sends a request for historic messages to a MailServer.
 func (api *PublicAPI) RequestMessages(_ context.Context, r ext.MessagesRequest) (types.HexBytes, error) {
-	api.log.Info("RequestMessages", "request", r)
+	// TODO:
+	/*
+		api.log.Info("RequestMessages", "request", r)
 
-	now := api.service.w.GetCurrentTime()
-	r.SetDefaults(now)
+		now := api.service.w.GetCurrentTime()
+		r.SetDefaults(now)
 
-	if r.From > r.To {
-		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
-	}
-
-	mailServerNode, err := api.service.GetPeer(r.MailServerPeer)
-	if err != nil {
-		return nil, fmt.Errorf("%v: %v", ext.ErrInvalidMailServerPeer, err)
-	}
-
-	var (
-		symKey    []byte
-		publicKey *ecdsa.PublicKey
-	)
-
-	if r.SymKeyID != "" {
-		symKey, err = api.service.w.GetSymKey(r.SymKeyID)
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", ext.ErrInvalidSymKeyID, err)
+		if r.From > r.To {
+			return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
 		}
-	} else {
-		publicKey = mailServerNode.Pubkey()
-	}
 
-	payload, err := ext.MakeMessagesRequestPayload(r)
-	if err != nil {
-		return nil, err
-	}
+		mailServerNode, err := api.service.GetPeer(r.MailServerPeer)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %v", ext.ErrInvalidMailServerPeer, err)
+		}
 
-	envelope, err := makeEnvelop(
-		payload,
-		symKey,
-		publicKey,
-		api.service.NodeID(),
-		api.service.w.MinPow(),
-		now,
-	)
-	if err != nil {
-		return nil, err
-	}
-	hash := envelope.Hash()
+		var (
+			symKey    []byte
+			publicKey *ecdsa.PublicKey
+		)
 
-	if !r.Force {
-		err = api.service.RequestsRegistry().Register(hash, r.Topics)
+		if r.SymKeyID != "" {
+			symKey, err = api.service.w.GetSymKey(r.SymKeyID)
+			if err != nil {
+				return nil, fmt.Errorf("%v: %v", ext.ErrInvalidSymKeyID, err)
+			}
+		} else {
+			publicKey = mailServerNode.Pubkey()
+		}
+
+		payload, err := ext.MakeMessagesRequestPayload(r)
 		if err != nil {
 			return nil, err
 		}
-	}
 
-	if err := api.service.w.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
-		if !r.Force {
-			api.service.RequestsRegistry().Unregister(hash)
+		envelope, err := makeEnvelop(
+			payload,
+			symKey,
+			publicKey,
+			api.service.NodeID(),
+			api.service.w.MinPow(),
+			now,
+		)
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
-	}
+		hash := envelope.Hash()
 
-	return hash[:], nil
+		if !r.Force {
+			err = api.service.RequestsRegistry().Register(hash, r.Topics)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if err := api.service.w.RequestHistoricMessagesWithTimeout(mailServerNode.ID().Bytes(), envelope, r.Timeout*time.Second); err != nil {
+			if !r.Force {
+				api.service.RequestsRegistry().Unregister(hash)
+			}
+			return nil, err
+		}
+
+		return hash[:], nil
+	*/
+	return nil, nil
 }
 
 // RequestMessagesSync repeats MessagesRequest using configuration in retry conf.
