@@ -35,7 +35,7 @@
 // 0019_blocks_ranges_extra_data.up.sql (89B)
 // 0020_metrics.up.sql (235B)
 // 0021_add_session_id_to_metrics.up.sql (55B)
-// 0021_settings_anon_metrics_should_send.up.sql (80B)
+// 1618237885_settings_anon_metrics_should_send.up.sql (80B)
 // doc.go (74B)
 
 package migrations
@@ -805,22 +805,22 @@ func _0021_add_session_id_to_metricsUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __0021_settings_anon_metrics_should_sendUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0e\x42\x21\x0c\x06\xe0\xdd\x53\xfc\xf7\x70\xea\x93\x3a\x55\x48\x0c\xcc\x84\x48\x55\x12\x2c\x89\xc5\xfb\xfb\x91\x64\xbe\x23\xd3\x21\x0c\xd7\xbd\x87\xbd\x1c\x14\x02\x2e\x49\xca\x2d\xa2\xd9\xb2\xfa\xd1\xfd\x1d\x0f\xaf\xfe\x5e\xbf\xd9\xab\xab\x75\x1c\x29\x09\x53\x44\xe0\x2b\x15\xc9\x78\xb6\xe9\x7a\x3e\xfd\x03\x00\x00\xff\xff\x9a\x73\xdd\x50\x50\x00\x00\x00")
+var __1618237885_settings_anon_metrics_should_sendUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x04\xc0\x31\x0e\x42\x21\x0c\x06\xe0\xdd\x53\xfc\xf7\x70\xea\x93\x3a\x55\x48\x0c\xcc\x84\x48\x55\x12\x2c\x89\xc5\xfb\xfb\x91\x64\xbe\x23\xd3\x21\x0c\xd7\xbd\x87\xbd\x1c\x14\x02\x2e\x49\xca\x2d\xa2\xd9\xb2\xfa\xd1\xfd\x1d\x0f\xaf\xfe\x5e\xbf\xd9\xab\xab\x75\x1c\x29\x09\x53\x44\xe0\x2b\x15\xc9\x78\xb6\xe9\x7a\x3e\xfd\x03\x00\x00\xff\xff\x9a\x73\xdd\x50\x50\x00\x00\x00")
 
-func _0021_settings_anon_metrics_should_sendUpSqlBytes() ([]byte, error) {
+func _1618237885_settings_anon_metrics_should_sendUpSqlBytes() ([]byte, error) {
 	return bindataRead(
-		__0021_settings_anon_metrics_should_sendUpSql,
-		"0021_settings_anon_metrics_should_send.up.sql",
+		__1618237885_settings_anon_metrics_should_sendUpSql,
+		"1618237885_settings_anon_metrics_should_send.up.sql",
 	)
 }
 
-func _0021_settings_anon_metrics_should_sendUpSql() (*asset, error) {
-	bytes, err := _0021_settings_anon_metrics_should_sendUpSqlBytes()
+func _1618237885_settings_anon_metrics_should_sendUpSql() (*asset, error) {
+	bytes, err := _1618237885_settings_anon_metrics_should_sendUpSqlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "0021_settings_anon_metrics_should_send.up.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1618237288, 0)}
+	info := bindataFileInfo{name: "1618237885_settings_anon_metrics_should_send.up.sql", size: 80, mode: os.FileMode(0644), modTime: time.Unix(1618237288, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xea, 0x6c, 0x1d, 0x1f, 0x54, 0x62, 0x18, 0x22, 0x5c, 0xa7, 0x8c, 0x59, 0x24, 0xd3, 0x4d, 0x55, 0xc4, 0x2a, 0x9e, 0x4c, 0x37, 0x6b, 0xfd, 0xac, 0xec, 0xb7, 0x68, 0x21, 0x26, 0x26, 0xf3, 0x92}}
 	return a, nil
 }
@@ -1006,7 +1006,7 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0021_add_session_id_to_metrics.up.sql": _0021_add_session_id_to_metricsUpSql,
 
-	"0021_settings_anon_metrics_should_send.up.sql": _0021_settings_anon_metrics_should_sendUpSql,
+	"1618237885_settings_anon_metrics_should_send.up.sql": _1618237885_settings_anon_metrics_should_sendUpSql,
 
 	"doc.go": docGo,
 }
@@ -1052,42 +1052,42 @@ type bintree struct {
 }
 
 var _bintree = &bintree{nil, map[string]*bintree{
-	"0001_app.down.sql":                               &bintree{_0001_appDownSql, map[string]*bintree{}},
-	"0001_app.up.sql":                                 &bintree{_0001_appUpSql, map[string]*bintree{}},
-	"0002_tokens.down.sql":                            &bintree{_0002_tokensDownSql, map[string]*bintree{}},
-	"0002_tokens.up.sql":                              &bintree{_0002_tokensUpSql, map[string]*bintree{}},
-	"0003_settings.down.sql":                          &bintree{_0003_settingsDownSql, map[string]*bintree{}},
-	"0003_settings.up.sql":                            &bintree{_0003_settingsUpSql, map[string]*bintree{}},
-	"0004_pending_stickers.down.sql":                  &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
-	"0004_pending_stickers.up.sql":                    &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
-	"0005_waku_mode.down.sql":                         &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
-	"0005_waku_mode.up.sql":                           &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
-	"0006_appearance.up.sql":                          &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
-	"0007_enable_waku_default.up.sql":                 &bintree{_0007_enable_waku_defaultUpSql, map[string]*bintree{}},
-	"0008_add_push_notifications.up.sql":              &bintree{_0008_add_push_notificationsUpSql, map[string]*bintree{}},
-	"0009_enable_sending_push_notifications.down.sql": &bintree{_0009_enable_sending_push_notificationsDownSql, map[string]*bintree{}},
-	"0009_enable_sending_push_notifications.up.sql":   &bintree{_0009_enable_sending_push_notificationsUpSql, map[string]*bintree{}},
-	"0010_add_block_mentions.down.sql":                &bintree{_0010_add_block_mentionsDownSql, map[string]*bintree{}},
-	"0010_add_block_mentions.up.sql":                  &bintree{_0010_add_block_mentionsUpSql, map[string]*bintree{}},
-	"0011_allow_webview_permission_requests.down.sql": &bintree{_0011_allow_webview_permission_requestsDownSql, map[string]*bintree{}},
-	"0011_allow_webview_permission_requests.up.sql":   &bintree{_0011_allow_webview_permission_requestsUpSql, map[string]*bintree{}},
-	"0012_pending_transactions.down.sql":              &bintree{_0012_pending_transactionsDownSql, map[string]*bintree{}},
-	"0012_pending_transactions.up.sql":                &bintree{_0012_pending_transactionsUpSql, map[string]*bintree{}},
-	"0013_favourites.down.sql":                        &bintree{_0013_favouritesDownSql, map[string]*bintree{}},
-	"0013_favourites.up.sql":                          &bintree{_0013_favouritesUpSql, map[string]*bintree{}},
-	"0014_add_use_mailservers.down.sql":               &bintree{_0014_add_use_mailserversDownSql, map[string]*bintree{}},
-	"0014_add_use_mailservers.up.sql":                 &bintree{_0014_add_use_mailserversUpSql, map[string]*bintree{}},
-	"0015_link_previews.down.sql":                     &bintree{_0015_link_previewsDownSql, map[string]*bintree{}},
-	"0015_link_previews.up.sql":                       &bintree{_0015_link_previewsUpSql, map[string]*bintree{}},
-	"0016_local_notifications_preferences.down.sql":   &bintree{_0016_local_notifications_preferencesDownSql, map[string]*bintree{}},
-	"0016_local_notifications_preferences.up.sql":     &bintree{_0016_local_notifications_preferencesUpSql, map[string]*bintree{}},
-	"0017_bookmarks.down.sql":                         &bintree{_0017_bookmarksDownSql, map[string]*bintree{}},
-	"0017_bookmarks.up.sql":                           &bintree{_0017_bookmarksUpSql, map[string]*bintree{}},
-	"0018_profile_pictures_visibility.up.sql":         &bintree{_0018_profile_pictures_visibilityUpSql, map[string]*bintree{}},
-	"0019_blocks_ranges_extra_data.up.sql":            &bintree{_0019_blocks_ranges_extra_dataUpSql, map[string]*bintree{}},
-	"0020_metrics.up.sql":                             &bintree{_0020_metricsUpSql, map[string]*bintree{}},
-	"0021_add_session_id_to_metrics.up.sql":           &bintree{_0021_add_session_id_to_metricsUpSql, map[string]*bintree{}},
-	"0021_settings_anon_metrics_should_send.up.sql":   &bintree{_0021_settings_anon_metrics_should_sendUpSql, map[string]*bintree{}},
+	"0001_app.down.sql":                                   &bintree{_0001_appDownSql, map[string]*bintree{}},
+	"0001_app.up.sql":                                     &bintree{_0001_appUpSql, map[string]*bintree{}},
+	"0002_tokens.down.sql":                                &bintree{_0002_tokensDownSql, map[string]*bintree{}},
+	"0002_tokens.up.sql":                                  &bintree{_0002_tokensUpSql, map[string]*bintree{}},
+	"0003_settings.down.sql":                              &bintree{_0003_settingsDownSql, map[string]*bintree{}},
+	"0003_settings.up.sql":                                &bintree{_0003_settingsUpSql, map[string]*bintree{}},
+	"0004_pending_stickers.down.sql":                      &bintree{_0004_pending_stickersDownSql, map[string]*bintree{}},
+	"0004_pending_stickers.up.sql":                        &bintree{_0004_pending_stickersUpSql, map[string]*bintree{}},
+	"0005_waku_mode.down.sql":                             &bintree{_0005_waku_modeDownSql, map[string]*bintree{}},
+	"0005_waku_mode.up.sql":                               &bintree{_0005_waku_modeUpSql, map[string]*bintree{}},
+	"0006_appearance.up.sql":                              &bintree{_0006_appearanceUpSql, map[string]*bintree{}},
+	"0007_enable_waku_default.up.sql":                     &bintree{_0007_enable_waku_defaultUpSql, map[string]*bintree{}},
+	"0008_add_push_notifications.up.sql":                  &bintree{_0008_add_push_notificationsUpSql, map[string]*bintree{}},
+	"0009_enable_sending_push_notifications.down.sql":     &bintree{_0009_enable_sending_push_notificationsDownSql, map[string]*bintree{}},
+	"0009_enable_sending_push_notifications.up.sql":       &bintree{_0009_enable_sending_push_notificationsUpSql, map[string]*bintree{}},
+	"0010_add_block_mentions.down.sql":                    &bintree{_0010_add_block_mentionsDownSql, map[string]*bintree{}},
+	"0010_add_block_mentions.up.sql":                      &bintree{_0010_add_block_mentionsUpSql, map[string]*bintree{}},
+	"0011_allow_webview_permission_requests.down.sql":     &bintree{_0011_allow_webview_permission_requestsDownSql, map[string]*bintree{}},
+	"0011_allow_webview_permission_requests.up.sql":       &bintree{_0011_allow_webview_permission_requestsUpSql, map[string]*bintree{}},
+	"0012_pending_transactions.down.sql":                  &bintree{_0012_pending_transactionsDownSql, map[string]*bintree{}},
+	"0012_pending_transactions.up.sql":                    &bintree{_0012_pending_transactionsUpSql, map[string]*bintree{}},
+	"0013_favourites.down.sql":                            &bintree{_0013_favouritesDownSql, map[string]*bintree{}},
+	"0013_favourites.up.sql":                              &bintree{_0013_favouritesUpSql, map[string]*bintree{}},
+	"0014_add_use_mailservers.down.sql":                   &bintree{_0014_add_use_mailserversDownSql, map[string]*bintree{}},
+	"0014_add_use_mailservers.up.sql":                     &bintree{_0014_add_use_mailserversUpSql, map[string]*bintree{}},
+	"0015_link_previews.down.sql":                         &bintree{_0015_link_previewsDownSql, map[string]*bintree{}},
+	"0015_link_previews.up.sql":                           &bintree{_0015_link_previewsUpSql, map[string]*bintree{}},
+	"0016_local_notifications_preferences.down.sql":       &bintree{_0016_local_notifications_preferencesDownSql, map[string]*bintree{}},
+	"0016_local_notifications_preferences.up.sql":         &bintree{_0016_local_notifications_preferencesUpSql, map[string]*bintree{}},
+	"0017_bookmarks.down.sql":                             &bintree{_0017_bookmarksDownSql, map[string]*bintree{}},
+	"0017_bookmarks.up.sql":                               &bintree{_0017_bookmarksUpSql, map[string]*bintree{}},
+	"0018_profile_pictures_visibility.up.sql":             &bintree{_0018_profile_pictures_visibilityUpSql, map[string]*bintree{}},
+	"0019_blocks_ranges_extra_data.up.sql":                &bintree{_0019_blocks_ranges_extra_dataUpSql, map[string]*bintree{}},
+	"0020_metrics.up.sql":                                 &bintree{_0020_metricsUpSql, map[string]*bintree{}},
+	"0021_add_session_id_to_metrics.up.sql":               &bintree{_0021_add_session_id_to_metricsUpSql, map[string]*bintree{}},
+	"1618237885_settings_anon_metrics_should_send.up.sql": &bintree{_1618237885_settings_anon_metrics_should_sendUpSql, map[string]*bintree{}},
 	"doc.go": &bintree{docGo, map[string]*bintree{}},
 }}
 
