@@ -1036,8 +1036,8 @@ func (m *Messenger) Init() error {
 	if err != nil {
 		return err
 	}
-	for _, contact := range contacts {
-		m.allContacts.Store(contact.ID, contact)
+	for idx, contact := range contacts {
+		m.allContacts.Store(contact.ID, contacts[idx])
 		// We only need filters for contacts added by us and not blocked.
 		if !contact.IsAdded() || contact.IsBlocked() {
 			continue
