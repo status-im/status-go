@@ -99,11 +99,13 @@ func LinkPreviewWhitelist() []Site {
 			Address:   "github.com",
 			ImageSite: false,
 		},
-		Site{
-			Title:     "Medium",
-			Address:   "medium.com",
-			ImageSite: false,
-		},
+		// Medium unfurling is failing - https://github.com/status-im/status-go/issues/2192
+		//
+		// Site{
+		// 	Title:     "Medium",
+		// 	Address:   "medium.com",
+		// 	ImageSite: false,
+		// },
 	}
 }
 
@@ -266,7 +268,7 @@ func GetLinkPreviewData(link string) (previewData LinkPreviewData, err error) {
 	switch hostname {
 	case "youtube.com", "youtu.be", "www.youtube.com":
 		return GetYoutubePreviewData(link)
-	case "github.com", "our.status.im", "medium.com":
+	case "github.com", "our.status.im":
 		return GetGenericLinkPreviewData(link)
 	case "giphy.com", "media.giphy.com":
 		return GetGiphyPreviewData(link)
