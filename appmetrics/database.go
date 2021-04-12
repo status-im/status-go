@@ -19,6 +19,8 @@ type AppMetric struct {
 	Value      json.RawMessage    `json:"value"`
 	AppVersion string             `json:"app_version"`
 	OS         string             `json:"os"`
+	SessionID  string             `json:"session_id"`
+	CreatedAt  string             `json:"created_at"`
 }
 
 type AppMetricValidationError struct {
@@ -98,7 +100,7 @@ func (db *Database) ValidateAppMetrics(appMetrics []AppMetric) (err error) {
 	return
 }
 
-func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
+func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (err error) {
 	var (
 		tx     *sql.Tx
 		insert *sql.Stmt
@@ -124,13 +126,13 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system) VALUES (?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 
 	for _, metric := range appMetrics {
-		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS)
+		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID)
 		if err != nil {
 			return
 		}
@@ -139,7 +141,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric) (err error) {
 }
 
 func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric, err error) {
-	rows, err := db.db.Query("SELECT event, value, app_version, operating_system FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
+	rows, err := db.db.Query("SELECT event, value, app_version, operating_system, session_id, created_at FROM app_metrics LIMIT ? OFFSET ?", limit, offset)
 
 	if err != nil {
 		return nil, err
@@ -147,8 +149,11 @@ func (db *Database) GetAppMetrics(limit int, offset int) (appMetrics []AppMetric
 	defer rows.Close()
 	for rows.Next() {
 		metric := AppMetric{}
-		err := rows.Scan(&metric.Event, &metric.Value, &metric.AppVersion, &metric.OS)
-
+		err := rows.Scan(
+			&metric.Event, &metric.Value,
+			&metric.AppVersion, &metric.OS,
+			&metric.SessionID, &metric.CreatedAt,
+		)
 		if err != nil {
 			return nil, err
 		}

@@ -24,6 +24,7 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 }
 
 func TestSaveAppMetrics(t *testing.T) {
+	sessionID := "rand-omse-ssid"
 	db, stop := setupTestDB(t)
 	defer stop()
 
@@ -33,10 +34,14 @@ func TestSaveAppMetrics(t *testing.T) {
 		{Event: NavigateTo, Value: json.RawMessage(`{"view_id": "some-view-id", "params": {"screen": "login"}}`), OS: "android", AppVersion: "1.11"},
 	}
 
-	err := db.SaveAppMetrics(appMetrics)
+	err := db.SaveAppMetrics(appMetrics, sessionID)
 	require.NoError(t, err)
 
 	res, err := db.GetAppMetrics(10, 0)
 	require.NoError(t, err)
-	require.Equal(t, appMetrics, res)
+	require.Equal(t, appMetrics[0].Event, res[0].Event)
+	require.Equal(t, appMetrics[0].Value, res[0].Value)
+	require.Equal(t, appMetrics[0].OS, res[0].OS)
+	require.Equal(t, appMetrics[0].AppVersion, res[0].AppVersion)
+	require.NotNil(t, res[0].CreatedAt)
 }

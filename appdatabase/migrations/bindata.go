@@ -34,6 +34,7 @@
 // 0018_profile_pictures_visibility.up.sql (84B)
 // 0019_blocks_ranges_extra_data.up.sql (89B)
 // 0020_metrics.up.sql (235B)
+// 0021_add_session_id_to_metrics.up.sql (55B)
 // doc.go (74B)
 
 package migrations
@@ -783,6 +784,26 @@ func _0020_metricsUpSql() (*asset, error) {
 	return a, nil
 }
 
+var __0021_add_session_id_to_metricsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x48\x2c\x28\x88\xcf\x4d\x2d\x29\xca\x4c\x2e\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x28\x4e\x2d\x2e\xce\xcc\xcf\x8b\xcf\x4c\x51\x08\x73\x0c\x72\xf6\x70\x0c\xb2\xe6\x02\x04\x00\x00\xff\xff\x10\x56\x8d\x9e\x37\x00\x00\x00")
+
+func _0021_add_session_id_to_metricsUpSqlBytes() ([]byte, error) {
+	return bindataRead(
+		__0021_add_session_id_to_metricsUpSql,
+		"0021_add_session_id_to_metrics.up.sql",
+	)
+}
+
+func _0021_add_session_id_to_metricsUpSql() (*asset, error) {
+	bytes, err := _0021_add_session_id_to_metricsUpSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "0021_add_session_id_to_metrics.up.sql", size: 55, mode: os.FileMode(0644), modTime: time.Unix(1618233659, 0)}
+	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0xb7, 0x81, 0xfc, 0x97, 0xd1, 0x8b, 0xea, 0x8e, 0xd7, 0xc2, 0x53, 0x62, 0xe9, 0xbc, 0xf, 0x8c, 0x46, 0x41, 0x41, 0xb7, 0x6, 0x35, 0xf5, 0xba, 0xbb, 0x28, 0x50, 0x48, 0xbf, 0x36, 0x90, 0x5c}}
+	return a, nil
+}
+
 var _docGo = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2c\xc9\xb1\x0d\xc4\x20\x0c\x05\xd0\x9e\x29\xfe\x02\xd8\xfd\x6d\xe3\x4b\xac\x2f\x44\x82\x09\x78\x7f\xa5\x49\xfd\xa6\x1d\xdd\xe8\xd8\xcf\x55\x8a\x2a\xe3\x47\x1f\xbe\x2c\x1d\x8c\xfa\x6f\xe3\xb4\x34\xd4\xd9\x89\xbb\x71\x59\xb6\x18\x1b\x35\x20\xa2\x9f\x0a\x03\xa2\xe5\x0d\x00\x00\xff\xff\x60\xcd\x06\xbe\x4a\x00\x00\x00")
 
 func docGoBytes() ([]byte, error) {
@@ -962,6 +983,8 @@ var _bindata = map[string]func() (*asset, error){
 
 	"0020_metrics.up.sql": _0020_metricsUpSql,
 
+	"0021_add_session_id_to_metrics.up.sql": _0021_add_session_id_to_metricsUpSql,
+
 	"doc.go": docGo,
 }
 
@@ -1040,6 +1063,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"0018_profile_pictures_visibility.up.sql":         &bintree{_0018_profile_pictures_visibilityUpSql, map[string]*bintree{}},
 	"0019_blocks_ranges_extra_data.up.sql":            &bintree{_0019_blocks_ranges_extra_dataUpSql, map[string]*bintree{}},
 	"0020_metrics.up.sql":                             &bintree{_0020_metricsUpSql, map[string]*bintree{}},
+	"0021_add_session_id_to_metrics.up.sql":           &bintree{_0021_add_session_id_to_metricsUpSql, map[string]*bintree{}},
 	"doc.go":                                          &bintree{docGo, map[string]*bintree{}},
 }}
 
