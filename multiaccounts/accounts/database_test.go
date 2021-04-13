@@ -23,6 +23,7 @@ var (
 	networks = json.RawMessage("{}")
 	settings = Settings{
 		Address:                   types.HexToAddress("0xdC540f3745Ff2964AFC1171a5A0DD726d1F6B472"),
+		AnonMetricsShouldSend:     false,
 		CurrentNetwork:            "mainnet_rpc",
 		DappsAddress:              types.HexToAddress("0xD1300f99fDF7346986CbC766903245087394ecd0"),
 		InstallationID:            "d3efcff6-cffa-560e-a547-21d3858cbc51",
