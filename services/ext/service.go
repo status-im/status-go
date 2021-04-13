@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
+	"encoding/hex"
+	"github.com/status-im/status-go/protocol/anonmetrics"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -23,6 +25,7 @@ import (
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/db"
 	coretypes "github.com/status-im/status-go/eth-node/core/types"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
@@ -412,6 +415,33 @@ func buildMessengerOptions(
 	settings, err := accountsDB.GetSettings()
 	if err != sql.ErrNoRows && err != nil {
 		return nil, err
+	}
+
+	// Generate anon metrics client config
+	if settings.AnonMetricsShouldSend {
+		keyBytes, err := hex.DecodeString(config.AnonMetricsSendID)
+		if err != nil {
+			return nil, err
+		}
+
+		key, err := crypto.UnmarshalPubkey(keyBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		amcc := &anonmetrics.ClientConfig{
+			ShouldSend: true,
+			SendAddress: key,
+		}
+		options = append(options, protocol.WithAnonMetricsClientConfig(amcc))
+	}
+
+	// Generate anon metrics server config
+	if config.AnonMetricsServerEnabled {
+		amsc := &anonmetrics.ServerConfig{
+			Enabled: true,
+		}
+		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
 	}
 
 	if settings.PushNotificationsServerEnabled {

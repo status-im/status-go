@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"database/sql"
-
+	"github.com/status-im/status-go/protocol/anonmetrics"
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts"
@@ -47,6 +47,9 @@ type config struct {
 	verifyTransactionClient  EthClient
 	verifyENSURL             string
 	verifyENSContractAddress string
+
+	anonMetricsClientConfig *anonmetrics.ClientConfig
+	anonMetricsServerConfig *anonmetrics.ServerConfig
 
 	pushNotificationServerConfig *pushnotificationserver.Config
 	pushNotificationClientConfig *pushnotificationclient.Config
@@ -112,6 +115,20 @@ func WithMailserversDatabase(ma *mailservers.Database) Option {
 func WithAccount(acc *multiaccounts.Account) Option {
 	return func(c *config) error {
 		c.account = acc
+		return nil
+	}
+}
+
+func WithAnonMetricsClientConfig(anonMetricsClientConfig *anonmetrics.ClientConfig) Option {
+	return func(c *config) error {
+		c.anonMetricsClientConfig = anonMetricsClientConfig
+		return nil
+	}
+}
+
+func WithAnonMetricsServerConfig(anonMetricsServerConfig *anonmetrics.ServerConfig) Option {
+	return func(c *config) error {
+		c.anonMetricsServerConfig = anonMetricsServerConfig
 		return nil
 	}
 }

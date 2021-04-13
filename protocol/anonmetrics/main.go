@@ -1,4 +1,4 @@
-package anon_metrics
+package anonmetrics
 
 import (
 	"github.com/status-im/status-go/appmetrics"

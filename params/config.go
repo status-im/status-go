@@ -566,6 +566,12 @@ type ShhextConfig struct {
 
 	// DefaultPushNotificationsServers is the default-status run push notification servers
 	DefaultPushNotificationsServers []*ecdsa.PublicKey
+
+	// AnonMetricsSendID is the public key used by a metrics node to decrypt metrics protobufs
+	AnonMetricsSendID string
+
+	// AnonMetricsServerEnabled indicates whether or not the
+	AnonMetricsServerEnabled bool
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
