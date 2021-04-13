@@ -581,8 +581,13 @@ func (m *Messenger) HandleChatMessage(state *ReceivedMessageState) error {
 
 	// It looks like status-react created profile chats as public chats
 	// so for now we need to check for the presence of "@" in their chatID
-	if chat.Public() && receivedMessage.ContentType == protobuf.ChatMessage_IMAGE && !chat.ProfileUpdates() {
-		return errors.New("images are not allowed in public chats")
+	if chat.Public() && !chat.ProfileUpdates() {
+		switch receivedMessage.ContentType {
+		case protobuf.ChatMessage_IMAGE:
+			return errors.New("images are not allowed in public chats")
+		case protobuf.ChatMessage_AUDIO:
+			return errors.New("audio messages are not allowed in public chats")
+		}
 	}
 
 	// If profile updates check if author is the same as chat profile public key
