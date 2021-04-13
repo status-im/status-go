@@ -23,3 +23,17 @@ type Client struct {
 // TODO implement start functionality
 
 // TODO implement stop functionality
+
+type FibonacciIntervalIncrementer struct {
+	Last    int
+	Current int
+}
+
+func (f *FibonacciIntervalIncrementer) Next() int {
+	out := f.Last + f.Current
+
+	f.Last = f.Current
+	f.Current = out
+
+	return out
+}
