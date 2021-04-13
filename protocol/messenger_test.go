@@ -308,6 +308,27 @@ func (s *MessengerSuite) TestInit() {
 	}
 }
 
+func buildAudioMessage(s *MessengerSuite, chat Chat) *common.Message {
+	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
+	message := &common.Message{}
+	message.Text = "text-input-message"
+	message.ChatId = chat.ID
+	message.Clock = clock
+	message.Timestamp = timestamp
+	message.WhisperTimestamp = clock
+	message.LocalChatID = chat.ID
+	message.MessageType = protobuf.MessageType_PUBLIC_GROUP
+	message.ContentType = protobuf.ChatMessage_AUDIO
+	message.Payload = &protobuf.ChatMessage_Audio{
+		Audio: &protobuf.AudioMessage{
+			Type:    1,
+			Payload: []byte("some-payload"),
+		},
+	}
+
+	return message
+}
+
 func buildTestMessage(chat Chat) *common.Message {
 	clock, timestamp := chat.NextClockAndTimestamp(&testTimeSource{})
 	message := &common.Message{}
@@ -611,6 +632,34 @@ func (s *MessengerSuite) TestRetrieveTheirPublic() {
 	s.Require().Equal(sentMessage.Clock, actualChat.LastClockValue)
 	// It sets the last message
 	s.Require().NotNil(actualChat.LastMessage)
+	s.Require().NoError(theirMessenger.Shutdown())
+}
+
+// Drop audio message in public group
+func (s *MessengerSuite) TestDropAudioMessageInPublicGroup() {
+	theirMessenger := s.newMessenger(s.shh)
+	_, err := theirMessenger.Start()
+	s.Require().NoError(err)
+	theirChat := CreatePublicChat("status", s.m.transport)
+	err = theirMessenger.SaveChat(theirChat)
+	s.Require().NoError(err)
+
+	chat := CreatePublicChat("status", s.m.transport)
+	err = s.m.SaveChat(chat)
+	s.Require().NoError(err)
+
+	_, err = s.m.Join(chat)
+	s.Require().NoError(err)
+
+	inputMessage := buildAudioMessage(s, *chat)
+
+	_, err = theirMessenger.SendChatMessage(context.Background(), inputMessage)
+	s.NoError(err)
+
+	time.Sleep(100 * time.Millisecond)
+	response, err := s.m.RetrieveAll()
+	s.Require().NoError(err)
+	s.Require().Len(response.Messages(), 0)
 	s.Require().NoError(theirMessenger.Shutdown())
 }
 
