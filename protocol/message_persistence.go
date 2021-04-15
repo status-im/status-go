@@ -617,7 +617,7 @@ func (db sqlitePersistence) PinnedMessageByChatIDs(chatIDs []string, currCursor 
 	}
 
 	var newCursor string
-	if len(result) > limit {
+	if len(result) > limit && cursors != nil {
 		newCursor = cursors[limit]
 		result = result[:limit]
 	}
