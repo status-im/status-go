@@ -29,6 +29,7 @@ type Config struct {
 	Host                   string   `toml:",omitempty"`
 	Port                   int      `toml:",omitempty"`
 	BootNodes              []string `toml:",omitempty"`
+	StoreNodes             []string `toml:",omitempty"`
 }
 
 var DefaultConfig = Config{

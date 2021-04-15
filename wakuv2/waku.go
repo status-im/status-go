@@ -44,9 +44,12 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	wakucommon "github.com/status-im/go-waku/waku/common"
+	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	node "github.com/status-im/go-waku/waku/v2/node"
+	"github.com/status-im/go-waku/waku/v2/protocol"
+	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
 	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
 
@@ -140,12 +143,26 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
 	}
 
+	err = waku.node.MountStore(false, nil) // Mounts the store protocol (without storing the messages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
+	}
+
 	for _, bootnode := range cfg.BootNodes {
 		err := waku.node.DialPeer(bootnode)
 		if err != nil {
 			log.Warn("Could not dial peer", err)
 		} else {
 			log.Info("Bootnode dialed successfully", bootnode)
+		}
+	}
+
+	for _, storenode := range cfg.StoreNodes {
+		peerId, err := waku.node.AddStorePeer(storenode)
+		if err != nil {
+			log.Warn("Could not add store peer", err)
+		} else {
+			log.Info("Storepeeer dialed successfully", "peerId", peerId.Pretty())
 		}
 	}
 
@@ -498,14 +515,24 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(envelope *common.ReceivedMessage) error {
-	// TODO:
-	/*ok, err := w.add(envelope)
-	if err == nil && !ok {
-		return fmt.Errorf("failed to add envelope")
+func (w *Waku) Send(msg *protocol.WakuMessage) ([]byte, error) {
+	return w.node.Publish(msg, nil)
+}
+
+func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) error {
+	// TODO: run into a go routine?
+	strTopics := make([]string, len(topics))
+	for i, t := range topics {
+		strTopics[i] = t.String()
 	}
-	return err*/
-	return nil
+
+	result, err := w.node.Query(strTopics, float64(from), float64(to), opts...)
+
+	_ = result
+
+	// TODO: trigger message signal
+
+	return err
 }
 
 // Start implements node.Service, starting the background data propagation thread
