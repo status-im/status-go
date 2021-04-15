@@ -49,7 +49,7 @@ func (s *MessengerPinMessageSuite) TearDownTest() {
 	s.Require().NoError(s.m.Shutdown())
 }
 
-func (s *MessengerPinMessageSuite) newMessenger(shh types.Waku) *Messenger {
+func (s *MessengerPinMessageSuite) newMessenger() *Messenger {
 	privateKey, err := crypto.GenerateKey()
 	s.Require().NoError(err)
 
@@ -59,7 +59,7 @@ func (s *MessengerPinMessageSuite) newMessenger(shh types.Waku) *Messenger {
 }
 
 func (s *MessengerPinMessageSuite) TestPinMessage() {
-	theirMessenger := s.newMessenger(s.shh)
+	theirMessenger := s.newMessenger()
 	_, err := theirMessenger.Start()
 	s.Require().NoError(err)
 
