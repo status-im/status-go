@@ -39,7 +39,7 @@ func (s *MessengerPinMessageSuite) SetupTest() {
 	s.shh = gethbridge.NewGethWakuWrapper(shh)
 	s.Require().NoError(shh.Start(nil))
 
-	s.m = s.newMessenger(s.shh)
+	s.m = s.newMessenger()
 	s.privateKey = s.m.identity
 	_, err := s.m.Start()
 	s.Require().NoError(err)
