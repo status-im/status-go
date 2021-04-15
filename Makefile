@@ -368,8 +368,11 @@ clean-mailserver-systemd: ##@Easy Clean your systemd service for running a mails
 clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserver
 	@cd _assets/compose/mailserver && $(MAKE) clean
 
-## TODO(samyoul) option to set and/or overwrite migration path
-migration: DEFAULT_MIGRATION_PATH := appdatabase/migrations/sql/
-migration: UNIX_TIMESTAMP := $(shell date +%s)
+UNIX_TIMESTAMP := $(shell date +%s)
+migration: PATH := appdatabase/migrations/sql
 migration:
-	touch $(DEFAULT_MIGRATION_PATH)$(UNIX_TIMESTAMP)_$(DESC).up.sql
+	touch $(PATH)/$(UNIX_TIMESTAMP)_$(D).up.sql
+
+migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
+migration-protocol:
+	touch $(DEFAULT_PROTOCOL_PATH)/$(UNIX_TIMESTAMP)_$(D).up.sql
