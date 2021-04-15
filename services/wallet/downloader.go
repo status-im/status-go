@@ -106,7 +106,8 @@ func (d *ETHTransferDownloader) getTransfersInBlock(ctx context.Context, blk *ty
 		}
 
 		for _, tx := range blk.Transactions() {
-			if tx.ChainId().Cmp(d.chain) != 0 {
+			if tx.ChainId().Cmp(big.NewInt(0)) != 0 && tx.ChainId().Cmp(d.chain) != 0 {
+				log.Info("chain id mismatch", "tx hash", tx.Hash(), "tx chain id", tx.ChainId(), "expected chain id", d.chain)
 				continue
 			}
 			from, err := types.Sender(d.signer, tx)
