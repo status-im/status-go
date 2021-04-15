@@ -247,10 +247,10 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		Payload:      payload,
 		Version:      version,
 		ContentTopic: req.Topic.String(),
-		Timestamp:    float64(api.w.CurrentTime().UnixNano()),
+		Timestamp:    float64(api.w.CurrentTime().UnixNano()) / 1000000000,
 	}
 
-	hash, err := api.w.node.Publish(wakuMsg, nil)
+	hash, err := api.w.Send(wakuMsg)
 
 	if err != nil {
 		return nil, err

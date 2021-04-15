@@ -272,6 +272,9 @@ type ClusterConfig struct {
 
 	// WakuNodes is a list of wakuv2 libp2p nodes
 	WakuNodes []string
+
+	// WakuStoreNodes is a list of wakuv2 store nodes
+	WakuStoreNodes []string
 }
 
 // String dumps config object as nicely indented JSON

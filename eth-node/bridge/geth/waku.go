@@ -2,8 +2,10 @@ package gethbridge
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"time"
 
+	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
@@ -178,6 +180,10 @@ func (w *gethWakuWrapper) SendMessagesRequest(peerID []byte, r types.MessagesReq
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (w *gethWakuWrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
 	return w.waku.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*wakucommon.Envelope), timeout)
+}
+
+func (w *gethWakuWrapper) RequestStoreMessages(topics []types.TopicType, from uint64, to uint64, options []store.HistoryRequestOption) error {
+	return errors.New("Not implemented")
 }
 
 type wakuFilterWrapper struct {

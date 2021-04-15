@@ -382,6 +382,7 @@ func createWakuV2Service(ctx *node.ServiceContext, nodeKey string, wakuCfg *para
 		Host:                   wakuCfg.Host,
 		Port:                   wakuCfg.Port,
 		BootNodes:              clusterCfg.WakuNodes,
+		StoreNodes:             clusterCfg.WakuStoreNodes,
 	}
 
 	if wakuCfg.MaxMessageSize > 0 {

@@ -2,8 +2,10 @@ package gethbridge
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"time"
 
+	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2"
 	wakucommon "github.com/status-im/status-go/wakuv2/common"
@@ -158,15 +160,7 @@ func (w *gethWakuV2Wrapper) createFilterWrapper(id string, keyAsym *ecdsa.Privat
 }
 
 func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesRequest) error {
-	return nil
-	/*
-		return w.waku.SendMessagesRequest(peerID, wakucommon.MessagesRequest{
-			ID:     r.ID,
-			From:   r.From,
-			To:     r.To,
-			Limit:  r.Limit,
-			Cursor: r.Cursor,
-		})*/
+	return errors.New("DEPRECATED")
 }
 
 // RequestHistoricMessages sends a message with p2pRequestCode to a specific peer,
@@ -175,9 +169,11 @@ func (w *gethWakuV2Wrapper) SendMessagesRequest(peerID []byte, r types.MessagesR
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
 func (w *gethWakuV2Wrapper) RequestHistoricMessagesWithTimeout(peerID []byte, envelope types.Envelope, timeout time.Duration) error {
-	return nil
-	// TODO:
-	// return w.waku.RequestHistoricMessagesWithTimeout(peerID, envelope.Unwrap().(*wakucommon.Envelope), timeout)
+	return errors.New("DEPRECATED")
+}
+
+func (w *gethWakuV2Wrapper) RequestStoreMessages(topics []types.TopicType, from uint64, to uint64, options []store.HistoryRequestOption) error {
+	return w.waku.Query(topics, from, to, options)
 }
 
 type wakuV2FilterWrapper struct {

@@ -88,6 +88,40 @@ type MessagesRequest struct {
 	Force bool `json:"force"`
 }
 
+// StoreRequest is a WakuV2 RequestMessages() request payload.
+type StoreRequest struct {
+	// MailServerPeer is MailServer's libp2p peer address.
+	MailServerPeer string `json:"mailServerPeer"`
+
+	// From is a lower bound of time range (optional).
+	// Default is 24 hours back from now.
+	From uint64 `json:"from"`
+
+	// To is a upper bound of time range (optional).
+	// Default is now.
+	To uint64 `json:"to"`
+
+	// PageSize determines the number of messages sent by the mail server
+	// for the current paginated request
+	PageSize uint64 `json:"pageSize"`
+
+	// Asc indicates if the ordering of the messages is ascending or descending  (ordered by timestamp)
+	Asc bool `json:"asc"`
+
+	// Cursor is used as starting point for paginated requests
+	Cursor string `json:"cursor"`
+
+	// Topics is a list of Whisper topics.
+	Topics []types.TopicType `json:"topics"`
+
+	// Timeout is the time to live of the request specified in seconds.
+	// Default is 10 seconds
+	Timeout time.Duration `json:"timeout"`
+
+	// Force ensures that requests will bypass enforced delay.
+	Force bool `json:"force"`
+}
+
 func (r *MessagesRequest) SetDefaults(now time.Time) {
 	// set From and To defaults
 	if r.To == 0 {
@@ -105,6 +139,30 @@ func (r *MessagesRequest) SetDefaults(now time.Time) {
 
 	if r.Timeout == 0 {
 		r.Timeout = defaultRequestTimeout
+	}
+}
+
+func (r *StoreRequest) SetDefaults(now time.Time) {
+	// set From and To defaults
+	if r.To == 0 {
+		r.To = uint64(now.UTC().Unix())
+	}
+
+	if r.From == 0 {
+		oneDay := uint64(86400) // -24 hours
+		if r.To < oneDay {
+			r.From = 0
+		} else {
+			r.From = r.To - oneDay
+		}
+	}
+
+	if r.Timeout == 0 {
+		r.Timeout = defaultRequestTimeout
+	}
+
+	if r.PageSize == 0 {
+		r.PageSize = 100
 	}
 }
 

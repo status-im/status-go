@@ -38,7 +38,6 @@ require (
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/mattn/go-runewidth v0.0.6 // indirect
-	github.com/mattn/go-sqlite3 v1.12.0 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/multiformats/go-multibase v0.0.3
 	github.com/multiformats/go-varint v0.0.6
@@ -54,7 +53,7 @@ require (
 	github.com/russolsen/same v0.0.0-20160222130632-f089df61f51d // indirect
 	github.com/russolsen/transit v0.0.0-20180705123435-0794b4c4505a
 	github.com/status-im/doubleratchet v3.0.0+incompatible
-	github.com/status-im/go-waku v0.0.0-20210411234542-d85c857a74db
+	github.com/status-im/go-waku v0.0.0-20210415175718-9572a766a819
 	github.com/status-im/go-wakurelay-pubsub v0.4.2
 	github.com/status-im/keycard-go v0.0.0-20200107115650-f38e9a19958e // indirect
 	github.com/status-im/markdown v0.0.0-20201022101546-c0cbdd5763bf
