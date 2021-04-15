@@ -21,7 +21,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	// A valid added chat is required.
 	chat, ok := m.allChats[message.ChatId]
 	if !ok {
-		return nil, errors.New("Chat not found")
+		return nil, errors.New("chat not found")
 	}
 
 	err := m.handleStandaloneChatIdentity(chat)
