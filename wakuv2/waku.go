@@ -528,9 +528,14 @@ func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []st
 
 	result, err := w.node.Query(strTopics, float64(from), float64(to), opts...)
 
-	_ = result
-
-	// TODO: trigger message signal
+	for _, msg := range result.Messages {
+		data, _ := msg.Marshal()
+		envelope := wakucommon.NewEnvelope(msg, len(data), crypto.Keccak256(data)) // TODO: consider modifying go-waku to return envelopes instead of messages
+		_, err = w.OnNewEnvelopes(envelope)
+		if err != nil {
+			return err
+		}
+	}
 
 	return err
 }
