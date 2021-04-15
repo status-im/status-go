@@ -213,7 +213,8 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 	msg.Padding = raw.Padding
 	msg.Signature = raw.Signature
 	msg.Src = raw.PubKey
-	msg.Sent = uint32(e.Envelope.Message().Timestamp / 1000000000)
+
+	msg.Sent = uint32(e.Envelope.Message().Timestamp)
 	msg.Topic = StringToTopic(e.Envelope.Message().ContentTopic)
 
 	return msg
