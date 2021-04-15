@@ -368,11 +368,10 @@ clean-mailserver-systemd: ##@Easy Clean your systemd service for running a mails
 clean-mailserver-docker: ##@Easy Clean your Docker container running a mailserver
 	@cd _assets/compose/mailserver && $(MAKE) clean
 
-UNIX_TIMESTAMP := $(shell date +%s)
 migration: PATH := appdatabase/migrations/sql
 migration:
-	touch $(PATH)/$(UNIX_TIMESTAMP)_$(D).up.sql
+	touch $(PATH)/$(shell date +%s)_$(D).up.sql
 
 migration-protocol: DEFAULT_PROTOCOL_PATH := protocol/migrations/sqlite
 migration-protocol:
-	touch $(DEFAULT_PROTOCOL_PATH)/$(UNIX_TIMESTAMP)_$(D).up.sql
+	touch $(DEFAULT_PROTOCOL_PATH)/$(shell date +%s)_$(D).up.sql
