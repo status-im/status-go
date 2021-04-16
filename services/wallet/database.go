@@ -5,8 +5,10 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"reflect"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -593,68 +595,125 @@ const (
 )
 
 type PendingTransaction struct {
-	TransactionHash common.Hash    `json:"transactionHash"`
-	BlockNumber     *big.Int       `json:"blockNumber"`
-	From            common.Address `json:"from_address"`
-	To              common.Address `json:"to_address"`
-	Type            PendingTrxType `json:"type"`
-	Data            string         `json:"data"`
+	Hash           common.Hash    `json:"hash"`
+	Timestamp      uint64         `json:"timestamp"`
+	Value          BigInt         `json:"value"`
+	From           common.Address `json:"from"`
+	To             common.Address `json:"to"`
+	Data           string         `json:"data"`
+	Symbol         string         `json:"symbol"`
+	GasPrice       BigInt         `json:"gasPrice"`
+	GasLimit       BigInt         `json:"gasLimit"`
+	Type           PendingTrxType `json:"type"`
+	AdditionalData string         `json:"additionalData"`
 }
 
-func (db *Database) GetPendingTransactions() ([]*PendingTransaction, error) {
-	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, from_address, to_address, type, data FROM pending_transactions WHERE network_id = ?`, db.network)
+func (db *Database) getAllPendingTransactions() ([]*PendingTransaction, error) {
+	rows, err := db.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
+                                         symbol, gas_price, gas_limit, type, additional_data
+                                  FROM pending_transactions
+                                  WHERE network_id = ?`, db.network)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var rst []*PendingTransaction
+	var transactions []*PendingTransaction
 	for rows.Next() {
-		trx := &PendingTransaction{BlockNumber: new(big.Int)}
-		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.From, &trx.To, &trx.Type, &trx.Data)
+		transaction := &PendingTransaction{
+			Value:    BigInt{Int: new(big.Int)},
+			GasPrice: BigInt{Int: new(big.Int)},
+			GasLimit: BigInt{Int: new(big.Int)},
+		}
+		err := rows.Scan(&transaction.Hash,
+			&transaction.Timestamp,
+			(*SQLBigIntBytes)(transaction.Value.Int),
+			&transaction.From,
+			&transaction.To,
+			&transaction.Data,
+			&transaction.Symbol,
+			(*SQLBigIntBytes)(transaction.GasPrice.Int),
+			(*SQLBigIntBytes)(transaction.GasLimit.Int),
+			&transaction.Type,
+			&transaction.AdditionalData,
+		)
 		if err != nil {
 			return nil, err
 		}
 
-		rst = append(rst, trx)
+		transactions = append(transactions, transaction)
 	}
 
-	return rst, nil
+	return transactions, nil
 }
 
-func (db *Database) GetPendingOutboundTransactionsByAddress(address common.Address) ([]*PendingTransaction, error) {
-	rows, err := db.db.Query(`SELECT transaction_hash, blk_number, from_address, to_address, type, data FROM pending_transactions WHERE network_id = ? AND from_address = ?`, db.network, address)
+func (db *Database) getPendingOutboundTransactionsByAddress(address common.Address) ([]*PendingTransaction, error) {
+	rows, err := db.db.Query(`SELECT hash, timestamp, value, from_address, to_address, data,
+                                         symbol, gas_price, gas_limit, type, additional_data
+                                  FROM pending_transactions
+                                  WHERE network_id = ?
+                                  AND from_address = ?`, db.network, address)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var rst []*PendingTransaction
+	var transactions []*PendingTransaction
 	for rows.Next() {
-		trx := &PendingTransaction{BlockNumber: new(big.Int)}
-		err := rows.Scan(&trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), &trx.From, &trx.To, &trx.Type, &trx.Data)
-
+		transaction := &PendingTransaction{
+			Value:    BigInt{Int: new(big.Int)},
+			GasPrice: BigInt{Int: new(big.Int)},
+			GasLimit: BigInt{Int: new(big.Int)},
+		}
+		err := rows.Scan(&transaction.Hash,
+			&transaction.Timestamp,
+			(*SQLBigIntBytes)(transaction.Value.Int),
+			&transaction.From,
+			&transaction.To,
+			&transaction.Data,
+			&transaction.Symbol,
+			(*SQLBigIntBytes)(transaction.GasPrice.Int),
+			(*SQLBigIntBytes)(transaction.GasLimit.Int),
+			&transaction.Type,
+			&transaction.AdditionalData,
+		)
 		if err != nil {
 			return nil, err
 		}
 
-		rst = append(rst, trx)
+		transactions = append(transactions, transaction)
 	}
 
-	return rst, nil
+	return transactions, nil
 }
 
-func (db *Database) StorePendingTransaction(trx PendingTransaction) error {
-	insert, err := db.db.Prepare("INSERT OR REPLACE INTO pending_transactions (network_id, transaction_hash, blk_number, from_address, to_address, type, data) VALUES (?, ?, ?, ?, ?, ?, ?)")
+func (db *Database) addPendingTransaction(transaction PendingTransaction) error {
+	insert, err := db.db.Prepare(`INSERT OR REPLACE INTO pending_transactions
+                                      (network_id, hash, timestamp, value, from_address, to_address,
+                                       data, symbol, gas_price, gas_limit, type, additional_data)
+                                      VALUES
+                                      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
-	_, err = insert.Exec(db.network, trx.TransactionHash, (*SQLBigInt)(trx.BlockNumber), trx.From, trx.To, trx.Type, trx.Data)
+	_, err = insert.Exec(db.network,
+		transaction.Hash,
+		transaction.Timestamp,
+		(*SQLBigIntBytes)(transaction.Value.Int),
+		transaction.From,
+		transaction.To,
+		transaction.Data,
+		transaction.Symbol,
+		(*SQLBigIntBytes)(transaction.GasPrice.Int),
+		(*SQLBigIntBytes)(transaction.GasLimit.Int),
+		transaction.Type,
+		transaction.AdditionalData,
+	)
 	return err
 }
 
-func (db *Database) DeletePendingTransaction(transactionHash common.Hash) error {
-	_, err := db.db.Exec(`DELETE FROM pending_transactions WHERE transaction_hash = ?`, transactionHash)
+func (db *Database) deletePendingTransaction(hash common.Hash) error {
+	_, err := db.db.Exec(`DELETE FROM pending_transactions WHERE hash = ?`, hash)
 	return err
 }
 
@@ -1020,5 +1079,26 @@ func markBlocksAsLoaded(creator statementCreator, address common.Address, networ
 			return err
 		}
 	}
+	return nil
+}
+
+type BigInt struct {
+	*big.Int
+}
+
+func (b BigInt) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + b.String() + "\""), nil
+}
+
+func (b *BigInt) UnmarshalJSON(p []byte) error {
+	if string(p) == "null" {
+		return nil
+	}
+	z := new(big.Int)
+	_, ok := z.SetString(strings.Trim(string(p), "\""), 10)
+	if !ok {
+		return fmt.Errorf("not a valid big integer: %s", "123")
+	}
+	b.Int = z
 	return nil
 }

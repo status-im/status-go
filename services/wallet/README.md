@@ -107,7 +107,7 @@ Starts watching for transaction confirmation/rejection. If transaction was not c
 }
 ```
 
-### wallet_checkRecentHistory
+### `wallet_checkRecentHistory`
 
 #### Parameters
 
@@ -129,7 +129,7 @@ Starts watching for transaction confirmation/rejection. If transaction was not c
 }
 ```
 
-### wallet_getTokensBalances
+### `wallet_getTokensBalances`
 
 Returns tokens balances mapping for every account. See section below for the response example.
 
@@ -137,6 +137,8 @@ Returns tokens balances mapping for every account. See section below for the res
 
 - `accounts` `HEX` - list of ethereum addresses encoded in hex
 - `tokens` `HEX` - list of ethereum addresses encoded in hex
+
+#### Request
 
 ```json
 {"jsonrpc":"2.0","id":11,"method":"wallet_getTokensBalances","params":[["0x066ed5c2ed45d70ad72f40de0b4dd97bd67d84de", "0x0ed535be4c0aa276942a1a782669790547ad8768"], ["0x5e4bbdc178684478a615354d83c748a4393b20f0", "0x5e4bbdc178684478a615354d83c748a4393b20f0"]]}
@@ -159,6 +161,156 @@ First level keys accounts, second level keys are tokens.
 }
 ```
 
+### `wallet_storePendingTransaction`
+
+Stores pending transation in the database.
+
+#### Parameters
+
+- `transaction` `OBJECT` - list of ethereum addresses encoded in hex
+
+##### Transaction
+
+- `hash` `HEX`
+- `timestamp` ``INT`
+- `from` `HEX`
+- `to` `HEX`
+- `symbol` `VARCHAR` - `"ETH"` for ethereum, otherwise ERC20 tokaen name, `null` for contract call 
+- `gasPrice` `BIGINT`
+- `gasLimit` `BIGINT`
+- `value` `BIGINT`
+- `data` `TEXT` - transaction's `data` field
+- `type` `VARCHAR`
+- `additionalData` `TEXT` - arbitrary additional data
+
+#### Request example
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"wallet_storePendingTransaction",
+  "params":[
+    {
+      "hash":"0x3bce2c2d0fffbd2862ef3ec61a62872e54954551585fa0072d8e5c2f6be3523e",
+      "symbol":"ETH",
+      "gasPrice":"2000000000",
+      "value":"1000000000000000",
+      "from":"0xaaaad65f3cB52605433ae118fb1363aaaaad2",
+      "timestamp":1618584138787,
+      "gasLimit":"21000",
+      "to":"0x237f8B4166D64a2b94097C60Cdc714F7eC3aa079",
+      "data":null
+    }
+  ]
+}
+```
+
+### `wallet_getPendingTransactions`
+
+Returns all stored pending transactions.
+
+#### Request
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"wallet_getPendingTransactions","params":[]}
+```
+
+#### Returns
+
+First level keys accounts, second level keys are tokens.
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "result":[
+    {
+      "hash":"0x3bce2c2d0fffbd2862ef3ec61a62872e54954551585fa0072d8e5c2f6be3523e",
+      "timestamp":1618584138787,
+      "value":"1000000000000000",
+      "from":"0xaaaaaaaa605a54a833ae118fb1aaaaaaaaaaa",
+      "to":"0x237f8b4166d64a2b94097c60cdc714f7ec3aa079",
+      "data":"",
+      "symbol":"ETH",
+      "gasPrice":"2000000000",
+      "gasLimit":"21000",
+      "type":"",
+      "additionalData":""
+    },
+    ...
+  ]
+}
+```
+
+### `wallet_getPendingOutboundTransactionsByAddress`
+
+Returns all stored pending transaction sent from `address`.
+
+#### Parameters
+
+- `address` `HEX` 
+
+#### Request
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"wallet_getPendingOutboundTransactionsByAddress",
+  "params":[
+    "0xaaaaaaaa605a54a833ae118fb1aaaaaaaaaaa"
+  ]
+}
+```
+
+#### Returns
+
+First level keys accounts, second level keys are tokens.
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "result":[
+    {
+      "hash":"0x3bce2c2d0fffbd2862ef3ec61a62872e54954551585fa0072d8e5c2f6be3523e",
+      "timestamp":1618584138787,
+      "value":"1000000000000000",
+      "from":"0xaaaaaaaa605a54a833ae118fb1aaaaaaaaaaa",
+      "to":"0x237f8b4166d64a2b94097c60cdc714f7ec3aa079",
+      "data":"",
+      "symbol":"ETH",
+      "gasPrice":"2000000000",
+      "gasLimit":"21000",
+      "type":"",
+      "additionalData":""
+    },
+    ...
+  ]
+}
+```
+
+### `wallet_deletePendingTransaction`
+
+Deletes pending transaction from the database by `hash`.
+
+#### Parameters
+
+- `hash` `HEX` 
+
+#### Request
+
+```json
+{
+  "jsonrpc":"2.0",
+  "id":1,
+  "method":"wallet_deletePendingTransaction",
+  "params":[
+    "0x3bce2c2d0fffbd2862ef3ec61a62872e54954551585fa0072d8e5c2f6be3523e"
+  ]
+}
+```
 
 ## Signals
 -------

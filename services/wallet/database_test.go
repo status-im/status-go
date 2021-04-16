@@ -240,47 +240,49 @@ func TestPendingTransactions(t *testing.T) {
 	defer stop()
 
 	trx := PendingTransaction{
-		TransactionHash: common.Hash{1},
-		BlockNumber:     big.NewInt(1),
-		From:            common.Address{1},
-		To:              common.Address{2},
-		Type:            RegisterENS,
-		Data:            "someuser.stateofus.eth",
+		Hash:           common.Hash{1},
+		From:           common.Address{1},
+		To:             common.Address{2},
+		Type:           RegisterENS,
+		AdditionalData: "someuser.stateofus.eth",
+		Value:          BigInt{big.NewInt(123)},
+		GasLimit:       BigInt{big.NewInt(21000)},
+		GasPrice:       BigInt{big.NewInt(1)},
 	}
 
-	rst, err := db.GetPendingTransactions()
+	rst, err := db.getAllPendingTransactions()
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	rst, err = db.GetPendingOutboundTransactionsByAddress(trx.From)
+	rst, err = db.getPendingOutboundTransactionsByAddress(trx.From)
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	err = db.StorePendingTransaction(trx)
+	err = db.addPendingTransaction(trx)
 	require.NoError(t, err)
 
-	rst, err = db.GetPendingOutboundTransactionsByAddress(trx.From)
+	rst, err = db.getPendingOutboundTransactionsByAddress(trx.From)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, trx, *rst[0])
 
-	rst, err = db.GetPendingTransactions()
+	rst, err = db.getAllPendingTransactions()
 	require.NoError(t, err)
 	require.Equal(t, 1, len(rst))
 	require.Equal(t, trx, *rst[0])
 
-	rst, err = db.GetPendingOutboundTransactionsByAddress(common.Address{2})
+	rst, err = db.getPendingOutboundTransactionsByAddress(common.Address{2})
 	require.NoError(t, err)
 	require.Nil(t, rst)
 
-	err = db.DeletePendingTransaction(trx.TransactionHash)
+	err = db.deletePendingTransaction(trx.Hash)
 	require.NoError(t, err)
 
-	rst, err = db.GetPendingOutboundTransactionsByAddress(trx.From)
+	rst, err = db.getPendingOutboundTransactionsByAddress(trx.From)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 
-	rst, err = db.GetPendingTransactions()
+	rst, err = db.getAllPendingTransactions()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(rst))
 

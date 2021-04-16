@@ -153,28 +153,28 @@ func (api *API) DeleteCustomToken(ctx context.Context, address common.Address) e
 
 func (api *API) GetPendingTransactions(ctx context.Context) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions")
-	rst, err := api.s.db.GetPendingTransactions()
+	rst, err := api.s.db.getAllPendingTransactions()
 	log.Debug("result from database for pending transactions", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) GetPendingOutboundTransactionsByAddress(ctx context.Context, address common.Address) ([]*PendingTransaction, error) {
 	log.Debug("call to get pending transactions by address")
-	rst, err := api.s.db.GetPendingOutboundTransactionsByAddress(address)
+	rst, err := api.s.db.getPendingOutboundTransactionsByAddress(address)
 	log.Debug("result from database for pending transactions by address", "len", len(rst))
 	return rst, err
 }
 
 func (api *API) StorePendingTransaction(ctx context.Context, trx PendingTransaction) error {
 	log.Debug("call to create or edit pending transaction")
-	err := api.s.db.StorePendingTransaction(trx)
+	err := api.s.db.addPendingTransaction(trx)
 	log.Debug("result from database for creating or editing a pending transaction", "err", err)
 	return err
 }
 
 func (api *API) DeletePendingTransaction(ctx context.Context, transactionHash common.Hash) error {
 	log.Debug("call to remove pending transaction")
-	err := api.s.db.DeletePendingTransaction(transactionHash)
+	err := api.s.db.deletePendingTransaction(transactionHash)
 	log.Debug("result from database for remove pending transaction", "err", err)
 	return err
 }
