@@ -11,3 +11,4 @@ CREATE TABLE app_metrics (
 INSERT INTO app_metrics(event, value, app_version, operating_system, created_at, session_id, processed)
 SELECT event, value, app_version, operating_system, created_at, session_id, processed
 FROM temp_app_metrics;
+DROP TABLE temp_app_metrics;
