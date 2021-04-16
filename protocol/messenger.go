@@ -42,12 +42,11 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
-	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
-	shhtransp "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/mailservers"
 )
 
+//todo: kozieiev: get rid of wakutransp word
 type chatContext string
 
 const (
@@ -79,7 +78,7 @@ type Messenger struct {
 	config                     *config
 	identity                   *ecdsa.PrivateKey
 	persistence                *sqlitePersistence
-	transport                  transport.Transport
+	transport                  *transport.Transport
 	encryptor                  *encryption.Protocol
 	processor                  *common.MessageProcessor
 	handler                    *MessageHandler
@@ -204,36 +203,21 @@ func NewMessenger(
 	}
 
 	// Initialize transport layer.
-	var transp transport.Transport
-	if shh, err := node.GetWhisper(nil); err == nil && shh != nil {
-		transp, err = shhtransp.NewTransport(
-			shh,
-			identity,
-			database,
-			nil,
-			c.envelopesMonitorConfig,
-			logger,
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create Transport")
-		}
-	} else {
-		logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
-		waku, err := node.GetWaku(nil)
-		if err != nil || waku == nil {
-			return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
-		}
-		transp, err = wakutransp.NewTransport(
-			waku,
-			identity,
-			database,
-			nil,
-			c.envelopesMonitorConfig,
-			logger,
-		)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create  Transport")
-		}
+	logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
+	waku, err := node.GetWaku(nil)
+	if err != nil || waku == nil {
+		return nil, errors.Wrap(err, "failed to find Whisper and Waku services")
+	}
+	transp, err := transport.NewTransport(
+		waku,
+		identity,
+		database,
+		nil,
+		c.envelopesMonitorConfig,
+		logger,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create  Transport")
 	}
 
 	// Initialize encryption layer.

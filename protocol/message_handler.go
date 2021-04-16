@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/status-im/status-go/protocol/transport"
+
 	"github.com/pkg/errors"
 
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -16,7 +18,6 @@ import (
 	"github.com/status-im/status-go/protocol/encryption/multidevice"
 	"github.com/status-im/status-go/protocol/ens"
 	"github.com/status-im/status-go/protocol/protobuf"
-	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 
 	"go.uber.org/zap"
@@ -34,13 +35,13 @@ type MessageHandler struct {
 	identity           *ecdsa.PrivateKey
 	persistence        *sqlitePersistence
 	settings           *accounts.Database
-	transport          transport.Transport
+	transport          *transport.Transport
 	ensVerifier        *ens.Verifier
 	communitiesManager *communities.Manager
 	logger             *zap.Logger
 }
 
-func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persistence *sqlitePersistence, communitiesManager *communities.Manager, transport transport.Transport, ensVerifier *ens.Verifier, settings *accounts.Database) *MessageHandler {
+func newMessageHandler(identity *ecdsa.PrivateKey, logger *zap.Logger, persistence *sqlitePersistence, communitiesManager *communities.Manager, transport *transport.Transport, ensVerifier *ens.Verifier, settings *accounts.Database) *MessageHandler {
 	return &MessageHandler{
 		identity:           identity,
 		persistence:        persistence,

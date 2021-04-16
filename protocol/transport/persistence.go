@@ -1,4 +1,4 @@
-package waku
+package transport
 
 import (
 	"database/sql"
