@@ -7,7 +7,7 @@ CREATE TABLE app_metrics (
     operating_system VARCHAR NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     session_id VARCHAR,
-    processed BOOLEAN DEFAULT FALSE);
+    processed BOOLEAN NOT NULL DEFAULT FALSE);
 INSERT INTO app_metrics(event, value, app_version, operating_system, created_at, session_id, processed)
 SELECT event, value, app_version, operating_system, created_at, session_id, processed
 FROM temp_app_metrics;
