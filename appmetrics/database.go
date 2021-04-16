@@ -15,12 +15,14 @@ type AppMetricEventType string
 // Value is `json.RawMessage` so we can send any json shape, including strings
 // Validation is handled using JSON schemas defined in validators.go, instead of Golang structs
 type AppMetric struct {
+	ID         int                `json:"-"`
 	Event      AppMetricEventType `json:"event"`
 	Value      json.RawMessage    `json:"value"`
 	AppVersion string             `json:"app_version"`
 	OS         string             `json:"os"`
 	SessionID  string             `json:"session_id"`
 	CreatedAt  string             `json:"created_at"`
+	Processed  bool               `json:"processed"`
 }
 
 type AppMetricValidationError struct {
