@@ -141,6 +141,10 @@ func (a *Transport) Filters() []*transport.Filter {
 	return a.filters.Filters()
 }
 
+func (a *Transport) FilterByChatID(chatID string) *transport.Filter {
+	return a.filters.FilterByChatID(chatID)
+}
+
 func (a *Transport) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return a.filters.InitWithFilters(filters)
 }
@@ -410,17 +414,14 @@ func (a *Transport) cleanFiltersLoop() {
 	}()
 }
 
-// RequestHistoricMessages requests historic messages for all registered filters.
-func (a *Transport) SendMessagesRequest(
+func (a *Transport) sendMessagesRequestForTopics(
 	ctx context.Context,
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	topics []types.TopicType,
+	waitForResponse bool,
 ) (cursor []byte, err error) {
-	topics := make([]types.TopicType, len(a.Filters()))
-	for _, f := range a.Filters() {
-		topics = append(topics, f.Topic)
-	}
 
 	r := createMessagesRequest(from, to, previousCursor, topics)
 	r.SetDefaults(a.waku.GetCurrentTime())
@@ -434,6 +435,10 @@ func (a *Transport) SendMessagesRequest(
 		return
 	}
 
+	if !waitForResponse {
+		return
+	}
+
 	resp, err := a.waitForRequestCompleted(ctx, r.ID, events)
 	if err == nil && resp != nil && resp.Error != nil {
 		err = resp.Error
@@ -443,15 +448,42 @@ func (a *Transport) SendMessagesRequest(
 	return
 }
 
+// RequestHistoricMessages requests historic messages for all registered filters.
+func (a *Transport) SendMessagesRequest(
+	ctx context.Context,
+	peerID []byte,
+	from, to uint32,
+	previousCursor []byte,
+	waitForResponse bool,
+) (cursor []byte, err error) {
+
+	topics := make([]types.TopicType, len(a.Filters()))
+	for _, f := range a.Filters() {
+		topics = append(topics, f.Topic)
+	}
+
+	return a.sendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+}
+
+func (a *Transport) SendMessagesRequestForFilter(
+	ctx context.Context,
+	peerID []byte,
+	from, to uint32,
+	previousCursor []byte,
+	filter *transport.Filter,
+	waitForResponse bool,
+) (cursor []byte, err error) {
+
+	topics := make([]types.TopicType, len(a.Filters()))
+	topics = append(topics, filter.Topic)
+
+	return a.sendMessagesRequestForTopics(ctx, peerID, from, to, previousCursor, topics, waitForResponse)
+}
+
 func (a *Transport) waitForRequestCompleted(ctx context.Context, requestID []byte, events chan types.EnvelopeEvent) (*types.MailServerResponse, error) {
 	for {
 		select {
 		case ev := <-events:
-			a.logger.Debug(
-				"waiting for request completed and received an event",
-				zap.Binary("requestID", requestID),
-				zap.Any("event", ev),
-			)
 			if !bytes.Equal(ev.Hash.Bytes(), requestID) {
 				continue
 			}

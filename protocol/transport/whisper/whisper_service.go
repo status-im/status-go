@@ -139,6 +139,10 @@ func (a *Transport) Filters() []*transport.Filter {
 	return a.filters.Filters()
 }
 
+func (a *Transport) FilterByChatID(chatID string) *transport.Filter {
+	return a.filters.FilterByChatID(chatID)
+}
+
 func (a *Transport) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
 	return a.filters.InitWithFilters(filters)
 }
@@ -418,6 +422,7 @@ func (a *Transport) SendMessagesRequest(
 	peerID []byte,
 	from, to uint32,
 	previousCursor []byte,
+	waitForResponse bool,
 ) (cursor []byte, err error) {
 	topics := make([]types.TopicType, len(a.Filters()))
 	for _, f := range a.Filters() {
@@ -436,6 +441,10 @@ func (a *Transport) SendMessagesRequest(
 		return
 	}
 
+	if !waitForResponse {
+		return
+	}
+
 	resp, err := a.waitForRequestCompleted(ctx, r.ID, events)
 	if err == nil && resp != nil && resp.Error != nil {
 		err = resp.Error
@@ -443,6 +452,18 @@ func (a *Transport) SendMessagesRequest(
 		cursor = resp.Cursor
 	}
 	return
+}
+
+//TODO: kozieiev: fix
+func (a *Transport) SendMessagesRequestForFilter(
+	ctx context.Context,
+	peerID []byte,
+	from, to uint32,
+	previousCursor []byte,
+	filter *transport.Filter,
+	waitForResponse bool,
+) (cursor []byte, err error) {
+	return nil, nil
 }
 
 func (a *Transport) LoadKeyFilters(key *ecdsa.PrivateKey) (*transport.Filter, error) {

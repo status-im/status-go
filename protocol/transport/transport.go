@@ -30,7 +30,18 @@ type Transport interface {
 		peerID []byte,
 		from, to uint32,
 		previousCursor []byte,
+		waitForResponse bool,
 	) (cursor []byte, err error)
+
+	SendMessagesRequestForFilter(
+		ctx context.Context,
+		peerID []byte,
+		from, to uint32,
+		previousCursor []byte,
+		filter *Filter,
+		waitForResponse bool,
+	) (cursor []byte, err error)
+	FilterByChatID(string) *Filter
 
 	Track(identifiers [][]byte, hash []byte, newMessage *types.NewMessage)
 

@@ -105,6 +105,7 @@ type Messenger struct {
 	account                    *multiaccounts.Account
 	mailserversDatabase        *mailservers.Database
 	quit                       chan struct{}
+	requestedCommunities       map[string]*transport.Filter
 
 	// TODO(samyoul) Determine if/how the remaining usage of this mutex can be removed
 	mutex sync.Mutex
@@ -313,6 +314,7 @@ func NewMessenger(
 		mailserversDatabase:        c.mailserversDatabase,
 		account:                    c.account,
 		quit:                       make(chan struct{}),
+		requestedCommunities:       make(map[string]*transport.Filter),
 		shutdownTasks: []func() error{
 			ensVerifier.Stop,
 			pushNotificationClient.Stop,
@@ -2403,13 +2405,13 @@ func (m *Messenger) markDeliveredMessages(acks [][]byte) {
 		}
 
 		//send signal to client that message status updated
-		if m.config.messageDeliveredHandler != nil {
+		if m.config.messengerSignalsHandler != nil {
 			message, err := m.persistence.MessageByID(messageID)
 			if err != nil {
 				m.logger.Debug("Can't get message from database", zap.Error(err))
 				continue
 			}
-			m.config.messageDeliveredHandler(message.LocalChatID, messageID)
+			m.config.messengerSignalsHandler.MessageDelivered(message.LocalChatID, messageID)
 		}
 	}
 }
@@ -2795,6 +2797,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							allMessagesProcessed = false
 							continue
 						}
+
+						//if community was among requested ones, send its info and remove filter
+						for communityID := range m.requestedCommunities {
+							if _, ok := messageState.Response.communities[communityID]; ok {
+								m.passStoredCommunityInfoToSignalHandler(communityID)
+							}
+						}
+
 					case protobuf.CommunityInvitation:
 						logger.Debug("Handling CommunityInvitation")
 						invitation := msg.ParsedMessage.Interface().(protobuf.CommunityInvitation)
@@ -3008,11 +3018,26 @@ func (m *Messenger) RequestHistoricMessages(
 	ctx context.Context,
 	from, to uint32,
 	cursor []byte,
+	waitForResponse bool,
 ) ([]byte, error) {
 	if m.mailserver == nil {
 		return nil, errors.New("no mailserver selected")
 	}
-	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor)
+	return m.transport.SendMessagesRequest(ctx, m.mailserver, from, to, cursor, waitForResponse)
+}
+
+func (m *Messenger) RequestHistoricMessagesForFilter(
+	ctx context.Context,
+	from, to uint32,
+	cursor []byte,
+	filter *transport.Filter,
+	waitForResponse bool,
+) ([]byte, error) {
+	if m.mailserver == nil {
+		return nil, errors.New("no mailserver selected")
+	}
+
+	return m.transport.SendMessagesRequestForFilter(ctx, m.mailserver, from, to, cursor, filter, waitForResponse)
 }
 
 func (m *Messenger) LoadFilters(filters []*transport.Filter) ([]*transport.Filter, error) {
