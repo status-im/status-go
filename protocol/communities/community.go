@@ -133,7 +133,32 @@ func (o *Community) MarshalJSON() ([]byte, error) {
 }
 
 func (o *Community) Name() string {
-	return o.config.CommunityDescription.Identity.DisplayName
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil &&
+		o.config.CommunityDescription.Identity != nil {
+		return o.config.CommunityDescription.Identity.DisplayName
+	}
+	return ""
+}
+
+func (o *Community) Description() string {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil &&
+		o.config.CommunityDescription.Identity != nil {
+		return o.config.CommunityDescription.Identity.Description
+	}
+	return ""
+}
+
+func (o *Community) MembersCount() int {
+	if o != nil &&
+		o.config != nil &&
+		o.config.CommunityDescription != nil {
+		return len(o.config.CommunityDescription.Members)
+	}
+	return 0
 }
 
 func (o *Community) initialize() {

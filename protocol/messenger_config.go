@@ -7,6 +7,7 @@ import (
 
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/protocol/common"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
@@ -15,6 +16,11 @@ import (
 )
 
 type MessageDeliveredHandler func(string, string)
+
+type MessengerSignalsHandler interface {
+	MessageDelivered(chatID string, messageID string)
+	CommunityInfoFound(community *communities.Community)
+}
 
 type config struct {
 	// This needs to be exposed until we move here mailserver logic
@@ -47,7 +53,7 @@ type config struct {
 
 	logger *zap.Logger
 
-	messageDeliveredHandler MessageDeliveredHandler
+	messengerSignalsHandler MessengerSignalsHandler
 }
 
 type Option func(*config) error
@@ -152,9 +158,9 @@ func WithEnvelopesMonitorConfig(emc *transport.EnvelopesMonitorConfig) Option {
 	}
 }
 
-func WithDeliveredHandler(h MessageDeliveredHandler) Option {
+func WithSignalsHandler(h MessengerSignalsHandler) Option {
 	return func(c *config) error {
-		c.messageDeliveredHandler = h
+		c.messengerSignalsHandler = h
 		return nil
 	}
 }

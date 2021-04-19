@@ -225,6 +225,14 @@ func (s *FiltersManager) FilterByFilterID(filterID string) *Filter {
 	return nil
 }
 
+// FilterByChatID returns a Filter for given chat id
+func (s *FiltersManager) FilterByChatID(chatID string) *Filter {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return s.filters[chatID]
+}
+
 func (s *FiltersManager) FiltersByPublicKey(publicKey *ecdsa.PublicKey) (result []*Filter) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

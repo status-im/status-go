@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -14,6 +15,7 @@ import (
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/requests"
+	"github.com/status-im/status-go/protocol/transport"
 )
 
 const communityInvitationText = "Upgrade to see a community invitation"
@@ -371,6 +373,10 @@ func (m *Messenger) ImportCommunity(key *ecdsa.PrivateKey) (*MessengerResponse, 
 		return nil, err
 	}
 
+	//request info already stored on mailserver, but its success is not crucial
+	// for import
+	_ = m.RequestCommunityInfoFromMailserver(org.IDString())
+
 	return &MessengerResponse{
 		Filters: filters,
 	}, nil
@@ -492,4 +498,98 @@ func (m *Messenger) BanUserFromCommunity(request *requests.BanUserFromCommunity)
 	response := &MessengerResponse{}
 	response.AddCommunity(community)
 	return response, nil
+}
+
+// RequestCommunityInfoFromMailserver installs filter for community and requests its details
+// from mailserver. When response received it will be passed through signals handler
+func (m *Messenger) RequestCommunityInfoFromMailserver(communityID string) error {
+
+	if _, ok := m.requestedCommunities[communityID]; ok {
+		return nil
+	}
+
+	//If filter wasn't installed we create it and remember for deinstalling after
+	//response received
+	filter := m.transport.FilterByChatID(communityID)
+	if filter == nil {
+		filters, err := m.transport.InitPublicFilters([]string{communityID})
+		if err != nil {
+			return fmt.Errorf("Can't install filter for community: %v", err)
+		}
+		if len(filters) != 1 {
+			return fmt.Errorf("Unexpected amount of filters created")
+		}
+		filter = filters[0]
+		m.requestedCommunities[communityID] = filter
+	} else {
+		//we don't remember filter id associated with community because it was already installed
+		m.requestedCommunities[communityID] = nil
+	}
+
+	now := uint32(m.transport.GetCurrentTime() / 1000)
+	monthAgo := now - (86400 * 30)
+
+	_, err := m.RequestHistoricMessagesForFilter(context.Background(),
+		monthAgo,
+		now,
+		nil,
+		filter,
+		false)
+
+	//It is possible that we already processed last existing message for community
+	//and won't get any updates, so send stored info in this case after timeout
+	go func() {
+		time.Sleep(15 * time.Second)
+		m.mutex.Lock()
+		defer m.mutex.Unlock()
+
+		if _, ok := m.requestedCommunities[communityID]; ok {
+			m.passStoredCommunityInfoToSignalHandler(communityID)
+		}
+	}()
+
+	return err
+}
+
+// forgetCommunityRequest removes community from requested ones and removes filter
+func (m *Messenger) forgetCommunityRequest(communityID string) {
+	filter, ok := m.requestedCommunities[communityID]
+	if !ok {
+		return
+	}
+
+	if filter != nil {
+		err := m.transport.RemoveFilters([]*transport.Filter{filter})
+		if err != nil {
+			m.logger.Warn("cant remove filter", zap.Error(err))
+		}
+	}
+
+	delete(m.requestedCommunities, communityID)
+}
+
+// passStoredCommunityInfoToSignalHandler calls signal handler with community info
+func (m *Messenger) passStoredCommunityInfoToSignalHandler(communityID string) {
+	if m.config.messengerSignalsHandler == nil {
+		return
+	}
+
+	//send signal to client that message status updated
+	community, err := m.communitiesManager.GetByIDString(communityID)
+	if community == nil {
+		return
+	}
+
+	//if there is no info helpful for client, we don't post it
+	if community.Name() == "" && community.Description() == "" && community.MembersCount() == 0 {
+		return
+	}
+
+	if err != nil {
+		m.logger.Warn("cant get community and pass it to signal handler", zap.Error(err))
+		return
+	}
+
+	m.config.messengerSignalsHandler.CommunityInfoFound(community)
+	m.forgetCommunityRequest(communityID)
 }

@@ -3,6 +3,7 @@ package ext
 import (
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/signal"
 )
 
@@ -47,4 +48,17 @@ func (h PublisherSignalHandler) FilterAdded(filters []*signal.Filter) {
 
 func (h PublisherSignalHandler) NewMessages(response *protocol.MessengerResponse) {
 	signal.SendNewMessages(response)
+}
+
+// MessengerSignalHandler sends signals on messenger events
+type MessengerSignalsHandler struct{}
+
+// MessageDelivered passes information that message was delivered
+func (m MessengerSignalsHandler) MessageDelivered(chatID string, messageID string) {
+	signal.SendMessageDelivered(chatID, messageID)
+}
+
+// MessageDelivered passes info about community that was requested before
+func (m MessengerSignalsHandler) CommunityInfoFound(community *communities.Community) {
+	signal.SendCommunityInfoFound(community)
 }

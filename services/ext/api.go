@@ -700,6 +700,10 @@ func (api *PublicAPI) EnsVerified(pk, ensName string) error {
 	return api.service.messenger.ENSVerified(pk, ensName)
 }
 
+func (api *PublicAPI) RequestCommunityInfoFromMailserver(communityID string) error {
+	return api.service.messenger.RequestCommunityInfoFromMailserver(communityID)
+}
+
 func (api *PublicAPI) UnreadActivityCenterNotificationsCount() (uint64, error) {
 	return api.service.messenger.UnreadActivityCenterNotificationsCount()
 }
