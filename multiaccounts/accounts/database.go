@@ -376,6 +376,12 @@ func (db *Database) SaveSetting(setting string, value interface{}) error {
 			return ErrInvalidConfig
 		}
 		update, err = db.db.Prepare("UPDATE settings SET webview_allow_permission_requests = ? WHERE synthetic_id = 'id'")
+	case "anon-metrics/should-send?":
+		_, ok := value.(bool)
+		if !ok {
+			return ErrInvalidConfig
+		}
+		update, err = db.db.Prepare("UPDATE settings SET anon_metrics_should_send = ? WHERE synthetic_id = 'id'")
 	default:
 		return ErrInvalidConfig
 	}
