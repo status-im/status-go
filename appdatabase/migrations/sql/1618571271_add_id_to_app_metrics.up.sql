@@ -1,6 +1,7 @@
 ALTER TABLE app_metrics RENAME TO temp_app_metrics;
 CREATE TABLE app_metrics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    proto_id VARCHAR,
     event VARCHAR NOT NULL,
     value TEXT NOT NULL,
     app_version VARCHAR NOT NULL,
