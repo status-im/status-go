@@ -425,3 +425,26 @@ func TestGetNewRanges(t *testing.T) {
 	require.Equal(t, int64(50), newRange.to.Int64())
 	require.Equal(t, 4, len(d))
 }
+
+func TestUpsertRange(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	r := &BlocksRange{
+		from: big.NewInt(0),
+		to:   big.NewInt(10),
+	}
+	nonce := uint64(199)
+	balance := big.NewInt(7657)
+	account := common.Address{2}
+
+	err := db.UpsertRange(account, db.network, r.from, r.to, balance, nonce)
+	require.NoError(t, err)
+
+	block, err := db.GetLastKnownBlockByAddress(account)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, block.Number.Cmp(r.to))
+	require.Equal(t, 0, block.Balance.Cmp(balance))
+	require.Equal(t, nonce, uint64(*block.Nonce))
+}

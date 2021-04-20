@@ -772,7 +772,7 @@ func insertBlocksWithTransactions(creator statementCreator, account common.Addre
 
 func (db *Database) UpsertRange(account common.Address, network uint64, from, to, balance *big.Int, nonce uint64) error {
 	log.Debug("upsert blocks range", "account", account, "network id", network, "from", from, "to", to, "balance", balance, "nonce", nonce)
-	insert, err := db.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?)")
+	insert, err := db.db.Prepare("INSERT INTO blocks_ranges (network_id, address, blk_from, blk_to, balance, nonce) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
