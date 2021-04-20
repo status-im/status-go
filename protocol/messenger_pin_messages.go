@@ -19,7 +19,7 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	var response MessengerResponse
 
 	// A valid added chat is required.
-	chat, ok := m.allChats[message.ChatId]
+	chat, ok := m.allChats.Load(message.ChatId)
 	if !ok {
 		return nil, errors.New("chat not found")
 	}

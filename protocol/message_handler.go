@@ -342,7 +342,7 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 	}
 	pinMessage.Pinned = message.Pinned
 
-	chat, err := m.matchChatEntity(pinMessage, state.AllChats, state.Timesource)
+	chat, err := m.matchChatEntity(pinMessage, state.AllChats, state.AllContacts, state.Timesource)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
@@ -357,7 +357,7 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 	// Set the LocalChatID for the message
 	pinMessage.LocalChatID = chat.ID
 
-	if c, ok := state.AllChats[chat.ID]; ok {
+	if c, ok := state.AllChats.Load(chat.ID); ok {
 		chat = c
 	}
 
@@ -372,7 +372,7 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 
 	// Set in the modified maps chat
 	state.Response.AddChat(chat)
-	state.AllChats[chat.ID] = chat
+	state.AllChats.Store(chat.ID, chat)
 
 	return nil
 }
