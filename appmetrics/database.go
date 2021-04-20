@@ -15,6 +15,7 @@ type AppMetricEventType string
 // Validation is handled using JSON schemas defined in validators.go, instead of Golang structs
 type AppMetric struct {
 	ID         int                `json:"-"`
+	ProtoID    string             `json:"proto_id"` // To be used by metric server to ignore previously received messages
 	Event      AppMetricEventType `json:"event"`
 	Value      json.RawMessage    `json:"value"`
 	AppVersion string             `json:"app_version"`
@@ -132,13 +133,13 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (er
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id, processed) VALUES (?, ?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id, processed, proto_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 
 	for _, metric := range appMetrics {
-		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID, metric.Processed)
+		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID, metric.Processed, metric.ProtoID)
 		if err != nil {
 			return
 		}
@@ -174,6 +175,7 @@ func (db *Database) getFromRows(rows *sql.Rows)(appMetrics []AppMetric, err erro
 		metric := AppMetric{}
 		err = rows.Scan(
 			&metric.ID,
+			&metric.ProtoID,
 			&metric.Event,
 			&metric.Value,
 			&metric.AppVersion,
@@ -191,7 +193,7 @@ func (db *Database) getFromRows(rows *sql.Rows)(appMetrics []AppMetric, err erro
 }
 
 func (db *Database) GetUnprocessed() ([]AppMetric, error) {
-	rows, err := db.db.Query("SELECT id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE processed IS ? ORDER BY session_id ASC, created_at ASC", false)
+	rows, err := db.db.Query("SELECT id, proto_id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE processed IS ? ORDER BY session_id ASC, created_at ASC", false)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +227,7 @@ func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 	for i := 0; i < len(ids); i++ {
 		in += "?,"
 	}
-	in = in[:len(in)-1]+")"
+	in = in[:len(in)-1] + ")"
 
 	update, err = tx.Prepare("UPDATE app_metrics SET processed = 1 WHERE id IN " + in)
 	if err != nil {
@@ -240,8 +242,8 @@ func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 
 	_, err = update.Exec(args...)
 	if err != nil {
-			return
-		}
+		return
+	}
 	return
 }
 
