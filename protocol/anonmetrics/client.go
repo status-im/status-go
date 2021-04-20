@@ -33,6 +33,9 @@ type Client struct {
 
 	// mainLoopQuit is a channel that concurrently orchestrates that the main loop that should be terminated
 	mainLoopQuit chan struct{}
+
+	// deleteLoopQuit is a channel that concurrently orchestrates that the delete loop that should be terminated
+	deleteLoopQuit chan struct{}
 }
 
 func NewClient(processor *common.MessageProcessor) *Client {
@@ -111,12 +114,30 @@ func (c *Client) startMainLoop() {
 	}()
 }
 
+func (c *Client) deleteLoop() error {
+	// TODO delete loop
+
+	return nil
+}
+
+func (c *Client) startDeleteLoop() {
+	c.stopDeleteLoop()
+	c.deleteLoopQuit = make(chan struct{})
+	go func() {
+		err := c.deleteLoop()
+		if err != nil {
+			c.Logger.Error("delete loop exited with an error", zap.Error(err))
+		}
+	}()
+}
+
 func (c *Client) Start() error {
 	if c.messageProcessor == nil {
 		return errors.New("can't start, missing message processor")
 	}
 
 	c.startMainLoop()
+	c.startDeleteLoop()
 	return nil
 }
 
@@ -127,7 +148,15 @@ func (c *Client) stopMainLoop() {
 	}
 }
 
+func (c *Client) stopDeleteLoop() {
+	if c.deleteLoopQuit != nil {
+		close(c.deleteLoopQuit)
+		c.deleteLoopQuit = nil
+	}
+}
+
 func (c *Client) Stop() error {
 	c.stopMainLoop()
+	c.stopDeleteLoop()
 	return nil
 }
