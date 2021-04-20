@@ -907,10 +907,10 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	}()
 
 	// select
-	selectQuery := "SELECT clock_value FROM pin_messages WHERE message_id = ?"
+	selectQuery := "SELECT clock_value FROM pin_messages WHERE id = ?"
 
 	// insert
-	allInsertFields := `message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned`
+	allInsertFields := `id, message_id, whisper_timestamp, chat_id, local_chat_id, clock_value, pinned`
 	insertValues := strings.Repeat("?, ", strings.Count(allInsertFields, ",")) + "?"
 	insertQuery := "INSERT INTO pin_messages(" + allInsertFields + ") VALUES (" + insertValues + ")" // nolint: gosec
 	insertStmt, err := tx.Prepare(insertQuery)
@@ -919,19 +919,20 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 	}
 
 	// update
-	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ? WHERE message_id = ?"
+	updateQuery := "UPDATE pin_messages SET pinned = ?, clock_value = ? WHERE id = ?"
 	updateStmt, err := tx.Prepare(updateQuery)
 	if err != nil {
 		return
 	}
 
 	for _, message := range messages {
-		row := tx.QueryRow(selectQuery, message.MessageID)
+		row := tx.QueryRow(selectQuery, message.ID)
 		var existingClock uint64
 		switch err = row.Scan(&existingClock); err {
 		case sql.ErrNoRows:
 			// not found, insert new record
 			allValues := []interface{}{
+				message.ID,
 				message.MessageID,
 				message.WhisperTimestamp,
 				message.ChatId,
@@ -947,7 +948,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 			// found, update if current message is more recent, otherwise skip
 			if existingClock < message.Clock {
 				// update
-				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.MessageID)
+				_, err = updateStmt.Exec(message.Pinned, message.Clock, message.ID)
 				if err != nil {
 					return
 				}
@@ -992,6 +993,12 @@ func (db sqlitePersistence) deleteMessagesByChatID(id string, tx *sql.Tx) (err e
 	}
 
 	_, err = tx.Exec(`DELETE FROM user_messages WHERE local_chat_id = ?`, id)
+	if err != nil {
+		return
+	}
+
+	_, err = tx.Exec(`DELETE FROM pin_messages WHERE local_chat_id = ?`, id)
+
 	return
 }
 

@@ -347,6 +347,8 @@ func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message p
 		return err // matchChatEntity returns a descriptive error message
 	}
 
+	pinMessage.ID = m.generatePinMessageID(pinMessage, chat)
+
 	// If deleted-at is greater, ignore message
 	if chat.DeletedAtClockValue >= pinMessage.Clock {
 		return nil
@@ -1198,4 +1200,16 @@ func (m *MessageHandler) isMessageAllowedFrom(allContacts *contactMap, publicKey
 
 	// Otherwise we check if we added it
 	return contact.IsAdded(), nil
+}
+
+func (m *MessageHandler) generatePinMessageID(pm *common.PinMessage, chat *Chat) string {
+	data := []byte(pm.MessageID)
+	switch {
+	case pm.GetMessageType() == protobuf.MessageType_ONE_TO_ONE:
+		data = append(data, crypto.CompressPubkey(&m.identity.PublicKey)...) // our key
+		data = append(data, []byte(pm.GetChatId())...)                       // their key
+	default:
+		data = append(data, []byte(pm.GetChatId())...)
+	}
+	return string(common.Shake256(data))
 }

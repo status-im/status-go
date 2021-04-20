@@ -205,6 +205,7 @@ func TestPinMessageByChatID(t *testing.T) {
 		// Pin this message
 		if i%100 == 0 {
 			pinMessage := &common.PinMessage{
+				ID:          strconv.Itoa(i),
 				MessageID:   strconv.Itoa(i),
 				LocalChatID: chatID,
 				From:        "me",
@@ -217,6 +218,7 @@ func TestPinMessageByChatID(t *testing.T) {
 			if i%200 == 0 {
 				// unpin a message
 				unpinMessage := &common.PinMessage{
+					ID:          strconv.Itoa(i),
 					MessageID:   strconv.Itoa(i),
 					LocalChatID: chatID,
 					From:        "me",
@@ -228,6 +230,7 @@ func TestPinMessageByChatID(t *testing.T) {
 
 				// pinned before the unpin
 				pinMessage2 := &common.PinMessage{
+					ID:          strconv.Itoa(i),
 					MessageID:   strconv.Itoa(i),
 					LocalChatID: chatID,
 					From:        "me",
@@ -250,7 +253,6 @@ func TestPinMessageByChatID(t *testing.T) {
 				From: "me",
 			})
 		}
-
 	}
 
 	err = p.SaveMessages(messages)

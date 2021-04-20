@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS pin_messages (
-  message_id VARCHAR PRIMARY KEY NOT NULL ON CONFLICT REPLACE,
+  id VARCHAR PRIMARY KEY NOT NULL,
+  message_id VARCHAR NOT NULL,
   whisper_timestamp INTEGER NOT NULL,
   chat_id VARCHAR NOT NULL,
   local_chat_id VARCHAR NOT NULL,
