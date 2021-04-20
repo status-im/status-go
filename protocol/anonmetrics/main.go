@@ -21,7 +21,7 @@ func adaptProtoToModel(pbAnonMetric *protobuf.AnonymousMetric) *appmetrics.AppMe
 }
 
 // adaptModelToProto is an adaptor helper function to convert a appmetrics.AppMetric into a protobuf.AnonymousMetric
-func adaptModelToProto(modelAnonMetric *appmetrics.AppMetric, sendID *ecdsa.PublicKey) *protobuf.AnonymousMetric {
+func adaptModelToProto(modelAnonMetric appmetrics.AppMetric, sendID *ecdsa.PublicKey) *protobuf.AnonymousMetric {
 	id := generateProtoID(modelAnonMetric, sendID)
 
 	return &protobuf.AnonymousMetric{
@@ -35,7 +35,7 @@ func adaptModelToProto(modelAnonMetric *appmetrics.AppMetric, sendID *ecdsa.Publ
 	}
 }
 
-func adaptModelsToProtoBatch(modelAnonMetrics []*appmetrics.AppMetric, sendID *ecdsa.PublicKey) *protobuf.AnonymousMetricBatch {
+func adaptModelsToProtoBatch(modelAnonMetrics []appmetrics.AppMetric, sendID *ecdsa.PublicKey) *protobuf.AnonymousMetricBatch {
 	amb := new(protobuf.AnonymousMetricBatch)
 
 	for _, m := range modelAnonMetrics {
@@ -55,7 +55,7 @@ func adaptProtoBatchToModels(protoBatch *protobuf.AnonymousMetricBatch) []*appme
 	return ams
 }
 
-func generateProtoID(modelAnonMetric *appmetrics.AppMetric, sendID *ecdsa.PublicKey) string {
+func generateProtoID(modelAnonMetric appmetrics.AppMetric, sendID *ecdsa.PublicKey) string {
 	return types.EncodeHex(crypto.Keccak256([]byte(fmt.Sprintf(
 		"%s%s%s%s%s%d",
 		types.EncodeHex(crypto.FromECDSAPub(sendID)),

@@ -1,5 +1,6 @@
 syntax = "proto3";
 
+option go_package = "./;protobuf";
 package protobuf;
 
 // AnonymousMetric represents a single metric data point

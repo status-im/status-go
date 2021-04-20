@@ -46,5 +46,6 @@ message ApplicationMetadataMessage {
     STATUS_UPDATE = 30;
     DELETE_MESSAGE = 31;
     SYNC_INSTALLATION_COMMUNITY = 32;
+    ANONYMOUS_METRIC_BATCH = 33;
   }
 }

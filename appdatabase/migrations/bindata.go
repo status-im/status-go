@@ -908,7 +908,7 @@ func _1618571271_add_id_to_app_metricsUpSql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "1618571271_add_id_to_app_metrics.up.sql", size: 633, mode: os.FileMode(0644), modTime: time.Unix(1623332286, 0)}
+	info := bindataFileInfo{name: "1618571271_add_id_to_app_metrics.up.sql", size: 633, mode: os.FileMode(0644), modTime: time.Unix(1628714493, 0)}
 	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x47, 0xd7, 0x7e, 0x2d, 0x34, 0xf0, 0xad, 0x8e, 0xc3, 0x43, 0x35, 0x98, 0x48, 0x47, 0xcf, 0xa0, 0x1a, 0x8e, 0x84, 0x6e, 0xc4, 0xd8, 0x17, 0x98, 0x7c, 0x5c, 0xc2, 0x84, 0x56, 0xc1, 0x51, 0xbd}}
 	return a, nil
 }

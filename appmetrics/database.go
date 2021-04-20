@@ -202,6 +202,20 @@ func (db *Database) GetUnprocessed() ([]AppMetric, error) {
 	return db.getFromRows(rows)
 }
 
+func (db *Database) GetUnprocessedGroupedBySession() (map[string][]AppMetric, error) {
+	uam, err := db.GetUnprocessed()
+	if err != nil {
+		return nil, err
+	}
+
+	out := map[string][]AppMetric{}
+	for _, am := range uam {
+		out[am.SessionID] = append(out[am.SessionID], am)
+	}
+
+	return out, nil
+}
+
 func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 	var (
 		tx     *sql.Tx
@@ -245,6 +259,11 @@ func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 		return
 	}
 	return
+}
+
+func (db *Database) SetToProcessed(appMetrics []AppMetric) (err error) {
+	ids := GetAppMetricsIDs(appMetrics)
+	return db.SetToProcessedByIDs(ids)
 }
 
 func GetAppMetricsIDs(appMetrics []AppMetric) []int {
