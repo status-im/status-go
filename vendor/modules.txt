@@ -407,7 +407,7 @@ github.com/spaolacci/murmur3
 github.com/status-im/doubleratchet
 # github.com/status-im/go-multiaddr-ethv4 v1.2.0
 github.com/status-im/go-multiaddr-ethv4
-# github.com/status-im/go-waku v0.0.0-20210411234542-d85c857a74db
+# github.com/status-im/go-waku v0.0.0-20210420215247-c3d9868e7765
 github.com/status-im/go-waku/waku/common
 github.com/status-im/go-waku/waku/v2/node
 github.com/status-im/go-waku/waku/v2/protocol

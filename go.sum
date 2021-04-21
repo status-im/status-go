@@ -932,9 +932,8 @@ github.com/status-im/go-ethereum v1.9.5-status.12 h1:+QZE2x5zF1CvNo3V+WaCzeOoar8
 github.com/status-im/go-ethereum v1.9.5-status.12/go.mod h1:YyH5DKB6+z+Vaya7eIm67pnuPZ1oiUMbbsZW41ktN0g=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
-github.com/status-im/go-waku v0.0.0-20210411234542-d85c857a74db/go.mod h1:2fHIqaNF8M8W/DQL5J3R9dXbrTLpOefvD5tbKSvoxBg=
-github.com/status-im/go-waku v0.0.0-20210415175718-9572a766a819 h1:FdBOdxxQmO/wVZdVsblY5iN4i18KqyjukV2G/m3tOjU=
-github.com/status-im/go-waku v0.0.0-20210415175718-9572a766a819/go.mod h1:GjrbwNCdtae7sFmvFyXJPSRgnrcmJp3wVSjDZWOG8+s=
+github.com/status-im/go-waku v0.0.0-20210420215247-c3d9868e7765 h1:rJbZuwG3MqTkx2vyOytiOriJLlRd9B80sQlsetgV0rw=
+github.com/status-im/go-waku v0.0.0-20210420215247-c3d9868e7765/go.mod h1:GjrbwNCdtae7sFmvFyXJPSRgnrcmJp3wVSjDZWOG8+s=
 github.com/status-im/go-wakurelay-pubsub v0.4.2 h1:F4UGcP80H0PGaeJ0mRMzA1Ux3DKYiyv/qu3bOR/efTg=
 github.com/status-im/go-wakurelay-pubsub v0.4.2/go.mod h1:LSCVYR7mnBBsxVJghrGpQ3yJAAATEe6XeQQqGCZhwrE=
 github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 h1:ju5UTwk5Odtm4trrY+4Ca4RMj5OyXbmVeDAVad2T0Jw=

@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/status-im/go-waku/waku/v2/protocol"
 	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext"
@@ -60,7 +61,12 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r ext.StoreRequest) (ty
 		store.WithPaging(r.Asc, r.PageSize),
 	}
 
-	// TODO: handle cursor
+	if r.Cursor != nil {
+		options = append(options, store.WithCursor(&protocol.Index{
+			Digest:       r.Cursor.Digest,
+			ReceivedTime: r.Cursor.ReceivedTime,
+		}))
+	}
 
 	var hash types.Hash
 	copy(hash[:], h[:types.HashLength])
