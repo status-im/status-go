@@ -74,10 +74,11 @@ func (c *Client) mainLoop() error {
 				continue
 			}
 			rawMessage := common.RawMessage{
-				Payload:        encodedMessage,
-				Sender:         ephemeralKey,
-				SkipEncryption: true,
-				MessageType:    protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
+				Payload:             encodedMessage,
+				Sender:              ephemeralKey,
+				SkipEncryption:      true,
+				SendOnPersonalTopic: true,
+				MessageType:         protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
 			}
 
 			// Send the metrics batch
@@ -115,9 +116,15 @@ func (c *Client) startMainLoop() {
 }
 
 func (c *Client) deleteLoop() error {
-	// TODO delete loop
+	for {
+		// TODO delete loop
 
-	return nil
+		select {
+		case <-time.After(time.Hour):
+		case <-c.mainLoopQuit:
+			return nil
+		}
+	}
 }
 
 func (c *Client) startDeleteLoop() {
