@@ -117,7 +117,14 @@ func (c *Client) startMainLoop() {
 
 func (c *Client) deleteLoop() error {
 	for {
-		// TODO delete loop
+		// TODO add a lock on DB from main loop
+		oneWeekAgo := time.Now().Add(time.Hour * 24 * 7 * -1)
+		err := c.DB.DeleteOlderThan(&oneWeekAgo)
+		if err != nil {
+			c.Logger.Error("failed to delete metrics older than given time",
+				zap.Time("time given", oneWeekAgo),
+				zap.Error(err))
+		}
 
 		select {
 		case <-time.After(time.Hour):

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/status-im/status-go/appdatabase"
 
@@ -146,7 +147,39 @@ func TestDatabase_GetUnprocessedGroupedBySession(t *testing.T) {
 	// Check we have the expected number of unprocessed metrics in the db
 	uam, err := db.GetUnprocessedGroupedBySession()
 	require.NoError(t, err)
+
+	// Check we have 2 groups / sessions
 	require.Len(t, uam, 2)
 	require.Len(t, uam["rand-omse-ssid"], 10)
 	require.Len(t, uam["rand-omse-ssid-2"], 10)
+}
+
+func TestDatabase_DeleteOlderThan(t *testing.T) {
+	db, stop := setupTestDB(t)
+	defer stop()
+
+	threeHoursAgo := time.Now().Add(time.Hour * -3) // go is annoying sometimes
+	oneHourHence := time.Now().Add(time.Hour)
+
+	// Add sample data to the DB
+	err := db.SaveAppMetrics(generateMetrics(20), "rand-omse-ssid")
+	require.NoError(t, err)
+
+	// Delete all messages older than 3 hours old
+	err = db.DeleteOlderThan(&threeHoursAgo)
+	require.NoError(t, err)
+
+	// Get all metrics from DB, none should be deleted
+	ams, err := db.GetAppMetrics(100,0)
+	require.NoError(t, err)
+	require.Len(t, ams, 20)
+
+	// Delete all messages older than 1 hours in the future
+	err = db.DeleteOlderThan(&oneHourHence)
+	require.NoError(t, err)
+
+	// Get all metrics from DB, all should be deleted
+	ams, err = db.GetAppMetrics(100,0)
+	require.NoError(t, err)
+	require.Len(t, ams, 0)
 }

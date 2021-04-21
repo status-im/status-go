@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -21,7 +22,7 @@ type AppMetric struct {
 	AppVersion string             `json:"app_version"`
 	OS         string             `json:"os"`
 	SessionID  string             `json:"session_id"`
-	CreatedAt  string             `json:"created_at"`
+	CreatedAt  time.Time          `json:"created_at"`
 	Processed  bool               `json:"processed"`
 }
 
@@ -264,6 +265,48 @@ func (db *Database) SetToProcessedByIDs(ids []int) (err error) {
 func (db *Database) SetToProcessed(appMetrics []AppMetric) (err error) {
 	ids := GetAppMetricsIDs(appMetrics)
 	return db.SetToProcessedByIDs(ids)
+}
+
+func (db *Database) GetMessagesOlderThan(date *time.Time) ([]AppMetric, error) {
+	rows, err := db.db.Query("SELECT id, proto_id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE created_at < ?", date)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return db.getFromRows(rows)
+}
+
+func (db *Database) DeleteOlderThan(date *time.Time) (err error) {
+	var (
+		tx *sql.Tx
+		d  *sql.Stmt
+	)
+
+	// start txn
+	tx, err = db.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			err = tx.Commit()
+			return
+		}
+		_ = tx.Rollback()
+	}()
+
+	d, err = tx.Prepare("DELETE FROM app_metrics WHERE created_at < ?")
+	if err != nil {
+		return err
+	}
+
+	_, err = d.Exec(date)
+	if err != nil {
+		return
+	}
+	return
 }
 
 func GetAppMetricsIDs(appMetrics []AppMetric) []int {
