@@ -133,18 +133,15 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	hostAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, ":", cfg.Port))
-	waku.node, err = node.New(context.Background(), privateKey, []net.Addr{hostAddr})
+	waku.node, err = node.New(context.Background(),
+		node.WithPrivateKey(privateKey),
+		node.WithHostAddress([]net.Addr{hostAddr}),
+		node.WithWakuRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize))),
+		node.WithWakuStore(false), // Mounts the store protocol (without storing the messages)
+	)
+
 	if err != nil {
 		fmt.Println(err)
-		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
-	}
-	err = waku.node.MountRelay(wakurelay.WithMaxMessageSize(int(waku.settings.MaxMsgSize)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
-	}
-
-	err = waku.node.MountStore(false, nil) // Mounts the store protocol (without storing the messages)
-	if err != nil {
 		return nil, fmt.Errorf("failed to start the go-waku node: %v", err)
 	}
 

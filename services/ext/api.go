@@ -109,7 +109,7 @@ type StoreRequest struct {
 	Asc bool `json:"asc"`
 
 	// Cursor is used as starting point for paginated requests
-	Cursor string `json:"cursor"`
+	Cursor *StoreRequestCursor `json:"cursor"`
 
 	// Topics is a list of Whisper topics.
 	Topics []types.TopicType `json:"topics"`
@@ -120,6 +120,11 @@ type StoreRequest struct {
 
 	// Force ensures that requests will bypass enforced delay.
 	Force bool `json:"force"`
+}
+
+type StoreRequestCursor struct {
+	Digest       []byte  `json:"digest"`
+	ReceivedTime float64 `json:"receivedTime"`
 }
 
 func (r *MessagesRequest) SetDefaults(now time.Time) {
