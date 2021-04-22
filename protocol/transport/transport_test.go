@@ -1,4 +1,4 @@
-package whisper
+package transport
 
 import (
 	"io/ioutil"
@@ -12,7 +12,7 @@ import (
 	"github.com/status-im/status-go/protocol/tt"
 )
 
-func TestNewWhisperServiceTransport(t *testing.T) {
+func TestNewTransport(t *testing.T) {
 	dbPath, err := ioutil.TempFile("", "transport.sql")
 	require.NoError(t, err)
 	defer os.Remove(dbPath.Name())

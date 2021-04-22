@@ -47,7 +47,7 @@ type MessageProcessor struct {
 	identity    *ecdsa.PrivateKey
 	datasync    *datasync.DataSync
 	protocol    *encryption.Protocol
-	transport   transport.Transport
+	transport   *transport.Transport
 	logger      *zap.Logger
 	persistence *RawMessagesPersistence
 
@@ -71,7 +71,7 @@ func NewMessageProcessor(
 	identity *ecdsa.PrivateKey,
 	database *sql.DB,
 	enc *encryption.Protocol,
-	transport transport.Transport,
+	transport *transport.Transport,
 	logger *zap.Logger,
 	features FeatureFlags,
 ) (*MessageProcessor, error) {

@@ -9,8 +9,7 @@ import (
 	appmigrations "github.com/status-im/status-go/protocol/migrations"
 	push_notification_client_migrations "github.com/status-im/status-go/protocol/pushnotificationclient/migrations"
 	push_notification_server_migrations "github.com/status-im/status-go/protocol/pushnotificationserver/migrations"
-	wakumigrations "github.com/status-im/status-go/protocol/transport/waku/migrations"
-	whispermigrations "github.com/status-im/status-go/protocol/transport/whisper/migrations"
+	wakumigrations "github.com/status-im/status-go/protocol/transport/migrations"
 )
 
 type getter func(string) ([]byte, error)
@@ -21,10 +20,6 @@ type migrationsWithGetter struct {
 }
 
 var defaultMigrations = []migrationsWithGetter{
-	{
-		Names:  whispermigrations.AssetNames(),
-		Getter: whispermigrations.Asset,
-	},
 	{
 		Names:  wakumigrations.AssetNames(),
 		Getter: wakumigrations.Asset,

@@ -6,6 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	transport2 "github.com/status-im/status-go/protocol/transport"
+
+	"github.com/status-im/status-go/waku"
+
 	"github.com/golang/protobuf/proto"
 
 	"github.com/stretchr/testify/suite"
@@ -19,9 +23,7 @@ import (
 	"github.com/status-im/status-go/protocol/encryption"
 	"github.com/status-im/status-go/protocol/protobuf"
 	"github.com/status-im/status-go/protocol/sqlite"
-	transport "github.com/status-im/status-go/protocol/transport/whisper"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
-	"github.com/status-im/status-go/whisper"
 )
 
 func TestMessageProcessorSuite(t *testing.T) {
@@ -67,13 +69,13 @@ func (s *MessageProcessorSuite) SetupTest() {
 		s.logger,
 	)
 
-	whisperConfig := whisper.DefaultConfig
-	whisperConfig.MinimumAcceptedPOW = 0
-	shh := whisper.New(&whisperConfig)
+	wakuConfig := waku.DefaultConfig
+	wakuConfig.MinimumAcceptedPoW = 0
+	shh := waku.New(&wakuConfig, s.logger)
 	s.Require().NoError(shh.Start(nil))
 
-	whisperTransport, err := transport.NewTransport(
-		gethbridge.NewGethWhisperWrapper(shh),
+	whisperTransport, err := transport2.NewTransport(
+		gethbridge.NewGethWakuWrapper(shh),
 		identity,
 		database,
 		nil,
