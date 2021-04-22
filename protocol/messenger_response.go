@@ -40,6 +40,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 		Chats                   []*Chat                         `json:"chats,omitempty"`
 		RemovedChats            []string                        `json:"removedChats,omitempty"`
 		Messages                []*common.Message               `json:"messages,omitempty"`
+		PinMessages             []*common.PinMessage            `json:"pinMessages,omitempty"`
 		Contacts                []*Contact                      `json:"contacts,omitempty"`
 		Installations           []*multidevice.Installation     `json:"installations,omitempty"`
 		EmojiReactions          []*EmojiReaction                `json:"emojiReactions,omitempty"`
@@ -76,6 +77,7 @@ func (r *MessengerResponse) MarshalJSON() ([]byte, error) {
 	responseItem.Communities = r.Communities()
 	responseItem.RemovedChats = r.RemovedChats()
 	responseItem.ActivityCenterNotifications = r.ActivityCenterNotifications()
+	responseItem.PinMessages = r.PinMessages()
 
 	return json.Marshal(responseItem)
 }
