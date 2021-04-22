@@ -1,4 +1,58 @@
-# App Metrics
+
+# Anonymous usage data
+Starting release 1.14, the Status mobile app asks to share anonymous end-to-end encrypted data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared anonymously over Waku, just like a 1:1 message.
+
+Sharing data is strictly opt-in, and can be changed at any times in Settings in the app.
+
+### What is shared (Opt-in)
+Status is an open-source platform. To verify that the app only collects and shares the events and metadata listed below, you can view the rules defined to store metrics data in the [source code](https://github.com/status-im/status-go/blob/develop/appmetrics/validators.go).
+
+- Your interactions with the app like clicks and screenviews
+- Background activity and internal processes
+- Settings and pre=eferences
+
+In detail this means the app can collect and share:
+- Navigation events
+- Screens that is navigated to
+- Action events (for example button clicks, list swipes, switch toggles, etc)
+- Time events are created
+- Operating System
+- App version
+- Session key
+- Time since last session
+- Time since last data message sent
+
+### What will never be shared
+No data will be shared unless you opt-in. Furthermore, Status commits to never collect identifiable data in its broadest sense. This means that we will never collect anything that can be linked back to you. Including but not limited to:
+- IP addresses
+- Random name
+- (Regular) Chat key
+- Public Ethereum addresses
+- Account balance(s)
+- Account history
+- ENS name
+- Input field entries (browser address bar, chat key/ENS entry)
+- Any content you generate (images, messages, profile picture)
+- Contacts or other (favorite) lists (wallet and browser favorites)
+- Chat, group, community memberships
+
+While we employ a ‘can’t be evil’ approach. We highly recommend that you employ a ‘don’t trust, but verify’ approach. In this case, the above data can technically be logged, stored and shared. In order to verify that this does not happen, view the rules defined to store metrics data in the [source code](https://github.com/status-im/status-go/blob/develop/appmetrics/validators.go).
+
+### Purpose of the data
+Anonymous, aggregated data is used to inform product development. Given our principles, the type of data that is collected and its anonymous nature, there is no incentive for Status or other parties to use the data for any other purpose.
+
+
+### Viewing the data
+As of writing, we plan to make a Dashboard that shows the aggregated data public; Similar to metrics.status.im. As soon as this Dashboard is available we will provide a link here. The data that is stored on your device and shared can be viewed through the interface of the app.
+
+
+
+
+
+_________
+
+# How it works
+## App Metrics
 
 `appmetrics` is a way to capture and transfer app usage data, anonymously over Waku to a Status managed key.
 
