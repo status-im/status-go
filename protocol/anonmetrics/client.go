@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -36,6 +37,9 @@ type Client struct {
 
 	// deleteLoopQuit is a channel that concurrently orchestrates that the delete loop that should be terminated
 	deleteLoopQuit chan struct{}
+
+	// DBLock prevents deletion of DB items during mainloop
+	DBLock sync.Mutex
 }
 
 func NewClient(processor *common.MessageProcessor) *Client {
@@ -48,52 +52,59 @@ func NewClient(processor *common.MessageProcessor) *Client {
 	}
 }
 
+func (c *Client) sendUnprocessedMetrics() {
+	c.DBLock.Lock()
+	defer c.DBLock.Unlock()
+
+	// Get all unsent metrics grouped by session id
+	uam, err := c.DB.GetUnprocessedGroupedBySession()
+	if err != nil {
+		c.Logger.Error("failed to get unprocessed messages grouped by session", zap.Error(err))
+	}
+
+	// Convert the metrics into protobuf
+	for _, batch := range uam {
+		amb := adaptModelsToProtoBatch(batch, &c.Identity.PublicKey)
+
+		// Generate an ephemeral key per session id
+		ephemeralKey, err := crypto.GenerateKey()
+		if err != nil {
+			c.Logger.Error("failed to generate an ephemeral key", zap.Error(err))
+			return
+		}
+
+		// Prepare the protobuf message
+		encodedMessage, err := proto.Marshal(amb)
+		if err != nil {
+			c.Logger.Error("failed to marshal protobuf", zap.Error(err))
+			return
+		}
+		rawMessage := common.RawMessage{
+			Payload:             encodedMessage,
+			Sender:              ephemeralKey,
+			SkipEncryption:      true,
+			SendOnPersonalTopic: true,
+			MessageType:         protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
+		}
+
+		// Send the metrics batch
+		_, err = c.messageProcessor.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
+		if err != nil {
+			c.Logger.Error("failed to send metrics batch message", zap.Error(err))
+			return
+		}
+
+		// Mark metrics as processed
+		err = c.DB.SetToProcessed(batch)
+		if err != nil {
+			c.Logger.Error("failed to set metrics as processed in db", zap.Error(err))
+		}
+	}
+}
+
 func (c *Client) mainLoop() error {
 	for {
-		// Get all unsent metrics grouped by session id
-		uam, err := c.DB.GetUnprocessedGroupedBySession()
-		if err != nil {
-			c.Logger.Error("failed to get unprocessed messages grouped by session", zap.Error(err))
-		}
-
-		// Convert the metrics into protobuf
-		for _, batch := range uam {
-			amb := adaptModelsToProtoBatch(batch, &c.Identity.PublicKey)
-
-			// Generate an ephemeral key per session id
-			ephemeralKey, err := crypto.GenerateKey()
-			if err != nil {
-				c.Logger.Error("failed to generate an ephemeral key", zap.Error(err))
-				continue
-			}
-
-			// Prepare the protobuf message
-			encodedMessage, err := proto.Marshal(amb)
-			if err != nil {
-				c.Logger.Error("failed to marshal protobuf", zap.Error(err))
-				continue
-			}
-			rawMessage := common.RawMessage{
-				Payload:             encodedMessage,
-				Sender:              ephemeralKey,
-				SkipEncryption:      true,
-				SendOnPersonalTopic: true,
-				MessageType:         protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
-			}
-
-			// Send the metrics batch
-			_, err = c.messageProcessor.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
-			if err != nil {
-				c.Logger.Error("failed to send metrics batch message", zap.Error(err))
-				continue
-			}
-
-			// Mark metrics as processed
-			err = c.DB.SetToProcessed(batch)
-			if err != nil {
-				c.Logger.Error("failed to set metrics as processed in db", zap.Error(err))
-			}
-		}
+		c.sendUnprocessedMetrics()
 
 		waitFor := time.Duration(c.IntervalInc.Next())
 		select {
@@ -116,19 +127,26 @@ func (c *Client) startMainLoop() {
 }
 
 func (c *Client) deleteLoop() error {
+	// Sleep to give the main lock time to process any old messages
+	time.Sleep(time.Second * 10)
+
 	for {
-		// TODO add a lock on DB from main loop
-		oneWeekAgo := time.Now().Add(time.Hour * 24 * 7 * -1)
-		err := c.DB.DeleteOlderThan(&oneWeekAgo)
-		if err != nil {
-			c.Logger.Error("failed to delete metrics older than given time",
-				zap.Time("time given", oneWeekAgo),
-				zap.Error(err))
-		}
+		func() {
+			c.DBLock.Lock()
+			defer c.DBLock.Unlock()
+
+			oneWeekAgo := time.Now().Add(time.Hour * 24 * 7 * -1)
+			err := c.DB.DeleteOlderThan(&oneWeekAgo)
+			if err != nil {
+				c.Logger.Error("failed to delete metrics older than given time",
+					zap.Time("time given", oneWeekAgo),
+					zap.Error(err))
+			}
+		}()
 
 		select {
 		case <-time.After(time.Hour):
-		case <-c.mainLoopQuit:
+		case <-c.deleteLoopQuit:
 			return nil
 		}
 	}
