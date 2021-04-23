@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 
@@ -1211,5 +1212,8 @@ func (m *MessageHandler) generatePinMessageID(pm *common.PinMessage, chat *Chat)
 	default:
 		data = append(data, []byte(pm.GetChatId())...)
 	}
-	return string(common.Shake256(data))
+	id := sha256.Sum256(data)
+	idString := fmt.Sprintf("%x", id)
+
+	return idString
 }
