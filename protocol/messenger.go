@@ -3071,7 +3071,16 @@ func (m *Messenger) MessageByChatID(chatID, cursor string, limit int) ([]*common
 		return nil, "", err
 	}
 
-	if chat.Timeline() {
+	if chatID == timelineChatID {
+		// If no timeline chat exists, creates it
+		if chat == nil {
+			err = m.ensureTimelineChat()
+			if err != nil {
+				return nil, "", err
+
+			}
+		}
+
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		contacts, err := m.persistence.Contacts()
 		if err != nil {
@@ -4172,7 +4181,14 @@ func (m *Messenger) EmojiReactionsByChatID(chatID string, cursor string, limit i
 		return nil, err
 	}
 
-	if chat.Timeline() {
+	if chatID == timelineChatID {
+		if chat == nil {
+			err = m.ensureTimelineChat()
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		var chatIDs = []string{"@" + contactIDFromPublicKey(&m.identity.PublicKey)}
 		m.allContacts.Range(func(contactID string, contact *Contact) (shouldContinue bool) {
 			if contact.IsAdded() {

@@ -228,3 +228,18 @@ func (m *Messenger) Join(chat *Chat) ([]*transport.Filter, error) {
 		return nil, errors.New("chat is neither public nor private")
 	}
 }
+
+func (m *Messenger) ensureTimelineChat() error {
+	chat, err := m.persistence.Chat(timelineChatID)
+	if err != nil {
+		return err
+	}
+
+	if chat == nil {
+		chat = CreateTimelineChat(m.getTimesource())
+	}
+
+	m.allChats.Store(timelineChatID, chat)
+
+	return nil
+}
