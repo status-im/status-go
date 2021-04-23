@@ -33,7 +33,11 @@ const (
 	ChatTypeCommunityChat
 )
 
-const pkStringLength = 68
+const (
+	// timelineChatID is a magic ID for the singleton timeline chat
+	timelineChatID = "@timeline70bd746ddcc12beb96b2c9d572d0784ab137ffc774f5383e50585a932080b57cca0484b259e61cecbaa33a4c98a300a"
+	pkStringLength = 68
+)
 
 type Chat struct {
 	// ID is the id of the chat, for public chats it is the name e.g. status, for one-to-one
@@ -282,6 +286,16 @@ func CreateOneToOneChat(name string, publicKey *ecdsa.PublicKey, timesource comm
 		Timestamp: int64(timesource.GetCurrentTime()),
 		Active:    true,
 		ChatType:  ChatTypeOneToOne,
+	}
+}
+
+func CreateTimelineChat(timesource common.TimeSource) *Chat {
+	return &Chat{
+		ID:        timelineChatID,
+		Name:      "#" + timelineChatID,
+		Timestamp: int64(timesource.GetCurrentTime()),
+		Active:    true,
+		ChatType:  ChatTypeTimeline,
 	}
 }
 
