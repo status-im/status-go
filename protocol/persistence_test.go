@@ -206,10 +206,11 @@ func TestPinMessageByChatID(t *testing.T) {
 		if i%100 == 0 {
 			pinMessage := &common.PinMessage{
 				ID:          strconv.Itoa(i),
-				MessageID:   strconv.Itoa(i),
 				LocalChatID: chatID,
 				From:        "me",
 			}
+
+			pinMessage.MessageId = strconv.Itoa(i)
 			pinMessage.Clock = 111
 			pinMessage.Pinned = true
 			pinMessages = append(pinMessages, pinMessage)
@@ -219,10 +220,10 @@ func TestPinMessageByChatID(t *testing.T) {
 				// unpin a message
 				unpinMessage := &common.PinMessage{
 					ID:          strconv.Itoa(i),
-					MessageID:   strconv.Itoa(i),
 					LocalChatID: chatID,
 					From:        "me",
 				}
+				pinMessage.MessageId = strconv.Itoa(i)
 				unpinMessage.Clock = 333
 				unpinMessage.Pinned = false
 				pinMessages = append(pinMessages, unpinMessage)
@@ -231,10 +232,10 @@ func TestPinMessageByChatID(t *testing.T) {
 				// pinned before the unpin
 				pinMessage2 := &common.PinMessage{
 					ID:          strconv.Itoa(i),
-					MessageID:   strconv.Itoa(i),
 					LocalChatID: chatID,
 					From:        "me",
 				}
+				pinMessage2.MessageId = strconv.Itoa(i)
 				pinMessage2.Clock = 222
 				pinMessage2.Pinned = true
 				pinMessages = append(pinMessages, pinMessage2)

@@ -933,7 +933,7 @@ func (db sqlitePersistence) SavePinMessages(messages []*common.PinMessage) (err 
 			// not found, insert new record
 			allValues := []interface{}{
 				message.ID,
-				message.MessageID,
+				message.MessageId,
 				message.WhisperTimestamp,
 				message.ChatId,
 				message.LocalChatID,

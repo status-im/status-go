@@ -2,8 +2,12 @@ package protocol
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/protobuf"
 )
@@ -34,6 +38,11 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 		return nil, err
 	}
 
+	message.ID, err = m.generatePinMessageID(message, chat)
+	if err != nil {
+		return nil, err
+	}
+
 	encodedMessage, err := m.encodeChatEntity(chat, message)
 	if err != nil {
 		return nil, err
@@ -49,8 +58,6 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	if err != nil {
 		return nil, err
 	}
-
-	message.ID = rawMessage.ID
 
 	err = m.persistence.SavePinMessages([]*common.PinMessage{message})
 	if err != nil {
@@ -86,4 +93,31 @@ func (m *Messenger) PinnedMessageByChatID(chatID, cursor string, limit int) ([]*
 
 func (m *Messenger) SavePinMessages(messages []*common.PinMessage) error {
 	return m.persistence.SavePinMessages(messages)
+}
+
+func (m *Messenger) generatePinMessageID(pm *common.PinMessage, chat *Chat) (string, error) {
+	data := gethcommon.FromHex(pm.MessageId)
+
+	switch {
+	case chat.ChatType == ChatTypeOneToOne:
+		ourPubKey := crypto.CompressPubkey(pm.SigPubKey)
+		tmpPubKey, err := chat.PublicKey()
+		if err != nil {
+			return "", err
+		}
+		theirPubKey := crypto.CompressPubkey(tmpPubKey)
+		data = append(data, ourPubKey...)   // our key
+		data = append(data, theirPubKey...) // their key
+
+	default:
+		chatPubKey, err := chat.PublicKey()
+		if err != nil {
+			return "", err
+		}
+		data = append(data, crypto.CompressPubkey(chatPubKey)...)
+	}
+	id := sha256.Sum256(data)
+	idString := fmt.Sprintf("%x", id)
+
+	return idString, nil
 }

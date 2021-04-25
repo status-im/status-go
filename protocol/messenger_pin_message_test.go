@@ -85,9 +85,9 @@ func (s *MessengerPinMessageSuite) TestPinMessage() {
 	s.Require().Len(response.Chats(), 1)
 
 	pinMessage := &common.PinMessage{
-		MessageID:   inputMessage.ID,
 		LocalChatID: theirChat.ID,
 	}
+	pinMessage.MessageId = inputMessage.ID
 	pinMessage.Pinned = true
 	pinMessage.ChatId = theirChat.ID
 	sendResponse, err = theirMessenger.SendPinMessage(context.Background(), pinMessage)

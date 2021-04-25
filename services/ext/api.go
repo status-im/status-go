@@ -504,8 +504,8 @@ func (api *PublicAPI) SendChatMessages(ctx context.Context, messages []*common.M
 	return api.service.messenger.SendChatMessages(ctx, messages)
 }
 
-func (api *PublicAPI) SendPinMessage(ctx context.Context, messages *common.PinMessage) (*protocol.MessengerResponse, error) {
-	return api.service.messenger.SendPinMessage(ctx, messages)
+func (api *PublicAPI) SendPinMessage(ctx context.Context, message *common.PinMessage) (*protocol.MessengerResponse, error) {
+	return api.service.messenger.SendPinMessage(ctx, message)
 }
 
 func (api *PublicAPI) RequestTransaction(ctx context.Context, chatID, value, contract, address string) (*protocol.MessengerResponse, error) {

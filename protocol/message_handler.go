@@ -20,6 +20,7 @@ import (
 	"github.com/status-im/status-go/protocol/transport"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"go.uber.org/zap"
 )
 
@@ -326,29 +327,28 @@ func (m *MessageHandler) HandleSyncInstallationPublicChat(state *ReceivedMessage
 
 func (m *MessageHandler) HandlePinMessage(state *ReceivedMessageState, message protobuf.PinMessage) error {
 	logger := m.logger.With(zap.String("site", "HandlePinMessage"))
-	// TODO
-	// ValidateReceivedChatMessage(&state.CurrentMessageState.Message, state.CurrentMessageState.WhisperTimestamp); err != nil {
 
 	logger.Info("Handling pin message")
 
 	pinMessage := &common.PinMessage{
-		PinMessage:       message,
-		ID:               state.CurrentMessageState.MessageID,
-		MessageID:        message.MessageId,
+		PinMessage: message,
+		// MessageID:        message.MessageId,
 		WhisperTimestamp: state.CurrentMessageState.WhisperTimestamp,
 		From:             state.CurrentMessageState.Contact.ID,
 		SigPubKey:        state.CurrentMessageState.PublicKey,
 		Identicon:        state.CurrentMessageState.Contact.Identicon,
 		Alias:            state.CurrentMessageState.Contact.Alias,
 	}
-	pinMessage.Pinned = message.Pinned
 
 	chat, err := m.matchChatEntity(pinMessage, state.AllChats, state.AllContacts, state.Timesource)
 	if err != nil {
 		return err // matchChatEntity returns a descriptive error message
 	}
 
-	pinMessage.ID = m.generatePinMessageID(pinMessage, chat)
+	pinMessage.ID, err = m.generatePinMessageID(pinMessage, chat)
+	if err != nil {
+		return err
+	}
 
 	// If deleted-at is greater, ignore message
 	if chat.DeletedAtClockValue >= pinMessage.Clock {
@@ -1203,17 +1203,29 @@ func (m *MessageHandler) isMessageAllowedFrom(allContacts *contactMap, publicKey
 	return contact.IsAdded(), nil
 }
 
-func (m *MessageHandler) generatePinMessageID(pm *common.PinMessage, chat *Chat) string {
-	data := []byte(pm.MessageID)
+func (m *MessageHandler) generatePinMessageID(pm *common.PinMessage, chat *Chat) (string, error) {
+	data := gethcommon.FromHex(pm.MessageId)
+
 	switch {
-	case pm.GetMessageType() == protobuf.MessageType_ONE_TO_ONE:
-		data = append(data, crypto.CompressPubkey(&m.identity.PublicKey)...) // our key
-		data = append(data, []byte(pm.GetChatId())...)                       // their key
+	case chat.ChatType == ChatTypeOneToOne:
+		ourPubKey := crypto.CompressPubkey(pm.SigPubKey)
+		tmpPubKey, err := chat.PublicKey()
+		if err != nil {
+			return "", err
+		}
+		theirPubKey := crypto.CompressPubkey(tmpPubKey)
+		data = append(data, ourPubKey...)   // our key
+		data = append(data, theirPubKey...) // their key
+
 	default:
-		data = append(data, []byte(pm.GetChatId())...)
+		chatPubKey, err := chat.PublicKey()
+		if err != nil {
+			return "", err
+		}
+		data = append(data, crypto.CompressPubkey(chatPubKey)...)
 	}
 	id := sha256.Sum256(data)
 	idString := fmt.Sprintf("%x", id)
 
-	return idString
+	return idString, nil
 }

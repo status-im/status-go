@@ -12,8 +12,8 @@ type PinMessage struct {
 	protobuf.PinMessage
 
 	// ID calculated as keccak256(compressedAuthorPubKey, data) where data is unencrypted payload.
-	ID        string `json:"id"`
-	MessageID string `json:"messageID"`
+	ID string `json:"id"`
+	// MessageID string `json:"messageID"`
 	// WhisperTimestamp is a timestamp of a Whisper envelope.
 	WhisperTimestamp uint64 `json:"whisperTimestamp"`
 	// From is a public key of the user who pinned the message.

@@ -2351,7 +2351,6 @@ type CurrentMessageState struct {
 	Message protobuf.ChatMessage
 	// MessageID is the ID of the message
 	MessageID string
-	Pinned    bool
 	// WhisperTimestamp is the whisper timestamp of the message
 	WhisperTimestamp uint64
 	// Contact is the contact associated with the author of the message
