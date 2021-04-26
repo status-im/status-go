@@ -1264,6 +1264,12 @@ func (m *Messenger) HandleChatIdentity(state *ReceivedMessageState, ci protobuf.
 	return nil
 }
 
+func (m *Messenger) HandleAnonymousMetricBatch(amb protobuf.AnonymousMetricBatch) error {
+
+	// TODO
+	return nil
+}
+
 func (m *Messenger) checkForEdits(message *common.Message) error {
 	// Check for any pending edit
 	// If any pending edits are available and valid, apply them
