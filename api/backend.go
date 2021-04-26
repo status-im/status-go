@@ -20,6 +20,7 @@ type StatusBackend interface {
 	StopNode() error
 	// RestartNode() error // NOTE: Only used in tests
 
+	GetNodeConfig() (*params.NodeConfig, error)
 	UpdateRootDataDir(datadir string)
 
 	// SelectAccount(loginParams account.LoginParams) error
