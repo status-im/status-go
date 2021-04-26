@@ -16,7 +16,6 @@ type AppMetricEventType string
 // Validation is handled using JSON schemas defined in validators.go, instead of Golang structs
 type AppMetric struct {
 	ID         int                `json:"-"`
-	ProtoID    string             `json:"proto_id"` // To be used by metric server to ignore previously received messages
 	Event      AppMetricEventType `json:"event"`
 	Value      json.RawMessage    `json:"value"`
 	AppVersion string             `json:"app_version"`
@@ -134,13 +133,13 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (er
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id, processed, proto_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id, processed) VALUES (?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 
 	for _, metric := range appMetrics {
-		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID, metric.Processed, metric.ProtoID)
+		_, err = insert.Exec(metric.Event, metric.Value, metric.AppVersion, metric.OS, sessionID, metric.Processed)
 		if err != nil {
 			return
 		}
@@ -160,13 +159,8 @@ func (db *Database) GetAppMetrics(limit int, offset int) (page Page, err error) 
 	}
 	defer rows.Close()
 
-	metrics, err := db.getFromRows(rows)
-	if err != nil {
-		return page, err
-	}
-
-	page.AppMetrics = metrics
-	return page, nil
+	page.AppMetrics, err = db.getFromRows(rows)
+	return page, err
 }
 
 func (db *Database) getFromRows(rows *sql.Rows)(appMetrics []AppMetric, err error) {
@@ -176,7 +170,6 @@ func (db *Database) getFromRows(rows *sql.Rows)(appMetrics []AppMetric, err erro
 		metric := AppMetric{}
 		err = rows.Scan(
 			&metric.ID,
-			&metric.ProtoID,
 			&metric.Event,
 			&metric.Value,
 			&metric.AppVersion,
@@ -194,7 +187,7 @@ func (db *Database) getFromRows(rows *sql.Rows)(appMetrics []AppMetric, err erro
 }
 
 func (db *Database) GetUnprocessed() ([]AppMetric, error) {
-	rows, err := db.db.Query("SELECT id, proto_id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE processed IS ? ORDER BY session_id ASC, created_at ASC", false)
+	rows, err := db.db.Query("SELECT id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE processed IS ? ORDER BY session_id ASC, created_at ASC", false)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +261,7 @@ func (db *Database) SetToProcessed(appMetrics []AppMetric) (err error) {
 }
 
 func (db *Database) GetMessagesOlderThan(date *time.Time) ([]AppMetric, error) {
-	rows, err := db.db.Query("SELECT id, proto_id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE created_at < ?", date)
+	rows, err := db.db.Query("SELECT id, event, value, app_version, operating_system, session_id, created_at, processed FROM app_metrics WHERE created_at < ?", date)
 	if err != nil {
 		return nil, err
 	}
