@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"database/sql"
 	"encoding/hex"
-	"github.com/status-im/status-go/protocol/anonmetrics"
+	"errors"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -31,6 +31,7 @@ import (
 	"github.com/status-im/status-go/multiaccounts/accounts"
 	"github.com/status-im/status-go/params"
 	"github.com/status-im/status-go/protocol"
+	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/pushnotificationclient"
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/transport"
@@ -430,7 +431,7 @@ func buildMessengerOptions(
 		}
 
 		amcc := &anonmetrics.ClientConfig{
-			ShouldSend: true,
+			ShouldSend:  true,
 			SendAddress: key,
 		}
 		options = append(options, protocol.WithAnonMetricsClientConfig(amcc))
@@ -438,8 +439,13 @@ func buildMessengerOptions(
 
 	// Generate anon metrics server config
 	if config.AnonMetricsServerEnabled {
+		if len(config.AnonMetricsServerPostgresURI) == 0 {
+			return nil, errors.New("AnonMetricsServerPostgresURI must be set")
+		}
+
 		amsc := &anonmetrics.ServerConfig{
-			Enabled: true,
+			Enabled:     true,
+			PostgresURI: config.AnonMetricsServerPostgresURI,
 		}
 		options = append(options, protocol.WithAnonMetricsServerConfig(amsc))
 	}

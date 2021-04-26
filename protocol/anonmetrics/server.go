@@ -1,16 +1,31 @@
 package anonmetrics
 
-import "go.uber.org/zap"
+import (
+	"go.uber.org/zap"
+
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
+	"github.com/status-im/status-go/postgres"
+)
 
 type ServerConfig struct {
-	Enabled bool
+	Enabled     bool
+	PostgresURI string
 }
 
 type Server struct {
-	Config *ServerConfig
-	Logger *zap.Logger
+	Config     *ServerConfig
+	Logger     *zap.Logger
+	PostgresDB *postgres.DB
 }
 
-// TODO implement start functionality
+func NewServer(postgresURI string, migrationResource *bindata.AssetSource) (*Server, error) {
+	db, err := postgres.NewPostgresDB(postgresURI, migrationResource)
+	if err != nil {
+		return nil, err
+	}
 
-// TODO implement stop functionality
+	return &Server{
+		PostgresDB: db,
+	}, nil
+}

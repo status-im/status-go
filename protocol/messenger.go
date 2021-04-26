@@ -7,8 +7,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/status-im/status-go/appmetrics"
-	"github.com/status-im/status-go/protocol/anonmetrics"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -23,13 +21,18 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/proto"
 
+	bindata "github.com/status-im/migrate/v4/source/go_bindata"
+
 	"github.com/status-im/status-go/appdatabase"
+	"github.com/status-im/status-go/appmetrics"
 	"github.com/status-im/status-go/connection"
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
 	userimage "github.com/status-im/status-go/images"
 	"github.com/status-im/status-go/multiaccounts"
 	"github.com/status-im/status-go/multiaccounts/accounts"
+	"github.com/status-im/status-go/protocol/anonmetrics"
+	"github.com/status-im/status-go/protocol/anonmetrics/migrations"
 	"github.com/status-im/status-go/protocol/audio"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
@@ -276,7 +279,14 @@ func NewMessenger(
 	// Initialise anon metrics server
 	var anonMetricsServer *anonmetrics.Server
 	if c.anonMetricsServerConfig != nil && c.anonMetricsServerConfig.Enabled {
-		anonMetricsServer = new(anonmetrics.Server)
+		// Generate anonymous metrics postgres migration resource and pass to Server gen
+		postgresMigration := bindata.Resource(migrations.AssetNames(), migrations.Asset)
+		server, err := anonmetrics.NewServer(c.anonMetricsServerConfig.PostgresURI, postgresMigration)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create anonmetrics.Server")
+		}
+
+		anonMetricsServer = server
 		anonMetricsServer.Config = c.anonMetricsServerConfig
 		anonMetricsServer.Logger = logger.Named("anon metrics server")
 	}
@@ -352,6 +362,7 @@ func NewMessenger(
 			// https://github.com/uber-go/zap/issues/328
 			func() error { _ = logger.Sync; return nil },
 			database.Close,
+			anonMetricsClient.Stop,
 		},
 		logger: logger,
 	}
@@ -447,6 +458,13 @@ func (m *Messenger) Start() (*MessengerResponse, error) {
 		m.handlePushNotificationClientRegistrations(m.pushNotificationClient.SubscribeToRegistrations())
 
 		if err := m.pushNotificationClient.Start(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Start anonymous metrics client
+	if m.anonMetricsClient != nil {
+		if err := m.anonMetricsClient.Start(); err != nil {
 			return nil, err
 		}
 	}
@@ -2948,6 +2966,15 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						err = m.HandleCommunityRequestToJoin(messageState, publicKey, request)
 						if err != nil {
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
+							continue
+						}
+
+					case protobuf.AnonymousMetricBatch:
+						logger.Debug("Handling AnonymousMetricBatch")
+						amb := msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch)
+						err = m.handler.HandleAnonymousMetricBatch(amb)
+						if err != nil {
+							logger.Warn("failed to handle AnonymousMetricBatch", zap.Error(err))
 							continue
 						}
 

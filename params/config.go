@@ -572,6 +572,9 @@ type ShhextConfig struct {
 
 	// AnonMetricsServerEnabled indicates whether or not the
 	AnonMetricsServerEnabled bool
+
+	// AnonMetricsServerPostgresURI is the uri used to connect to a postgres db
+	AnonMetricsServerPostgresURI string
 }
 
 // Validate validates the ShhextConfig struct and returns an error if inconsistent values are found
