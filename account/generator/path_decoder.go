@@ -176,7 +176,7 @@ func (d *pathDecoder) parseSeparator() error {
 		return d.saveSegment()
 	}
 
-	return fmt.Errorf("expected %s, got %s", string(rune(tokenSeparator)), string(b))
+	return fmt.Errorf("expected %s, got %s", string(rune(tokenSeparator)), string(rune(b)))
 }
 
 func (d *pathDecoder) parseSegment() error {

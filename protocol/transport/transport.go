@@ -83,12 +83,13 @@ func NewTransport(
 	waku types.Waku,
 	privateKey *ecdsa.PrivateKey,
 	db *sql.DB,
+	sqlitePersistenceTableName string,
 	mailservers []string,
 	envelopesMonitorConfig *EnvelopesMonitorConfig,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Transport, error) {
-	filtersManager, err := NewFiltersManager(newSQLitePersistence(db), waku, privateKey, logger)
+	filtersManager, err := NewFiltersManager(newSQLitePersistence(db, sqlitePersistenceTableName), waku, privateKey, logger)
 	if err != nil {
 		return nil, err
 	}

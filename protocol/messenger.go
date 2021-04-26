@@ -43,8 +43,6 @@ import (
 	"github.com/status-im/status-go/protocol/pushnotificationserver"
 	"github.com/status-im/status-go/protocol/sqlite"
 	"github.com/status-im/status-go/protocol/transport"
-	wakutransp "github.com/status-im/status-go/protocol/transport/waku"
-	wakuv2transp "github.com/status-im/status-go/protocol/transport/wakuv2"
 	v1protocol "github.com/status-im/status-go/protocol/v1"
 	"github.com/status-im/status-go/services/mailservers"
 )
@@ -207,15 +205,16 @@ func NewMessenger(
 	}
 
 	// Initialize transport layer.
-	var transp transport.Transport
+	var transp *transport.Transport
 
 	logger.Info("failed to find Whisper service; trying Waku", zap.Error(err))
 
 	if waku, err := node.GetWaku(nil); err == nil && waku != nil {
-		transp, err = wakutransp.NewTransport(
+		transp, err = transport.NewTransport(
 			waku,
 			identity,
 			database,
+			"waku_keys",
 			nil,
 			c.envelopesMonitorConfig,
 			logger,
@@ -229,10 +228,11 @@ func NewMessenger(
 		if err != nil || wakuV2 == nil {
 			return nil, errors.Wrap(err, "failed to find Whisper and Waku V1/V2 services")
 		}
-		transp, err = wakuv2transp.NewTransport(
+		transp, err = transport.NewTransport(
 			wakuV2,
 			identity,
 			database,
+			"wakuv2_keys",
 			nil,
 			c.envelopesMonitorConfig,
 			logger,
