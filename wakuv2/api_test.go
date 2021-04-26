@@ -23,11 +23,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/status-im/status-go/waku/common"
+	"github.com/status-im/status-go/wakuv2/common"
 )
 
 func TestMultipleTopicCopyInNewMessageFilter(t *testing.T) {
-	w := New(nil, nil)
+	w, err := New("", nil, nil)
+	if err != nil {
+		t.Fatalf("Error creating WakuV2 client: %v", err)
+	}
 
 	keyID, err := w.GenerateSymKey()
 	if err != nil {

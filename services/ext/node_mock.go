@@ -28,6 +28,10 @@ func (w *TestNodeWrapper) GetWaku(_ interface{}) (types.Waku, error) {
 	return w.waku, nil
 }
 
+func (w *TestNodeWrapper) GetWakuV2(_ interface{}) (types.Waku, error) {
+	return w.waku, nil
+}
+
 func (w *TestNodeWrapper) PeersCount() int {
 	return 1
 }

@@ -2,18 +2,20 @@ package transport
 
 import (
 	"database/sql"
+	"fmt"
 )
 
-type sqlitePersistence struct {
-	db *sql.DB
+type SqlitePersistence struct {
+	db        *sql.DB
+	tableName string
 }
 
-func newSQLitePersistence(db *sql.DB) *sqlitePersistence {
-	return &sqlitePersistence{db: db}
+func newSQLitePersistence(db *sql.DB, tableName string) *SqlitePersistence {
+	return &SqlitePersistence{db: db, tableName: tableName}
 }
 
-func (s *sqlitePersistence) Add(chatID string, key []byte) error {
-	statement := "INSERT INTO waku_keys(chat_id, key) VALUES(?, ?)"
+func (s *SqlitePersistence) Add(chatID string, key []byte) error {
+	statement := fmt.Sprintf("INSERT INTO %s(chat_id, key) VALUES(?, ?)", s.tableName)
 	stmt, err := s.db.Prepare(statement)
 	if err != nil {
 		return err
@@ -24,10 +26,10 @@ func (s *sqlitePersistence) Add(chatID string, key []byte) error {
 	return err
 }
 
-func (s *sqlitePersistence) All() (map[string][]byte, error) {
+func (s *SqlitePersistence) All() (map[string][]byte, error) {
 	keys := make(map[string][]byte)
 
-	statement := "SELECT chat_id, key FROM waku_keys"
+	statement := fmt.Sprintf("SELECT chat_id, key FROM %s", s.tableName)
 
 	stmt, err := s.db.Prepare(statement)
 	if err != nil {
