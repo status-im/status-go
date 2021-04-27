@@ -16,6 +16,7 @@ type AppMetricEventType string
 // Validation is handled using JSON schemas defined in validators.go, instead of Golang structs
 type AppMetric struct {
 	ID         int                `json:"-"`
+	MessageID  string             `json:"message_id"`
 	Event      AppMetricEventType `json:"event"`
 	Value      json.RawMessage    `json:"value"`
 	AppVersion string             `json:"app_version"`

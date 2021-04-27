@@ -62,9 +62,13 @@ func (c *Client) sendUnprocessedMetrics() {
 		c.Logger.Error("failed to get unprocessed messages grouped by session", zap.Error(err))
 	}
 
-	// Convert the metrics into protobuf
 	for _, batch := range uam {
-		amb := adaptModelsToProtoBatch(batch, &c.Identity.PublicKey)
+		// Convert the metrics into protobuf
+		amb, err := adaptModelsToProtoBatch(batch, &c.Identity.PublicKey)
+		if err != nil {
+			c.Logger.Error("failed to adapt models to protobuf batch", zap.Error(err))
+			return
+		}
 
 		// Generate an ephemeral key per session id
 		ephemeralKey, err := crypto.GenerateKey()
