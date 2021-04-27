@@ -39,7 +39,6 @@
 // 1618237885_settings_anon_metrics_should_send.up.sql (80B)
 // 1618395756_contacts_only.up.sql (136B)
 // 1618412233_add_processed_to_metrics.up.sql (54B)
-// 1618571271_add_id_to_app_metrics.up.sql (633B)
 // 1622184614_add_default_sync_period.up.sql (125B)
 // 1625872445_user_status.up.sql (351B)
 // 1627983977_add_gif_to_settings.up.sql (102B)
@@ -894,26 +893,6 @@ func _1618412233_add_processed_to_metricsUpSql() (*asset, error) {
 	return a, nil
 }
 
-var __1618571271_add_id_to_app_metricsUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xac\x92\xcd\x6e\xea\x40\x0c\x85\xf7\x79\x0a\x2f\x41\x9a\x37\x60\x65\x82\xb9\x37\xea\x64\x06\x39\x4e\x55\x56\x51\x44\xac\x2a\x52\x21\x51\x66\x8a\xd4\xb7\xaf\x20\x2d\x8d\x1a\xd8\x75\xeb\xcf\x3f\xe7\x1c\x19\xad\x10\x83\xe0\xda\x12\xd4\x7d\x5f\x1d\x35\x0e\xed\x21\x00\x93\xc3\x9c\x40\x3c\x44\x3d\xf6\xd5\x04\xad\x92\x94\x09\x85\xee\x0c\x2d\x12\x00\x80\xb6\x81\xcc\x09\xfd\x23\x86\x1d\x67\x39\xf2\x1e\x9e\x68\x0f\x58\x8a\xcf\x5c\xca\x94\x93\x13\x73\xed\xec\x87\x2e\x76\x55\xdb\xc0\x33\x72\xfa\x1f\x79\xac\xea\x59\x4f\xf1\xbb\x04\xce\x0b\xb8\xd2\xda\x91\x9d\xeb\xb7\x77\x05\xa1\x17\xf9\x05\x2e\x32\xce\x3a\x84\xb6\x3b\x3d\x18\xed\x7a\x1d\xea\xd8\x9e\x5e\xab\xf0\x11\xa2\x1e\x1f\xb4\x1d\x06\xad\xa3\x36\x55\x1d\x41\xb2\x9c\x0a\xc1\x7c\x07\x1b\xda\x62\x69\x05\xd2\x92\x99\x9c\x54\x37\x32\xce\x04\x0d\x97\xc3\x33\x27\xfd\xd0\x1d\x34\x04\x6d\x60\xed\xbd\x25\x74\xb7\x5b\xb7\x8d\x5b\xb4\x05\x2d\x57\x49\xe6\x0a\x62\xb9\x04\xe7\xa7\x91\x2e\xae\x61\x98\xd1\xb7\x99\xba\x34\x33\x43\x66\xa2\xdd\x4c\x34\x99\x1f\x1d\xcb\xa4\x20\x4b\xa9\xc0\xdf\xae\x4d\xb6\xec\xf3\x3b\x8f\xb2\x61\xbf\xfb\x7a\x93\x19\xfc\x0c\x00\x00\xff\xff\x44\xc7\xaf\xc8\x79\x02\x00\x00")
-
-func _1618571271_add_id_to_app_metricsUpSqlBytes() ([]byte, error) {
-	return bindataRead(
-		__1618571271_add_id_to_app_metricsUpSql,
-		"1618571271_add_id_to_app_metrics.up.sql",
-	)
-}
-
-func _1618571271_add_id_to_app_metricsUpSql() (*asset, error) {
-	bytes, err := _1618571271_add_id_to_app_metricsUpSqlBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	info := bindataFileInfo{name: "1618571271_add_id_to_app_metrics.up.sql", size: 633, mode: os.FileMode(0644), modTime: time.Unix(1630494612, 0)}
-	a := &asset{bytes: bytes, info: info, digest: [32]uint8{0x47, 0xd7, 0x7e, 0x2d, 0x34, 0xf0, 0xad, 0x8e, 0xc3, 0x43, 0x35, 0x98, 0x48, 0x47, 0xcf, 0xa0, 0x1a, 0x8e, 0x84, 0x6e, 0xc4, 0xd8, 0x17, 0x98, 0x7c, 0x5c, 0xc2, 0x84, 0x56, 0xc1, 0x51, 0xbd}}
-	return a, nil
-}
-
 var __1622184614_add_default_sync_periodUpSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\x4e\x2d\x29\xc9\xcc\x4b\x2f\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x49\x4d\x4b\x2c\xcd\x29\x89\x2f\xae\xcc\x4b\x8e\x2f\x48\x2d\xca\xcc\x4f\x51\xf0\xf4\x0b\x71\x75\x77\x0d\x52\x70\x71\x75\x73\x0c\xf5\x09\x51\xb0\x30\x33\x31\x30\xb0\xe6\x0a\x0d\x70\x71\x0c\x41\x32\x25\xd8\x35\x04\xab\x76\x5b\x98\x06\x2e\x40\x00\x00\x00\xff\xff\xdd\x46\xb2\xc4\x7d\x00\x00\x00")
 
 func _1622184614_add_default_sync_periodUpSqlBytes() ([]byte, error) {
@@ -1203,8 +1182,6 @@ var _bindata = map[string]func() (*asset, error){
 
 	"1618412233_add_processed_to_metrics.up.sql": _1618412233_add_processed_to_metricsUpSql,
 
-	"1618571271_add_id_to_app_metrics.up.sql": _1618571271_add_id_to_app_metricsUpSql,
-
 	"1622184614_add_default_sync_period.up.sql": _1622184614_add_default_sync_periodUpSql,
 
 	"1625872445_user_status.up.sql": _1625872445_user_statusUpSql,
@@ -1298,7 +1275,6 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"1618237885_settings_anon_metrics_should_send.up.sql": &bintree{_1618237885_settings_anon_metrics_should_sendUpSql, map[string]*bintree{}},
 	"1618395756_contacts_only.up.sql":                     &bintree{_1618395756_contacts_onlyUpSql, map[string]*bintree{}},
 	"1618412233_add_processed_to_metrics.up.sql":          &bintree{_1618412233_add_processed_to_metricsUpSql, map[string]*bintree{}},
-	"1618571271_add_id_to_app_metrics.up.sql":             &bintree{_1618571271_add_id_to_app_metricsUpSql, map[string]*bintree{}},
 	"1622184614_add_default_sync_period.up.sql":           &bintree{_1622184614_add_default_sync_periodUpSql, map[string]*bintree{}},
 	"1625872445_user_status.up.sql":                       &bintree{_1625872445_user_statusUpSql, map[string]*bintree{}},
 	"1627983977_add_gif_to_settings.up.sql":               &bintree{_1627983977_add_gif_to_settingsUpSql, map[string]*bintree{}},
