@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/status-im/go-waku/waku/v2/node"
+	"github.com/status-im/go-waku/waku/v2/protocol"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol"
 )
 
 // MessageParams specifies the exact way a message should be wrapped
@@ -146,12 +147,12 @@ func NewReceivedMessage(env *protocol.Envelope) *ReceivedMessage {
 }
 
 // Hash returns the SHA3 hash of the envelope, calculating it if not yet done.
-func (e *ReceivedMessage) Hash() common.Hash {
-	if (e.hash == common.Hash{}) {
-		envelopeHash := e.Envelope.Hash()
-		e.hash = crypto.Keccak256Hash(envelopeHash[:])
+func (msg *ReceivedMessage) Hash() common.Hash {
+	if (msg.hash == common.Hash{}) {
+		envelopeHash := msg.Envelope.Hash()
+		msg.hash = crypto.Keccak256Hash(envelopeHash[:])
 	}
-	return e.hash
+	return msg.hash
 }
 
 // Add adds message to store.
@@ -177,7 +178,7 @@ func (store *MemoryMessageStore) Pop() ([]*ReceivedMessage, error) {
 }
 
 // Open tries to decrypt an message, and populates the message fields in case of success.
-func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
+func (msg *ReceivedMessage) Open(watcher *Filter) (result *ReceivedMessage) {
 	if watcher == nil {
 		return nil
 	}
@@ -187,8 +188,8 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 		return nil
 	}
 
-	// TODO: should we update `e` instead of creating a new received message?
-	msg = new(ReceivedMessage)
+	// TODO: should we update msg instead of creating a new received message?
+	result = new(ReceivedMessage)
 
 	keyInfo := new(node.KeyInfo)
 	if watcher.expectsAsymmetricEncryption() {
@@ -201,21 +202,21 @@ func (e *ReceivedMessage) Open(watcher *Filter) (msg *ReceivedMessage) {
 		msg.SymKeyHash = crypto.Keccak256Hash(watcher.KeySym)
 	}
 
-	raw, err := node.DecodePayload(e.Envelope.Message(), keyInfo)
+	raw, err := node.DecodePayload(msg.Envelope.Message(), keyInfo)
 
 	if err != nil {
 		log.Error("failed to decode message", "err", err)
 		return nil
 	}
 
-	msg.Envelope = e.Envelope
-	msg.Data = raw.Data
-	msg.Padding = raw.Padding
-	msg.Signature = raw.Signature
-	msg.Src = raw.PubKey
+	result.Envelope = msg.Envelope
+	result.Data = raw.Data
+	result.Padding = raw.Padding
+	result.Signature = raw.Signature
+	result.Src = raw.PubKey
 
-	msg.Sent = uint32(e.Envelope.Message().Timestamp)
-	msg.Topic = StringToTopic(e.Envelope.Message().ContentTopic)
+	result.Sent = uint32(msg.Envelope.Message().Timestamp)
+	result.Topic = StringToTopic(msg.Envelope.Message().ContentTopic)
 
-	return msg
+	return result
 }

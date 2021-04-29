@@ -4,18 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/status-im/go-waku/waku/v2/protocol"
 	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
+
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext"
-)
-
-const (
-	// defaultWorkTime is a work time reported in messages sent to MailServer nodes.
-	defaultWorkTime = 5
 )
 
 // PublicAPI extends waku public API.
@@ -49,7 +45,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r ext.StoreRequest) (ty
 
 	h := protocol.GenerateRequestId()
 
-	mailserver, err := peer.IDB58Decode(r.MailServerPeer)
+	mailserver, err := peer.Decode(r.MailServerPeer)
 	if err != nil {
 		return nil, err
 	}

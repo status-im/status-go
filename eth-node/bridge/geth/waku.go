@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/status-im/go-waku/waku/v2/protocol/store"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/waku"
 	wakucommon "github.com/status-im/status-go/waku/common"
