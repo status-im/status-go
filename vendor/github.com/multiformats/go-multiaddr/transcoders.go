@@ -10,12 +10,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ipfs/go-cid"
 	mh "github.com/multiformats/go-multihash"
 )
 
 type Transcoder interface {
+	// Validates and encodes to bytes a multiaddr that's in the string representation.
 	StringToBytes(string) ([]byte, error)
+	// Validates and decodes to a string a multiaddr that's in the bytes representation.
 	BytesToString([]byte) (string, error)
+	// Validates bytes when parsing a multiaddr that's already in the bytes representation.
 	ValidateBytes([]byte) error
 }
 
@@ -62,6 +66,9 @@ func ip4StB(s string) ([]byte, error) {
 func ip6zoneStB(s string) ([]byte, error) {
 	if len(s) == 0 {
 		return nil, fmt.Errorf("empty ip6zone")
+	}
+	if strings.Contains(s, "/") {
+		return nil, fmt.Errorf("IPv6 zone ID contains '/': %s", s)
 	}
 	return []byte(s), nil
 }
@@ -286,13 +293,29 @@ func garlic32Validate(b []byte) error {
 
 var TranscoderP2P = NewTranscoderFromFunctions(p2pStB, p2pBtS, p2pVal)
 
+// The encoded peer ID can either be a CID of a key or a raw multihash (identity
+// or sha256-256).
 func p2pStB(s string) ([]byte, error) {
-	// the address is a varint prefixed multihash string representation
-	m, err := mh.FromB58String(s)
+	// check if the address is a base58 encoded sha256 or identity multihash
+	if strings.HasPrefix(s, "Qm") || strings.HasPrefix(s, "1") {
+		m, err := mh.FromB58String(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse p2p addr: %s %s", s, err)
+		}
+		return m, nil
+	}
+
+	// check if the address is a CID
+	c, err := cid.Decode(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse p2p addr: %s %s", s, err)
 	}
-	return m, nil
+
+	if ty := c.Type(); ty == cid.Libp2pKey {
+		return c.Hash(), nil
+	} else {
+		return nil, fmt.Errorf("failed to parse p2p addr: %s has the invalid codec %d", s, ty)
+	}
 }
 
 func p2pVal(b []byte) error {

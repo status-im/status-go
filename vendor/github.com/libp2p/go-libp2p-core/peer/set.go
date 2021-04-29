@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-// PeerSet is a threadsafe set of peers
+// PeerSet is a threadsafe set of peers.
 type Set struct {
 	lk sync.RWMutex
 	ps map[ID]struct{}

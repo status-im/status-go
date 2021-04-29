@@ -99,5 +99,5 @@ func (r *LoggableSpanRecorder) RecordSpan(span RawSpan) {
 		return
 	}
 
-	writer.WriterGroup.Write(buf.Bytes())
+	_, _ = writer.WriterGroup.Write(buf.Bytes())
 }

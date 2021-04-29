@@ -70,10 +70,12 @@ func NewTCPTransport(upgrader *tptu.Upgrader) *TcpTransport {
 	return &TcpTransport{Upgrader: upgrader, ConnectTimeout: DefaultConnectTimeout}
 }
 
+var dialMatcher = mafmt.And(mafmt.IP, mafmt.Base(ma.P_TCP))
+
 // CanDial returns true if this transport believes it can dial the given
 // multiaddr.
 func (t *TcpTransport) CanDial(addr ma.Multiaddr) bool {
-	return mafmt.TCP.Matches(addr)
+	return dialMatcher.Matches(addr)
 }
 
 func (t *TcpTransport) maDial(ctx context.Context, raddr ma.Multiaddr) (manet.Conn, error) {

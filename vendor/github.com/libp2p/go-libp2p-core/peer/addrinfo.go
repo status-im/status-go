@@ -74,7 +74,7 @@ func AddrInfoFromP2pAddr(m ma.Multiaddr) (*AddrInfo, error) {
 	return info, nil
 }
 
-// AddrInfoToP2pAddr converts an AddrInfo to a list of Multiaddrs.
+// AddrInfoToP2pAddrs converts an AddrInfo to a list of Multiaddrs.
 func AddrInfoToP2pAddrs(pi *AddrInfo) ([]ma.Multiaddr, error) {
 	var addrs []ma.Multiaddr
 	p2ppart, err := ma.NewComponent("p2p", IDB58Encode(pi.ID))

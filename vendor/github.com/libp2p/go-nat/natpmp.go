@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/jackpal/gateway"
 	"github.com/jackpal/go-nat-pmp"
 )
 
@@ -16,24 +15,24 @@ var (
 func discoverNATPMP(ctx context.Context) <-chan NAT {
 	res := make(chan NAT, 1)
 
-	ip, err := gateway.DiscoverGateway()
-	if err == nil {
-		go func() {
-			defer close(res)
-			// Unfortunately, we can't actually _stop_ the natpmp
-			// library. However, we can at least close _our_ channel
-			// and walk away.
-			select {
-			case client, ok := <-discoverNATPMPWithAddr(ip):
-				if ok {
-					res <- &natpmpNAT{client, ip, make(map[int]int)}
-				}
-			case <-ctx.Done():
-			}
-		}()
-	} else {
-		close(res)
+	ip, err := getDefaultGateway()
+	if err != nil {
+		return nil
 	}
+
+	go func() {
+		defer close(res)
+		// Unfortunately, we can't actually _stop_ the natpmp
+		// library. However, we can at least close _our_ channel
+		// and walk away.
+		select {
+		case client, ok := <-discoverNATPMPWithAddr(ip):
+			if ok {
+				res <- &natpmpNAT{client, ip, make(map[int]int)}
+			}
+		case <-ctx.Done():
+		}
+	}()
 	return res
 }
 

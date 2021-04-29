@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/multiformats/go-varint"
 )
 
 func stringToBytes(s string) ([]byte, error) {
@@ -30,7 +32,7 @@ func stringToBytes(s string) ([]byte, error) {
 		if p.Code == 0 {
 			return nil, fmt.Errorf("failed to parse multiaddr %q: unknown protocol %s", s, sp[0])
 		}
-		_, _ = b.Write(CodeToVarint(p.Code))
+		_, _ = b.Write(p.VCode)
 		sp = sp[1:]
 
 		if p.Size == 0 { // no length.
@@ -52,7 +54,7 @@ func stringToBytes(s string) ([]byte, error) {
 			return nil, fmt.Errorf("failed to parse multiaddr %q: invalid value %q for protocol %s: %s", s, sp[0], p.Name, err)
 		}
 		if p.Size < 0 { // varint size.
-			_, _ = b.Write(CodeToVarint(len(a)))
+			_, _ = b.Write(varint.ToUvarint(uint64(len(a))))
 		}
 		b.Write(a)
 		sp = sp[1:]

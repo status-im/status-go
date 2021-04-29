@@ -10,7 +10,6 @@ env:
   global:
     - GOTFLAGS="-race"
   matrix:
-    - BUILD_DEPTYPE=gx
     - BUILD_DEPTYPE=gomod
 
 
@@ -24,9 +23,8 @@ script:
 
 cache:
   directories:
-    - /Users/raul/go/src/gx
-    - /Users/raul/go/pkg/mod
-    - /Users/raul/.cache/go-build
+    - $GOPATH/pkg/mod
+    - $HOME/.cache/go-build
 
 notifications:
   email: false

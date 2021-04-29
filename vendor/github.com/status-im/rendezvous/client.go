@@ -12,7 +12,6 @@ import (
 	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	ma "github.com/multiformats/go-multiaddr"
@@ -58,7 +57,7 @@ func (c Client) Register(ctx context.Context, srv ma.Multiaddr, topic string, re
 	if err != nil {
 		return err
 	}
-	defer helpers.FullClose(s)
+	defer s.Close()
 	if err = rlp.Encode(s, protocol.REGISTER); err != nil {
 		return err
 	}
@@ -89,7 +88,8 @@ func (c Client) Discover(ctx context.Context, srv ma.Multiaddr, topic string, li
 	if err != nil {
 		return
 	}
-	defer helpers.FullClose(s)
+	defer s.Close()
+
 	if err = rlp.Encode(s, protocol.DISCOVER); err != nil {
 		return
 	}

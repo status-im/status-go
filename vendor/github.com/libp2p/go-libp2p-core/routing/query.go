@@ -7,22 +7,32 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
+// QueryEventType indicates the query event's type.
 type QueryEventType int
 
 // Number of events to buffer.
 var QueryEventBufferSize = 16
 
 const (
+	// Sending a query to a peer.
 	SendingQuery QueryEventType = iota
+	// Got a response from a peer.
 	PeerResponse
+	// Found a "closest" peer (not currently used).
 	FinalPeer
+	// Got an error when querying.
 	QueryError
+	// Found a provider.
 	Provider
+	// Found a value.
 	Value
+	// Adding a peer to the query.
 	AddingPeer
+	// Dialing a peer.
 	DialingPeer
 )
 
+// QueryEvent is emitted for every notable event that happens during a DHT query.
 type QueryEvent struct {
 	ID        peer.ID
 	Type      QueryEventType
@@ -67,6 +77,12 @@ func (e *eventChannel) send(ctx context.Context, ev *QueryEvent) {
 	e.mu.Unlock()
 }
 
+// RegisterForQueryEvents registers a query event channel with the given
+// context. The returned context can be passed to DHT queries to receive query
+// events on the returned channels.
+//
+// The passed context MUST be canceled when the caller is no longer interested
+// in query events.
 func RegisterForQueryEvents(ctx context.Context) (context.Context, <-chan *QueryEvent) {
 	ch := make(chan *QueryEvent, QueryEventBufferSize)
 	ech := &eventChannel{ch: ch, ctx: ctx}
@@ -74,6 +90,8 @@ func RegisterForQueryEvents(ctx context.Context) (context.Context, <-chan *Query
 	return context.WithValue(ctx, routingQueryKey{}, ech), ch
 }
 
+// PublishQueryEvent publishes a query event to the query event channel
+// associated with the given context, if any.
 func PublishQueryEvent(ctx context.Context, ev *QueryEvent) {
 	ich := ctx.Value(routingQueryKey{})
 	if ich == nil {
@@ -83,4 +101,11 @@ func PublishQueryEvent(ctx context.Context, ev *QueryEvent) {
 	// We *want* to panic here.
 	ech := ich.(*eventChannel)
 	ech.send(ctx, ev)
+}
+
+// SubscribesToQueryEvents returns true if the context subscribes to query
+// events. If this function returns falls, calling `PublishQueryEvent` on the
+// context will be a no-op.
+func SubscribesToQueryEvents(ctx context.Context) bool {
+	return ctx.Value(routingQueryKey{}) != nil
 }

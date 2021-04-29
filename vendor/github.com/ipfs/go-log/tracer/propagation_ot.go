@@ -12,10 +12,8 @@ import (
 )
 
 type textMapPropagator struct {
-	tracer *LoggableTracer
 }
 type binaryPropagator struct {
-	tracer *LoggableTracer
 }
 
 const (

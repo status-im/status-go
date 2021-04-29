@@ -121,7 +121,7 @@ func (nat *NAT) rmMapping(m *mapping) {
 	nat.mappingmu.Unlock()
 }
 
-// NewMapping attemps to construct a mapping on protocol and internal port
+// NewMapping attempts to construct a mapping on protocol and internal port
 // It will also periodically renew the mapping until the returned Mapping
 // -- or its parent NAT -- is Closed.
 //
@@ -183,7 +183,7 @@ func (nat *NAT) establishMapping(m *mapping) {
 	if err != nil || newport == 0 {
 		m.setExternalPort(0) // clear mapping
 		// TODO: log.Event
-		log.Warningf("failed to establish port mapping: %s", err)
+		log.Warnf("failed to establish port mapping: %s", err)
 		// we do not close if the mapping failed,
 		// because it may work again next time.
 		return

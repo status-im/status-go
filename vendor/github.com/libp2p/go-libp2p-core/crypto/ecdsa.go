@@ -37,6 +37,8 @@ var (
 	ErrNilSig = errors.New("sig is nil")
 	// ErrNilPrivateKey is returned when a nil private key is provided
 	ErrNilPrivateKey = errors.New("private key is nil")
+	// ErrNilPublicKey is returned when a nil public key is provided
+	ErrNilPublicKey = errors.New("public key is nil")
 	// ECDSACurve is the default ecdsa curve used
 	ECDSACurve = elliptic.P256()
 )

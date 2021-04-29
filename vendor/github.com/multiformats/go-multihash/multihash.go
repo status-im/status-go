@@ -4,13 +4,13 @@
 package multihash
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
 
 	b58 "github.com/mr-tron/base58/base58"
+	"github.com/multiformats/go-varint"
 )
 
 // errors
@@ -68,7 +68,9 @@ const (
 	// Deprecated: use MURMUR3_128
 	MURMUR3 = MURMUR3_128
 
-	X11 = 0x1100
+	SHA2_256_TRUNC254_PADDED  = 0x1012
+	X11                       = 0x1100
+	POSEIDON_BLS12_381_A1_FC1 = 0xb401
 )
 
 func init() {
@@ -93,47 +95,51 @@ func init() {
 
 // Names maps the name of a hash to the code
 var Names = map[string]uint64{
-	"identity":     IDENTITY,
-	"sha1":         SHA1,
-	"sha2-256":     SHA2_256,
-	"sha2-512":     SHA2_512,
-	"sha3":         SHA3_512,
-	"sha3-224":     SHA3_224,
-	"sha3-256":     SHA3_256,
-	"sha3-384":     SHA3_384,
-	"sha3-512":     SHA3_512,
-	"dbl-sha2-256": DBL_SHA2_256,
-	"murmur3-128":  MURMUR3_128,
-	"keccak-224":   KECCAK_224,
-	"keccak-256":   KECCAK_256,
-	"keccak-384":   KECCAK_384,
-	"keccak-512":   KECCAK_512,
-	"shake-128":    SHAKE_128,
-	"shake-256":    SHAKE_256,
-	"x11":          X11,
-	"md5":          MD5,
+	"identity":                  IDENTITY,
+	"sha1":                      SHA1,
+	"sha2-256":                  SHA2_256,
+	"sha2-512":                  SHA2_512,
+	"sha3":                      SHA3_512,
+	"sha3-224":                  SHA3_224,
+	"sha3-256":                  SHA3_256,
+	"sha3-384":                  SHA3_384,
+	"sha3-512":                  SHA3_512,
+	"dbl-sha2-256":              DBL_SHA2_256,
+	"murmur3-128":               MURMUR3_128,
+	"keccak-224":                KECCAK_224,
+	"keccak-256":                KECCAK_256,
+	"keccak-384":                KECCAK_384,
+	"keccak-512":                KECCAK_512,
+	"shake-128":                 SHAKE_128,
+	"shake-256":                 SHAKE_256,
+	"sha2-256-trunc254-padded":  SHA2_256_TRUNC254_PADDED,
+	"x11":                       X11,
+	"md5":                       MD5,
+	"poseidon-bls12_381-a2-fc1": POSEIDON_BLS12_381_A1_FC1,
 }
 
 // Codes maps a hash code to it's name
 var Codes = map[uint64]string{
-	IDENTITY:     "identity",
-	SHA1:         "sha1",
-	SHA2_256:     "sha2-256",
-	SHA2_512:     "sha2-512",
-	SHA3_224:     "sha3-224",
-	SHA3_256:     "sha3-256",
-	SHA3_384:     "sha3-384",
-	SHA3_512:     "sha3-512",
-	DBL_SHA2_256: "dbl-sha2-256",
-	MURMUR3_128:  "murmur3-128",
-	KECCAK_224:   "keccak-224",
-	KECCAK_256:   "keccak-256",
-	KECCAK_384:   "keccak-384",
-	KECCAK_512:   "keccak-512",
-	SHAKE_128:    "shake-128",
-	SHAKE_256:    "shake-256",
-	X11:          "x11",
-	MD5:          "md5",
+	IDENTITY:                  "identity",
+	SHA1:                      "sha1",
+	SHA2_256:                  "sha2-256",
+	SHA2_512:                  "sha2-512",
+	SHA3_224:                  "sha3-224",
+	SHA3_256:                  "sha3-256",
+	SHA3_384:                  "sha3-384",
+	SHA3_512:                  "sha3-512",
+	DBL_SHA2_256:              "dbl-sha2-256",
+	MURMUR3_128:               "murmur3-128",
+	KECCAK_224:                "keccak-224",
+	KECCAK_256:                "keccak-256",
+	KECCAK_384:                "keccak-384",
+	KECCAK_512:                "keccak-512",
+	SHAKE_128:                 "shake-128",
+	SHAKE_256:                 "shake-256",
+	SHA2_256_TRUNC254_PADDED:  "sha2-256-trunc254-padded",
+	X11:                       "x11",
+	POSEIDON_BLS12_381_A1_FC1: "poseidon-bls12_381-a2-fc1",
+	MD5:                       "md5",
 }
 
 // DefaultLengths maps a hash code to it's default length
@@ -159,7 +165,10 @@ var DefaultLengths = map[uint64]int{
 }
 
 func uvarint(buf []byte) (uint64, []byte, error) {
-	n, c := binary.Uvarint(buf)
+	n, c, err := varint.FromUvarint(buf)
+	if err != nil {
+		return n, buf, err
+	}
 
 	if c == 0 {
 		return n, buf, ErrVarintBufferShort
@@ -236,36 +245,19 @@ func Cast(buf []byte) (Multihash, error) {
 
 // Decode parses multihash bytes into a DecodedMultihash.
 func Decode(buf []byte) (*DecodedMultihash, error) {
-
-	if len(buf) < 2 {
-		return nil, ErrTooShort
-	}
-
-	var err error
-	var code, length uint64
-
-	code, buf, err = uvarint(buf)
+	rlen, code, hdig, err := readMultihashFromBuf(buf)
 	if err != nil {
 		return nil, err
-	}
-
-	length, buf, err = uvarint(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if length > math.MaxInt32 {
-		return nil, errors.New("digest too long, supporting only <= 2^31-1")
 	}
 
 	dm := &DecodedMultihash{
 		Code:   code,
 		Name:   Codes[code],
-		Length: int(length),
-		Digest: buf,
+		Length: len(hdig),
+		Digest: hdig,
 	}
 
-	if len(dm.Digest) != dm.Length {
+	if len(buf) != rlen {
 		return nil, ErrInconsistentLen{dm}
 	}
 
@@ -275,18 +267,16 @@ func Decode(buf []byte) (*DecodedMultihash, error) {
 // Encode a hash digest along with the specified function code.
 // Note: the length is derived from the length of the digest itself.
 func Encode(buf []byte, code uint64) ([]byte, error) {
-
 	if !ValidCode(code) {
 		return nil, ErrUnknownCode
 	}
 
-	start := make([]byte, 2*binary.MaxVarintLen64, 2*binary.MaxVarintLen64+len(buf))
-	spot := start
-	n := binary.PutUvarint(spot, code)
-	spot = start[n:]
-	n += binary.PutUvarint(spot, uint64(len(buf)))
+	newBuf := make([]byte, varint.UvarintSize(code)+varint.UvarintSize(uint64(len(buf)))+len(buf))
+	n := varint.PutUvarint(newBuf, code)
+	n += varint.PutUvarint(newBuf[n:], uint64(len(buf)))
 
-	return append(start[:n], buf...), nil
+	copy(newBuf[n:], buf)
+	return newBuf, nil
 }
 
 // EncodeName is like Encode() but providing a string name
@@ -299,4 +289,49 @@ func EncodeName(buf []byte, name string) ([]byte, error) {
 func ValidCode(code uint64) bool {
 	_, ok := Codes[code]
 	return ok
+}
+
+// readMultihashFromBuf reads a multihash from the given buffer, returning the
+// individual pieces of the multihash.
+// Note: the returned digest is a slice over the passed in data and should be
+// copied if the buffer will be reused
+func readMultihashFromBuf(buf []byte) (int, uint64, []byte, error) {
+	bufl := len(buf)
+	if bufl < 2 {
+		return 0, 0, nil, ErrTooShort
+	}
+
+	var err error
+	var code, length uint64
+
+	code, buf, err = uvarint(buf)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	length, buf, err = uvarint(buf)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+
+	if length > math.MaxInt32 {
+		return 0, 0, nil, errors.New("digest too long, supporting only <= 2^31-1")
+	}
+	if int(length) > len(buf) {
+		return 0, 0, nil, errors.New("length greater than remaining number of bytes in buffer")
+	}
+
+	rlen := (bufl - len(buf)) + int(length)
+	return rlen, code, buf[:length], nil
+}
+
+// MHFromBytes reads a multihash from the given byte buffer, returning the
+// number of bytes read as well as the multihash
+func MHFromBytes(buf []byte) (int, Multihash, error) {
+	nr, _, _, err := readMultihashFromBuf(buf)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return nr, Multihash(buf[:nr]), nil
 }
