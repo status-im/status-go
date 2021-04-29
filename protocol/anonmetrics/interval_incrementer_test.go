@@ -19,4 +19,3 @@ func TestFibonacciIntervalIncrementer_Next(t *testing.T) {
 		}
 	}
 }
-
