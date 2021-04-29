@@ -4,7 +4,7 @@ import (
 	"crypto/ecdsa"
 	"time"
 
-	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
+	"github.com/status-im/go-waku/waku/v2/protocol/store"
 )
 
 // Whisper represents a dark communication interface through the Ethereum

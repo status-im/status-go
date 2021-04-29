@@ -3,12 +3,12 @@ package wakuv2ext
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/status-im/go-waku/waku/v2/protocol"
-	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
+	"github.com/status-im/go-waku/waku/v2/protocol/pb"
+	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/services/ext"
 )
@@ -47,7 +47,7 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r ext.StoreRequest) (ty
 		return nil, fmt.Errorf("Query range is invalid: from > to (%d > %d)", r.From, r.To)
 	}
 
-	h := store.GenerateRequestId()
+	h := protocol.GenerateRequestId()
 
 	mailserver, err := peer.IDB58Decode(r.MailServerPeer)
 	if err != nil {
@@ -57,12 +57,13 @@ func (api *PublicAPI) RequestMessages(_ context.Context, r ext.StoreRequest) (ty
 	options := []store.HistoryRequestOption{
 		store.WithRequestId(h),
 		store.WithPeer(mailserver),
-		store.WithTimeout(r.Timeout * time.Second),
 		store.WithPaging(r.Asc, r.PageSize),
 	}
 
+	// TODO: timeout
+
 	if r.Cursor != nil {
-		options = append(options, store.WithCursor(&protocol.Index{
+		options = append(options, store.WithCursor(&pb.Index{
 			Digest:       r.Cursor.Digest,
 			ReceivedTime: r.Cursor.ReceivedTime,
 		}))

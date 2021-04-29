@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol"
+	"github.com/status-im/go-waku/waku/v2/protocol/pb"
 
 	"github.com/status-im/status-go/wakuv2/common"
 
@@ -243,7 +243,7 @@ func (api *PublicWakuAPI) Post(ctx context.Context, req NewMessage) (hexutil.Byt
 		return nil, err
 	}
 
-	wakuMsg := &protocol.WakuMessage{
+	wakuMsg := &pb.WakuMessage{
 		Payload:      payload,
 		Version:      version,
 		ContentTopic: req.Topic.String(),
