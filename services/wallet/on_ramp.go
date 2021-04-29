@@ -17,12 +17,13 @@ const (
 )
 
 type CryptoOnRamp struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Fees        string `json:"fees"`
-	LogoURL     string `json:"logoUrl"`
-	SiteURL     string `json:"siteUrl"`
-	Hostname    string `json:"hostname"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Fees        string            `json:"fees"`
+	LogoURL     string            `json:"logoUrl"`
+	SiteURL     string            `json:"siteUrl"`
+	Hostname    string            `json:"hostname"`
+	Params      map[string]string `json:"params"` // TODO implement params in JSON and parsing status-react
 }
 
 type DataSourceType int
@@ -139,7 +140,7 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "description": "Global crypto to fiat flow",
     "fees": "0.49%% - 2.9%%",
     "logoUrl": "%s",
-    "siteUrl": "https://ramp.network/buy/",
+    "siteUrl": "https://buy.ramp.network/?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove",
     "hostname": "ramp.network"
   },
   {
