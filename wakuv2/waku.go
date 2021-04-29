@@ -43,13 +43,15 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	wakucommon "github.com/status-im/go-waku/waku/common"
+	wakuprotocol "github.com/status-im/go-waku/waku/v2/protocol"
+	"github.com/status-im/go-waku/waku/v2/protocol/relay"
+
 	"github.com/status-im/status-go/eth-node/types"
 	"github.com/status-im/status-go/wakuv2/common"
 
 	node "github.com/status-im/go-waku/waku/v2/node"
-	"github.com/status-im/go-waku/waku/v2/protocol"
-	store "github.com/status-im/go-waku/waku/v2/protocol/waku_store"
+	"github.com/status-im/go-waku/waku/v2/protocol/pb"
+	"github.com/status-im/go-waku/waku/v2/protocol/store"
 	wakurelay "github.com/status-im/go-wakurelay-pubsub"
 )
 
@@ -512,8 +514,8 @@ func (w *Waku) UnsubscribeMany(ids []string) error {
 
 // Send injects a message into the waku send queue, to be distributed in the
 // network in the coming cycles.
-func (w *Waku) Send(msg *protocol.WakuMessage) ([]byte, error) {
-	return w.node.Publish(msg, nil)
+func (w *Waku) Send(msg *pb.WakuMessage) ([]byte, error) {
+	return w.node.Publish(context.Background(), msg, nil)
 }
 
 func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []store.HistoryRequestOption) error {
@@ -523,11 +525,10 @@ func (w *Waku) Query(topics []types.TopicType, from uint64, to uint64, opts []st
 		strTopics[i] = t.String()
 	}
 
-	result, err := w.node.Query(strTopics, float64(from), float64(to), opts...)
+	result, err := w.node.Query(context.Background(), strTopics, float64(from), float64(to), opts...)
 
 	for _, msg := range result.Messages {
-		data, _ := msg.Marshal()
-		envelope := wakucommon.NewEnvelope(msg, len(data), crypto.Keccak256(data)) // TODO: consider modifying go-waku to return envelopes instead of messages
+		envelope := wakuprotocol.NewEnvelope(msg, string(relay.DefaultWakuTopic)) // TODO: consider modifying go-waku to return envelopes instead of messages
 		_, err = w.OnNewEnvelopes(envelope)
 		if err != nil {
 			return err
@@ -562,7 +563,7 @@ func (w *Waku) softBlacklisted(peerID string) bool {
 	return w.settings.SoftBlacklistedPeerIDs[peerID]
 }
 
-func (w *Waku) OnNewEnvelopes(envelope *wakucommon.Envelope) ([]common.EnvelopeError, error) {
+func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope) ([]common.EnvelopeError, error) {
 	recvMessage := common.NewReceivedMessage(envelope)
 	envelopeErrors := make([]common.EnvelopeError, 0)
 

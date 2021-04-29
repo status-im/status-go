@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	wakucommon "github.com/status-im/go-waku/waku/common"
 	"github.com/status-im/go-waku/waku/v2/node"
+	"github.com/status-im/go-waku/waku/v2/protocol"
 )
 
 // MessageParams specifies the exact way a message should be wrapped
@@ -27,7 +27,7 @@ type MessageParams struct {
 // ReceivedMessage represents a data packet to be received through the
 // WakuV2 protocol and successfully decrypted.
 type ReceivedMessage struct {
-	Envelope *wakucommon.Envelope // Wrapped Waku Message
+	Envelope *protocol.Envelope // Wrapped Waku Message
 
 	Data      []byte
 	Padding   []byte
@@ -139,7 +139,7 @@ type MemoryMessageStore struct {
 	messages map[common.Hash]*ReceivedMessage
 }
 
-func NewReceivedMessage(env *wakucommon.Envelope) *ReceivedMessage {
+func NewReceivedMessage(env *protocol.Envelope) *ReceivedMessage {
 	return &ReceivedMessage{
 		Envelope: env,
 	}
