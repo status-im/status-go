@@ -36,7 +36,7 @@ func (s *Server) Stop() error {
 	return s.PostgresDB.Close()
 }
 
-func (s *Server) AddMetrics(appMetricsBatch protobuf.AnonymousMetricBatch) (err error) {
+func (s *Server) StoreMetrics(appMetricsBatch protobuf.AnonymousMetricBatch) (err error) {
 	appMetrics, err := adaptProtoBatchToModels(appMetricsBatch)
 	if err != nil {
 		return err
