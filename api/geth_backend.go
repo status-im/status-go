@@ -68,6 +68,8 @@ var (
 	// ErrRPCClientUnavailable is returned if an RPC client can't be retrieved.
 	// This is a normal situation when a node is stopped.
 	ErrRPCClientUnavailable = errors.New("JSON-RPC client is unavailable")
+	// ErrDBNotAvailable is returned if a method is called before the DB is available for usage
+	ErrDBNotAvailable = errors.New("DB is unavailable")
 )
 
 var _ StatusBackend = (*GethStatusBackend)(nil)
@@ -536,6 +538,13 @@ func (b *GethStatusBackend) loadNodeConfig() (*params.NodeConfig, error) {
 	conf.KeyStoreDir = filepath.Join(b.rootDataDir, conf.KeyStoreDir)
 
 	return &conf, nil
+}
+
+func (b *GethStatusBackend) GetNodeConfig() (*params.NodeConfig, error) {
+	if b.appDB == nil {
+		return nil, ErrDBNotAvailable
+	}
+	return b.loadNodeConfig()
 }
 
 func (b *GethStatusBackend) rpcFiltersService() gethnode.ServiceConstructor {

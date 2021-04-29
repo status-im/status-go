@@ -87,6 +87,22 @@ func SignGroupMembership(content string) string {
 	return string(data)
 }
 
+// GetNodeConfig returns the current config of the Status node
+func GetNodeConfig() string {
+	conf, err := statusBackend.GetNodeConfig()
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	respJSON, err := json.Marshal(conf)
+
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+
+	return string(respJSON)
+}
+
 // ValidateNodeConfig validates config for the Status node.
 func ValidateNodeConfig(configJSON string) string {
 	var resp APIDetailedResponse
