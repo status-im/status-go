@@ -120,6 +120,14 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
 	data := fmt.Sprintf(`
 [
   {
+    "name": "Ramp",
+    "description": "Global crypto to fiat flow",
+    "fees": "0.49%% - 2.9%%",
+    "logoUrl": "%s",
+    "siteUrl": "https://buy.ramp.network/?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove",
+    "hostname": "ramp.network"
+  },
+  {
     "name": "MoonPay",
     "description": "The new standard for fiat to crypto",
     "fees": "1%%-4.5%%",
@@ -134,14 +142,6 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "logoUrl": "%s",
     "siteUrl": "https://global.transak.com",
     "hostname": "transak.com"
-  },
-  {
-    "name": "Ramp",
-    "description": "Global crypto to fiat flow",
-    "fees": "0.49%% - 2.9%%",
-    "logoUrl": "%s",
-    "siteUrl": "https://buy.ramp.network/?hostApiKey=zrtf9u2uqebeyzcs37fu5857tktr3eg9w5tffove",
-    "hostname": "ramp.network"
   },
   {
     "name": "LocalCryptos",
@@ -159,7 +159,7 @@ func (c *CryptoOnRampManager) getFromStaticDataSource() ([]byte, error) {
     "siteUrl": "https://latamex.com/",
     "hostname": "latamex.com"
   }
-]`, logoMoonPay, logoTransak, logoRamp, logoLocalCryptos, logoLatamex)
+]`, logoRamp, logoMoonPay, logoTransak, logoLocalCryptos, logoLatamex)
 
 	return []byte(data), nil
 }
