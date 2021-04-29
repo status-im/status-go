@@ -135,6 +135,10 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	hostAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprint(cfg.Host, ":", cfg.Port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup the network interface: %v", err)
+	}
+
 	waku.node, err = node.New(context.Background(),
 		node.WithPrivateKey(privateKey),
 		node.WithHostAddress([]net.Addr{hostAddr}),
@@ -157,11 +161,11 @@ func New(nodeKey string, cfg *Config, logger *zap.Logger) (*Waku, error) {
 	}
 
 	for _, storenode := range cfg.StoreNodes {
-		peerId, err := waku.node.AddStorePeer(storenode)
+		peerID, err := waku.node.AddStorePeer(storenode)
 		if err != nil {
 			log.Warn("Could not add store peer", err)
 		} else {
-			log.Info("Storepeeer dialed successfully", "peerId", peerId.Pretty())
+			log.Info("Storepeeer dialed successfully", "peerId", peerID.Pretty())
 		}
 	}
 
@@ -180,7 +184,11 @@ func (w *Waku) runMsgLoop() {
 	}
 
 	for env := range sub.C {
-		w.OnNewEnvelopes(env)
+		envelopeErrors, err := w.OnNewEnvelopes(env)
+
+		// TODO: should these be handled?
+		_ = envelopeErrors
+		_ = err
 	}
 }
 
@@ -555,12 +563,6 @@ func (w *Waku) Stop() error {
 	w.node.Stop()
 	close(w.quit)
 	return nil
-}
-
-func (w *Waku) softBlacklisted(peerID string) bool {
-	w.settingsMu.RLock()
-	defer w.settingsMu.RUnlock()
-	return w.settings.SoftBlacklistedPeerIDs[peerID]
 }
 
 func (w *Waku) OnNewEnvelopes(envelope *wakuprotocol.Envelope) ([]common.EnvelopeError, error) {

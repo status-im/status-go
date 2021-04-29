@@ -20,29 +20,22 @@ package common
 
 import (
 	"time"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Waku protocol parameters
 const (
-	SizeMask      = byte(3) // mask used to extract the size of payload size field from the flags
-	signatureFlag = byte(4)
+	SizeMask = byte(3) // mask used to extract the size of payload size field from the flags
 
-	TopicLength      = 4                      // in bytes
-	signatureLength  = crypto.SignatureLength // in bytes
-	AESKeyLength     = 32                     // in bytes
-	aesNonceLength   = 12                     // in bytes; for more info please see cipher.gcmStandardNonceSize & aesgcm.NonceSize()
-	KeyIDSize        = 32                     // in bytes
-	BloomFilterSize  = 64                     // in bytes
+	TopicLength      = 4  // in bytes
+	AESKeyLength     = 32 // in bytes
+	KeyIDSize        = 32 // in bytes
+	BloomFilterSize  = 64 // in bytes
 	MaxTopicInterest = 10000
-	flagsLength      = 1
 
 	EnvelopeHeaderLength = 20
 
 	MaxMessageSize        = uint32(10 * 1024 * 1024) // maximum accepted size of a message.
 	DefaultMaxMessageSize = uint32(1 << 20)          // DefaultMaximumMessageSize is 1mb.
-	padSizeLimit          = 256                      // just an arbitrary number, could be changed without breaking the protocol
 
 	ExpirationCycle   = time.Second
 	TransmissionCycle = 300 * time.Millisecond
