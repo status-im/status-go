@@ -4,6 +4,8 @@ import "chat_identity.proto";
 
 package protobuf;
 
+option go_package = "./;protobuf";
+
 message Grant {
   bytes community_id = 1;
   bytes member_id = 2;

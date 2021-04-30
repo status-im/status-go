@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+option go_package = "./;protobuf";
+
 message GroupChatInvitation {
 
   // clock Lamport timestamp of the chat message

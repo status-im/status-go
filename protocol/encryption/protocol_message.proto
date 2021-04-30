@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package encryption;
 
+option go_package = "./;encryption";
+
 message SignedPreKey {
   bytes signed_pre_key = 1;
   uint32 version = 2;

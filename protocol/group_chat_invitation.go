@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/eth-node/crypto"
 	"github.com/status-im/status-go/eth-node/types"
@@ -15,7 +15,7 @@ import (
 // Invitation represents a group chat invitation request from a user in the application layer, used for persistence, querying and
 // signaling
 type GroupChatInvitation struct {
-	protobuf.GroupChatInvitation
+	*protobuf.GroupChatInvitation
 
 	// From is a public key of the author of the invitation request.
 	From string `json:"from,omitempty"`
@@ -38,7 +38,7 @@ func (g GroupChatInvitation) GetSigPubKey() *ecdsa.PublicKey {
 // GetProtoBuf returns the struct's embedded protobuf struct
 // this function is required to implement the ChatEntity interface
 func (g GroupChatInvitation) GetProtobuf() proto.Message {
-	return &g.GroupChatInvitation
+	return g.GroupChatInvitation
 }
 
 func (g GroupChatInvitation) MarshalJSON() ([]byte, error) {

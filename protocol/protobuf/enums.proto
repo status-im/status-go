@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+option go_package = "./;protobuf";
+
 enum MessageType {
   UNKNOWN_MESSAGE_TYPE = 0;
   ONE_TO_ONE = 1;

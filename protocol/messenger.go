@@ -19,7 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/status-im/status-go/appdatabase"
 	"github.com/status-im/status-go/eth-node/crypto"
@@ -1343,7 +1343,7 @@ func (m *Messenger) AddMembersToGroupChat(ctx context.Context, chatID string, me
 		logger.Info("ApproveInvitationByChatIdAndFrom", zap.String("chatID", chatID), zap.Any("member", member))
 
 		groupChatInvitation := &GroupChatInvitation{
-			GroupChatInvitation: protobuf.GroupChatInvitation{
+			GroupChatInvitation: &protobuf.GroupChatInvitation{
 				ChatId: chat.ID,
 			},
 			From: member,
@@ -1479,7 +1479,7 @@ func (m *Messenger) SendGroupChatInvitationRequest(ctx context.Context, chatID s
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	invitationR := &GroupChatInvitation{
-		GroupChatInvitation: protobuf.GroupChatInvitation{
+		GroupChatInvitation: &protobuf.GroupChatInvitation{
 			Clock:               clock,
 			ChatId:              chatID,
 			IntroductionMessage: message,
@@ -2332,7 +2332,7 @@ func (m *Messenger) RetrieveAll() (*MessengerResponse, error) {
 
 type CurrentMessageState struct {
 	// Message is the protobuf message received
-	Message protobuf.ChatMessage
+	Message *protobuf.ChatMessage
 	// MessageID is the ID of the message
 	MessageID string
 	// WhisperTimestamp is the whisper timestamp of the message
@@ -2519,7 +2519,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					switch msg.ParsedMessage.Interface().(type) {
 					case protobuf.MembershipUpdateMessage:
 						logger.Debug("Handling MembershipUpdateMessage")
-						rawMembershipUpdate := msg.ParsedMessage.Interface().(protobuf.MembershipUpdateMessage)
+						rawMembershipUpdate := msg.ParsedMessage.Interface().(*protobuf.MembershipUpdateMessage)
 
 						chat, _ := messageState.AllChats.Load(rawMembershipUpdate.ChatId)
 						err = m.handler.HandleMembershipUpdate(messageState, chat, rawMembershipUpdate, m.systemMessagesTranslations)
@@ -2531,7 +2531,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.ChatMessage:
 						logger.Debug("Handling ChatMessage")
-						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(protobuf.ChatMessage)
+						messageState.CurrentMessageState.Message = msg.ParsedMessage.Interface().(*protobuf.ChatMessage)
 						err = m.handler.HandleChatMessage(messageState)
 						if err != nil {
 							logger.Warn("failed to handle ChatMessage", zap.Error(err))
@@ -2544,7 +2544,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							logger.Warn("not coming from us, ignoring")
 							continue
 						}
-						p := msg.ParsedMessage.Interface().(protobuf.PairInstallation)
+						p := msg.ParsedMessage.Interface().(*protobuf.PairInstallation)
 						logger.Debug("Handling PairInstallation", zap.Any("message", p))
 						err = m.handler.HandlePairInstallation(messageState, p)
 						if err != nil {
@@ -2559,7 +2559,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationContact)
+						p := msg.ParsedMessage.Interface().(*protobuf.SyncInstallationContact)
 						logger.Debug("Handling SyncInstallationContact", zap.Any("message", p))
 						err = m.handler.HandleSyncInstallationContact(messageState, p)
 						if err != nil {
@@ -2574,7 +2574,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 
-						p := msg.ParsedMessage.Interface().(protobuf.SyncInstallationPublicChat)
+						p := msg.ParsedMessage.Interface().(*protobuf.SyncInstallationPublicChat)
 						logger.Debug("Handling SyncInstallationPublicChat", zap.Any("message", p))
 						added := m.handler.HandleSyncInstallationPublicChat(messageState, p)
 
@@ -2591,7 +2591,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.RequestAddressForTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.RequestAddressForTransaction)
+						command := msg.ParsedMessage.Interface().(*protobuf.RequestAddressForTransaction)
 						logger.Debug("Handling RequestAddressForTransaction", zap.Any("message", command))
 						err = m.handler.HandleRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -2601,7 +2601,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.SendTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.SendTransaction)
+						command := msg.ParsedMessage.Interface().(*protobuf.SendTransaction)
 						logger.Debug("Handling SendTransaction", zap.Any("message", command))
 						err = m.handler.HandleSendTransaction(messageState, command)
 						if err != nil {
@@ -2611,7 +2611,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.AcceptRequestAddressForTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.AcceptRequestAddressForTransaction)
+						command := msg.ParsedMessage.Interface().(*protobuf.AcceptRequestAddressForTransaction)
 						logger.Debug("Handling AcceptRequestAddressForTransaction")
 						err = m.handler.HandleAcceptRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -2621,7 +2621,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeclineRequestAddressForTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestAddressForTransaction)
+						command := msg.ParsedMessage.Interface().(*protobuf.DeclineRequestAddressForTransaction)
 						logger.Debug("Handling DeclineRequestAddressForTransaction")
 						err = m.handler.HandleDeclineRequestAddressForTransaction(messageState, command)
 						if err != nil {
@@ -2631,7 +2631,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.DeclineRequestTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.DeclineRequestTransaction)
+						command := msg.ParsedMessage.Interface().(*protobuf.DeclineRequestTransaction)
 						logger.Debug("Handling DeclineRequestTransaction")
 						err = m.handler.HandleDeclineRequestTransaction(messageState, command)
 						if err != nil {
@@ -2641,7 +2641,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 
 					case protobuf.RequestTransaction:
-						command := msg.ParsedMessage.Interface().(protobuf.RequestTransaction)
+						command := msg.ParsedMessage.Interface().(*protobuf.RequestTransaction)
 
 						logger.Debug("Handling RequestTransaction")
 						err = m.handler.HandleRequestTransaction(messageState, command)
@@ -2653,7 +2653,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.ContactUpdate:
 						logger.Debug("Handling ContactUpdate")
-						contactUpdate := msg.ParsedMessage.Interface().(protobuf.ContactUpdate)
+						contactUpdate := msg.ParsedMessage.Interface().(*protobuf.ContactUpdate)
 						err = m.handler.HandleContactUpdate(messageState, contactUpdate)
 						if err != nil {
 							logger.Warn("failed to handle ContactUpdate", zap.Error(err))
@@ -2666,7 +2666,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQuery")
-						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationQuery)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationQuery(publicKey, msg.ID, msg.ParsedMessage.Interface().(*protobuf.PushNotificationQuery)); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationQuery", zap.Error(err))
 						}
@@ -2678,7 +2678,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRegistrationResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationRegistrationResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationRegistrationResponse(publicKey, msg.ParsedMessage.Interface().(*protobuf.PushNotificationRegistrationResponse)); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationRegistrationResponse", zap.Error(err))
 						}
@@ -2687,11 +2687,11 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 					case protobuf.ContactCodeAdvertisement:
 						logger.Debug("Received ContactCodeAdvertisement")
 
-						cca := msg.ParsedMessage.Interface().(protobuf.ContactCodeAdvertisement)
+						cca := msg.ParsedMessage.Interface().(*protobuf.ContactCodeAdvertisement)
 						if cca.ChatIdentity != nil {
 
 							logger.Debug("Received ContactCodeAdvertisement ChatIdentity")
-							err = m.handler.HandleChatIdentity(messageState, *cca.ChatIdentity)
+							err = m.handler.HandleChatIdentity(messageState, cca.ChatIdentity)
 							if err != nil {
 								allMessagesProcessed = false
 								logger.Warn("failed to handle ContactCodeAdvertisement ChatIdentity", zap.Error(err))
@@ -2717,7 +2717,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationResponse(publicKey, msg.ParsedMessage.Interface().(*protobuf.PushNotificationResponse)); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationResponse", zap.Error(err))
 						}
@@ -2730,7 +2730,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationQueryResponse")
-						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.Interface().(protobuf.PushNotificationQueryResponse)); err != nil {
+						if err := m.pushNotificationClient.HandlePushNotificationQueryResponse(publicKey, msg.ParsedMessage.Interface().(*protobuf.PushNotificationQueryResponse)); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationQueryResponse", zap.Error(err))
 						}
@@ -2743,7 +2743,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 							continue
 						}
 						logger.Debug("Handling PushNotificationRequest")
-						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, msg.ParsedMessage.Interface().(protobuf.PushNotificationRequest)); err != nil {
+						if err := m.pushNotificationServer.HandlePushNotificationRequest(publicKey, msg.ID, msg.ParsedMessage.Interface().(*protobuf.PushNotificationRequest)); err != nil {
 							allMessagesProcessed = false
 							logger.Warn("failed to handle PushNotificationRequest", zap.Error(err))
 						}
@@ -2751,7 +2751,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						continue
 					case protobuf.EmojiReaction:
 						logger.Debug("Handling EmojiReaction")
-						err = m.handler.HandleEmojiReaction(messageState, msg.ParsedMessage.Interface().(protobuf.EmojiReaction))
+						err = m.handler.HandleEmojiReaction(messageState, msg.ParsedMessage.Interface().(*protobuf.EmojiReaction))
 						if err != nil {
 							logger.Warn("failed to handle EmojiReaction", zap.Error(err))
 							allMessagesProcessed = false
@@ -2759,14 +2759,14 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 					case protobuf.GroupChatInvitation:
 						logger.Debug("Handling GroupChatInvitation")
-						err = m.handler.HandleGroupChatInvitation(messageState, msg.ParsedMessage.Interface().(protobuf.GroupChatInvitation))
+						err = m.handler.HandleGroupChatInvitation(messageState, msg.ParsedMessage.Interface().(*protobuf.GroupChatInvitation))
 						if err != nil {
 							logger.Warn("failed to handle GroupChatInvitation", zap.Error(err))
 							allMessagesProcessed = false
 							continue
 						}
 					case protobuf.ChatIdentity:
-						err = m.handler.HandleChatIdentity(messageState, msg.ParsedMessage.Interface().(protobuf.ChatIdentity))
+						err = m.handler.HandleChatIdentity(messageState, msg.ParsedMessage.Interface().(*protobuf.ChatIdentity))
 						if err != nil {
 							logger.Warn("failed to handle ChatIdentity", zap.Error(err))
 							allMessagesProcessed = false
@@ -2775,7 +2775,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.CommunityDescription:
 						logger.Debug("Handling CommunityDescription")
-						err = m.handler.HandleCommunityDescription(messageState, publicKey, msg.ParsedMessage.Interface().(protobuf.CommunityDescription), msg.DecryptedPayload)
+						err = m.handler.HandleCommunityDescription(messageState, publicKey, msg.ParsedMessage.Interface().(*protobuf.CommunityDescription), msg.DecryptedPayload)
 						if err != nil {
 							logger.Warn("failed to handle CommunityDescription", zap.Error(err))
 							allMessagesProcessed = false
@@ -2791,7 +2791,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.CommunityInvitation:
 						logger.Debug("Handling CommunityInvitation")
-						invitation := msg.ParsedMessage.Interface().(protobuf.CommunityInvitation)
+						invitation := msg.ParsedMessage.Interface().(*protobuf.CommunityInvitation)
 						err = m.handler.HandleCommunityInvitation(messageState, publicKey, invitation, invitation.CommunityDescription)
 						if err != nil {
 							logger.Warn("failed to handle CommunityInvitation", zap.Error(err))
@@ -2800,7 +2800,7 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 						}
 					case protobuf.CommunityRequestToJoin:
 						logger.Debug("Handling CommunityRequestToJoin")
-						request := msg.ParsedMessage.Interface().(protobuf.CommunityRequestToJoin)
+						request := msg.ParsedMessage.Interface().(*protobuf.CommunityRequestToJoin)
 						err = m.handler.HandleCommunityRequestToJoin(messageState, publicKey, request)
 						if err != nil {
 							logger.Warn("failed to handle CommunityRequestToJoin", zap.Error(err))
@@ -4112,7 +4112,7 @@ func (m *Messenger) SendEmojiReaction(ctx context.Context, chatID, messageID str
 	clock, _ := chat.NextClockAndTimestamp(m.getTimesource())
 
 	emojiR := &EmojiReaction{
-		EmojiReaction: protobuf.EmojiReaction{
+		EmojiReaction: &protobuf.EmojiReaction{
 			Clock:     clock,
 			MessageId: messageID,
 			ChatId:    chatID,

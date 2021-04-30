@@ -4,11 +4,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 
-	"github.com/golang/protobuf/proto"
 	datasyncnode "github.com/vacp2p/mvds/node"
 	datasyncproto "github.com/vacp2p/mvds/protobuf"
 	datasynctransport "github.com/vacp2p/mvds/transport"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	datasyncpeer "github.com/status-im/status-go/protocol/datasync/peer"
 )
@@ -60,7 +60,7 @@ func (d *DataSync) Stop() {
 	d.Node.Stop()
 }
 
-func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto.Payload) {
+func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage *datasyncproto.Payload) {
 	packet := datasynctransport.Packet{
 		Sender:  datasyncpeer.PublicKeyToPeerID(*publicKey),
 		Payload: datasyncMessage,
@@ -68,7 +68,8 @@ func (d *DataSync) add(publicKey *ecdsa.PublicKey, datasyncMessage datasyncproto
 	d.NodeTransport.AddPacket(packet)
 }
 
-func unwrap(payload []byte) (datasyncPayload datasyncproto.Payload, err error) {
-	err = proto.Unmarshal(payload, &datasyncPayload)
-	return
+func unwrap(payload []byte) (datasyncPayload *datasyncproto.Payload, err error) {
+	datasyncPayload = &datasyncproto.Payload{}
+	err = proto.Unmarshal(payload, datasyncPayload)
+	return datasyncPayload, err
 }

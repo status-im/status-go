@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+option go_package = "./;protobuf";
+
 import "chat_message.proto";
 import "emoji_reaction.proto";
 

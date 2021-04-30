@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	_ "github.com/mutecomm/go-sqlcipher" // require go-sqlcipher that overrides default implementation
+	"google.golang.org/protobuf/proto"
 
 	"github.com/stretchr/testify/suite"
 

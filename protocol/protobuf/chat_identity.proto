@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package protobuf;
 
+option go_package = "./;protobuf";
+
 import "enums.proto";
 
 // ChatIdentity represents the user defined identity associated with their public chat key
