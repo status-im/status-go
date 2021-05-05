@@ -137,3 +137,18 @@ func OpenUnecryptedDB(path string) (*sql.DB, error) {
 
 	return db, nil
 }
+
+func ChangeEncryptionKey(path, key, newKey string) error {
+	db, err := openDB(path, key)
+
+	if err != nil {
+		return err
+	}
+
+	resetKeyString := fmt.Sprintf("PRAGMA rekey = '%s'", newKey)
+	if _, err = db.Exec(resetKeyString); err != nil {
+		return errors.New("failed to set rekey pragma")
+	}
+
+	return nil
+}

@@ -687,3 +687,11 @@ func ImportUnencryptedDatabase(accountData, password, databasePath string) strin
 	}
 	return makeJSONResponse(nil)
 }
+
+func ChangeDatabasePassword(keyUID, password, newPassword string) string {
+	err := statusBackend.ChangeDatabasePassword(keyUID, password, newPassword)
+	if err != nil {
+		return makeJSONResponse(err)
+	}
+	return makeJSONResponse(nil)
+}

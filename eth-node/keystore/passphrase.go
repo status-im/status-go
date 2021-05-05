@@ -328,3 +328,13 @@ func pkcs7Unpad(in []byte) []byte {
 	}
 	return in[:len(in)-int(padding)]
 }
+
+
+func RawKeyToCryptoJSON(rawKeyFile []byte) (cj CryptoJSON, e error){
+	var keyJSON encryptedKeyJSONV3
+	if e := json.Unmarshal(rawKeyFile, &keyJSON); e != nil {
+		return cj, fmt.Errorf("failed to read key file: %s", e)
+	}
+
+	return keyJSON.Crypto, e
+}

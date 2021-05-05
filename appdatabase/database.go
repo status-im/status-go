@@ -31,3 +31,7 @@ func DecryptDatabase(oldPath, newPath, password string) error {
 func EncryptDatabase(oldPath, newPath, password string) error {
 	return sqlite.EncryptDB(oldPath, newPath, password)
 }
+
+func ChangeDatabasePassword(path, password, newPassword string) error {
+	return sqlite.ChangeEncryptionKey(path, password, newPassword)
+}
