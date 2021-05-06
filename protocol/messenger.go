@@ -273,7 +273,7 @@ func NewMessenger(
 		anonMetricsClient.Config = c.anonMetricsClientConfig
 		anonMetricsClient.Identity = identity
 		anonMetricsClient.DB = appmetrics.NewDB(database)
-		anonMetricsClient.Logger = logger.Named("anon metrics client")
+		anonMetricsClient.Logger = logger
 	}
 
 	// Initialise anon metrics server
@@ -288,7 +288,7 @@ func NewMessenger(
 
 		anonMetricsServer = server
 		anonMetricsServer.Config = c.anonMetricsServerConfig
-		anonMetricsServer.Logger = logger.Named("anon metrics server")
+		anonMetricsServer.Logger = logger
 	}
 
 	// Initialize push notification server
@@ -362,10 +362,15 @@ func NewMessenger(
 			// https://github.com/uber-go/zap/issues/328
 			func() error { _ = logger.Sync; return nil },
 			database.Close,
-			anonMetricsClient.Stop,
-			anonMetricsServer.Stop,
 		},
 		logger: logger,
+	}
+
+	if anonMetricsClient != nil {
+		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsClient.Stop)
+	}
+	if anonMetricsServer != nil {
+		messenger.shutdownTasks = append(messenger.shutdownTasks, anonMetricsServer.Stop)
 	}
 
 	if c.envelopesMonitorConfig != nil {
@@ -2972,11 +2977,12 @@ func (m *Messenger) handleRetrievedMessages(chatWithMessages map[transport.Filte
 
 					case protobuf.AnonymousMetricBatch:
 						logger.Debug("Handling AnonymousMetricBatch")
-						err = m.anonMetricsServer.StoreMetrics(msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch))
+						ams, err := m.anonMetricsServer.StoreMetrics(msg.ParsedMessage.Interface().(protobuf.AnonymousMetricBatch))
 						if err != nil {
 							logger.Warn("failed to store AnonymousMetricBatch", zap.Error(err))
 							continue
 						}
+						messageState.Response.AnonymousMetrics = append(messageState.Response.AnonymousMetrics, ams...)
 
 					default:
 						// Check if is an encrypted PushNotificationRegistration

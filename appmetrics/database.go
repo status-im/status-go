@@ -24,6 +24,7 @@ type AppMetric struct {
 	SessionID  string             `json:"session_id"`
 	CreatedAt  time.Time          `json:"created_at"`
 	Processed  bool               `json:"processed"`
+	ReceivedAt time.Time          `json:"received_at"`
 }
 
 type AppMetricValidationError struct {
@@ -134,7 +135,7 @@ func (db *Database) SaveAppMetrics(appMetrics []AppMetric, sessionID string) (er
 		_ = tx.Rollback()
 	}()
 
-	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id, processed) VALUES (?, ?, ?, ?, ?, ?, ?)")
+	insert, err = tx.Prepare("INSERT INTO app_metrics (event, value, app_version, operating_system, session_id, processed) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}

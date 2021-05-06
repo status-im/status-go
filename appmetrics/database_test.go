@@ -24,24 +24,6 @@ func setupTestDB(t *testing.T) (*Database, func()) {
 	}
 }
 
-func generateMetrics(num int) []AppMetric {
-	var appMetrics []AppMetric
-	for i := 0; i < num; i++ {
-		am := AppMetric{
-			Event:      NavigateTo,
-			Value:      json.RawMessage(`{"view_id": "some-view-id", "params": {"screen": "login"}}`),
-			OS:         "android",
-			AppVersion: "1.11",
-		}
-		if i < num/2 {
-			am.Processed = true
-		}
-		appMetrics = append(appMetrics, am)
-	}
-
-	return appMetrics
-}
-
 func TestSaveAppMetrics(t *testing.T) {
 	sessionID := "rand-omse-ssid"
 	db, stop := setupTestDB(t)
@@ -81,7 +63,7 @@ func TestDatabase_GetUnprocessedMetrics(t *testing.T) {
 
 	for i := 0; i < numberOfSessionSaves; i++ {
 		for ii := 1; ii < numberOfSessions+1; ii++ {
-			err := db.SaveAppMetrics(generateMetrics(metricsPerSession), "rand-omse-ssid-" + string(ii))
+			err := db.SaveAppMetrics(GenerateMetrics(metricsPerSession), "rand-omse-ssid-" + string(ii))
 			require.NoError(t, err)
 
 			uam, err = db.GetUnprocessed()
@@ -107,7 +89,7 @@ func TestDatabase_SetProcessedMetrics(t *testing.T) {
 	defer stop()
 
 	// Add sample data to the DB
-	err := db.SaveAppMetrics(generateMetrics(20), "rand-omse-ssid")
+	err := db.SaveAppMetrics(GenerateMetrics(20), "rand-omse-ssid")
 	require.NoError(t, err)
 
 	// Get only the unprocessed metrics
@@ -118,7 +100,7 @@ func TestDatabase_SetProcessedMetrics(t *testing.T) {
 	ids := GetAppMetricsIDs(uam)
 
 	// Add some more metrics to the DB
-	err = db.SaveAppMetrics(generateMetrics(20), "rand-omse-ssid-2")
+	err = db.SaveAppMetrics(GenerateMetrics(20), "rand-omse-ssid-2")
 	require.NoError(t, err)
 
 	// Set metrics as processed with the given ids
@@ -136,11 +118,11 @@ func TestDatabase_GetUnprocessedGroupedBySession(t *testing.T) {
 	defer stop()
 
 	// Add sample data to the DB
-	err := db.SaveAppMetrics(generateMetrics(20), "rand-omse-ssid")
+	err := db.SaveAppMetrics(GenerateMetrics(20), "rand-omse-ssid")
 	require.NoError(t, err)
 
 	// Add some more metrics to the DB
-	err = db.SaveAppMetrics(generateMetrics(20), "rand-omse-ssid-2")
+	err = db.SaveAppMetrics(GenerateMetrics(20), "rand-omse-ssid-2")
 	require.NoError(t, err)
 
 
@@ -162,7 +144,7 @@ func TestDatabase_DeleteOlderThan(t *testing.T) {
 	oneHourHence := time.Now().Add(time.Hour)
 
 	// Add sample data to the DB
-	err := db.SaveAppMetrics(generateMetrics(20), "rand-omse-ssid")
+	err := db.SaveAppMetrics(GenerateMetrics(20), "rand-omse-ssid")
 	require.NoError(t, err)
 
 	// Delete all messages older than 3 hours old

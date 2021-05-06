@@ -53,6 +53,8 @@ func NewClient(processor *common.MessageProcessor) *Client {
 }
 
 func (c *Client) sendUnprocessedMetrics() {
+	c.Logger.Debug("sendUnprocessedMetrics() triggered")
+
 	c.DBLock.Lock()
 	defer c.DBLock.Unlock()
 
@@ -61,8 +63,11 @@ func (c *Client) sendUnprocessedMetrics() {
 	if err != nil {
 		c.Logger.Error("failed to get unprocessed messages grouped by session", zap.Error(err))
 	}
+	c.Logger.Debug("unprocessed metrics from db", zap.Reflect("uam", uam))
 
-	for _, batch := range uam {
+	for session, batch := range uam {
+		c.Logger.Debug("processing uam from session", zap.String("session", session))
+
 		// Convert the metrics into protobuf
 		amb, err := adaptModelsToProtoBatch(batch, &c.Identity.PublicKey)
 		if err != nil {
@@ -91,6 +96,8 @@ func (c *Client) sendUnprocessedMetrics() {
 			MessageType:         protobuf.ApplicationMetadataMessage_ANONYMOUS_METRIC_BATCH,
 		}
 
+		c.Logger.Debug("rawMessage prepared from unprocessed anonymous metrics", zap.Reflect("rawMessage", rawMessage))
+
 		// Send the metrics batch
 		_, err = c.messageProcessor.SendPrivate(context.Background(), c.Config.SendAddress, &rawMessage)
 		if err != nil {
@@ -107,12 +114,15 @@ func (c *Client) sendUnprocessedMetrics() {
 }
 
 func (c *Client) mainLoop() error {
+	c.Logger.Debug("mainLoop() triggered")
+
 	for {
 		c.sendUnprocessedMetrics()
 
-		waitFor := time.Duration(c.IntervalInc.Next())
+		waitFor := time.Duration(c.IntervalInc.Next()) * time.Second
+		c.Logger.Debug("mainLoop() wait interval set", zap.Duration("waitFor", waitFor))
 		select {
-		case <-time.After(waitFor * time.Second):
+		case <-time.After(waitFor):
 		case <-c.mainLoopQuit:
 			return nil
 		}
@@ -120,9 +130,12 @@ func (c *Client) mainLoop() error {
 }
 
 func (c *Client) startMainLoop() {
+	c.Logger.Debug("startMainLoop() triggered")
+
 	c.stopMainLoop()
 	c.mainLoopQuit = make(chan struct{})
 	go func() {
+		c.Logger.Debug("startMainLoop() anonymous go routine triggered")
 		err := c.mainLoop()
 		if err != nil {
 			c.Logger.Error("main loop exited with an error", zap.Error(err))
@@ -168,6 +181,7 @@ func (c *Client) startDeleteLoop() {
 }
 
 func (c *Client) Start() error {
+	c.Logger.Debug("Main Start() triggered")
 	if c.messageProcessor == nil {
 		return errors.New("can't start, missing message processor")
 	}
@@ -178,7 +192,11 @@ func (c *Client) Start() error {
 }
 
 func (c *Client) stopMainLoop() {
+	c.Logger.Debug("stopMainLoop() triggered")
+
 	if c.mainLoopQuit != nil {
+		c.Logger.Debug("mainLoopQuit not set, attempting to close")
+
 		close(c.mainLoopQuit)
 		c.mainLoopQuit = nil
 	}
