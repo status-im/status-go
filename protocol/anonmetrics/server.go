@@ -2,6 +2,7 @@ package anonmetrics
 
 import (
 	"database/sql"
+
 	"go.uber.org/zap"
 
 	bindata "github.com/status-im/migrate/v4/source/go_bindata"
@@ -86,7 +87,7 @@ ON CONFLICT (message_id) DO NOTHING;`
 			metric.OS,
 			metric.SessionID,
 			metric.CreatedAt,
-			)
+		)
 		if err != nil {
 			return
 		}

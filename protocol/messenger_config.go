@@ -2,10 +2,11 @@ package protocol
 
 import (
 	"database/sql"
-	"github.com/status-im/status-go/protocol/anonmetrics"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts"
+	"github.com/status-im/status-go/protocol/anonmetrics"
 	"github.com/status-im/status-go/protocol/common"
 	"github.com/status-im/status-go/protocol/communities"
 	"github.com/status-im/status-go/protocol/protobuf"

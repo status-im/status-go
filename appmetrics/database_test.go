@@ -63,7 +63,7 @@ func TestDatabase_GetUnprocessedMetrics(t *testing.T) {
 
 	for i := 0; i < numberOfSessionSaves; i++ {
 		for ii := 1; ii < numberOfSessions+1; ii++ {
-			err := db.SaveAppMetrics(GenerateMetrics(metricsPerSession), "rand-omse-ssid-" + string(ii))
+			err := db.SaveAppMetrics(GenerateMetrics(metricsPerSession), "rand-omse-ssid-"+string(ii))
 			require.NoError(t, err)
 
 			uam, err = db.GetUnprocessed()
@@ -73,11 +73,11 @@ func TestDatabase_GetUnprocessedMetrics(t *testing.T) {
 	}
 
 	// Test metrics are grouped by session_id
-	lastSessionId := ""
+	lastSessionID := ""
 	sessionCount := 0
 	for _, m := range uam {
-		if lastSessionId != m.SessionID {
-			lastSessionId = m.SessionID
+		if lastSessionID != m.SessionID {
+			lastSessionID = m.SessionID
 			sessionCount++
 		}
 	}
@@ -125,7 +125,6 @@ func TestDatabase_GetUnprocessedGroupedBySession(t *testing.T) {
 	err = db.SaveAppMetrics(GenerateMetrics(20), "rand-omse-ssid-2")
 	require.NoError(t, err)
 
-
 	// Check we have the expected number of unprocessed metrics in the db
 	uam, err := db.GetUnprocessedGroupedBySession()
 	require.NoError(t, err)
@@ -152,7 +151,7 @@ func TestDatabase_DeleteOlderThan(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get all metrics from DB, none should be deleted
-	ams, err := db.GetAppMetrics(100,0)
+	ams, err := db.GetAppMetrics(100, 0)
 	require.NoError(t, err)
 	require.Len(t, ams, 20)
 
@@ -161,7 +160,7 @@ func TestDatabase_DeleteOlderThan(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get all metrics from DB, all should be deleted
-	ams, err = db.GetAppMetrics(100,0)
+	ams, err = db.GetAppMetrics(100, 0)
 	require.NoError(t, err)
 	require.Len(t, ams, 0)
 }
