@@ -1,3 +1,5 @@
+library 'status-jenkins-lib@v1.2.17'
+
 pipeline {
   agent { label 'linux' }
 
@@ -27,9 +29,9 @@ pipeline {
   }
 
   environment {
-    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    CI_DIR      = "${env.STATUS_PATH}/_assets/ci"
+    TARGET      = "docker"
     GOPATH      = "${env.WORKSPACE}"
+    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
     PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* docker image settings */
     IMAGE_NAME  = "statusteam/status-go"
@@ -37,20 +39,15 @@ pipeline {
   }
 
   stages {
-    stage('Prep') { steps { script {
-      lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-      /* clarify what we're building */
-      println("Version: ${lib.getVersion()}")
-      println("Git Branch: ${lib.gitBranch()}")
-      println("Git Commit: ${lib.gitCommit()}")
-      /* save and create a dir for artifacts */
-      dest = "${env.WORKSPACE}/pkg"
-      sh "mkdir -p ${dest}"
-    } } }
+    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
+      println("Version:    ${utils.getVersion()}")
+      println("Git Branch: ${utils.branchName()}")
+      println("Git Commit: ${utils.gitCommit()}")
+    } } } }
 
     stage('Build') { steps { dir(env.STATUS_PATH) { script {
       sh 'make docker-image'
-      image = docker.image("${env.IMAGE_NAME}:${lib.getVersion()}")
+      image = docker.image("${env.IMAGE_NAME}:v${utils.getVersion()}")
     } } } }
 
     stage('Push') { steps { dir(env.STATUS_PATH) { script {
@@ -68,8 +65,8 @@ pipeline {
     } } } }
   } // stages
   post {
-    success { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(true) } }
-    failure { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(false) } }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
     always  { dir(env.STATUS_PATH) {
       sh 'make clean-docker-images'
     } }

@@ -1,3 +1,5 @@
+library 'status-jenkins-lib@v1.2.16'
+
 pipeline {
   agent { label 'linux' }
 
@@ -27,56 +29,36 @@ pipeline {
 
   environment {
     STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    CI_DIR      = "${env.STATUS_PATH}/_assets/ci"
     GOPATH      = "${env.WORKSPACE}"
     PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
     /* This will override the var in Makefile */
-    RELEASE_DIR = "${env.WORKSPACE}/out"
+    RELEASE_DIR = "${env.WORKSPACE}/pkg"
   }
 
   stages {
-    stage('Prep') {
-      steps { script {
-        lib = load("${env.STATUS_PATH}/_assets/ci/lib.groovy")
-        version = lib.getVersion()
-        println("Version: ${version}")
-        println("Git Branch: ${lib.gitBranch()}")
-        println("Git Commit: ${lib.gitCommit()}")
-      } }
-    } // stage(Prep)
-
-    stage('Setup') { steps { dir(env.STATUS_PATH) {
-      /* install release tools */
-      sh 'make release-install modvendor-install'
-    } } } // stage(Setup)
-
-    stage('Vendoring check') { steps { dir(env.STATUS_PATH) {
-      /* fail build if vendoring hasn't been done */
-      sh 'GO111MODULE=on make vendor && git diff --exit-code --no-color --stat vendor/'
-    } } } // stage(Vendoring check)
-
     stage('Build') {
       parallel {
         stage('iOS') { steps { script {
-          ios = lib.buildBranch('status-go/platforms/ios')
+          ios = jenkins.Build('status-go/platforms/ios')
         } } }
         stage('Android') { steps { script {
-          android = lib.buildBranch('status-go/platforms/android')
+          android = jenkins.Build('status-go/platforms/android')
         } } }
         stage('Linux') { steps { script {
-          linux = lib.buildBranch('status-go/platforms/linux')
+          linux = jenkins.Build('status-go/platforms/linux')
         } } }
         stage('Docker') { steps { script {
-          dock = lib.buildBranch('status-go/platforms/docker')
+          dock = jenkins.Build('status-go/platforms/docker')
         } } }
       } // parallel
     } // stage(Build)
 
     stage('Archive') {
       steps { script {
-        sh("rm -fr ${env.RELEASE_DIR}/*")
+        sh "rm -fr ${env.RELEASE_DIR}"
+        sh "mkdir ${env.RELEASE_DIR}"
         [ios, android, linux].each { platformBuild ->
-          lib.copyArts(platformBuild)
+          jenkins.copyArts(platformBuild)
         }
         dir(env.RELEASE_DIR) {
           /* generate sha256 checksums for upload */
@@ -86,9 +68,10 @@ pipeline {
       } }
     } // stage(Archive)
 
-    stage('Release') { when { expression { params.RELEASE == true } }
+    stage('Release') {
+      when { expression { params.RELEASE == true } }
       steps { script {
-        def suffix = "-"+lib.suffix()
+        def suffix = "-"+utils.suffix()
         /* rename build files to not include versions */
         dir(env.RELEASE_DIR) {
           findFiles(glob: 'status-go-*').each { pkg ->
@@ -103,7 +86,7 @@ pipeline {
             usernameVariable: 'GITHUB_USER',
             passwordVariable: 'GITHUB_TOKEN'
           ]]) {
-            env.RELEASE_BRANCH = lib.gitBranch()
+            env.RELEASE_BRANCH = utils.branchName()
             env.RELEASE_DIR = env.RELEASE_DIR
             sh 'yes | make release'
           }

@@ -1,3 +1,5 @@
+library 'status-jenkins-lib@v1.2.17'
+
 pipeline {
   agent { label 'macos' }
 
@@ -28,29 +30,22 @@ pipeline {
 
   environment {
     /* fix for gomobile complaining about missing packages */
-    CGO_ENABLED    = "1"
-    GO111MODULE    = "off"
+    CGO_ENABLED = "1"
+    GO111MODULE = "off"
     /* Other stuff */
-    BUILD_PLATFORM = 'ios'
-    STATUS_PATH    = "${env.WORKSPACE}/src/github.com/status-im/status-go"
-    CI_DIR         = "${env.STATUS_PATH}/_assets/ci"
-    GOPATH         = "${env.WORKSPACE}"
-    PATH           = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
+    TARGET      = 'ios'
+    GOPATH      = "${env.WORKSPACE}"
+    STATUS_PATH = "${env.WORKSPACE}/src/github.com/status-im/status-go"
+    ARTIFACT    = "${env.WORKSPACE}/status-go-ios-${utils.timestamp()}-${utils.gitCommit()}.zip"
+    PATH        = "/usr/local/go/bin:${env.PATH}:${env.GOPATH}/bin"
   }
 
   stages {
-    stage('Prep') { steps { script {
-      lib = load("${CI_DIR}/lib.groovy")
-      /* clarify what we're building */
-      println("Version: ${lib.getVersion()}")
-      println("Git Branch: ${lib.gitBranch()}")
-      println("Git Commit: ${lib.gitCommit()}")
-      /* save and create a dir for artifacts */
-      dest = "${env.WORKSPACE}/out"
-      sh "mkdir -p ${dest}"
-      /* for easier reuse */
-      artifact = "status-go-ios-${lib.suffix()}.zip"
-    } } }
+    stage('Prep') { steps { dir(env.STATUS_PATH) { script {
+      println("Version:    ${utils.getVersion()}")
+      println("Git Branch: ${utils.branchName()}")
+      println("Git Commit: ${utils.gitCommit()}")
+    } } } }
 
     stage('Setup') { steps { dir(env.STATUS_PATH) {
       sh 'unset TMPDIR && make setup-build'
@@ -61,24 +56,21 @@ pipeline {
       sh 'go get golang.org/x/tools/go/packages'
       dir('build/bin') {
         sh 'zip -r status-go-ios.zip Statusgo.framework'
-        sh "cp status-go-ios.zip ${dest}/${artifact}"
+        sh "cp status-go-ios.zip ${env.ARTIFACT}"
       }
     } } }
 
     stage('Archive') { steps {
-      archiveArtifacts("out/${artifact}")
+      archiveArtifacts(env.ARTIFACT.minus("${env.WORKSPACE}/"))
     } }
 
     stage('Upload') { steps { script {
-      env.PKG_URL = lib.uploadArtifact("out/${artifact}")
+      env.PKG_URL = s3.uploadArtifact(env.ARTIFACT)
     } } }
   } // stages
   post {
-    success { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(true) } }
-    failure { script { load("${CI_DIR}/ghcmgr.groovy").postBuild(false) } }
-    always { dir(env.STATUS_PATH) {
-      sh 'make clean'
-      sh "rm -fr ${dest}"
-    } }
+    success { script { github.notifyPR(true) } }
+    failure { script { github.notifyPR(false) } }
+    always { dir(env.STATUS_PATH) { sh 'make clean' } }
   } // post
 } // pipeline
