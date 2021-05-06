@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"database/sql"
-	"github.com/status-im/status-go/protocol/anonmetrics"
+
 	"go.uber.org/zap"
 
 	"github.com/status-im/status-go/multiaccounts"
