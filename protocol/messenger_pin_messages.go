@@ -49,10 +49,11 @@ func (m *Messenger) sendPinMessage(ctx context.Context, message *common.PinMessa
 	}
 
 	rawMessage := common.RawMessage{
-		LocalChatID:         chat.ID,
-		Payload:             encodedMessage,
-		MessageType:         protobuf.ApplicationMetadataMessage_PIN_MESSAGE,
-		ResendAutomatically: true,
+		LocalChatID:          chat.ID,
+		Payload:              encodedMessage,
+		MessageType:          protobuf.ApplicationMetadataMessage_PIN_MESSAGE,
+		SkipGroupMessageWrap: true,
+		ResendAutomatically:  true,
 	}
 	_, err = m.dispatchMessage(ctx, rawMessage)
 	if err != nil {
