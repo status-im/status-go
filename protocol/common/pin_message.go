@@ -34,7 +34,7 @@ type PinnedMessage struct {
 
 // WrapGroupMessage indicates whether we should wrap this in membership information
 func (m *PinMessage) WrapGroupMessage() bool {
-	return true
+	return false
 }
 
 // SetMessageType a setter for the MessageType field
