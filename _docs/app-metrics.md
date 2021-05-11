@@ -13,7 +13,7 @@ Status is an open-source platform. To verify that the app only collects and shar
 
 In detail this means the app can collect and share:
 - Navigation events
-- Screens that is navigated to
+- Screens that are navigated to
 - Action events (for example button clicks, list swipes, switch toggles, etc)
 - Time events are created
 - Operating System
