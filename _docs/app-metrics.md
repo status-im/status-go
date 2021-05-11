@@ -15,7 +15,7 @@ In detail this means the app can collect and share:
 - Navigation events
 - Screens that are navigated to
 - Action events (for example button clicks, list swipes, switch toggles, etc)
-- Time events are created
+- The time events are created
 - Operating System
 - App version
 - Session key
