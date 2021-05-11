@@ -101,6 +101,12 @@ func TestInteroparableWithSolidity(t *testing.T) {
 		"chainId":           json.RawMessage("1"),
 		"verifyingContract": json.RawMessage(`"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`),
 	}
+	domainChainIDAsString := map[string]json.RawMessage{
+		"name":              json.RawMessage(`"Ether Mail"`),
+		"version":           json.RawMessage(`"1"`),
+		"chainId":           json.RawMessage(`"1"`),
+		"verifyingContract": json.RawMessage(`"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"`),
+	}
 	msg := map[string]json.RawMessage{
 		"from":     json.RawMessage(fromWallet),
 		"to":       json.RawMessage(toWallet),
@@ -110,6 +116,12 @@ func TestInteroparableWithSolidity(t *testing.T) {
 		Types:       mytypes,
 		PrimaryType: "Mail",
 		Domain:      domain,
+		Message:     msg,
+	}
+	typedChainIDAsString := TypedData{
+		Types:       mytypes,
+		PrimaryType: "Mail",
+		Domain:      domainChainIDAsString,
 		Message:     msg,
 	}
 
@@ -124,6 +136,10 @@ func TestInteroparableWithSolidity(t *testing.T) {
 	signature, err := Sign(typed, key, big.NewInt(1))
 	require.NoError(t, err)
 	require.Len(t, signature, 65)
+
+	signature2, err := Sign(typedChainIDAsString, key, big.NewInt(1))
+	require.NoError(t, err)
+	require.Equal(t, signature, signature2)
 
 	r := [32]byte{}
 	copy(r[:], signature[:32])

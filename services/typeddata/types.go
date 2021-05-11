@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 )
 
 const (
@@ -77,7 +78,13 @@ func (t TypedData) ValidateChainID(chain *big.Int) error {
 	}
 	var chainID int64
 	if err := json.Unmarshal(t.Domain[chainIDKey], &chainID); err != nil {
-		return err
+		var chainIDString string
+		if err = json.Unmarshal(t.Domain[chainIDKey], &chainIDString); err != nil {
+			return err
+		}
+		if chainID, err = strconv.ParseInt(chainIDString, 0, 64); err != nil {
+			return err
+		}
 	}
 	if chainID != chain.Int64() {
 		return fmt.Errorf("chainId %d doesn't match selected chain %s", chainID, chain)
