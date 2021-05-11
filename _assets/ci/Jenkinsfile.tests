@@ -59,12 +59,7 @@ pipeline {
         script{
           node {
             checkout scm
-            docker.image('postgres:9.6-alpine').withRun('--name mailserver-db -e POSTGRES_USER=whisper -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=whisper -d -p 5432:5432') { c ->
-              //sh apk --update add postgresql-client
-
-              /* Wait until postgres service is up */
-              //sh 'while ! pg_isready ping -h0.0.0.0 --silent; do sleep 1; done'
-            }
+            sh(script:'docker run --name mailserver-db -e POSTGRES_USER=whisper -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=whisper -d -p 5432:5432 postgres:9.6-alpine', returnStdout: true)
           }
         }
         dir(env.STATUS_PATH) {
