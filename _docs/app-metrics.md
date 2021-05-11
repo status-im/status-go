@@ -1,6 +1,6 @@
 
 # Status usage data
-Starting release 1.14, the Status mobile app asks to share anonymous end-to-end encrypted data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared anonymously over Waku, just like a 1:1 message.
+Starting release 1.14, the Status mobile app asks to share privacy-preserving, end-to-end encrypted data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared over Status' peer-to-peer network (Waku), just like a 1:1 message.
 
 Sharing data is strictly opt-in, and can be changed at any times in Settings in the app.
 
