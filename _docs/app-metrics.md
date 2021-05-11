@@ -18,7 +18,7 @@ In detail this means the app can collect and share:
 - The time events are created
 - Operating System
 - App version
-- Session key
+- Batch ID
 - Time since last session
 - Time since last data message sent
 
@@ -26,7 +26,7 @@ In detail this means the app can collect and share:
 No data will be shared unless you opt-in. Furthermore, Status commits to never collect identifiable data in its broadest sense. This means that we will never collect anything that can be linked back to you. Including but not limited to:
 - IP addresses
 - Random name
-- (Regular) Chat key
+- Chat key
 - Public Ethereum addresses
 - Account balance(s)
 - Account history
