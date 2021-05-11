@@ -45,10 +45,6 @@ Anonymous, aggregated data is used to inform product development. Given our prin
 ### Viewing the data
 As of writing, we plan to make a Dashboard that shows the aggregated data public; Similar to metrics.status.im. As soon as this Dashboard is available we will provide a link here. The data that is stored on your device and shared can be viewed through the interface of the app.
 
-
-
-
-
 _________
 
 # How it works
