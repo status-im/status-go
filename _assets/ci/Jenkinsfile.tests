@@ -54,9 +54,25 @@ pipeline {
       sh 'make canary-test'
     } } }
 
-    stage('Unit Tests') { steps { dir(env.STATUS_PATH) {
-      sh 'make test-unit'
-    } } }
+    stage('Unit Tests') {
+      node {
+        checkout scm
+        /*
+         * In order to communicate with the MySQL server, this Pipeline explicitly
+         * maps the port (`3306`) to a known port on the host machine.
+         */
+        docker.image('postgres:9.6-alpine').withRun('--name mailserver-db -e POSTGRES_USER=whisper -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_DB=whisper -d -p 5432:5432') { c ->
+          /* Wait until mysql service is up */
+          sh 'while ! pg_isready ping -h0.0.0.0 --silent; do sleep 1; done'
+        }
+      }
+
+      steps {
+        dir(env.STATUS_PATH) {
+          sh 'make test-unit'
+        }
+      }
+    }
 
     stage('Race E2E Tests') { steps { dir(env.STATUS_PATH) {
       sh 'make test-e2e-race'
