@@ -5,7 +5,7 @@ Starting release 1.14, the Status mobile app asks to share anonymous end-to-end 
 Sharing data is strictly opt-in, and can be changed at any times in Settings in the app.
 
 ### What is shared (Opt-in)
-Status is an open-source platform. To verify that the app only collects and shares the events and metadata listed below, you can view the rules defined to store metrics data in the [source code](https://github.com/status-im/status-go/blob/develop/appmetrics/validators.go).
+Status is an open-source platform. To verify that the app only collects and shares the events and metadata listed below, you can view the rules set to store metrics data in the [source code](https://github.com/status-im/status-go/blob/develop/appmetrics/validators.go).
 
 - Your interactions with the app like clicks and screenviews
 - Background activity and internal processes
@@ -21,6 +21,10 @@ In detail this means the app can collect and share:
 - Batch ID
 - Time since last session
 - Time since last data message sent
+
+For any data to be collected and shared, it needs to meet the rules set in the validator script. By policy of Status' Core Contributors, rules set in the validator script need to be assessed as posing a non-existent to low threat by being in:
+- local storage over time **(Specify what worst case can be and when this occurs)**
+- aggregated storage from Status over time
 
 ### What will never be shared
 No data will be shared unless you opt-in. Furthermore, Status commits to never collect identifiable data in its broadest sense. This means that we will never collect anything that we believe can be linked back to you. Including but not limited to:
