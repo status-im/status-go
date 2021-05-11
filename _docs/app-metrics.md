@@ -1,5 +1,5 @@
 
-# Anonymous usage data
+# Status usage data
 Starting release 1.14, the Status mobile app asks to share anonymous end-to-end encrypted data about how you use Status. Data is only ever shared if you opt in to doing so, you can review all data before it is sent and it is shared anonymously over Waku, just like a 1:1 message.
 
 Sharing data is strictly opt-in, and can be changed at any times in Settings in the app.
@@ -23,7 +23,7 @@ In detail this means the app can collect and share:
 - Time since last data message sent
 
 ### What will never be shared
-No data will be shared unless you opt-in. Furthermore, Status commits to never collect identifiable data in its broadest sense. This means that we will never collect anything that can be linked back to you. Including but not limited to:
+No data will be shared unless you opt-in. Furthermore, Status commits to never collect identifiable data in its broadest sense. This means that we will never collect anything that we believe can be linked back to you. Including but not limited to:
 - IP addresses
 - Random name
 - Chat key
@@ -39,7 +39,7 @@ No data will be shared unless you opt-in. Furthermore, Status commits to never c
 While we employ a ‘can’t be evil’ approach. We highly recommend that you employ a ‘don’t trust, but verify’ approach. In this case, the above data can technically be logged, stored and shared. In order to verify that this does not happen, view the rules defined to store metrics data in the [source code](https://github.com/status-im/status-go/blob/develop/appmetrics/validators.go).
 
 ### Purpose of the data
-Anonymous, aggregated data is used to inform product development. Given our principles, the type of data that is collected and its anonymous nature, there is no incentive for Status or other parties to use the data for any other purpose.
+Aggregated data is used to inform product development. Given our principles, the type of data that is collected and its rudimentary nature, there is no incentive for Status or other parties to use the data for any other purpose.
 
 
 ### Viewing the data
