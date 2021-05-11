@@ -9,7 +9,7 @@ Status is an open-source platform. To verify that the app only collects and shar
 
 - Your interactions with the app like clicks and screenviews
 - Background activity and internal processes
-- Settings and pre=eferences
+- Settings and preferences
 
 In detail this means the app can collect and share:
 - Navigation events
@@ -81,4 +81,3 @@ Transmission happens over Waku, and as of now, all data will be deleted locally 
 |-----------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | navigate-to           | {:view_id: "", :params {:screen ""}} | The user navigated to one of the screens. If the `view_id` has a `_stack` suffix, it could signify a top level tab. |
 | screens/on-will-focus | {:view_id: "", :params {:screen ""}} | The user navigated to a top level tab.                                                                              |
-
