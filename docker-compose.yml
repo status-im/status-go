@@ -1,0 +1,14 @@
+version: "3"
+services:
+  statusgo:
+    depends_on:
+      - db
+    build:
+      context: ./
+      dockerfile: Dockerfile-alternate
+  db:
+    image: postgres:9.6-alpine
+    environment:
+      POSTGRES_USER: whisper
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: whisper
