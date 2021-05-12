@@ -623,6 +623,8 @@ github.com/status-im/doubleratchet v3.0.0+incompatible h1:aJ1ejcSERpSzmWZBgtfYti
 github.com/status-im/doubleratchet v3.0.0+incompatible/go.mod h1:1sqR0+yhiM/bd+wrdX79AOt2csZuJOni0nUDzKNuqOU=
 github.com/status-im/go-ethereum v1.9.5-status.11 h1:97yCttJkIXoTZGrew7Lkl6uOGaeYELdp7gMnKBm1YwY=
 github.com/status-im/go-ethereum v1.9.5-status.11/go.mod h1:YyH5DKB6+z+Vaya7eIm67pnuPZ1oiUMbbsZW41ktN0g=
+github.com/status-im/go-ethereum v1.9.5-status.12 h1:+QZE2x5zF1CvNo3V+WaCzeOoar8pdh5Y7BGaAJ83pOw=
+github.com/status-im/go-ethereum v1.9.5-status.12/go.mod h1:YyH5DKB6+z+Vaya7eIm67pnuPZ1oiUMbbsZW41ktN0g=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0 h1:OT84UsUzTCwguqCpJqkrCMiL4VZ1SvUtH9a5MsZupBk=
 github.com/status-im/go-multiaddr-ethv4 v1.2.0/go.mod h1:2VQ3C+9zEurcceasz12gPAtmEzCeyLUGPeKLSXYQKHo=
 github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48/go.mod h1:RZLeN1LMWmRsyYjvAu+I6Dm9QmlDaIIt+Y+4Kd7Tp+Q=
