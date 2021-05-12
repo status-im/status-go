@@ -18,6 +18,7 @@
 package math
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 )
@@ -47,6 +48,26 @@ func NewHexOrDecimal256(x int64) *HexOrDecimal256 {
 	b := big.NewInt(x)
 	h := HexOrDecimal256(*b)
 	return &h
+}
+
+func (i *HexOrDecimal256) UnmarshalJSON(data []byte) error {
+	var x int64
+	var s string
+	var b *big.Int
+	var err error
+	if err = json.Unmarshal(data, &x); err == nil {
+		b = big.NewInt(x)
+	} else if err = json.Unmarshal(data, &s); err == nil {
+		var ok bool
+		b, ok = ParseBig256(s)
+		if !ok {
+			return fmt.Errorf("invalid hex or decimal integer %q", s)
+		}
+	} else {
+		return err
+	}
+	*i = HexOrDecimal256(*b)
+	return nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
